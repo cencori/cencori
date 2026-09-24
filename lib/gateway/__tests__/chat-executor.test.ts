@@ -12,6 +12,11 @@ const mockGetFallbackModel = vi.fn();
 const mockIsNonRetryableError = vi.fn();
 const mockTriggerFallbackWebhook = vi.fn();
 const mockInitializeBYOKProviders = vi.fn();
+const mockGetCreditsBalance = vi.fn();
+
+vi.mock('@/lib/credits', () => ({
+    getCreditsBalance: (...args: unknown[]) => mockGetCreditsBalance(...args),
+}));
 
 vi.mock('@/lib/providers/circuit-breaker', () => ({
     isCircuitOpen: (...args: unknown[]) => mockIsCircuitOpen(...args),
@@ -104,6 +109,7 @@ describe('executeGatewayChat failover', () => {
         mockGetFallbackChain.mockReturnValue(['anthropic']);
         mockGetFallbackModel.mockResolvedValue('claude-sonnet-4');
         mockInitializeBYOKProviders.mockResolvedValue({ success: true });
+        mockGetCreditsBalance.mockResolvedValue(100);
     });
 
     it('returns primary provider response on success', async () => {
@@ -209,6 +215,28 @@ describe('executeGatewayChat failover', () => {
         });
         expect(result.billingMode).toBe('byok');
         expect(result.cost).toEqual({ providerCostUsd: 0.25, cencoriChargeUsd: 0, markupPercentage: 0 });
+    });
+
+    it('does not spend a managed fallback key for zero-balance BYOK requests', async () => {
+        mockGetCreditsBalance.mockResolvedValue(0);
+        mockInitializeBYOKProviders.mockResolvedValue({ success: true, usesByok: false });
+        const primaryChat = vi.fn().mockRejectedValue(new Error('BYOK provider unavailable'));
+        const fallbackChat = vi.fn().mockResolvedValue(mockResponse('must not run'));
+
+        await expect(executeGatewayChat({
+            supabase: createMockSupabaseForExecutor({ maxRetries: 1 }) as never,
+            projectId: 'proj-ex',
+            organizationId: 'org-ex',
+            tier: 'free',
+            request: { messages: [], model: 'gpt-4o', stream: false } as UnifiedChatRequest,
+            resolved: {
+                providerName: 'openai', model: 'gpt-4o', billingMode: 'byok',
+                provider: { chat: primaryChat, stream: vi.fn(), countTokens: vi.fn(), getPricing: vi.fn() },
+                router: { hasProvider: () => true, getProvider: () => ({ chat: fallbackChat, getPricing: vi.fn() }) },
+            } as never,
+        })).rejects.toThrow('Credit balance exhausted');
+        expect(primaryChat).toHaveBeenCalledOnce();
+        expect(fallbackChat).not.toHaveBeenCalled();
     });
 
     it('makes only one charge-sensitive provider attempt without fallback', async () => {

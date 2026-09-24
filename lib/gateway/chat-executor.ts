@@ -32,8 +32,20 @@ import {
     setCachedFailoverConfig,
 } from '@/lib/config-cache';
 import { hedgedStream } from '@/lib/gateway/hedged-stream';
+import { getCreditsBalance } from '@/lib/credits';
 
 type SupabaseAdmin = ReturnType<typeof createAdminClient>;
+
+async function assertManagedCreditsAvailable(
+    billingMode: GatewayBillingMode,
+    organizationId: string,
+    tier: SubscriptionTier,
+): Promise<void> {
+    if (billingMode !== 'standard' || tier === 'enterprise') return;
+    if (await getCreditsBalance(organizationId) <= 0) {
+        throw new Error('Credit balance exhausted: managed model calls require prepaid credits');
+    }
+}
 
 export type GatewayChatExecutionMeta = {
     actualProvider: string;
@@ -184,14 +196,24 @@ export async function executeGatewayChat(params: {
             ? new GeminiProvider(memoryKey)
             : new OpenAICompatibleProvider(resolved.providerName, memoryKey);
         resolved.router.registerProvider(resolved.providerName, overridden);
-        resolved = { ...resolved, provider: overridden };
+        resolved = {
+            ...resolved,
+            provider: overridden,
+            billingMode: resolved.billingMode === 'sponsored' ? 'sponsored' : 'standard',
+        };
     }
 
     if (params.googleApiKeyOverride && resolved.providerName === 'google') {
         const overridden = new GeminiProvider(params.googleApiKeyOverride);
         resolved.router.registerProvider('google', overridden);
-        resolved = { ...resolved, provider: overridden };
+        resolved = {
+            ...resolved,
+            provider: overridden,
+            billingMode: resolved.billingMode === 'sponsored' ? 'sponsored' : 'standard',
+        };
     }
+
+    await assertManagedCreditsAvailable(resolved.billingMode, params.organizationId, params.tier);
 
     const { providerName, model, provider, router } = resolved;
     const chatRequest: UnifiedChatRequest = { ...params.request, model };
@@ -299,6 +321,7 @@ export async function executeGatewayChat(params: {
                 model: fallbackModel,
             });
             const fallbackBillingMode = resolveProviderBillingMode(fallbackAccessMode, initialized.usesByok);
+            await assertManagedCreditsAvailable(fallbackBillingMode, params.organizationId, params.tier);
             await fallbackProvider.getPricing(fallbackModel);
             const providerResponse = await withTimeout(
                 fallbackProvider.chat({ ...chatRequest, model: fallbackModel, signal: attemptSignal }),
@@ -375,6 +398,8 @@ export async function* streamGatewayChat(params: {
             sponsoredModels: params.sponsoredModels,
         }));
 
+    await assertManagedCreditsAvailable(resolved.billingMode, params.organizationId, params.tier);
+
     const { providerName, model, provider, router } = resolved;
     const chatRequest: UnifiedChatRequest = { ...params.request, model };
     const failoverAllowed = hasFeature(params.tier, 'failover');
@@ -435,6 +460,7 @@ export async function* streamGatewayChat(params: {
                             model: fallbackModel,
                         });
                         const billingMode = resolveProviderBillingMode(accessMode, initialized.usesByok);
+                        await assertManagedCreditsAvailable(billingMode, params.organizationId, params.tier);
                         await fallbackProvider.getPricing(fallbackModel);
                         hedgeFallbackProviderName = candidate;
                         hedgeFallbackModel = fallbackModel;
@@ -574,6 +600,7 @@ export async function* streamGatewayChat(params: {
                 model: fallbackModel,
             });
             const fallbackBillingMode = resolveProviderBillingMode(fallbackAccessMode, initialized.usesByok);
+            await assertManagedCreditsAvailable(fallbackBillingMode, params.organizationId, params.tier);
             await fallbackProvider.getPricing(fallbackModel);
             params.performance?.markProviderStart();
             const stream = fallbackProvider.stream({ ...chatRequest, model: fallbackModel });

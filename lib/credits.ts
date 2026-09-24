@@ -156,15 +156,15 @@ async function applyCreditDelta(
         
         if (!result.success) {
             console.warn(`[Credits] Deduction failed: ${result.error_message}`);
-            // If it failed due to insufficient funds, update cache to reflect reality
             if (result.error_message === 'Insufficient balance') {
-                await setCachedCreditsBalance(organizationId, result.new_balance);
+                await invalidateCreditsBalance(organizationId);
             }
             return false;
         }
 
-        // SUCCESS: Update Redis cache with the exact balance returned by the DB
-        await setCachedCreditsBalance(organizationId, result.new_balance);
+        // Concurrent RPCs can return out of order. Writing each returned value
+        // to cache can resurrect an older, higher balance after a newer debit.
+        await invalidateCreditsBalance(organizationId);
         return true;
     }
 

@@ -45,7 +45,7 @@ You can mix and match Managed Keys and BYOK:
 
 See [Credits System](/docs/platform/credits) and [Billing & Usage](/docs/platform/billing) for how usage charging is applied in your deployment.
 
-BYOK requests still pass the current credit-balance preflight on credit-gated plans. A zero balance can therefore block a request even though its Cencori usage charge would be zero.
+At a zero credit balance, requests that identify an active project BYOK key before execution can still proceed without a Cencori usage deduction. Ambiguous or multi-provider operations may require credits until their key source can be proven; a managed fallback will not run against an empty wallet.
 
 ## Security
 

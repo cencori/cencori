@@ -8,6 +8,7 @@ import {
   getBillingInterval,
   getScanTierByProductId,
   getCreditTopupCreditsByProductId,
+  getCreditTopupPackConfig,
   getBasecodePlanByProductId,
   netCreditsAfterFee,
   computePeriodEnd,
@@ -19,7 +20,8 @@ import {
   applyVerifiedBasecodePayment,
   majorAmountToMinor,
 } from '@/lib/basecode-billing';
-import { addCredits } from '@/lib/credits';
+import { applyPaidCreditTopup } from '@/lib/billing/paid-credit-topups';
+import { isVerifiedBachsTopupCharge } from '@/lib/billing/verify-paid-topups';
 import {
   buildOrganizationSubscriptionUpdate,
   type SubscriptionLifecycleEventType,
@@ -33,6 +35,9 @@ async function handleCollectionSucceeded(
 ) {
   const productId = data.product_cart?.[0]?.product_id;
   if (!productId) {
+    if (data.metadata?.purchase_type === 'credits_topup') {
+      throw new Error('Bachs credits top-up has no product ID');
+    }
     console.warn('[Bachs Webhook] No product_id in product_cart', data.charge_id);
     return;
   }
@@ -93,25 +98,50 @@ async function handleCollectionSucceeded(
     case 'credits_topup': {
       const orgId = data.metadata?.org_id;
       if (!orgId) {
-        console.warn(
-          '[Bachs Webhook] Missing org_id in metadata for credits topup',
-          data.charge_id
-        );
-        return;
+        throw new Error('Bachs credits top-up has no organization ID');
       }
 
       const grossCredits = getCreditTopupCreditsByProductId(productId);
       if (!grossCredits) {
-        console.warn('[Bachs Webhook] Unknown credits product', productId);
-        return;
+        throw new Error(`Bachs credits top-up has unknown product ${productId}`);
       }
 
-      await addCredits(
-        orgId,
-        netCreditsAfterFee(grossCredits),
-        'topup',
-        'Bachs credits top-up'
-      );
+      if (!data.charge_id) {
+        throw new Error('Bachs credits top-up has no charge ID');
+      }
+
+      const pack = getCreditTopupPackConfig(productId);
+      const charge = await getCharge(data.charge_id);
+      if (!pack || !isVerifiedBachsTopupCharge({
+        charge,
+        chargeId: data.charge_id,
+        organizationId: orgId,
+        productId,
+        minimumAmountMinor: pack.price,
+      })) {
+        throw new Error('Bachs credits top-up charge did not verify');
+      }
+
+      // The new grant ledger starts empty at rollout. Do not mint a second,
+      // smaller grant if an old webhook for this charge is delivered again.
+      const { data: legacyEvent, error: legacyEventError } = await supabase
+        .from('webhook_events')
+        .select('id')
+        .eq('charge_id', data.charge_id)
+        .eq('event_type', 'collection.succeeded')
+        .limit(1)
+        .maybeSingle();
+      if (legacyEventError) throw legacyEventError;
+      if (legacyEvent) return;
+
+      await applyPaidCreditTopup({
+        supabase,
+        provider: 'bachs',
+        paymentReference: data.charge_id,
+        organizationId: orgId,
+        amountUsd: netCreditsAfterFee(grossCredits),
+        metadata: { product_id: productId, gross_credits_usd: grossCredits },
+      });
 
       await supabase
         .from('organizations')
