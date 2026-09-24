@@ -152,6 +152,8 @@ export {
 } from './chat';
 export { SessionsNamespace, type Session, type SessionEvent, type CreateSessionParams, type TurnParams, type PaginatedResponse, type SessionListParams } from './sessions';
 export {
+    CencoriEmbeddedApiError,
+    type EmbeddedRequestOptions,
     TenantsNamespace,
     ClientTokensNamespace,
     ModelsNamespace,

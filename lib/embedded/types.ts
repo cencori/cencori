@@ -102,8 +102,9 @@ export interface ClientTokenClaims {
 export const CLIENT_TOKEN_PREFIX = 'ect_';
 export const PROVIDER_CONNECTION_PREFIX = 'prc_';
 export const PROVIDER_SYNC_PREFIX = 'pms_';
-export const TENANT_PREFIX = 'ten_';
-export const USER_PREFIX = 'usr_';
+// withPrefix adds the separator. Keep these as bare resource prefixes.
+export const TENANT_PREFIX = 'ten';
+export const USER_PREFIX = 'usr';
 
 export const EMBEDDED_ERROR_CODES = [
     'tenant_scope_mismatch',

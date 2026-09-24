@@ -1,8 +1,26 @@
 import type { CencoriConfig } from '../types';
 
-async function request<T>(config: Required<CencoriConfig>, method: string, path: string, body?: unknown, extraHeaders?: Record<string, string>): Promise<T> {
+export interface EmbeddedRequestOptions { signal?: AbortSignal }
+
+export class CencoriEmbeddedApiError extends Error {
+    readonly name = 'CencoriEmbeddedApiError';
+
+    constructor(
+        message: string,
+        readonly status: number,
+        readonly code: string | null,
+        readonly requestId: string | null,
+        readonly type: string | null,
+        readonly param: string | null,
+    ) {
+        super(`Cencori API error: ${message}`);
+    }
+}
+
+async function request<T>(config: Required<CencoriConfig>, method: string, path: string, body?: unknown, extraHeaders?: Record<string, string>, options?: EmbeddedRequestOptions): Promise<T> {
     const response = await fetch(`${config.baseUrl}${path}`, {
         method,
+        signal: options?.signal,
         headers: {
             'CENCORI_API_KEY': config.apiKey,
             'Content-Type': 'application/json',
@@ -12,9 +30,10 @@ async function request<T>(config: Required<CencoriConfig>, method: string, path:
         body: body ? JSON.stringify(body) : undefined,
     });
     if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' })) as { error?: { message?: string; code?: string } | string };
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' })) as { error?: { message?: string; code?: string; request_id?: string; type?: string; param?: string } | string };
         const message = typeof errorData.error === 'string' ? errorData.error : errorData.error?.message || response.statusText;
-        throw new Error(`Cencori API error: ${message}`);
+        const details = typeof errorData.error === 'object' ? errorData.error : null;
+        throw new CencoriEmbeddedApiError(message, response.status, details?.code ?? null, details?.request_id ?? response.headers.get('X-Request-Id'), details?.type ?? null, details?.param ?? null);
     }
     if (response.status === 204) return undefined as T;
     return response.json() as Promise<T>;
@@ -50,8 +69,8 @@ export class TenantsNamespace {
     list(params?: { limit?: number; cursor?: string; status?: string }): Promise<{ data: Tenant[]; next_cursor: string | null }> {
         return request(this.config, 'GET', `/v1/tenants${qs({ limit: params?.limit, cursor: params?.cursor, status: params?.status })}`);
     }
-    get(tenantId: string): Promise<Tenant> {
-        return request(this.config, 'GET', `/v1/tenants/${tenantId}`);
+    get(tenantId: string, options?: EmbeddedRequestOptions): Promise<Tenant> {
+        return request(this.config, 'GET', `/v1/tenants/${tenantId}`, undefined, undefined, options);
     }
     update(tenantId: string, params: { name?: string; metadata?: Record<string, unknown>; region?: string | null }): Promise<Tenant> {
         return request(this.config, 'PATCH', `/v1/tenants/${tenantId}`, params);
@@ -175,8 +194,8 @@ export class AgentVersionsNamespace {
     publish(agentId: string, version: string): Promise<unknown> {
         return request(this.config, 'POST', `/v1/agents/${agentId}/versions/${version}/publish`, {});
     }
-    test(agentId: string, version: string, params?: { input?: string; test_connection_ids?: string[] }): Promise<unknown> {
-        return request(this.config, 'POST', `/v1/agents/${agentId}/versions/${version}/test`, params ?? {});
+    test(agentId: string, version: string, params?: { input?: string; test_connection_ids?: string[] }, options?: EmbeddedRequestOptions): Promise<unknown> {
+        return request(this.config, 'POST', `/v1/agents/${agentId}/versions/${version}/test`, params ?? {}, undefined, options);
     }
     deprecate(agentId: string, version: string): Promise<unknown> {
         return request(this.config, 'POST', `/v1/agents/${agentId}/versions/${version}/deprecate`, {});
@@ -218,17 +237,17 @@ export class InstallationsNamespace {
 
 export class RunsNamespace {
     constructor(private config: Required<CencoriConfig>) {}
-    create(agentId: string, params: { installation_id?: string; tenant_id?: string; external_user_id?: string; mode?: string; input?: unknown; response_format?: unknown; session_id?: string }, idempotencyKey?: string): Promise<unknown> {
-        return request(this.config, 'POST', `/v1/agents/${agentId}/runs`, params, idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined);
+    create(agentId: string, params: { installation_id?: string; tenant_id?: string; external_user_id?: string; mode?: string; input?: unknown; response_format?: unknown; session_id?: string }, idempotencyKey?: string, options?: EmbeddedRequestOptions): Promise<unknown> {
+        return request(this.config, 'POST', `/v1/agents/${agentId}/runs`, params, idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined, options);
     }
-    get(runId: string): Promise<unknown> {
-        return request(this.config, 'GET', `/v1/runs/${runId}`);
+    get(runId: string, options?: EmbeddedRequestOptions): Promise<unknown> {
+        return request(this.config, 'GET', `/v1/runs/${runId}`, undefined, undefined, options);
     }
     events(runId: string, params?: { after?: string; limit?: number }): Promise<{ data: unknown[]; next_cursor: string | null }> {
         return request(this.config, 'GET', `/v1/runs/${runId}/events${qs({ after: params?.after, limit: params?.limit })}`);
     }
-    cancel(runId: string): Promise<unknown> {
-        return request(this.config, 'POST', `/v1/runs/${runId}/cancel`, {});
+    cancel(runId: string, options?: EmbeddedRequestOptions): Promise<unknown> {
+        return request(this.config, 'POST', `/v1/runs/${runId}/cancel`, {}, undefined, options);
     }
     delegate(runId: string, params: { agent_version_id: string; input?: unknown; installation_id?: string }, idempotencyKey?: string): Promise<unknown> {
         return request(this.config, 'POST', `/v1/runs/${runId}/delegate`, params, idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined);

@@ -14,7 +14,11 @@ queued → running → completed | failed | cancelled | expired
 
 `POST /v1/agents/:id/runs` is idempotent (`Idempotency-Key` scoped to your project; same key + different body is `409`). Suspended tenants accept no new runs. Poll `GET /v1/runs/:id`, page through the durable JSON event log at `GET .../events?after=`, and cancel with `POST .../cancel` — cancellation wins executor races via conditional claims and cascades to active child runs.
 
-Structured output is strict: a requested `json_schema` must validate or the run fails loudly. Every run records the exact agent/skill/subagent versions, knowledge citations, and policy snapshot used.
+Run `input` accepts JSON up to 64 KiB. The complete JSON is sent to the model as one user message; a `messages` array inside it is data, not a native multi-role conversation. Use session turns when you need role-aware conversation. Oversized input is rejected with `413 input_too_large`, never silently truncated.
+
+For structured output, put `response_format` beside `input` in the create request. A requested `json_schema` is checked after generation; invalid JSON or output that violates the supported schema subset fails the run rather than completing it. The validator supports `type`, `properties`, `required`, `additionalProperties`, `items`, and `enum`. Unsupported assertion keywords are rejected at creation rather than ignored. Callers should still validate critical actions in their own application.
+
+The completed `Run.output` is an envelope, not the generated value itself: `Run.output.output` holds the model text, or the parsed JSON value when `json_schema` was requested. The envelope also includes `model`, `provider`, camel-case token `usage`, USD `cost` (`providerCostUsd` and `cencoriChargeUsd`), versions, citations, and the policy snapshot. Historical runs may lack `cost`. Every new run records the exact agent/skill/subagent versions, knowledge citations, and policy snapshot used.
 
 ## Delegation
 

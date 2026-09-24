@@ -839,6 +839,102 @@
           "next_cursor"
         ]
       },
+      "RunOutput": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "example": "result"
+          },
+          "output": {},
+          "model": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "agent_version_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "agent_version": {
+            "type": "string",
+            "nullable": true
+          },
+          "knowledge_citations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true
+            }
+          },
+          "skills_used": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "manifest_tools": {
+            "type": "array",
+            "items": {}
+          },
+          "manifest_policy": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true
+          },
+          "usage": {
+            "type": "object",
+            "properties": {
+              "promptTokens": {
+                "type": "integer"
+              },
+              "completionTokens": {
+                "type": "integer"
+              },
+              "totalTokens": {
+                "type": "integer"
+              },
+              "cacheReadTokens": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "promptTokens",
+              "completionTokens",
+              "totalTokens"
+            ]
+          },
+          "cost": {
+            "type": "object",
+            "properties": {
+              "providerCostUsd": {
+                "type": "number"
+              },
+              "cencoriChargeUsd": {
+                "type": "number"
+              },
+              "markupPercentage": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "providerCostUsd",
+              "cencoriChargeUsd",
+              "markupPercentage"
+            ]
+          }
+        },
+        "required": [
+          "type",
+          "output",
+          "model",
+          "provider",
+          "usage",
+          "cost"
+        ]
+      },
       "Run": {
         "type": "object",
         "properties": {
@@ -885,15 +981,13 @@
               "expired"
             ]
           },
-          "input": {
-            "type": "object",
-            "properties": {},
-            "additionalProperties": true
-          },
+          "input": {},
           "output": {
-            "type": "object",
-            "properties": {},
-            "additionalProperties": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RunOutput"
+              }
+            ],
             "nullable": true
           },
           "error": {
@@ -2822,14 +2916,46 @@
             "type": "string",
             "enum": [
               "background",
-              "sync"
+              "sync",
+              "streaming"
             ]
           },
-          "input": {},
+          "input": {
+            "description": "Any JSON value, at most 64 KiB when serialized as UTF-8."
+          },
           "response_format": {
             "type": "object",
-            "properties": {},
-            "additionalProperties": true
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "json_schema"
+                ]
+              },
+              "json_schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "strict": {
+                    "type": "boolean"
+                  },
+                  "schema": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true
+                  }
+                },
+                "required": [
+                  "schema"
+                ]
+              }
+            },
+            "required": [
+              "type",
+              "json_schema"
+            ]
           },
           "session_id": {
             "type": "string"
