@@ -16,8 +16,26 @@ function routeFiles(directory: string): string[] {
 describe('Embedded Agents public contracts', () => {
     const openapi = JSON.parse(read('openapi/embedded-agents.json')) as {
         servers: Array<{ url: string }>;
-        paths: Record<string, Record<string, unknown>>;
+        components: {
+            parameters: Record<string, unknown>;
+            responses: Record<string, unknown>;
+            schemas: Record<string, unknown>;
+        };
+        paths: Record<string, Record<string, Record<string, unknown> | unknown>>;
     };
+
+    const methods = ['get', 'post', 'put', 'patch', 'delete'] as const;
+
+    function documentedOperations() {
+        return Object.entries(openapi.paths).flatMap(([path, item]) =>
+            methods.flatMap((method) => {
+                const operation = item[method];
+                return operation && typeof operation === 'object'
+                    ? [{ path, method, operation: operation as Record<string, unknown> }]
+                    : [];
+            }),
+        );
+    }
 
     it('maps every documented OpenAPI operation to an implemented handler', () => {
         const apiRoot = resolve(root, 'app/api');
@@ -34,14 +52,92 @@ describe('Embedded Agents public contracts', () => {
                 .map((method) => `${method} ${normalizePath(route)}`);
         });
 
-        const documented = Object.entries(openapi.paths).flatMap(([path, item]) =>
-            ['get', 'post', 'put', 'patch', 'delete']
-                .filter((method) => item[method])
-                .map((method) => `${method.toUpperCase()} ${normalizePath(path)}`)
+        const documented = documentedOperations().map(
+            ({ path, method }) => `${method.toUpperCase()} ${normalizePath(path)}`,
         );
 
         expect(documented).toHaveLength(122);
         expect(documented.filter((operation) => !handlers.includes(operation))).toEqual([]);
+    });
+
+    it('documents every implemented operation in each Embedded Agents API family', () => {
+        const apiRoot = resolve(root, 'app/api');
+        const documented = new Set(
+            documentedOperations().map(
+                ({ path, method }) => `${method.toUpperCase()} ${normalizePath(path)}`,
+            ),
+        );
+        const families = new Set(
+            Object.keys(openapi.paths).map((path) => path.split('/')[2]),
+        );
+        const handlers = routeFiles(resolve(apiRoot, 'v1')).flatMap((file) => {
+            const route = `/${file
+                .slice(apiRoot.length)
+                .replace(/^\//, '')
+                .replace(/\/route\.ts$/, '')
+                .replace(/\[([^\]]+)\]/g, '{$1}')}`;
+            if (!families.has(route.split('/')[2])) return [];
+
+            const source = readFileSync(file, 'utf8');
+            return methods
+                .filter((method) => new RegExp(`export\\s+(?:async\\s+)?function\\s+${method.toUpperCase()}\\b`).test(source))
+                .map((method) => `${method.toUpperCase()} ${normalizePath(route)}`);
+        });
+
+        expect(handlers.filter((operation) => !documented.has(operation))).toEqual([]);
+    });
+
+    it('publishes a typed and intentionally complete operation contract', () => {
+        const operations = documentedOperations();
+        const operationIds = operations.map(({ operation }) => operation.operationId);
+
+        expect(Object.keys(openapi.components.schemas).length).toBeGreaterThanOrEqual(100);
+        expect(new Set(operationIds).size).toBe(operations.length);
+
+        for (const { path, method, operation } of operations) {
+            expect(operation.operationId, `${method.toUpperCase()} ${path} needs operationId`).toEqual(expect.any(String));
+            expect(operation.tags, `${method.toUpperCase()} ${path} needs a tag`).toEqual(expect.any(Array));
+
+            if (['post', 'put', 'patch'].includes(method)) {
+                expect(
+                    Boolean(operation.requestBody) || operation['x-cencori-empty-body'] === true,
+                    `${method.toUpperCase()} ${path} needs request body semantics`,
+                ).toBe(true);
+            }
+
+            const responses = operation.responses as Record<string, Record<string, unknown>>;
+            expect(responses?.default, `${method.toUpperCase()} ${path} needs the standard error response`).toEqual({
+                $ref: '#/components/responses/Error',
+            });
+
+            const success = Object.entries(responses).find(([status]) => /^[23]\d\d$/.test(status));
+            expect(success, `${method.toUpperCase()} ${path} needs a success response`).toBeTruthy();
+            if (success && !['204', '302'].includes(success[0])) {
+                expect(success[1].content, `${method.toUpperCase()} ${path} needs typed success content`).toBeTruthy();
+            }
+        }
+    });
+
+    it('declares every path variable and resolves every component reference', () => {
+        for (const [path, item] of Object.entries(openapi.paths)) {
+            const expected = [...path.matchAll(/\{([^}]+)\}/g)].map((match) => match[1]);
+            const parameters = (item.parameters ?? []) as Array<{ $ref?: string }>;
+            const declared = parameters.map((parameter) => {
+                const name = parameter.$ref?.split('/').at(-1);
+                const component = name ? openapi.components.parameters[name] as { name?: string } : undefined;
+                return component?.name;
+            });
+            expect(declared, `${path} path parameters`).toEqual(expected);
+        }
+
+        const serialized = JSON.stringify(openapi);
+        for (const match of serialized.matchAll(/"\$ref":"#\/components\/(schemas|parameters|responses)\/([^"/]+)"/g)) {
+            const [, group, name] = match;
+            expect(
+                openapi.components[group as keyof typeof openapi.components][name],
+                `unresolved component reference ${group}/${name}`,
+            ).toBeTruthy();
+        }
     });
 
     it('publishes one canonical origin and a real JSON specification route', () => {
