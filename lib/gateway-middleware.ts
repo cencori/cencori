@@ -10,7 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import crypto from 'crypto';
 import { geolocation, ipAddress, waitUntil } from '@vercel/functions';
-import { checkRateLimit } from '@/lib/rate-limit';
+import { checkRateLimit, classifyRateLimitTier, MAX_READ_REQUESTS_PER_WINDOW, READ_BUCKET_SUFFIX, type RateLimitResult } from '@/lib/rate-limit';
 import { checkSpendCap } from '@/lib/budgets';
 import { deductCredits } from '@/lib/credits';
 import { extractCencoriApiKeyFromHeaders } from '@/lib/api-keys';
@@ -657,6 +657,30 @@ return {
     const basecodeAccessPromise = basecodeUserId
         ? supabase.rpc('basecode_gateway_access', { p_user_id: basecodeUserId })
         : Promise.resolve({ data: null, error: null });
+    // Tiered quotas: control-plane reads (polls) draw from a roomy bucket so
+    // they cannot starve the write budget, and cancellation is always
+    // admitted — the corrective action for overload must never be blocked by
+    // overload. The 429 message and X-RateLimit-* headers below already render
+    // per-result limits, so each tier reports honestly.
+    const rateLimitTier = classifyRateLimitTier(req.method, route);
+    const rateLimitPromise: Promise<RateLimitResult> =
+        rateLimitTier === 'cancel_exempt'
+            ? Promise.resolve({
+                success: true,
+                allowed: true,
+                limit: 0,
+                remaining: 0,
+                reset: Date.now(),
+                status: 'ok',
+                reason: 'exempt',
+            } as const)
+            : checkRateLimit(
+                project.id,
+                { requestId, route },
+                rateLimitTier === 'read'
+                    ? { limit: MAX_READ_REQUESTS_PER_WINDOW, keySuffix: READ_BUCKET_SUFFIX }
+                    : undefined,
+            );
     const [networkDenial, creditsBalance, rateLimitResult, spendCapResult, basecodeAccess] = await Promise.all([
         enforceProjectIngressPolicy({
             supabase,
@@ -665,7 +689,7 @@ return {
             requestId,
         }),
         creditsBalancePromise,
-        checkRateLimit(project.id, { requestId, route }),
+        rateLimitPromise,
         checkSpendCap(project.id),
         basecodeAccessPromise,
     ]);

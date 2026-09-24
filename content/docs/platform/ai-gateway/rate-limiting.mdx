@@ -13,20 +13,26 @@ Cencori enforces a per-project rate limit (per-minute). There is no monthly requ
 
 ## Default Rate Limits
 
-| Limit | Scope | Value |
-|-------|-------|-------|
-| Per-minute | Per project | **60 requests** (sliding 60s window) |
+| Traffic | Scope | Value |
+|---------|-------|-------|
+| Writes (run creation, chat, completions, embeddings, …) | Per project | **60 requests** (fixed 60s window) |
+| Control-plane reads (run status, run events) | Per project | **300 requests** (fixed 60s window, separate bucket) |
+| Run cancellation | Per project | **Exempt** — never rate limited |
 
-There are no tiered per-minute limits or burst allowances — all tiers share the same 60/min per-project window. Need more throughput? Add a second project.
+Reads draw from their own bucket (`rate_limit:<projectId>:read`), so status polling can never starve the write budget that run creation uses. Cancellation is always admitted: the corrective action for overload must never itself be blocked by overload. `X-RateLimit-Limit` on each response tells you which tier applied. Need more write throughput? Add a second project.
 
-> Warning: to know, these limits are enforced project-wide across **all** AI endpoints (chat, vision, audio, embeddings), not per endpoint.
+> Warning: to know, write limits are enforced project-wide across **all** AI endpoints (chat, vision, audio, embeddings), not per endpoint.
+
+## Polling guidance
+
+Poll run status no faster than **once every 2 seconds**, always honor the `Retry-After` header on `429`, and back off rather than retrying aggressively. For fleets of concurrent runs, prefer webhooks (`run.completed` delivery) or `mode: 'sync'` over per-run poll loops.
 
 ## Architecture & Performance
 
-Cencori uses a **Redis-backed sliding-window** counter keyed by project id (`rate_limit:<projectId>`). Checks run in a single Redis pipeline (INCR + EXPIRE + TTL):
+Cencori uses **Redis-backed fixed-window** counters keyed by project id (`rate_limit:<projectId>`, reads under `rate_limit:<projectId>:read`). Checks run in a single Redis pipeline (INCR + TTL, expiry set once per window):
 
 - **Sub-millisecond check:** a single round-trip keeps overhead small.
-- **Sliding window:** the TTL carries the window forward, so limits are enforced continuously, not in fixed wall-clock minutes.
+- **Fixed window:** the expiry is set once when the window opens and is never refreshed — rejected requests do not extend the block, so the window always ends on schedule.
 - **Fail-closed by default:** if the Redis backend is unavailable the request is rejected with `503 rate_limit_unavailable` unless fail-open mode is enabled for the deployment.
 
 ## Monthly Requests
