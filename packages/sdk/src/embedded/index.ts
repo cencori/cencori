@@ -18,10 +18,31 @@ export class CencoriEmbeddedApiError extends Error {
     }
 }
 
-function parseRetryAfterSeconds(value: string | null | undefined): number | null {
+const HTTP_DATE_PATTERNS = [
+    // IMF-fixdate, e.g. Sun, 06 Nov 1994 08:49:37 GMT (what toUTCString emits)
+    /^[A-Za-z]{3}, \d{2} [A-Za-z]{3} \d{4} \d{2}:\d{2}:\d{2} GMT$/,
+    // RFC 850, e.g. Sunday, 06-Nov-94 08:49:37 GMT
+    /^[A-Za-z]+, \d{2}-[A-Za-z]{3}-\d{2} \d{2}:\d{2}:\d{2} GMT$/,
+    // asctime, e.g. Sun Nov  6 08:49:37 1994
+    /^[A-Za-z]{3} [A-Za-z]{3} ( \d|\d{2}) \d{2}:\d{2}:\d{2} \d{4}$/,
+];
+
+export function parseRetryAfterSeconds(value: string | null | undefined, nowMs: number = Date.now()): number | null {
     if (!value) return null;
-    const seconds = Number.parseInt(value.trim(), 10);
-    return Number.isFinite(seconds) && seconds >= 0 ? seconds : null;
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    // Strict delay-seconds per RFC 9110 §10.2.3: non-negative integer only.
+    // parseInt would accept "60garbage" or "0x3C" — reject those explicitly.
+    // Date.parse is also too lenient ("2.5" parses as a 2001 date), so
+    // HTTP-dates are allow-listed by format before parsing.
+    if (/^[0-9]+$/.test(trimmed)) {
+        const seconds = Number.parseInt(trimmed, 10);
+        return Number.isFinite(seconds) && seconds >= 0 ? seconds : null;
+    }
+    if (!HTTP_DATE_PATTERNS.some((pattern) => pattern.test(trimmed))) return null;
+    const timestamp = Date.parse(trimmed);
+    if (!Number.isFinite(timestamp)) return null;
+    return Math.max(0, Math.ceil((timestamp - nowMs) / 1000));
 }
 
 async function request<T>(config: Required<CencoriConfig>, method: string, path: string, body?: unknown, extraHeaders?: Record<string, string>, options?: EmbeddedRequestOptions): Promise<T> {

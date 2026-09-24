@@ -1,6 +1,9 @@
 """Cencori SDK client."""
 
 import math
+import re
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from typing import Any, Dict, Optional, cast
 
 import httpx
@@ -247,12 +250,27 @@ class Cencori:
             retry_after: Optional[int] = None
             raw = response.headers.get("Retry-After") or response.headers.get("retry-after")
             if raw:
-                try:
-                    parsed = int(str(raw).strip())
-                    if parsed >= 0:
-                        retry_after = parsed
-                except (TypeError, ValueError):
-                    retry_after = None
+                text = str(raw).strip()
+                if re.fullmatch(r"[0-9]+", text or ""):
+                    try:
+                        parsed = int(text, 10)
+                        if parsed >= 0:
+                            retry_after = parsed
+                    except (TypeError, ValueError):
+                        retry_after = None
+                else:
+                    # HTTP-date form per RFC 9110 §10.2.3.
+                    try:
+                        dt = parsedate_to_datetime(text)
+                        if dt is not None:
+                            if dt.tzinfo is None:
+                                dt = dt.replace(tzinfo=timezone.utc)
+                            delta = (dt - datetime.now(timezone.utc)).total_seconds()
+                            retry_after = max(0, int(math.ceil(delta)))
+                        else:
+                            retry_after = None
+                    except (TypeError, ValueError, OverflowError):
+                        retry_after = None
             if retry_after is None:
                 try:
                     body_hint = response.json()
