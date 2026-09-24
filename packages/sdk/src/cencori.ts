@@ -57,6 +57,7 @@ import {
     UsageNamespace,
     EndUsersNamespace,
     RatePlansNamespace,
+    parseRetryAfterSeconds,
 } from './embedded';
 import { fetchWithRetry } from './utils';
 import {
@@ -387,8 +388,7 @@ export class Cencori {
                 }
                 if (response.status === 429) {
                     const rawRetryAfter = response.headers.get('Retry-After') ?? response.headers.get('retry-after');
-                    const parsed = rawRetryAfter ? Number.parseInt(rawRetryAfter.trim(), 10) : NaN;
-                    let retryAfterSeconds: number | null = Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+                    let retryAfterSeconds: number | null = parseRetryAfterSeconds(rawRetryAfter);
                     if (retryAfterSeconds == null) {
                         const secHint = errorData.retry_after_seconds ?? errorData.retry_after;
                         if (typeof secHint === 'number' && Number.isFinite(secHint) && secHint >= 0) {

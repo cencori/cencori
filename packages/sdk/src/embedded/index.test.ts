@@ -51,4 +51,47 @@ describe('embedded SDK request diagnostics', () => {
         const error = await new RunsNamespace(config).create('agt_123', { input: {} }).catch((e) => e) as CencoriEmbeddedApiError;
         expect(error.retryAfterSeconds).toBe(3600);
     });
+
+    it('parses HTTP-date Retry-After into remaining seconds', async () => {
+        const future = new Date(Date.now() + 120_000).toUTCString();
+        vi.spyOn(global, 'fetch').mockResolvedValueOnce(new Response(JSON.stringify({
+            error: { type: 'invalid_request_error', code: 'rate_limit_exceeded', message: 'Rate limit exceeded', request_id: 'req_429d' },
+        }), { status: 429, headers: { 'Retry-After': future } }));
+        const error = await new RunsNamespace(config).create('agt_123', { input: {} }).catch((e) => e) as CencoriEmbeddedApiError;
+        expect(error.retryAfterSeconds).toBeGreaterThanOrEqual(119);
+        expect(error.retryAfterSeconds).toBeLessThanOrEqual(120);
+    });
+
+    it('normalizes past HTTP-date Retry-After to zero', async () => {
+        const past = new Date(Date.now() - 60_000).toUTCString();
+        vi.spyOn(global, 'fetch').mockResolvedValueOnce(new Response(JSON.stringify({
+            error: { type: 'invalid_request_error', code: 'rate_limit_exceeded', message: 'Rate limit exceeded', request_id: 'req_429e' },
+        }), { status: 429, headers: { 'Retry-After': past } }));
+        const error = await new RunsNamespace(config).create('agt_123', { input: {} }).catch((e) => e) as CencoriEmbeddedApiError;
+        expect(error.retryAfterSeconds).toBe(0);
+    });
+
+    it('rejects malformed numeric Retry-After values', async () => {
+        vi.spyOn(global, 'fetch').mockResolvedValueOnce(new Response(JSON.stringify({
+            error: { type: 'invalid_request_error', code: 'rate_limit_exceeded', message: 'Rate limit exceeded', request_id: 'req_429f' },
+        }), { status: 429, headers: { 'Retry-After': '60garbage' } }));
+        const error = await new RunsNamespace(config).create('agt_123', { input: {} }).catch((e) => e) as CencoriEmbeddedApiError;
+        expect(error.retryAfterSeconds).toBeNull();
+    });
+
+    it('rejects fractional Retry-After values', async () => {
+        vi.spyOn(global, 'fetch').mockResolvedValueOnce(new Response(JSON.stringify({
+            error: { type: 'invalid_request_error', code: 'rate_limit_exceeded', message: 'Rate limit exceeded', request_id: 'req_429g' },
+        }), { status: 429, headers: { 'Retry-After': '2.5' } }));
+        const error = await new RunsNamespace(config).create('agt_123', { input: {} }).catch((e) => e) as CencoriEmbeddedApiError;
+        expect(error.retryAfterSeconds).toBeNull();
+    });
+
+    it('uses JSON fallback when the header is malformed', async () => {
+        vi.spyOn(global, 'fetch').mockResolvedValueOnce(new Response(JSON.stringify({
+            error: { type: 'invalid_request_error', code: 'rate_limit_exceeded', message: 'Rate limit exceeded', request_id: 'req_429h', retry_after_seconds: 10 },
+        }), { status: 429, headers: { 'Retry-After': '60garbage' } }));
+        const error = await new RunsNamespace(config).create('agt_123', { input: {} }).catch((e) => e) as CencoriEmbeddedApiError;
+        expect(error.retryAfterSeconds).toBe(10);
+    });
 });
