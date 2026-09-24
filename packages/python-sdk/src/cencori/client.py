@@ -1,5 +1,6 @@
 """Cencori SDK client."""
 
+import math
 from typing import Any, Dict, Optional, cast
 
 import httpx
@@ -243,7 +244,39 @@ class Cencori:
             raise AuthenticationError()
 
         if response.status_code == 429:
-            raise RateLimitError()
+            retry_after: Optional[int] = None
+            raw = response.headers.get("Retry-After") or response.headers.get("retry-after")
+            if raw:
+                try:
+                    parsed = int(str(raw).strip())
+                    if parsed >= 0:
+                        retry_after = parsed
+                except (TypeError, ValueError):
+                    retry_after = None
+            if retry_after is None:
+                try:
+                    body_hint = response.json()
+                    err = body_hint.get("error") if isinstance(body_hint, dict) else None
+                    ms_candidates = []
+                    sec_candidates = []
+                    if isinstance(err, dict):
+                        ms_candidates.append(err.get("retry_after_ms"))
+                        sec_candidates += [err.get("retry_after_seconds"), err.get("retry_after")]
+                    if isinstance(body_hint, dict):
+                        ms_candidates.append(body_hint.get("retry_after_ms"))
+                        sec_candidates += [body_hint.get("retry_after_seconds"), body_hint.get("retry_after")]
+                    for candidate in sec_candidates:
+                        if isinstance(candidate, (int, float)) and candidate >= 0:
+                            retry_after = int(math.ceil(float(candidate)))
+                            break
+                    if retry_after is None:
+                        for candidate in ms_candidates:
+                            if isinstance(candidate, (int, float)) and candidate >= 0:
+                                retry_after = int(math.ceil(float(candidate) / 1000))
+                                break
+                except Exception:
+                    retry_after = None
+            raise RateLimitError(retry_after_seconds=retry_after)
 
         if response.status_code == 402:
             raise InsufficientCreditsError()

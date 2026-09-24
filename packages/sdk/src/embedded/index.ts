@@ -12,9 +12,16 @@ export class CencoriEmbeddedApiError extends Error {
         readonly requestId: string | null,
         readonly type: string | null,
         readonly param: string | null,
+        readonly retryAfterSeconds: number | null = null,
     ) {
         super(`Cencori API error: ${message}`);
     }
+}
+
+function parseRetryAfterSeconds(value: string | null | undefined): number | null {
+    if (!value) return null;
+    const seconds = Number.parseInt(value.trim(), 10);
+    return Number.isFinite(seconds) && seconds >= 0 ? seconds : null;
 }
 
 async function request<T>(config: Required<CencoriConfig>, method: string, path: string, body?: unknown, extraHeaders?: Record<string, string>, options?: EmbeddedRequestOptions): Promise<T> {
@@ -30,10 +37,34 @@ async function request<T>(config: Required<CencoriConfig>, method: string, path:
         body: body ? JSON.stringify(body) : undefined,
     });
     if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' })) as { error?: { message?: string; code?: string; request_id?: string; type?: string; param?: string } | string };
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' })) as {
+            error?: { message?: string; code?: string; request_id?: string; type?: string; param?: string; retry_after_ms?: unknown; retry_after?: unknown; retry_after_seconds?: unknown } | string;
+            retry_after_ms?: unknown; retry_after?: unknown; retry_after_seconds?: unknown;
+        };
         const message = typeof errorData.error === 'string' ? errorData.error : errorData.error?.message || response.statusText;
         const details = typeof errorData.error === 'object' ? errorData.error : null;
-        throw new CencoriEmbeddedApiError(message, response.status, details?.code ?? null, details?.request_id ?? response.headers.get('X-Request-Id'), details?.type ?? null, details?.param ?? null);
+        // Prefer the standards-compliant Retry-After response header; fall back
+        // to versioned body hints (retry_after_ms / retry_after_seconds) so
+        // callers can back off precisely without parsing raw responses.
+        let retryAfterSeconds = parseRetryAfterSeconds(response.headers.get('Retry-After') ?? response.headers.get('retry-after'));
+        if (retryAfterSeconds == null) {
+            // Body hints are unit-explicit: *_seconds / retry_after are seconds,
+            // *_ms is milliseconds. Never guess by magnitude (e.g. 3600s).
+            const secHint =
+                details?.retry_after_seconds ??
+                (errorData as { retry_after_seconds?: unknown }).retry_after_seconds ??
+                details?.retry_after ??
+                (errorData as { retry_after?: unknown }).retry_after;
+            if (typeof secHint === 'number' && Number.isFinite(secHint) && secHint >= 0) {
+                retryAfterSeconds = Math.ceil(secHint);
+            } else {
+                const msHint = details?.retry_after_ms ?? (errorData as { retry_after_ms?: unknown }).retry_after_ms;
+                if (typeof msHint === 'number' && Number.isFinite(msHint) && msHint >= 0) {
+                    retryAfterSeconds = Math.ceil(msHint / 1000);
+                }
+            }
+        }
+        throw new CencoriEmbeddedApiError(message, response.status, details?.code ?? null, details?.request_id ?? response.headers.get('X-Request-Id'), details?.type ?? null, details?.param ?? null, retryAfterSeconds);
     }
     if (response.status === 204) return undefined as T;
     return response.json() as Promise<T>;

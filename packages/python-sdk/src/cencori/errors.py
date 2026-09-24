@@ -49,10 +49,19 @@ class RateLimitError(CencoriError):
 
     This error occurs when you've made too many requests in a short period.
     Consider implementing exponential backoff retry logic.
+
+    Attributes:
+        retry_after_seconds: Seconds to wait before retrying, parsed from the
+            `Retry-After` response header (or body hints) when present.
     """
 
-    def __init__(self, message: str = "Rate limit exceeded"):
+    def __init__(
+        self,
+        message: str = "Rate limit exceeded",
+        retry_after_seconds: Optional[int] = None,
+    ):
         super().__init__(message, status_code=429, code="RATE_LIMIT_EXCEEDED")
+        self.retry_after_seconds = retry_after_seconds
 
 
 class SafetyError(CencoriError):
