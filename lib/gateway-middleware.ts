@@ -516,7 +516,7 @@ return {
         // was revoked rather than left guessing at "invalid".
         const { data: revokedKey } = await supabase
             .from('api_keys')
-            .select('id, project_id, projects!inner(organization_id)')
+            .select('id, project_id, environment, projects!inner(organization_id)')
             .eq('key_hash', keyHash)
             .not('revoked_at', 'is', null)
             .maybeSingle();
@@ -537,6 +537,7 @@ return {
                     startTime,
                     status: 'blocked',
                     supabase,
+                    environment: (revokedKey as { environment?: string | null }).environment ?? undefined,
                 })
             );
         }
@@ -734,6 +735,7 @@ return {
                     startTime,
                     status: refusal.status === 429 ? 'rate_limited' : 'blocked',
                     supabase,
+                    environment: keyData.environment ?? undefined,
                 })
             );
             return {
@@ -767,6 +769,25 @@ return {
         : false;
 
     if (shouldEnforceCredits && creditsBalance <= 0 && !zeroBalanceByok) {
+        // A zero-balance refusal used to return before any log was written, so an
+        // org that ran out of credits saw failing requests and an idle console.
+        // Record the refusal like every other pre-provider denial.
+        waitUntil(
+            logGatewayRefusal({
+                apiKeyId: keyData.id,
+                clientIp,
+                countryCode,
+                endpoint: route,
+                errorMessage: 'Credit balance exhausted',
+                organizationId,
+                projectId: project.id,
+                requestId,
+                startTime,
+                status: 'blocked',
+                supabase,
+                environment: keyData.environment ?? undefined,
+            })
+        );
         return {
             success: false,
             response: addGatewayHeaders(
@@ -1054,12 +1075,13 @@ async function logGatewayRefusal(params: {
     startTime: number;
     status: 'blocked' | 'rate_limited';
     supabase: ReturnType<typeof createAdminClient>;
+    environment?: string;
 }): Promise<void> {
     try {
         const { error } = await params.supabase.from('ai_requests').insert({
             project_id: params.projectId,
             api_key_id: params.apiKeyId,
-            environment: 'production',
+            environment: params.environment === 'test' ? 'test' : 'production',
             endpoint: params.endpoint,
             // Refusal happens before the body is read, so the model is genuinely not known yet.
             model: 'unknown',

@@ -13,7 +13,7 @@ import {
     type UnifiedChatRequest,
 } from '@/lib/providers/base';
 import { settleStreamUsage } from '@/lib/gateway/stream-usage';
-import { executeGatewayChat, streamGatewayChat } from '@/lib/gateway/chat-executor';
+import { executeGatewayChat, isCreditExhaustedError, streamGatewayChat } from '@/lib/gateway/chat-executor';
 import { resolveGatewayProvider } from '@/lib/gateway/providers-setup';
 import { mapProviderErrorToHttpResponse } from '@/lib/gateway-reliability';
 import type { GatewayContext } from '@/lib/gateway-middleware';
@@ -386,6 +386,24 @@ function providerFailureResult(error: unknown, model?: string): V1ResponseExecut
         body.retry_after = failure.retryAfter;
     }
     return { ok: false, status: failure.status, body };
+}
+
+/**
+ * Credit-exhaustion check that survives mocked chat-executor modules in tests:
+ * when the mock factory does not re-export the helper, fall back to the
+ * message/code shape.
+ */
+function isCreditExhausted(error: unknown): boolean {
+    try {
+        if (typeof isCreditExhaustedError === 'function' && isCreditExhaustedError(error)) {
+            return true;
+        }
+    } catch {
+        // Fall through to the structural check below.
+    }
+    return error instanceof Error
+        && (error.message.includes('Credit balance exhausted')
+            || (error as { code?: unknown }).code === 'credit_balance_exhausted');
 }
 
 // ── Streaming ──
@@ -1243,6 +1261,24 @@ export async function runV1ResponsesExecution(
                     // real cause — rate limits, an exhausted provider, a retired model — left
                     // behind in the gateway. Carry it on the response the client actually reads.
                     const message = error instanceof Error ? error.message : 'Stream failed';
+                    if (isCreditExhausted(error)) {
+                        try {
+                            params.logSuccess({
+                                provider: 'cencori',
+                                model: body.model || model,
+                                status: 'error',
+                                promptTokens: 0,
+                                completionTokens: 0,
+                                totalTokens: 0,
+                                providerCostUsd: 0,
+                                cencoriChargeUsd: 0,
+                                markupPercentage: 0,
+                                errorMessage: message,
+                            });
+                        } catch {
+                            // Logging must never break the error response.
+                        }
+                    }
                     const failedResponse = buildResponsesJson({
                         id: responseId,
                         model: body.model || model,
@@ -1281,6 +1317,37 @@ export async function runV1ResponsesExecution(
             }),
         };
     } catch (error) {
+        if (isCreditExhausted(error)) {
+            const message = error instanceof Error ? error.message : 'Credit balance exhausted';
+            try {
+                params.logSuccess({
+                    provider: 'cencori',
+                    model: params.model,
+                    status: 'error',
+                    promptTokens: 0,
+                    completionTokens: 0,
+                    totalTokens: 0,
+                    providerCostUsd: 0,
+                    cencoriChargeUsd: 0,
+                    markupPercentage: 0,
+                    errorMessage: message,
+                });
+            } catch {
+                // Logging must never break the error response.
+            }
+            return {
+                ok: false,
+                status: 403,
+                body: {
+                    error: {
+                        message: 'Credit balance exhausted. Top up to continue.',
+                        type: 'invalid_request_error',
+                        code: 'credit_balance_exhausted',
+                    },
+                    status: 'failed',
+                },
+            };
+        }
         return providerFailureResult(error, params.model);
     }
 }
