@@ -116,6 +116,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ agentId: s
                     { role: 'user' as const, content: input },
                 ],
                 model: manifest.model,
+                temperature: manifest.temperature,
                 maxTokens: TEST_MAX_TOKENS,
             },
             requestId: `test_${requestId.slice(0, 8)}`,

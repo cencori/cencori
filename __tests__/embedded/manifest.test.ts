@@ -13,6 +13,7 @@ describe('capability manifest normalization', () => {
             temperature: 0.5,
         });
         expect(m.model).toBe('gpt-5-mini');
+        expect(m.temperature).toBe(0.5);
         expect(m.instructions).toBe('Be helpful.');
         expect(m.tools).toEqual([
             { type: 'builtin', name: 'web_search' },
