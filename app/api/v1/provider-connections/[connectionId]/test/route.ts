@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabaseAdmin';
 import { validateGatewayRequest, addGatewayHeaders, handleCorsPreFlight } from '@/lib/gateway-middleware';
 import { embeddedError, dePrefixId } from '@/lib/embedded/http';
 import { decryptApiKey } from '@/lib/encryption';
+import { extractUpstreamErrorDetails } from '@/lib/embedded/upstream-error';
 import { safeOutboundFetch } from '@/lib/security/outbound-url';
 import crypto from 'crypto';
 
@@ -57,7 +58,25 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ connection
         const latencyMs = Date.now() - started;
         if (!res.ok) {
             await supabase.from('provider_connections').update({ last_tested_at: new Date().toISOString(), status: 'unhealthy' }).eq('id', row.id as string);
-            return addGatewayHeaders(NextResponse.json({ success: false, reachable: true, authenticated: res.status !== 401 && res.status !== 403, latency_ms: latencyMs, status: res.status }), { requestId });
+            // Surface the upstream rejection reason (redacted + truncated) instead of
+            // a bare status — callers can't tell invalid_request_error from bad
+            // credentials without it. Existing fields stay for backward compat.
+            const rawText = await res.text().catch(() => '');
+            const upstream = extractUpstreamErrorDetails(rawText);
+            return addGatewayHeaders(
+                NextResponse.json({
+                    success: false,
+                    reachable: true,
+                    authenticated: res.status !== 401 && res.status !== 403,
+                    latency_ms: latencyMs,
+                    status: res.status,
+                    upstream_status: res.status,
+                    code: upstream.code,
+                    error: upstream.message ?? `Upstream request failed with status ${res.status}`,
+                    upstream_message: upstream.excerpt,
+                }),
+                { requestId },
+            );
         }
         const json = (await res.json().catch(() => null)) as { data?: unknown[] } | null;
         await supabase.from('provider_connections').update({ last_tested_at: new Date().toISOString(), status: 'active' }).eq('id', row.id as string);
