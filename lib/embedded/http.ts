@@ -40,14 +40,18 @@ export function cursorPaginate<T extends { id: string }>(rows: T[], limit: numbe
 
 /** UUID passthrough that also accepts ten_/usr_/prc_/pms_ prefixed aliases. */
 export function dePrefixId(value: string): string {
-    // Accept IDs emitted by the older double-separator tenant/user serializer
-    // while returning canonical single-separator IDs from new responses.
-    return value.replace(/^(ten__|usr__|ten_|usr_|prc_|pms_|ins_|ses_|run_|act_|kb_|src_|con_)/, '');
+    // Accept IDs emitted by the older double-separator serializers
+    // (tenant/user historically, provider/sync via the trailing-underscore
+    // prefix constants) while new responses emit canonical single-separator IDs.
+    return value.replace(/^(ten__|usr__|prc__|pms__|ten_|usr_|prc_|pms_|ins_|ses_|run_|act_|kb_|src_|con_)/, '');
 }
 
 export function withPrefix(prefix: string, id: string): string {
-    if (id.startsWith(`${prefix}_`)) return id;
-    return `${prefix}_${id}`;
+    // Tolerate prefix constants with or without a trailing underscore
+    // ('prc_' vs 'prc') and normalize double-prefixed inputs to single.
+    const bare = prefix.replace(/_+$/, '');
+    const stripped = dePrefixId(id);
+    return `${bare}_${stripped}`;
 }
 
 /**

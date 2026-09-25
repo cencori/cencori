@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { decodeRunRequest, encodeRunRequest, isRunResponseFormat, sameRunRequestBody, stableStringify } from '@/lib/embedded/run-request';
 import { dePrefixId, withPrefix } from '@/lib/embedded/http';
-import { TENANT_PREFIX, USER_PREFIX } from '@/lib/embedded/types';
+import { PROVIDER_CONNECTION_PREFIX, PROVIDER_SYNC_PREFIX, TENANT_PREFIX, USER_PREFIX } from '@/lib/embedded/types';
 
 describe('embedded resource IDs', () => {
     it('returns canonical tenant and user IDs that round-trip', () => {
@@ -14,6 +14,20 @@ describe('embedded resource IDs', () => {
     it('accepts previously returned double-underscore IDs', () => {
         expect(dePrefixId('ten__abc')).toBe('abc');
         expect(dePrefixId('usr__abc')).toBe('abc');
+        expect(dePrefixId('prc__abc')).toBe('abc');
+        expect(dePrefixId('pms__abc')).toBe('abc');
+    });
+
+    it('emits single-separator provider IDs and round-trips double-prefixed input', () => {
+        const uuid = '1c4a8041-cd14-48ea-9c4f-28ec3795cba2';
+        expect(withPrefix(PROVIDER_CONNECTION_PREFIX, uuid)).toBe(`prc_${uuid}`);
+        // Legacy constant form with trailing underscore must not double up.
+        expect(withPrefix('prc_', uuid)).toBe(`prc_${uuid}`);
+        expect(withPrefix(PROVIDER_SYNC_PREFIX, uuid)).toBe(`pms_${uuid}`);
+        // Double-prefixed IDs seen in the wild normalize to single.
+        expect(withPrefix(PROVIDER_CONNECTION_PREFIX, `prc__${uuid}`)).toBe(`prc_${uuid}`);
+        expect(dePrefixId(`prc_${uuid}`)).toBe(uuid);
+        expect(dePrefixId(`prc__${uuid}`)).toBe(uuid);
     });
 });
 
