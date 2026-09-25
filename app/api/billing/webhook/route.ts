@@ -6,7 +6,6 @@ import {
   getProductTypeFromId,
   getSubscriptionTierFromProductId,
   getBillingInterval,
-  getScanTierByProductId,
   getCreditTopupCreditsByProductId,
   getCreditTopupPackConfig,
   getBasecodePlanByProductId,
@@ -151,52 +150,13 @@ async function handleCollectionSucceeded(
     }
 
     case 'scan_subscription': {
-      let userId: string | undefined = data.metadata?.user_id;
-
-      if (!userId) {
-        const { data: sub } = await supabase
-          .from('scan_subscriptions')
-          .select('user_id')
-          .eq('bachs_customer_id', data.customer.id)
-          .maybeSingle();
-        if (sub) {
-          userId = sub.user_id;
-        } else {
-          console.warn(
-            '[Bachs Webhook] Could not resolve user for scan subscription',
-            data.charge_id
-          );
-          return;
-        }
-      }
-
-      const scanTier = getScanTierByProductId(productId);
-      if (!scanTier) {
-        console.warn('[Bachs Webhook] Unknown scan product', productId);
-        return;
-      }
-
-      const now = new Date();
-      const { error } = await supabase.from('scan_subscriptions').upsert(
-        {
-          user_id: userId,
-          scan_tier: scanTier,
-          status: 'active',
-          bachs_customer_id: data.customer.id,
-          current_period_start: now.toISOString(),
-          current_period_end: new Date(
-            now.getTime() + 30 * 24 * 60 * 60 * 1000
-          ).toISOString(),
-        },
-        { onConflict: 'user_id' }
-      );
-
-      if (error) {
-        console.error(
-          '[Bachs Webhook] Failed to upsert scan subscription',
-          error
-        );
-      }
+      // Deprecated: standalone Scan is removed from the product offering.
+      // No new grants. Existing rows are left untouched (grandfathered read
+      // path removed in lib/scan/entitlements.ts); cancel/refund via dashboard.
+      console.warn('[Bachs Webhook] Ignoring deprecated scan_subscription event', {
+        charge_id: data.charge_id,
+        product_id: productId,
+      });
       break;
     }
 
@@ -263,19 +223,6 @@ async function handleCollectionFailed(
       .from('organizations')
       .update({ subscription_status: 'past_due' })
       .eq('id', org.id);
-  }
-
-  const { data: scanSub } = await supabase
-    .from('scan_subscriptions')
-    .select('user_id')
-    .eq('bachs_customer_id', customerId)
-    .maybeSingle();
-
-  if (scanSub) {
-    await supabase
-      .from('scan_subscriptions')
-      .update({ status: 'past_due' })
-      .eq('user_id', scanSub.user_id);
   }
 }
 
@@ -351,50 +298,8 @@ async function handleSubscriptionLifecycle(
     return;
   }
 
-  if (productType === 'scan_subscription') {
-    const scanTier = getScanTierByProductId(data.product_id);
-    if (!scanTier) {
-      console.warn('[Bachs Webhook] Unknown scan subscription product', data.product_id);
-      return;
-    }
-
-    let userId = data.metadata?.user_id;
-    if (!userId) {
-      const { data: existing } = await supabase
-        .from('scan_subscriptions')
-        .select('user_id')
-        .or(
-          `subscription_id.eq.${data.subscription_id},bachs_customer_id.eq.${data.customer.customer_id}`
-        )
-        .maybeSingle();
-      userId = existing?.user_id;
-    }
-
-    if (!userId) {
-      console.warn('[Bachs Webhook] Could not resolve user for scan subscription event', {
-        subscriptionId: data.subscription_id,
-        eventType,
-      });
-      return;
-    }
-
-    const { error } = await supabase.from('scan_subscriptions').upsert(
-      {
-        user_id: userId,
-        subscription_id: data.subscription_id,
-        bachs_customer_id: data.customer.customer_id,
-        scan_tier: scanTier,
-        status: data.status,
-        current_period_start: data.current_period_start,
-        current_period_end: data.current_period_end,
-      },
-      { onConflict: 'user_id' }
-    );
-
-    if (error) {
-      console.error('[Bachs Webhook] Failed to reconcile scan subscription', error);
-    }
-  }
+  // Standalone Scan is deprecated and removed. Legacy scan product IDs now
+  // resolve to null via getProductTypeFromId and fall through (ignored).
 }
 
 export async function POST(req: NextRequest) {

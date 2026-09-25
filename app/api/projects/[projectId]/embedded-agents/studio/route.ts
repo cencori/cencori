@@ -215,6 +215,10 @@ export async function POST(request: Request, ctx: Context) {
             if (statusError || !validating) return fail('Version changed while testing. Refresh and try again.', 409);
             try {
                 const { executeGatewayChat } = await import('@/lib/gateway/chat-executor');
+                // Pure UUID: credit_transactions.reference_id is UUID-typed,
+                // so a prefixed id fails the debit and blocks the test.
+                const testRequestId = crypto.randomUUID();
+                const gatewayStartedAt = Date.now();
                 const result = await executeGatewayChat({
                     supabase: db as never, projectId, organizationId: access.organizationId, tier,
                     request: {
@@ -224,8 +228,34 @@ export async function POST(request: Request, ctx: Context) {
                         ],
                         model: simple.manifest.model!, maxTokens: 500,
                     },
-                    requestId: `studio_test_${crypto.randomUUID().slice(0, 8)}`,
+                    requestId: testRequestId,
                 });
+                if (!result.content?.trim()) {
+                    throw new Error('The model returned no response. Try again.');
+                }
+                // Meter the managed model call before treating the test as
+                // successful: idempotent wallet debit + ai_requests usage row.
+                // A failed charge/metre leaves last_test_passed=false so the
+                // test cannot become a free pass.
+                const { meterAgentTestUsage } = await import('@/lib/embedded/test-metering');
+                const metered = await meterAgentTestUsage({
+                    supabase: db as never,
+                    projectId,
+                    organizationId: access.organizationId,
+                    tier,
+                    endpoint: 'agents.studio_test',
+                    requestId: testRequestId,
+                    agentId,
+                    model: (result as { actualModel?: string }).actualModel ?? result.model,
+                    provider: (result as { actualProvider?: string }).actualProvider ?? result.provider,
+                    usage: result.usage,
+                    cost: result.cost,
+                    latencyMs: Date.now() - gatewayStartedAt,
+                });
+                if (!metered.ok) {
+                    await db.from('agent_versions').update({ status: 'draft', last_tested_at: new Date().toISOString(), last_test_passed: false }).eq('project_id', projectId).eq('agent_id', agentId).eq('id', versionId).eq('status', 'validating').eq('checksum', version.checksum as string);
+                    return fail(metered.message, metered.code === 'insufficient_credits' ? 402 : 502);
+                }
                 const { data: evidence, error: evidenceError } = await db.from('agent_versions').update({ status: 'ready_for_review', last_tested_at: new Date().toISOString(), last_test_passed: true }).eq('project_id', projectId).eq('agent_id', agentId).eq('id', versionId).eq('status', 'validating').eq('checksum', version.checksum as string).select('id').maybeSingle();
                 if (evidenceError || !evidence) {
                     await db.from('agent_versions').update({ status: 'draft', last_test_passed: false }).eq('project_id', projectId).eq('agent_id', agentId).eq('id', versionId).eq('status', 'validating').eq('checksum', version.checksum as string);

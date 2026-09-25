@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,22 +13,17 @@ import {
 } from "@/components/ui/dialog";
 import type { ScanPaywallPayload } from "@/lib/scan/paywall-client";
 
-type ScanCheckoutTier = "scan" | "scan_team";
-
 interface ScanPaywallDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     payload: ScanPaywallPayload | null;
 }
 
-const SCAN_BASE_URL = "https://scan.cencori.com";
-const SCAN_SIGNUP_URL = `${SCAN_BASE_URL}/signup?redirect=${encodeURIComponent(SCAN_BASE_URL)}`;
-
 function getDialogCopy(payload: ScanPaywallPayload | null) {
     if (!payload) {
         return {
-            title: "Upgrade Scan",
-            description: "Choose a scan plan to continue.",
+            title: "Upgrade for unlimited scans",
+            description: "Choose a platform plan to continue.",
         };
     }
 
@@ -40,8 +35,8 @@ function getDialogCopy(payload: ScanPaywallPayload | null) {
             title: "Project import limit reached",
             description:
                 typeof max === "number" && typeof used === "number"
-                    ? `You have imported ${used} of ${max} projects on Scan Free. Upgrade for unlimited imports.`
-                    : "You have reached the Scan Free project import limit. Upgrade for unlimited imports.",
+                    ? `You have imported ${used} of ${max} projects on the free tier. Upgrade for unlimited imports.`
+                    : "You have reached the free project import limit. Upgrade for unlimited imports.",
         };
     }
 
@@ -50,55 +45,19 @@ function getDialogCopy(payload: ScanPaywallPayload | null) {
             title: "Scan limit reached",
             description:
                 typeof max === "number" && typeof used === "number"
-                    ? `You have used ${used} of ${max} scans for this project on Scan Free. Upgrade for unlimited scans.`
-                    : "You have reached the Scan Free scan limit for this project. Upgrade for unlimited scans.",
+                    ? `You have used ${used} of ${max} scans for this project on the free tier. Upgrade for unlimited scans.`
+                    : "You have reached the free scan limit for this project. Upgrade for unlimited scans.",
         };
     }
 
     return {
-        title: "Upgrade Scan",
-        description: payload.error || "Choose a scan plan to continue using scan workflows.",
+        title: "Upgrade for unlimited scans",
+        description: payload.error || "Choose a platform plan to continue using scan workflows.",
     };
 }
 
 export function ScanPaywallDialog({ open, onOpenChange, payload }: ScanPaywallDialogProps) {
-    const [loadingTier, setLoadingTier] = useState<ScanCheckoutTier | null>(null);
-    const [error, setError] = useState<string | null>(null);
     const copy = useMemo(() => getDialogCopy(payload), [payload]);
-
-    const handleCheckout = async (tier: ScanCheckoutTier) => {
-        setLoadingTier(tier);
-        setError(null);
-
-        try {
-            const response = await fetch("/api/billing/scan/checkout", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ tier }),
-            });
-
-            if (response.status === 401) {
-                window.location.href = SCAN_SIGNUP_URL;
-                return;
-            }
-
-            const data = await response.json().catch(() => ({}));
-            if (!response.ok || !data?.checkoutUrl) {
-                const message = data?.details
-                    ? `${data?.error || "Failed to start checkout"}: ${data.details}`
-                    : (data?.error || "Failed to start checkout");
-                throw new Error(message);
-            }
-
-            window.location.href = data.checkoutUrl;
-        } catch (checkoutError) {
-            setError(
-                checkoutError instanceof Error ? checkoutError.message : "Failed to start checkout"
-            );
-        } finally {
-            setLoadingTier(null);
-        }
-    };
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -119,65 +78,61 @@ export function ScanPaywallDialog({ open, onOpenChange, payload }: ScanPaywallDi
 
                 <div className="grid gap-3 p-5 md:grid-cols-2">
                     <article className="rounded-md border border-border/50 bg-card p-4">
-                        <p className="text-sm font-semibold">Scan</p>
-                        <p className="mt-1 text-2xl font-semibold">
-                            $9<span className="text-sm font-normal text-muted-foreground">/mo</span>
-                        </p>
-                        <ul className="mt-3 space-y-1.5">
-                            <li className="flex items-center gap-2 text-xs text-muted-foreground">
-                                <Check className="h-3.5 w-3.5 text-foreground" />
-                                Unlimited repository imports
-                            </li>
-                            <li className="flex items-center gap-2 text-xs text-muted-foreground">
-                                <Check className="h-3.5 w-3.5 text-foreground" />
-                                Unlimited scans per project
-                            </li>
-                        </ul>
-                        <Button
-                            className="mt-4 h-8 w-full text-xs"
-                            variant="outline"
-                            disabled={loadingTier === "scan"}
-                            onClick={() => handleCheckout("scan")}
-                        >
-                            {loadingTier === "scan" ? "Redirecting..." : "Get Scan"}
-                        </Button>
-                    </article>
-
-                    <article className="rounded-md border border-foreground/25 bg-card p-4">
-                        <p className="text-sm font-semibold">Scan Teams</p>
+                        <p className="text-sm font-semibold">Pro</p>
                         <p className="mt-1 text-2xl font-semibold">
                             $29<span className="text-sm font-normal text-muted-foreground">/mo</span>
                         </p>
                         <ul className="mt-3 space-y-1.5">
                             <li className="flex items-center gap-2 text-xs text-muted-foreground">
                                 <Check className="h-3.5 w-3.5 text-foreground" />
-                                Everything in Scan
+                                Unlimited projects and scans
                             </li>
                             <li className="flex items-center gap-2 text-xs text-muted-foreground">
                                 <Check className="h-3.5 w-3.5 text-foreground" />
-                                Team workflows and priority support
+                                Full security pipeline
                             </li>
                         </ul>
                         <Button
                             className="mt-4 h-8 w-full text-xs"
-                            disabled={loadingTier === "scan_team"}
-                            onClick={() => handleCheckout("scan_team")}
+                            variant="outline"
+                            onClick={() => { window.location.href = "/pricing"; }}
                         >
-                            {loadingTier === "scan_team" ? "Redirecting..." : "Get Scan Teams"}
+                            View Pro
+                        </Button>
+                    </article>
+
+                    <article className="rounded-md border border-foreground/25 bg-card p-4">
+                        <p className="text-sm font-semibold">Team</p>
+                        <p className="mt-1 text-2xl font-semibold">
+                            $99<span className="text-sm font-normal text-muted-foreground">/mo</span>
+                        </p>
+                        <ul className="mt-3 space-y-1.5">
+                            <li className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <Check className="h-3.5 w-3.5 text-foreground" />
+                                Everything in Pro
+                            </li>
+                            <li className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <Check className="h-3.5 w-3.5 text-foreground" />
+                                Team seats and collaboration
+                            </li>
+                        </ul>
+                        <Button
+                            className="mt-4 h-8 w-full text-xs"
+                            onClick={() => { window.location.href = "/pricing"; }}
+                        >
+                            View Team
                         </Button>
                     </article>
                 </div>
 
                 <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/40 px-5 py-3">
                     <p className="text-[11px] text-muted-foreground">
-                        Pro, Team, and Enterprise plans include unlimited scan access.
+                        Standalone Scan plans are deprecated. Pro and Team include unlimited scan access.
                     </p>
                     <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => onOpenChange(false)}>
                         Continue
                     </Button>
                 </div>
-
-                {error && <p className="px-5 pb-4 text-xs text-red-400">{error}</p>}
             </DialogContent>
         </Dialog>
     );

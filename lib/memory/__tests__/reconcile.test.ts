@@ -123,20 +123,16 @@ describe('parseReconcilePlan', () => {
     });
 });
 
-describe('resolveMemoryModel (managed: Gemini or open GPT-OSS)', () => {
-    it('keeps any gemini model as-is', () => {
-        expect(resolveMemoryModel('gemini-2.5-flash')).toBe('gemini-2.5-flash');
-        expect(resolveMemoryModel('gemini-3-pro')).toBe('gemini-3-pro');
-        expect(resolveMemoryModel('  Gemini-2.5-Flash  ')).toBe('Gemini-2.5-Flash');
-    });
-
-    it('allows open managed models (Cerebras gpt-oss, Groq llama), not Google', () => {
+describe('resolveMemoryModel (managed production GPT-OSS models)', () => {
+    it('allows the explicit Groq and Cerebras production models', () => {
         expect(resolveMemoryModel('gpt-oss-120b')).toBe('gpt-oss-120b');
-        expect(resolveMemoryModel('openai/gpt-oss-120b')).toBe('openai/gpt-oss-120b');
-        expect(resolveMemoryModel('groq/compound')).toBe('groq/compound');
+        expect(resolveMemoryModel('openai/gpt-oss-20b')).toBe('openai/gpt-oss-20b');
     });
 
-    it('coerces OpenAI/Anthropic/unknown (or empty) to the managed default', () => {
+    it('coerces retired, non-managed, unknown, or empty choices to the managed default', () => {
+        expect(resolveMemoryModel('gemini-2.5-flash')).toBe(MEMORY_MANAGED_MODEL);
+        expect(resolveMemoryModel('groq/compound')).toBe(MEMORY_MANAGED_MODEL);
+        expect(resolveMemoryModel('openai/gpt-oss-120b')).toBe(MEMORY_MANAGED_MODEL);
         expect(resolveMemoryModel('gpt-4o-mini')).toBe(MEMORY_MANAGED_MODEL);
         expect(resolveMemoryModel('claude-sonnet-4-6')).toBe(MEMORY_MANAGED_MODEL);
         expect(resolveMemoryModel('')).toBe(MEMORY_MANAGED_MODEL);

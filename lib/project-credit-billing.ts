@@ -45,7 +45,8 @@ export async function chargeProjectUsageCredits(
     organizationId: string,
     tier: string | null | undefined,
     amountUsd: number,
-    endpoint: string
+    endpoint: string,
+    referenceId?: string
 ): Promise<boolean> {
     if (!shouldEnforceProjectCredits(tier)) {
         return true;
@@ -58,6 +59,7 @@ export async function chargeProjectUsageCredits(
     return deductCredits(
         organizationId,
         amountUsd,
-        `Usage charge: ${endpoint}`
+        `Usage charge: ${endpoint}`,
+        referenceId
     );
 }

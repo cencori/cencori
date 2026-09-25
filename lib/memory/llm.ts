@@ -3,17 +3,17 @@
  *
  * Extraction, reconciliation, and entity extraction all need *a* capable model
  * returning JSON — they don't care which. Memory is a MANAGED product, so
- * Cencori picks the backend, and picks SEVERAL: the call fans out across free
- * managed providers in order and returns the first success.
+ * Cencori picks the backend and keeps a provider-diverse fallback: the call
+ * fans out across cost-controlled managed providers in order and returns the
+ * first success.
  *
- *   Groq Compound  →  Cerebras gpt-oss
+ *   Groq GPT-OSS 20B  →  Cerebras GPT-OSS 120B
  *
  * Generation is deliberately Google-free: Gemini does only embeddings for
  * memory (its dedicated project has generative models retired for new projects
  * anyway). Why a chain instead of one provider:
  * - No single dependency (not beholden to Google — or to any one of them).
- * - Aggregate free throughput = the sum of each provider's free rate limit, so
- *   one provider throttling doesn't stall memory.
+ * - A provider throttle or outage does not stall memory writeback.
  * - Deliberately excludes OpenAI/Anthropic — a memory call must never cascade
  *   into an unfunded paid provider.
  *
@@ -30,16 +30,16 @@ import type { SubscriptionTier } from '@/lib/entitlements';
 type SupabaseAdmin = ReturnType<typeof createAdminClient>;
 
 /**
- * Ordered list of free managed models to try. Each resolves to a distinct
- * provider (Cerebras / Groq / Google). Override via MEMORY_LLM_CHAIN
+ * Ordered list of managed production models to try. Each resolves to a distinct
+ * provider (Groq / Cerebras by default). Override via MEMORY_LLM_CHAIN
  * (comma-separated) without a deploy.
  */
 export const MEMORY_LLM_CHAIN: string[] = (process.env.MEMORY_LLM_CHAIN
     ?.split(',')
     .map(s => s.trim())
     .filter(Boolean)) ?? [
-    'groq/compound',            // Groq — free, capable, higher rate limits (primary)
-    'gpt-oss-120b',             // Cerebras — free, strong reconcile quality (fallback)
+    'openai/gpt-oss-20b',       // Groq — fast, low-cost structured extraction (primary)
+    'gpt-oss-120b',             // Cerebras — provider-diverse, higher-quality fallback
     // Gemini is intentionally NOT here: memory's generation stays Google-free
     // (Gemini serves embeddings only). Add a current Gemini model to
     // MEMORY_LLM_CHAIN for a 3rd fallback if you want one.
@@ -74,7 +74,7 @@ export interface MemoryLlmResult {
     costUsd: number;
 }
 
-/** Build the attempt order, pinning preferModel first when it's a chain member. */
+/** Build the attempt order, pinning a configured chain member first. */
 function orderedChain(preferModel?: string): string[] {
     if (preferModel && MEMORY_LLM_CHAIN.includes(preferModel)) {
         return [preferModel, ...MEMORY_LLM_CHAIN.filter(m => m !== preferModel)];

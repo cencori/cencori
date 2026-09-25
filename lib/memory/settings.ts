@@ -11,7 +11,7 @@ import {
     getCachedMemoryConfig,
     setCachedMemoryConfig,
 } from '@/lib/config-cache';
-import { DEFAULT_MEMORY_SETTINGS, type MemorySettings } from './types';
+import { DEFAULT_MEMORY_SETTINGS, resolveMemoryModel, type MemorySettings } from './types';
 
 type SupabaseAdmin = ReturnType<typeof createAdminClient>;
 
@@ -21,7 +21,11 @@ export async function getProjectMemorySettings(
 ): Promise<MemorySettings> {
     const cached = await getCachedMemoryConfig(projectId);
     if (cached?.data) {
-        return cached.data as MemorySettings;
+        const settings = cached.data as MemorySettings;
+        return {
+            ...settings,
+            extractionModel: resolveMemoryModel(settings.extractionModel),
+        };
     }
 
     let settings: MemorySettings = DEFAULT_MEMORY_SETTINGS;
@@ -40,7 +44,9 @@ export async function getProjectMemorySettings(
         if (row) {
             settings = {
                 enabled: row.enabled !== false,
-                extractionModel: row.extraction_model || DEFAULT_MEMORY_SETTINGS.extractionModel,
+                // Normalize retired/unsupported stored choices at read time. This
+                // changes runtime behavior safely without a data-rewriting migration.
+                extractionModel: resolveMemoryModel(row.extraction_model),
                 extractionPrompt: row.extraction_prompt || null,
                 minImportance:
                     typeof row.min_importance === 'number'

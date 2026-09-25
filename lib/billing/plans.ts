@@ -17,8 +17,8 @@ export const CENCORI_PAID_PLANS: Record<PaidPlanTier, PaidPlan> = {
     description: "For developers shipping production AI workloads.",
     logRetention: "30-day log retention",
     prices: {
-      month: 4_900,
-      year: 49_000,
+      month: 2_900,
+      year: 29_000,
     },
     features: [
       "Unlimited projects",
@@ -34,8 +34,8 @@ export const CENCORI_PAID_PLANS: Record<PaidPlanTier, PaidPlan> = {
     description: "For teams operating AI systems at scale.",
     logRetention: "90-day log retention",
     prices: {
-      month: 14_900,
-      year: 149_000,
+      month: 9_900,
+      year: 99_000,
     },
     features: [
       "Everything in Pro",

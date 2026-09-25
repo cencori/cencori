@@ -1,7 +1,7 @@
 /**
  * Entity-graph extraction + persistence — Phase 3, Layer 5 write path.
  *
- * Extracts entities + relations from an exchange (LLM, managed Google-only) and
+ * Extracts entities + relations from an exchange (managed GPT-OSS LLM) and
  * persists them into the memory graph with resolution: a merged entity gains an
  * alias and a mention, a new one is created, and relations become edges keyed by
  * (src, relation, dst). Same tenant boundary as gateway_memories.
@@ -48,7 +48,7 @@ export interface ExtractEntitiesResult {
     model: string;
 }
 
-/** LLM entity/relation extraction from an exchange. Managed Google-only. */
+/** LLM entity/relation extraction from an exchange. Managed GPT-OSS only. */
 export async function extractEntities(params: {
     supabase: SupabaseAdmin;
     projectId: string;
@@ -61,7 +61,7 @@ export async function extractEntities(params: {
 }): Promise<ExtractEntitiesResult> {
     const preferModel = resolveMemoryModel(params.model);
     try {
-        // Fan out across Cerebras → Groq → Gemini; first provider to answer wins.
+        // Fan out across the managed production chain; first provider to answer wins.
         const response = await callMemoryLlm({
             supabase: params.supabase,
             projectId: params.projectId,

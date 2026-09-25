@@ -1,10 +1,10 @@
 export interface ScanPaywallEntitlement {
     hasScanAccess?: boolean;
-    source?: "platform" | "scan_subscription" | "free" | null;
+    source?: "platform" | "free" | null;
     platformTier?: "pro" | "team" | "enterprise" | null;
-    scanTier?: "scan" | "scan_team" | null;
+    scanTier?: null;
     scanStatus?: string | null;
-    plan?: "free" | "scan" | "scan_team" | "pro" | "team" | "enterprise";
+    plan?: "free" | "pro" | "team" | "enterprise";
     limits?: {
         maxProjects?: number | null;
         maxScansPerProject?: number | null;
