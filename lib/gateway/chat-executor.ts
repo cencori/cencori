@@ -36,6 +36,26 @@ import { getCreditsBalance } from '@/lib/credits';
 
 type SupabaseAdmin = ReturnType<typeof createAdminClient>;
 
+export const CREDIT_EXHAUSTED_MESSAGE =
+    'Credit balance exhausted: managed model calls require prepaid credits';
+
+export class CreditExhaustedError extends Error {
+    code = 'credit_balance_exhausted' as const;
+    constructor(message: string = CREDIT_EXHAUSTED_MESSAGE) {
+        super(message);
+        this.name = 'CreditExhaustedError';
+    }
+}
+
+export function isCreditExhaustedError(error: unknown): boolean {
+    if (error instanceof CreditExhaustedError) return true;
+    if (error instanceof Error) {
+        return error.message.includes('Credit balance exhausted')
+            || (error as { code?: unknown }).code === 'credit_balance_exhausted';
+    }
+    return false;
+}
+
 async function assertManagedCreditsAvailable(
     billingMode: GatewayBillingMode,
     organizationId: string,
@@ -43,7 +63,7 @@ async function assertManagedCreditsAvailable(
 ): Promise<void> {
     if (billingMode !== 'standard' || tier === 'enterprise') return;
     if (await getCreditsBalance(organizationId) <= 0) {
-        throw new Error('Credit balance exhausted: managed model calls require prepaid credits');
+        throw new CreditExhaustedError();
     }
 }
 

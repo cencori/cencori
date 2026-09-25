@@ -10,7 +10,7 @@ import {
 } from '@/lib/providers/base';
 import type { SecurityCheckResult } from '@/lib/safety/multi-layer-check';
 import { deTokenize } from '@/lib/safety/custom-data-rules';
-import { executeGatewayChat, streamGatewayChat } from '@/lib/gateway/chat-executor';
+import { executeGatewayChat, isCreditExhaustedError, streamGatewayChat } from '@/lib/gateway/chat-executor';
 import { resolveGatewayProvider } from '@/lib/gateway/providers-setup';
 import { settleStreamUsage, toOpenAiUsage } from '@/lib/gateway/stream-usage';
 import {
@@ -195,6 +195,24 @@ function v1ProviderFailureResult(error: unknown, providerHint?: string, model?: 
         body.retry_after = failure.retryAfter;
     }
     return { ok: false, status: failure.status, body };
+}
+
+/**
+ * Credit-exhaustion check that survives mocked chat-executor modules in tests:
+ * when the mock factory does not re-export the helper, fall back to the
+ * message/code shape.
+ */
+function isCreditExhausted(error: unknown): boolean {
+    try {
+        if (typeof isCreditExhaustedError === 'function' && isCreditExhaustedError(error)) {
+            return true;
+        }
+    } catch {
+        // Fall through to the structural check below.
+    }
+    return error instanceof Error
+        && (error.message.includes('Credit balance exhausted')
+            || (error as { code?: unknown }).code === 'credit_balance_exhausted');
 }
 
 /**
@@ -1027,6 +1045,40 @@ export async function runV1ProviderExecution(
             response: new NextResponse(stream, { headers: streamHeaders }),
         };
     } catch (error) {
+        // A zero-balance managed call throws before any provider runs. Without
+        // this the request fails with no ai_requests row — the same invisibility
+        // as the preflight credit block. Record it as an error row so the
+        // console shows why the request went nowhere.
+        if (isCreditExhausted(error)) {
+            const message = error instanceof Error ? error.message : 'Credit balance exhausted';
+            try {
+                params.logSuccess({
+                    provider: 'cencori',
+                    model: params.model,
+                    status: 'error',
+                    promptTokens: 0,
+                    completionTokens: 0,
+                    totalTokens: 0,
+                    providerCostUsd: 0,
+                    cencoriChargeUsd: 0,
+                    markupPercentage: 0,
+                    errorMessage: message,
+                });
+            } catch {
+                // Logging must never break the error response.
+            }
+            return {
+                ok: false,
+                status: 403,
+                body: {
+                    error: {
+                        message: 'Credit balance exhausted. Top up to continue.',
+                        type: 'invalid_request_error',
+                        code: 'credit_balance_exhausted',
+                    },
+                },
+            };
+        }
         return v1ProviderFailureResult(error, undefined, params.model);
     }
 }

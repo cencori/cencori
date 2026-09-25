@@ -48,50 +48,30 @@ export async function GET(
                 break;
         }
 
-        const apiKeysQuery = supabaseAdmin
+        // Key names are display-only. Fetch all keys (including revoked) so
+        // rows tied to a rotated key still resolve. Filtering is by
+        // project + environment on ai_requests itself — never by key list —
+        // so playground (null key), revoked-key, and embedded-run rows stay
+        // visible.
+        const { data: allApiKeys } = await supabaseAdmin
             .from('api_keys')
             .select('id, name, key_prefix, environment')
-            .eq('project_id', projectId)
-            .is('revoked_at', null);
+            .eq('project_id', projectId);
 
-        const { data: allApiKeys } = await apiKeysQuery;
-
-        const apiKeys = allApiKeys?.filter(key => {
-            if (key.environment) {
-                return environment === 'production'
-                    ? key.environment === 'production'
-                    : key.environment === 'test';
-            } else {
-                const isTestKey = key.key_prefix?.includes('_test') || key.key_prefix?.includes('test_');
-                return environment === 'production' ? !isTestKey : isTestKey;
-            }
-        });
         const apiKeyMap: Record<string, { name: string; prefix: string }> = {};
-        apiKeys?.forEach(k => {
+        allApiKeys?.forEach(k => {
             apiKeyMap[k.id] = { name: k.name, prefix: k.key_prefix };
         });
-
-        const apiKeyIds = apiKeys?.map(k => k.id) || [];
-
-        if (apiKeyIds.length === 0) {
-            return NextResponse.json({
-                requests: [],
-                pagination: {
-                    page,
-                    per_page: perPage,
-                    total: 0,
-                    total_pages: 0,
-                },
-            });
-        }
-
-        const targetKeyIds = apiKeyId && apiKeyId !== 'all' ? [apiKeyId] : apiKeyIds;
 
         let query = supabaseAdmin
             .from('ai_requests')
             .select('*', { count: 'exact' })
             .eq('project_id', projectId)
-            .in('api_key_id', targetKeyIds);
+            .eq('environment', environment);
+
+        if (apiKeyId && apiKeyId !== 'all') {
+            query = query.eq('api_key_id', apiKeyId);
+        }
 
         if (status && status !== 'all') {
             query = query.eq('status', status);
@@ -136,7 +116,7 @@ export async function GET(
                 requestPreview = '';
             }
 
-            const keyInfo = apiKeyMap[req.api_key_id];
+            const keyInfo = req.api_key_id ? apiKeyMap[req.api_key_id] : undefined;
 
             return {
                 id: req.id,
@@ -144,8 +124,8 @@ export async function GET(
                 status: req.status,
                 model: req.model,
                 api_key_id: req.api_key_id,
-                api_key_name: keyInfo?.name || 'Unknown',
-                api_key_prefix: keyInfo?.prefix || 'unknown',
+                api_key_name: keyInfo?.name || (req.api_key_id ? 'Unknown' : 'No key'),
+                api_key_prefix: keyInfo?.prefix || (req.api_key_id ? 'unknown' : 'no-key'),
                 prompt_tokens: req.prompt_tokens,
                 completion_tokens: req.completion_tokens,
                 total_tokens: req.total_tokens,
