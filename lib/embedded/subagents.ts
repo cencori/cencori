@@ -4,6 +4,7 @@ import { resolveAgentRuntimeConfig } from './agents';
 import { normalizeManifest } from './manifest';
 import { appendRunEvent, emitEmbeddedEvent } from './runs';
 import { dePrefixId } from './http';
+import { chargeProjectUsageCredits } from '@/lib/project-credit-billing';
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -235,6 +236,7 @@ export async function delegateSubagent(
         const controller = new AbortController();
         const timer = setTimeout(() => { timedOut = true; controller.abort(); }, timeoutMs);
         let response: Awaited<ReturnType<typeof executeGatewayChat>>;
+        const gatewayChatStartedAt = Date.now();
         try {
             response = await executeGatewayChat({
                 supabase,
@@ -258,6 +260,7 @@ export async function delegateSubagent(
         } finally {
             clearTimeout(timer);
         }
+        const gatewayChatMs = Date.now() - gatewayChatStartedAt;
 
         const output = {
             type: 'result',
@@ -270,23 +273,33 @@ export async function delegateSubagent(
             usage: response.usage,
             cost: response.cost,
         };
-        // Meter the provider call even if cancellation wins the completion
-        // race. A completed provider request is never free merely because the
-        // child output was discarded.
+        // Meter and debit the provider call even if cancellation wins the
+        // completion race. The child cannot expose an unpaid managed result.
+        let charged = false;
+        try {
+            charged = await chargeProjectUsageCredits(opts.organizationId, opts.tier, response.cost.cencoriChargeUsd, 'runs.delegate');
+        } catch {
+            charged = false;
+        }
+        if (!charged) reconciliationReason = 'credit_deduction_failed';
         const { error: usageError } = await supabase.from('ai_requests').insert({
             project_id: opts.projectId, api_key_id: null, environment: 'production', endpoint: 'runs.delegate',
-            model: response.model, provider: response.provider, status: 'success',
+            model: response.model, provider: response.provider, status: charged ? 'success' : 'error',
             prompt_tokens: response.usage.promptTokens, completion_tokens: response.usage.completionTokens, total_tokens: response.usage.totalTokens,
-            cost_usd: response.cost.cencoriChargeUsd, provider_cost_usd: response.cost.providerCostUsd, cencori_charge_usd: response.cost.cencoriChargeUsd,
+            latency_ms: gatewayChatMs,
+            cost_usd: charged ? response.cost.cencoriChargeUsd : 0, provider_cost_usd: response.cost.providerCostUsd, cencori_charge_usd: charged ? response.cost.cencoriChargeUsd : 0,
             markup_percentage: response.cost.markupPercentage,
             tenant_id: parent.tenant_id, agent_id: childAgentId, installation_id: childInstallationId,
             run_id: childId, request_id: `sub_${childId.slice(0, 8)}`, request_payload: {},
+            metadata: reconciliationReason ? { billing_reconciliation_required: true, reason: reconciliationReason } : {},
         });
         if (usageError) {
             reconciliationReason = 'metering_failure';
-            throw new Error(`Failed to record subagent usage: ${usageError.message}`);
+            console.warn('[Embedded subagents] Usage insert failed', { childId, code: usageError.code });
+            throw new Error('Failed to record subagent usage');
         }
         usageRecorded = true;
+        if (!charged) throw new Error('Subagent usage could not be charged');
         if (timedOut) throw new Error('Subagent model completed after its deadline');
         const { data: done } = await supabase.from('embedded_runs').update({ status: 'completed', output_ref: output, completed_at: new Date().toISOString() }).eq('id', childId).eq('status', 'running').select('id').maybeSingle();
         if (done) {
@@ -300,17 +313,18 @@ export async function delegateSubagent(
         const message = timedOut ? `Subagent execution timed out after ${appliedTimeoutMs}ms` : e instanceof Error ? e.message : 'Subagent failed';
         if (!usageRecorded && /\btimed out after \d+ms\b/.test(message)) reconciliationReason = 'provider_timeout';
         if (timedOut && !usageRecorded) reconciliationReason = 'provider_timeout';
-        if (reconciliationReason && attemptedModel) {
+        if (reconciliationReason && attemptedModel && !usageRecorded) {
             const { error: reconciliationError } = await supabase.from('ai_requests').insert({
                 project_id: opts.projectId, api_key_id: null, environment: 'production', endpoint: 'runs.delegate',
                 model: attemptedModel, provider: 'unknown', status: 'error',
                 prompt_tokens: 0, completion_tokens: 0, total_tokens: 0,
+                latency_ms: timedOut ? appliedTimeoutMs : 0,
                 cost_usd: 0, provider_cost_usd: 0, cencori_charge_usd: 0, markup_percentage: 0,
                 tenant_id: parent.tenant_id, agent_id: childAgentId, installation_id: childInstallationId,
                 run_id: childId, request_id: `sub_${childId.slice(0, 8)}`, request_payload: {},
                 metadata: { billing_reconciliation_required: true, reason: reconciliationReason },
             });
-            if (reconciliationError) console.error('[Embedded subagents] Reconciliation row insert failed:', reconciliationError.message);
+            if (reconciliationError) console.error('[Embedded subagents] Reconciliation row insert failed', { childId, code: reconciliationError.code });
         }
         const errorText = reconciliationReason ? `billing_reconciliation_required:${reconciliationReason}; ${message}` : message;
         const { data: failed } = await supabase.from('embedded_runs').update({ status: 'failed', error: errorText.slice(0, 1000), completed_at: new Date().toISOString() }).eq('id', childId).eq('status', 'running').select('id').maybeSingle();
