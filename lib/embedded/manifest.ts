@@ -8,6 +8,7 @@ export const REASONING_EFFORTS = ['low', 'medium', 'high'] as const;
 
 export interface CapabilityManifest {
     model?: string;
+    temperature?: number;
     reasoning_effort?: string;
     fallback_policy?: { model?: string; on?: string[] };
     instructions?: string;
@@ -44,6 +45,7 @@ export function normalizeManifest(config: Record<string, unknown>): CapabilityMa
     const network = (policy.network ?? {}) as { mode?: string; allowed_hosts?: string[] };
     return {
         model: c.model as string | undefined,
+        temperature: c.temperature as number | undefined,
         reasoning_effort: c.reasoning_effort as string | undefined,
         fallback_policy: c.fallback_policy as CapabilityManifest['fallback_policy'],
         instructions: (c.instructions ?? c.system_prompt) as string | undefined,
@@ -120,6 +122,9 @@ export async function validateManifest(
     if (!m.model?.trim()) {
         errors.push('manifest.model is required');
     } else {
+        if (/^(?:openai\/)?gpt-6(?:[.-]|$)/.test(m.model) && m.temperature !== undefined) {
+            warnings.push('temperature is ignored for GPT-6 models while reasoning effort is enabled');
+        }
         try {
             const registry = await buildUnifiedModelRegistry(supabase, { projectId: opts.projectId });
             const match = registry.models.find((row) => row.id === m.model || `${row.provider}/${row.id}` === m.model || row.id === (m.model as string).split('/').pop());

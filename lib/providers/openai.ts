@@ -21,7 +21,9 @@ import { toOpenAIMessages, estimateTokenCount } from './utils';
 import { normalizeProviderError } from './errors';
 
 export function openAICompletionLimits(request: Pick<UnifiedChatRequest, 'model' | 'maxTokens' | 'temperature'>) {
-    const reasoningModel = /^(?:gpt-5(?:[.-]|$)|o[1-9](?:[.-]|$))/.test(request.model);
+    // GPT-6 defaults to reasoning effort "medium", which rejects sampling
+    // parameters just like the GPT-5 and o-series reasoning models.
+    const reasoningModel = /^(?:gpt-[56](?:[.-]|$)|o[1-9](?:[.-]|$))/.test(request.model);
     return {
         temperature: reasoningModel ? undefined : (request.temperature ?? 0.7),
         max_completion_tokens: request.maxTokens,
