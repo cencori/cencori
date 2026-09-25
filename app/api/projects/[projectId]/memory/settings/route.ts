@@ -18,10 +18,8 @@ import { getProjectMemorySettings, resolveMemoryModel } from '@/lib/memory';
 // Managed models memory is allowed to run on (see resolveMemoryModel). Not
 // exported — a Next.js route module may only export handlers.
 const MEMORY_MODEL_CHOICES = [
-    { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', hint: 'Default. Managed, fast, cheap.' },
-    { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', hint: 'Better extraction on messy exchanges.' },
-    { value: 'gpt-oss-120b', label: 'GPT-OSS 120B', hint: 'Cerebras. Not Google, no Gemini dependency.' },
-    { value: 'groq/compound', label: 'Groq Compound', hint: 'Groq. Fast, open, no Gemini dependency.' },
+    { value: 'openai/gpt-oss-20b', label: 'GPT-OSS 20B', hint: 'Default. Groq; fast and cost-efficient.' },
+    { value: 'gpt-oss-120b', label: 'GPT-OSS 120B (Cerebras)', hint: 'Provider-diverse high-quality option.' },
 ];
 
 /**

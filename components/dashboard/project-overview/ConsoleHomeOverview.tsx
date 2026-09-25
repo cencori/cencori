@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/lib/supabaseClient";
 import { formatCurrency } from "@/lib/currency";
-import { queryKeys } from "@/lib/hooks/useQueries";
 
 interface ConsoleHomeOverviewProps {
     orgId: string;
@@ -75,16 +74,26 @@ function useCreditsBalance(orgId: string, initialBalance: number | null) {
 }
 
 function useApiKeyCount(projectId: string) {
+    // Dedicated cache key — the settings page stores the raw keys array under
+    // queryKeys.apiKeys(projectId), which poisoned this count with an object.
     return useQuery({
-        queryKey: queryKeys.apiKeys(projectId),
-        queryFn: async () => {
+        queryKey: ["consoleHomeApiKeyCount", projectId],
+        queryFn: async (): Promise<number> => {
             const response = await fetch(`/api/projects/${projectId}/api-keys`);
             if (!response.ok) throw new Error("Could not load API keys");
-            const json = await response.json();
-            const keys = (json?.apiKeys || json?.keys || []) as unknown[];
-            return keys.length;
+            const json: unknown = await response.json();
+            const record = (typeof json === "object" && json !== null ? json : {}) as Record<string, unknown>;
+            const candidates = [record.apiKeys, record.keys, record.data, json];
+            for (const candidate of candidates) {
+                if (Array.isArray(candidate)) return candidate.length;
+                if (typeof candidate === "number" && Number.isFinite(candidate)) return candidate;
+            }
+            return 0;
         },
-        staleTime: 30 * 1000,
+        // Always refetch on mount so revokes/creates from other pages are
+        // reflected the moment the user comes back here.
+        staleTime: 0,
+        refetchOnMount: "always",
     });
 }
 
@@ -101,7 +110,8 @@ export function ConsoleHomeOverview({
 
     const firstName = useFirstName(initialFirstName);
     const { data: balance, isLoading: balanceLoading } = useCreditsBalance(orgId, initialBalance);
-    const { data: keyCount, isLoading: keysLoading } = useApiKeyCount(projectId);
+    const { data: keyCountData, isLoading: keysLoading } = useApiKeyCount(projectId);
+    const keyCount = keyCountData ?? 0;
 
     const greeting = greetingForHour(new Date().getHours());
     const billingHref = consoleMode ? "/billing" : `/${orgSlug}/~/billing`;
@@ -215,7 +225,7 @@ export function ConsoleHomeOverview({
                     defaultKeyType="secret"
                     onKeyGenerated={() => {
                         void queryClient.invalidateQueries({
-                            queryKey: queryKeys.apiKeys(projectId),
+                            queryKey: ["consoleHomeApiKeyCount", projectId],
                         });
                     }}
                 />

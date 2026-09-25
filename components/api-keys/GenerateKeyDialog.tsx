@@ -240,7 +240,7 @@ export function GenerateKeyDialog({
                                     <Input
                                         value={generatedKey}
                                         readOnly
-                                        className="h-8 font-mono text-[10px] bg-secondary/50"
+                                        className="h-8 font-mono text-[10px] bg-secondary/50 border-foreground/25"
                                     />
                                     <Button variant="outline" size="icon" onClick={handleCopy} className="h-8 w-8 shrink-0">
                                         {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}

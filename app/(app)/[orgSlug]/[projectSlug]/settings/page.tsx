@@ -318,17 +318,25 @@ export default function ProjectSettingsPage({ params }: PageProps) {
   });
 
   // Fetch API keys with caching
-  const { data: apiKeys = [], refetch: refetchApiKeys } = useQuery<ApiKeyData[]>({
+  const { data: apiKeysData, refetch: refetchApiKeys } = useQuery<unknown, Error, ApiKeyData[]>({
     queryKey: ["apiKeys", project?.id],
     queryFn: async () => {
       const response = await fetch(`/api/projects/${project!.id}/api-keys`);
       if (!response.ok) throw new Error("Failed to fetch API keys");
-      const data = await response.json();
-      return data.apiKeys || [];
+      return response.json();
+    },
+    select: (payload): ApiKeyData[] => {
+      if (Array.isArray(payload)) return payload as ApiKeyData[];
+      if (payload && typeof payload === "object" && "apiKeys" in payload) {
+        const keys = (payload as { apiKeys?: unknown }).apiKeys;
+        return Array.isArray(keys) ? (keys as ApiKeyData[]) : [];
+      }
+      return [];
     },
     enabled: !!project?.id,
     staleTime: 30 * 1000,
   });
+  const apiKeys: ApiKeyData[] = apiKeysData ?? [];
 
   // Fetch provider settings
   interface ProviderSettingsData {

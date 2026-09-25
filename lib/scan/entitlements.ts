@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 
 export type ScanStandaloneTier = "scan" | "scan_team";
-type EntitlementSource = "platform" | "scan_subscription" | "free" | null;
-type ScanPlan = "free" | "scan" | "scan_team" | "pro" | "team" | "enterprise";
+type EntitlementSource = "platform" | "free" | null;
+type ScanPlan = "free" | "pro" | "team" | "enterprise";
 
 export const FREE_SCAN_MAX_PROJECTS = 5;
 export const FREE_SCAN_MAX_SCANS_PER_PROJECT = 2;
@@ -17,16 +17,11 @@ interface OrganizationRow {
     bachs_customer_id?: string | null;
 }
 
-interface ScanSubscriptionRow {
-    scan_tier: ScanStandaloneTier;
-    status: string | null;
-}
-
 export interface ScanEntitlement {
     hasScanAccess: boolean;
     source: EntitlementSource;
     platformTier: "pro" | "team" | "enterprise" | null;
-    scanTier: ScanStandaloneTier | null;
+    scanTier: null;
     scanStatus: string | null;
     plan: ScanPlan;
     limits: {
@@ -125,7 +120,7 @@ async function getImportedProjectCount(
 }
 
 export function hasUnlimitedScanAccess(entitlement: ScanEntitlement): boolean {
-    return entitlement.source === "platform" || entitlement.source === "scan_subscription";
+    return entitlement.source === "platform";
 }
 
 export async function getScanEntitlementForUser(userId: string): Promise<ScanEntitlement> {
@@ -193,44 +188,18 @@ export async function getScanEntitlementForUser(userId: string): Promise<ScanEnt
         };
     }
 
-    const { data: scanSubscription, error: scanSubscriptionError } = await supabaseAdmin
-        .from("scan_subscriptions")
-        .select("scan_tier, status")
-        .eq("user_id", userId)
-        .maybeSingle();
-
-    if (scanSubscriptionError) {
-        throw new Error(`Failed to resolve scan subscription: ${scanSubscriptionError.message}`);
-    }
-
-    const typedScanSubscription = scanSubscription as ScanSubscriptionRow | null;
-    if (typedScanSubscription && isActiveStatus(typedScanSubscription.status)) {
-        return {
-            hasScanAccess: true,
-            source: "scan_subscription",
-            platformTier: null,
-            scanTier: typedScanSubscription.scan_tier,
-            scanStatus: typedScanSubscription.status || "active",
-            plan: typedScanSubscription.scan_tier,
-            limits: {
-                maxProjects: null,
-                maxScansPerProject: null,
-            },
-            usage: {
-                projectsImported: null,
-                remainingProjectImports: null,
-            },
-        };
-    }
-
+    // Standalone Scan subscriptions are deprecated and removed from the
+    // product offering. No new grants; the scan_subscriptions table is no
+    // longer read. Platform Pro/Team/Enterprise grant unlimited access,
+    // everyone else falls back to free limits below.
     const projectsImported = await getImportedProjectCount(userId, supabaseAdmin);
 
     return {
         hasScanAccess: true,
         source: "free",
         platformTier: null,
-        scanTier: typedScanSubscription?.scan_tier || null,
-        scanStatus: typedScanSubscription?.status || null,
+        scanTier: null,
+        scanStatus: null,
         plan: "free",
         limits: {
             maxProjects: FREE_SCAN_MAX_PROJECTS,

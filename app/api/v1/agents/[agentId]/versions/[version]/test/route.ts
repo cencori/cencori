@@ -105,6 +105,10 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ agentId: s
 
     try {
         const { executeGatewayChat } = await import('@/lib/gateway/chat-executor');
+        // Reuse the gateway request UUID directly: credit_transactions
+        // .reference_id is UUID-typed, so a prefixed id fails the debit.
+        const testRequestId = requestId;
+        const gatewayStartedAt = Date.now();
         const response = await executeGatewayChat({
             supabase: supabase as never,
             projectId: validation.context.projectId,
@@ -119,8 +123,32 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ agentId: s
                 temperature: manifest.temperature,
                 maxTokens: TEST_MAX_TOKENS,
             },
-            requestId: `test_${requestId.slice(0, 8)}`,
+            requestId: testRequestId,
         });
+        // Meter the managed model call before treating the test as
+        // successful: idempotent wallet debit + ai_requests usage row.
+        const { meterAgentTestUsage } = await import('@/lib/embedded/test-metering');
+        const metered = await meterAgentTestUsage({
+            supabase: supabase as never,
+            projectId: validation.context.projectId,
+            organizationId,
+            tier,
+            endpoint: 'agents.version_test',
+            requestId: testRequestId,
+            agentId,
+            model: (response as { actualModel?: string }).actualModel ?? response.model,
+            provider: (response as { actualProvider?: string }).actualProvider ?? response.provider,
+            usage: response.usage,
+            cost: response.cost,
+            latencyMs: Date.now() - gatewayStartedAt,
+            apiKeyId: validation.context.apiKeyId ?? null,
+            environment: validation.context.environment ?? 'production',
+        });
+        if (!metered.ok) {
+            await supabase.from('agent_versions').update({ last_tested_at: new Date().toISOString(), last_test_passed: false }).eq('id', (target.id as string));
+            const status = metered.code === 'insufficient_credits' ? 402 : 502;
+            return addGatewayHeaders(embeddedError(status, 'invalid_request_error', metered.message, { requestId }), { requestId });
+        }
         // Record test evidence: publication requires a passing test.
         const { error: evidenceError } = await supabase.from('agent_versions').update({ last_tested_at: new Date().toISOString(), last_test_passed: true }).eq('id', (target.id as string));
         if (evidenceError) throw new Error(`Unable to record passing test evidence: ${evidenceError.message}`);

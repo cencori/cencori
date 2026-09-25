@@ -25,7 +25,6 @@ export function getWebhookSecret(): string {
 export type BachsProductType =
   | 'subscription'
   | 'credits_topup'
-  | 'scan_subscription'
   | 'basecode_subscription';
 export type SubscriptionTier = 'pro' | 'team';
 export type BillingInterval = 'month' | 'year';
@@ -287,8 +286,6 @@ export const BACHS_CONFIG = {
     creditsStarter: process.env.BACHS_PRODUCT_CREDITS_STARTER || '',
     creditsGrowth: process.env.BACHS_PRODUCT_CREDITS_GROWTH || '',
     creditsScale: process.env.BACHS_PRODUCT_CREDITS_SCALE || '',
-    scanMonthly: process.env.BACHS_PRODUCT_SCAN_MONTHLY || '',
-    scanTeamMonthly: process.env.BACHS_PRODUCT_SCAN_TEAM_MONTHLY || '',
     basecodeBuilderMonthly: process.env.BACHS_PRODUCT_BASECODE_BUILDER_MONTHLY || '',
     basecodeProMonthly: process.env.BACHS_PRODUCT_BASECODE_PRO_MONTHLY || '',
   } as const,
@@ -330,8 +327,6 @@ function initProductBillingInterval() {
   if (p.proAnnual) PRODUCT_BILLING_INTERVAL[p.proAnnual] = 'year';
   if (p.teamMonthly) PRODUCT_BILLING_INTERVAL[p.teamMonthly] = 'month';
   if (p.teamAnnual) PRODUCT_BILLING_INTERVAL[p.teamAnnual] = 'year';
-  if (p.scanMonthly) PRODUCT_BILLING_INTERVAL[p.scanMonthly] = 'month';
-  if (p.scanTeamMonthly) PRODUCT_BILLING_INTERVAL[p.scanTeamMonthly] = 'month';
 }
 
 let _intervalInit = false;
@@ -376,15 +371,6 @@ export function getProductId(
   return id;
 }
 
-export function getScanProductId(tier: 'scan' | 'scan_team'): string {
-  const id =
-    tier === 'scan'
-      ? BACHS_CONFIG.products.scanMonthly
-      : BACHS_CONFIG.products.scanTeamMonthly;
-  if (!id) throw new Error(`No Bachs product configured for ${tier}`);
-  return id;
-}
-
 export function getBasecodeProductId(tier: 'builder' | 'pro'): string {
   const id =
     tier === 'builder'
@@ -399,14 +385,6 @@ export function getBasecodePlanByProductId(
 ): 'builder' | 'pro' | null {
   if (productId === BACHS_CONFIG.products.basecodeBuilderMonthly) return 'builder';
   if (productId === BACHS_CONFIG.products.basecodeProMonthly) return 'pro';
-  return null;
-}
-
-export function getScanTierByProductId(
-  productId: string
-): 'scan' | 'scan_team' | null {
-  if (productId === BACHS_CONFIG.products.scanMonthly) return 'scan';
-  if (productId === BACHS_CONFIG.products.scanTeamMonthly) return 'scan_team';
   return null;
 }
 
@@ -457,9 +435,6 @@ export function getProductTypeFromId(
     productId === p.creditsScale
   ) {
     return 'credits_topup';
-  }
-  if (productId === p.scanMonthly || productId === p.scanTeamMonthly) {
-    return 'scan_subscription';
   }
   if (
     productId === p.basecodeBuilderMonthly ||

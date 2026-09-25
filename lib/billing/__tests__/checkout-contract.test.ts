@@ -34,7 +34,7 @@ describe("Cencori checkout contract", () => {
       expect(plan.features.some((feature) => /requests?\/month|requests each month/i.test(feature)))
         .toBe(false);
     }
-    expect(getMonthlyEquivalentCents("pro", "year")).toBeCloseTo(4_083.33, 1);
+    expect(getMonthlyEquivalentCents("pro", "year")).toBeCloseTo(2_416.67, 1);
   });
 
   test("does not offer a customer their current plan as an upgrade", () => {

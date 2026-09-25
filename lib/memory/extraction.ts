@@ -56,15 +56,15 @@ export async function extractFacts(params: {
         settings, extractOverride, userText, assistantText, requestId,
     } = params;
 
-    // Managed memory model preference (Gemini or open GPT-OSS) — pins the first
-    // provider in the fan-out; callMemoryLlm falls across the rest if it fails.
+    // Managed GPT-OSS preference pins the first provider in the fan-out;
+    // callMemoryLlm falls across the provider-diverse defaults if it fails.
     const preferModel = resolveMemoryModel(extractOverride?.model || settings.extractionModel);
     const minImportance = extractOverride?.minImportance ?? settings.minImportance;
     const systemPrompt =
         extractOverride?.prompt || settings.extractionPrompt || DEFAULT_EXTRACTION_PROMPT;
 
     try {
-        // Fan out across Cerebras → Groq → Gemini; first provider to answer wins.
+        // Fan out across the managed production chain; first provider to answer wins.
         const response = await callMemoryLlm({
             supabase,
             projectId,

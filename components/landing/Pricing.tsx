@@ -12,11 +12,7 @@ import { CENCORI_PAID_PLANS } from "@/lib/billing/plans";
 type Tier = "free" | "pro" | "team" | "enterprise";
 type BillingPeriod = "monthly" | "annual";
 type Currency = "USD" | "NGN";
-type ScanTier = "scan_free" | "scan" | "scan_team";
-type PaidScanTier = Exclude<ScanTier, "scan_free">;
 type MatrixValue = boolean | string;
-const SCAN_APP_ORIGIN = "https://scan.cencori.com";
-const SCAN_SIGNUP_URL = `${SCAN_APP_ORIGIN}/signup?redirect=${encodeURIComponent(SCAN_APP_ORIGIN)}`;
 
 const tiers: Array<{
     name: Tier;
@@ -54,7 +50,7 @@ const tiers: Array<{
                 monthly: CENCORI_PAID_PLANS.pro.prices.month / 100,
                 annual: CENCORI_PAID_PLANS.pro.prices.year / 100,
             },
-            NGN: { monthly: 39000, annual: 390000 }
+            NGN: { monthly: 29000, annual: 290000 }
         },
         features: [
             "Unlimited projects",
@@ -76,7 +72,7 @@ const tiers: Array<{
                 monthly: CENCORI_PAID_PLANS.team.prices.month / 100,
                 annual: CENCORI_PAID_PLANS.team.prices.year / 100,
             },
-            NGN: { monthly: 150000, annual: 1500000 }
+            NGN: { monthly: 99000, annual: 990000 }
         },
         features: [
             "Unlimited projects",
@@ -107,55 +103,6 @@ const tiers: Array<{
         ],
         cta: "Contact Sales",
         ctaVariant: "outline",
-    },
-];
-
-const scanAddons: Array<{
-    name: ScanTier;
-    displayName: string;
-    price: Record<Currency, number>;
-    description: string;
-    features: string[];
-    cta: string;
-}> = [
-    {
-        name: "scan_free",
-        displayName: "Scan Free",
-        price: { USD: 0, NGN: 0 },
-        description: "Start scanning at no cost with limited usage.",
-        features: [
-            "Up to 5 imported projects",
-            "2 scans per project",
-            "Scan dashboard access",
-            "Upgrade anytime to unlimited",
-        ],
-        cta: "Start Free",
-    },
-    {
-        name: "scan",
-        displayName: "Scan",
-        price: { USD: 9, NGN: 9000 },
-        description: "Unlimited standalone scan access for individual engineers.",
-        features: [
-            "Unlimited repository imports",
-            "Unlimited scans per project",
-            "AI fix generation",
-            "Fix PR workflow",
-        ],
-        cta: "Start Scan",
-    },
-    {
-        name: "scan_team",
-        displayName: "Scan Teams",
-        price: { USD: 29, NGN: 29000 },
-        description: "Unlimited standalone scan access for teams.",
-        features: [
-            "Everything in Scan",
-            "Team-oriented scan workflows",
-            "Changelog and remediation pipeline",
-            "Priority scan support",
-        ],
-        cta: "Start Scan Teams",
     },
 ];
 
@@ -322,17 +269,12 @@ function getSubPriceLabel(tier: (typeof tiers)[number], billingPeriod: BillingPe
     return "Platform subscription";
 }
 
-function isPaidScanTier(tier: ScanTier): tier is PaidScanTier {
-    return tier === "scan" || tier === "scan_team";
-}
-
 export function Pricing() {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>("monthly");
     const [currency, setCurrency] = useState<Currency>("USD");
     const [orgId, setOrgId] = useState<string | null>(null);
     const [loadingTier, setLoadingTier] = useState<Tier | null>(null);
-    const [loadingScanTier, setLoadingScanTier] = useState<ScanTier | null>(null);
 
     useEffect(() => {
         try {
@@ -415,37 +357,6 @@ export function Pricing() {
             window.location.href = "/dashboard";
         } finally {
             setLoadingTier(null);
-        }
-    };
-
-    const handleScanCTA = async (tier: ScanTier) => {
-        if (!isAuthenticated) {
-            window.location.href = SCAN_SIGNUP_URL;
-            return;
-        }
-
-        if (tier === "scan_free") {
-            window.location.href = SCAN_APP_ORIGIN;
-            return;
-        }
-
-        setLoadingScanTier(tier);
-        try {
-            const res = await fetch("/api/billing/scan/checkout", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ tier: isPaidScanTier(tier) ? tier : "scan" }),
-            });
-            const data = await res.json().catch(() => ({}));
-            if (data.checkoutUrl) {
-                window.location.href = data.checkoutUrl;
-            } else {
-                window.location.href = SCAN_APP_ORIGIN;
-            }
-        } catch {
-            window.location.href = SCAN_APP_ORIGIN;
-        } finally {
-            setLoadingScanTier(null);
         }
     };
 
@@ -630,65 +541,6 @@ export function Pricing() {
                                 ))}
                             </tbody>
                         </table>
-                    </div>
-                </div>
-
-                <div className="mt-8 overflow-hidden rounded-2xl border border-border/50 bg-background/95">
-                    <div className="border-b border-border/50 px-5 py-4">
-                        <p className="text-sm font-semibold">Scan Add-on</p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                            Standalone scan plans for users who only need scan workflows. Platform Pro, Team, and Enterprise
-                            plans include full scan access automatically. Free scan usage includes 5 imported projects and 2 scans per project.
-                        </p>
-                    </div>
-                    <div className="grid gap-0 border-border/50 md:grid-cols-3">
-                        {scanAddons.map((addon, index) => (
-                            <article
-                                key={addon.name}
-                                className={cn(
-                                    "flex flex-col gap-4 p-5",
-                                    index < scanAddons.length - 1 && "border-b border-border/50 md:border-b-0 md:border-r"
-                                )}
-                            >
-                                <div>
-                                    <p className="text-base font-semibold">{addon.displayName}</p>
-                                    <p className="mt-1 text-sm text-muted-foreground">{addon.description}</p>
-                                </div>
-
-                                <p className="text-3xl font-semibold tracking-tight">
-                                    {addon.price[currency] === 0 ? "Free" : formatCurrency(addon.price[currency], currency, { maximumFractionDigits: 0 })}
-                                    <span className="text-base text-muted-foreground">{addon.price[currency] === 0 ? "" : " /mo"}</span>
-                                </p>
-
-                                <ul className="space-y-2">
-                                    {addon.features.map((feature) => (
-                                        <li key={feature} className="flex items-start gap-2 text-xs text-muted-foreground">
-                                            <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-foreground" />
-                                            <span>{feature}</span>
-                                        </li>
-                                    ))}
-                                </ul>
-
-                                <Button
-                                    className="mt-auto w-full rounded-full text-xs"
-                                    variant={addon.name === "scan_team" ? "default" : "outline"}
-                                    onClick={() => handleScanCTA(addon.name)}
-                                    disabled={loadingScanTier === addon.name}
-                                >
-                                    {loadingScanTier === addon.name ? (
-                                        <span className="inline-flex items-center gap-1.5">
-                                            <span className="h-3 w-3 animate-spin rounded-full border border-current border-t-transparent" />
-                                            Redirecting...
-                                        </span>
-                                    ) : (
-                                        <span className="inline-flex items-center gap-1.5">
-                                            {addon.cta}
-                                            <ArrowRight className="h-3 w-3" />
-                                        </span>
-                                    )}
-                                </Button>
-                            </article>
-                        ))}
                     </div>
                 </div>
 

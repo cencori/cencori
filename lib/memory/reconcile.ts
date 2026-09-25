@@ -250,7 +250,7 @@ export async function reconcileFacts(params: ReconcileParams): Promise<Reconcile
     }
 
     try {
-        // Fan out across Cerebras → Groq → Gemini; first provider to answer wins.
+        // Fan out across the managed production chain; first provider to answer wins.
         const response = await callMemoryLlm({
             supabase,
             projectId,
