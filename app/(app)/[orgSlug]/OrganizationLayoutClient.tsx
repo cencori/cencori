@@ -48,6 +48,7 @@ import Chart01Icon from "@hugeicons/core-free-icons/Chart01Icon";
 import Loading03Icon from "@hugeicons/core-free-icons/Loading03Icon";
 import UserMultipleIcon from "@hugeicons/core-free-icons/UserMultipleIcon";
 import DocumentValidationIcon from "@hugeicons/core-free-icons/DocumentValidationIcon";
+import Building03Icon from "@hugeicons/core-free-icons/Building03Icon";
 import { useMobileSheet } from "@/lib/contexts/MobileSheetContext";
 import { useSession } from "@/lib/contexts/SessionContext";
 import { isAuthExpiredError } from "@/lib/auth/auth-errors";
@@ -443,7 +444,7 @@ export default function OrganizationLayoutClient({
         { href: consoleMode ? "/usage" : `${orgBase}/~/usage`, icon: <HugeiconsIcon icon={Chart01Icon} className="!h-5 !w-5" />, label: "Usage" },
         { href: consoleMode ? "/teams" : `${orgBase}/~/teams`, icon: <HugeiconsIcon icon={UserMultipleIcon} className="!h-5 !w-5" />, label: "Teams" },
         { href: consoleMode ? "/audit-log" : `${orgBase}/~/audit-log`, icon: <HugeiconsIcon icon={DocumentValidationIcon} className="!h-5 !w-5" />, label: "Audit Log" },
-        { href: consoleMode ? "/governance" : `${orgBase}/~/governance`, icon: <HugeiconsIcon icon={AiLockIcon} className="!h-5 !w-5" />, label: "Governance" },
+        { href: consoleMode ? "/governance" : `${orgBase}/~/governance`, icon: <HugeiconsIcon icon={Building03Icon} className="!h-5 !w-5" />, label: "Governance" },
     ];
 
     const bottomItems = [

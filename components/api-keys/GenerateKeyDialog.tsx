@@ -125,7 +125,7 @@ export function GenerateKeyDialog({
 
     return (
         <Dialog open={open} onOpenChange={handleClose}>
-            <DialogContent className="sm:max-w-[420px] p-0">
+            <DialogContent className="sm:max-w-[420px] p-0 border-0 bg-muted/50">
                 {!generatedKey ? (
                     <>
                         <DialogHeader className="px-4 pt-4 pb-0">
@@ -197,7 +197,6 @@ export function GenerateKeyDialog({
                             {!isPublishable && (
                                 <div className="rounded-md bg-amber-500/10 border border-amber-500/20 p-2.5">
                                     <div className="flex gap-2">
-                                        <Shield className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
                                         <div className="space-y-1">
                                             <p className="text-[11px] font-medium text-amber-600 dark:text-amber-400">Keep this key secret</p>
                                             <ul className="text-[10px] text-amber-600/80 dark:text-amber-400/80 space-y-0.5 list-disc list-inside">
