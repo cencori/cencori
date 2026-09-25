@@ -6,6 +6,41 @@ import type { ProviderApiFormat } from './types';
 type Admin = ReturnType<typeof createAdminClient>;
 
 // Official providers must use Cencori-owned origins; base_url is never caller-editable.
+// Callers often paste the vendor's default URL (e.g. https://api.openai.com/v1 for
+// openai) out of habit — accept that exact canonical value and normalize it to null
+// (managed endpoint) instead of 422ing, so live connection tests don't fail on UX.
+const OFFICIAL_BASE_URLS: Record<string, string[]> = {
+    openai: ['https://api.openai.com/v1'],
+    anthropic: ['https://api.anthropic.com', 'https://api.anthropic.com/v1'],
+    google: ['https://generativelanguage.googleapis.com', 'https://generativelanguage.googleapis.com/v1beta'],
+    cohere: ['https://api.cohere.ai/v1'],
+    xai: ['https://api.x.ai/v1'],
+    deepseek: ['https://api.deepseek.com', 'https://api.deepseek.com/v1'],
+    groq: ['https://api.groq.com/openai/v1'],
+    mistral: ['https://api.mistral.ai/v1'],
+    together: ['https://api.together.xyz/v1'],
+    perplexity: ['https://api.perplexity.ai', 'https://api.perplexity.ai/v1'],
+    huggingface: ['https://api-inference.huggingface.co/v1', 'https://api-inference.huggingface.co'],
+    zai: ['https://api.z.ai/api/paas/v4'],
+    cerebras: ['https://api.cerebras.ai/v1'],
+    qwen: ['https://dashscope.aliyuncs.com/compatible-mode/v1'],
+    meta: ['https://api.together.xyz/v1'],
+    maximo: ['https://api.maximoai.co/v1'],
+    helix: ['https://api.launchverse.app/api/v1'],
+    centaur: ['https://api.okeymeta.com.ng/v1'],
+    bai: ['https://api.b.ai/v1'],
+};
+
+function normalizeBaseUrl(value: string): string {
+    return value.trim().replace(/\/+$/, '').toLowerCase();
+}
+
+export function isCanonicalOfficialBaseUrl(provider: string, baseUrl: string): boolean {
+    const allowed = OFFICIAL_BASE_URLS[provider.toLowerCase()];
+    if (!allowed) return false;
+    const normalized = normalizeBaseUrl(baseUrl);
+    return allowed.some((u) => normalizeBaseUrl(u) === normalized);
+}
 const OFFICIAL_PROVIDERS = new Set([
     'openai', 'anthropic', 'google', 'cohere', 'xai', 'deepseek', 'groq', 'mistral',
     'together', 'perplexity', 'huggingface', 'zai', 'cerebras', 'qwen',
@@ -38,7 +73,12 @@ export async function validateConnectionInput(
 
     if (isOfficialProvider(provider)) {
         if (input.baseUrl && input.baseUrl.trim()) {
-            return { ok: false, code: 'invalid_request_error', message: 'base_url is not editable for official providers' };
+            // Tolerate the vendor default — callers paste it from docs/SDK examples.
+            // Normalize to the managed endpoint instead of failing the connection test.
+            if (isCanonicalOfficialBaseUrl(provider, input.baseUrl)) {
+                return { ok: true, baseUrl: null };
+            }
+            return { ok: false, code: 'invalid_request_error', message: `base_url must be omitted for official provider '${provider}' (Cencori uses its managed endpoint automatically). Remove base_url — or register a custom provider name to use a proxy.` };
         }
         return { ok: true, baseUrl: null };
     }

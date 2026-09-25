@@ -741,7 +741,13 @@ export async function POST(req: NextRequest) {
 
             const flatBody: Record<string, unknown> = {
                 error: nested?.code || 'provider_error',
-                message: nested?.message || 'Provider request failed',
+                // Never return a bare "Provider request failed" — without the
+                // status/code the caller can't tell invalid_request_error from
+                // auth/rate-limit/outage. Message is already public-safe here
+                // (branded upstream text, no key material).
+                message: nested?.message || `Provider request failed (HTTP ${execResult.status}, code ${nested?.code ?? 'provider_error'})`,
+                code: nested?.code || 'provider_error',
+                status: execResult.status,
             };
             if (execResult.body.retry_after != null) {
                 flatBody.retry_after = execResult.body.retry_after;

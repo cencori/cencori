@@ -4,6 +4,7 @@ import { validateGatewayRequest, addGatewayHeaders, handleCorsPreFlight } from '
 import { embeddedError, dePrefixId, withPrefix, getIdempotencyKey } from '@/lib/embedded/http';
 import { PROVIDER_CONNECTION_PREFIX, PROVIDER_SYNC_PREFIX } from '@/lib/embedded/types';
 import { decryptApiKey } from '@/lib/encryption';
+import { extractUpstreamErrorDetails } from '@/lib/embedded/upstream-error';
 import { safeOutboundFetch } from '@/lib/security/outbound-url';
 import crypto from 'crypto';
 
@@ -65,7 +66,10 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ connection
             }
             const res = await safeOutboundFetch(`${baseUrl.replace(/\/$/, '')}/models`, { headers, signal: AbortSignal.timeout(15000) }, { maxRedirects: 0 });
             if (!res.ok) {
-                return addGatewayHeaders(embeddedError(502, 'provider_unhealthy', `Upstream model discovery failed with status ${res.status}`, { requestId }), { requestId });
+                const rawText = await res.text().catch(() => '');
+                const upstream = extractUpstreamErrorDetails(rawText);
+                const detail = upstream.message ?? upstream.excerpt ?? `status ${res.status}`;
+                return addGatewayHeaders(embeddedError(502, upstream.code ?? 'provider_unhealthy', `Upstream model discovery failed with status ${res.status}: ${detail}`, { requestId }), { requestId });
             }
             upstreamEtag = res.headers.get('etag');
             const json = (await res.json().catch(() => null)) as { data?: Array<{ id?: string; name?: string; display_name?: string }> } | null;
