@@ -66,6 +66,8 @@ interface ProviderKeyData {
     defaultModel?: string;
     defaultImageModel?: string;
     createdAt?: string;
+    source?: 'dashboard' | 'api';
+    connectionId?: string;
 }
 
 interface ProviderKeysResponse {
@@ -318,6 +320,11 @@ export function ProviderKeyManager({ projectId }: ProviderKeyManagerProps) {
                                     Default
                                 </Badge>
                             )}
+                            {keyData?.source === 'api' && (
+                                <Badge variant="outline" title={keyData.connectionId ? `Connected via API (${keyData.connectionId})` : 'Connected via API'} className="text-[10px] px-1.5 py-0 h-4 rounded-md border-border/50">
+                                    API
+                                </Badge>
+                            )}
                         </div>
 
                         {/* Right: Status + Chevron */}
@@ -360,6 +367,9 @@ export function ProviderKeyManager({ projectId }: ProviderKeyManagerProps) {
                             <a href={selectedProvider?.website} target="_blank" rel="noopener noreferrer" className="text-foreground hover:underline">
                                 {selectedProvider?.website?.replace('https://', '')}
                             </a>
+                            {selectedProvider && data?.providers.find(p => p.provider === selectedProvider.id)?.source === 'api' && (
+                                <span className="block mt-1">Connected via API — saving here moves it to dashboard keys.</span>
+                            )}
                         </DialogDescription>
                     </DialogHeader>
 

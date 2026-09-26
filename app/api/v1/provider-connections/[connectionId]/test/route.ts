@@ -4,6 +4,7 @@ import { validateGatewayRequest, addGatewayHeaders, handleCorsPreFlight } from '
 import { embeddedError, dePrefixId } from '@/lib/embedded/http';
 import { decryptApiKey } from '@/lib/encryption';
 import { extractUpstreamErrorDetails } from '@/lib/embedded/upstream-error';
+import { invalidateProviderConfig } from '@/lib/config-cache';
 import { safeOutboundFetch } from '@/lib/security/outbound-url';
 import crypto from 'crypto';
 
@@ -28,6 +29,11 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ connection
     if (!row) return addGatewayHeaders(embeddedError(404, 'invalid_request_error', 'Provider connection not found', { requestId }), { requestId });
 
     const started = Date.now();
+    // Probe flips (active/unhealthy) change fallback eligibility — drop the
+    // cached BYOK row so the gateway picks up the new state within the TTL.
+    const touchProviderCache = () => {
+        void invalidateProviderConfig(validation.context.projectId, String((row.provider as string) ?? '').toLowerCase());
+    };
     try {
         const baseUrl = (row.base_url as string | null) ?? null;
         const apiFormat = (row.api_format as string) ?? 'openai';
@@ -35,6 +41,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ connection
             // Official provider: key-presence check only in M0 (no upstream call without explicit probe opt-in).
             const hasKey = Boolean(row.encrypted_key_ref);
             await supabase.from('provider_connections').update({ last_tested_at: new Date().toISOString(), status: hasKey ? 'active' : 'unhealthy' }).eq('id', row.id as string);
+            touchProviderCache();
             return addGatewayHeaders(
                 NextResponse.json({ success: hasKey, reachable: null, authenticated: hasKey, latency_ms: Date.now() - started, discovery_supported: true }),
                 { requestId },
@@ -58,6 +65,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ connection
         const latencyMs = Date.now() - started;
         if (!res.ok) {
             await supabase.from('provider_connections').update({ last_tested_at: new Date().toISOString(), status: 'unhealthy' }).eq('id', row.id as string);
+            touchProviderCache();
             // Surface the upstream rejection reason (redacted + truncated) instead of
             // a bare status — callers can't tell invalid_request_error from bad
             // credentials without it. Existing fields stay for backward compat.
@@ -80,6 +88,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ connection
         }
         const json = (await res.json().catch(() => null)) as { data?: unknown[] } | null;
         await supabase.from('provider_connections').update({ last_tested_at: new Date().toISOString(), status: 'active' }).eq('id', row.id as string);
+        touchProviderCache();
         return addGatewayHeaders(
             NextResponse.json({ success: true, reachable: true, authenticated: true, latency_ms: latencyMs, discovery_supported: true, model_count: Array.isArray(json?.data) ? json?.data.length : null }),
             { requestId },
@@ -87,6 +96,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ connection
     } catch (e) {
         const message = e instanceof Error ? e.message : 'Connection test failed';
         await supabase.from('provider_connections').update({ last_tested_at: new Date().toISOString(), status: 'unhealthy' }).eq('id', row.id as string);
+        touchProviderCache();
         return addGatewayHeaders(NextResponse.json({ success: false, reachable: false, authenticated: false, latency_ms: Date.now() - started, error: message }), { requestId });
     }
 }
