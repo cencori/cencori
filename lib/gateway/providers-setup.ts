@@ -9,6 +9,7 @@ import {
 } from '@/lib/providers';
 import { ProviderRouter } from '@/lib/providers/router';
 import { decryptApiKey } from '@/lib/encryption';
+import { fetchEmbeddedFallbackKey } from '@/lib/embedded/runtime-fallback';
 import { getGoogleApiKey } from '@/lib/providers/google-env';
 import { resolveCustomProviderForProject } from '@/lib/providers/custom-provider-routing';
 import type { AIProvider } from '@/lib/providers/base';
@@ -130,6 +131,38 @@ export function registerDefaultProviders(router: ProviderRouter): void {
     }
 }
 
+/**
+ * Register a decrypted BYOK key against the router. Shared by the dashboard
+ * (`provider_keys`) path and the embedded (`provider_connections`) fallback
+ * so both stores power agents identically.
+ */
+function registerByokKey(router: ProviderRouter, targetProvider: string, apiKey: string): boolean {
+    if (targetProvider === 'google') {
+        router.registerProvider(targetProvider, new GeminiProvider(apiKey));
+        return true;
+    }
+    if (targetProvider === 'openai') {
+        router.registerProvider(targetProvider, new OpenAIProvider(apiKey));
+        return true;
+    }
+    if (targetProvider === 'anthropic') {
+        router.registerProvider(targetProvider, new AnthropicProvider(apiKey));
+        return true;
+    }
+    if (isOpenAICompatible(targetProvider)) {
+        router.registerProvider(
+            targetProvider,
+            new OpenAICompatibleProvider(targetProvider, apiKey)
+        );
+        return true;
+    }
+    if (targetProvider === 'cohere') {
+        router.registerProvider(targetProvider, new CohereProvider(apiKey));
+        return true;
+    }
+    return false;
+}
+
 export async function initializeBYOKProviders(
     router: ProviderRouter,
     supabase: SupabaseAdmin,
@@ -157,28 +190,31 @@ export async function initializeBYOKProviders(
 
         if (!error && providerKey && providerKey.is_active) {
             const apiKey = decryptApiKey(providerKey.encrypted_key, organizationId);
-            if (targetProvider === 'google') {
-                router.registerProvider(targetProvider, new GeminiProvider(apiKey));
+            if (registerByokKey(router, targetProvider, apiKey)) {
                 return { success: true, usesByok: true, defaultModel: providerKey.default_model || undefined };
             }
-            if (targetProvider === 'openai') {
-                router.registerProvider(targetProvider, new OpenAIProvider(apiKey));
-                return { success: true, usesByok: true, defaultModel: providerKey.default_model || undefined };
-            }
-            if (targetProvider === 'anthropic') {
-                router.registerProvider(targetProvider, new AnthropicProvider(apiKey));
-                return { success: true, usesByok: true, defaultModel: providerKey.default_model || undefined };
-            }
-            if (isOpenAICompatible(targetProvider)) {
-                router.registerProvider(
-                    targetProvider,
-                    new OpenAICompatibleProvider(targetProvider, apiKey)
-                );
-                return { success: true, usesByok: true, defaultModel: providerKey.default_model || undefined };
-            }
-            if (targetProvider === 'cohere') {
-                router.registerProvider(targetProvider, new CohereProvider(apiKey));
-                return { success: true, usesByok: true, defaultModel: providerKey.default_model || undefined };
+        }
+
+        // Real fix for the split-brain key stores: a key added over the
+        // embedded API (`provider_connections`) historically never powered
+        // agents — the runtime only read `provider_keys`, so the dashboard
+        // kept showing "Not configured" after a 201. Fall back to the newest
+        // active managed-endpoint connection before giving up to managed.
+        if (!providerKey || !providerKey.is_active) {
+            const fallback = await fetchEmbeddedFallbackKey(supabase as never, projectId, targetProvider);
+            if (fallback) {
+                try {
+                    const apiKey = decryptApiKey(fallback.encryptedKeyRef, organizationId);
+                    if (registerByokKey(router, targetProvider, apiKey)) {
+                        void setCachedProviderConfig(projectId, targetProvider, {
+                            encrypted_key: fallback.encryptedKeyRef,
+                            is_active: true,
+                        });
+                        return { success: true, usesByok: true };
+                    }
+                } catch {
+                    // Decrypt/registration failure falls through to managed below.
+                }
             }
         }
 

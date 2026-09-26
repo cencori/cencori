@@ -16,7 +16,10 @@ interface ProviderKeyResponse {
     defaultModel?: string;
     defaultImageModel?: string;
     createdAt?: string;
-    apiKey?: string;
+    /** Where the key lives: dashboard table vs embedded API table. */
+    source?: 'dashboard' | 'api';
+    /** Embedded connection id (single-separator) when source is 'api'. */
+    connectionId?: string;
 }
 
 export async function GET(
@@ -82,17 +85,69 @@ export async function GET(
 
         const keyMap = new Map(providerKeys?.map(k => [k.provider, k]) || []);
 
+        // Honesty fix: keys added over the embedded API live in
+        // `provider_connections`, a table this endpoint never read — so the
+        // dashboard kept showing "Not configured" after a 201. Merge the
+        // newest usable embedded connection per provider as an API-sourced
+        // entry instead of hiding it.
+        const { indexEmbeddedConnections } = await import('@/lib/embedded/runtime-fallback');
+        const { withPrefix } = await import('@/lib/embedded/http');
+        const { PROVIDER_CONNECTION_PREFIX } = await import('@/lib/embedded/types');
+        const { data: embeddedRows } = await supabaseAdmin
+            .from('provider_connections')
+            .select('id, provider, key_hint, status, base_url, encrypted_key_ref, created_at')
+            .eq('project_id', projectId);
+        const embeddedByProvider = indexEmbeddedConnections(
+            ((embeddedRows ?? []) as Array<Record<string, unknown>>).map((r) => ({
+                id: r.id as string,
+                provider: r.provider as string,
+                status: r.status as string,
+                base_url: (r.base_url ?? null) as string | null,
+                encrypted_key_ref: (r.encrypted_key_ref ?? null) as string | null,
+                key_hint: (r.key_hint ?? null) as string | null,
+                created_at: (r.created_at ?? null) as string | null,
+            })),
+        );
+
         const providers: ProviderKeyResponse[] = SUPPORTED_PROVIDERS.map(p => {
             const key = keyMap.get(p.id);
+            if (key) {
+                return {
+                    provider: p.id,
+                    providerName: p.name,
+                    hasKey: true,
+                    keyHint: key?.key_hint || undefined,
+                    isActive: key?.is_active ?? false,
+                    defaultModel: key?.default_model || undefined,
+                    defaultImageModel: key?.default_image_model || undefined,
+                    createdAt: key?.created_at || undefined,
+                    source: 'dashboard' as const,
+                };
+            }
+            const embedded = embeddedByProvider.get(p.id.toLowerCase());
+            if (embedded) {
+                return {
+                    provider: p.id,
+                    providerName: p.name,
+                    hasKey: true,
+                    keyHint: (embedded.key_hint as string) || undefined,
+                    isActive: true,
+                    defaultModel: undefined,
+                    defaultImageModel: undefined,
+                    createdAt: (embedded.created_at as string) || undefined,
+                    source: 'api' as const,
+                    connectionId: withPrefix(PROVIDER_CONNECTION_PREFIX, embedded.id as string),
+                };
+            }
             return {
                 provider: p.id,
                 providerName: p.name,
-                hasKey: !!key,
-                keyHint: key?.key_hint || undefined,
-                isActive: key?.is_active ?? false,
-                defaultModel: key?.default_model || undefined,
-                defaultImageModel: key?.default_image_model || undefined,
-                createdAt: key?.created_at || undefined,
+                hasKey: false,
+                keyHint: undefined,
+                isActive: false,
+                defaultModel: undefined,
+                defaultImageModel: undefined,
+                createdAt: undefined,
             };
         });
 

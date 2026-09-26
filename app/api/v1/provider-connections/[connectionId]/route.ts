@@ -4,6 +4,7 @@ import { validateGatewayRequest, addGatewayHeaders, handleCorsPreFlight } from '
 import { embeddedError, withPrefix, dePrefixId } from '@/lib/embedded/http';
 import { PROVIDER_CONNECTION_PREFIX } from '@/lib/embedded/types';
 import { sanitizeConnection, validateConnectionInput, keyHintFor } from '@/lib/embedded/provider-connections';
+import { invalidateProviderConfig } from '@/lib/config-cache';
 import { encryptApiKey } from '@/lib/encryption';
 import crypto from 'crypto';
 
@@ -72,6 +73,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ connectio
     if (error || !data) {
         return addGatewayHeaders(embeddedError(500, 'invalid_request_error', error?.message ?? 'Update failed', { requestId }), { requestId });
     }
+    void invalidateProviderConfig(validation.context.projectId, String(row.provider as string).toLowerCase());
     return addGatewayHeaders(NextResponse.json(serialize(data as Record<string, unknown>)), { requestId });
 }
 
@@ -86,5 +88,6 @@ export async function DELETE(req: NextRequest, ctx: { params: Promise<{ connecti
     if (!row) return addGatewayHeaders(embeddedError(404, 'invalid_request_error', 'Provider connection not found', { requestId }), { requestId });
     const { error } = await supabase.from('provider_connections').delete().eq('id', row.id as string);
     if (error) return addGatewayHeaders(embeddedError(500, 'invalid_request_error', error.message, { requestId }), { requestId });
+    void invalidateProviderConfig(validation.context.projectId, String(row.provider as string).toLowerCase());
     return addGatewayHeaders(NextResponse.json({ deleted: true }), { requestId });
 }
