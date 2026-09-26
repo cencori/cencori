@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { validateGatewayRequest, addGatewayHeaders, handleCorsPreFlight } from '@/lib/gateway-middleware';
-import { embeddedError, dePrefixId } from '@/lib/embedded/http';
+import { embeddedError, dePrefixId, withPrefix } from '@/lib/embedded/http';
 import crypto from 'crypto';
 
 export async function OPTIONS() {
@@ -37,7 +37,19 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ serverId: 
         const diff = diffToolSnapshot(previous, discovered.tools);
         const snapshot = { tools: discovered.tools, discovered_at: new Date().toISOString(), transport_negotiated: discovered.transport };
         await supabase.from('mcp_servers').update({ tool_snapshot: snapshot, last_discovered_at: snapshot.discovered_at, status: 'active', last_error: null }).eq('id', r.id as string);
-        return addGatewayHeaders(NextResponse.json({ tools: discovered.tools, diff }), { requestId });
+        // Contract shape is McpDiscoveryResult (nested `server`); the diff
+        // helper tracks added/removed/unchanged, and per-tool change tracking
+        // is not computed, so `changed` is empty.
+        return addGatewayHeaders(
+            NextResponse.json({
+                server: { ...(r as Record<string, unknown>), id: withPrefix('mcp', r.id as string) },
+                tools: discovered.tools,
+                added: diff.added,
+                removed: diff.removed,
+                changed: [],
+            }),
+            { requestId },
+        );
     } catch (e) {
         const message = e instanceof Error ? e.message : 'Discovery failed';
         await supabase.from('mcp_servers').update({ status: 'unhealthy', last_error: message.slice(0, 500) }).eq('id', r.id as string);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { classifyTool } from '@/lib/embedded/tool-risk';
-import { applyAllowlist, diffToolSnapshot } from '@/lib/embedded/mcp';
+import { applyAllowlist, diffToolSnapshot, toMcpDiscoveryResult } from '@/lib/embedded/mcp';
 import { codeChallenge, newCodeVerifier, signOAuthState } from '@/lib/embedded/oauth';
 
 describe('tool risk classification', () => {
@@ -36,6 +36,16 @@ describe('mcp snapshot + allowlist', () => {
 
     it('non-empty allowlist intersects', () => {
         expect(applyAllowlist(['a', 'b', 'c'], ['a', 'c'])).toEqual(['a', 'c']);
+    });
+
+    it('shapes registration as the contracted McpDiscoveryResult', () => {
+        const server = { id: 'mcp_abc', name: 'wiki', url: 'https://mcp.deepwiki.com/mcp', transport: 'streamable-http', status: 'active' };
+        const result = toMcpDiscoveryResult(server, [{ name: 'search' }, { name: 'read' }]);
+        expect(result.server).toEqual(server);
+        expect(result.tools).toHaveLength(2);
+        expect(result.added).toEqual(['search', 'read']);
+        expect(result.removed).toEqual([]);
+        expect(result.changed).toEqual([]);
     });
 });
 

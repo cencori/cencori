@@ -214,6 +214,25 @@ export function diffToolSnapshot(previous: DiscoveredTool[], next: DiscoveredToo
     };
 }
 
+/**
+ * Shape of POST /v1/mcp/servers per the Embedded Agents OpenAPI contract
+ * (`McpDiscoveryResult`): the server nested under `server` with its freshly
+ * discovered tools. Registration has no previous snapshot, so everything
+ * discovered counts as added.
+ */
+export function toMcpDiscoveryResult(
+    server: Record<string, unknown>,
+    tools: DiscoveredTool[],
+): { server: Record<string, unknown>; tools: DiscoveredTool[]; added: string[]; removed: string[]; changed: string[] } {
+    return {
+        server,
+        tools,
+        added: tools.map((t) => t.name),
+        removed: [],
+        changed: [],
+    };
+}
+
 /** Intersect discovered tools with an installation allowlist. Empty allowlist = allow all (M2 default). */
 export function applyAllowlist(discovered: string[], allowedTools: string[] | null | undefined): string[] {
     if (!allowedTools || allowedTools.length === 0) return discovered;

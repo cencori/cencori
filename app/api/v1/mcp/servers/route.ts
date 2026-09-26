@@ -111,5 +111,9 @@ export async function POST(req: NextRequest) {
     if (error || !data) {
         return addGatewayHeaders(embeddedError(500, 'invalid_request_error', error?.message ?? 'Failed to register MCP server', { requestId }), { requestId });
     }
-    return addGatewayHeaders(NextResponse.json(serialize(data as Record<string, unknown>), { status: 201 }), { requestId });
+    // Contract shape is McpDiscoveryResult (nested `server`), not the bare row.
+    const { toMcpDiscoveryResult } = await import('@/lib/embedded/mcp');
+    const server = serialize(data as Record<string, unknown>);
+    const snapshotTools = ((snapshot.tools ?? []) as import('@/lib/embedded/mcp').DiscoveredTool[]);
+    return addGatewayHeaders(NextResponse.json(toMcpDiscoveryResult(server, snapshotTools), { status: 201 }), { requestId });
 }
