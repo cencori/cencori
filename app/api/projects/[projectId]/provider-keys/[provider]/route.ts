@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { createServerClient } from '@/lib/supabaseServer';
 import { encryptApiKey } from '@/lib/encryption';
+import { getProvider } from '@/lib/providers/config';
+import { mirrorKeysToConnections } from '@/lib/providers/byok-store';
 import { writeAuditLog } from '@/lib/audit-log';
 import { requireTierFeatureForProject } from '@/lib/require-tier-feature';
 import { invalidateProviderConfig } from '@/lib/config-cache';
@@ -124,6 +126,13 @@ export async function PATCH(
 
         await invalidateProviderConfig(projectId, provider);
 
+        await mirrorKeysToConnections(supabaseAdmin as never, {
+            projectId,
+            organizationId: project.organization_id as string,
+            provider,
+            displayName: getProvider(provider)?.name ?? provider,
+        });
+
         return NextResponse.json({
             success: true,
             provider: {
@@ -203,6 +212,14 @@ export async function DELETE(
         }
 
         await invalidateProviderConfig(projectId, provider);
+
+        // Stand down mirrored embedded rows so "remove" truly disconnects.
+        await mirrorKeysToConnections(supabaseAdmin as never, {
+            projectId,
+            organizationId: project.organization_id as string,
+            provider,
+            displayName: getProvider(provider)?.name ?? provider,
+        });
 
         writeAuditLog({
             organizationId: project.organization_id,

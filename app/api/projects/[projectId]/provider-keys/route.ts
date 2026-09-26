@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabaseAdmin';
 import { createServerClient } from '@/lib/supabaseServer';
 import { encryptApiKey } from '@/lib/encryption';
 import { SUPPORTED_PROVIDERS, getProvider } from '@/lib/providers/config';
+import { mirrorKeysToConnections } from '@/lib/providers/byok-store';
 import { writeAuditLog } from '@/lib/audit-log';
 import { requireTierFeatureForProject } from '@/lib/require-tier-feature';
 import { invalidateProviderConfig } from '@/lib/config-cache';
@@ -90,7 +91,7 @@ export async function GET(
         // dashboard kept showing "Not configured" after a 201. Merge the
         // newest usable embedded connection per provider as an API-sourced
         // entry instead of hiding it.
-        const { indexEmbeddedConnections } = await import('@/lib/embedded/runtime-fallback');
+        const { indexEmbeddedConnections } = await import('@/lib/providers/byok-store');
         const { withPrefix } = await import('@/lib/embedded/http');
         const { PROVIDER_CONNECTION_PREFIX } = await import('@/lib/embedded/types');
         const { data: embeddedRows } = await supabaseAdmin
@@ -271,6 +272,16 @@ export async function POST(
         }
 
         await invalidateProviderConfig(projectId, provider);
+
+        // Unified surface: mirror into the embedded connection list so the
+        // key also appears over the API and keeps working if the dashboard
+        // row is later removed.
+        await mirrorKeysToConnections(supabaseAdmin as never, {
+            projectId,
+            organizationId: project.organization_id as string,
+            provider,
+            displayName: providerConfig.name,
+        });
 
         writeAuditLog({
             organizationId: project.organization_id,

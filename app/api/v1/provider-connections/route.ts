@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabaseAdmin';
 import { validateGatewayRequest, addGatewayHeaders, handleCorsPreFlight } from '@/lib/gateway-middleware';
 import { embeddedError, withPrefix } from '@/lib/embedded/http';
 import { invalidateProviderConfig } from '@/lib/config-cache';
+import { mirrorConnectionsToKeys } from '@/lib/providers/byok-store';
 import { PROVIDER_CONNECTION_PREFIX } from '@/lib/embedded/types';
 import { persistConnection, sanitizeConnection } from '@/lib/embedded/provider-connections';
 import crypto from 'crypto';
@@ -52,6 +53,13 @@ export async function POST(req: NextRequest) {
         // Keep the gateway BYOK cache (now fed by both key stores) from
         // serving the pre-create state for up to its TTL.
         void invalidateProviderConfig(ctx.projectId, String(body.provider).trim().toLowerCase());
+        // Unified surface: official keys also land in the dashboard store so
+        // they power agents and show as configured immediately.
+        await mirrorConnectionsToKeys(supabase as never, {
+            projectId: ctx.projectId,
+            organizationId: ctx.organizationId,
+            provider: String(body.provider),
+        });
         return respond(NextResponse.json(serialize(data as Record<string, unknown>), { status: 201 }));
     } catch (e) {
         const err = e as { code?: string; message?: string; status?: number };
