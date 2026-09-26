@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { validateGatewayRequest, addGatewayHeaders, handleCorsPreFlight } from '@/lib/gateway-middleware';
-import { embeddedError, dePrefixId } from '@/lib/embedded/http';
+import { embeddedError, dePrefixId, withPrefix } from '@/lib/embedded/http';
 import crypto from 'crypto';
 
 export async function OPTIONS() {
@@ -24,5 +24,5 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ serverId: s
     const row = await loadServer(createAdminClient(), validation.context.projectId, serverId);
     if (!row) return addGatewayHeaders(embeddedError(404, 'invalid_request_error', 'MCP server not found', { requestId }), { requestId });
     const snapshot = ((row.tool_snapshot ?? {}) as { tools?: unknown[] });
-    return addGatewayHeaders(NextResponse.json({ server_id: row.id, tools: snapshot.tools ?? [], last_discovered_at: row.last_discovered_at ?? null, status: row.status }), { requestId });
+    return addGatewayHeaders(NextResponse.json({ server_id: withPrefix('mcp', row.id as string), tools: snapshot.tools ?? [], last_discovered_at: row.last_discovered_at ?? null, status: row.status }), { requestId });
 }
