@@ -16,6 +16,15 @@ describe('embedded resource IDs', () => {
         expect(dePrefixId('usr__abc')).toBe('abc');
         expect(dePrefixId('prc__abc')).toBe('abc');
         expect(dePrefixId('pms__abc')).toBe('abc');
+        expect(dePrefixId('mcp__abc')).toBe('abc');
+    });
+
+    it('round-trips MCP server IDs issued at registration', () => {
+        const uuid = '6c8b4af4-dcf3-4bd3-8629-179b4a0bf824';
+        expect(withPrefix('mcp', uuid)).toBe(`mcp_${uuid}`);
+        // The exact failure from the field: id-routes 404d on the registered id.
+        expect(dePrefixId(`mcp_${uuid}`)).toBe(uuid);
+        expect(dePrefixId(uuid)).toBe(uuid);
     });
 
     it('emits single-separator provider IDs and round-trips double-prefixed input', () => {
