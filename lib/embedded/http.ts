@@ -38,12 +38,12 @@ export function cursorPaginate<T extends { id: string }>(rows: T[], limit: numbe
     return { data: rows.slice(0, limit), next_cursor: rows[limit - 1].id };
 }
 
-/** UUID passthrough that also accepts ten_/usr_/prc_/pms_ prefixed aliases. */
+/** UUID passthrough that also accepts ten_/usr_/prc_/pms_/mcp_ prefixed aliases. */
 export function dePrefixId(value: string): string {
     // Accept IDs emitted by the older double-separator serializers
     // (tenant/user historically, provider/sync via the trailing-underscore
     // prefix constants) while new responses emit canonical single-separator IDs.
-    return value.replace(/^(ten__|usr__|prc__|pms__|ten_|usr_|prc_|pms_|ins_|ses_|run_|act_|kb_|src_|con_)/, '');
+    return value.replace(/^(ten__|usr__|prc__|pms__|mcp__|ten_|usr_|prc_|pms_|mcp_|ins_|ses_|run_|act_|kb_|src_|con_)/, '');
 }
 
 export function withPrefix(prefix: string, id: string): string {
