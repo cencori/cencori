@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { validateGatewayRequest, handleCorsPreFlight, type GatewayContext } from '@/lib/gateway-middleware';
 import { extractCencoriApiKeyFromHeaders } from '@/lib/api-keys';
@@ -7,11 +8,23 @@ import { extractCencoriApiKeyFromHeaders } from '@/lib/api-keys';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-const respondError = (status: number, message: string, code = 'invalid_request_error') =>
-    NextResponse.json(
-        { error: { message, type: 'invalid_request_error', code }, status: 'failed' },
+const respondError = (status: number, message: string, code = 'invalid_request_error') => {
+    // Every response carries a correlation ID (header + body): legacy
+    // identity ops previously emitted neither.
+    const requestId = crypto.randomUUID();
+    const res = NextResponse.json(
+        { error: { message, type: 'invalid_request_error', code, request_id: requestId }, status: 'failed' },
         { status }
     );
+    res.headers.set('X-Request-Id', requestId);
+    return res;
+};
+
+const respondOk = (body: unknown, status = 200) => {
+    const res = NextResponse.json(body, { status });
+    res.headers.set('X-Request-Id', crypto.randomUUID());
+    return res;
+};
 
 type AgentCreateBody = {
     project_id?: string;
@@ -171,7 +184,7 @@ export async function POST(req: NextRequest) {
             return respondError(500, 'Failed to create agent configuration', 'config_creation_failed');
         }
 
-        return NextResponse.json({
+        return respondOk({
             id: agent.id,
             name: agent.name,
             description: agent.description,
@@ -184,7 +197,7 @@ export async function POST(req: NextRequest) {
                 tools: agentConfig.tools,
                 temperature: agentConfig.temperature,
             },
-        }, { status: 201 });
+        }, 201);
     } catch (error: unknown) {
         console.error('[Agents API] Error:', error);
         const message = error instanceof Error ? error.message : 'Internal server error';
@@ -236,7 +249,7 @@ export async function GET(req: NextRequest) {
             return respondError(500, 'Failed to list agents', 'list_failed');
         }
 
-        return NextResponse.json({ data: agents || [] });
+        return respondOk({ data: agents || [] });
     } catch (error: unknown) {
         console.error('[Agents API] Error:', error);
         const message = error instanceof Error ? error.message : 'Internal server error';

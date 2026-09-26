@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { validateGatewayRequest, handleCorsPreFlight, type GatewayContext } from '@/lib/gateway-middleware';
 import { extractCencoriApiKeyFromHeaders } from '@/lib/api-keys';
@@ -8,11 +9,23 @@ import { invalidateAgentConfig } from '@/lib/config-cache';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-const respondError = (status: number, message: string, code = 'invalid_request_error') =>
-    NextResponse.json(
-        { error: { message, type: 'invalid_request_error', code }, status: 'failed' },
+const respondError = (status: number, message: string, code = 'invalid_request_error') => {
+    // Every response carries a correlation ID (header + body): legacy
+    // identity ops previously emitted neither.
+    const requestId = crypto.randomUUID();
+    const res = NextResponse.json(
+        { error: { message, type: 'invalid_request_error', code, request_id: requestId }, status: 'failed' },
         { status }
     );
+    res.headers.set('X-Request-Id', requestId);
+    return res;
+};
+
+const respondOk = (body: unknown, status = 200) => {
+    const res = NextResponse.json(body, { status });
+    res.headers.set('X-Request-Id', crypto.randomUUID());
+    return res;
+};
 
 async function resolveProjectForAgent(
     adminClient: ReturnType<typeof createAdminClient>,
@@ -117,7 +130,7 @@ export async function GET(
             .eq('agent_id', agentId)
             .single();
 
-        return NextResponse.json({
+        return respondOk({
             id: agent.id,
             name: agent.name,
             description: agent.description,
@@ -274,7 +287,7 @@ export async function PATCH(
             .eq('agent_id', agentId)
             .single();
 
-        return NextResponse.json({
+        return respondOk({
             id: agent!.id,
             name: agent!.name,
             description: agent!.description,
@@ -340,7 +353,9 @@ export async function DELETE(
 
         await invalidateAgentConfig(agentId);
 
-        return new NextResponse(null, { status: 204 });
+        const res = new NextResponse(null, { status: 204 });
+        res.headers.set('X-Request-Id', crypto.randomUUID());
+        return res;
     } catch (error: unknown) {
         console.error('[Agents API] Error:', error);
         const message = error instanceof Error ? error.message : 'Internal server error';

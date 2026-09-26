@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { validateGatewayRequest, addGatewayHeaders, handleCorsPreFlight } from '@/lib/gateway-middleware';
 import { embeddedError, dePrefixId, withPrefix, getIdempotencyKey } from '@/lib/embedded/http';
-import { resolveAgentRuntimeConfig } from '@/lib/embedded/agents';
+import { executionVersionInputs, resolveAgentRuntimeConfig } from '@/lib/embedded/agents';
 import { appendRunEvent, canTransition } from '@/lib/embedded/runs';
 import { scheduleEmbeddedWebhook } from '@/lib/embedded/dispatch-webhook';
 import { decodeRunRequest, encodeRunRequest, isRunResponseFormat, sameRunRequestBody } from '@/lib/embedded/run-request';
@@ -79,11 +79,18 @@ async function executeRun(runId: string): Promise<void> {
         if (!organizationId) throw new Error('Run project has no organization');
         const tier = (((project as { organizations?: { subscription_tier?: string } } | null)?.organizations?.subscription_tier as string) ?? 'free') as import('@/lib/entitlements').SubscriptionTier;
 
-        // Resolve the configured agent (installation pin → stable → latest → legacy).
+        // Resolve the configured agent. The submission-pinned version wins:
+        // upgrades between submit and start apply to newly created runs only.
+        // Rows without a pin (legacy) fall back to live installation/channel
+        // resolution exactly as before.
+        const versionInputs = executionVersionInputs(
+            { agent_version_id: run.agent_version_id },
+            ins as { agent_version_id?: string | null; update_channel?: string | null } | null,
+        );
         const runtime = await resolveAgentRuntimeConfig(supabase as never, {
             agentId: run.agent_id,
-            installationVersionId: ((ins as { agent_version_id?: string | null } | null)?.agent_version_id as string | null) ?? run.agent_version_id,
-            updateChannel: ((ins as { update_channel?: string | null } | null)?.update_channel as string | null) ?? null,
+            installationVersionId: versionInputs.installationVersionId,
+            updateChannel: versionInputs.updateChannel,
         });
         const config = (runtime.config ?? {}) as { model?: string; instructions?: string; system_prompt?: string; temperature?: number; max_output_tokens?: number };
         const model = config.model?.trim();
@@ -337,9 +344,14 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ agentId: s
     const { agentId } = await ctx.params;
     const supabase = createAdminClient();
 
-    const { data: agent } = await supabase.from('agents').select('id, project_id').eq('id', agentId).maybeSingle();
+    const { data: agent } = await supabase.from('agents').select('id, project_id, is_active').eq('id', agentId).maybeSingle();
     if (!agent || (agent.project_id as string) !== validation.context.projectId) {
         return addGatewayHeaders(embeddedError(404, 'invalid_request_error', 'Agent not found', { requestId }), { requestId });
+    }
+    // Paused agents admit no new work. Installation/tenant gates below cover
+    // bound runs; this covers direct (unbound) runs.
+    if ((agent.is_active as boolean | null) === false) {
+        return addGatewayHeaders(embeddedError(403, 'agent_disabled', 'Agent is disabled', { requestId }), { requestId });
     }
 
     let body: { installation_id?: string; tenant_id?: string; external_user_id?: string; mode?: string; input?: unknown; response_format?: unknown; session_id?: string };

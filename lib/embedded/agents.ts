@@ -126,6 +126,31 @@ export function validateVersionConfig(config: AgentVersionConfig): { ok: true } 
 }
 
 /** Resolve runtime config: installation pin → stable → latest published → legacy agent_configs. */
+export interface ExecutionVersionInputs {
+    /** Version pinned on the run row at submission time (may be null for legacy rows). */
+    runVersionId: string | null;
+    /** Live installation row values (may have moved since submission). */
+    installationVersionId?: string | null;
+    updateChannel?: string | null;
+}
+
+/**
+ * Which version inputs feed resolution when execution starts. The
+ * submission pin wins so upgrades between submit and start apply to newly
+ * created runs only; rows without a pin keep the previous live behavior.
+ */
+export function executionVersionInputs(
+    run: { agent_version_id?: string | null },
+    ins: { agent_version_id?: string | null; update_channel?: string | null } | null,
+): ExecutionVersionInputs {
+    const pinned = run.agent_version_id ?? null;
+    if (pinned) return { runVersionId: pinned, installationVersionId: pinned, updateChannel: null };
+    return {
+        runVersionId: null,
+        installationVersionId: ins?.agent_version_id ?? null,
+        updateChannel: ins?.update_channel ?? null,
+    };
+}
 export async function resolveAgentRuntimeConfig(
     supabase: Admin,
     opts: { agentId: string; installationVersionId?: string | null; updateChannel?: string | null },

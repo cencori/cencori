@@ -32,11 +32,18 @@ interface KeyAccess {
  * Shared unified model registry (ADR-002).
  * Single projection over: Cencori-managed catalog + project BYOK/custom models
  * + synced provider_connection_models + pricing + access policy + provider health.
+ *
+ * Identity: rows are deduplicated by model id (first occurrence wins:
+ * managed catalog, then synced connections, then custom) so counts are
+ * distinct eligible IDs. Connection-scoped rows keep their identity via
+ * `connection_id` and remain addressable with `?connection_id=`.
+ * `partial` is true when any source query failed — a 200 with partial:true
+ * is not a complete catalog.
  */
 export async function buildUnifiedModelRegistry(
     supabase: Admin,
     opts: { projectId?: string | null; keyAccess?: KeyAccess | null; query?: RegistryQuery },
-): Promise<{ models: UnifiedModelRow[]; providers: Array<{ id: string; name: string; supports_byok: boolean; connection_status: string; model_count: number }> }> {
+): Promise<{ models: UnifiedModelRow[]; providers: Array<{ id: string; name: string; supports_byok: boolean; connection_status: string; model_count: number }>; partial: boolean }> {
     const projectId = opts.projectId ?? null;
     const keyAccess = opts.keyAccess ?? { allowedModels: null, sponsoredModels: null };
     const q = opts.query ?? {};
@@ -48,13 +55,15 @@ export async function buildUnifiedModelRegistry(
     const customCatalog: Array<{ id: string; owned_by: string; name: string; created: number }> = [];
     const syncedByConnection = new Map<string, UnifiedModelRow[]>();
     const connectionProvider = new Map<string, string>();
+    let partial = false;
 
     if (projectId) {
-        const { data: providerKeys } = await supabase
+        const { data: providerKeys, error: keysError } = await supabase
             .from('provider_keys')
             .select('provider')
             .eq('project_id', projectId)
             .eq('is_active', true);
+        if (keysError) partial = true;
         for (const row of providerKeys ?? []) {
             if (row.provider) {
                 managedProviders.add(row.provider);
@@ -63,19 +72,21 @@ export async function buildUnifiedModelRegistry(
         }
 
         // M0 public connections also contribute.
-        const { data: connections } = await supabase
+        const { data: connections, error: connectionsError } = await supabase
             .from('provider_connections')
             .select('id, provider, status')
             .eq('project_id', projectId)
             .eq('status', 'active');
+        if (connectionsError) partial = true;
         for (const c of connections ?? []) {
             connectionProvider.set(c.id as string, c.provider as string);
             byokProviders.add(c.provider as string);
             if (q.connectionId && (c.id as string) !== q.connectionId) continue;
-            const { data: synced } = await supabase
+            const { data: synced, error: syncedError } = await supabase
                 .from('provider_connection_models')
                 .select('upstream_model_id, display_name, capabilities, context_window, lifecycle_status, availability_status, unavailable_reason, pricing_status, updated_at')
                 .eq('provider_connection_id', c.id as string);
+            if (syncedError) partial = true;
             const rows: UnifiedModelRow[] = (synced ?? []).map((m) => {
                 const available = (m.availability_status as string) === 'available';
                 return {
@@ -102,11 +113,12 @@ export async function buildUnifiedModelRegistry(
             syncedByConnection.set(c.id as string, rows);
         }
 
-        const { data: projectCustomProviders } = await supabase
+        const { data: projectCustomProviders, error: customError } = await supabase
             .from('custom_providers')
             .select('id, name, created_at, custom_models(model_name, display_name, is_active, created_at)')
             .eq('project_id', projectId)
             .eq('is_active', true);
+        if (customError) partial = true;
         if (Array.isArray(projectCustomProviders)) {
             const seen = new Set<string>();
             for (const provider of projectCustomProviders) {
@@ -126,7 +138,8 @@ export async function buildUnifiedModelRegistry(
         }
     }
 
-    const { data: pricingRows } = await supabase.from('model_pricing').select('*').eq('is_active', true);
+    const { data: pricingRows, error: pricingError } = await supabase.from('model_pricing').select('*').eq('is_active', true);
+    if (pricingError) partial = true;
     const activePricing = (pricingRows ?? []).filter(
         (row) =>
             !(row as { pricing_expires_at?: string }).pricing_expires_at ||
@@ -241,8 +254,19 @@ export async function buildUnifiedModelRegistry(
     if (q.source) filtered = filtered.filter((m) => m.source === q.source);
     if (q.connectionId) filtered = filtered.filter((m) => m.connection_id === q.connectionId);
 
+    // Distinct model identities: first occurrence wins (managed, then synced,
+    // then custom). Connection-scoped rows keep their own identity so they
+    // stay addressable via ?connection_id=.
+    const seenIds = new Set<string>();
+    const distinct = filtered.filter((m) => {
+        const key = m.connection_id ? `${m.id}${m.connection_id}` : m.id;
+        if (seenIds.has(key)) return false;
+        seenIds.add(key);
+        return true;
+    });
+
     const byProvider = new Map<string, number>();
-    for (const m of filtered) byProvider.set(m.provider, (byProvider.get(m.provider) ?? 0) + 1);
+    for (const m of distinct) byProvider.set(m.provider, (byProvider.get(m.provider) ?? 0) + 1);
     const providers = SUPPORTED_PROVIDERS.filter((p) => byProvider.has(p.id)).map((p) => ({
         id: p.id,
         name: p.name,
@@ -251,5 +275,5 @@ export async function buildUnifiedModelRegistry(
         model_count: byProvider.get(p.id) ?? 0,
     }));
 
-    return { models: filtered, providers };
+    return { models: distinct, providers, partial };
 }
