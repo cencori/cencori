@@ -31,6 +31,17 @@ export async function OPTIONS() {
     return handleCorsPreFlight();
 }
 
+function parseModelsCursor(raw: string | null): number | null {
+    if (!raw) return 0;
+    try {
+        const parsed = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8')) as { o?: unknown };
+        if (parsed && Number.isInteger(parsed.o) && (parsed.o as number) >= 0) return parsed.o as number;
+    } catch {
+        // Fall through to invalid below.
+    }
+    return null;
+}
+
 export async function GET(req: NextRequest) {
     const requestId = crypto.randomUUID();
     const startedAt = Date.now();
@@ -149,6 +160,13 @@ export async function GET(req: NextRequest) {
     const availableParam = url.searchParams.get('available');
     const sourceParam = url.searchParams.get('source') as ModelSource | null;
     const connectionParam = url.searchParams.get('connection_id');
+    // Bounded pages with an explicit total: the catalog is assembled
+    // in-memory, so the cursor is an offset into the filtered list.
+    const limit = Math.min(1000, Math.max(1, Number.parseInt(url.searchParams.get('limit') ?? '1000', 10) || 1000));
+    const offset = parseModelsCursor(url.searchParams.get('cursor'));
+    if (offset === null) {
+        return respond(NextResponse.json({ error: { message: 'Invalid cursor', type: 'invalid_request_error', code: 'invalid_request_error' } }, { status: 400 }), 'invalid_request_error', 'Invalid cursor');
+    }
 
     const registry = await buildUnifiedModelRegistry(createAdminClient() as never, {
         projectId: apiLogContext?.projectId ?? null,
@@ -162,10 +180,14 @@ export async function GET(req: NextRequest) {
         },
     });
 
+    const total = registry.models.length;
+    const page = registry.models.slice(offset, offset + limit);
+    const nextOffset = offset + limit < total ? offset + limit : null;
+
     return respond(
         NextResponse.json({
             object: 'list',
-            data: registry.models.map((m) => ({
+            data: page.map((m) => ({
                 id: m.id,
                 object: 'model',
                 created: m.created,
@@ -189,6 +211,9 @@ export async function GET(req: NextRequest) {
                 pricing_status: m.pricing_status,
                 pricing: m.pricing ?? undefined,
             })),
+            total,
+            next_cursor: nextOffset !== null ? Buffer.from(JSON.stringify({ o: nextOffset }), 'utf8').toString('base64url') : null,
+            partial: registry.partial,
             providers: registry.providers.map((p) => ({
                 id: p.id,
                 name: p.name,

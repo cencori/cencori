@@ -35,6 +35,9 @@ export async function GET(req: NextRequest) {
     if ('error' in window) return addGatewayHeaders(embeddedError(400, 'invalid_request_error', window.error, { requestId }), { requestId });
 
     const supabase = createAdminClient();
+    // One over the cap so truncation is explicit instead of silent: totals
+    // over a truncated scan are partial, not complete.
+    const ROW_CAP = 10000;
     let query = supabase
         .from('ai_requests')
         .select('tenant_id, agent_id, installation_id, model, provider, prompt_tokens, completion_tokens, total_tokens, cost_usd, provider_cost_usd, cencori_charge_usd, created_at')
@@ -42,11 +45,12 @@ export async function GET(req: NextRequest) {
         .gte('created_at', window.since)
         .lte('created_at', window.until)
         .order('created_at', { ascending: false })
-        .limit(10000);
+        .limit(ROW_CAP + 1);
     query = applyScopeFilters(query as never, url.searchParams) as never;
     const { data, error } = await query;
     if (error) return addGatewayHeaders(embeddedError(500, 'invalid_request_error', error.message, { requestId }), { requestId });
-    const rows = ((data ?? []) as Array<Record<string, unknown>>).map((r) => ({
+    const truncated = (data ?? []).length > ROW_CAP;
+    const rows = ((data ?? []).slice(0, ROW_CAP) as Array<Record<string, unknown>>).map((r) => ({
         tenant_id: (r.tenant_id as string | null) ?? null,
         agent_id: (r.agent_id as string | null) ?? null,
         installation_id: (r.installation_id as string | null) ?? null,
@@ -65,5 +69,14 @@ export async function GET(req: NextRequest) {
         (acc, r) => ({ requests: acc.requests + 1, total_tokens: acc.total_tokens + r.total_tokens, cost_usd: acc.cost_usd + r.cost_usd, cencori_charge_usd: acc.cencori_charge_usd + r.cencori_charge_usd }),
         { requests: 0, total_tokens: 0, cost_usd: 0, cencori_charge_usd: 0 },
     );
-    return addGatewayHeaders(NextResponse.json({ window: { since: window.since, until: window.until }, totals, groups }), { requestId });
+    return addGatewayHeaders(
+        NextResponse.json({
+            window: { since: window.since, until: window.until },
+            totals,
+            groups,
+            truncated,
+            row_cap: ROW_CAP,
+        }),
+        { requestId },
+    );
 }
