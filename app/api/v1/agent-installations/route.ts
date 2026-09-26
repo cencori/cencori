@@ -45,6 +45,29 @@ async function enrich(supabase: ReturnType<typeof createAdminClient>, row: Recor
     };
 }
 
+// Opaque keyset cursor over (created_at, id). Raw-timestamp cursors issued
+// before keyset pagination are still accepted (no id tiebreaker there).
+function encodeInstallationCursor(createdAt: string, id: string): string {
+    return Buffer.from(JSON.stringify({ c: createdAt, i: id }), 'utf8').toString('base64url');
+}
+
+function parseInstallationCursor(
+    raw: string | null,
+): { cursor: { createdAt: string; id: string | null } } | { error: string } | null {
+    if (!raw) return null;
+    try {
+        const parsed = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8')) as { c?: unknown; i?: unknown };
+        if (parsed && typeof parsed.c === 'string' && parsed.c) {
+            return { cursor: { createdAt: parsed.c, id: typeof parsed.i === 'string' && parsed.i ? parsed.i : null } };
+        }
+    } catch {
+        // Not an opaque cursor — fall through to legacy handling below.
+    }
+    // Legacy: raw ISO timestamp previously emitted as next_cursor.
+    if (/^\d{4}-\d{2}-\d{2}T/.test(raw)) return { cursor: { createdAt: raw, id: null } };
+    return { error: 'Invalid cursor' };
+}
+
 export async function POST(req: NextRequest) {
     const requestId = crypto.randomUUID();
     const validation = await validateGatewayRequest(req);
@@ -156,14 +179,40 @@ export async function GET(req: NextRequest) {
     const supabase = createAdminClient();
     const url = new URL(req.url);
     const tenantFilter = url.searchParams.get('tenant_id');
-    let query = supabase.from('agent_installations').select('*').eq('project_id', validation.context.projectId).order('created_at', { ascending: false }).limit(100);
+    const agentFilter = url.searchParams.get('agent_id');
+    const limit = Math.min(100, Math.max(1, Number.parseInt(url.searchParams.get('limit') ?? '100', 10) || 100));
+    const cursor = parseInstallationCursor(url.searchParams.get('cursor'));
+    if (cursor && 'error' in cursor) return addGatewayHeaders(embeddedError(400, 'invalid_request_error', cursor.error, { requestId }), { requestId });
+    let query = supabase.from('agent_installations').select('*').eq('project_id', validation.context.projectId).order('created_at', { ascending: false }).order('id', { ascending: false }).limit(limit + 1);
     if (tenantFilter) {
         const tenant = await resolveTenant(supabase, validation.context.projectId, tenantFilter);
         if (!tenant) return addGatewayHeaders(embeddedError(404, 'tenant_not_found', 'Tenant not found', { requestId }), { requestId });
         query = query.eq('tenant_id', tenant.id);
     }
+    if (agentFilter) {
+        query = query.eq('agent_id', dePrefixId(agentFilter));
+    }
+    if (cursor && 'cursor' in cursor && cursor.cursor) {
+        // Keyset on (created_at, id): equal-timestamp rows straddling the
+        // boundary are not skipped. Legacy raw-timestamp cursors keep working
+        // (without the id tiebreaker).
+        const { createdAt, id } = cursor.cursor;
+        query = id
+            ? query.or(`created_at.lt.${createdAt},and(created_at.eq.${createdAt},id.lt.${id})`)
+            : query.lt('created_at', createdAt);
+    }
     const { data, error } = await query;
     if (error) return addGatewayHeaders(embeddedError(500, 'invalid_request_error', error.message, { requestId }), { requestId });
-    const enriched = await Promise.all(((data ?? []) as Record<string, unknown>[]).map((r) => enrich(supabase, r)));
-    return addGatewayHeaders(NextResponse.json({ data: enriched.map(serialize), next_cursor: null }), { requestId });
+    const rows = (data ?? []) as Record<string, unknown>[];
+    const hasMore = rows.length > limit;
+    const page = hasMore ? rows.slice(0, limit) : rows;
+    const enriched = await Promise.all(page.map((r) => enrich(supabase, r)));
+    const last = page[page.length - 1] as Record<string, unknown> | undefined;
+    return addGatewayHeaders(
+        NextResponse.json({
+            data: enriched.map(serialize),
+            next_cursor: hasMore && last ? encodeInstallationCursor(last.created_at as string, last.id as string) : null,
+        }),
+        { requestId },
+    );
 }
