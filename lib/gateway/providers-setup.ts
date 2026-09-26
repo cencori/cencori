@@ -9,7 +9,7 @@ import {
 } from '@/lib/providers';
 import { ProviderRouter } from '@/lib/providers/router';
 import { decryptApiKey } from '@/lib/encryption';
-import { fetchEmbeddedFallbackKey } from '@/lib/embedded/runtime-fallback';
+import { resolveProviderKeyRow } from '@/lib/providers/byok-store';
 import { getGoogleApiKey } from '@/lib/providers/google-env';
 import { resolveCustomProviderForProject } from '@/lib/providers/custom-provider-routing';
 import type { AIProvider } from '@/lib/providers/base';
@@ -173,48 +173,23 @@ export async function initializeBYOKProviders(
     try {
         const cached = await getCachedProviderConfig(projectId, targetProvider);
         let providerKey = cached?.row;
-        let error: unknown = null;
         if (!cached) {
-            const result = await supabase
-                .from('provider_keys')
-                .select('encrypted_key, is_active, default_model')
-                .eq('project_id', projectId)
-                .eq('provider', targetProvider)
-                .single();
-            providerKey = result.data;
-            error = result.error;
-            // Cache misses too: managed-provider projects should not query the
-            // BYOK table on every inference.
-            void setCachedProviderConfig(projectId, targetProvider, providerKey ?? null);
+            // Unified read: dashboard row first, newest usable embedded
+            // connection as fallback — one surface for both key stores.
+            // Cache misses too: managed-provider projects should not query
+            // the BYOK tables on every inference.
+            const resolved = await resolveProviderKeyRow(supabase as never, {
+                projectId,
+                provider: targetProvider,
+            });
+            providerKey = resolved?.row ?? null;
+            void setCachedProviderConfig(projectId, targetProvider, providerKey);
         }
 
-        if (!error && providerKey && providerKey.is_active) {
+        if (providerKey && providerKey.is_active) {
             const apiKey = decryptApiKey(providerKey.encrypted_key, organizationId);
             if (registerByokKey(router, targetProvider, apiKey)) {
                 return { success: true, usesByok: true, defaultModel: providerKey.default_model || undefined };
-            }
-        }
-
-        // Real fix for the split-brain key stores: a key added over the
-        // embedded API (`provider_connections`) historically never powered
-        // agents — the runtime only read `provider_keys`, so the dashboard
-        // kept showing "Not configured" after a 201. Fall back to the newest
-        // active managed-endpoint connection before giving up to managed.
-        if (!providerKey || !providerKey.is_active) {
-            const fallback = await fetchEmbeddedFallbackKey(supabase as never, projectId, targetProvider);
-            if (fallback) {
-                try {
-                    const apiKey = decryptApiKey(fallback.encryptedKeyRef, organizationId);
-                    if (registerByokKey(router, targetProvider, apiKey)) {
-                        void setCachedProviderConfig(projectId, targetProvider, {
-                            encrypted_key: fallback.encryptedKeyRef,
-                            is_active: true,
-                        });
-                        return { success: true, usesByok: true };
-                    }
-                } catch {
-                    // Decrypt/registration failure falls through to managed below.
-                }
             }
         }
 

@@ -16,35 +16,27 @@ vi.mock('@/lib/providers', () => ({
 
 import { initializeBYOKProviders } from '@/lib/gateway/providers-setup';
 
+// Table-aware mock: dashboard lookups resolve via maybeSingle, embedded
+// lookups via order/limit — mirroring the unified byok-store read path.
 function gatewayClient(opts: {
     providerKeyRow: Record<string, unknown> | null;
     embeddedRows?: Record<string, unknown>[];
 }) {
-    return {
-        from: (table: string) => {
-            if (table === 'provider_keys') {
-                return {
-                    select: () => ({
-                        eq: () => ({
-                            eq: () => ({ single: async () => ({ data: opts.providerKeyRow, error: null }) }),
-                        }),
-                    }),
-                };
-            }
-            const rows = opts.embeddedRows ?? [];
-            return {
-                select: () => ({
-                    eq: () => ({
-                        eq: () => ({
-                            order: () => ({
-                                limit: async () => ({ data: rows, error: null }),
-                            }),
-                        }),
-                    }),
-                }),
-            };
-        },
+    const chain: Record<string, unknown> = {};
+    const api = (table: string) => {
+        (chain as Record<string, unknown>).table = table;
+        return chain;
     };
+    Object.assign(chain, {
+        select: () => chain,
+        eq: () => chain,
+        is: () => chain,
+        not: () => chain,
+        order: () => chain,
+        maybeSingle: async () => ({ data: opts.providerKeyRow, error: null }),
+        limit: async () => ({ data: opts.embeddedRows ?? [], error: null }),
+    });
+    return { from: api };
 }
 
 describe('provider-key billing source', () => {
@@ -61,7 +53,7 @@ describe('provider-key billing source', () => {
         expect(router.registerProvider).toHaveBeenCalledOnce();
     });
 
-    it('keeps managed billing when no active project key exists', async () => {
+    it('keeps managed billing when no key exists in either store', async () => {
         const router = { registerProvider: vi.fn(), hasProvider: () => true };
         const result = await initializeBYOKProviders(
             router as never,
@@ -74,7 +66,7 @@ describe('provider-key billing source', () => {
         expect(router.registerProvider).not.toHaveBeenCalled();
     });
 
-    it('falls back to an API-added embedded connection when no dashboard key exists', async () => {
+    it('powers BYOK from an API-added embedded connection (unified surface)', async () => {
         const router = { registerProvider: vi.fn(), hasProvider: () => true };
         const result = await initializeBYOKProviders(
             router as never,
@@ -98,6 +90,31 @@ describe('provider-key billing source', () => {
         );
         expect(result).toEqual({ success: true, usesByok: true });
         expect(router.registerProvider).toHaveBeenCalledOnce();
+    });
+
+    it('treats an explicitly disabled dashboard key as disconnected', async () => {
+        const router = { registerProvider: vi.fn(), hasProvider: () => true };
+        const result = await initializeBYOKProviders(
+            router as never,
+            gatewayClient({
+                providerKeyRow: { encrypted_key: 'encrypted', is_active: false, default_model: null },
+                embeddedRows: [
+                    {
+                        id: 'uuid-1',
+                        provider: 'openai',
+                        status: 'active',
+                        base_url: null,
+                        encrypted_key_ref: 'IV:TAG:DATA',
+                        created_at: '2026-09-25T23:00:47Z',
+                    },
+                ],
+            }) as never,
+            'project-1',
+            'org-1',
+            'openai',
+        );
+        expect(result).toEqual({ success: true, usesByok: false });
+        expect(router.registerProvider).not.toHaveBeenCalled();
     });
 
     it('ignores unhealthy or proxy-bound embedded connections', async () => {
