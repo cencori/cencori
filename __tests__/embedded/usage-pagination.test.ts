@@ -147,6 +147,22 @@ describe('usage events pagination', () => {
         const res = (await GET(req('http://x/v1/usage/events?cursor=!!!'))) as { status: number };
         expect(res.status).toBe(400);
     });
+
+    it('marks reconciliation-pending rows unresolved instead of free', async () => {
+        const { GET } = await import('@/app/api/v1/usage/events/route');
+        const { from } = makeDb({
+            ai_requests: [
+                usageRow('e1', '2026-09-25T00:00:02Z', { cost_usd: 0, cencori_charge_usd: 0, metadata: { billing_reconciliation_required: true } }),
+                usageRow('e2', '2026-09-25T00:00:03Z', { cost_usd: 0, cencori_charge_usd: 0, metadata: {} }),
+            ],
+        });
+        (globalThis as Record<string, unknown>).__fakeDb = { from };
+        const res = (await GET(
+            req('http://x/v1/usage/events?since=2026-09-01T00:00:00Z&until=2026-10-01T00:00:00Z'),
+        )) as { __body: { data: Array<{ id: string; billing_state: string }> } };
+        const states = Object.fromEntries(res.__body.data.map((r) => [r.id, r.billing_state]));
+        expect(states).toEqual({ e1: 'unresolved', e2: 'final' });
+    });
 });
 
 describe('usage summary truncation', () => {
@@ -171,9 +187,25 @@ describe('usage summary truncation', () => {
         const { from } = makeDb({ ai_requests: [usageRow('e1', '2026-09-25T00:00:02Z')] });
         (globalThis as Record<string, unknown>).__fakeDb = { from };
         const res = (await GET(req('http://x/v1/usage?since=2026-09-01T00:00:00Z&until=2026-10-01T00:00:00Z'))) as {
-            __body: { totals: { requests: number }; truncated: boolean };
+            __body: { totals: { requests: number }; truncated: boolean; unresolved_rows: number };
         };
         expect(res.__body.truncated).toBe(false);
         expect(res.__body.totals.requests).toBe(1);
+        expect(res.__body.unresolved_rows).toBe(0);
+    });
+
+    it('counts unresolved rows in the summary', async () => {
+        const { GET } = await import('@/app/api/v1/usage/route');
+        const { from } = makeDb({
+            ai_requests: [
+                usageRow('e1', '2026-09-25T00:00:02Z', { metadata: { billing_reconciliation_required: true } }),
+                usageRow('e2', '2026-09-25T00:00:03Z', { metadata: {} }),
+            ],
+        });
+        (globalThis as Record<string, unknown>).__fakeDb = { from };
+        const res = (await GET(req('http://x/v1/usage?since=2026-09-01T00:00:00Z&until=2026-10-01T00:00:00Z'))) as {
+            __body: { unresolved_rows: number };
+        };
+        expect(res.__body.unresolved_rows).toBe(1);
     });
 });

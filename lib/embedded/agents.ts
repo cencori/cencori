@@ -20,6 +20,36 @@ export function checksumConfig(config: AgentVersionConfig): string {
     return crypto.createHash('sha256').update(JSON.stringify(config)).digest('hex');
 }
 
+export type AgentActivity = { active: true; found: boolean } | { active: false; found: boolean };
+
+/**
+ * Single pause gate shared by run admission, session creation, and turns:
+ * only an explicitly disabled agent refuses work. Missing rows are reported
+ * via `found` so callers can keep their own 404/403 shapes.
+ */
+export async function checkAgentActivity(
+    supabase: { from: (table: string) => any },
+    projectId: string,
+    agentId: string,
+): Promise<AgentActivity> {
+    try {
+        const { data, error } = await supabase
+            .from('agents')
+            .select('is_active')
+            .eq('project_id', projectId)
+            .eq('id', agentId)
+            .maybeSingle();
+        if (error || !data) return { active: true, found: false };
+        return (data as { is_active?: boolean | null }).is_active === false
+            ? { active: false, found: true }
+            : { active: true, found: true };
+    } catch {
+        // Fail open on lookup failure: admission gates must not wedge when
+        // the check itself errors; execution paths re-verify downstream.
+        return { active: true, found: false };
+    }
+}
+
 /**
  * Pin an agent version's skill references as durable join rows (used for
  * turn-time loading and audit). Refs must already be validated as published.
@@ -138,8 +168,7 @@ export interface ExecutionVersionInputs {
  * Which version inputs feed resolution when execution starts. The
  * submission pin wins so upgrades between submit and start apply to newly
  * created runs only; rows without a pin keep the previous live behavior.
- */
-export function executionVersionInputs(
+ */export function executionVersionInputs(
     run: { agent_version_id?: string | null },
     ins: { agent_version_id?: string | null; update_channel?: string | null } | null,
 ): ExecutionVersionInputs {

@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabaseAdmin';
 import { validateGatewayRequest, addGatewayHeaders, handleCorsPreFlight } from '@/lib/gateway-middleware';
 import { embeddedError, dePrefixId, withPrefix, getIdempotencyKey } from '@/lib/embedded/http';
 import { executionVersionInputs, resolveAgentRuntimeConfig } from '@/lib/embedded/agents';
+import { registerRunController, unregisterRunController } from '@/lib/embedded/run-abort';
 import { appendRunEvent, canTransition } from '@/lib/embedded/runs';
 import { scheduleEmbeddedWebhook } from '@/lib/embedded/dispatch-webhook';
 import { decodeRunRequest, encodeRunRequest, isRunResponseFormat, sameRunRequestBody } from '@/lib/embedded/run-request';
@@ -13,6 +14,73 @@ import crypto from 'crypto';
 
 export async function OPTIONS() {
     return handleCorsPreFlight();
+}
+
+// Opaque keyset cursor over (created_at, id). Raw-timestamp cursors are
+// accepted for compatibility (no id tiebreaker there).
+function encodeRunCursor(createdAt: string, id: string): string {
+    return Buffer.from(JSON.stringify({ c: createdAt, i: id }), 'utf8').toString('base64url');
+}
+
+function parseRunCursor(raw: string | null): { cursor: { createdAt: string; id: string | null } } | { error: string } | null {
+    if (!raw) return null;
+    try {
+        const parsed = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8')) as { c?: unknown; i?: unknown };
+        if (parsed && typeof parsed.c === 'string' && parsed.c) {
+            return { cursor: { createdAt: parsed.c, id: typeof parsed.i === 'string' && parsed.i ? parsed.i : null } };
+        }
+    } catch {
+        // Not an opaque cursor — fall through to legacy handling below.
+    }
+    if (/^\d{4}-\d{2}-\d{2}T/.test(raw)) return { cursor: { createdAt: raw, id: null } };
+    return { error: 'Invalid cursor' };
+}
+
+// GET /v1/agents/:agentId/runs — paginated run history for one agent.
+// Covers queued, cancelled, and pre-inference failed runs that usage rows
+// cannot supply.
+export async function GET(req: NextRequest, ctx: { params: Promise<{ agentId: string }> }) {
+    const requestId = crypto.randomUUID();
+    const validation = await validateGatewayRequest(req);
+    if (!validation.success) return validation.response;
+    if (validation.context.keyType !== 'secret') return addGatewayHeaders(embeddedError(403, 'secret_key_required', 'This operation requires a secret project key', { requestId }), { requestId });
+    const { agentId } = await ctx.params;
+    const supabase = createAdminClient();
+    const { data: agent } = await supabase.from('agents').select('id, project_id').eq('id', agentId).maybeSingle();
+    if (!agent || (agent.project_id as string) !== validation.context.projectId) {
+        return addGatewayHeaders(embeddedError(404, 'invalid_request_error', 'Agent not found', { requestId }), { requestId });
+    }
+    const url = new URL(req.url);
+    const limit = Math.min(100, Math.max(1, Number.parseInt(url.searchParams.get('limit') ?? '20', 10) || 20));
+    const parsedCursor = parseRunCursor(url.searchParams.get('cursor'));
+    if (parsedCursor && 'error' in parsedCursor) return addGatewayHeaders(embeddedError(400, 'invalid_request_error', parsedCursor.error, { requestId }), { requestId });
+    let query = supabase
+        .from('embedded_runs')
+        .select('*')
+        .eq('project_id', validation.context.projectId)
+        .eq('agent_id', agentId)
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .limit(limit + 1);
+    if (parsedCursor && 'cursor' in parsedCursor && parsedCursor.cursor) {
+        const { createdAt, id } = parsedCursor.cursor;
+        query = id
+            ? query.or(`created_at.lt.${createdAt},and(created_at.eq.${createdAt},id.lt.${id})`)
+            : query.lt('created_at', createdAt);
+    }
+    const { data, error } = await query;
+    if (error) return addGatewayHeaders(embeddedError(500, 'invalid_request_error', error.message, { requestId }), { requestId });
+    const rows = (data ?? []) as Record<string, unknown>[];
+    const hasMore = rows.length > limit;
+    const page = hasMore ? rows.slice(0, limit) : rows;
+    const last = page[page.length - 1];
+    return addGatewayHeaders(
+        NextResponse.json({
+            data: page.map((r) => serializeRun(r)),
+            next_cursor: hasMore && last ? encodeRunCursor(last.created_at as string, last.id as string) : null,
+        }),
+        { requestId },
+    );
 }
 
 function serializeRun(row: Record<string, unknown>) {
@@ -55,6 +123,11 @@ async function executeRun(runId: string): Promise<void> {
         agent_version_id: string | null; installation_id: string | null;
         external_user_id: string | null; input_ref: Record<string, unknown>;
     };
+    // Cancellation signal: the cancel route aborts this controller so the
+    // in-flight provider call stops and failover suppresses retries. The
+    // conditional terminal writes below still let a concurrent cancel win.
+    const abortController = new AbortController();
+    registerRunController(runId, abortController);
     await appendRunEvent(supabase as never, runId, 'run.started', { run_id: runId });
     scheduleEmbeddedWebhook(run.project_id, 'run.started', { run_id: runId, agent_id: run.agent_id });
 
@@ -106,10 +179,11 @@ async function executeRun(runId: string): Promise<void> {
         const { input, responseFormat } = decodeRunRequest(run.input_ref);
         const inputText = JSON.stringify(input);
         // Installed skills are independent of KB retrieval; overlap their DB
-        // lookups instead of serially extending pre-model latency.
+        // lookups instead of serially extending pre-model latency. Skills
+        // follow the submission-pinned version, not the live installation.
         const skillsPromise = run.installation_id
             ? import('@/lib/embedded/turn-knowledge')
-                .then(({ retrieveTurnSkills }) => retrieveTurnSkills(supabase as never, { installationId: run.installation_id, tenantId: run.tenant_id }))
+                .then(({ retrieveTurnSkills }) => retrieveTurnSkills(supabase as never, { installationId: run.installation_id, tenantId: run.tenant_id, versionId: run.agent_version_id }))
                 .catch(() => ({ block: null, skill_version_ids: [] as string[] }))
             : Promise.resolve({ block: null, skill_version_ids: [] as string[] });
         if (run.installation_id) {
@@ -180,10 +254,15 @@ async function executeRun(runId: string): Promise<void> {
                 model,
                 temperature: config.temperature ?? undefined,
                 maxTokens: config.max_output_tokens ?? undefined,
+                signal: abortController.signal,
             },
             requestId: `run_${runId}`,
         });
         const gatewayChatMs = Date.now() - gatewayChatStartedAt;
+
+        // A cancel that landed after provider success must not be billed:
+        // the terminal write below would lose to it anyway.
+        if (abortController.signal.aborted) throw new Error('Chat request aborted');
 
         // A managed-key run must debit the wallet just like direct Gateway
         // inference. Charge immediately after provider success, even if later
@@ -331,6 +410,8 @@ async function executeRun(runId: string): Promise<void> {
             await appendRunEvent(supabase as never, runId, 'run.failed', { run_id: runId, error: errorText.slice(0, 500) });
             scheduleEmbeddedWebhook(run.project_id, 'run.failed', { run_id: runId, error: errorText.slice(0, 300) });
         }
+    } finally {
+        unregisterRunController(runId);
     }
 }
 

@@ -127,6 +127,26 @@ export async function POST(req: NextRequest) {
     }
 
     const channel = body.update_channel === 'stable' ? 'stable' : 'pinned';
+    // Grants are additive here (PATCH replaces); but every granted ID must
+    // still exist in-project and belong to a compatible scope — validated
+    // BEFORE any mutation so junk can never be stored.
+    if ((body.knowledge_base_ids ?? []).length > 0 || (body.connection_ids ?? []).length > 0) {
+        if (body.knowledge_base_ids !== undefined && (!Array.isArray(body.knowledge_base_ids) || body.knowledge_base_ids.some((k) => typeof k !== 'string'))) {
+            return addGatewayHeaders(embeddedError(400, 'invalid_request_error', 'knowledge_base_ids must be an array of strings', { requestId }), { requestId });
+        }
+        if (body.connection_ids !== undefined && (!Array.isArray(body.connection_ids) || body.connection_ids.some((c) => typeof c !== 'string'))) {
+            return addGatewayHeaders(embeddedError(400, 'invalid_request_error', 'connection_ids must be an array of strings', { requestId }), { requestId });
+        }
+        const { validateInstallationGrants } = await import('@/lib/embedded/installation-grants');
+        const checked = await validateInstallationGrants(
+            supabase as never,
+            { projectId: validation.context.projectId, tenantId: tenant.id },
+            { knowledgeBaseIds: body.knowledge_base_ids ?? [], connectionIds: body.connection_ids ?? [] },
+        );
+        if (!checked.ok) {
+            return addGatewayHeaders(embeddedError(checked.error.status, checked.error.code, checked.error.message, { requestId }), { requestId });
+        }
+    }
     const { data: installation, error } = await supabase
         .from('agent_installations')
         .upsert(
@@ -206,7 +226,13 @@ export async function GET(req: NextRequest) {
     const rows = (data ?? []) as Record<string, unknown>[];
     const hasMore = rows.length > limit;
     const page = hasMore ? rows.slice(0, limit) : rows;
-    const enriched = await Promise.all(page.map((r) => enrich(supabase, r)));
+    // Grants must load or the page fails loudly — never show empty grants.
+    let enriched: Record<string, unknown>[];
+    try {
+        enriched = await Promise.all(page.map((r) => enrich(supabase, r)));
+    } catch (e) {
+        return addGatewayHeaders(embeddedError(500, 'invalid_request_error', e instanceof Error ? e.message : 'Failed to load installation grants', { requestId }), { requestId });
+    }
     const last = page[page.length - 1] as Record<string, unknown> | undefined;
     return addGatewayHeaders(
         NextResponse.json({

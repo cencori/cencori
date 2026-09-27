@@ -48,9 +48,18 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ installatio
     if (!validation.success) return validation.response;
     if (validation.context.keyType !== 'secret') return addGatewayHeaders(embeddedError(403, 'secret_key_required', 'This operation requires a secret project key', { requestId }), { requestId });
     const { installationId } = await ctx.params;
-    const row = await loadInstallation(createAdminClient(), validation.context.projectId, installationId);
+    const supabase = createAdminClient();
+    const row = await loadInstallation(supabase, validation.context.projectId, installationId);
     if (!row) return addGatewayHeaders(embeddedError(404, 'installation_not_found', 'Installation not found', { requestId }), { requestId });
-    return addGatewayHeaders(NextResponse.json(serialize(row)), { requestId });
+    // Grants live in join tables: every read path must load them and surface
+    // read failures instead of defaulting to empty.
+    let full: Record<string, unknown>;
+    try {
+        full = await enrich(supabase, row);
+    } catch (e) {
+        return addGatewayHeaders(embeddedError(500, 'invalid_request_error', e instanceof Error ? e.message : 'Failed to load installation grants', { requestId }), { requestId });
+    }
+    return addGatewayHeaders(NextResponse.json(serialize(full)), { requestId });
 }
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ installationId: string }> }) {
@@ -93,21 +102,34 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ installat
     }
 
     // Grant replacement (explicit arrays replace; absent leaves unchanged;
-    // empty clears). POST only ever added joins, so revocation previously
-    // had no enforceable path.
+    // empty clears). Validated BEFORE mutation; swapped atomically by RPC so
+    // revocation is enforceable and a failed write cannot half-replace.
     let replaceKb: string[] | null = null;
     let replaceConns: string[] | null = null;
     if (body.knowledge_base_ids !== undefined) {
         if (!Array.isArray(body.knowledge_base_ids) || body.knowledge_base_ids.some((k) => typeof k !== 'string')) {
             return addGatewayHeaders(embeddedError(400, 'invalid_request_error', 'knowledge_base_ids must be an array of strings', { requestId }), { requestId });
         }
-        replaceKb = (body.knowledge_base_ids as string[]).map((k) => dePrefixId(k));
+        replaceKb = body.knowledge_base_ids as string[];
     }
     if (body.connection_ids !== undefined) {
         if (!Array.isArray(body.connection_ids) || body.connection_ids.some((c) => typeof c !== 'string')) {
             return addGatewayHeaders(embeddedError(400, 'invalid_request_error', 'connection_ids must be an array of strings', { requestId }), { requestId });
         }
         replaceConns = body.connection_ids as string[];
+    }
+    let validated: { knowledgeBaseIds: string[]; connectionIds: string[] } | null = null;
+    if (replaceKb !== null || replaceConns !== null) {
+        const { validateInstallationGrants } = await import('@/lib/embedded/installation-grants');
+        const checked = await validateInstallationGrants(
+            supabase as never,
+            { projectId: validation.context.projectId, tenantId: row.tenant_id as string },
+            { knowledgeBaseIds: replaceKb ?? [], connectionIds: replaceConns ?? [] },
+        );
+        if (!checked.ok) {
+            return addGatewayHeaders(embeddedError(checked.error.status, checked.error.code, checked.error.message, { requestId }), { requestId });
+        }
+        validated = checked.grants;
     }
 
     if (Object.keys(patch).length === 0 && replaceKb === null && replaceConns === null) {
@@ -118,19 +140,23 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ installat
         if (error || !data) return addGatewayHeaders(embeddedError(500, 'invalid_request_error', error?.message ?? 'Update failed', { requestId }), { requestId });
         Object.assign(row, data as Record<string, unknown>);
     }
-    if (replaceKb !== null) {
-        await supabase.from('installation_knowledge_bases').delete().eq('installation_id', row.id as string);
-        for (const kbId of replaceKb) {
-            await supabase.from('installation_knowledge_bases').upsert({ installation_id: row.id as string, knowledge_base_id: kbId }, { onConflict: 'installation_id,knowledge_base_id' });
+    if (replaceKb !== null || replaceConns !== null) {
+        const grants = validated as { knowledgeBaseIds: string[]; connectionIds: string[] };
+        const { data: swapped, error: swapError } = await supabase.rpc('replace_installation_grants', {
+            p_installation_id: row.id as string,
+            p_kb_ids: replaceKb !== null ? grants.knowledgeBaseIds : null,
+            p_connection_ids: replaceConns !== null ? grants.connectionIds : null,
+        });
+        if (swapError || !swapped) {
+            return addGatewayHeaders(embeddedError(500, 'invalid_request_error', swapError?.message ?? 'Grant replacement failed', { requestId }), { requestId });
         }
     }
-    if (replaceConns !== null) {
-        await supabase.from('installation_connections').delete().eq('installation_id', row.id as string);
-        for (const connId of replaceConns) {
-            await supabase.from('installation_connections').upsert({ installation_id: row.id as string, connection_id: connId }, { onConflict: 'installation_id,connection_id' });
-        }
+    let full: Record<string, unknown>;
+    try {
+        full = await enrich(supabase, row);
+    } catch (e) {
+        return addGatewayHeaders(embeddedError(500, 'invalid_request_error', e instanceof Error ? e.message : 'Failed to load installation grants', { requestId }), { requestId });
     }
-    const full = await enrich(supabase, row);
     return addGatewayHeaders(NextResponse.json(serialize(full)), { requestId });
 }
 

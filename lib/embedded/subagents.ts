@@ -39,12 +39,15 @@ async function ancestorVersionIds(supabase: Admin, runId: string): Promise<Set<s
 
 async function cancelDescendant(supabase: Admin, runId: string, projectId: string): Promise<void> {
     const { data } = await supabase.from('embedded_runs').select('id').eq('parent_run_id', runId).not('status', 'in', '(completed,failed,cancelled,expired)');
+    const { abortRun } = await import('./run-abort');
     for (const child of (data ?? []) as Array<{ id: string }>) {
         const { data: claimed, error } = await supabase.from('embedded_runs')
             .update({ status: 'cancelled', completed_at: new Date().toISOString() })
             .eq('id', child.id).eq('project_id', projectId)
             .in('status', ['queued', 'running', 'requires_action']).select('id').maybeSingle();
         if (error) throw new Error(`Failed to cancel child run: ${error.message}`);
+        // Abort same-instance in-flight work for the claimed child.
+        if (claimed) abortRun(child.id);
         if (claimed) await appendRunEvent(supabase, child.id, 'run.cancelled', { run_id: child.id, cascade_from: runId });
         await cancelDescendant(supabase, child.id, projectId);
     }
@@ -182,7 +185,7 @@ export async function delegateSubagent(
             : message.includes('subagent_spend_budget_exhausted') ? 402
             : message.includes('idempotency_conflict') ? 409
                 : message.includes('parent_run_not_found') ? 404
-                    : message.includes('tenant_suspended') || message.includes('child_installation_scope_mismatch') ? 403
+                    : message.includes('tenant_suspended') || message.includes('child_installation_scope_mismatch') || message.includes('parent_agent_disabled') || message.includes('child_agent_disabled') ? 403
                         : message.includes('parent_run_inactive') || message.includes('child_version_unavailable') ? 409 : 500;
         throw Object.assign(new Error(message), { status, code: status === 409 && message.includes('idempotency_conflict') ? 'idempotency_conflict' : 'invalid_request_error' });
     }
@@ -235,6 +238,10 @@ export async function delegateSubagent(
         appliedTimeoutMs = timeoutMs;
         const controller = new AbortController();
         const timer = setTimeout(() => { timedOut = true; controller.abort(); }, timeoutMs);
+        // Cancellation shares this controller so amid-flight child aborts on
+        // cascade (same-instance, best-effort like root runs).
+        const { registerRunController, unregisterRunController } = await import('./run-abort');
+        registerRunController(childId, controller);
         let response: Awaited<ReturnType<typeof executeGatewayChat>>;
         const gatewayChatStartedAt = Date.now();
         try {
@@ -259,6 +266,7 @@ export async function delegateSubagent(
             });
         } finally {
             clearTimeout(timer);
+            unregisterRunController(childId);
         }
         const gatewayChatMs = Date.now() - gatewayChatStartedAt;
 

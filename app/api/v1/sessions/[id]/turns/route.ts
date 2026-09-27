@@ -224,13 +224,23 @@ export async function POST(
             if (installationId) {
                 const { data: ins } = await adminClient
                     .from('agent_installations')
-                    .select('agent_version_id, status, overlay_config')
+                    .select('agent_id, agent_version_id, status, overlay_config')
                     .eq('project_id', (gatewayCtx as GatewayContext).projectId)
                     .eq('id', installationId)
                     .maybeSingle();
                 const versionId = (ins as { agent_version_id?: string | null } | null)?.agent_version_id;
                 if (!ins || ins.status !== 'active' || !versionId) {
                     return respondError(403, 'Agent installation is not active', 'installation_inactive');
+                }
+                // Pause is an agent-level flag: a paused agent admits no turns
+                // even through an otherwise active installation.
+                const insAgentId = (ins as { agent_id?: string | null } | null)?.agent_id ?? null;
+                if (insAgentId) {
+                    const { checkAgentActivity } = await import('@/lib/embedded/agents');
+                    const activity = await checkAgentActivity(adminClient as never, (gatewayCtx as GatewayContext).projectId, insAgentId);
+                    if (!activity.active) {
+                        return respondError(403, 'Agent is disabled', 'agent_disabled');
+                    }
                 }
                 if (versionId) {
                     const { data: version } = await adminClient.from('agent_versions').select('config_json, status').eq('project_id', (gatewayCtx as GatewayContext).projectId).eq('id', versionId).maybeSingle();

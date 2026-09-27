@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabaseAdmin';
 import { validateGatewayRequest, addGatewayHeaders, handleCorsPreFlight } from '@/lib/gateway-middleware';
 import { embeddedError, withPrefix } from '@/lib/embedded/http';
 import { appendRunEvent, RUN_TERMINAL, emitEmbeddedEvent } from '@/lib/embedded/runs';
+import { abortRun } from '@/lib/embedded/run-abort';
 import crypto from 'crypto';
 
 export async function OPTIONS() {
@@ -48,5 +49,11 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ runId: str
     } catch {
         // best-effort; parent cancellation already recorded
     }
+    // Best-effort in-process abort: stops the in-flight provider call and
+    // suppresses failover retries on this instance (descendants abort inside
+    // the cascade below). Cross-instance work is still fenced by the
+    // conditional terminal writes (cancel always wins the race), so a
+    // cancelled status never flips back to completed.
+    abortRun(run.id);
     return addGatewayHeaders(NextResponse.json({ id: withPrefix('run', run.id), status: 'cancelled' }), { requestId });
 }

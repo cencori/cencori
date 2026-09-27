@@ -183,6 +183,9 @@ export async function GET(req: NextRequest) {
     const total = registry.models.length;
     const page = registry.models.slice(offset, offset + limit);
     const nextOffset = offset + limit < total ? offset + limit : null;
+    // total counts catalog rows (connection variants stay addressable via
+    // ?connection_id=); distinct_model_ids counts unique model IDs.
+    const distinctModelIds = new Set(registry.models.map((m) => m.id)).size;
 
     return respond(
         NextResponse.json({
@@ -212,6 +215,7 @@ export async function GET(req: NextRequest) {
                 pricing: m.pricing ?? undefined,
             })),
             total,
+            distinct_model_ids: distinctModelIds,
             next_cursor: nextOffset !== null ? Buffer.from(JSON.stringify({ o: nextOffset }), 'utf8').toString('base64url') : null,
             partial: registry.partial,
             providers: registry.providers.map((p) => ({

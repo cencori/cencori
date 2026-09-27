@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
     const ROW_CAP = 10000;
     let query = supabase
         .from('ai_requests')
-        .select('tenant_id, agent_id, installation_id, model, provider, prompt_tokens, completion_tokens, total_tokens, cost_usd, provider_cost_usd, cencori_charge_usd, created_at')
+        .select('tenant_id, agent_id, installation_id, model, provider, prompt_tokens, completion_tokens, total_tokens, cost_usd, provider_cost_usd, cencori_charge_usd, metadata, created_at')
         .eq('project_id', validation.context.projectId)
         .gte('created_at', window.since)
         .lte('created_at', window.until)
@@ -62,6 +62,9 @@ export async function GET(req: NextRequest) {
         cost_usd: Number(r.cost_usd ?? 0),
         provider_cost_usd: Number(r.provider_cost_usd ?? 0),
         cencori_charge_usd: Number(r.cencori_charge_usd ?? 0),
+        billing_state: ((r.metadata as { billing_reconciliation_required?: boolean } | null)?.billing_reconciliation_required === true)
+            ? 'unresolved'
+            : 'final',
         created_at: (r.created_at as string) ?? new Date().toISOString(),
     }));
     const groups = groupUsage(rows);
@@ -69,6 +72,11 @@ export async function GET(req: NextRequest) {
         (acc, r) => ({ requests: acc.requests + 1, total_tokens: acc.total_tokens + r.total_tokens, cost_usd: acc.cost_usd + r.cost_usd, cencori_charge_usd: acc.cencori_charge_usd + r.cencori_charge_usd }),
         { requests: 0, total_tokens: 0, cost_usd: 0, cencori_charge_usd: 0 },
     );
+    // Amounts are DECIMAL(10,6) summed in float64: exact for realistic
+    // magnitudes (integer micros stay precise well past single-digit
+    // millions of dollars). Rows with unresolved billing still contribute
+    // their recorded zeros — count them so totals read as provisional.
+    const unresolved_rows = rows.filter((r) => r.billing_state === 'unresolved').length;
     return addGatewayHeaders(
         NextResponse.json({
             window: { since: window.since, until: window.until },
@@ -76,6 +84,7 @@ export async function GET(req: NextRequest) {
             groups,
             truncated,
             row_cap: ROW_CAP,
+            unresolved_rows,
         }),
         { requestId },
     );

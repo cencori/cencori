@@ -116,7 +116,35 @@ function makeDb(seed: Record<string, Row[]>) {
             resolve({ data: run(), error: null });
         },
     });
-    return { db: { from: api.from }, tables };
+    return {
+        db: {
+            from: api.from,
+            rpc: async (fn: string, args: Record<string, unknown>) => {
+                if (fn !== 'replace_installation_grants') return { data: null, error: { message: 'unknown function' } };
+                const id = args.p_installation_id as string;
+                if (args.p_kb_ids !== null && args.p_kb_ids !== undefined) {
+                    tables.installation_knowledge_bases = tables.installation_knowledge_bases.filter((r) => r.installation_id !== id);
+                    for (const kb of (args.p_kb_ids as string[])) {
+                        tables.installation_knowledge_bases.push({ installation_id: id, knowledge_base_id: kb });
+                    }
+                }
+                if (args.p_connection_ids !== null && args.p_connection_ids !== undefined) {
+                    tables.installation_connections = tables.installation_connections.filter((r) => r.installation_id !== id);
+                    for (const c of (args.p_connection_ids as string[])) {
+                        tables.installation_connections.push({ installation_id: id, connection_id: c });
+                    }
+                }
+                return {
+                    data: {
+                        knowledge_base_ids: tables.installation_knowledge_bases.filter((r) => r.installation_id === id).map((r) => r.knowledge_base_id),
+                        connection_ids: tables.installation_connections.filter((r) => r.installation_id === id).map((r) => r.connection_id),
+                    },
+                    error: null,
+                };
+            },
+        },
+        tables,
+    };
 }
 
 function req(url: string, body?: unknown) {
@@ -180,6 +208,8 @@ describe('installation PATCH grants', () => {
                 { id: 'v2', agent_id: 'agent-a', version: '2', status: 'published' },
                 { id: 'vd', agent_id: 'agent-a', version: 'draft', status: 'draft' },
             ],
+            knowledge_bases: [{ id: 'new', project_id: 'proj-1', status: 'active', scope_type: 'tenant', tenant_id: 't1' }],
+            tool_connections: [],
             installation_connections: [{ installation_id: 'ins1', connection_id: 'old-conn' }],
             installation_knowledge_bases: [{ installation_id: 'ins1', knowledge_base_id: 'old-kb' }],
         });
@@ -237,5 +267,50 @@ describe('installation PATCH grants', () => {
         expect(empty.status).toBe(400);
         const bad = (await PATCH(req('http://x', { connection_ids: 'x' }), { params: Promise.resolve({ installationId: 'ins1' }) })) as { status: number };
         expect(bad.status).toBe(400);
+    });
+
+    it('rejects unknown, cross-tenant, and inactive grants before mutating', async () => {
+        const { PATCH } = await import('@/app/api/v1/agent-installations/[installationId]/route');
+        const seed = () => makeDb({
+            agent_installations: [{ id: 'ins1', project_id: 'proj-1', tenant_id: 't1', agent_id: 'agent-a', agent_version_id: 'v1', status: 'active' }],
+            agent_versions: [],
+            knowledge_bases: [
+                { id: 'kb-other-tenant', project_id: 'proj-1', status: 'active', scope_type: 'tenant', tenant_id: 't2' },
+                { id: 'kb-archived', project_id: 'proj-1', status: 'archived', scope_type: 'tenant', tenant_id: 't1' },
+            ],
+            tool_connections: [{ id: 'conn-expired', project_id: 'proj-1', status: 'expired', tenant_id: null }],
+            installation_connections: [{ installation_id: 'ins1', connection_id: 'keep-conn' }],
+            installation_knowledge_bases: [{ installation_id: 'ins1', knowledge_base_id: 'keep-kb' }],
+        });
+
+        const patchWith = async (body: unknown) => {
+            const { db, tables } = seed();
+            (globalThis as Record<string, unknown>).__fakeDb = db;
+            const res = (await PATCH(req('http://x', body), { params: Promise.resolve({ installationId: 'ins1' }) })) as {
+                status: number;
+                __body: { error?: { code?: string } };
+            };
+            return { res, tables };
+        };
+
+        // Nonexistent KB → 404, existing joins untouched.
+        const missing = await patchWith({ knowledge_base_ids: ['kb_nope'] });
+        expect(missing.res.status).toBe(404);
+        expect(missing.res.__body.error?.code).toBe('knowledge_base_not_found');
+        expect(missing.tables.installation_knowledge_bases).toHaveLength(1);
+
+        // Other tenant's KB → 403.
+        const cross = await patchWith({ knowledge_base_ids: ['kb-other-tenant'] });
+        expect(cross.res.status).toBe(403);
+        expect(cross.res.__body.error?.code).toBe('knowledge_base_scope_mismatch');
+
+        // Archived KB → 409.
+        const archived = await patchWith({ knowledge_base_ids: ['kb-archived'] });
+        expect(archived.res.status).toBe(409);
+
+        // Inactive connection → 409.
+        const expired = await patchWith({ connection_ids: ['conn-expired'] });
+        expect(expired.res.status).toBe(409);
+        expect(expired.res.__body.error?.code).toBe('connection_unavailable');
     });
 });

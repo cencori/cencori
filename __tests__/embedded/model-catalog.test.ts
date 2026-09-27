@@ -102,6 +102,31 @@ describe('unified model registry', () => {
         const registry = await buildUnifiedModelRegistry({ from } as never, { projectId: 'proj-1', query: {} });
         expect(registry.partial).toBe(true);
     });
+
+    it('caps synced source reads and marks truncation partial', async () => {
+        const synced = Array.from({ length: 2005 }, (_, i) => ({
+            provider_connection_id: 'c1',
+            upstream_model_id: `synth-model-${i}`,
+            display_name: null,
+            capabilities: ['chat'],
+            context_window: 0,
+            lifecycle_status: 'active',
+            availability_status: 'available',
+            unavailable_reason: null,
+            pricing_status: 'unknown',
+            updated_at: '2026-09-25T00:00:01Z',
+        }));
+        const { from } = makeDb({
+            provider_keys: [],
+            provider_connections: [{ id: 'c1', project_id: 'proj-1', provider: 'openai', status: 'active' }],
+            provider_connection_models: synced,
+            custom_providers: [],
+            model_pricing: [],
+        });
+        const registry = await buildUnifiedModelRegistry({ from } as never, { projectId: 'proj-1', query: {} });
+        expect(registry.partial).toBe(true);
+        expect(registry.models.filter((m) => m.connection_id === 'c1')).toHaveLength(2000);
+    });
 });
 
 describe('models endpoint pagination', () => {
