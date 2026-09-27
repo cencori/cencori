@@ -197,8 +197,8 @@ export interface UnifiedModel {
 
 export class ModelsNamespace {
     constructor(private config: Required<CencoriConfig>) {}
-    list(params?: { provider?: string; type?: string; available?: boolean; source?: string; connection_id?: string }): Promise<{ object: string; data: UnifiedModel[]; providers: unknown[] }> {
-        return request(this.config, 'GET', `/v1/models${qs({ provider: params?.provider, type: params?.type, available: params?.available, source: params?.source, connection_id: params?.connection_id })}`);
+    list(params?: { provider?: string; type?: string; available?: boolean; source?: string; connection_id?: string; limit?: number; cursor?: string }): Promise<{ object: string; data: UnifiedModel[]; providers: unknown[]; total: number; next_cursor: string | null; partial: boolean }> {
+        return request(this.config, 'GET', `/v1/models${qs({ provider: params?.provider, type: params?.type, available: params?.available, source: params?.source, connection_id: params?.connection_id, limit: params?.limit, cursor: params?.cursor })}`);
     }
 }
 
@@ -282,8 +282,8 @@ export class InstallationsNamespace {
     create(params: { tenant_id: string; agent_id: string; version?: string; update_channel?: string; knowledge_base_ids?: string[]; connection_ids?: string[]; approval_policy?: Record<string, unknown> }): Promise<unknown> {
         return request(this.config, 'POST', '/v1/agent-installations', params);
     }
-    list(tenantId?: string): Promise<{ data: unknown[]; next_cursor: string | null }> {
-        return request(this.config, 'GET', `/v1/agent-installations${qs({ tenant_id: tenantId })}`);
+    list(tenantId?: string, params?: { agent_id?: string; limit?: number; cursor?: string }): Promise<{ data: unknown[]; next_cursor: string | null }> {
+        return request(this.config, 'GET', `/v1/agent-installations${qs({ tenant_id: tenantId, agent_id: params?.agent_id, limit: params?.limit, cursor: params?.cursor })}`);
     }
     get(installationId: string): Promise<unknown> {
         return request(this.config, 'GET', `/v1/agent-installations/${installationId}`);
@@ -308,6 +308,9 @@ export class RunsNamespace {
     constructor(private config: Required<CencoriConfig>) {}
     create(agentId: string, params: { installation_id?: string; tenant_id?: string; external_user_id?: string; mode?: string; input?: unknown; response_format?: unknown; session_id?: string }, idempotencyKey?: string, options?: EmbeddedRequestOptions): Promise<unknown> {
         return request(this.config, 'POST', `/v1/agents/${agentId}/runs`, params, idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined, options);
+    }
+    history(agentId: string, params?: { limit?: number; cursor?: string }): Promise<{ data: unknown[]; next_cursor: string | null }> {
+        return request(this.config, 'GET', `/v1/agents/${agentId}/runs${qs({ limit: params?.limit, cursor: params?.cursor })}`);
     }
     get(runId: string, options?: EmbeddedRequestOptions): Promise<unknown> {
         return request(this.config, 'GET', `/v1/runs/${runId}`, undefined, undefined, options);
@@ -506,6 +509,21 @@ export class McpServersNamespace {
     }
 }
 
+// ── Public marketplace ─────────────────────────────
+
+export class MarketplaceNamespace {
+    constructor(private config: Required<CencoriConfig>) {}
+    list(params?: { limit?: number; cursor?: string }): Promise<{ data: unknown[]; next_cursor: string | null }> {
+        return request(this.config, 'GET', `/v1/marketplace/agents${qs({ limit: params?.limit, cursor: params?.cursor })}`);
+    }
+    get(versionId: string): Promise<unknown> {
+        return request(this.config, 'GET', `/v1/marketplace/agents/${versionId}`);
+    }
+    install(params: { version_id: string; tenant_id: string; knowledge_base_ids?: string[]; connection_ids?: string[]; approval_policy?: Record<string, unknown>; budget?: Record<string, unknown>; overlay_config?: Record<string, unknown> }): Promise<unknown> {
+        return request(this.config, 'POST', '/v1/marketplace/installations', params);
+    }
+}
+
 // ── Webhooks + usage + billing admin ───────────────────────
 
 export class WebhooksNamespace {
@@ -532,11 +550,11 @@ export class WebhooksNamespace {
 
 export class UsageNamespace {
     constructor(private config: Required<CencoriConfig>) {}
-    summary(params?: { days?: number; tenant_id?: string; agent_id?: string }): Promise<{ totals: unknown; groups: unknown[] }> {
-        return request(this.config, 'GET', `/v1/usage${qs({ days: params?.days, tenant_id: params?.tenant_id, agent_id: params?.agent_id })}`);
+    summary(params?: { days?: number; since?: string; until?: string; tenant_id?: string; agent_id?: string; installation_id?: string; model?: string }): Promise<{ totals: unknown; groups: unknown[]; truncated: boolean; row_cap: number; unresolved_rows: number }> {
+        return request(this.config, 'GET', `/v1/usage${qs({ days: params?.days, since: params?.since, until: params?.until, tenant_id: params?.tenant_id, agent_id: params?.agent_id, installation_id: params?.installation_id, model: params?.model })}`);
     }
-    events(params?: { days?: number; tenant_id?: string; agent_id?: string; limit?: number; cursor?: string }): Promise<{ data: unknown[]; next_cursor: string | null }> {
-        return request(this.config, 'GET', `/v1/usage/events${qs({ days: params?.days, tenant_id: params?.tenant_id, agent_id: params?.agent_id, limit: params?.limit, cursor: params?.cursor })}`);
+    events(params?: { days?: number; since?: string; until?: string; tenant_id?: string; agent_id?: string; installation_id?: string; model?: string; limit?: number; cursor?: string }): Promise<{ data: unknown[]; next_cursor: string | null }> {
+        return request(this.config, 'GET', `/v1/usage/events${qs({ days: params?.days, since: params?.since, until: params?.until, tenant_id: params?.tenant_id, agent_id: params?.agent_id, installation_id: params?.installation_id, model: params?.model, limit: params?.limit, cursor: params?.cursor })}`);
     }
     async exportCsv(params?: { days?: number; tenant_id?: string; agent_id?: string }): Promise<string> {
         // CSV is text, not JSON — fetch directly instead of the JSON helper.

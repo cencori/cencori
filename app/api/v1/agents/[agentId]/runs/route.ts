@@ -165,12 +165,21 @@ async function executeRun(runId: string): Promise<void> {
             installationVersionId: versionInputs.installationVersionId,
             updateChannel: versionInputs.updateChannel,
         });
-        const config = (runtime.config ?? {}) as { model?: string; instructions?: string; system_prompt?: string; temperature?: number; max_output_tokens?: number };
+        const config = (runtime.config ?? {}) as { model?: string; instructions?: string; system_prompt?: string; temperature?: number; max_output_tokens?: number; reasoning_effort?: string; provider_connection_id?: string };
         const model = config.model?.trim();
         if (!model) {
             throw new Error('Agent has no model configured');
         }
         attemptedModel = model;
+        // Manifest controls, validated at publish; re-checked defensively
+        // here so a hand-edited config can never inject an invalid value.
+        const { REASONING_EFFORTS } = await import('@/lib/embedded/manifest');
+        const reasoningEffort = (REASONING_EFFORTS as readonly string[]).includes(config.reasoning_effort as string)
+            ? (config.reasoning_effort as 'low' | 'medium' | 'high')
+            : undefined;
+        const pinnedConnectionId = typeof config.provider_connection_id === 'string' && config.provider_connection_id.trim()
+            ? config.provider_connection_id.trim()
+            : null;
         const instructions = config.instructions ?? config.system_prompt ?? undefined;
 
         // Knowledge context: embed the input and retrieve per bound KB (fallback: first chunks).
@@ -240,25 +249,149 @@ async function executeRun(runId: string): Promise<void> {
             wantsJson ? `Respond with JSON only, matching this schema: ${JSON.stringify(responseFormat?.json_schema?.schema ?? {})}` : null,
         ].filter(Boolean) as string[];
 
-        const gatewayChatStartedAt = Date.now();
-        const response = await executeGatewayChat({
-            supabase: supabase as never,
-            projectId: run.project_id,
-            organizationId,
-            tier,
-            request: {
-                messages: [
-                    ...(systemParts.length > 0 ? [{ role: 'system' as const, content: systemParts.join('\n\n') }] : []),
-                    { role: 'user' as const, content: inputText },
-                ],
-                model,
-                temperature: config.temperature ?? undefined,
-                maxTokens: config.max_output_tokens ?? undefined,
-                signal: abortController.signal,
-            },
-            requestId: `run_${runId}`,
-        });
-        const gatewayChatMs = Date.now() - gatewayChatStartedAt;
+        // Hosted MCP tool loop: manifest grants are offered to the model;
+        // read-classified calls execute now against their granting server,
+        // approval-gated calls become pending actions and fail the run
+        // loudly (a human completes them via the actions API). Bounded at
+        // 5 model turns; spend re-checked every iteration.
+        const { normalizeManifest } = await import('@/lib/embedded/manifest');
+        const runManifest = normalizeManifest((runtime.config ?? {}) as Record<string, unknown>);
+        const { loadMcpSnapshots, callMcpTool, mcpAuthHeaders } = await import('@/lib/embedded/mcp');
+        const { mcpManifestTools, parseMcpHostedToolName } = await import('@/lib/embedded/turn-tools');
+        const { classifyTool } = await import('@/lib/embedded/tool-risk');
+        const runSnapshots: Map<string, import('@/lib/embedded/mcp').McpServerSnapshot> = runManifest.mcp_tools.length > 0
+            ? await loadMcpSnapshots(supabase as never, run.project_id, runManifest.mcp_tools.map((m) => m.server_id))
+            : new Map();
+        const runMcpTools = mcpManifestTools(
+            runManifest.mcp_tools,
+            new Map([...runSnapshots].map(([id, snap]) => [id, snap.tools])),
+        );
+        const { resolveActionNetworkPolicy, checkEgress } = await import('@/lib/embedded/net-policy');
+        const runNetPolicy = await resolveActionNetworkPolicy(supabase as never, { project_id: run.project_id, run_id: runId, approval_policy: {} });
+        const { checkSpendBudgets } = await import('@/lib/embedded/budgets');
+
+        const baseMessages: import('@/lib/providers/base').UnifiedMessage[] = [
+            ...(systemParts.length > 0 ? [{ role: 'system' as const, content: systemParts.join('\n\n') }] : []),
+            { role: 'user' as const, content: inputText },
+        ];
+        let loopMessages = [...baseMessages];
+        let response: Awaited<ReturnType<typeof executeGatewayChat>> | null = null;
+        let totalPrompt = 0;
+        let totalCompletion = 0;
+        let totalProviderCost = 0;
+        let totalCharge = 0;
+        let totalGatewayMs = 0;
+        let markupPercentage = 0;
+        const executedToolCalls: Array<{ tool: string; status: 'executed' | 'failed'; action_id: string }> = [];
+        const pendingApprovals: Array<{ action_id: string; tool: string }> = [];
+        const MAX_TOOL_ITERATIONS = 5;
+        const preGatewayMs = Date.now() - executorStartedAt;
+
+        for (let iteration = 0; ; iteration++) {            if (abortController.signal.aborted) throw new Error('Chat request aborted');
+            const gatewayChatStartedAt = Date.now();
+            response = await executeGatewayChat({
+                supabase: supabase as never,
+                projectId: run.project_id,
+                organizationId,
+                tier,
+                request: {
+                    messages: loopMessages,
+                    model,
+                    temperature: config.temperature ?? undefined,
+                    maxTokens: config.max_output_tokens ?? undefined,
+                    signal: abortController.signal,
+                    ...(reasoningEffort ? { reasoningEffort } : {}),
+                    ...(runMcpTools.length > 0 ? { tools: runMcpTools as never } : {}),
+                },
+                requestId: `run_${runId}`,
+                ...(pinnedConnectionId ? { pinnedConnectionId } : {}),
+            });
+            const gatewayChatMs = Date.now() - gatewayChatStartedAt;
+            totalGatewayMs += gatewayChatMs;
+            totalPrompt += response.usage.promptTokens;
+            totalCompletion += response.usage.completionTokens;
+            totalProviderCost += response.cost.providerCostUsd;
+            totalCharge += response.cost.cencoriChargeUsd;
+            markupPercentage = response.cost.markupPercentage;
+
+            const calls = (response.toolCalls ?? []).filter((tc) => tc.function?.name);
+            if (calls.length === 0 || iteration >= MAX_TOOL_ITERATIONS) break;
+
+            const spend = await checkSpendBudgets(supabase as never, { projectId: run.project_id, tenantId: run.tenant_id, installationId: run.installation_id, agentId: run.agent_id });
+            if (!spend.ok) {
+                throw Object.assign(new Error(`${spend.scope} spend budget exceeded`), { status: 402, code: 'budget_exceeded' });
+            }
+
+            const assistantCalls = calls.map((tc) => ({ id: tc.id, type: 'function' as const, function: { name: tc.function.name, arguments: tc.function.arguments } }));
+            loopMessages = [...loopMessages, { role: 'assistant' as const, content: response.content || '', tool_calls: assistantCalls }];
+
+            let progressed = false;
+            for (const tc of calls) {
+                const parsed = parseMcpHostedToolName(tc.function.name);
+                const server = parsed
+                    ? [...runSnapshots.values()].find((s) => s.id.replace(/-/g, '').toLowerCase().startsWith(parsed.serverShort.toLowerCase()) && s.tools.some((t) => t.name === parsed.tool))
+                    : undefined;
+                if (!parsed || !server) {
+                    loopMessages = [...loopMessages, { role: 'tool' as const, content: `Unknown tool '${tc.function.name}': not granted by this agent version`, toolCallId: tc.id }];
+                    continue;
+                }
+                const needsApproval = (runMcpTools.find((t) => (t as { function: { name: string } }).function.name === tc.function.name) as { needsApproval?: boolean } | undefined)?.needsApproval === true
+                    || classifyTool(parsed.tool).approval !== 'auto';
+                let args: Record<string, unknown> = {};
+                try {
+                    args = JSON.parse(tc.function.arguments || '{}') as Record<string, unknown>;
+                } catch {
+                    loopMessages = [...loopMessages, { role: 'tool' as const, content: `Invalid arguments JSON for '${tc.function.name}'`, toolCallId: tc.id }];
+                    continue;
+                }
+                if (needsApproval) {
+                    const executionKey = `run_${runId}_i${iteration}_${tc.id}`.slice(0, 64);
+                    const { data: action } = await supabase.from('actions').insert({
+                        project_id: run.project_id,
+                        tenant_id: run.tenant_id,
+                        run_id: runId,
+                        session_id: null,
+                        turn_number: null,
+                        tool_name: tc.function.name,
+                        risk_level: classifyTool(parsed.tool).risk,
+                        status: 'pending',
+                        sanitized_arguments: args,
+                        approval_policy: { mcp_server_id: server.id, mcp_tool: parsed.tool },
+                        expires_at: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+                        execution_key: executionKey,
+                    }).select('id').single();
+                    pendingApprovals.push({ action_id: (action as { id: string } | null)?.id ?? tc.id, tool: tc.function.name });
+                    continue;
+                }
+                const egress = await checkEgress(server.url, runNetPolicy);
+                if (!egress.allowed) {
+                    loopMessages = [...loopMessages, { role: 'tool' as const, content: `Network policy denied MCP egress to ${egress.host ?? 'unknown host'}: ${egress.reason}`, toolCallId: tc.id }];
+                    executedToolCalls.push({ tool: tc.function.name, status: 'failed', action_id: tc.id });
+                    continue;
+                }
+                try {
+                    const headers = await mcpAuthHeaders(supabase as never, run.project_id, organizationId, server.authConnectionId);
+                    const output = await callMcpTool({ url: server.url, headers, transport: server.transport === 'sse' ? 'sse' : 'streamable-http', tool: parsed.tool, args });
+                    loopMessages = [...loopMessages, { role: 'tool' as const, content: typeof output === 'string' ? output : JSON.stringify(output ?? null).slice(0, 8000), toolCallId: tc.id }];
+                    executedToolCalls.push({ tool: tc.function.name, status: 'executed', action_id: tc.id });
+                    await appendRunEvent(supabase as never, runId, 'tool_call.completed', { run_id: runId, tool: tc.function.name, action_id: tc.id, executed_by: 'host' });
+                    progressed = true;
+                } catch (e) {
+                    loopMessages = [...loopMessages, { role: 'tool' as const, content: `Tool '${tc.function.name}' failed: ${(e instanceof Error ? e.message : 'unknown').slice(0, 500)}`, toolCallId: tc.id }];
+                    executedToolCalls.push({ tool: tc.function.name, status: 'failed', action_id: tc.id });
+                    progressed = true;
+                }
+            }
+
+            if (pendingApprovals.length > 0) {
+                throw Object.assign(
+                    new Error(`Approval required for ${pendingApprovals.length} tool call(s): ${pendingApprovals.map((p) => `${p.tool} (action ${p.action_id})`).join(', ')}. Approve via POST /v1/actions/:id/approve.`),
+                    { status: 409, code: 'approval_required', pendingApprovals },
+                );
+            }
+            if (!progressed) break;
+        }
+        if (!response) throw new Error('Provider produced no response');
 
         // A cancel that landed after provider success must not be billed:
         // the terminal write below would lose to it anyway.
@@ -267,15 +400,15 @@ async function executeRun(runId: string): Promise<void> {
         // A managed-key run must debit the wallet just like direct Gateway
         // inference. Charge immediately after provider success, even if later
         // JSON validation fails or cancellation discards the model output.
+        // Totals accumulate across tool-loop iterations.
         const billingStartedAt = Date.now();
         let charged = false;
         try {
-            charged = await chargeProjectUsageCredits(organizationId, tier, response.cost.cencoriChargeUsd, 'runs.execute');
+            charged = await chargeProjectUsageCredits(organizationId, tier, totalCharge, 'runs.execute');
         } catch {
             charged = false;
         }
         const billingMs = Date.now() - billingStartedAt;
-        const preGatewayMs = gatewayChatStartedAt - executorStartedAt;
 
         // Spend budgets read this row, so it must be committed before the run
         // becomes complete. This contains no prompts or KB snippets.
@@ -288,14 +421,14 @@ async function executeRun(runId: string): Promise<void> {
             model: response.model,
             provider: response.provider,
             status: charged ? 'success' : 'error',
-            prompt_tokens: response.usage.promptTokens,
-            completion_tokens: response.usage.completionTokens,
-            total_tokens: response.usage.totalTokens,
-            latency_ms: gatewayChatMs,
-            cost_usd: charged ? response.cost.cencoriChargeUsd : 0,
-            provider_cost_usd: response.cost.providerCostUsd,
-            cencori_charge_usd: charged ? response.cost.cencoriChargeUsd : 0,
-            markup_percentage: response.cost.markupPercentage,
+            prompt_tokens: totalPrompt,
+            completion_tokens: totalCompletion,
+            total_tokens: totalPrompt + totalCompletion,
+            latency_ms: totalGatewayMs,
+            cost_usd: charged ? totalCharge : 0,
+            provider_cost_usd: totalProviderCost,
+            cencori_charge_usd: charged ? totalCharge : 0,
+            markup_percentage: markupPercentage,
             tenant_id: run.tenant_id,
             agent_id: run.agent_id,
             installation_id: run.installation_id,
@@ -303,7 +436,7 @@ async function executeRun(runId: string): Promise<void> {
             request_id: `run_${runId}`,
             request_payload: {},
             metadata: {
-                run_timing_ms: { pre_gateway: preGatewayMs, gateway_chat: gatewayChatMs, billing: billingMs },
+                run_timing_ms: { pre_gateway: preGatewayMs, gateway_chat: totalGatewayMs, billing: billingMs },
                 ...(charged ? {} : { billing_reconciliation_required: true, reason: 'credit_deduction_failed' }),
             },
         });
@@ -340,12 +473,22 @@ async function executeRun(runId: string): Promise<void> {
             provider: response.provider,
             agent_version_id: runtime.versionId,
             agent_version: runtime.version,
+            reasoning_effort_applied: reasoningEffort ?? null,
             knowledge_citations: citations,
             skills_used: runSkillIds,
             manifest_tools: ((runtime.config ?? {}) as { tools?: unknown }).tools ?? [],
             manifest_policy: ((runtime.config ?? {}) as { policy?: unknown }).policy ?? { browser: { enabled: false }, network: { mode: 'none', allowed_hosts: [] } },
-            usage: response.usage,
-            cost: response.cost,
+            usage: {
+                promptTokens: totalPrompt,
+                completionTokens: totalCompletion,
+                totalTokens: totalPrompt + totalCompletion,
+            },
+            cost: {
+                providerCostUsd: totalProviderCost,
+                cencoriChargeUsd: totalCharge,
+                markupPercentage,
+            },
+            tool_calls: executedToolCalls,
         };
 
         const finalizationStartedAt = Date.now();
@@ -361,7 +504,7 @@ async function executeRun(runId: string): Promise<void> {
                 runId,
                 queueMs: Number.isFinite(createdAt) ? executorStartedAt - createdAt : null,
                 preGatewayMs,
-                gatewayChatMs,
+                gatewayChatMs: totalGatewayMs,
                 billingMs,
                 meteringMs,
                 finalizationMs: Date.now() - finalizationStartedAt,

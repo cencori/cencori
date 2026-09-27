@@ -13,6 +13,18 @@ vi.mock('@/lib/providers', () => ({
     CohereProvider: class {},
     isOpenAICompatible: () => false,
 }));
+// byok-store imports provider implementations directly (not via the index).
+vi.mock('@/lib/providers/openai', () => ({
+    OpenAIProvider: class {},
+    openAIReasoningEffort: () => undefined,
+}));
+vi.mock('@/lib/providers/gemini', () => ({ GeminiProvider: class {} }));
+vi.mock('@/lib/providers/anthropic', () => ({ AnthropicProvider: class {} }));
+vi.mock('@/lib/providers/cohere', () => ({ CohereProvider: class {} }));
+vi.mock('@/lib/providers/openai-compatible', () => ({
+    OpenAICompatibleProvider: class {},
+    isOpenAICompatible: () => false,
+}));
 
 import { initializeBYOKProviders } from '@/lib/gateway/providers-setup';
 

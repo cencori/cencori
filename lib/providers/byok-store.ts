@@ -16,6 +16,13 @@
  */
 
 import { decryptApiKey } from '@/lib/encryption';
+import { dePrefixId } from '@/lib/embedded/http';
+import type { ProviderRouter } from './router';
+import { AnthropicProvider } from './anthropic';
+import { CohereProvider } from './cohere';
+import { GeminiProvider } from './gemini';
+import { OpenAIProvider } from './openai';
+import { OpenAICompatibleProvider, isOpenAICompatible } from './openai-compatible';
 
 export interface EmbeddedConnectionRow {
     id?: string;
@@ -193,6 +200,78 @@ export async function resolveProviderKey(
     } catch {
         return null;
     }
+}
+
+/**
+ * Register a decrypted BYOK key against the router. Shared by the dashboard
+ * path, the embedded fallback, and exact connection pins so all three power
+ * agents identically.
+ */
+export function registerByokKey(router: ProviderRouter, targetProvider: string, apiKey: string): boolean {
+    if (targetProvider === 'google') {
+        router.registerProvider(targetProvider, new GeminiProvider(apiKey));
+        return true;
+    }
+    if (targetProvider === 'openai') {
+        router.registerProvider(targetProvider, new OpenAIProvider(apiKey));
+        return true;
+    }
+    if (targetProvider === 'anthropic') {
+        router.registerProvider(targetProvider, new AnthropicProvider(apiKey));
+        return true;
+    }
+    if (isOpenAICompatible(targetProvider)) {
+        router.registerProvider(
+            targetProvider,
+            new OpenAICompatibleProvider(targetProvider, apiKey)
+        );
+        return true;
+    }
+    if (targetProvider === 'cohere') {
+        router.registerProvider(targetProvider, new CohereProvider(apiKey));
+        return true;
+    }
+    return false;
+}
+
+/**
+ * Apply an exact provider-connection pin: load the connection, verify it is
+ * usable for this provider right now (rotation or deletion since publish
+ * fails closed here), and override the router's instance with its key.
+ * Throws on any mismatch — callers convert to 4xx/5xx.
+ */
+export async function applyPinnedConnection(
+    router: ProviderRouter,
+    supabase: AdminQuery,
+    opts: { projectId: string; organizationId: string; provider: string; connectionId: string },
+): Promise<{ connectionId: string }> {
+    const raw = dePrefixId(opts.connectionId);
+    const { data, error } = await supabase
+        .from('provider_connections')
+        .select('id, provider, status, base_url, encrypted_key_ref')
+        .eq('project_id', opts.projectId)
+        .eq('id', raw)
+        .maybeSingle();
+    const row = (error ? null : data) as {
+        id?: string; provider?: string; status?: string; base_url?: string | null; encrypted_key_ref?: string | null;
+    } | null;
+    if (!row) throw new Error(`Pinned provider connection '${opts.connectionId}' not found in this project`);
+    if (row.status !== 'active') throw new Error(`Pinned provider connection '${opts.connectionId}' is not active`);
+    if (!row.encrypted_key_ref) throw new Error(`Pinned provider connection '${opts.connectionId}' holds no key`);
+    if ((row.base_url ?? null) !== null) throw new Error(`Pinned provider connection '${opts.connectionId}' points at a custom proxy; pins require managed-endpoint connections`);
+    if ((row.provider ?? '').toLowerCase() !== opts.provider.toLowerCase()) {
+        throw new Error(`Pinned provider connection '${opts.connectionId}' serves '${row.provider}', not '${opts.provider}'`);
+    }
+    let apiKey: string;
+    try {
+        apiKey = decryptApiKey(row.encrypted_key_ref, opts.organizationId);
+    } catch {
+        throw new Error(`Pinned provider connection '${opts.connectionId}' cannot be decrypted`);
+    }
+    if (!registerByokKey(router, opts.provider, apiKey)) {
+        throw new Error(`Pinned provider connection '${opts.connectionId}' targets unsupported provider '${opts.provider}'`);
+    }
+    return { connectionId: opts.connectionId };
 }
 
 /**

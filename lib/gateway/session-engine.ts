@@ -57,6 +57,10 @@ export type TurnExecuteParams = {
     knowledgeContext?: { block: string | null; citations: Array<{ chunk_id: string; source_id: string; ord?: number | null; score: number }> };
     /** Published skill procedures pinned to the installed agent version. */
     skillsBlock?: string | null;
+    /** Exact provider-connection pin from the installed manifest. */
+    pinnedConnectionId?: string | null;
+    /** Reasoning effort from the installed manifest (OpenAI family only). */
+    reasoningEffort?: 'low' | 'medium' | 'high';
     logSuccess: (meta: {
         provider: string; model: string; status: 'success' | 'success_fallback' | 'error';
         promptTokens: number; completionTokens: number; totalTokens: number;
@@ -161,6 +165,9 @@ function makeStream(params: {
     pauseOnToolCalls: boolean;
     needsApprovalToolNames: Set<string>;
     collectedBuiltinToolOutputs: ToolCallOutput[];
+    reasoningEffort?: 'low' | 'medium' | 'high';
+    /** Exact provider-connection pin (frozen into turn.started for resume). */
+    pinnedConnectionId?: string | null;
     instructions?: string;
     inputText?: string;
     inputSecurity?: SecurityCheckResult;
@@ -178,7 +185,8 @@ function makeStream(params: {
         messages, functionTools, forceSchemaResult, schemaToolName, tool_choice,
         temperature, max_output_tokens, pauseOnToolCalls, needsApprovalToolNames, collectedBuiltinToolOutputs,
         instructions, inputText, inputSecurity, tokenMap, endUserId,
-        tier, logSuccess, incrementUsage, recordEndUserUsage, onCompletion, knowledgeContext,
+        tier, logSuccess, incrementUsage, recordEndUserUsage, onCompletion, knowledgeContext, reasoningEffort,
+        pinnedConnectionId,
     } = params;
 
     const stream = new ReadableStream({
@@ -225,6 +233,10 @@ function makeStream(params: {
                     input_messages: messages.map(m => ({ role: m.role, content: m.content ?? null })),
                     input_security: inputSecurity,
                     input_token_map: tokenMap ? Object.fromEntries(tokenMap) : undefined,
+                    // Frozen turn controls so an approved resume runs on the
+                    // same key and effort as the paused turn.
+                    ...(pinnedConnectionId ? { provider_connection_id: pinnedConnectionId } : {}),
+                    ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
                 });
 
                 for await (const chunk of streamGatewayChat({
@@ -236,6 +248,7 @@ function makeStream(params: {
                         temperature, maxTokens: max_output_tokens, stream: true,
                         tools: functionTools.length > 0 ? functionTools : undefined,
                         toolChoice: resolveToolChoice(forceSchemaResult, schemaToolName, tool_choice),
+                        ...(reasoningEffort ? { reasoningEffort } : {}),
                     },
                     resolved: resolved as never,
                     requestId: gatewayCtx.requestId,
@@ -509,7 +522,7 @@ export async function executeSessionTurn(params: TurnExecuteParams): Promise<Tur
         instructions, tools, tool_choice, temperature, max_output_tokens,
         response_format, inputMessages, inputText, inputSecurity, tokenMap,
         pauseOnToolCalls, tier, logSuccess, incrementUsage, recordEndUserUsage, onCompletion,
-        knowledgeContext, skillsBlock,
+        knowledgeContext, skillsBlock, pinnedConnectionId, reasoningEffort,
     } = params;
 
     try {
@@ -517,6 +530,7 @@ export async function executeSessionTurn(params: TurnExecuteParams): Promise<Tur
             supabase, projectId: gatewayCtx.projectId, organizationId: gatewayCtx.organizationId, requestedModel: model,
             basecodeModelPolicy: gatewayCtx.basecodeModelPolicy,
             allowedModels: gatewayCtx.allowedModels, sponsoredModels: gatewayCtx.sponsoredModels,
+            pinnedConnectionId: pinnedConnectionId ?? null,
         });
 
         const { functionTools, builtInTools } = extractTools(tools);
@@ -605,6 +619,8 @@ export async function executeSessionTurn(params: TurnExecuteParams): Promise<Tur
             instructions, inputText, inputSecurity, tokenMap, endUserId: params.endUserId,
             tier, logSuccess, incrementUsage, recordEndUserUsage, onCompletion,
             knowledgeContext,
+            reasoningEffort: params.reasoningEffort,
+            pinnedConnectionId: params.pinnedConnectionId ?? null,
         });
 
         return { ok: true, response };
@@ -664,6 +680,11 @@ export async function resumeSessionTurn(params: ResumeTurnParams): Promise<TurnE
         const instructions = sp.instructions as string | undefined;
         const inputText = sp.input_text as string | undefined;
         const storedInputSecurity = sp.input_security as SecurityCheckResult | undefined;
+        // Frozen at turn start so the resumed turn runs on the same key/effort.
+        const storedPin = typeof sp.provider_connection_id === 'string' && sp.provider_connection_id ? sp.provider_connection_id : null;
+        const storedEffort = ['low', 'medium', 'high'].includes(sp.reasoning_effort as string)
+            ? (sp.reasoning_effort as 'low' | 'medium' | 'high')
+            : undefined;
         const storedTokenMap = new Map<string, string>(
             Object.entries((sp.input_token_map as Record<string, string> | undefined) ?? {})
         );
@@ -679,6 +700,7 @@ export async function resumeSessionTurn(params: ResumeTurnParams): Promise<TurnE
             supabase, projectId: gatewayCtx.projectId, organizationId: gatewayCtx.organizationId, requestedModel: model,
             basecodeModelPolicy: gatewayCtx.basecodeModelPolicy,
             allowedModels: gatewayCtx.allowedModels, sponsoredModels: gatewayCtx.sponsoredModels,
+            pinnedConnectionId: storedPin,
         });
 
         // Reconstruct assistant text and tool calls from events
@@ -804,6 +826,7 @@ export async function resumeSessionTurn(params: ResumeTurnParams): Promise<TurnE
                             messages: messages as never,
                             model: resolved.model,
                             stream: true,
+                            ...(storedEffort ? { reasoningEffort: storedEffort } : {}),
                         },
                         resolved: resolved as never,
                         requestId: gatewayCtx.requestId,

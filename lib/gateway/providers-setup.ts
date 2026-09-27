@@ -9,7 +9,7 @@ import {
 } from '@/lib/providers';
 import { ProviderRouter } from '@/lib/providers/router';
 import { decryptApiKey } from '@/lib/encryption';
-import { resolveProviderKeyRow } from '@/lib/providers/byok-store';
+import { applyPinnedConnection, registerByokKey, resolveProviderKeyRow } from '@/lib/providers/byok-store';
 import { getGoogleApiKey } from '@/lib/providers/google-env';
 import { resolveCustomProviderForProject } from '@/lib/providers/custom-provider-routing';
 import type { AIProvider } from '@/lib/providers/base';
@@ -131,38 +131,6 @@ export function registerDefaultProviders(router: ProviderRouter): void {
     }
 }
 
-/**
- * Register a decrypted BYOK key against the router. Shared by the dashboard
- * (`provider_keys`) path and the embedded (`provider_connections`) fallback
- * so both stores power agents identically.
- */
-function registerByokKey(router: ProviderRouter, targetProvider: string, apiKey: string): boolean {
-    if (targetProvider === 'google') {
-        router.registerProvider(targetProvider, new GeminiProvider(apiKey));
-        return true;
-    }
-    if (targetProvider === 'openai') {
-        router.registerProvider(targetProvider, new OpenAIProvider(apiKey));
-        return true;
-    }
-    if (targetProvider === 'anthropic') {
-        router.registerProvider(targetProvider, new AnthropicProvider(apiKey));
-        return true;
-    }
-    if (isOpenAICompatible(targetProvider)) {
-        router.registerProvider(
-            targetProvider,
-            new OpenAICompatibleProvider(targetProvider, apiKey)
-        );
-        return true;
-    }
-    if (targetProvider === 'cohere') {
-        router.registerProvider(targetProvider, new CohereProvider(apiKey));
-        return true;
-    }
-    return false;
-}
-
 export async function initializeBYOKProviders(
     router: ProviderRouter,
     supabase: SupabaseAdmin,
@@ -271,6 +239,13 @@ export async function resolveGatewayProvider(params: {
     basecodeModelPolicy?: 'auto' | 'open_weight' | 'frontier' | 'custom' | null;
     allowedModels?: string[] | null;
     sponsoredModels?: string[] | null;
+    /**
+     * Exact provider-connection pin from the agent manifest. Overrides
+     * default BYOK resolution for the resolved provider; mismatches fail
+     * closed here (rotation/deletion since publish must not silently fall
+     * back to another key).
+     */
+    pinnedConnectionId?: string | null;
 }): Promise<ResolvedGatewayProvider> {
     const requestedModel = resolveBasecodePlanModel(
         params.requestedModel,
@@ -331,6 +306,16 @@ export async function resolveGatewayProvider(params: {
 
         if (!byokResult.success) {
             registerDefaultProviders(router);
+        }
+
+        if (params.pinnedConnectionId) {
+            await applyPinnedConnection(router, params.supabase as never, {
+                projectId: params.projectId,
+                organizationId: params.organizationId,
+                provider: providerName,
+                connectionId: params.pinnedConnectionId,
+            });
+            usesByok = true;
         }
     }
 

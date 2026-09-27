@@ -194,6 +194,11 @@ export async function executeGatewayChat(params: {
     /** Charge-sensitive callers may forbid retries and fallback providers. */
     singleProviderAttempt?: boolean;
     performance?: GatewayPerformanceTracker;
+    /**
+     * Exact provider-connection pin (agent manifest). Overrides default
+     * BYOK resolution; mismatches fail closed inside resolution.
+     */
+    pinnedConnectionId?: string | null;
 }): Promise<UnifiedChatResponse & GatewayChatExecutionMeta> {
     let resolved =
         params.resolved ??
@@ -205,6 +210,7 @@ export async function executeGatewayChat(params: {
             basecodeModelPolicy: params.basecodeModelPolicy,
             allowedModels: params.allowedModels,
             sponsoredModels: params.sponsoredModels,
+            pinnedConnectionId: params.pinnedConnectionId ?? null,
         }));
 
     // Dedicated per-provider memory key override (Cerebras/Groq/Google), so the

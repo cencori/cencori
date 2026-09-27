@@ -1,14 +1,31 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { encryptApiKey } from '@/lib/encryption';
+
+vi.mock('@/lib/providers/openai', () => ({
+    OpenAIProvider: class {
+        constructor(public apiKey?: string) {}
+    },
+    openAIReasoningEffort: () => undefined,
+}));
+vi.mock('@/lib/providers/gemini', () => ({ GeminiProvider: class {} }));
+vi.mock('@/lib/providers/anthropic', () => ({ AnthropicProvider: class {} }));
+vi.mock('@/lib/providers/cohere', () => ({ CohereProvider: class {} }));
+vi.mock('@/lib/providers/openai-compatible', () => ({
+    OpenAICompatibleProvider: class {},
+    isOpenAICompatible: () => false,
+}));
 import {
+    applyPinnedConnection,
     canMirrorProvider,
     indexEmbeddedConnections,
     mirrorConnectionsToKeys,
     mirrorKeysToConnections,
     pickEmbeddedFallbackRow,
+    registerByokKey,
     resolveProviderKey,
     resolveProviderKeyRow,
 } from '@/lib/providers/byok-store';
+import { validatePinnedConnection } from '@/lib/embedded/manifest';
 
 interface LoggedCall {
     op: string;
@@ -145,8 +162,7 @@ describe('mirror: connections -> keys', () => {
     });
 });
 
-describe('mirror: keys -> connections', () => {
-    it('updates the primary embedded connection in place', async () => {
+describe('mirror: keys -> connections', () => {    it('updates the primary embedded connection in place', async () => {
         const { log, client } = fakeDb({
             keysSingle: { encrypted_key: 'CIPH-NEW', key_hint: '...EW', is_active: true },
             connectionsList: [
@@ -180,5 +196,66 @@ describe('mirror: keys -> connections', () => {
         await mirrorKeysToConnections(client as never, { projectId: 'p', organizationId: 'org-1', provider: 'openai', displayName: 'OpenAI' });
         const update = log.find((c) => c.op === 'update' && c.table === 'provider_connections');
         expect(update?.args).toEqual({ status: 'disabled' });
+    });
+});
+
+describe('pinned connections', () => {
+    const pinRow = (overrides: Record<string, unknown> = {}) => ({
+        id: 'conn-1',
+        provider: 'openai',
+        status: 'active',
+        base_url: null,
+        encrypted_key_ref: encryptApiKey('sk-pinned', 'org-1'),
+        key_hint: '...ned',
+        ...overrides,
+    });
+    const pinDb = (row: Record<string, unknown> | null) => ({
+        from: () => ({
+            select: () => ({ eq: () => ({ eq: () => ({ maybeSingle: async () => ({ data: row, error: null }) }) }) }),
+        }),
+    });
+    const router = () => {
+        const calls: unknown[][] = [];
+        return {
+            calls,
+            registerProvider: (...args: unknown[]) => { calls.push(args); },
+        };
+    };
+
+    it('validates pins against project, status, key, endpoint, and model', async () => {
+        const good = await validatePinnedConnection(pinDb(pinRow()) as never, 'proj-1', 'prc_conn-1', 'gpt-4o');
+        expect(good.errors).toEqual([]);
+
+        const missing = await validatePinnedConnection(pinDb(null) as never, 'proj-1', 'prc_nope', 'gpt-4o');
+        expect(missing.errors.some((e) => e.includes('not found'))).toBe(true);
+
+        const inactive = await validatePinnedConnection(pinDb(pinRow({ status: 'disabled' })) as never, 'proj-1', 'prc_conn-1', 'gpt-4o');
+        expect(inactive.errors.some((e) => e.includes('not active'))).toBe(true);
+
+        const proxy = await validatePinnedConnection(
+            pinDb(pinRow({ base_url: 'https://proxy.example.com/v1' })) as never, 'proj-1', 'prc_conn-1', 'gpt-4o',
+        );
+        expect(proxy.errors.some((e) => e.includes('custom proxy'))).toBe(true);
+
+        const mismatch = await validatePinnedConnection(pinDb(pinRow({ provider: 'anthropic' })) as never, 'proj-1', 'prc_conn-1', 'gpt-4o');
+        expect(mismatch.errors.some((e) => e.includes("not model 'gpt-4o'"))).toBe(true);
+    });
+
+    it('applies pins by registering the connection key, failing closed otherwise', async () => {
+        const r = router();
+        const applied = await applyPinnedConnection(r as never, pinDb(pinRow()) as never, {
+            projectId: 'proj-1', organizationId: 'org-1', provider: 'openai', connectionId: 'prc_conn-1',
+        });
+        expect(applied).toEqual({ connectionId: 'prc_conn-1' });
+        expect(r.calls).toHaveLength(1);
+        expect(registerByokKey(r as never, 'nope', 'sk-x')).toBe(false);
+
+        await expect(applyPinnedConnection(router() as never, pinDb(null) as never, {
+            projectId: 'proj-1', organizationId: 'org-1', provider: 'openai', connectionId: 'prc_nope',
+        })).rejects.toThrow('not found');
+
+        await expect(applyPinnedConnection(router() as never, pinDb(pinRow({ status: 'unhealthy' })) as never, {
+            projectId: 'proj-1', organizationId: 'org-1', provider: 'openai', connectionId: 'prc_conn-1',
+        })).rejects.toThrow('not active');
     });
 });

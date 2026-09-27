@@ -501,8 +501,23 @@ export async function POST(
         // tools. Request-supplied and legacy definitions are ignored for an
         // installation, so a caller cannot introduce a new tool or schema.
         // Without an installation, legacy agent-config merging applies.
+        // Manifest MCP grants resolve against stored discovery snapshots.
+        let mcpSnapshots: Map<string, import('@/lib/embedded/mcp').DiscoveredTool[]> | null = null;
+        if (installedManifest && installedManifest.mcp_tools.length > 0) {
+            try {
+                const { loadMcpSnapshots } = await import('@/lib/embedded/mcp');
+                const loaded = await loadMcpSnapshots(
+                    adminClient as never,
+                    (gatewayCtx as GatewayContext).projectId,
+                    installedManifest.mcp_tools.map((m) => m.server_id),
+                );
+                mcpSnapshots = new Map([...loaded].map(([id, snap]) => [id, snap.tools]));
+            } catch {
+                mcpSnapshots = null;
+            }
+        }
         const tools: ResponsesRequest['tools'] = installedManifest
-            ? installedTurnTools(installedManifest, effectiveNetworkPolicy ?? { mode: 'none', allowed_hosts: [] }, effectiveBrowserEnabled)
+            ? installedTurnTools(installedManifest, effectiveNetworkPolicy ?? { mode: 'none', allowed_hosts: [] }, effectiveBrowserEnabled, mcpSnapshots)
             : [...(body.tools || [])];
         if (!installedManifest && agentId && agentConfig?.tools && agentConfig.tools.length > 0) {
             const existingTypes = new Set<string>(tools.map(t => t.type));
@@ -620,6 +635,10 @@ export async function POST(
             pauseOnToolCalls: body.pause_on_tool_calls ?? false,
             knowledgeContext,
             skillsBlock: skillsBlock ?? undefined,
+            pinnedConnectionId: installedManifest?.provider_connection_id ?? null,
+            reasoningEffort: installedManifest && ['low', 'medium', 'high'].includes(installedManifest.reasoning_effort as string)
+                ? (installedManifest.reasoning_effort as 'low' | 'medium' | 'high')
+                : undefined,
             endUserId,
             tier: (gatewayCtx.tier || "free") as SubscriptionTier,
             logSuccess: (meta) => {

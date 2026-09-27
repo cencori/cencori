@@ -51,6 +51,7 @@ import {
     KnowledgeNamespace,
     ConnectionsNamespace,
     McpServersNamespace,
+    MarketplaceNamespace,
     SkillsNamespace,
     SkillImportsNamespace,
     WebhooksNamespace,
@@ -258,6 +259,7 @@ export class Cencori {
     readonly knowledge: KnowledgeNamespace;
     readonly connections: ConnectionsNamespace;
     readonly mcpServers: McpServersNamespace;
+    readonly marketplace: MarketplaceNamespace;
     readonly skills: SkillsNamespace;
     readonly skillImports: SkillImportsNamespace;
     readonly webhooks: WebhooksNamespace;
@@ -319,6 +321,7 @@ export class Cencori {
         this.knowledge = new KnowledgeNamespace(this.config);
         this.connections = new ConnectionsNamespace(this.config);
         this.mcpServers = new McpServersNamespace(this.config);
+        this.marketplace = new MarketplaceNamespace(this.config);
         this.skills = new SkillsNamespace(this.config);
         this.skillImports = new SkillImportsNamespace(this.config);
         this.webhooks = new WebhooksNamespace(this.config);

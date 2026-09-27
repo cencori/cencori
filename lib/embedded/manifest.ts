@@ -1,6 +1,7 @@
 import type { createAdminClient } from '@/lib/supabaseAdmin';
 import { buildUnifiedModelRegistry } from './model-registry';
 import { canonicalAllowedHost } from './net-policy';
+import { dePrefixId } from './http';
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -10,6 +11,13 @@ export interface CapabilityManifest {
     model?: string;
     temperature?: number;
     reasoning_effort?: string;
+    /**
+     * Exact model provider connection pinned for execution. Must reference
+     * an active managed-endpoint connection in this project whose provider
+     * serves the manifest model; execution uses its key instead of the
+     * default BYOK resolution.
+     */
+    provider_connection_id?: string;
     fallback_policy?: { model?: string; on?: string[] };
     instructions?: string;
     skills: Array<{ skill_version_id: string }>;
@@ -18,7 +26,7 @@ export interface CapabilityManifest {
     mcp_tools: Array<{ server_id: string; tool: string }>;
     subagents: Array<{ agent_version_id: string; max_calls?: number; timeout_ms?: number; budget_limit?: number }>;
     policy: {
-        browser: { enabled: boolean };
+        browser: { enabled: boolean; automation?: boolean };
         network: { mode: 'none' | 'allowlist'; allowed_hosts: string[] };
         max_delegation_depth: number;
         require_approval: string[];
@@ -41,12 +49,13 @@ export function normalizeManifest(config: Record<string, unknown>): CapabilityMa
         }))
         : [];
     const policy = (c.policy ?? {}) as Record<string, unknown>;
-    const browser = (policy.browser ?? {}) as { enabled?: boolean };
+    const browser = (policy.browser ?? {}) as { enabled?: boolean; automation?: boolean };
     const network = (policy.network ?? {}) as { mode?: string; allowed_hosts?: string[] };
     return {
         model: c.model as string | undefined,
         temperature: c.temperature as number | undefined,
         reasoning_effort: c.reasoning_effort as string | undefined,
+        provider_connection_id: (c as Record<string, unknown>).provider_connection_id as string | undefined,
         fallback_policy: c.fallback_policy as CapabilityManifest['fallback_policy'],
         instructions: (c.instructions ?? c.system_prompt) as string | undefined,
         skills: Array.isArray(c.skills) ? (c.skills as Array<{ skill_version_id?: string }>).filter((s) => s?.skill_version_id).map((s) => ({ skill_version_id: s.skill_version_id as string })) : [],
@@ -65,7 +74,7 @@ export function normalizeManifest(config: Record<string, unknown>): CapabilityMa
             }))
             : [],
         policy: {
-            browser: { enabled: browser.enabled ?? false },
+            browser: { enabled: browser.enabled ?? false, ...(browser.automation !== undefined ? { automation: browser.automation } : {}) },
             network: {
                 mode: network.mode === 'allowlist' ? 'allowlist' : 'none',
                 allowed_hosts: Array.isArray(network.allowed_hosts) ? network.allowed_hosts : [],
@@ -84,7 +93,64 @@ export interface ManifestValidation {
     warnings: string[];
 }
 
-const dePrefix = (v: string) => v.replace(/^(mcp_|con_|agv_)/, '');
+const dePrefix = (v: string) => v.replace(/^(mcp_|con_|agv_|prc_)/, '');
+
+/** Providers with a native reasoning-effort control (OpenAI family). */
+const SUPPORTED_EFFORT_PROVIDERS = new Set([
+    'openai', 'groq', 'mistral', 'together', 'perplexity', 'xai', 'deepseek',
+    'qwen', 'moonshot', 'huggingface', 'zai', 'cerebras', 'meta', 'maximo',
+    'helix', 'centaur', 'bai',
+]);
+
+/**
+ * Validate an exact provider-connection pin: same project, active,
+ * managed-endpoint (no proxies), serving the manifest model.
+ */
+export async function validatePinnedConnection(
+    supabase: Admin,
+    projectId: string,
+    connectionId: string,
+    model: string | undefined,
+): Promise<{ errors: string[]; warnings: string[] }> {
+    const errors: string[] = [];
+    const warnings: string[] = [];
+    const { data, error } = await supabase
+        .from('provider_connections')
+        .select('id, provider, status, base_url, encrypted_key_ref')
+        .eq('project_id', projectId)
+        .eq('id', dePrefixId(connectionId))
+        .maybeSingle();
+    if (error || !data) {
+        errors.push(`provider_connection '${connectionId}' not found in this project`);
+        return { errors, warnings };
+    }
+    const row = data as { provider?: string; status?: string; base_url?: string | null; encrypted_key_ref?: string | null };
+    if (row.status !== 'active') {
+        errors.push(`provider_connection '${connectionId}' is not active`);
+    }
+    if (!row.encrypted_key_ref) {
+        errors.push(`provider_connection '${connectionId}' holds no key`);
+    }
+    if ((row.base_url ?? null) !== null) {
+        errors.push(`provider_connection '${connectionId}' points at a custom proxy; pins require managed-endpoint connections`);
+    }
+    if (model?.trim()) {
+        const { ProviderRouter } = await import('@/lib/providers/router');
+        let provider: string | null = null;
+        try {
+            provider = new ProviderRouter().detectProvider(model.trim());
+        } catch {
+            errors.push(`provider_connection pin cannot serve unroutable model '${model}'`);
+            return { errors, warnings };
+        }
+        if ((row.provider ?? '').toLowerCase() !== (provider ?? '').toLowerCase()) {
+            errors.push(`provider_connection '${connectionId}' serves '${row.provider}', not model '${model}'`);
+        }
+    } else {
+        warnings.push('provider_connection pin without a manifest model is checked at execution time');
+    }
+    return { errors, warnings };
+}
 
 /**
  * Deterministic manifest validation: no external side effects (no DNS, no
@@ -139,7 +205,14 @@ export async function validateManifest(
                         errors.push(`reasoning_effort must be one of ${REASONING_EFFORTS.join('|')}`);
                     } else if (!match.reasoning_supported) {
                         errors.push(`reasoning_effort requires a reasoning-capable model; '${m.model}' does not advertise reasoning`);
+                    } else if (!SUPPORTED_EFFORT_PROVIDERS.has(match.provider)) {
+                        warnings.push(`reasoning_effort is applied on OpenAI-family providers; '${match.provider}' runs at default effort`);
                     }
+                }
+                if (m.provider_connection_id !== undefined) {
+                    const pin = await validatePinnedConnection(supabase, opts.projectId, m.provider_connection_id, m.model);
+                    errors.push(...pin.errors);
+                    warnings.push(...pin.warnings);
                 }
             }
         } catch (e) {
@@ -186,7 +259,7 @@ export async function validateManifest(
             continue;
         }
         if ((server.status as string) !== 'active') {
-            warnings.push(`MCP server '${ref.server_id}' is ${(server.status as string) ?? 'not active'}`);
+            errors.push(`MCP server '${ref.server_id}' is ${(server.status as string) ?? 'not active'}; grants against it can never execute`);
         }
         const snapshot = ((server.tool_snapshot ?? {}) as { tools?: Array<{ name: string }> }).tools ?? [];
         if (snapshot.length > 0 && !snapshot.some((t) => t.name === ref.tool)) {
@@ -254,6 +327,13 @@ export async function validateManifest(
                 errors.push(`allowed host '${String(host)}' must be an HTTPS hostname (optional explicit port; no path or credentials)`);
             }
         }
+    }
+
+    // Browser contract: `enabled` covers indexed web search only. There is
+    // no connected-browser runtime (navigation, sessions, actions), so
+    // requesting automation fails loudly instead of silently degrading.
+    if (m.policy.browser.automation === true) {
+        errors.push('browser automation is not available: policy.browser covers indexed web search only');
     }
 
     return { valid: errors.length === 0, errors, warnings };

@@ -30,6 +30,14 @@ export function openAICompletionLimits(request: Pick<UnifiedChatRequest, 'model'
     };
 }
 
+export function openAIReasoningEffort(request: Pick<UnifiedChatRequest, 'model' | 'reasoningEffort'>) {
+    // reasoning_effort is only valid on reasoning models; sending it
+    // elsewhere risks a 400, so non-reasoning models silently omit it.
+    if (!request.reasoningEffort) return undefined;
+    const reasoningModel = /^(?:gpt-[56](?:[.-]|$)|o[1-9](?:[.-]|$))/.test(request.model);
+    return reasoningModel ? request.reasoningEffort : undefined;
+}
+
 export class OpenAIProvider extends AIProvider {
     readonly providerName = 'openai';
     readonly supportsTools = true;
@@ -68,6 +76,7 @@ export class OpenAIProvider extends AIProvider {
                 model: request.model,
                 messages: toOpenAIMessages(request.messages) as any,
                 ...openAICompletionLimits(request),
+                ...(openAIReasoningEffort(request) ? { reasoning_effort: openAIReasoningEffort(request) } : {}),
                 stream: false,
                 user: request.userId,
                 tools,
@@ -164,6 +173,7 @@ export class OpenAIProvider extends AIProvider {
                 model: request.model,
                 messages: toOpenAIMessages(request.messages) as any,
                 ...openAICompletionLimits(request),
+                ...(openAIReasoningEffort(request) ? { reasoning_effort: openAIReasoningEffort(request) } : {}),
                 stream: true,
                 user: request.userId,
                 tools,
