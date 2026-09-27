@@ -71,6 +71,7 @@ function useScrollChoreography(
   motion: boolean,
   viewportKey: number,
   settleKey: number,
+  staticOnPhone = false,
 ) {
   // Choreography across the pinned runway: words reveal at display size, the
   // block collapses toward the top right, then the cards rise in behind it.
@@ -94,9 +95,14 @@ function useScrollChoreography(
     // The pane pins wherever the whole composition fits the viewport, which
     // both layouts are sized to do. Anything that does not fit falls back to
     // the reveal alone rather than stranding content below a sticky fold.
+    // Mission additionally opts out of the pin on phones (static dock): the
+    // copy stays at rest size under the eyebrow and the visual reveals below
+    // it, so there is no font-size tween to judder.
     const viewport = window.innerHeight || document.documentElement.clientHeight;
     const narrow = !window.matchMedia("(min-width: 901px)").matches;
-    const full = pane.scrollHeight <= viewport * 1.02;
+    const phone = window.matchMedia("(max-width: 640px)").matches;
+    const full =
+      !(staticOnPhone && phone) && pane.scrollHeight <= viewport * 1.02;
     if (full) section.dataset.pin = "on";
     section.dataset.choreo = full ? "full" : "reveal";
 
@@ -106,7 +112,6 @@ function useScrollChoreography(
     // then cards — so the copy drops back under the eyebrow before the
     // visual fades in. Overlapping them crowds the 100svh pane and reads
     // as a hang on mobile. Desktop timings are untouched.
-    const phone = window.matchMedia("(max-width: 640px)").matches;
     const REVEAL_IN = phone ? 0.02 : 0.04;
     const REVEAL_OUT = phone ? 0.34 : 0.42;
     const SHRINK_IN = phone ? 0.36 : 0.45;
@@ -150,6 +155,33 @@ function useScrollChoreography(
     let maxScale = 1;
     let targetX = 0;
     let targetY = 0;
+
+    // Narrow centring target, measured once per layout. The per-frame painter
+    // used to read lead.offsetHeight *after* setting the interpolated
+    // font-size and then multiply that live centre by `grown` — a quadratic
+    // (A·g − C·g²) that rises then falls, so the copy visibly judders
+    // mid-shrink. Caching the full-size height/top keeps the translate linear
+    // in `grown` (like the desktop transform path) while the font-size still
+    // interpolates for reflow.
+    let narrowBigH = 0;
+    let narrowTop = 0;
+    let narrowCached = false;
+
+    const measureNarrow = () => {
+      if (!narrow || !full) {
+        narrowCached = false;
+        return;
+      }
+      const prevFont = lead.style.fontSize;
+      const prevTransform = lead.style.transform;
+      lead.style.transform = "none";
+      lead.style.fontSize = `${LEAD_BIG}rem`;
+      narrowBigH = lead.offsetHeight;
+      narrowTop = offsetWithin(lead, pane).top;
+      lead.style.fontSize = prevFont;
+      lead.style.transform = prevTransform;
+      narrowCached = narrowBigH > 0;
+    };
 
     const measure = () => {
       if (!body) return;
@@ -205,12 +237,13 @@ function useScrollChoreography(
         lead.style.fontSize = `${size.toFixed(3)}rem`;
 
         // Centred in the held frame while large, relaxing to its docked slot
-        // under the eyebrow as it shrinks. Height is read after the size is
-        // applied, since the copy re-wraps as it grows.
+        // under the eyebrow as it shrinks. The target is cached at full size
+        // so the translate stays linear in `grown`; only the pane height is
+        // read live (mobile chrome can resize it mid-pin).
         if (full) {
+          if (!narrowCached) measureNarrow();
           const centred =
-            (pane.clientHeight - lead.offsetHeight) / 2 -
-            offsetWithin(lead, pane).top;
+            (pane.clientHeight - narrowBigH) / 2 - narrowTop;
           lead.style.transform = `translateY(${(centred * grown).toFixed(2)}px)`;
         }
         return;
@@ -268,6 +301,7 @@ function useScrollChoreography(
 
     const onResize = () => {
       measure();
+      measureNarrow();
       paint();
     };
 
@@ -291,6 +325,7 @@ function useScrollChoreography(
     );
 
     measure();
+    measureNarrow();
     paint();
     observer.observe(section);
     window.addEventListener("resize", onResize);
@@ -309,7 +344,7 @@ function useScrollChoreography(
         card.style.transform = "";
       }
     };
-  }, [sectionRef, leadRef, gridRef, motion, viewportKey, settleKey]);
+  }, [sectionRef, leadRef, gridRef, motion, viewportKey, settleKey, staticOnPhone]);
 }
 
 export function CencoriFuturePage() {
@@ -386,6 +421,7 @@ export function CencoriFuturePage() {
     developerMotion,
     developerViewport,
     layoutSettled,
+    true,
   );
 
   // Scroll-linked reveal. The statement is pinned, so progress is measured

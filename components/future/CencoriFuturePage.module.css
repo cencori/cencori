@@ -1249,21 +1249,35 @@
     padding: 1.5rem 1.25rem 4.5rem;
   }
 
-  .missionSticky {
-    height: 100vh;
-    height: 100svh;
+  /* Static dock on phones: no pin, no shrink, no runway. The copy stays at
+     rest size under the eyebrow and the visual reveals below it on normal
+     scroll, same pattern as developers. No min-height: the section ends
+     flush at the image so no bare ink band sits between it and partners. */
+  .mission,
+  .mission[data-pin="on"] {
+    height: auto;
+    min-height: 0;
+  }
+
+  .missionSticky,
+  .mission[data-pin="on"] .missionSticky {
+    display: block;
+    position: static;
+    height: auto;
+    min-height: 0;
     padding: 1.5rem 0 0;
   }
 
-  /* Shorter runway to match the earlier phone timings: less scrolling
-     through the held frame before the visual arrives. */
-  .mission[data-pin="on"] {
-    height: 220vh;
+  .mission .pinBody {
+    padding-top: 2.5rem;
   }
 
-  /* Developers only. Three stacked full-width cards cannot fit a pinned frame,
-     so that section scrolls. Mission carries a single visual and fits, so it
-     keeps the pin and the full choreography. */
+  .missionVisual {
+    height: 72svh;
+  }
+
+  /* Both sections scroll statically on phones: their stacked cards and the
+     mission visual cannot live inside a pinned frame without crowding it. */
   .developers,
   .developers[data-pin="on"] {
     height: auto;
@@ -1282,10 +1296,14 @@
     padding-top: 2.5rem;
   }
 
-  .developers .pinGrid,
-  .mission .pinGrid {
+  .developers .pinGrid {
     grid-template-columns: 1fr;
     gap: 2.75rem;
+  }
+
+  .mission .pinGrid {
+    grid-template-columns: 1fr;
+    gap: 0;
   }
 
   .developers .pinPoster,
