@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
     const supabase = createAdminClient();
     let query = supabase
         .from('ai_requests')
-        .select('id, model, provider, status, total_tokens, cost_usd, cencori_charge_usd, tenant_id, agent_id, installation_id, session_id, run_id, end_user_id, created_at')
+        .select('id, model, provider, status, total_tokens, cost_usd, cencori_charge_usd, tenant_id, agent_id, installation_id, session_id, run_id, end_user_id, metadata, created_at')
         .eq('project_id', validation.context.projectId)
         .gte('created_at', window.since)
         .lte('created_at', window.until)
@@ -73,9 +73,18 @@ export async function GET(req: NextRequest) {
     const hasMore = rows.length > limit;
     const page = hasMore ? rows.slice(0, limit) : rows;
     const last = page[page.length - 1];
+    // Billing state: rows written while charges were unresolved (provider
+    // timeout, deduction failure) carry cost 0 with a reconciliation flag —
+    // an ambiguous zero must not read as genuinely free.
+    const withState = page.map((r) => ({
+        ...r,
+        billing_state: ((r.metadata as { billing_reconciliation_required?: boolean } | null)?.billing_reconciliation_required === true)
+            ? 'unresolved'
+            : 'final',
+    }));
     return addGatewayHeaders(
         NextResponse.json({
-            data: page,
+            data: withState,
             next_cursor: hasMore && last ? encodeUsageCursor(last.created_at as string, last.id as string) : null,
         }),
         { requestId },

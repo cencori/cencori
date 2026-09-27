@@ -10,6 +10,10 @@ type Admin = ReturnType<typeof createAdminClient>;
 
 const UNKNOWN_CREATED = 0;
 
+// Largest synced-model set read per connection per request. Overflow marks
+// the catalog partial rather than silently dominating it.
+const SYNCED_MODELS_PER_CONNECTION = 2000;
+
 function toEpochSeconds(value: unknown): number {
     const parsed = typeof value === 'string' ? Date.parse(value) : NaN;
     return Number.isFinite(parsed) ? Math.floor(parsed / 1000) : UNKNOWN_CREATED;
@@ -82,12 +86,17 @@ export async function buildUnifiedModelRegistry(
             connectionProvider.set(c.id as string, c.provider as string);
             byokProviders.add(c.provider as string);
             if (q.connectionId && (c.id as string) !== q.connectionId) continue;
+            // Bounded source read: an unbounded sync table would silently
+            // dominate the registry. Truncation marks the catalog partial.
             const { data: synced, error: syncedError } = await supabase
                 .from('provider_connection_models')
                 .select('upstream_model_id, display_name, capabilities, context_window, lifecycle_status, availability_status, unavailable_reason, pricing_status, updated_at')
-                .eq('provider_connection_id', c.id as string);
+                .eq('provider_connection_id', c.id as string)
+                .limit(SYNCED_MODELS_PER_CONNECTION + 1);
             if (syncedError) partial = true;
-            const rows: UnifiedModelRow[] = (synced ?? []).map((m) => {
+            const syncedRows = (synced ?? []) as Array<Record<string, unknown>>;
+            if (syncedRows.length > SYNCED_MODELS_PER_CONNECTION) partial = true;
+            const rows: UnifiedModelRow[] = (syncedRows.slice(0, SYNCED_MODELS_PER_CONNECTION) ?? []).map((m) => {
                 const available = (m.availability_status as string) === 'available';
                 return {
                     id: m.upstream_model_id as string,

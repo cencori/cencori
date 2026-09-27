@@ -33,24 +33,32 @@ export interface TurnSkills {
     skill_version_ids: string[];
 }
 
+async function liveInstallationVersionId(supabase: Admin, installationId: string): Promise<string | null> {
+    const { data: ins } = await supabase
+        .from('agent_installations')
+        .select('agent_version_id')
+        .eq('id', installationId)
+        .maybeSingle();
+    return (ins as { agent_version_id?: string | null } | null)?.agent_version_id ?? null;
+}
+
 /**
  * Load published skill contents pinned to the session's installed agent
  * version. Tenant-private skills load only for their own tenant. Best-effort:
  * empty on any failure. Skills are passive procedures — never credentials.
+ *
+ * Pass the run's submitted version id when one exists: the installation's
+ * live version may have moved since the run was queued, and queued work must
+ * execute the configuration it was submitted with.
  */
 export async function retrieveTurnSkills(
     supabase: Admin,
-    opts: { installationId: string | null; tenantId: string | null },
+    opts: { installationId: string | null; tenantId: string | null; versionId?: string | null },
 ): Promise<TurnSkills> {
     const empty: TurnSkills = { block: null, skill_version_ids: [] };
     if (!opts.installationId) return empty;
     try {
-        const { data: ins } = await supabase
-            .from('agent_installations')
-            .select('agent_version_id')
-            .eq('id', opts.installationId)
-            .maybeSingle();
-        const versionId = (ins as { agent_version_id?: string | null } | null)?.agent_version_id;
+        const versionId = opts.versionId ?? await liveInstallationVersionId(supabase, opts.installationId);
         if (!versionId) return empty;
         const { data: pins } = await supabase
             .from('agent_version_skills')

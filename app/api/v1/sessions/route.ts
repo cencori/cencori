@@ -261,6 +261,25 @@ export async function POST(req: NextRequest) {
                 if (!tenantId) tenantId = (ins.tenant_id as string);
                 installationId = (ins.id as string);
             }
+            // Installation-only sessions carry no agent_id, so the agent pause
+            // check below would be skipped: resolve the agent through the
+            // installation and enforce pause here.
+            if (installationId && !body.agent_id) {
+                const { data: bound } = await adminClient
+                    .from('agent_installations')
+                    .select('agent_id')
+                    .eq('project_id', gatewayCtx.projectId)
+                    .eq('id', installationId)
+                    .maybeSingle();
+                const boundAgentId = (bound?.agent_id as string | null) ?? null;
+                if (boundAgentId) {
+                    const { checkAgentActivity } = await import('@/lib/embedded/agents');
+                    const activity = await checkAgentActivity(adminClient as never, gatewayCtx.projectId, boundAgentId);
+                    if (!activity.active) {
+                        return respondError(409, 'Agent is not active', 'agent_inactive');
+                    }
+                }
+            }
         }
 
         if (body.agent_id) {

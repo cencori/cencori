@@ -355,6 +355,22 @@
               "$ref": "#/components/schemas/UnifiedModel"
             }
           },
+          "total": {
+            "type": "integer",
+            "description": "Filtered catalog rows (connection variants stay addressable via connection_id)."
+          },
+          "distinct_model_ids": {
+            "type": "integer",
+            "description": "Unique model IDs in the filtered catalog."
+          },
+          "next_cursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "partial": {
+            "type": "boolean",
+            "description": "True when a source query failed or was truncated: the catalog is incomplete."
+          },
           "providers": {
             "type": "array",
             "items": {
@@ -367,6 +383,9 @@
         "required": [
           "object",
           "data",
+          "total",
+          "next_cursor",
+          "partial",
           "providers"
         ]
       },
@@ -800,6 +819,16 @@
             "additionalProperties": true
           },
           "overlay_config": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true
+          },
+          "budget": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true
+          },
+          "metadata": {
             "type": "object",
             "properties": {},
             "additionalProperties": true
@@ -2233,6 +2262,19 @@
       "UsageSummary": {
         "type": "object",
         "properties": {
+          "window": {
+            "type": "object",
+            "properties": {
+              "since": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "until": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          },
           "totals": {
             "type": "object",
             "properties": {},
@@ -2245,11 +2287,25 @@
               "properties": {},
               "additionalProperties": true
             }
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "True when the scan hit the row cap: totals are partial, not complete."
+          },
+          "row_cap": {
+            "type": "integer"
+          },
+          "unresolved_rows": {
+            "type": "integer",
+            "description": "Rows whose charges are not yet reconciled (see billing_state)."
           }
         },
         "required": [
           "totals",
-          "groups"
+          "groups",
+          "truncated",
+          "row_cap",
+          "unresolved_rows"
         ]
       },
       "UsageEvent": {
@@ -2293,14 +2349,29 @@
             "type": "string",
             "nullable": true
           },
-          "input_tokens": {
-            "type": "integer"
+          "status": {
+            "type": "string"
           },
-          "output_tokens": {
+          "total_tokens": {
             "type": "integer"
           },
           "cost_usd": {
             "type": "number"
+          },
+          "cencori_charge_usd": {
+            "type": "number"
+          },
+          "end_user_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "billing_state": {
+            "type": "string",
+            "enum": [
+              "final",
+              "unresolved"
+            ],
+            "description": "Unresolved rows carry recorded-zero costs pending billing reconciliation and must not read as free."
           },
           "created_at": {
             "type": "string",
@@ -2309,8 +2380,8 @@
         },
         "required": [
           "id",
-          "project_id",
-          "created_at"
+          "created_at",
+          "billing_state"
         ]
       },
       "UsageEventList": {
@@ -4036,6 +4107,14 @@
             }
           },
           {
+            "name": "agent_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "limit",
             "in": "query",
             "required": false,
@@ -4120,6 +4199,7 @@
       },
       "patch": {
         "summary": "Update installation overlays/policy",
+        "description": "Scalar fields patch in place. version pins a published version. knowledge_base_ids and connection_ids replace the grant sets atomically when present (empty clears); absent leaves them unchanged. Every granted ID is validated for existence, project scope, and tenant compatibility before mutation.",
         "responses": {
           "200": {
             "description": "OK",
@@ -4459,6 +4539,72 @@
       ]
     },
     "/v1/agents/{agentId}/runs": {
+      "get": {
+        "summary": "List agent run history",
+        "description": "Paginated run history for one agent: queued, running, cancelled, failed, and completed runs. Usage rows cannot substitute for this collection.",
+        "responses": {
+          "200": {
+            "description": "Run history",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Run"
+                      }
+                    },
+                    "next_cursor": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "next_cursor"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "getAgentsByAgentIdRuns",
+        "tags": [
+          "Agents"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AgentId"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "Opaque keyset cursor over (created_at, id).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
       "post": {
         "summary": "Create background run (idempotent)",
         "responses": {
@@ -6204,6 +6350,25 @@
             "name": "connection_id",
             "in": "query",
             "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "Opaque offset cursor into the filtered catalog.",
             "schema": {
               "type": "string"
             }
@@ -8002,6 +8167,7 @@
     "/v1/usage": {
       "get": {
         "summary": "Usage summary by tenant/agent/installation",
+        "description": "Scans at most 10,000 rows (see truncated/row_cap). Totals over a truncated scan are partial.",
         "responses": {
           "200": {
             "description": "Summary",
@@ -8032,7 +8198,27 @@
             "schema": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 365
+              "maximum": 90
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "description": "Window start (ISO-8601). Defaults to until minus days.",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "required": false,
+            "description": "Window end (ISO-8601). Defaults to now. Windows are capped at 90 days.",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
             }
           },
           {
@@ -8053,6 +8239,14 @@
           },
           {
             "name": "installation_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "model",
             "in": "query",
             "required": false,
             "schema": {
@@ -8096,7 +8290,27 @@
             "schema": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 365
+              "maximum": 90
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "description": "Window start (ISO-8601). Defaults to until minus days.",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "required": false,
+            "description": "Window end (ISO-8601). Defaults to now. Windows are capped at 90 days.",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
             }
           },
           {
@@ -8109,6 +8323,22 @@
           },
           {
             "name": "agent_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "installation_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "model",
             "in": "query",
             "required": false,
             "schema": {
@@ -8129,6 +8359,7 @@
             "name": "cursor",
             "in": "query",
             "required": false,
+            "description": "Opaque keyset cursor over (created_at, id).",
             "schema": {
               "type": "string"
             }

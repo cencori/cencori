@@ -10,6 +10,14 @@ const usageSecuritySql = readFileSync(
     resolve(process.cwd(), 'supabase/migrations/20260924_140000_embedded_run_inference_telemetry.sql'),
     'utf8'
 );
+const claimAgentActiveSql = readFileSync(
+    resolve(process.cwd(), 'supabase/migrations/20260926_000003_embedded_claim_agent_active.sql'),
+    'utf8'
+);
+const grantSwapSql = readFileSync(
+    resolve(process.cwd(), 'supabase/migrations/20260926_000002_installation_grant_swap.sql'),
+    'utf8'
+);
 
 describe('embedded migration contracts', () => {
     it('uses null-safe equality for every retry identity field in the race fallback', () => {
@@ -40,13 +48,37 @@ describe('embedded migration contracts', () => {
         );
     });
 
-    it('keeps usage-log writes service-only while preserving scoped reads', () => {
-        expect(usageSecuritySql).toMatch(/ALTER COLUMN api_key_id DROP NOT NULL/);
+    it('keeps usage-log writes service-only while preserving scoped reads', () => {        expect(usageSecuritySql).toMatch(/ALTER COLUMN api_key_id DROP NOT NULL/);
         expect(usageSecuritySql).not.toMatch(/ADD CONSTRAINT ai_requests_key_or_run_check/);
         expect(usageSecuritySql).toMatch(/REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER\s+ON TABLE public\.ai_requests FROM PUBLIC, anon, authenticated/);
         expect(usageSecuritySql).toMatch(/GRANT INSERT, UPDATE, DELETE ON TABLE public\.ai_requests TO service_role/);
         expect(usageSecuritySql).toMatch(/FOR INSERT TO service_role WITH CHECK \(true\)/);
         expect(usageSecuritySql).toMatch(/FOR UPDATE TO service_role USING \(true\) WITH CHECK \(true\)/);
         expect(usageSecuritySql).not.toMatch(/DROP POLICY[^;]*Users can view ai_requests for their organization projects/);
+    });
+
+    it('gates delegation claims on agent pause without widening access', () => {
+        expect(claimAgentActiveSql.match(/CREATE OR REPLACE FUNCTION/g)).toHaveLength(1);
+        expect(claimAgentActiveSql).not.toMatch(/\b(?:CREATE|ALTER|DROP)\s+TABLE\b/i);
+        expect(claimAgentActiveSql).toContain("RAISE EXCEPTION 'parent_agent_disabled'");
+        expect(claimAgentActiveSql).toContain("RAISE EXCEPTION 'child_agent_disabled'");
+        expect(claimAgentActiveSql).toContain(
+            'REVOKE ALL ON FUNCTION public.claim_embedded_subagent_run(uuid, uuid, uuid, uuid, jsonb, text)'
+        );
+        expect(claimAgentActiveSql).toContain(
+            'GRANT EXECUTE ON FUNCTION public.claim_embedded_subagent_run(uuid, uuid, uuid, uuid, jsonb, text)'
+        );
+    });
+
+    it('swaps installation grants atomically with a restricted grant', () => {
+        expect(grantSwapSql.match(/CREATE OR REPLACE FUNCTION/g)).toHaveLength(1);
+        expect(grantSwapSql).toContain('DELETE FROM public.installation_knowledge_bases');
+        expect(grantSwapSql).toContain('DELETE FROM public.installation_connections');
+        expect(grantSwapSql).toContain(
+            'REVOKE ALL ON FUNCTION public.replace_installation_grants(uuid, uuid[], text[])'
+        );
+        expect(grantSwapSql).toContain(
+            'GRANT EXECUTE ON FUNCTION public.replace_installation_grants(uuid, uuid[], text[])'
+        );
     });
 });
