@@ -12,6 +12,7 @@ import Rocket02Icon from "@hugeicons/core-free-icons/Rocket02Icon";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
 import { ModelSelect } from "./ModelSelect";
+import { MarketplaceBrowser } from "./MarketplaceBrowser";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
 import { cn } from "@/lib/utils";
 import { useProjectIdBySlug } from "@/lib/hooks/useQueries";
@@ -22,14 +23,14 @@ import {
 } from "lucide-react";
 
 type Agent = { id: string; name: string; description: string | null; is_active: boolean; stable_version_id: string | null; created_at: string };
-type Version = { id: string; agent_id: string; version: string; status: string; config_json: { model?: string; instructions?: string; system_prompt?: string; [key: string]: unknown }; last_tested_at: string | null; last_test_passed: boolean; published_at: string | null; created_at: string };
+type Version = { id: string; agent_id: string; version: string; status: string; visibility?: string | null; config_json: { model?: string; instructions?: string; system_prompt?: string; [key: string]: unknown }; last_tested_at: string | null; last_test_passed: boolean; published_at: string | null; created_at: string };
 type Tenant = { id: string; name: string; external_id: string; status: string };
 type Installation = { id: string; agent_id: string; tenant_id: string; agent_version_id: string | null; status: string };
 type Run = { id: string; agent_id: string; tenant_id: string | null; status: string; error: string | null; created_at: string };
 type Model = { id: string; name: string; provider: string };
 type Workspace = { can_manage: boolean; studio_ready: boolean; agents: Agent[]; versions: Version[]; tenants: Tenant[]; installations: Installation[]; runs: Run[]; models: Model[] };
 type Form = { name: string; description: string; model: string; instructions: string };
-type Tab = "setup" | "customers" | "activity";
+type Tab = "setup" | "customers" | "marketplace" | "activity";
 type TestMessage = { id: string; role: "user" | "assistant"; content: string; error?: boolean };
 
 const emptyForm: Form = { name: "", description: "", model: "", instructions: "" };
@@ -291,6 +292,12 @@ export function EmbeddedAgentsDashboard({ orgSlug, projectSlug }: { orgSlug: str
         if (result) { setSelectedVersionId(result.version_id as string); setTab("setup"); toast.success("New draft ready", { description: "The published version remains unchanged." }); }
     }
 
+    async function setVisibility(visibility: string) {
+        if (!selectedAgent || !selectedVersion || !canManage) return;
+        const result = await act("set_visibility", { agent_id: selectedAgent.id, version_id: selectedVersion.id, visibility });
+        if (result) toast.success(`Version ${selectedVersion.version} is now ${visibility}`, { description: visibility === "public" ? "It appears in the public marketplace." : undefined });
+    }
+
     if (projectLoading || (projectId && workspace.isLoading)) return <div className="grid h-full min-h-0 animate-pulse grid-cols-[240px_1fr] gap-px overflow-hidden bg-border"><div className="bg-sidebar" /><div className="bg-background" /></div>;
     if (!projectId) return <p className="p-8 text-sm text-muted-foreground">Project not found.</p>;
     if (workspace.isError || !data) return <div role="alert" className="flex h-full min-h-0 flex-col justify-center border-l border-destructive/30 p-8"><h2 className="font-semibold">Agent workspace unavailable</h2><p className="mt-2 text-sm text-muted-foreground">{workspace.error instanceof Error ? workspace.error.message : "We couldn't load this project's agents."}</p><button onClick={() => workspace.refetch()} className="mt-4 w-fit text-sm underline">Try again</button></div>;
@@ -372,7 +379,7 @@ export function EmbeddedAgentsDashboard({ orgSlug, projectSlug }: { orgSlug: str
                             </div>
                         </div>
                         <div className="mt-6 flex items-center gap-4 overflow-x-auto">
-                            {(["setup", "customers", "activity"] as Tab[]).map((item) => <button key={item} onClick={() => { setTab(item); setError(null); }} className={`whitespace-nowrap border-b-2 px-0.5 pb-3 text-xs font-medium capitalize transition-colors ${tab === item ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}>{item}</button>)}
+                            {(["setup", "customers", "marketplace", "activity"] as Tab[]).map((item) => <button key={item} onClick={() => { setTab(item); setError(null); }} className={`whitespace-nowrap border-b-2 px-0.5 pb-3 text-xs font-medium capitalize transition-colors ${tab === item ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}>{item}</button>)}
                         </div>
                     </header>
 
@@ -387,6 +394,9 @@ export function EmbeddedAgentsDashboard({ orgSlug, projectSlug }: { orgSlug: str
                                     <div className="block"><span className={labelClass}>Model</span><ModelSelect value={form.model} onChange={(value) => updateForm("model", value)} models={data.models} disabled={!visualEditable || !canManage} placeholder="Choose a model" /></div>
                                     <Field label="Instructions" value={form.instructions} onChange={(value) => updateForm("instructions", value)} placeholder="Tell this agent how to work..." textarea help="Tell the agent what to do, what to avoid, and how to respond." disabled={!visualEditable || !canManage} />
                                     {!editable && <p className="text-xs text-muted-foreground">This version is locked. Create a new draft to change it.</p>}
+                                    {selectedVersion && <label className="block"><span className={labelClass}>Visibility</span><select value={selectedVersion.visibility ?? "private"} onChange={(event) => void setVisibility(event.target.value)} disabled={!canManage || !!busy} className={`${inputClass} disabled:cursor-not-allowed disabled:opacity-50`}>
+                                        {(["private", "tenant", "unlisted", "public"] as const).map((option) => <option key={option} value={option}>{option[0].toUpperCase()}{option.slice(1)}</option>)}
+                                    </select><span className="mt-1.5 block text-xs leading-5 text-muted-foreground">Public versions appear in the marketplace. Anyone can fork them into their own project.</span></label>}
                                     {!simpleVersion && <p className="text-xs leading-5 text-amber-500">This version includes advanced tools or skills. Use the API to test and publish those capabilities.</p>}
                                     {visualEditable && canManage && <WorkspaceButton onClick={() => void saveDraft()} disabled={!dirty || !!busy}>{busy === "save_draft" ? "Saving..." : "Save changes"}</WorkspaceButton>}
                                 </div>
@@ -451,6 +461,8 @@ export function EmbeddedAgentsDashboard({ orgSlug, projectSlug }: { orgSlug: str
                             <div className="mt-7 divide-y divide-border border-y border-border">{data.tenants.map((tenant) => <div key={tenant.id} className="flex flex-wrap items-center gap-3 py-4"><span className="flex h-9 w-9 items-center justify-center rounded-md bg-muted text-sm font-medium text-muted-foreground">{tenant.name.slice(0, 1).toUpperCase()}</span><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{tenant.name}</p><p className="truncate text-xs text-muted-foreground">{tenant.external_id}</p></div>{installedByTenant.has(tenant.id) ? <Status status={installedByTenant.get(tenant.id)?.status ?? "disabled"} /> : canManage && selectedAgent.stable_version_id && tenant.status === "active" ? <WorkspaceButton quiet onClick={async () => { const result = await act("install_agent", { agent_id: selectedAgent.id, tenant_id: tenant.id }); if (result) toast.success("Agent installed", { description: `${selectedAgent.name} is now available to ${tenant.name}.` }); }} disabled={!!busy}>{busy === "install_agent" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />} Install agent</WorkspaceButton> : <span className="text-xs text-muted-foreground">Not installed</span>}</div>)}{data.tenants.length === 0 && <p className="py-10 text-center text-sm text-muted-foreground">No customers yet. Add one below to give them access.</p>}</div>
                             {canManage && <form onSubmit={async (event) => { event.preventDefault(); const result = await act("create_tenant", { name: customerName, external_id: customerId }); if (result) { setCustomerName(""); setCustomerId(""); toast.success("Customer added", { description: "You can now install this agent for them." }); } }} className="mt-8 rounded-lg border border-border bg-card p-5"><h4 className="text-sm font-medium">Add a customer</h4><p className="mt-1 text-xs text-muted-foreground">Use the same customer ID your application uses.</p><div className="mt-5 grid gap-4 sm:grid-cols-2"><Field label="Customer name" value={customerName} onChange={setCustomerName} placeholder="e.g. Northstar Health" /><Field label="Customer ID in your app" value={customerId} onChange={setCustomerId} placeholder="e.g. northstar-health" /></div><div className="mt-5"><WorkspaceButton type="submit" disabled={!customerName.trim() || !customerId.trim() || !!busy}>{busy === "create_tenant" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />} Add customer</WorkspaceButton></div></form>}
                         </div>}
+
+                        {tab === "marketplace" && projectId && <MarketplaceBrowser projectId={projectId} tenants={data.tenants} canManage={canManage} />}
 
                         {tab === "activity" && <div className="max-w-4xl"><div className="flex items-center gap-3"><Activity className="h-5 w-5 text-foreground" /><div><h3 className="text-lg font-semibold">Recent activity</h3><p className="mt-1 text-xs text-muted-foreground">The latest runs for this agent.</p></div></div><div className="mt-7 divide-y divide-border border-y border-border">{agentRuns.map((run) => <div key={run.id} className="flex flex-wrap items-center gap-4 py-4"><span className="flex h-8 w-8 items-center justify-center rounded-md bg-muted"><Activity className="h-3.5 w-3.5 text-muted-foreground" /></span><div className="min-w-0 flex-1"><p className="text-sm">{data.tenants.find((tenant) => tenant.id === run.tenant_id)?.name ?? "Agent run"}</p><p className="mt-1 truncate text-xs text-muted-foreground">{run.error || new Date(run.created_at).toLocaleString()}</p></div><Status status={run.status} /></div>)}{agentRuns.length === 0 && <p className="py-10 text-center text-sm text-muted-foreground">No runs yet. Customer activity will appear here.</p>}</div></div>}
                     </div>

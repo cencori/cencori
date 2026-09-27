@@ -11,6 +11,12 @@ vi.mock('@/lib/gateway-middleware', () => ({
 
 vi.mock('@/lib/supabaseAdmin', () => ({ createAdminClient: () => (globalThis as Record<string, unknown>).__fakeDb }));
 
+vi.mock('@/lib/supabaseServer', () => ({
+    createServerClient: () => ({
+        auth: { getUser: async () => ({ data: { user: (globalThis as Record<string, unknown>).__sessionUser ?? null }, error: (globalThis as Record<string, unknown>).__sessionUser ? null : { message: 'no session' } }) },
+    }),
+}));
+
 vi.mock('next/server', () => ({
     NextRequest: class {},
     NextResponse: {
@@ -208,6 +214,48 @@ describe('marketplace install by fork', () => {
             req('http://x', { version_id: 'v-priv', tenant_id: 't1' }),
         )) as { status: number };
         expect(hidden.status).toBe(404);
+        expect(tables.agents).toHaveLength(0);
+    });
+});
+
+describe('dashboard marketplace install (session auth)', () => {
+    const ownerDb = () => makeDb({
+        projects: [{ id: 'proj-mine', organization_id: 'org-1', organizations: { owner_id: 'user-1' } }],
+        agent_versions: [publicVersion('v-pub', 'public')],
+        platform_tenants: [{ id: 't1', project_id: 'proj-mine', status: 'active' }],
+        agents: [],
+        agent_installations: [],
+        knowledge_bases: [],
+        installation_knowledge_bases: [],
+        installation_connections: [],
+    });
+
+    it('installs for project members without a secret key', async () => {
+        const { POST } = await import('@/app/api/projects/[projectId]/marketplace/installations/route');
+        const { db, tables } = ownerDb();
+        (globalThis as Record<string, unknown>).__fakeDb = db;
+        (globalThis as Record<string, unknown>).__sessionUser = { id: 'user-1' };
+        const res = (await POST(
+            req('http://x/api/projects/proj-mine/marketplace/installations', { version_id: 'v-pub', tenant_id: 't1' }),
+            { params: Promise.resolve({ projectId: 'proj-mine' }) },
+        )) as { status: number; __body: Record<string, unknown> };
+        expect(res.status).toBe(201);
+        expect(res.__body.source_version_id).toBe('v-pub');
+        expect(tables.agents).toHaveLength(1);
+        expect(tables.agent_installations).toHaveLength(1);
+        (globalThis as Record<string, unknown>).__sessionUser = null;
+    });
+
+    it('rejects anonymous callers', async () => {
+        const { POST } = await import('@/app/api/projects/[projectId]/marketplace/installations/route');
+        const { db, tables } = ownerDb();
+        (globalThis as Record<string, unknown>).__fakeDb = db;
+        (globalThis as Record<string, unknown>).__sessionUser = null;
+        const res = (await POST(
+            req('http://x/api/projects/proj-mine/marketplace/installations', { version_id: 'v-pub', tenant_id: 't1' }),
+            { params: Promise.resolve({ projectId: 'proj-mine' }) },
+        )) as { status: number };
+        expect(res.status).toBe(401);
         expect(tables.agents).toHaveLength(0);
     });
 });
