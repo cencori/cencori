@@ -173,7 +173,24 @@ export async function POST(request: Request, ctx: Context) {
 
         const versionId = cleanText(body.version_id, 100);
         const version = versionId ? await scopedVersion(db, projectId, agentId, versionId) : null;
-        if (['save_draft', 'test_version', 'publish_version'].includes(body.action) && !version) return fail('Version not found in this project.', 404);
+        if (['save_draft', 'test_version', 'publish_version', 'set_visibility'].includes(body.action) && !version) return fail('Version not found in this project.', 404);
+
+        // Marketplace publishing: flip a version's visibility. Public
+        // versions appear in anonymous discovery; anything else stays hidden.
+        if (body.action === 'set_visibility' && version) {
+            const visibility = typeof body.visibility === 'string' ? body.visibility : '';
+            if (!['private', 'tenant', 'unlisted', 'public'].includes(visibility)) {
+                return fail('Visibility must be private, tenant, unlisted, or public.', 400);
+            }
+            const { data, error } = await db.from('agent_versions')
+                .update({ visibility })
+                .eq('project_id', projectId)
+                .eq('id', (version as { id: string }).id)
+                .select('id, visibility')
+                .single();
+            if (error || !data) return fail('Could not update visibility.', 502);
+            return NextResponse.json({ version_id: (data as { id: string }).id, visibility: (data as { visibility: string }).visibility });
+        }
 
         if (body.action === 'save_draft' && version) {
             if (['published', 'deprecated', 'retired'].includes(version.status as string)) return fail('Published versions cannot be edited. Create a new draft.', 409);
