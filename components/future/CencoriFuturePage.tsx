@@ -102,16 +102,17 @@ function useScrollChoreography(
 
     const FLOOR = 0.12;
     const SOFTNESS = 4;
-    // Phones retime the same beats earlier: a 280vh runway otherwise holds a
-    // black void for most of the pin before the visual fades in. Order and
-    // easing are unchanged, desktop timings are untouched.
+    // Phones use the same sequential order as desktop — reveal, then shrink,
+    // then cards — so the copy drops back under the eyebrow before the
+    // visual fades in. Overlapping them crowds the 100svh pane and reads
+    // as a hang on mobile. Desktop timings are untouched.
     const phone = window.matchMedia("(max-width: 640px)").matches;
     const REVEAL_IN = phone ? 0.02 : 0.04;
-    const REVEAL_OUT = phone ? 0.32 : 0.42;
-    const SHRINK_IN = phone ? 0.3 : 0.45;
-    const SHRINK_OUT = phone ? 0.58 : 0.7;
-    const CARDS_IN = phone ? 0.25 : 0.64;
-    const CARDS_OUT = phone ? 0.65 : 0.92;
+    const REVEAL_OUT = phone ? 0.34 : 0.42;
+    const SHRINK_IN = phone ? 0.36 : 0.45;
+    const SHRINK_OUT = phone ? 0.62 : 0.7;
+    const CARDS_IN = phone ? 0.64 : 0.64;
+    const CARDS_OUT = phone ? 0.92 : 0.92;
     const LEAD_REST = 1.3;
     const LEAD_BIG = 3.6;
 
