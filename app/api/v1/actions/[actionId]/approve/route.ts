@@ -4,6 +4,7 @@ import { validateGatewayRequest, addGatewayHeaders, handleCorsPreFlight } from '
 import { embeddedError, dePrefixId, withPrefix } from '@/lib/embedded/http';
 import { emitEmbeddedEvent } from '@/lib/embedded/runs';
 import { executeGmailSend } from '@/lib/embedded/tool-executor';
+import { parseMcpHostedToolName } from '@/lib/embedded/turn-tools';
 import crypto from 'crypto';
 
 export async function OPTIONS() {
@@ -37,14 +38,26 @@ async function dispatchExecution(
     }
 
     const mcpServerId = policy.mcp_server_id as string | undefined;
-    if (mcpServerId || tool.startsWith('mcp.')) {
-        const sid = mcpServerId ? dePrefixId(mcpServerId) : null;
+    const hosted = parseMcpHostedToolName(action.tool_name);
+    if (mcpServerId || tool.startsWith('mcp.') || hosted) {
+        // Explicit server binding wins; otherwise resolve a hosted
+        // `mcp__<server>__<tool>` name against this project's servers.
+        let sid = mcpServerId ? dePrefixId(mcpServerId) : null;
+        let mcpTool = (policy.mcp_tool as string) || (hosted ? hosted.tool : action.tool_name.replace(/^mcp\./, ''));
+        if (!sid && hosted) {
+            const { data: servers } = await supabase.from('mcp_servers').select('id, url').eq('project_id', action.project_id).eq('status', 'active');
+            const match = ((servers ?? []) as Array<{ id: string }>)
+                .map((s) => s.id as string)
+                .filter((id) => id.replace(/-/g, '').toLowerCase().startsWith(hosted.serverShort.toLowerCase()));
+            if (match.length !== 1) throw new Error('MCP server for this tool call is ambiguous or missing in this project');
+            sid = match[0];
+            mcpTool = hosted.tool;
+        }
         const { data: server } = sid
             ? await supabase.from('mcp_servers').select('*').eq('project_id', action.project_id).eq('id', sid).maybeSingle()
             : { data: null };
         if (!server) throw new Error('MCP server not found in this project');
         const s = server as { url: string; transport?: string; auth_connection_id?: string | null };
-        const mcpTool = (policy.mcp_tool as string) || action.tool_name.replace(/^mcp\./, '');
         // Default-deny egress: the effective version ∩ installation network
         // policy must allowlist the server host (plus outbound safety).
         const { resolveActionNetworkPolicy, checkEgress } = await import('@/lib/embedded/net-policy');

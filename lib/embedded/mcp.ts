@@ -1,6 +1,7 @@
 import { safeOutboundFetch } from '@/lib/security/outbound-url';
 import type { createAdminClient } from '@/lib/supabaseAdmin';
 import { decryptApiKey } from '@/lib/encryption';
+import { dePrefixId } from './http';
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -238,4 +239,56 @@ export function applyAllowlist(discovered: string[], allowedTools: string[] | nu
     if (!allowedTools || allowedTools.length === 0) return discovered;
     const allowed = new Set(allowedTools);
     return discovered.filter((t) => allowed.has(t));
+}
+
+export interface McpServerSnapshot {
+    id: string;
+    name: string;
+    url: string;
+    transport: string;
+    status: string;
+    authConnectionId: string | null;
+    tools: DiscoveredTool[];
+}
+
+/**
+ * Load stored discovery snapshots for manifest MCP grants. Keyed by
+ * lowercase de-prefixed server id (matching turn-tools lookup). Only
+ * active servers with tools are returned; the manifest validator already
+ * rejects missing/inactive servers at publish time.
+ */
+export async function loadMcpSnapshots(
+    supabase: Admin,
+    projectId: string,
+    serverIds: string[],
+): Promise<Map<string, McpServerSnapshot>> {
+    const out = new Map<string, McpServerSnapshot>();
+    const ids = [...new Set(serverIds.map((s) => dePrefixId(s).toLowerCase()))].filter(Boolean);
+    if (ids.length === 0) return out;
+    try {
+        const { data, error } = await supabase
+            .from('mcp_servers')
+            .select('id, name, url, transport, status, auth_connection_id, tool_snapshot')
+            .eq('project_id', projectId)
+            .in('id', ids);
+        if (error || !data) return out;
+        for (const row of data as Array<Record<string, unknown>>) {
+            if ((row.status as string) !== 'active') continue;
+            const tools = (((row.tool_snapshot ?? {}) as { tools?: unknown }).tools ?? []) as DiscoveredTool[];
+            if (!Array.isArray(tools) || tools.length === 0) continue;
+            const id = row.id as string;
+            out.set(id.toLowerCase(), {
+                id,
+                name: (row.name as string) ?? id,
+                url: row.url as string,
+                transport: (row.transport as string) ?? 'streamable-http',
+                status: row.status as string,
+                authConnectionId: (row.auth_connection_id as string | null) ?? null,
+                tools: tools.filter((t) => t && typeof t.name === 'string'),
+            });
+        }
+    } catch {
+        // Best-effort: turns still run with manifest-declared tools only.
+    }
+    return out;
 }

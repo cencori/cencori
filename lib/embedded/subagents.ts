@@ -242,6 +242,10 @@ export async function delegateSubagent(
         // cascade (same-instance, best-effort like root runs).
         const { registerRunController, unregisterRunController } = await import('./run-abort');
         registerRunController(childId, controller);
+        // Manifest controls validated at publish; re-checked defensively so a
+        // hand-edited config can never inject an invalid value.
+        const childEffort = (config as { reasoning_effort?: unknown }).reasoning_effort;
+        const childPin = (config as { provider_connection_id?: unknown }).provider_connection_id;
         let response: Awaited<ReturnType<typeof executeGatewayChat>>;
         const gatewayChatStartedAt = Date.now();
         try {
@@ -260,9 +264,11 @@ export async function delegateSubagent(
                     signal: controller.signal,
                     temperature: config.temperature ?? undefined,
                     maxTokens: config.max_output_tokens ?? undefined,
+                    ...(typeof childEffort === 'string' && ['low', 'medium', 'high'].includes(childEffort) ? { reasoningEffort: childEffort as 'low' | 'medium' | 'high' } : {}),
                 },
                 requestId: `sub_${childId.slice(0, 8)}`,
                 singleProviderAttempt: true,
+                ...(typeof childPin === 'string' && childPin.trim() ? { pinnedConnectionId: childPin.trim() } : {}),
             });
         } finally {
             clearTimeout(timer);

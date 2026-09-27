@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeManifest, REASONING_EFFORTS } from '@/lib/embedded/manifest';
+import { normalizeManifest, REASONING_EFFORTS, validateManifest } from '@/lib/embedded/manifest';
 import { installedTurnTools } from '@/lib/embedded/turn-tools';
 import { intersectBrowserEnabled } from '@/lib/embedded/net-policy';
 import { validateVersionConfig } from '@/lib/embedded/agents';
@@ -83,5 +83,28 @@ describe('capability manifest normalization', () => {
         expect(intersectBrowserEnabled({ browser: { enabled: true } }, { browser: { enabled: false } })).toBe(false);
         expect(intersectBrowserEnabled({ browser: { enabled: false } }, { browser: { enabled: true } })).toBe(false);
         expect(intersectBrowserEnabled(null, null)).toBe(false);
+    });
+
+    it('passes connection pins through normalization', () => {
+        const m = normalizeManifest({ model: 'gpt-4o', provider_connection_id: 'prc_abc' });
+        expect(m.provider_connection_id).toBe('prc_abc');
+        expect(normalizeManifest({ model: 'gpt-4o' }).provider_connection_id).toBeUndefined();
+    });
+
+    it('rejects browser automation instead of degrading to search', async () => {
+        const noDb = { from: () => { throw new Error('no db'); } };
+        const bad = await validateManifest(noDb as never, {
+            projectId: 'p',
+            agentId: 'a',
+            manifest: normalizeManifest({ policy: { browser: { enabled: true, automation: true } } }),
+        });
+        expect(bad.valid).toBe(false);
+        expect(bad.errors.some((e) => e.includes('browser automation is not available'))).toBe(true);
+        const ok = await validateManifest(noDb as never, {
+            projectId: 'p',
+            agentId: 'a',
+            manifest: normalizeManifest({ policy: { browser: { enabled: true } } }),
+        });
+        expect(ok.errors.some((e) => e.includes('browser automation'))).toBe(false);
     });
 });

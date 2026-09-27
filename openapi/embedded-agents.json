@@ -776,14 +776,77 @@
           "status"
         ]
       },
+      "MarketplaceAgent": {
+        "type": "object",
+        "properties": {
+          "version_id": {
+            "type": "string"
+          },
+          "agent_id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "visibility": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "config": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true
+          },
+          "requirements": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true
+          },
+          "published_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "version_id",
+          "agent_id",
+          "version"
+        ]
+      },
+      "MarketplaceAgentList": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MarketplaceAgent"
+            }
+          },
+          "next_cursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "next_cursor"
+        ]
+      },
       "Installation": {
         "type": "object",
         "properties": {
           "id": {
             "type": "string",
             "example": "ins_abc"
-          },
-          "tenant_id": {
+          },          "tenant_id": {
             "type": "string"
           },
           "agent_id": {
@@ -889,6 +952,33 @@
           "agent_version": {
             "type": "string",
             "nullable": true
+          },
+          "reasoning_effort_applied": {
+            "type": "string",
+            "nullable": true,
+            "description": "Manifest reasoning effort applied to provider requests (OpenAI family), or null."
+          },
+          "tool_calls": {
+            "type": "array",
+            "description": "Hosted MCP tool calls executed during the run.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "tool": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "executed",
+                    "failed"
+                  ]
+                },
+                "action_id": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "knowledge_citations": {
             "type": "array",
@@ -3718,6 +3808,14 @@
           "type": "string"
         }
       },
+      "VersionId": {
+        "name": "versionId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
       "InstallationId": {
         "name": "installationId",
         "in": "path",
@@ -4342,6 +4440,166 @@
           "$ref": "#/components/parameters/InstallationId"
         }
       ]
+    },
+    "/v1/marketplace/agents": {
+      "get": {
+        "summary": "Discover public agents (anonymous)",
+        "description": "Cross-project discovery. Only published versions marked public; unlisted versions are addressable by id but never listed. No authentication.",
+        "responses": {
+          "200": {
+            "description": "Marketplace listing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarketplaceAgentList"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "getMarketplaceAgents",
+        "tags": [
+          "Marketplace"
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "Opaque keyset cursor over (created_at, id).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/marketplace/agents/{versionId}": {
+      "get": {
+        "summary": "Public agent version detail (anonymous)",
+        "description": "Public versions plus unlisted versions by id. Private and tenant versions return 404. No authentication.",
+        "responses": {
+          "200": {
+            "description": "Marketplace agent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarketplaceAgent"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "getMarketplaceAgentsByVersionId",
+        "tags": [
+          "Marketplace"
+        ]
+      },
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/VersionId"
+        }
+      ]
+    },
+    "/v1/marketplace/installations": {
+      "post": {
+        "summary": "Install a public agent by fork",
+        "description": "Forks the public version into the caller's project (private copy, pinned installation) and bills spend there. Later publisher edits never move the fork. Requires a secret project key.",
+        "responses": {
+          "201": {
+            "description": "Installation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Installation"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "postMarketplaceInstallations",
+        "tags": [
+          "Marketplace"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "version_id": {
+                    "type": "string"
+                  },
+                  "tenant_id": {
+                    "type": "string"
+                  },
+                  "knowledge_base_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "connection_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "approval_policy": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true
+                  },
+                  "budget": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true
+                  },
+                  "overlay_config": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true
+                  }
+                },
+                "required": [
+                  "version_id",
+                  "tenant_id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
     },
     "/v1/agents": {
       "get": {

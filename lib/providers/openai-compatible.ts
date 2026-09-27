@@ -20,6 +20,7 @@ import {
 import { getPricingFromDB } from './pricing';
 import { toOpenAIMessages, estimateTokenCount } from './utils';
 import { normalizeProviderError } from './errors';
+import { openAIReasoningEffort } from './openai';
 import { safeProviderFetch } from '@/lib/security/outbound-url';
 
 /**
@@ -182,6 +183,7 @@ export class OpenAICompatibleProvider extends AIProvider {
                 messages: toOpenAIMessages(request.messages) as any,
                 temperature: request.temperature ?? 0.7,
                 max_tokens: request.maxTokens,
+                ...(openAIReasoningEffort(request) ? { reasoning_effort: openAIReasoningEffort(request) } : {}),
                 stream: false,
                 user: request.userId,
                 tools: this.toOpenAITools(request),
@@ -265,6 +267,7 @@ export class OpenAICompatibleProvider extends AIProvider {
                 messages: toOpenAIMessages(request.messages) as any,
                 temperature: request.temperature ?? 0.7,
                 max_tokens: request.maxTokens,
+                ...(openAIReasoningEffort(request) ? { reasoning_effort: openAIReasoningEffort(request) } : {}),
                 stream: true,
                 user: request.userId,
                 tools: this.toOpenAITools(request),

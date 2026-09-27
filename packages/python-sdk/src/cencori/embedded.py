@@ -63,6 +63,18 @@ class RunsModule:
         """Get a run."""
         return self._client._request("GET", f"/v1/runs/{run_id}")
 
+    def history(self, agent_id: str, limit: Optional[int] = None, cursor: Optional[str] = None) -> Dict[str, Any]:
+        """Paginated run history for one agent."""
+        path = f"/v1/agents/{agent_id}/runs"
+        query = []
+        if limit is not None:
+            query.append(f"limit={limit}")
+        if cursor:
+            query.append(f"cursor={cursor}")
+        if query:
+            path += "?" + "&".join(query)
+        return self._client._request("GET", path)
+
     def events(self, run_id: str, after: Optional[str] = None, limit: int = 50) -> Dict[str, Any]:
         """Read the durable run event log."""
         path = f"/v1/runs/{run_id}/events?limit={limit}"
@@ -225,20 +237,36 @@ class UsageModule:
     def __init__(self, client: "Cencori") -> None:
         self._client = client
 
-    def summary(self, days: int = 30, tenant_id: Optional[str] = None, agent_id: Optional[str] = None) -> Dict[str, Any]:
+    def summary(self, days: int = 30, tenant_id: Optional[str] = None, agent_id: Optional[str] = None, installation_id: Optional[str] = None, model: Optional[str] = None, since: Optional[str] = None, until: Optional[str] = None) -> Dict[str, Any]:
         """Usage summary grouped by tenant/agent/installation."""
         path = f"/v1/usage?days={days}"
         if tenant_id:
             path += f"&tenant_id={tenant_id}"
         if agent_id:
             path += f"&agent_id={agent_id}"
+        if installation_id:
+            path += f"&installation_id={installation_id}"
+        if model:
+            path += f"&model={model}"
+        if since:
+            path += f"&since={since}"
+        if until:
+            path += f"&until={until}"
         return self._client._request("GET", path)
 
-    def events(self, days: int = 30, limit: int = 20, cursor: Optional[str] = None) -> Dict[str, Any]:
+    def events(self, days: int = 30, limit: int = 20, cursor: Optional[str] = None, tenant_id: Optional[str] = None, agent_id: Optional[str] = None, installation_id: Optional[str] = None, model: Optional[str] = None) -> Dict[str, Any]:
         """Paginated attributed request rows."""
         path = f"/v1/usage/events?days={days}&limit={limit}"
         if cursor:
             path += f"&cursor={cursor}"
+        if tenant_id:
+            path += f"&tenant_id={tenant_id}"
+        if agent_id:
+            path += f"&agent_id={agent_id}"
+        if installation_id:
+            path += f"&installation_id={installation_id}"
+        if model:
+            path += f"&model={model}"
         return self._client._request("GET", path)
 
     def export_csv(
@@ -281,6 +309,7 @@ class EmbeddedModule:
         self.installations = InstallationsModule(client)
         self.connections = ToolConnectionsModule(client)
         self.mcp_servers = McpServersModule(client)
+        self.marketplace = MarketplaceModule(client)
         self.webhooks = WebhooksModule(client)
         self.end_users = EndUsersModule(client)
         self.rate_plans = RatePlansModule(client)
@@ -303,7 +332,7 @@ class ModelsModule:
     def __init__(self, client: "Cencori") -> None:
         self._client = client
 
-    def list(self, available: Optional[bool] = None, provider: Optional[str] = None, source: Optional[str] = None) -> Dict[str, Any]:
+    def list(self, available: Optional[bool] = None, provider: Optional[str] = None, source: Optional[str] = None, limit: Optional[int] = None, cursor: Optional[str] = None) -> Dict[str, Any]:
         """List models with availability metadata."""
         path = "/v1/models"
         query = []
@@ -313,6 +342,10 @@ class ModelsModule:
             query.append(f"provider={provider}")
         if source:
             query.append(f"source={source}")
+        if limit is not None:
+            query.append(f"limit={limit}")
+        if cursor:
+            query.append(f"cursor={cursor}")
         if query:
             path += "?" + "&".join(query)
         return self._client._request("GET", path)
@@ -427,11 +460,20 @@ class InstallationsModule:
         """Install an agent for a tenant."""
         return self._client._request("POST", "/v1/agent-installations", json={"tenant_id": tenant_id, "agent_id": agent_id, **kwargs})
 
-    def list(self, tenant_id: Optional[str] = None) -> Dict[str, Any]:
+    def list(self, tenant_id: Optional[str] = None, agent_id: Optional[str] = None, limit: Optional[int] = None, cursor: Optional[str] = None) -> Dict[str, Any]:
         """List installations."""
         path = "/v1/agent-installations"
+        query = []
         if tenant_id:
-            path += f"?tenant_id={tenant_id}"
+            query.append(f"tenant_id={tenant_id}")
+        if agent_id:
+            query.append(f"agent_id={agent_id}")
+        if limit is not None:
+            query.append(f"limit={limit}")
+        if cursor:
+            query.append(f"cursor={cursor}")
+        if query:
+            path += "?" + "&".join(query)
         return self._client._request("GET", path)
 
     def get(self, installation_id: str) -> Dict[str, Any]:
@@ -537,6 +579,33 @@ class McpServersModule:
     def refresh_tools(self, server_id: str) -> Dict[str, Any]:
         """Re-discover with diff."""
         return self._client._request("POST", f"/v1/mcp/servers/{server_id}/refresh-tools", json={})
+
+
+class MarketplaceModule:
+    """Public agent discovery (anonymous) and fork-to-install (secret key)."""
+
+    def __init__(self, client: "Cencori") -> None:
+        self._client = client
+
+    def list(self, limit: Optional[int] = None, cursor: Optional[str] = None) -> Dict[str, Any]:
+        """List public agents."""
+        path = "/v1/marketplace/agents"
+        query = []
+        if limit is not None:
+            query.append(f"limit={limit}")
+        if cursor:
+            query.append(f"cursor={cursor}")
+        if query:
+            path += "?" + "&".join(query)
+        return self._client._request("GET", path)
+
+    def get(self, version_id: str) -> Dict[str, Any]:
+        """Public (or unlisted) version detail."""
+        return self._client._request("GET", f"/v1/marketplace/agents/{version_id}")
+
+    def install(self, version_id: str, tenant_id: str, **kwargs: Any) -> Dict[str, Any]:
+        """Fork a public version into your project and install it pinned."""
+        return self._client._request("POST", "/v1/marketplace/installations", json={"version_id": version_id, "tenant_id": tenant_id, **kwargs})
 
 
 class WebhooksModule:

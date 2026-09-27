@@ -12,6 +12,13 @@ export interface NetworkPolicy {
 
 export interface BrowserPolicy {
     enabled: boolean;
+    /**
+     * Connected-browser automation (navigation, clicks, sessions). No
+     * automation runtime exists: indexed web search is the only browser
+     * capability, and requesting automation fails manifest validation
+     * loudly instead of silently degrading to search.
+     */
+    automation?: boolean;
 }
 
 const DEFAULT_NETWORK: NetworkPolicy = { mode: 'none', allowed_hosts: [] };
