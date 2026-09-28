@@ -7,7 +7,7 @@ export default function PricingLayout({
     children: React.ReactNode;
 }) {
     return (
-        <div className="min-h-screen bg-background text-foreground">
+        <div className="editorial-dark min-h-screen bg-background text-foreground">
             <SiteNav solid />
             {children}
             <SiteFooter />
