@@ -92,10 +92,10 @@ export interface UnifiedChatRequest {
     promptCacheKey?: string;
     /**
      * Reasoning effort for reasoning-capable models. Forwarded only by
-     * providers with a native effort control (OpenAI family); all others
+     * providers with a native effort control (OpenAI and Maximo); all others
      * ignore it. Never set for non-reasoning models.
      */
-    reasoningEffort?: 'low' | 'medium' | 'high';
+    reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 }
 
 /**
