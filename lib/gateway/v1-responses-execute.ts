@@ -296,7 +296,7 @@ function buildResponsesJson(params: {
         totalTokens: number;
         cacheReadTokens?: number;
     };
-    status?: 'completed' | 'failed';
+    status?: 'completed' | 'failed' | 'in_progress';
     annotations?: Array<{ type: string; start_index: number; end_index: number; url: string; title?: string }>;
     error?: { code: string; message: string };
     metadata?: Record<string, string>;
@@ -410,7 +410,7 @@ function isCreditExhausted(error: unknown): boolean {
 // ── Streaming ──
 
 function buildResponsesStreamChunk(params: {
-    type: 'response.output_text.delta' | 'response.output_text.done' | 'response.function_call_arguments.delta' | 'response.function_call_arguments.done' | 'response.web_search_call.completed' | 'response.file_search_call.completed' | 'response.code_interpreter_call.completed' | 'response.done';
+    type: 'response.in_progress' | 'response.output_text.delta' | 'response.output_text.done' | 'response.function_call_arguments.delta' | 'response.function_call_arguments.done' | 'response.web_search_call.completed' | 'response.file_search_call.completed' | 'response.code_interpreter_call.completed' | 'response.done';
     data: Record<string, unknown>;
 }): string {
     return `event: ${params.type}\ndata: ${JSON.stringify(params.data)}\n\n`;
@@ -783,9 +783,30 @@ export async function runV1ResponsesExecution(
         }
 
         // ── Streaming ──
+        const streamAbort = new AbortController();
+        let cancelled = false;
+        let heartbeat: ReturnType<typeof setInterval> | undefined;
         const stream = new ReadableStream({
             async start(controller) {
                 const encoder = new TextEncoder();
+                // The runtime's idle clock advances on parsed SSE events, not comments.
+                // This standard event keeps the connection alive without fake assistant text.
+                heartbeat = setInterval(() => {
+                    if (cancelled) return;
+                    const response = buildResponsesJson({
+                        id: responseId,
+                        model: body.model || model,
+                        content: '',
+                        toolOutputs: [],
+                        usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+                        status: 'in_progress',
+                        metadata: body.metadata,
+                    });
+                    controller.enqueue(encoder.encode(buildResponsesStreamChunk({
+                        type: 'response.in_progress',
+                        data: { type: 'response.in_progress', response },
+                    })));
+                }, 15_000);
                 let fullText = '';
                 // Real usage from the provider when the adapter reports it.
                 let reportedUsage: TokenUsage | undefined;
@@ -886,7 +907,12 @@ export async function runV1ResponsesExecution(
                         sponsoredModels: gatewayCtx.sponsoredModels,
                         basecodeModelPolicy: gatewayCtx.basecodeModelPolicy,
                         tier,
-                        request: chatRequest,
+                        request: {
+                            ...chatRequest,
+                            signal: chatRequest.signal
+                                ? AbortSignal.any([streamAbort.signal, chatRequest.signal])
+                                : streamAbort.signal,
+                        },
                         resolved,
                         requestId: gatewayCtx.requestId,
                     })) {
@@ -1262,6 +1288,7 @@ export async function runV1ResponsesExecution(
                         }
                     }
                 } catch (error) {
+                    if (cancelled) return;
                     // The message was computed and dropped here, so every mid-stream provider
                     // failure reached the client as a bare "upstream response failed" with the
                     // real cause — rate limits, an exhausted provider, a retired model — left
@@ -1304,7 +1331,15 @@ export async function runV1ResponsesExecution(
                         )
                     );
                     controller.close();
+                } finally {
+                    clearInterval(heartbeat);
+                    streamAbort.abort();
                 }
+            },
+            cancel(reason) {
+                cancelled = true;
+                clearInterval(heartbeat);
+                streamAbort.abort(reason);
             },
         });
 

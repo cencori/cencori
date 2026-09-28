@@ -1,53 +1,70 @@
 type StreamTimeoutOptions = {
     signal?: AbortSignal;
     timeoutMs?: number;
+    /** Transport heartbeats cannot keep a stream with no decoded progress alive forever. */
+    maxPendingMs?: number;
 };
 
-/** Bounds silence between provider chunks, without limiting a healthy stream's total duration. */
+/** Bounds network silence and heartbeat-only stalls, without limiting total stream duration. */
 export async function* streamWithTimeout<T>(
-    createStream: (signal: AbortSignal) => AsyncIterable<T>,
+    createStream: (signal: AbortSignal, reportActivity: () => void) => AsyncIterable<T>,
     label: string,
     options: StreamTimeoutOptions = {},
 ): AsyncGenerator<T> {
     const timeoutMs = options.timeoutMs ?? 60_000;
+    const maxPendingMs = options.maxPendingMs ?? 180_000;
     const controller = new AbortController();
     const signal = options.signal
         ? AbortSignal.any([controller.signal, options.signal])
         : controller.signal;
-    const iterator = createStream(signal)[Symbol.asyncIterator]();
+    let resetIdle: (() => void) | undefined;
+    // SDKs discard SSE comments. Count real bytes even when they contain no model delta.
+    const iterator = createStream(signal, () => resetIdle?.())[Symbol.asyncIterator]();
     try {
         while (true) {
             signal.throwIfAborted();
-            let timer: ReturnType<typeof setTimeout> | undefined;
+            let idleTimer: ReturnType<typeof setTimeout> | undefined;
+            let progressTimer: ReturnType<typeof setTimeout> | undefined;
             let onAbort: (() => void) | undefined;
+            const clearDeadline = () => {
+                resetIdle = undefined;
+                clearTimeout(idleTimer);
+                clearTimeout(progressTimer);
+                if (onAbort) signal.removeEventListener('abort', onAbort);
+            };
             try {
                 const aborted = new Promise<never>((_, reject) => {
                     onAbort = () => reject(signal.reason);
                     signal.addEventListener('abort', onAbort, { once: true });
-                    timer = setTimeout(() => {
-                        controller.abort(new Error(`${label} next chunk timed out after ${timeoutMs}ms`));
-                    }, timeoutMs);
+                    resetIdle = () => {
+                        clearTimeout(idleTimer);
+                        if (!signal.aborted) {
+                            idleTimer = setTimeout(() => {
+                                controller.abort(new Error(`${label} next chunk timed out after ${timeoutMs}ms`));
+                            }, timeoutMs);
+                        }
+                    };
+                    resetIdle();
+                    progressTimer = setTimeout(() => {
+                        controller.abort(new Error(`${label} made no stream progress after ${maxPendingMs}ms`));
+                    }, maxPendingMs);
                 });
                 const next = await Promise.race([iterator.next(), aborted]);
                 if (next.done) return;
-                // Stop the idle clock while the caller processes this chunk (e.g. output guards).
-                clearTimeout(timer);
-                if (onAbort) signal.removeEventListener('abort', onAbort);
+                // Output guards and caller processing are not provider silence.
+                clearDeadline();
                 yield next.value;
             } finally {
-                clearTimeout(timer);
-                if (onAbort) signal.removeEventListener('abort', onAbort);
+                clearDeadline();
             }
         }
     } finally {
         controller.abort();
-        // An async generator queues return() behind its pending next(). Awaiting it after a
-        // timeout waits on the exact read that stalled, so the client never receives the error.
-        // Abort provider HTTP work above and observe cleanup errors without blocking settlement.
+        // return() can queue behind the stalled next(). Do not block error settlement on it.
         try {
             void Promise.resolve(iterator.return?.()).catch(() => {});
         } catch {
-            // Synchronous cleanup failures must not replace the original stream error either.
+            // Cleanup failures must not replace the original stream error.
         }
     }
 }

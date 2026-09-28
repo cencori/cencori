@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  */
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest';
 import type { UnifiedChatRequest, UnifiedChatResponse } from '@/lib/providers/base';
 
 const mockIsCircuitOpen = vi.fn();
@@ -486,6 +486,34 @@ describe('executeGatewayChat failover', () => {
 });
 
 describe('streamGatewayChat', () => {
+    afterEach(() => vi.useRealTimers());
+
+    it('allows a bounded Maximo drafting pause beyond 60s and forwards transport activity', async () => {
+        vi.useFakeTimers();
+        let onStreamActivity: (() => void) | undefined;
+        const providerStream = vi.fn(async function* (request: UnifiedChatRequest) {
+            onStreamActivity = request.onStreamActivity;
+            await new Promise(resolve => setTimeout(resolve, 100_000));
+            yield { delta: 'Draft ready', finishReason: 'stop' };
+        });
+        const stream = streamGatewayChat({
+            supabase: createMockSupabaseForExecutor({ enableFallback: false }) as never,
+            projectId: 'proj-ex', organizationId: 'org-ex', tier: 'free',
+            request: { messages: [], model: 'maximo-atlas-1.3', stream: true },
+            resolved: {
+                providerName: 'maximo', model: 'maximo-atlas-1.3', billingMode: 'sponsored',
+                provider: { chat: vi.fn(), stream: providerStream, countTokens: vi.fn(), getPricing: vi.fn() },
+                router: { hasProvider: () => false, getProvider: vi.fn() },
+            } as never,
+        });
+        const next = stream.next();
+        await vi.advanceTimersByTimeAsync(0);
+        expect(onStreamActivity).toBeTypeOf('function');
+        await vi.advanceTimersByTimeAsync(100_000);
+        expect((await next).value).toMatchObject({ delta: 'Draft ready' });
+        expect((await stream.next()).done).toBe(true);
+        expect(vi.getTimerCount()).toBe(0);
+    });
     beforeEach(() => {
         vi.clearAllMocks();
         mockIsCircuitOpen.mockResolvedValue(false);

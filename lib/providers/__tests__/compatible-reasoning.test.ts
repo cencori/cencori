@@ -4,6 +4,7 @@ const { create } = vi.hoisted(() => ({ create: vi.fn() }));
 vi.mock('openai', () => ({
     default: class {
         chat = { completions: { create } };
+        withOptions() { return this; }
     },
 }));
 vi.mock('../pricing', () => ({

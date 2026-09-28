@@ -5,6 +5,45 @@ import { streamWithTimeout } from '@/lib/gateway/stream-timeout';
 afterEach(() => vi.useRealTimers());
 
 describe('provider stream deadlines', () => {
+    it('counts transport heartbeats that SDKs discard while awaiting a decoded chunk', async () => {
+        vi.useFakeTimers();
+        let activity!: () => void;
+        let deliver!: () => void;
+        const stream = streamWithTimeout((_signal, reportActivity) => {
+            activity = reportActivity;
+            return (async function* () {
+                await new Promise<void>(resolve => { deliver = resolve; });
+                yield 'finished drafting';
+            })();
+        }, 'provider', { timeoutMs: 50, maxPendingMs: 200 });
+        const next = stream.next();
+        for (let i = 0; i < 4; i++) {
+            await vi.advanceTimersByTimeAsync(40);
+            activity();
+        }
+        deliver();
+        expect((await next).value).toBe('finished drafting');
+        await stream.return(undefined);
+        expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('bounds a heartbeat-only stall even when transport traffic continues', async () => {
+        vi.useFakeTimers();
+        let activity!: () => void;
+        const stream = streamWithTimeout((_signal, reportActivity) => {
+            activity = reportActivity;
+            return { [Symbol.asyncIterator]: () => ({ next: () => new Promise(() => {}) }) };
+        }, 'provider', { timeoutMs: 50, maxPendingMs: 120 });
+        const rejected = expect(stream.next()).rejects.toThrow('no stream progress after 120ms');
+        await vi.advanceTimersByTimeAsync(40);
+        activity();
+        await vi.advanceTimersByTimeAsync(40);
+        activity();
+        await vi.advanceTimersByTimeAsync(40);
+        await rejected;
+        activity();
+        expect(vi.getTimerCount()).toBe(0);
+    });
     it('reports a stalled next() even when generator cleanup cannot finish', async () => {
         vi.useFakeTimers();
         let providerSignal!: AbortSignal;
