@@ -185,6 +185,11 @@ type V1ResponseExecuteParams = {
     shadowMode?: boolean;
     createPendingAction?: (toolCall: ToolCallPayload) => Promise<string | null>;
     createDispatchedAction?: (toolCall: ToolCallPayload) => void;
+    /**
+     * Explicit dashboard opt-in for the legacy output scanner. Absent/false =
+     * output passes with zero risk signals; governance policies still enforce.
+     */
+    securityEnabled?: boolean;
 };
 
 export type V1ResponseExecuteResult =
@@ -627,6 +632,7 @@ export async function runV1ResponsesExecution(
                 organizationId: gatewayCtx.organizationId,
                 model: result.actualModel,
                 region: gatewayCtx.countryCode,
+                securityEnabled: params.securityEnabled,
             });
 
             if (!outputCheck.ok) {
@@ -958,6 +964,7 @@ export async function runV1ResponsesExecution(
                                     organizationId: gatewayCtx.organizationId,
                                     model: resolved.model,
                                     region: gatewayCtx.countryCode,
+                                    securityEnabled: params.securityEnabled,
                                 });
                                 if (incrementalCheck.ok) {
                                     releaseApprovedText();
@@ -1030,6 +1037,7 @@ export async function runV1ResponsesExecution(
                                 organizationId: gatewayCtx.organizationId,
                                 model: chunk.actualModel,
                                 region: gatewayCtx.countryCode,
+                                securityEnabled: params.securityEnabled,
                             });
 
                             // Approved text must not wait for pricing, token counts or storage.

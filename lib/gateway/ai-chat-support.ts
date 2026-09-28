@@ -124,15 +124,24 @@ export function validateCachedOutput(params: {
     inputText: string;
     inputSecurity: SecurityCheckResult;
     conversationHistory: UnifiedMessage[];
+    /** Explicit dashboard opt-in. Without it cached output is served as-is. */
+    outputScanningEnabled?: boolean;
 }): string | null {
     const finalContent = params.tokenMap
         ? deTokenize(params.cachedContent, params.tokenMap)
         : params.cachedContent;
-    const outputSecurity = checkOutputSecurity(finalContent, {
-        inputText: params.inputText,
-        inputSecurityResult: params.inputSecurity,
-        conversationHistory: params.conversationHistory,
-    });
+    if (params.outputScanningEnabled !== true) {
+        return finalContent;
+    }
+    const outputSecurity = checkOutputSecurity(
+        finalContent,
+        {
+            inputText: params.inputText,
+            inputSecurityResult: params.inputSecurity,
+            conversationHistory: params.conversationHistory,
+        },
+        { enableOutputScanning: true }
+    );
     if (!outputSecurity.safe) {
         console.warn('[Cache] Ignoring cache hit because output failed current policy checks');
         return null;

@@ -46,6 +46,29 @@ describe('Gateway output pipeline contract', () => {
         expect(mockEnforcePolicies).not.toHaveBeenCalled();
     });
 
+    it('skips the legacy output scan without explicit opt-in', async () => {
+        const supabase = createMockSupabaseForSecurity({ tier: 'pro' });
+        const inputSecurity = checkInputSecurity(ALLOWED_USER_MESSAGE);
+
+        const result = await runGatewayOutputGuard({
+            supabase: supabase as never,
+            projectId: 'proj-off',
+            organizationId: 'org-off',
+            outputText: HARMFUL_AI_RESPONSE,
+            inputText: ALLOWED_USER_MESSAGE,
+            inputSecurity,
+            conversationHistory: toUnifiedMessages([{ role: 'user', content: ALLOWED_USER_MESSAGE }]),
+        });
+
+        expect(result).toEqual({ ok: true });
+        expect(mockEnforcePolicies).toHaveBeenCalledWith(
+            supabase,
+            expect.objectContaining({
+                signals: { risk_score: 0 },
+            })
+        );
+    });
+
     it('does not block output based on legacy heuristics alone', async () => {
         const supabase = createMockSupabaseForSecurity({ tier: 'pro' });
         const inputSecurity = checkInputSecurity(ALLOWED_USER_MESSAGE);
@@ -61,6 +84,7 @@ describe('Gateway output pipeline contract', () => {
             inputSecurity,
             conversationHistory: toUnifiedMessages([{ role: 'user', content: ALLOWED_USER_MESSAGE }]),
             endUserId: 'eu-1',
+            securityEnabled: true,
         });
 
         expect(result).toEqual({ ok: true });
@@ -98,6 +122,7 @@ describe('Gateway output pipeline contract', () => {
             inputText: ALLOWED_USER_MESSAGE,
             inputSecurity,
             conversationHistory: toUnifiedMessages([{ role: 'user', content: ALLOWED_USER_MESSAGE }]),
+            securityEnabled: true,
         });
 
         expect(result).toEqual({

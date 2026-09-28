@@ -23,6 +23,11 @@ export type OutputGuardParams = {
     organizationId?: string | null;
     model?: string | null;
     region?: string | null;
+    /**
+     * Explicit dashboard opt-in for the legacy output scanner. Absent/false =
+     * no scan (safe, zero risk signals); governance policies still enforce.
+     */
+    securityEnabled?: boolean;
 };
 
 export type OutputGuardResult =
@@ -39,11 +44,15 @@ export async function runGatewayOutputGuard(
         return { ok: true };
     }
 
-    const outputSecurity = checkOutputSecurity(params.outputText, {
-        inputText: params.inputText,
-        inputSecurityResult: params.inputSecurity,
-        conversationHistory: params.conversationHistory,
-    });
+    const outputSecurity = checkOutputSecurity(
+        params.outputText,
+        {
+            inputText: params.inputText,
+            inputSecurityResult: params.inputSecurity,
+            conversationHistory: params.conversationHistory,
+        },
+        params.securityEnabled === true ? { enableOutputScanning: true } : undefined
+    );
 
     // The legacy output scanner uses broad substring and PII heuristics. Those
     // signals are useful to an explicitly configured policy, but are not

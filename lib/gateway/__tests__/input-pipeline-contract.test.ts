@@ -4,7 +4,7 @@
  * Contract: both gateway routes depend on runGatewayInputPipeline.
  * Same fixtures must produce the same allow/block decisions.
  */
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/webhooks', () => ({
     triggerSecurityWebhook: vi.fn(),
@@ -22,8 +22,12 @@ import {
     toUnifiedMessages,
 } from '@/lib/gateway/__tests__/fixtures';
 import { createMockSupabaseForSecurity } from '@/lib/gateway/__tests__/mock-supabase';
+import { clearLocalGatewayCache } from '@/lib/config-cache';
 
 describe('Gateway input pipeline contract', () => {
+    beforeEach(() => {
+        clearLocalGatewayCache();
+    });
     it('allows benign prompts on Pro tier', async () => {
         const supabase = createMockSupabaseForSecurity({ tier: 'pro' });
         const messages = toUnifiedMessages([{ role: 'user', content: ALLOWED_USER_MESSAGE }]);
@@ -42,7 +46,7 @@ describe('Gateway input pipeline contract', () => {
         }
     });
 
-    it('blocks jailbreak prompts on Pro tier', async () => {
+    it('blocks jailbreak prompts when explicitly enabled', async () => {
         const supabase = createMockSupabaseForSecurity({ tier: 'pro' });
         const messages = toUnifiedMessages([{ role: 'user', content: JAILBREAK_USER_MESSAGE }]);
 
@@ -57,6 +61,33 @@ describe('Gateway input pipeline contract', () => {
         if (!result.ok) {
             expect(result.status).toBe(403);
             expect(result.code).toBe('security_violation');
+        }
+    });
+
+    it('allows jailbreak prompts when scanning was never enabled (no defaults, any tier)', async () => {
+        const supabase = createMockSupabaseForSecurity({
+            tier: 'pro',
+            securitySettings: {
+                safety_threshold: 0.5,
+                filter_jailbreaks: true,
+                filter_pii: true,
+                filter_prompt_injection: true,
+            },
+        });
+        const messages = toUnifiedMessages([{ role: 'user', content: JAILBREAK_USER_MESSAGE }]);
+
+        const result = await runGatewayInputPipeline({
+            supabase: supabase as never,
+            projectId: 'proj-1',
+            tier: 'pro',
+            messages,
+        });
+
+        // Flags without the master switch change nothing.
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+            expect(result.securityEnabled).toBe(false);
+            expect(result.inputSecurity.safe).toBe(true);
         }
     });
 

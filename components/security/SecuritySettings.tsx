@@ -9,13 +9,14 @@ import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/components/ui/toast';
-import { Save, Plus, X, Shield, Eye, Ban, Siren, Fingerprint } from 'lucide-react';
+import { Save, Plus, X, Shield, ShieldCheck, Eye, Ban, Siren, Fingerprint } from 'lucide-react';
 
 interface SecuritySettingsProps {
     projectId: string;
 }
 
 interface Settings {
+    security_enabled: boolean;
     filter_harmful_content: boolean;
     filter_pii: boolean;
     filter_nsfw: boolean;
@@ -131,6 +132,29 @@ export function SecuritySettings({ projectId }: SecuritySettingsProps) {
 
     return (
         <div className="space-y-6">
+            {/* Master switch — scanning runs only when this is on */}
+            <div className="rounded-lg border border-border/40 bg-card overflow-hidden">
+                <div className="p-4">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+                            <div>
+                                <p className="text-xs font-medium">Enable security scanning</p>
+                                <p className="text-[10px] text-muted-foreground">
+                                    {currentSettings.security_enabled
+                                        ? 'Gateway input/output checks, jailbreak and PII detection are active for this project.'
+                                        : 'Off — gateway traffic skips all security checks for maximum speed. Turn on only if you need it.'}
+                                </p>
+                            </div>
+                        </div>
+                        <Switch
+                            checked={currentSettings.security_enabled ?? false}
+                            onCheckedChange={(checked) => handleChange('security_enabled', checked)}
+                        />
+                    </div>
+                </div>
+            </div>
+
             {/* Content Filtering */}
             <div className="rounded-lg border border-border/40 bg-card overflow-hidden">
                 <div className="px-4 py-3 border-b border-border/40 bg-secondary/20">

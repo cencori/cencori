@@ -105,6 +105,18 @@ export type V1ExecuteParams = {
     performance?: GatewayPerformanceTracker;
     onPerformance?: (metrics: GatewayPerformanceMetrics) => void;
     hedgeDelayMs?: number;
+    /**
+     * Fast-lane: skip the output guard (per-chunk + final) in the critical
+     * path. Logging still runs async. Caller must run its own safety layers.
+     */
+    skipOutputGuard?: boolean;
+    /** Fast-lane: single upstream attempt — no gateway retries or fallback. */
+    singleProviderAttempt?: boolean;
+    /**
+     * Explicit dashboard opt-in for the legacy output scanner. Absent/false =
+     * output passes with zero risk signals; governance policies still enforce.
+     */
+    securityEnabled?: boolean;
 };
 
 function buildOpenAiCompletionJson(params: {
@@ -276,6 +288,7 @@ export async function runV1ProviderExecution(
                 resolved,
                 requestId: params.gatewayCtx.requestId,
                 performance: params.performance,
+                singleProviderAttempt: params.singleProviderAttempt,
             });
 
             let content = result.content;
@@ -334,20 +347,23 @@ export async function runV1ProviderExecution(
                 content,
                 ...(openAiToolCalls ?? []).map((toolCall) => toolCall.function.arguments),
             ].filter(Boolean).join('\n');
-            const outputBlock = await runGatewayOutputGuard({
-                supabase: params.supabase,
-                projectId: params.gatewayCtx.projectId,
-                apiKeyId: params.gatewayCtx.apiKeyId,
-                environment: params.gatewayCtx.environment,
-                outputText: outputTextForGuard,
-                inputText: params.inputText,
-                inputSecurity: params.inputSecurity,
-                conversationHistory: params.messages,
-                endUserId: params.endUserId,
-                organizationId: params.gatewayCtx.organizationId,
-                model: result.actualModel,
-                region: params.gatewayCtx.countryCode,
-            });
+            const outputBlock = params.skipOutputGuard
+                ? { ok: true as const }
+                : await runGatewayOutputGuard({
+                    supabase: params.supabase,
+                    projectId: params.gatewayCtx.projectId,
+                    apiKeyId: params.gatewayCtx.apiKeyId,
+                    environment: params.gatewayCtx.environment,
+                    outputText: outputTextForGuard,
+                    inputText: params.inputText,
+                    inputSecurity: params.inputSecurity,
+                    conversationHistory: params.messages,
+                    endUserId: params.endUserId,
+                    organizationId: params.gatewayCtx.organizationId,
+                    model: result.actualModel,
+                    region: params.gatewayCtx.countryCode,
+                    securityEnabled: params.securityEnabled,
+                });
 
             if (!outputBlock.ok) {
                 const providerLogName = resolved.customProviderTag || result.actualProvider;
@@ -581,19 +597,22 @@ export async function runV1ProviderExecution(
                     releasedRawLength = releaseEnd;
                 };
 
-                const checkCurrentOutput = () => runGatewayOutputGuard({
-                    supabase: params.supabase,
-                    projectId: params.gatewayCtx.projectId,
-                    apiKeyId: params.gatewayCtx.apiKeyId,
-                    environment: params.gatewayCtx.environment,
-                    outputText: detokenize(fullText),
-                    inputText: params.inputText,
-                    inputSecurity: params.inputSecurity,
-                    conversationHistory: params.messages,
-                    endUserId: params.endUserId,
-                    organizationId: params.gatewayCtx.organizationId,
+                const checkCurrentOutput = () => params.skipOutputGuard
+                    ? Promise.resolve({ ok: true as const })
+                    : runGatewayOutputGuard({
+                        supabase: params.supabase,
+                        projectId: params.gatewayCtx.projectId,
+                        apiKeyId: params.gatewayCtx.apiKeyId,
+                        environment: params.gatewayCtx.environment,
+                        outputText: detokenize(fullText),
+                        inputText: params.inputText,
+                        inputSecurity: params.inputSecurity,
+                        conversationHistory: params.messages,
+                        endUserId: params.endUserId,
+                        organizationId: params.gatewayCtx.organizationId,
                     model: resolved.model,
                     region: params.gatewayCtx.countryCode,
+                    securityEnabled: params.securityEnabled,
                 });
 
                 /**
@@ -783,19 +802,22 @@ export async function runV1ProviderExecution(
                         detokenize(fullText),
                         ...toolCallValues.map((toolCall) => toolCall.function.arguments),
                     ].filter(Boolean).join('\n');
-                    const outputCheck = await runGatewayOutputGuard({
-                        supabase: params.supabase,
-                        projectId: params.gatewayCtx.projectId,
-                        apiKeyId: params.gatewayCtx.apiKeyId,
-                        environment: params.gatewayCtx.environment,
-                        outputText: outputTextForGuard,
-                        inputText: params.inputText,
-                        inputSecurity: params.inputSecurity,
-                        conversationHistory: params.messages,
-                        endUserId: params.endUserId,
-                        organizationId: params.gatewayCtx.organizationId,
+                    const outputCheck = params.skipOutputGuard
+                        ? { ok: true as const }
+                        : await runGatewayOutputGuard({
+                            supabase: params.supabase,
+                            projectId: params.gatewayCtx.projectId,
+                            apiKeyId: params.gatewayCtx.apiKeyId,
+                            environment: params.gatewayCtx.environment,
+                            outputText: outputTextForGuard,
+                            inputText: params.inputText,
+                            inputSecurity: params.inputSecurity,
+                            conversationHistory: params.messages,
+                            endUserId: params.endUserId,
+                            organizationId: params.gatewayCtx.organizationId,
                         model: meta.actualModel,
                         region: params.gatewayCtx.countryCode,
+                        securityEnabled: params.securityEnabled,
                     });
 
                     if (!outputCheck.ok) {
@@ -923,6 +945,7 @@ export async function runV1ProviderExecution(
                         requestId: params.gatewayCtx.requestId,
                         performance: params.performance,
                         hedgeDelayMs: params.hedgeDelayMs,
+                        singleProviderAttempt: params.singleProviderAttempt,
                     })) {
                         const originalProvider: string = lastMeta?.usedFallback && chunk.usedFallback
                             ? lastMeta.originalProvider

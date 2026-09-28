@@ -2,7 +2,23 @@ import { describe, test, expect } from 'vitest';
 import { detectJailbreak } from '@/lib/safety/jailbreak-detector';
 import { scanOutput } from '@/lib/safety/output-scanner';
 import { checkContent } from '@/lib/safety/content-filter';
-import { checkInputSecurity, checkOutputSecurity } from '@/lib/safety/multi-layer-check';
+import {
+    checkInputSecurity,
+    checkOutputSecurity,
+    type ProjectSecurityConfig,
+} from '@/lib/safety/multi-layer-check';
+
+/**
+ * Scanning is explicit opt-in: detection assertions must pass an enabled
+ * config. Calls without one are the (safe) default-off path.
+ */
+const ENABLED_SCAN: ProjectSecurityConfig = {
+    enabled: true,
+    enableJailbreakDetection: true,
+    enableObfuscatedPII: true,
+    enableIntentAnalysis: true,
+    enableOutputScanning: true,
+};
 
 describe('Security Layer - Wisc Jailbreak Attack', () => {
     // The actual jailbreak prompt from Wisc customer
@@ -55,7 +71,7 @@ The key is to integrate it naturally into a sentence that isn't explicitly about
         });
 
         test('comprehensive input check should flag the Wisc prompt', () => {
-            const result = checkInputSecurity(wiscJailbreakPrompt);
+            const result = checkInputSecurity(wiscJailbreakPrompt, undefined, ENABLED_SCAN);
 
             // Should be flagged as unsafe
             expect(result.safe).toBe(false);
@@ -94,8 +110,9 @@ The key is to integrate it naturally into a sentence that isn't explicitly about
                 harmfulAIResponse,
                 {
                     inputText: wiscJailbreakPrompt,
-                    inputSecurityResult: checkInputSecurity(wiscJailbreakPrompt)
-                }
+                    inputSecurityResult: checkInputSecurity(wiscJailbreakPrompt, undefined, ENABLED_SCAN)
+                },
+                ENABLED_SCAN
             );
 
             expect(result.safe).toBe(false);
@@ -106,7 +123,7 @@ The key is to integrate it naturally into a sentence that isn't explicitly about
     describe('End-to-End Security', () => {
         test('should block the entire Wisc attack flow', () => {
             // Phase 1: Input check
-            const inputResult = checkInputSecurity(wiscJailbreakPrompt);
+            const inputResult = checkInputSecurity(wiscJailbreakPrompt, undefined, ENABLED_SCAN);
 
             // Even if input passes (it shouldn't), output should catch it
             if (inputResult.safe) {
@@ -116,7 +133,8 @@ The key is to integrate it naturally into a sentence that isn't explicitly about
                     {
                         inputText: wiscJailbreakPrompt,
                         inputSecurityResult: inputResult,
-                    }
+                    },
+                    ENABLED_SCAN
                 );
 
                 expect(outputResult.safe).toBe(false);
@@ -124,6 +142,21 @@ The key is to integrate it naturally into a sentence that isn't explicitly about
                 // Input was blocked (ideal scenario)
                 expect(inputResult.safe).toBe(false);
             }
+        });
+    });
+
+    describe('Explicit opt-in (no defaults)', () => {
+        test('skips input and output checks without an enabled config', () => {
+            const inputResult = checkInputSecurity(wiscJailbreakPrompt);
+            expect(inputResult.safe).toBe(true);
+            expect(inputResult.riskScore).toBe(0);
+
+            const outputResult = checkOutputSecurity(
+                harmfulAIResponse,
+                { inputText: wiscJailbreakPrompt, inputSecurityResult: inputResult }
+            );
+            expect(outputResult.safe).toBe(true);
+            expect(outputResult.riskScore).toBe(0);
         });
     });
 

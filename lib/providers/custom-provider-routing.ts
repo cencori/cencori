@@ -138,7 +138,9 @@ export async function resolveCustomProviderForProject(params: {
         : null;
     if (local && local.expiresAt <= Date.now()) localProviders.delete(projectId);
 
-    if (client) {
+    // Fresh instance-local entries need no network: skip Redis on a hit so the
+    // data plane stays at zero round trips when warm.
+    if (!providers && client) {
         try {
             const cached = await client.get<CustomProviderLookupRow[]>(cacheKey);
             if (cached) {

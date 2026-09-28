@@ -215,6 +215,7 @@ export async function runGatewayInputPipeline(
         messages,
         inputText,
         inputSecurity,
+        securityEnabled: securityConfig.enabled === true,
         customRules,
         tokenMap,
         route: policyRoute,

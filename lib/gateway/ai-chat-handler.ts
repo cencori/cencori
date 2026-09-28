@@ -29,6 +29,8 @@ import {
     type GatewayContext,
 } from '@/lib/gateway-middleware';
 import { runGatewayInputPipeline } from '@/lib/gateway/input-guard';
+import { buildPassthroughInputPipeline, isFastLaneRequest } from '@/lib/gateway/fast-lane';
+import { warmGatewayProjectConfig } from '@/lib/gateway/request-config';
 import {
     hasImageInMessages,
     runVisionChat,
@@ -394,21 +396,29 @@ export async function POST(req: NextRequest) {
                   })
                 : Promise.resolve([]);
 
+        // ── Data-plane split: one fetch warms the per-project config so the
+        // pipeline and provider resolution below hit memory, not Supabase. ──
+        await warmGatewayProjectConfig(supabase, ctx.projectId);
+
         // ── Input security pipeline (shared) → legacy flat errors ──
+        // Fast-lane (passthrough): caller runs its own safety layers.
+        const fastLane = isFastLaneRequest(body, req.headers);
         const tier = (ctx.tier || 'free') as SubscriptionTier;
-        const inputPipeline = await runGatewayInputPipeline({
-            supabase,
-            projectId: ctx.projectId,
-            apiKeyId: ctx.apiKeyId,
-            environment: ctx.environment,
-            tier,
-            messages: unifiedMessages,
-            endUserId,
-            // Policy-as-code enforcement (PRD M1.2)
-            organizationId: ctx.organizationId,
-            model,
-            region: ctx.countryCode,
-        });
+        const inputPipeline = fastLane
+            ? buildPassthroughInputPipeline(unifiedMessages)
+            : await runGatewayInputPipeline({
+                supabase,
+                projectId: ctx.projectId,
+                apiKeyId: ctx.apiKeyId,
+                environment: ctx.environment,
+                tier,
+                messages: unifiedMessages,
+                endUserId,
+                // Policy-as-code enforcement (PRD M1.2)
+                organizationId: ctx.organizationId,
+                model,
+                region: ctx.countryCode,
+            });
 
         if (!inputPipeline.ok) {
             return wrap(
@@ -473,7 +483,7 @@ export async function POST(req: NextRequest) {
         let cachePromptText: string | null = null;
         let cacheWriteEligible = false;
 
-        if (cacheEligible && !skipCache) {
+        if (cacheEligible && !skipCache && !fastLane) {
             try {
                 const cachedConfigRow = await getCachedCacheConfig(ctx.projectId);
                 const loadedConfig =
@@ -539,6 +549,7 @@ export async function POST(req: NextRequest) {
                                 inputText: inputPipeline.inputText,
                                 inputSecurity: inputPipeline.inputSecurity,
                                 conversationHistory: unifiedMessages,
+                                outputScanningEnabled: inputPipeline.securityEnabled,
                             });
 
                             if (finalCachedContent) {
@@ -696,6 +707,9 @@ export async function POST(req: NextRequest) {
             tools,
             toolChoice,
             wireFormat: 'cencori',
+            skipOutputGuard: fastLane,
+            singleProviderAttempt: fastLane,
+            securityEnabled: inputPipeline.securityEnabled,
             enforceMaxTokens: true,
             endUserId,
             endUserQuota,

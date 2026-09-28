@@ -12,8 +12,13 @@ import {
     setCachedSecurityConfig,
 } from '@/lib/config-cache';
 
-/** Settings-row state, before the subscription-tier gate is applied. */
-type CachedSecuritySettings = {
+/**
+ * Settings-row state. Scanning is explicit opt-in: nothing runs unless the
+ * project turned it on on the dashboard (`security_settings.security_enabled`).
+ * There are no defaults — no row or an unset flag means fully disabled.
+ */
+export type CachedSecuritySettings = {
+    enabled: boolean;
     inputThreshold: number;
     outputThreshold: number;
     jailbreakThreshold: number;
@@ -22,38 +27,73 @@ type CachedSecuritySettings = {
     filterPromptInjection: boolean;
 };
 
+type SecuritySettingsRow = {
+    security_enabled?: boolean | null;
+    safety_threshold?: number | null;
+    filter_jailbreaks?: boolean | null;
+    filter_pii?: boolean | null;
+    filter_prompt_injection?: boolean | null;
+} | null | undefined;
+
+const DISABLED_SECURITY_SETTINGS: CachedSecuritySettings = {
+    enabled: false,
+    inputThreshold: 0.5,
+    outputThreshold: 0.6,
+    jailbreakThreshold: 0.7,
+    filterJailbreaks: false,
+    filterPII: false,
+    filterPromptInjection: false,
+};
+
+/**
+ * Pure row → cache-shape mapper. Shared by the DB reader below and the
+ * gateway request warmer so a packed bundle seeds exactly what a DB read
+ * would have cached.
+ */
+export function toCachedSecuritySettings(row: SecuritySettingsRow): CachedSecuritySettings {
+    if (!row || row.security_enabled !== true) {
+        return { ...DISABLED_SECURITY_SETTINGS };
+    }
+    const safetyThreshold = row.safety_threshold ?? 0.7;
+    const inputThreshold = safetyThreshold; // Strictly follow the UI value
+    return {
+        enabled: true,
+        inputThreshold,
+        outputThreshold: Math.max(0.1, inputThreshold - 0.1), // Slightly more lenient output check
+        jailbreakThreshold: Math.max(0.2, inputThreshold),
+        filterJailbreaks: row.filter_jailbreaks ?? true,
+        filterPII: row.filter_pii ?? true,
+        filterPromptInjection: row.filter_prompt_injection ?? true,
+    };
+}
+
 /**
  * Get project security configuration from database.
- * Returns sensible defaults if no config is found.
- * Security features are disabled for free tier.
+ *
+ * Explicit opt-in only: scanning runs iff the project enabled it on the
+ * dashboard (`security_settings.security_enabled`). No row or an unset flag
+ * means every scanner is off, on every tier. The cached value carries the
+ * switch, so tier plays no role in the decision.
  */
 export async function getProjectSecurityConfig(
     supabase: ReturnType<typeof createAdminClient>,
     projectId: string,
-    tier: SubscriptionTier = 'free'
+    _tier: SubscriptionTier = 'free'
 ): Promise<ProjectSecurityConfig> {
-    const securityEnabled = tier !== 'free';
-
-    /**
-     * The cached value is deliberately tier-independent. Tier comes from the
-     * org subscription, not from the project row, so baking it into the cache
-     * would leave a freshly upgraded org running with security switched off
-     * until the entry expired. Cache what the settings row says, gate on tier
-     * at read time.
-     */
-    const applyTier = (settings: CachedSecuritySettings): ProjectSecurityConfig => ({
+    const applyExplicit = (settings: CachedSecuritySettings): ProjectSecurityConfig => ({
+        enabled: settings.enabled,
         inputThreshold: settings.inputThreshold,
         outputThreshold: settings.outputThreshold,
         jailbreakThreshold: settings.jailbreakThreshold,
-        enableOutputScanning: securityEnabled,
-        enableJailbreakDetection: securityEnabled && settings.filterJailbreaks,
-        enableObfuscatedPII: securityEnabled && settings.filterPII,
-        enableIntentAnalysis: securityEnabled && settings.filterPromptInjection,
+        enableOutputScanning: settings.enabled,
+        enableJailbreakDetection: settings.enabled && settings.filterJailbreaks,
+        enableObfuscatedPII: settings.enabled && settings.filterPII,
+        enableIntentAnalysis: settings.enabled && settings.filterPromptInjection,
     });
 
     const cached = await getCachedSecurityConfig(projectId);
     if (cached?.data) {
-        return applyTier(cached.data as CachedSecuritySettings);
+        return applyExplicit(cached.data as CachedSecuritySettings);
     }
 
     try {
@@ -63,41 +103,22 @@ export async function getProjectSecurityConfig(
             .eq('project_id', projectId)
             .single();
 
-        if (!settings) {
-            const defaults: CachedSecuritySettings = {
-                inputThreshold: 0.5,
-                outputThreshold: 0.6,
-                jailbreakThreshold: 0.7,
-                filterJailbreaks: true,
-                filterPII: true,
-                filterPromptInjection: true,
-            };
-            void setCachedSecurityConfig(projectId, defaults);
-            return applyTier(defaults);
-        }
-
-        const safetyThreshold = settings.safety_threshold ?? 0.7;
-        const inputThreshold = safetyThreshold; // Strictly follow the UI value
-        const resolved: CachedSecuritySettings = {
-            inputThreshold,
-            outputThreshold: Math.max(0.1, inputThreshold - 0.1), // Slightly more lenient output check
-            jailbreakThreshold: Math.max(0.2, inputThreshold),
-            filterJailbreaks: settings.filter_jailbreaks ?? true,
-            filterPII: settings.filter_pii ?? true,
-            filterPromptInjection: settings.filter_prompt_injection ?? true,
-        };
+        // Null row (never configured) maps to fully disabled, as does any
+        // warmer-seeded bundle without the explicit switch.
+        const resolved = toCachedSecuritySettings(settings);
         void setCachedSecurityConfig(projectId, resolved);
-        return applyTier(resolved);
+        return applyExplicit(resolved);
     } catch (error) {
         console.warn('[Security] Failed to fetch security settings:', error);
         return {
+            enabled: false,
             inputThreshold: 0.5,
             outputThreshold: 0.6,
             jailbreakThreshold: 0.7,
-            enableOutputScanning: securityEnabled,
-            enableJailbreakDetection: securityEnabled,
-            enableObfuscatedPII: securityEnabled,
-            enableIntentAnalysis: securityEnabled,
+            enableOutputScanning: false,
+            enableJailbreakDetection: false,
+            enableObfuscatedPII: false,
+            enableIntentAnalysis: false,
         };
     }
 }

@@ -14,6 +14,7 @@ import { extractCencoriApiKeyFromHeaders } from "@/lib/api-keys";
 import { checkEndUserQuota, recordEndUserUsage, type QuotaCheckResult } from "@/lib/end-user-billing";
 import type { UnifiedMessage } from "@/lib/providers/base";
 import { runGatewayInputPipeline } from "@/lib/gateway/input-guard";
+import { warmGatewayProjectConfig } from "@/lib/gateway/request-config";
 import { normalizeResponsesContent, toolOutputTurns } from "@/lib/gateway/responses-content";
 import {
     MAX_TEXT_FIELD_BYTES,
@@ -329,6 +330,9 @@ export async function POST(req: NextRequest) {
             }
         }
 
+        // Data-plane split: warm per-project config in one fetch (see chat route).
+        await warmGatewayProjectConfig(adminClient, gatewayCtx.projectId);
+
         const inputPipeline = await runGatewayInputPipeline({
             supabase: adminClient,
             projectId: gatewayCtx.projectId,
@@ -481,6 +485,7 @@ export async function POST(req: NextRequest) {
                     void createDispatchedAction(adminClient, agentId, toolCall);
                 }
                 : undefined,
+            securityEnabled: inputPipeline.securityEnabled,
         });
 
         if (!execResult.ok) {
