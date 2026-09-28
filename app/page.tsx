@@ -1,6 +1,11 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { CencoriFuturePage } from "@/components/future/CencoriFuturePage";
 import { getAllPosts, getPostUrl } from "@/lib/blog";
+
+export const viewport: Viewport = {
+  themeColor: "#000000",
+  colorScheme: "dark",
+};
 
 export const metadata: Metadata = {
   title: "Cencori — The computing infrastructure AI runs on",

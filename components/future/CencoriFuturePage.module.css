@@ -1,3 +1,12 @@
+/* Safari samples the document background for the areas around its controls.
+ * Keep this scoped to the homepage, including before client hydration. */
+:global(html):has(.site),
+:global(body):has(.site) {
+  background-color: #000;
+  /* Override next-themes' inline scheme when the system uses light mode. */
+  color-scheme: dark !important;
+}
+
 .site {
   --ink: #050505;
   --carbon: #0a0a0a;
