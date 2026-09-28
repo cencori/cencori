@@ -12,6 +12,7 @@ import {
 import { SiteNav } from "@/components/nav/SiteNav";
 import { SiteCTA } from "@/components/marketing/SiteCTA";
 import { SiteFooter } from "@/components/marketing/SiteFooter";
+import { NewsBanner, type NewsBannerProps } from "@/components/marketing/NewsBanner";
 import { arcieBrand } from "@/lib/arcie-brand";
 import { stories } from "@/lib/stories";
 import styles from "./CencoriFuturePage.module.css";
@@ -347,7 +348,11 @@ function useScrollChoreography(
   }, [sectionRef, leadRef, gridRef, motion, viewportKey, settleKey, staticOnPhone]);
 }
 
-export function CencoriFuturePage() {
+export function CencoriFuturePage({
+  recentNews,
+}: {
+  recentNews: NewsBannerProps | null;
+}) {
   const beliefRef = useRef<HTMLElement>(null);
   const thesisRef = useRef<HTMLParagraphElement>(null);
   const developersRef = useRef<HTMLElement>(null);
@@ -501,17 +506,22 @@ export function CencoriFuturePage() {
 
   return (
     <main className={styles.site}>
-      <section className={styles.hero} aria-labelledby="future-hero-title">
-        <div className={styles.heroImage} aria-hidden="true" />
-        <div className={styles.heroShade} aria-hidden="true" />
-
-        <SiteNav />
-
-        <div className={styles.heroContent}>
-          <h1 id="future-hero-title">The computing infrastructure AI runs on.</h1>
+      <div className={styles.heroBackdrop}>
+        <div className={styles.heroVisual} aria-hidden="true">
+          <div className={styles.heroImage} />
+          <div className={styles.heroShade} />
         </div>
 
-      </section>
+        {recentNews ? <NewsBanner {...recentNews} /> : null}
+
+        <section className={styles.hero} aria-labelledby="future-hero-title">
+          <SiteNav />
+
+          <div className={styles.heroContent}>
+            <h1 id="future-hero-title">The computing infrastructure AI runs on.</h1>
+          </div>
+        </section>
+      </div>
 
       <section className={styles.belief} id="belief" ref={beliefRef}>
         <div className={styles.beliefSticky}>
