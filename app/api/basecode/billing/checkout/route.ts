@@ -3,14 +3,15 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   authenticateBasecodeBillingRequest,
   basecodeCheckoutReference,
-  flutterwavePaymentOptions,
+  getPaystackPlanCode,
+  paystackChannels,
   getBasecodePlan,
   getOrCreateBasecodeBillingAccount,
   parseBasecodeCheckoutInput,
   resolveBasecodeCheckoutOrigin,
 } from "@/lib/basecode-billing";
 import { createCheckoutSession, getBasecodeProductId } from "@/lib/bachsClient";
-import { createFlutterwaveCheckout } from "@/lib/flutterwaveClient";
+import { initializePaystackTransaction } from "@/lib/paystackClient";
 import { noStoreHeaders } from "@/lib/basecode-auth";
 import { resolvePublicOrigin } from "@/lib/public-origin";
 
@@ -51,9 +52,9 @@ export async function POST(request: NextRequest) {
       getBasecodePlan(session.admin, input.plan),
     ]);
     accountId = account.id;
-    const currency = input.provider === "flutterwave" ? "NGN" : "USD";
+    const currency = input.provider === "paystack" ? "NGN" : "USD";
     const expectedAmountMinor =
-      input.provider === "flutterwave" ? plan.price_ngn_minor : plan.price_usd_minor;
+      input.provider === "paystack" ? plan.price_ngn_minor : plan.price_usd_minor;
     if (!expectedAmountMinor || expectedAmountMinor <= 0) {
       throw new Error("The selected plan does not have a configured price.");
     }
@@ -74,35 +75,31 @@ export async function POST(request: NextRequest) {
     let providerCheckoutId: string | null = null;
     let checkoutUrl: string;
 
-    if (input.provider === "flutterwave") {
-      const result = await createFlutterwaveCheckout({
-        tx_ref: reference,
-        amount: expectedAmountMinor / 100,
+    if (input.provider === "paystack") {
+      // Recurring always pays by card: only card authorizations can be reused for
+      // subscriptions — OPay and bank-transfer payments are one-off by nature.
+      const result = await initializePaystackTransaction({
+        email: session.user.email,
+        // Paystack takes the NGN minor unit (kobo) directly — the same units the
+        // plans table stores, so no major/minor conversion happens here. Ignored
+        // when `plan` is passed: the plan amount is charged instead.
+        amountMinor: expectedAmountMinor,
+        reference,
+        callbackUrl: `${baseUrl}/basecode?billing_return=${encodeURIComponent(checkoutId)}`,
         currency: "NGN",
-        redirect_url: `${baseUrl}/basecode?billing_return=${encodeURIComponent(checkoutId)}`,
-        payment_options: flutterwavePaymentOptions(input.paymentMethod),
-        customer: {
-          email: session.user.email,
-          name:
-            (session.user.user_metadata?.full_name as string | undefined) ||
-            session.user.email.split("@")[0],
-        },
-        customizations: {
-          title: `Basecode ${plan.name}`,
-          description: `30 days of Basecode ${plan.name}`,
-        },
-        meta: {
+        channels: input.recurring ? ["card"] : paystackChannels(input.paymentMethod),
+        ...(input.recurring ? { plan: getPaystackPlanCode(input.plan) } : {}),
+        metadata: {
           purchase_type: "basecode_subscription",
           checkout_id: checkoutId,
           account_id: account.id,
           user_id: session.user.id,
           plan_code: plan.code,
+          ...(input.recurring ? { recurring: "true" } : {}),
         },
-        session_duration: 30,
-        max_retry_attempt: 3,
-        bank_transfer_options: { expires: 1800 },
       });
-      checkoutUrl = result.data.link;
+      providerCheckoutId = result.data.access_code;
+      checkoutUrl = result.data.authorization_url;
     } else {
       const result = await createCheckoutSession({
         product_cart: [{ product_id: getBasecodeProductId(input.plan), quantity: 1 }],

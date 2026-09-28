@@ -1,8 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   basecodeCheckoutReference,
   effectiveBasecodePlan,
-  flutterwavePaymentOptions,
+  getBasecodePlanByPaystackPlanCode,
+  getPaystackPlanCode,
+  paystackChannels,
   majorAmountToMinor,
   parseBasecodeCheckoutInput,
   resolveBasecodeCheckoutOrigin,
@@ -13,20 +15,55 @@ describe("Basecode billing contracts", () => {
     expect(
       parseBasecodeCheckoutInput({
         plan: "builder",
-        provider: "flutterwave",
+        provider: "paystack",
         paymentMethod: "opay",
       }),
-    ).toEqual({ plan: "builder", provider: "flutterwave", paymentMethod: "opay" });
-    expect(parseBasecodeCheckoutInput({ plan: "free", provider: "flutterwave" })).toBeNull();
+    ).toEqual({ plan: "builder", provider: "paystack", paymentMethod: "opay", recurring: false });
+    expect(parseBasecodeCheckoutInput({ plan: "free", provider: "paystack" })).toBeNull();
     expect(
       parseBasecodeCheckoutInput({ plan: "pro", provider: "bachs", paymentMethod: "opay" }),
     ).toBeNull();
   });
 
-  it("uses the Nigerian checkout methods requested for Flutterwave", () => {
-    expect(flutterwavePaymentOptions("opay")).toBe("opay");
-    expect(flutterwavePaymentOptions("banktransfer")).toBe("banktransfer");
-    expect(flutterwavePaymentOptions("auto")).toContain("opay,banktransfer");
+  it("only allows auto-renew on Paystack", () => {
+    expect(
+      parseBasecodeCheckoutInput({ plan: "pro", provider: "paystack", recurring: true }),
+    ).toEqual({ plan: "pro", provider: "paystack", paymentMethod: "auto", recurring: true });
+    expect(
+      parseBasecodeCheckoutInput({ plan: "pro", provider: "bachs", recurring: true }),
+    ).toBeNull();
+    expect(
+      parseBasecodeCheckoutInput({ plan: "pro", provider: "paystack", recurring: "yes" }),
+    ).toEqual({ plan: "pro", provider: "paystack", paymentMethod: "auto", recurring: false });
+  });
+
+  it("maps Paystack plan codes to Basecode plans", () => {
+    vi.stubEnv("PAYSTACK_PLAN_BASECODE_BUILDER", "PLN_builder_test");
+    vi.stubEnv("PAYSTACK_PLAN_BASECODE_PRO", "PLN_pro_test");
+    try {
+      expect(getPaystackPlanCode("builder")).toBe("PLN_builder_test");
+      expect(getPaystackPlanCode("pro")).toBe("PLN_pro_test");
+      expect(getBasecodePlanByPaystackPlanCode("PLN_builder_test")).toBe("builder");
+      expect(getBasecodePlanByPaystackPlanCode("PLN_pro_test")).toBe("pro");
+      expect(getBasecodePlanByPaystackPlanCode("PLN_unknown")).toBeNull();
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("throws when a Paystack plan is unconfigured", () => {
+    vi.stubEnv("PAYSTACK_PLAN_BASECODE_BUILDER", "");
+    try {
+      expect(() => getPaystackPlanCode("builder")).toThrow("No Paystack plan");
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("uses the Nigerian checkout channels requested for Paystack", () => {
+    expect(paystackChannels("opay")).toEqual(["bank"]);
+    expect(paystackChannels("banktransfer")).toEqual(["bank_transfer"]);
+    expect(paystackChannels("auto")).toBeUndefined();
   });
 
   it("converts provider major-unit amounts without floating point drift", () => {
@@ -62,7 +99,7 @@ describe("Basecode billing contracts", () => {
 
   it("creates provider-safe checkout references", () => {
     expect(basecodeCheckoutReference("d8b6c53e-1fcb-44e1-b6f7-23aa19c6a3c1")).toBe(
-      "basecode_d8b6c53e1fcb44e1b6f723aa19c6a3c1",
+      "basecode-d8b6c53e1fcb44e1b6f723aa19c6a3c1",
     );
   });
 
