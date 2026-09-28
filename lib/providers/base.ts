@@ -74,6 +74,8 @@ export interface UnifiedChatRequest {
     model: string;
     /** Abort in-flight provider HTTP work when a caller's execution deadline expires. */
     signal?: AbortSignal;
+    /** Internal transport activity, including SSE heartbeats discarded by SDK decoders. */
+    onStreamActivity?: () => void;
     temperature?: number;
     maxTokens?: number;
     stream?: boolean;

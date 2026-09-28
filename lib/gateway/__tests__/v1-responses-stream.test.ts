@@ -10,7 +10,7 @@
  * streamed 10–19 frames on /v1/chat/completions. These tests pin the incremental
  * release, and pin that it did not cost the output guard its veto.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockExecuteGatewayChat = vi.fn();
 const mockStreamGatewayChat = vi.fn();
@@ -126,7 +126,58 @@ beforeEach(() => {
     });
 });
 
+afterEach(() => vi.useRealTimers());
+
 describe('/v1/responses streaming', () => {
+    it('keeps a pending stream alive with standard events and stops its timer at completion', async () => {
+        vi.useFakeTimers();
+        const { finish } = controllableStream();
+        const result = await runV1ResponsesExecution(baseParams());
+        if (!result.ok) throw new Error('expected ok');
+        const reader = result.response.body!.getReader();
+        await reader.read();
+        await vi.advanceTimersByTimeAsync(45_000);
+        const ids = [];
+        for (let i = 0; i < 3; i++) {
+            const heartbeat = new TextDecoder().decode((await reader.read()).value);
+            expect(heartbeat).toContain('event: response.in_progress');
+            const event = JSON.parse(heartbeat.split('data: ')[1]);
+            expect(event.type).toBe('response.in_progress');
+            expect(event.response.status).toBe('in_progress');
+            expect(event.response.output).toEqual([]);
+            ids.push(event.response.id);
+        }
+        finish();
+        let tail = '';
+        for (;;) {
+            const next = await reader.read();
+            if (next.done) break;
+            tail += new TextDecoder().decode(next.value);
+        }
+        expect(new Set(ids).size).toBe(1);
+        expect(tail).toContain(`"id":"${ids[0]}"`);
+        expect(tail).toContain('"status":"completed"');
+        expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('cancels provider work and keepalives when the client disconnects', async () => {
+        vi.useFakeTimers();
+        let signal!: AbortSignal;
+        mockStreamGatewayChat.mockImplementation(({ request }) => (async function* () {
+            signal = request.signal;
+            yield chunk({ delta: 'A'.repeat(STREAM_GUARD_HOLDBACK_CHARS + 40) });
+            await new Promise((_, reject) => {
+                signal.addEventListener('abort', () => reject(new Error('Client disconnected')), { once: true });
+            });
+        })());
+        const result = await runV1ResponsesExecution(baseParams());
+        if (!result.ok) throw new Error('expected ok');
+        const reader = result.response.body!.getReader();
+        await reader.read();
+        await reader.cancel('User stopped the task');
+        expect(signal.aborted).toBe(true);
+        expect(vi.getTimerCount()).toBe(0);
+    });
     it.each(['low', 'medium', 'high', 'xhigh', 'max'])('forwards Responses reasoning %s to the provider', async effort => {
         mockStreamGatewayChat.mockImplementation(() => (async function* () {
             yield chunk({ delta: 'OK', finishReason: 'stop' });

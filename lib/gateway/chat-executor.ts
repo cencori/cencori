@@ -440,9 +440,9 @@ export async function* streamGatewayChat(params: {
                 primary: () => {
                     params.performance?.markProviderStart();
                     return streamWithTimeout(
-                        signal => provider.stream({ ...chatRequest, signal }),
+                        (signal, onStreamActivity) => provider.stream({ ...chatRequest, signal, onStreamActivity }),
                         `${providerName} hedged primary`,
-                        { signal: chatRequest.signal }
+                        { signal: chatRequest.signal, timeoutMs: providerName === 'maximo' ? 120_000 : undefined }
                     );
                 },
                 secondary: async () => {
@@ -477,9 +477,9 @@ export async function* streamGatewayChat(params: {
                         hedgeFallbackModel = fallbackModel;
                         hedgeFallbackBillingMode = billingMode;
                         return streamWithTimeout(
-                            signal => fallbackProvider.stream({ ...chatRequest, model: fallbackModel, signal }),
+                            (signal, onStreamActivity) => fallbackProvider.stream({ ...chatRequest, model: fallbackModel, signal, onStreamActivity }),
                             `${candidate} hedge`,
-                            { signal: chatRequest.signal }
+                            { signal: chatRequest.signal, timeoutMs: candidate === 'maximo' ? 120_000 : undefined }
                         );
                     }
                     throw new Error('No hedge fallback provider is available');
@@ -538,9 +538,9 @@ export async function* streamGatewayChat(params: {
             try {
                 params.performance?.markProviderStart();
                 const stream = streamWithTimeout(
-                    signal => provider.stream({ ...chatRequest, signal }),
+                    (signal, onStreamActivity) => provider.stream({ ...chatRequest, signal, onStreamActivity }),
                     `${providerName} primary`,
-                    { signal: chatRequest.signal }
+                    { signal: chatRequest.signal, timeoutMs: providerName === 'maximo' ? 120_000 : undefined }
                 );
                 for await (const chunk of stream) {
                     emitted = true;
@@ -620,9 +620,9 @@ export async function* streamGatewayChat(params: {
             await fallbackProvider.getPricing(fallbackModel);
             params.performance?.markProviderStart();
             const stream = streamWithTimeout(
-                signal => fallbackProvider.stream({ ...chatRequest, model: fallbackModel, signal }),
+                (signal, onStreamActivity) => fallbackProvider.stream({ ...chatRequest, model: fallbackModel, signal, onStreamActivity }),
                 `${fallbackProviderName} fallback`,
-                { signal: chatRequest.signal }
+                { signal: chatRequest.signal, timeoutMs: fallbackProviderName === 'maximo' ? 120_000 : undefined }
             );
 
             for await (const chunk of stream) {

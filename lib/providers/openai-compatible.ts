@@ -277,7 +277,28 @@ export class OpenAICompatibleProvider extends AIProvider {
 
     async *stream(request: UnifiedChatRequest): AsyncGenerator<StreamChunk> {
         try {
-            const stream = await this.client.chat.completions.create({
+            // Keep activity scoped to this request; the shared client may serve concurrent turns.
+            // Large Maximo tool drafts can pause during reasoning/prefill. Match the
+            // gateway's bounded 120s quiet window instead of aborting headers at 55s.
+            const client = request.onStreamActivity || this.providerName === 'maximo'
+                ? this.client.withOptions({
+                    ...(this.providerName === 'maximo' ? { timeout: 120_000 } : {}),
+                    fetch: async (input, init) => {
+                        const response = await safeProviderFetch(input, init);
+                        if (!response.body) return response;
+                        const body = response.body.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({
+                            transform(bytes, controller) {
+                                if (bytes.byteLength) request.onStreamActivity?.();
+                                controller.enqueue(bytes);
+                            },
+                        }));
+                        return new Response(body, {
+                            status: response.status, statusText: response.statusText, headers: response.headers,
+                        });
+                    },
+                })
+                : this.client;
+            const stream = await client.chat.completions.create({
                 model: request.model,
                 messages: toOpenAIMessages(request.messages) as any,
                 temperature: request.temperature ?? 0.7,
@@ -352,6 +373,9 @@ export class OpenAICompatibleProvider extends AIProvider {
                     toolCalls,
                     ...(usage ? { usage } : {}),
                 };
+                // A terminal choice completes the output. Waiting for a missing [DONE] can
+                // otherwise turn a completed answer or tool call into a timeout.
+                if (finishReason && ['stop', 'length', 'content_filter', 'tool_calls'].includes(finishReason)) return;
             }
         } catch (error) {
             throw normalizeProviderError(this.providerName, error);
