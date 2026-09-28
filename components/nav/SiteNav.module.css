@@ -89,9 +89,7 @@
   align-items: center;
   gap: clamp(1.1rem, 2vw, 2rem);
   padding: 0.68rem 1.1rem;
-  background: rgba(0, 0, 0, 0.32);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: transparent;
   transition: background-color 180ms ease;
 }
 
