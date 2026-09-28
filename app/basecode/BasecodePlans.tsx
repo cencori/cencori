@@ -53,15 +53,30 @@ const plans: Array<{
   },
 ];
 
-function checkoutPayload(plan: PaidPlan, method: CheckoutMethod) {
-  return method === "international"
-    ? { paymentMethod: "auto", plan, provider: "bachs" }
-    : { paymentMethod: method, plan, provider: "flutterwave" };
+function checkoutPayload(plan: PaidPlan, method: CheckoutMethod, recurring: boolean) {
+  if (method === "international") {
+    return { paymentMethod: "auto", plan, provider: "bachs" };
+  }
+  if (recurring) {
+    // Auto-renew pays by card: only card authorizations can be reused for
+    // subscriptions. OPay and bank transfer stay one-off.
+    return { paymentMethod: "auto", plan, provider: "paystack", recurring: true };
+  }
+  return { paymentMethod: method, plan, provider: "paystack" };
 }
+
+type AutoRenewState = {
+  autoRenews: boolean;
+  provider: string;
+  currentPeriodEnd: string | null;
+} | null;
 
 export function BasecodePlans() {
   const [currentPlan, setCurrentPlan] = useState<PlanCode | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<PaidPlan | null>(null);
+  const [recurring, setRecurring] = useState(false);
+  const [autoRenew, setAutoRenew] = useState<AutoRenewState>(null);
+  const [cancelling, setCancelling] = useState(false);
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -73,7 +88,20 @@ export function BasecodePlans() {
         return (await response.json()) as BillingSnapshot;
       })
       .then((snapshot) => {
-        if (active && snapshot) setCurrentPlan(snapshot.plan.code);
+        if (active && snapshot) {
+          setCurrentPlan(snapshot.plan.code);
+          if (snapshot.plan.code === "builder" || snapshot.plan.code === "pro") {
+            void fetch("/api/basecode/billing/subscription", { cache: "no-store" })
+              .then(async (response) => {
+                if (!response.ok) return null;
+                return (await response.json()) as { subscription: AutoRenewState };
+              })
+              .then((result) => {
+                if (active && result) setAutoRenew(result.subscription);
+              })
+              .catch(() => undefined);
+          }
+        }
       })
       .catch(() => undefined);
     return () => {
@@ -81,15 +109,34 @@ export function BasecodePlans() {
     };
   }, []);
 
+  async function cancelAutoRenew() {
+    setCancelling(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/basecode/billing/subscription/cancel", {
+        method: "POST",
+      });
+      const result = (await response.json()) as { cancelled?: boolean; error?: string };
+      if (!response.ok || !result.cancelled) {
+        throw new Error(result.error || "Auto-renew could not be turned off.");
+      }
+      setAutoRenew((previous) => (previous ? { ...previous, autoRenews: false } : previous));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Auto-renew could not be turned off.");
+    } finally {
+      setCancelling(false);
+    }
+  }
+
   async function beginCheckout(plan: PaidPlan, method: CheckoutMethod) {
-    const key = `${plan}:${method}`;
+    const key = `${plan}:${method}:${recurring ? "recurring" : "once"}`;
     setLoading(key);
     setError(null);
     try {
       const response = await fetch("/api/basecode/billing/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(checkoutPayload(plan, method)),
+        body: JSON.stringify(checkoutPayload(plan, method, recurring)),
       });
       if (response.status === 401) {
         window.location.assign(`/login?redirect=${encodeURIComponent("/basecode#plans")}`);
@@ -166,38 +213,84 @@ export function BasecodePlans() {
 
               <div className="mt-auto pt-8">
                 {isCurrent ? (
-                  <div className="flex h-9 items-center justify-center rounded-md border border-white/15 text-xs text-white/50">
-                    Current plan
+                  <div className="grid gap-2">
+                    <div className="flex h-9 items-center justify-center rounded-md border border-white/15 text-xs text-white/50">
+                      Current plan
+                    </div>
+                    {autoRenew && autoRenew.provider === "paystack" ? (
+                      autoRenew.autoRenews ? (
+                        <button
+                          className="h-8 text-[11px] text-white/45 transition-colors hover:text-white/75 disabled:opacity-50"
+                          disabled={cancelling}
+                          onClick={() => void cancelAutoRenew()}
+                          type="button"
+                        >
+                          {cancelling ? "Turning off…" : "Auto-renew on · turn off"}
+                        </button>
+                      ) : (
+                        <p className="text-center text-[11px] text-white/40">
+                          Auto-renew off — turn it on at your next renewal.
+                        </p>
+                      )
+                    ) : null}
                   </div>
                 ) : isPaid ? (
                   isSelected ? (
                     <div className="grid gap-2" aria-label={`Pay for ${plan.code}`}>
-                      <button
-                        className="h-9 rounded-md bg-white text-xs font-medium text-black transition-colors hover:bg-white/85 disabled:opacity-50"
-                        disabled={loading !== null}
-                        onClick={() => void beginCheckout(plan.code as PaidPlan, "opay")}
-                        type="button"
-                      >
-                        {loading === `${plan.code}:opay` ? "Opening…" : "Pay with OPay"}
-                      </button>
-                      <button
-                        className="h-9 rounded-md border border-white/20 text-xs font-medium text-white transition-colors hover:bg-white/10 disabled:opacity-50"
-                        disabled={loading !== null}
-                        onClick={() => void beginCheckout(plan.code as PaidPlan, "banktransfer")}
-                        type="button"
-                      >
-                        {loading === `${plan.code}:banktransfer` ? "Opening…" : "Bank transfer"}
-                      </button>
-                      <button
-                        className="h-8 text-[11px] text-white/45 transition-colors hover:text-white/75 disabled:opacity-50"
-                        disabled={loading !== null}
-                        onClick={() => void beginCheckout(plan.code as PaidPlan, "international")}
-                        type="button"
-                      >
-                        {loading === `${plan.code}:international`
-                          ? "Opening…"
-                          : `International card · $${plan.code === "builder" ? "5" : "15"}`}
-                      </button>
+                      <label className="flex cursor-pointer items-center gap-2 text-[11px] text-white/60">
+                        <input
+                          checked={recurring}
+                          className="h-3.5 w-3.5 accent-white"
+                          disabled={loading !== null}
+                          onChange={(event) => setRecurring(event.target.checked)}
+                          type="checkbox"
+                        />
+                        Auto-renew every 30 days
+                      </label>
+                      {recurring ? (
+                        <>
+                          <button
+                            className="h-9 rounded-md bg-white text-xs font-medium text-black transition-colors hover:bg-white/85 disabled:opacity-50"
+                            disabled={loading !== null}
+                            onClick={() => void beginCheckout(plan.code as PaidPlan, "opay")}
+                            type="button"
+                          >
+                            {loading?.startsWith(`${plan.code}:`) ? "Opening…" : "Pay with card · auto-renews"}
+                          </button>
+                          <p className="-mt-1 text-[11px] leading-4 text-white/40">
+                            Auto-renew needs a card — OPay and bank transfer are one-off.
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            className="h-9 rounded-md bg-white text-xs font-medium text-black transition-colors hover:bg-white/85 disabled:opacity-50"
+                            disabled={loading !== null}
+                            onClick={() => void beginCheckout(plan.code as PaidPlan, "opay")}
+                            type="button"
+                          >
+                            {loading === `${plan.code}:opay:once` ? "Opening…" : "Pay with OPay"}
+                          </button>
+                          <button
+                            className="h-9 rounded-md border border-white/20 text-xs font-medium text-white transition-colors hover:bg-white/10 disabled:opacity-50"
+                            disabled={loading !== null}
+                            onClick={() => void beginCheckout(plan.code as PaidPlan, "banktransfer")}
+                            type="button"
+                          >
+                            {loading === `${plan.code}:banktransfer:once` ? "Opening…" : "Bank transfer"}
+                          </button>
+                          <button
+                            className="h-8 text-[11px] text-white/45 transition-colors hover:text-white/75 disabled:opacity-50"
+                            disabled={loading !== null}
+                            onClick={() => void beginCheckout(plan.code as PaidPlan, "international")}
+                            type="button"
+                          >
+                            {loading === `${plan.code}:international:once`
+                              ? "Opening…"
+                              : `International card · $${plan.code === "builder" ? "5" : "15"}`}
+                          </button>
+                        </>
+                      )}
                     </div>
                   ) : (
                     <button
@@ -235,8 +328,9 @@ export function BasecodePlans() {
         </p>
       ) : null}
       <p className="mt-5 text-center text-[11px] leading-5 text-white/40">
-        OPay and Nigerian bank transfers are processed by Flutterwave. International card checkout
-        is processed by Bachs. Usage allowances reset weekly; paid access renews every 30 days.
+        OPay and Nigerian bank transfers are processed by Paystack. International card checkout
+        is processed by Bachs. Card payments can auto-renew every 30 days; OPay and bank
+        transfer are one-off. Usage allowances reset weekly.
       </p>
     </section>
   );

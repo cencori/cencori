@@ -5,7 +5,7 @@ import { createServerClient } from "@/lib/supabaseServer";
 
 export type BasecodePlanCode = "free" | "builder" | "pro" | "enterprise";
 export type BasecodePaidPlanCode = Exclude<BasecodePlanCode, "free" | "enterprise">;
-export type BasecodePaymentProvider = "flutterwave" | "bachs";
+export type BasecodePaymentProvider = "paystack" | "bachs";
 export type BasecodePaymentMethod = "auto" | "opay" | "banktransfer";
 
 const BASECODE_PRODUCTION_ORIGIN = "https://cencori.com";
@@ -60,18 +60,47 @@ export function parseBasecodeCheckoutInput(value: unknown): {
   paymentMethod: BasecodePaymentMethod;
   plan: BasecodePaidPlanCode;
   provider: BasecodePaymentProvider;
+  recurring: boolean;
 } | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const body = value as Record<string, unknown>;
   if (!isPaidPlan(body.plan)) return null;
-  const provider = body.provider === "bachs" ? "bachs" : body.provider === "flutterwave" ? "flutterwave" : null;
+  const provider = body.provider === "bachs" ? "bachs" : body.provider === "paystack" ? "paystack" : null;
   if (!provider) return null;
   const paymentMethod =
     body.paymentMethod === "opay" || body.paymentMethod === "banktransfer"
       ? body.paymentMethod
       : "auto";
   if (provider === "bachs" && paymentMethod !== "auto") return null;
-  return { paymentMethod, plan: body.plan, provider };
+  // Auto-renew is a Paystack-plans feature. Bachs monthly products already bill
+  // recurringly through Bachs itself, so the flag is meaningless there — and OPay /
+  // bank-transfer authorizations cannot be reused, so recurring always pays by card.
+  const recurring = body.recurring === true;
+  if (recurring && provider !== "paystack") return null;
+  return { paymentMethod, plan: body.plan, provider, recurring };
+}
+
+/**
+ * Paystack plan for an auto-renewing Basecode purchase. Amounts on these plans must
+ * match the plans table (Builder ₦5,000 / Pro ₦15,000) — Paystack charges the plan
+ * amount, ignoring the initialize amount, when a plan is passed.
+ *
+ * Test and live Paystack accounts have separate plans, so these hold the test codes
+ * locally and the live codes in production — same names, different values.
+ */
+export function getPaystackPlanCode(plan: BasecodePaidPlanCode): string {
+  const code =
+    plan === "builder"
+      ? process.env.PAYSTACK_PLAN_BASECODE_BUILDER
+      : process.env.PAYSTACK_PLAN_BASECODE_PRO;
+  if (!code) throw new Error(`No Paystack plan configured for ${plan}`);
+  return code;
+}
+
+export function getBasecodePlanByPaystackPlanCode(planCode: string): BasecodePaidPlanCode | null {
+  if (planCode && planCode === process.env.PAYSTACK_PLAN_BASECODE_BUILDER) return "builder";
+  if (planCode && planCode === process.env.PAYSTACK_PLAN_BASECODE_PRO) return "pro";
+  return null;
 }
 
 export function majorAmountToMinor(value: unknown): number | null {
@@ -253,14 +282,22 @@ function readAccountTokens(value: unknown) {
   return tokens;
 }
 
-export function flutterwavePaymentOptions(method: BasecodePaymentMethod): string {
-  if (method === "opay") return "opay";
-  if (method === "banktransfer") return "banktransfer";
-  return "opay,banktransfer,card,ussd";
+/**
+ * Paystack channels for the requested Nigerian method. `undefined` means the full
+ * Paystack channel list. OPay rides on the `bank` (Pay with Bank) channel: the customer
+ * picks OPay on the Paystack checkout and authorizes in the OPay app or web app.
+ * (Requires the Bank channel enabled in the Paystack dashboard preferences.)
+ */
+export function paystackChannels(method: BasecodePaymentMethod): string[] | undefined {
+  if (method === "opay") return ["bank"];
+  if (method === "banktransfer") return ["bank_transfer"];
+  return undefined;
 }
 
 export function basecodeCheckoutReference(id: string): string {
-  return `basecode_${id.replaceAll("-", "")}`;
+  // Dash-separated: Paystack references allow only `-`, `.`, `=` and alphanumerics,
+  // and Bachs accepts the same shape, so one format serves both providers.
+  return `basecode-${id.replaceAll("-", "")}`;
 }
 
 export type VerifiedBasecodePayment = {

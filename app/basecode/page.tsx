@@ -3,7 +3,9 @@ import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import Link from "next/link";
+import { Suspense } from "react";
 import { BasecodePlans } from "./BasecodePlans";
+import { BillingReturnNotice } from "./BillingReturnNotice";
 
 export default function BasecodePage() {
   return (
@@ -66,6 +68,9 @@ export default function BasecodePage() {
             width={3132}
           />
         </section>
+        <Suspense>
+          <BillingReturnNotice />
+        </Suspense>
         <BasecodePlans />
       </main>
     </div>
