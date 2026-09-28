@@ -32,6 +32,7 @@ import {
     setCachedFailoverConfig,
 } from '@/lib/config-cache';
 import { hedgedStream } from '@/lib/gateway/hedged-stream';
+import { streamWithTimeout } from '@/lib/gateway/stream-timeout';
 import { getCreditsBalance } from '@/lib/credits';
 
 type SupabaseAdmin = ReturnType<typeof createAdminClient>;
@@ -92,26 +93,6 @@ async function withTimeout<T>(promise: Promise<T>, ms: number, label: string, on
         return await Promise.race([promise, timed]);
     } finally {
         clearTimeout(timer);
-    }
-}
-
-async function* streamWithTimeout<T>(
-    stream: AsyncIterable<T>,
-    label: string
-): AsyncGenerator<T> {
-    const iterator = stream[Symbol.asyncIterator]();
-    try {
-        while (true) {
-            const next = await withTimeout(
-                iterator.next(),
-                PROVIDER_TIMEOUT_MS,
-                `${label} next chunk`
-            );
-            if (next.done) return;
-            yield next.value;
-        }
-    } finally {
-        await iterator.return?.();
     }
 }
 
@@ -458,7 +439,11 @@ export async function* streamGatewayChat(params: {
             const raced = hedgedStream<StreamChunk>({
                 primary: () => {
                     params.performance?.markProviderStart();
-                    return streamWithTimeout(provider.stream(chatRequest), `${providerName} hedged primary`);
+                    return streamWithTimeout(
+                        signal => provider.stream({ ...chatRequest, signal }),
+                        `${providerName} hedged primary`,
+                        { signal: chatRequest.signal }
+                    );
                 },
                 secondary: async () => {
                     const fallbackChain = getFallbackChain(providerName, settings.configuredFallback);
@@ -492,8 +477,9 @@ export async function* streamGatewayChat(params: {
                         hedgeFallbackModel = fallbackModel;
                         hedgeFallbackBillingMode = billingMode;
                         return streamWithTimeout(
-                            fallbackProvider.stream({ ...chatRequest, model: fallbackModel }),
-                            `${candidate} hedge`
+                            signal => fallbackProvider.stream({ ...chatRequest, model: fallbackModel, signal }),
+                            `${candidate} hedge`,
+                            { signal: chatRequest.signal }
                         );
                     }
                     throw new Error('No hedge fallback provider is available');
@@ -551,8 +537,12 @@ export async function* streamGatewayChat(params: {
             let emitted = false;
             try {
                 params.performance?.markProviderStart();
-                const stream = provider.stream(chatRequest);
-                for await (const chunk of streamWithTimeout(stream, `${providerName} primary`)) {
+                const stream = streamWithTimeout(
+                    signal => provider.stream({ ...chatRequest, signal }),
+                    `${providerName} primary`,
+                    { signal: chatRequest.signal }
+                );
+                for await (const chunk of stream) {
                     emitted = true;
                     yield {
                         ...chunk,
@@ -629,9 +619,13 @@ export async function* streamGatewayChat(params: {
             await assertManagedCreditsAvailable(fallbackBillingMode, params.organizationId, params.tier);
             await fallbackProvider.getPricing(fallbackModel);
             params.performance?.markProviderStart();
-            const stream = fallbackProvider.stream({ ...chatRequest, model: fallbackModel });
+            const stream = streamWithTimeout(
+                signal => fallbackProvider.stream({ ...chatRequest, model: fallbackModel, signal }),
+                `${fallbackProviderName} fallback`,
+                { signal: chatRequest.signal }
+            );
 
-            for await (const chunk of streamWithTimeout(stream, `${fallbackProviderName} fallback`)) {
+            for await (const chunk of stream) {
                 fallbackEmitted = true;
                 yield {
                     ...chunk,

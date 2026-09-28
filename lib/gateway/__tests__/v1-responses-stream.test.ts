@@ -127,6 +127,28 @@ beforeEach(() => {
 });
 
 describe('/v1/responses streaming', () => {
+    it('releases the approved final text while pricing is still pending', async () => {
+        const { finish } = controllableStream();
+        let releasePricing!: (pricing: { inputPer1KTokens: number; outputPer1KTokens: number; cencoriMarkupPercentage: number }) => void;
+        const pricing = new Promise<{ inputPer1KTokens: number; outputPer1KTokens: number; cencoriMarkupPercentage: number }>(resolve => {
+            releasePricing = resolve;
+        });
+        mockProvider.getPricing.mockImplementationOnce(() => pricing);
+        const result = await runV1ResponsesExecution(baseParams());
+        if (!result.ok) throw new Error('expected ok');
+        const reader = result.response.body!.getReader();
+        await reader.read();
+        finish();
+        try {
+            // The model finished, but accounting deliberately has not. Its last words still arrive.
+            const tail = new TextDecoder().decode((await reader.read()).value);
+            expect(joinedDeltaText(tail)).toBe('A'.repeat(STREAM_GUARD_HOLDBACK_CHARS) + 'TAIL');
+        } finally {
+            releasePricing({ inputPer1KTokens: 0.001, outputPer1KTokens: 0.002, cencoriMarkupPercentage: 10 });
+        }
+        while (!(await reader.read()).done) { /* Drain settlement. */ }
+    });
+
     it('releases text before the provider has finished', async () => {
         const { finish } = controllableStream();
 

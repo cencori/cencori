@@ -1003,6 +1003,41 @@ export async function runV1ResponsesExecution(
                                 region: gatewayCtx.countryCode,
                             });
 
+                            // Approved text must not wait for pricing, token counts or storage.
+                            if (outputCheck.ok) {
+                                // Everything still held back: the rolling boundary above, plus the
+                                // whole answer when this stream never released incrementally. The
+                                // full-output guard has just passed, so the remainder is approved.
+                                // `fullText` is detokenized by this point, and `emittedText` is the
+                                // detokenized prefix already sent, so the difference is what is owed.
+                                // If the prefix ever disagreed, re-sending the whole answer would give
+                                // the client the prefix twice. `output_text.done` below carries the
+                                // authoritative full text, so emitting nothing extra is the safe side.
+                                const remainder = fullText.startsWith(emittedText)
+                                    ? fullText.slice(emittedText.length)
+                                    : '';
+                                if (remainder) {
+                                    controller.enqueue(
+                                        encoder.encode(
+                                            buildResponsesStreamChunk({
+                                                type: 'response.output_text.delta',
+                                                data: { delta: remainder, index: 0 },
+                                            })
+                                        )
+                                    );
+                                }
+                                // Send output_text.done
+                                controller.enqueue(
+                                    encoder.encode(
+                                        buildResponsesStreamChunk({
+                                            type: 'response.output_text.done',
+                                            data: { index: 0, text: fullText },
+                                        })
+                                    )
+                                );
+
+                            }
+
                             const streamProvider =
                                 chunk.actualProvider !== resolved.providerName
                                 && resolved.router.hasProvider(chunk.actualProvider)
@@ -1087,37 +1122,6 @@ export async function runV1ResponsesExecution(
                                 controller.close();
                                 return;
                             }
-
-                            // Everything still held back: the rolling boundary above, plus the
-                            // whole answer when this stream never released incrementally. The
-                            // full-output guard has just passed, so the remainder is approved.
-                            // `fullText` is detokenized by this point, and `emittedText` is the
-                            // detokenized prefix already sent, so the difference is what is owed.
-                            // If the prefix ever disagreed, re-sending the whole answer would give
-                            // the client the prefix twice. `output_text.done` below carries the
-                            // authoritative full text, so emitting nothing extra is the safe side.
-                            const remainder = fullText.startsWith(emittedText)
-                                ? fullText.slice(emittedText.length)
-                                : '';
-                            if (remainder) {
-                                controller.enqueue(
-                                    encoder.encode(
-                                        buildResponsesStreamChunk({
-                                            type: 'response.output_text.delta',
-                                            data: { delta: remainder, index: 0 },
-                                        })
-                                    )
-                                );
-                            }
-                            // Send output_text.done
-                            controller.enqueue(
-                                encoder.encode(
-                                    buildResponsesStreamChunk({
-                                        type: 'response.output_text.done',
-                                        data: { index: 0, text: fullText },
-                                    })
-                                )
-                            );
 
                             // Send built-in tool results
                             for (const toolOutput of collectedBuiltinToolOutputs) {
