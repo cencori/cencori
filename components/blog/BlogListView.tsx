@@ -41,7 +41,7 @@ export function BlogListView({ posts }: { posts: BlogCardPost[] }) {
               className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
               fill
               sizes="160px"
-              src={post.coverImage || `/newsroom/og/v1/square/${post.slug}.jpg`}
+              src={post.coverImage || `/newsroom/og/v1/square/${post.slug}.jpg?v=2`}
               unoptimized
             />
           </span>

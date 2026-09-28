@@ -25,11 +25,11 @@ export async function generateMetadata({ params }: BlogPostPageProps): Promise<M
     // metadataBase (cencori.com). Building an absolute URL here from
     // NEXT_PUBLIC_APP_URL leaked cencori.vercel.app into the card tags in
     // production, and X's crawler gets a 404 on that domain — no preview card.
-    // Share the cover artwork as-is so generated labels do not overlap it.
-    // Posts without cover artwork retain the generated social image.
+    // Both cover artwork and generated fallback images are shared without overlays.
+    // Version the image URLs to refresh previously cached cards with text.
     const ogImage = post.coverImage
-        ? { url: post.coverImage, alt: post.title }
-        : { url: `/newsroom/og/v1/${post.slug}.jpg`, width: 1200, height: 630, alt: post.title };
+        ? { url: `${post.coverImage}${post.coverImage.includes("?") ? "&" : "?"}v=2`, alt: post.title }
+        : { url: `/newsroom/og/v1/${post.slug}.jpg?v=2`, width: 1200, height: 630, alt: post.title };
 
     return {
         title: post.title,

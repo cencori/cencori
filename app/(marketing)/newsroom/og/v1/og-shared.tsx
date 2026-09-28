@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import sharp from "sharp";
 
 import { getAllPosts } from "@/lib/blog";
 
@@ -61,41 +62,30 @@ export async function loadPublicImage(
   }
 }
 
-export interface OgFonts {
-  manropeFont: ArrayBuffer;
-  geistFont: ArrayBuffer;
-}
+export async function createBareImageResponse(
+  image: ArrayBuffer,
+  size: { width: number; height: number },
+): Promise<Response> {
+  const jpeg = await sharp(Buffer.from(image))
+    .resize(size.width, size.height, { fit: "cover", position: "centre" })
+    .flatten({ background: "#050505" })
+    .jpeg({
+      quality: 82,
+      progressive: true,
+      chromaSubsampling: "4:2:0",
+      mozjpeg: true,
+    })
+    .toBuffer();
+  const body = new ArrayBuffer(jpeg.byteLength);
+  new Uint8Array(body).set(jpeg);
 
-export async function loadFonts(): Promise<OgFonts> {
-  const [manropeFile, geistFile] = await Promise.all([
-    readFile(
-      path.join(process.cwd(), "public", "fonts", "manrope-medium.ttf"),
-    ),
-    readFile(path.join(process.cwd(), "app", "Geist-Black.ttf")),
-  ]);
-  return { manropeFont: sliceBuffer(manropeFile), geistFont: sliceBuffer(geistFile) };
-}
-
-export function CencoriMark() {
-  return (
-    <svg
-      aria-hidden="true"
-      width="24"
-      height="24"
-      viewBox="0 0 100 100"
-      fill="none"
-    >
-      <g clipPath="url(#newsroom-og-mark-clip)">
-        <circle cx="35.3" cy="0" r="35.3" fill="#fff" />
-        <circle cx="0" cy="64.7" r="35.3" fill="#fff" />
-        <circle cx="100" cy="35.3" r="35.3" fill="#fff" />
-        <circle cx="64.7" cy="100" r="35.3" fill="#fff" />
-      </g>
-      <defs>
-        <clipPath id="newsroom-og-mark-clip">
-          <rect width="100" height="100" rx="3" fill="#fff" />
-        </clipPath>
-      </defs>
-    </svg>
-  );
+  return new Response(body, {
+    headers: {
+      "Cache-Control": "public, max-age=31536000, immutable",
+      "CDN-Cache-Control": "public, max-age=31536000, immutable",
+      "Content-Length": String(jpeg.byteLength),
+      "Content-Type": "image/jpeg",
+      "Vercel-CDN-Cache-Control": "public, max-age=31536000, immutable",
+    },
+  });
 }
