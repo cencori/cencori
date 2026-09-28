@@ -62,6 +62,11 @@ import {
     resolveGatewayRoutingProfile,
     type GatewayRoutingProfile,
 } from "@/lib/gateway/speed-profile";
+import {
+    buildPassthroughInputPipeline,
+    isFastLaneRequest,
+} from "@/lib/gateway/fast-lane";
+import { warmGatewayProjectConfig } from "@/lib/gateway/request-config";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -90,6 +95,9 @@ type ChatRequestBody = {
     };
     memory?: MemoryDirectiveInput;
     routing_profile?: GatewayRoutingProfile;
+    /** Fast-lane passthrough: skip gateway guards/cache/retries (own safety layers). */
+    passthrough?: boolean;
+    fast_lane?: boolean;
 };
 
 const normalizeGatewayModelId = (modelId: string): string => {
@@ -220,6 +228,7 @@ export async function POST(req: NextRequest) {
     const callerIdentity = extractGatewayCallerIdentity(req.headers);
     let gatewayCtx: GatewayContext | null = null;
     let routingProfile: GatewayRoutingProfile = 'balanced';
+    let fastLaneResponse = false;
 
     const respond = (response: NextResponse, errorCode?: string, errorMessage?: string) => {
         if (!gatewayCtx) {
@@ -254,6 +263,9 @@ export async function POST(req: NextRequest) {
         }
 
         response.headers.set('X-Cencori-Routing-Profile', routingProfile);
+        if (fastLaneResponse) {
+            response.headers.set('X-Cencori-Fast-Lane', 'true');
+        }
         const preflight = performance.snapshot().gatewayPreflightMs;
         if (preflight !== null) {
             response.headers.set('Server-Timing', `cencori_preflight;dur=${preflight}`);
@@ -547,6 +559,14 @@ export async function POST(req: NextRequest) {
             ? toVisionGuardMessages(messages)
             : toUnifiedMessages(messages);
 
+        // Data-plane split: warm network/security/rules/failover/BYOK/cache
+        // config in one fetch so the input pipeline and provider resolution
+        // below hit instance memory instead of fanning out serial DB reads.
+        // Never throws — on failure the per-reader paths run as before.
+        if (gatewayCtx) {
+            await warmGatewayProjectConfig(adminClient, gatewayCtx.projectId);
+        }
+
         // Kick off memory retrieval in parallel with the input pipeline —
         // the embedding + RPC overlap the pipeline's own work, keeping added
         // latency well under the 150ms p95 budget. retrieveMemories is
@@ -584,15 +604,22 @@ export async function POST(req: NextRequest) {
                 })
                 : Promise.resolve([]);
 
-        const inputPipeline = await runGatewayInputPipeline({
-            supabase: adminClient,
-            projectId: gatewayCtx.projectId,
-            apiKeyId: gatewayCtx.apiKeyId,
-            environment: gatewayCtx.environment,
-            tier: (gatewayCtx.tier || "free") as SubscriptionTier,
-            messages: pipelineMessages,
-            endUserId,
-        });
+        // Fast-lane (passthrough): caller runs its own safety layers, so skip
+        // the input scan + custom rules + governance policies in the critical
+        // path. Auth, rate limiting, credits, routing, and async logging run.
+        const fastLane = isFastLaneRequest(body, req.headers);
+        fastLaneResponse = fastLane;
+        const inputPipeline = fastLane
+            ? buildPassthroughInputPipeline(pipelineMessages)
+            : await runGatewayInputPipeline({
+                supabase: adminClient,
+                projectId: gatewayCtx.projectId,
+                apiKeyId: gatewayCtx.apiKeyId,
+                environment: gatewayCtx.environment,
+                tier: (gatewayCtx.tier || "free") as SubscriptionTier,
+                messages: pipelineMessages,
+                endUserId,
+            });
 
         if (!inputPipeline.ok) {
             const errorBody = inputPipeline.assistantMessage
@@ -703,7 +730,7 @@ export async function POST(req: NextRequest) {
         // facts must never be cached (semantic cache matches project-wide —
         // user A's facts could serve user B), and lookups against such
         // prompts are useless. Skip the cache in both directions.
-        if (gatewayCtx && !tools && !skipCache && !memoryDirective?.retrieve) {
+        if (gatewayCtx && !tools && !skipCache && !memoryDirective?.retrieve && !fastLane) {
             try {
                 // Try cache first - use cached config if available
                 const cachedConfig = await getCachedCacheConfig(gatewayCtx.projectId);
@@ -947,6 +974,9 @@ export async function POST(req: NextRequest) {
                 ));
             },
             hedgeDelayMs,
+            skipOutputGuard: fastLane,
+            singleProviderAttempt: fastLane,
+            securityEnabled: inputPipeline.securityEnabled,
         });
 
         if (!execResult.ok) {

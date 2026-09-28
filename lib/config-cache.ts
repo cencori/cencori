@@ -32,12 +32,19 @@ const TTL = {
     NETWORK_CONFIG: 60,    // 1 minute for project ingress policy
     CREDITS: 300,          // 5 minutes for balance (invalidated on spend)
     MEMORY_CONFIG: 300,    // 5 minutes for project memory settings
+    /** Packed gateway bundle: one Redis GET warms the whole data plane. */
+    GATEWAY_PACKED: 60,    // 1 minute for the packed project bundle
 };
+
+/** Exported so the gateway warmer can seed per-concern TTLs without drift. */
+export const GATEWAY_CACHE_TTLS = { ...TTL };
+
+/** Bound the per-instance map; serverless instances must not grow unbounded. */
+const LOCAL_CACHE_MAX_ENTRIES = 2000;
 
 const localCache = new Map<string, { value: unknown; expiresAt: number }>();
 
 function getLocal<T>(key: string): { found: boolean; value?: T } {
-    if (!redisConfigured) return { found: false };
     const entry = localCache.get(key);
     if (!entry) return { found: false };
     if (entry.expiresAt <= Date.now()) {
@@ -48,12 +55,78 @@ function getLocal<T>(key: string): { found: boolean; value?: T } {
 }
 
 function setLocal(key: string, value: unknown, ttlSeconds: number): void {
-    if (!redisConfigured) return;
+    if (!localCache.has(key) && localCache.size >= LOCAL_CACHE_MAX_ENTRIES) {
+        const oldest = localCache.keys().next();
+        if (!oldest.done) localCache.delete(oldest.value);
+    }
     localCache.set(key, { value, expiresAt: Date.now() + ttlSeconds * 1000 });
 }
 
 function deleteLocal(key: string): void {
     localCache.delete(key);
+}
+
+/**
+ * Seed the instance-local cache without touching Redis. Used by the gateway
+ * request warmer after a single packed fetch — per-concern readers then hit
+ * memory instead of issuing their own Redis/DB round trips.
+ */
+export function seedLocalCacheEntry(key: string, value: unknown, ttlSeconds: number): void {
+    setLocal(key, value, ttlSeconds);
+}
+
+/**
+ * Test-only: drop all instance-local entries. Test suites reuse fixed
+ * project ids with different mock backends per case, so without a reset the
+ * first case's cached config leaks into later cases.
+ */
+export function clearLocalGatewayCache(): void {
+    localCache.clear();
+}
+
+/** Cache-key builders shared with the gateway warmer (single source of truth). */
+export const gatewayCacheKeys = {
+    packed: (projectId: string) => `${CONFIG_PREFIX}gwpack:${projectId}`,
+    security: (projectId: string) => `${CONFIG_PREFIX}security:${projectId}`,
+    customRules: (projectId: string) => `${CONFIG_PREFIX}custom_rules:${projectId}`,
+    provider: (projectId: string, provider: string) => `${CONFIG_PREFIX}provider:${projectId}:${provider}`,
+    failover: (projectId: string) => `${CONFIG_PREFIX}failover:${projectId}`,
+    network: (projectId: string) => `${CONFIG_PREFIX}network:${projectId}`,
+    cache: (projectId: string) => `${CONFIG_PREFIX}cache:${projectId}`,
+};
+
+export async function getPackedGatewayConfig(projectId: string): Promise<unknown | null> {
+    const cacheKey = gatewayCacheKeys.packed(projectId);
+    const local = getLocal<unknown>(cacheKey);
+    if (local.found) return local.value ?? null;
+    try {
+        const cached = await redis.get(cacheKey);
+        if (cached === null || cached === undefined) return null;
+        setLocal(cacheKey, cached, TTL.GATEWAY_PACKED);
+        return cached;
+    } catch {
+        return null;
+    }
+}
+
+export async function setPackedGatewayConfig(projectId: string, bundle: unknown): Promise<void> {
+    const cacheKey = gatewayCacheKeys.packed(projectId);
+    setLocal(cacheKey, bundle, TTL.GATEWAY_PACKED);
+    try {
+        await redis.set(cacheKey, bundle, { ex: TTL.GATEWAY_PACKED });
+    } catch {
+        // Silently fail
+    }
+}
+
+export async function invalidatePackedGatewayConfig(projectId: string): Promise<void> {
+    const cacheKey = gatewayCacheKeys.packed(projectId);
+    deleteLocal(cacheKey);
+    try {
+        await redis.del(cacheKey);
+    } catch {
+        // Silently fail
+    }
 }
 
 /**
@@ -179,6 +252,7 @@ export async function invalidateCacheConfig(projectId: string): Promise<void> {
     } catch {
         // Silently fail
     }
+    await invalidatePackedGatewayConfig(projectId);
 }
 
 /**
@@ -303,6 +377,7 @@ export async function invalidateSecurityConfig(projectId: string): Promise<void>
     } catch {
         // Silently fail
     }
+    await invalidatePackedGatewayConfig(projectId);
 }
 
 export async function getCachedCustomRules(projectId: string): Promise<any[] | null> {
@@ -337,6 +412,7 @@ export async function invalidateCustomRules(projectId: string): Promise<void> {
     } catch {
         // Silently fail
     }
+    await invalidatePackedGatewayConfig(projectId);
 }
 
 export async function getCachedProviderConfig(
@@ -376,6 +452,7 @@ export async function invalidateProviderConfig(projectId: string, provider: stri
     } catch {
         // Silently fail
     }
+    await invalidatePackedGatewayConfig(projectId);
 }
 
 export async function getCachedFailoverConfig(projectId: string): Promise<any | null> {
@@ -409,6 +486,7 @@ export async function invalidateFailoverConfig(projectId: string): Promise<void>
     } catch {
         // Silently fail
     }
+    await invalidatePackedGatewayConfig(projectId);
 }
 
 /**
@@ -451,4 +529,5 @@ export async function invalidateNetworkConfig(projectId: string): Promise<void> 
     } catch {
         // The one-minute TTL remains the fallback.
     }
+    await invalidatePackedGatewayConfig(projectId);
 }

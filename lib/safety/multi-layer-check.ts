@@ -20,13 +20,15 @@ export interface SecurityCheckResult {
 }
 
 export interface ProjectSecurityConfig {
+    /** Explicit dashboard opt-in. Absent/false = every scanner below is off. */
+    enabled?: boolean;
     inputThreshold?: number; // 0-1, default 0.5
     outputThreshold?: number; // 0-1, default 0.6 (more strict)
     jailbreakThreshold?: number; // 0-1, default 0.7
-    enableOutputScanning?: boolean; // default true
-    enableJailbreakDetection?: boolean; // default true
-    enableObfuscatedPII?: boolean; // default true
-    enableIntentAnalysis?: boolean; // default true
+    enableOutputScanning?: boolean; // default false
+    enableJailbreakDetection?: boolean; // default false
+    enableObfuscatedPII?: boolean; // default false
+    enableIntentAnalysis?: boolean; // default false
 }
 
 /**
@@ -37,13 +39,27 @@ export function checkInputSecurity(
     conversationHistory?: Array<{ role: string; content: string }>,
     config?: ProjectSecurityConfig
 ): SecurityCheckResult {
-    const enableJailbreak = config?.enableJailbreakDetection ?? true;
+    // No defaults: without an explicit opt-in config every scanner stays off
+    // and the check is a pass-through (also skipping the regex work).
+    const enableJailbreak = config?.enableJailbreakDetection ?? false;
+    const enableObfuscatedPII = config?.enableObfuscatedPII ?? false;
+    const enableIntentAnalysis = config?.enableIntentAnalysis ?? false;
+
+    if (!enableJailbreak && !enableObfuscatedPII && !enableIntentAnalysis) {
+        return {
+            safe: true,
+            reasons: [],
+            layer: 'input',
+            riskScore: 0,
+            confidence: 1,
+        };
+    }
 
     // 1. Content filtering
     const contentFilterConfig: ContentFilterConfig = {
         threshold: config?.inputThreshold ?? 0.5,
-        enableObfuscatedPII: config?.enableObfuscatedPII ?? true,
-        enableIntentAnalysis: config?.enableIntentAnalysis ?? true,
+        enableObfuscatedPII,
+        enableIntentAnalysis,
     };
 
     const inputCheck = checkContent(inputText, contentFilterConfig);
@@ -105,7 +121,7 @@ export function checkOutputSecurity(
     },
     config?: ProjectSecurityConfig
 ): SecurityCheckResult {
-    const enableOutput = config?.enableOutputScanning ?? true;
+    const enableOutput = config?.enableOutputScanning ?? false;
 
     if (!enableOutput) {
         return {

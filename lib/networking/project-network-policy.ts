@@ -19,7 +19,8 @@ interface ProjectNetworkPolicyRow {
     allowed_cidrs: string[] | null;
 }
 
-function fromRow(row: ProjectNetworkPolicyRow | null): ProjectNetworkPolicy {
+/** Pure row → policy mapper, shared with the gateway request warmer. */
+export function projectNetworkPolicyFromRow(row: ProjectNetworkPolicyRow | null): ProjectNetworkPolicy {
     if (!row) return DEFAULT_PROJECT_NETWORK_POLICY;
     return {
         accessMode: row.access_mode,
@@ -44,7 +45,7 @@ export async function loadProjectNetworkPolicy(
         throw new Error(`Unable to load project network policy: ${error.message}`);
     }
 
-    const policy = fromRow(data as ProjectNetworkPolicyRow | null);
+    const policy = projectNetworkPolicyFromRow(data as ProjectNetworkPolicyRow | null);
     void setCachedNetworkConfig(projectId, policy);
     return policy;
 }

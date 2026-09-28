@@ -392,6 +392,8 @@ export async function* streamGatewayChat(params: {
     requestId?: string;
     performance?: GatewayPerformanceTracker;
     hedgeDelayMs?: number;
+    /** Fast-lane: single upstream attempt, no retries or cross-provider fallback. */
+    singleProviderAttempt?: boolean;
 }): AsyncGenerator<GatewayStreamChunk> {
     const resolved =
         params.resolved ??
@@ -533,7 +535,9 @@ export async function* streamGatewayChat(params: {
     }
 
     if (!(await isCircuitOpen(primaryCircuit, cbConfig))) {
-        const maxRetries = failoverAllowed ? settings.maxRetries : 1;
+        const maxRetries = params.singleProviderAttempt
+            ? 1
+            : failoverAllowed ? settings.maxRetries : 1;
         for (let attempt = 0; attempt < maxRetries; attempt++) {
             let emitted = false;
             try {
@@ -577,7 +581,7 @@ export async function* streamGatewayChat(params: {
         lastError = new Error(`Provider ${providerName} circuit is open`);
     }
 
-    if (!failoverAllowed || !settings.enableFallback || !lastError) {
+    if (params.singleProviderAttempt || !failoverAllowed || !settings.enableFallback || !lastError) {
         throw lastError || new Error('Stream request failed');
     }
 

@@ -18,6 +18,8 @@ export type GatewayInputPipelineSuccess = {
     messages: UnifiedMessage[];
     inputText: string;
     inputSecurity: SecurityCheckResult;
+    /** Explicit dashboard opt-in for gateway scanning (false = checks skipped). */
+    securityEnabled: boolean;
     customRules: CustomRulesPipelineResult;
     tokenMap?: Map<string, string>;
     /** Policy `route` directive (PRD M1) — caller overrides the model/provider. */

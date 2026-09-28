@@ -50,6 +50,24 @@ export function computeExactCacheKey(params: {
 
 // ---- Config ----
 
+/**
+ * Pure row → config mapper, shared with the gateway request warmer so a
+ * packed bundle seeds exactly what a DB read would have returned.
+ */
+export function toCacheConfig(row: Record<string, unknown> | null | undefined): CacheConfig {
+    if (!row) return DEFAULT_CACHE_CONFIG;
+    return {
+        cacheEnabled: row.cache_enabled as CacheConfig['cacheEnabled'],
+        exactMatchEnabled: row.exact_match_enabled as CacheConfig['exactMatchEnabled'],
+        semanticMatchEnabled: row.semantic_match_enabled as CacheConfig['semanticMatchEnabled'],
+        ttlSeconds: row.ttl_seconds as CacheConfig['ttlSeconds'],
+        similarityThreshold: row.similarity_threshold as CacheConfig['similarityThreshold'],
+        maxEntries: row.max_entries as CacheConfig['maxEntries'],
+        excludedModels: (row.excluded_models as CacheConfig['excludedModels']) || [],
+        maxCacheableTemperature: row.max_cacheable_temperature as CacheConfig['maxCacheableTemperature'],
+    };
+}
+
 export async function getProjectCacheConfig(projectId: string): Promise<CacheConfig> {
     try {
         const supabase = createAdminClient();
@@ -61,16 +79,7 @@ export async function getProjectCacheConfig(projectId: string): Promise<CacheCon
 
         if (!data) return DEFAULT_CACHE_CONFIG;
 
-        return {
-            cacheEnabled: data.cache_enabled,
-            exactMatchEnabled: data.exact_match_enabled,
-            semanticMatchEnabled: data.semantic_match_enabled,
-            ttlSeconds: data.ttl_seconds,
-            similarityThreshold: data.similarity_threshold,
-            maxEntries: data.max_entries,
-            excludedModels: data.excluded_models || [],
-            maxCacheableTemperature: data.max_cacheable_temperature,
-        };
+        return toCacheConfig(data as Record<string, unknown>);
     } catch {
         return DEFAULT_CACHE_CONFIG;
     }

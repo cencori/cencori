@@ -1,6 +1,7 @@
 import { vi } from 'vitest';
 
 type SecuritySettingsRow = {
+    security_enabled?: boolean;
     safety_threshold: number;
     filter_jailbreaks: boolean;
     filter_pii: boolean;
@@ -9,6 +10,10 @@ type SecuritySettingsRow = {
 
 /**
  * Minimal Supabase mock for input-pipeline contract tests (security_settings + custom_data_rules).
+ *
+ * Scanning is explicit opt-in: tests that need the scanners use tier 'pro'
+ * (which defaults the switch on) or pass security_enabled explicitly; tier
+ * 'free' and explicit null rows mean no scanning.
  */
 export function createMockSupabaseForSecurity(options?: {
     tier?: 'free' | 'pro';
@@ -20,6 +25,7 @@ export function createMockSupabaseForSecurity(options?: {
         (options?.tier === 'free'
             ? null
             : {
+                  security_enabled: true,
                   safety_threshold: 0.5,
                   filter_jailbreaks: true,
                   filter_pii: true,

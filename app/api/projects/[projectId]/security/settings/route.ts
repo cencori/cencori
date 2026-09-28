@@ -5,6 +5,8 @@ import { requireTierFeatureForProject } from '@/lib/require-tier-feature';
 import { invalidateSecurityConfig } from '@/lib/config-cache';
 
 interface SecuritySettings {
+    /** Master switch: only when true does the gateway scan traffic. Default off. */
+    security_enabled: boolean;
     filter_harmful_content: boolean;
     filter_pii: boolean;
     filter_nsfw: boolean;
@@ -58,6 +60,7 @@ export async function GET(
     if (!settings) {
         return NextResponse.json({
             settings: {
+                security_enabled: false,
                 filter_harmful_content: true,
                 filter_pii: true,
                 filter_nsfw: true,
@@ -104,6 +107,10 @@ export async function PUT(
     if (gate) return gate;
 
     const body: Partial<SecuritySettings> = await req.json();
+
+    if (body.security_enabled !== undefined && typeof body.security_enabled !== 'boolean') {
+        return NextResponse.json({ error: 'security_enabled must be a boolean' }, { status: 400 });
+    }
 
     if (body.safety_threshold !== undefined) {
         if (body.safety_threshold < 0 || body.safety_threshold > 1) {

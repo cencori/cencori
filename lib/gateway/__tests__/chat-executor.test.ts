@@ -45,6 +45,7 @@ vi.mock('@/lib/gateway/providers-setup', () => ({
 }));
 
 import { executeGatewayChat, streamGatewayChat } from '@/lib/gateway/chat-executor';
+import { clearLocalGatewayCache } from '@/lib/config-cache';
 
 function createMockSupabaseForExecutor(options?: {
     enableFallback?: boolean;
@@ -102,6 +103,7 @@ function mockResponse(content: string): UnifiedChatResponse {
 describe('executeGatewayChat failover', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        clearLocalGatewayCache();
         mockIsCircuitOpen.mockResolvedValue(false);
         mockRecordSuccess.mockResolvedValue(undefined);
         mockRecordFailure.mockResolvedValue(undefined);
@@ -539,6 +541,7 @@ describe('streamGatewayChat', () => {
     });
     beforeEach(() => {
         vi.clearAllMocks();
+        clearLocalGatewayCache();
         mockIsCircuitOpen.mockResolvedValue(false);
         mockRecordSuccess.mockResolvedValue(undefined);
         mockRecordFailure.mockResolvedValue(undefined);

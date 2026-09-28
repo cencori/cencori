@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  */
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/webhooks', () => ({
     triggerSecurityWebhook: vi.fn(),
@@ -20,8 +20,12 @@ import {
     toUnifiedMessages,
 } from '@/lib/gateway/__tests__/fixtures';
 import { createMockSupabaseForSecurity } from '@/lib/gateway/__tests__/mock-supabase';
+import { clearLocalGatewayCache } from '@/lib/config-cache';
 
 describe('Gateway custom rule actions (mask / redact / tokenize)', () => {
+    beforeEach(() => {
+        clearLocalGatewayCache();
+    });
     it('masks matched content without blocking', async () => {
         const supabase = createMockSupabaseForSecurity({
             tier: 'pro',
