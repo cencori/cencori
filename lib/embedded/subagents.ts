@@ -242,6 +242,12 @@ export async function delegateSubagent(
         // cascade (same-instance, best-effort like root runs).
         const { registerRunController, unregisterRunController } = await import('./run-abort');
         registerRunController(childId, controller);
+        // Cross-instance backstop mirroring root runs: a cascade-cancelled
+        // child stops here even on another server instance.
+        {
+            const { data: live } = await supabase.from('embedded_runs').select('status').eq('id', childId).maybeSingle();
+            if ((live as { status?: string } | null)?.status !== 'running') throw new Error('Chat request aborted');
+        }
         // Manifest controls validated at publish; re-checked defensively so a
         // hand-edited config can never inject an invalid value.
         const childEffort = (config as { reasoning_effort?: unknown }).reasoning_effort;

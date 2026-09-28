@@ -20,12 +20,18 @@ export function checksumConfig(config: AgentVersionConfig): string {
     return crypto.createHash('sha256').update(JSON.stringify(config)).digest('hex');
 }
 
-export type AgentActivity = { active: true; found: boolean } | { active: false; found: boolean };
+export type AgentActivity =
+    | { active: true; found: boolean }
+    | { active: false; found: boolean }
+    | { active: true; found: false; unavailable: true };
 
 /**
  * Single pause gate shared by run admission, session creation, and turns:
  * only an explicitly disabled agent refuses work. Missing rows are reported
- * via `found` so callers can keep their own 404/403 shapes.
+ * via `found` so callers can keep their own 404/403 shapes. Lookup failures
+ * are NOT treated as active: callers must answer 503 so a paused agent can
+ * never execute through an outage, and clients retry instead of assuming
+ * either state.
  */
 export async function checkAgentActivity(
     supabase: { from: (table: string) => any },
@@ -39,14 +45,33 @@ export async function checkAgentActivity(
             .eq('project_id', projectId)
             .eq('id', agentId)
             .maybeSingle();
-        if (error || !data) return { active: true, found: false };
+        if (error) return { active: true, found: false, unavailable: true };
+        if (!data) return { active: true, found: false };
         return (data as { is_active?: boolean | null }).is_active === false
             ? { active: false, found: true }
             : { active: true, found: true };
     } catch {
-        // Fail open on lookup failure: admission gates must not wedge when
-        // the check itself errors; execution paths re-verify downstream.
-        return { active: true, found: false };
+        return { active: true, found: false, unavailable: true };
+    }
+}
+
+/**
+ * Re-verify pause at execution start: admission may long predate it.
+ * Throws on unavailable checks (retry), disabled agents, or inactive
+ * installations so queued work never runs stale.
+ */
+export async function assertExecutionAdmissible(
+    supabase: { from: (table: string) => any },
+    run: { project_id: string; agent_id: string; installation_id: string | null },
+): Promise<void> {
+    const activity = await checkAgentActivity(supabase as never, run.project_id, run.agent_id);
+    if ('unavailable' in activity) throw new Error('Agent pause check unavailable; retry shortly');
+    if (!activity.active) throw Object.assign(new Error('Agent is disabled'), { code: 'agent_disabled' });
+    if (run.installation_id) {
+        const { data: liveIns } = await supabase.from('agent_installations').select('status').eq('id', run.installation_id).maybeSingle();
+        if (!liveIns || (liveIns as { status?: string }).status !== 'active') {
+            throw Object.assign(new Error('Agent installation is not active'), { code: 'installation_inactive' });
+        }
     }
 }
 
@@ -187,6 +212,9 @@ export async function resolveAgentRuntimeConfig(
     if (opts.installationVersionId) {
         const { data } = await supabase.from('agent_versions').select('id, version, config_json').eq('id', opts.installationVersionId).maybeSingle();
         if (data) return { versionId: data.id as string, version: data.version as string, config: (data.config_json ?? {}) as AgentVersionConfig, source: 'installation' };
+        // An explicit pin that resolves to nothing must stop, not silently
+        // fall back to another configuration.
+        return { versionId: null, version: null, config: null, source: 'none' };
     }
     if (opts.updateChannel === 'stable') {
         const { data: agent } = await supabase.from('agents').select('stable_version_id').eq('id', opts.agentId).maybeSingle();

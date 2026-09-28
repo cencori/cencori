@@ -52,4 +52,10 @@ describe('retrieveTurnSkills version pinning', () => {
         const res = await retrieveTurnSkills(db as never, { installationId: 'ins1', tenantId: null, versionId: 'v-empty' });
         expect(res).toEqual({ block: null, skill_version_ids: [] });
     });
+
+    it('flags read failures instead of silently returning empty', async () => {
+        const db = { from: () => { throw new Error('db down'); } };
+        const res = await retrieveTurnSkills(db as never, { installationId: 'ins1', tenantId: null, versionId: 'v1' });
+        expect(res).toEqual({ block: null, skill_version_ids: [], failed: true });
+    });
 });

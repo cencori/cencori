@@ -31,6 +31,8 @@ export function buildKnowledgeBlock(snippets: string[]): string | null {
 export interface TurnSkills {
     block: string | null;
     skill_version_ids: string[];
+    /** True when the read failed as opposed to finding no skills. */
+    failed?: boolean;
 }
 
 async function liveInstallationVersionId(supabase: Admin, installationId: string): Promise<string | null> {
@@ -57,6 +59,10 @@ export async function retrieveTurnSkills(
 ): Promise<TurnSkills> {
     const empty: TurnSkills = { block: null, skill_version_ids: [] };
     if (!opts.installationId) return empty;
+    const failed = (cause: unknown): TurnSkills => {
+        console.warn('[TurnSkills] Skill read failed (returning empty, flagged):', cause instanceof Error ? cause.message : cause);
+        return { block: null, skill_version_ids: [], failed: true };
+    };
     try {
         const versionId = opts.versionId ?? await liveInstallationVersionId(supabase, opts.installationId);
         if (!versionId) return empty;
@@ -95,8 +101,8 @@ export async function retrieveTurnSkills(
             block: `Agent skills (passive procedures to follow when relevant):\n\n${parts.join('\n\n---\n\n')}`,
             skill_version_ids: used,
         };
-    } catch {
-        return empty;
+    } catch (e) {
+        return failed(e);
     }
 }
 

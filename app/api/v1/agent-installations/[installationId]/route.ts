@@ -33,8 +33,10 @@ async function loadInstallation(supabase: ReturnType<typeof createAdminClient>, 
 }
 
 async function enrich(supabase: ReturnType<typeof createAdminClient>, row: Record<string, unknown>) {
-    const { data: kbs } = await supabase.from('installation_knowledge_bases').select('knowledge_base_id').eq('installation_id', row.id as string);
-    const { data: conns } = await supabase.from('installation_connections').select('connection_id').eq('installation_id', row.id as string);
+    const { data: kbs, error: kbError } = await supabase.from('installation_knowledge_bases').select('knowledge_base_id').eq('installation_id', row.id as string);
+    if (kbError) throw new Error(`Failed to load knowledge grants: ${kbError.message}`);
+    const { data: conns, error: connError } = await supabase.from('installation_connections').select('connection_id').eq('installation_id', row.id as string);
+    if (connError) throw new Error(`Failed to load connection grants: ${connError.message}`);
     return {
         ...row,
         knowledge_base_ids: ((kbs ?? []) as Array<{ knowledge_base_id: string }>).map((k) => k.knowledge_base_id),
@@ -135,21 +137,21 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ installat
     if (Object.keys(patch).length === 0 && replaceKb === null && replaceConns === null) {
         return addGatewayHeaders(embeddedError(400, 'invalid_request_error', 'No updatable fields', { requestId }), { requestId });
     }
-    if (Object.keys(patch).length > 0) {
-        const { data, error } = await supabase.from('agent_installations').update(patch).eq('id', row.id as string).select('*').single();
-        if (error || !data) return addGatewayHeaders(embeddedError(500, 'invalid_request_error', error?.message ?? 'Update failed', { requestId }), { requestId });
-        Object.assign(row, data as Record<string, unknown>);
-    }
-    if (replaceKb !== null || replaceConns !== null) {
-        const grants = validated as { knowledgeBaseIds: string[]; connectionIds: string[] };
-        const { data: swapped, error: swapError } = await supabase.rpc('replace_installation_grants', {
+    // One atomic call: row patch + grant swap commit together, so a version
+    // bump can never land without its revocations (or vice versa).
+    if (replaceKb !== null || replaceConns !== null || Object.keys(patch).length > 0) {
+        const rowPatch = Object.keys(patch).length > 0 ? patch : null;
+        const grants = validated ?? { knowledgeBaseIds: [], connectionIds: [] };
+        const { error: swapError } = await supabase.rpc('replace_installation_grants', {
             p_installation_id: row.id as string,
             p_kb_ids: replaceKb !== null ? grants.knowledgeBaseIds : null,
             p_connection_ids: replaceConns !== null ? grants.connectionIds : null,
+            p_row_patch: rowPatch,
         });
-        if (swapError || !swapped) {
-            return addGatewayHeaders(embeddedError(500, 'invalid_request_error', swapError?.message ?? 'Grant replacement failed', { requestId }), { requestId });
+        if (swapError) {
+            return addGatewayHeaders(embeddedError(500, 'invalid_request_error', swapError.message ?? 'Update failed', { requestId }), { requestId });
         }
+        if (rowPatch) Object.assign(row, rowPatch);
     }
     let full: Record<string, unknown>;
     try {

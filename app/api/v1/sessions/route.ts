@@ -227,6 +227,27 @@ export async function POST(req: NextRequest) {
             externalUserId = embeddedScope.externalUserId;
             // Raw UUID into the UUID column — never the prefixed public form.
             installationId = body.installation_id ? dePrefixId(body.installation_id) : (embeddedScope.installationIds?.[0] ?? null);
+            // Client-token sessions skip the secret-key admission below, so
+            // enforce installation activity + agent pause here.
+            if (installationId) {
+                const { data: scopedIns } = await adminClient
+                    .from('agent_installations')
+                    .select('id, agent_id, status')
+                    .eq('project_id', gatewayCtx.projectId)
+                    .eq('id', installationId)
+                    .maybeSingle();
+                if (!scopedIns) return respondError(404, 'Installation not found', 'installation_not_found');
+                if ((scopedIns.status as string) !== 'active') return respondError(409, 'Installation is not active', 'installation_not_found');
+                const scopedAgentId = (scopedIns.agent_id as string | null) ?? null;
+                if (scopedAgentId) {
+                    const { checkAgentActivity } = await import('@/lib/embedded/agents');
+                    const activity = await checkAgentActivity(adminClient as never, gatewayCtx.projectId, scopedAgentId);
+                    if ('unavailable' in activity) {
+                        return respondError(503, 'Agent pause check unavailable; retry shortly', 'activity_check_unavailable');
+                    }
+                    if (!activity.active) return respondError(409, 'Agent is not active', 'agent_inactive');
+                }
+            }
         } else if (body.tenant_id || body.installation_id || body.external_user_id) {
             // Secret-key path: trusted, but tenant/user must exist under this project.
             if (body.tenant_id) {
@@ -275,6 +296,9 @@ export async function POST(req: NextRequest) {
                 if (boundAgentId) {
                     const { checkAgentActivity } = await import('@/lib/embedded/agents');
                     const activity = await checkAgentActivity(adminClient as never, gatewayCtx.projectId, boundAgentId);
+                    if ('unavailable' in activity) {
+                        return respondError(503, 'Agent pause check unavailable; retry shortly', 'activity_check_unavailable');
+                    }
                     if (!activity.active) {
                         return respondError(409, 'Agent is not active', 'agent_inactive');
                     }

@@ -103,6 +103,15 @@ describe('unified model registry', () => {
         expect(registry.partial).toBe(true);
     });
 
+    it('flags partial when a source hits its read cap', async () => {
+        const keys = Array.from({ length: 502 }, (_, i) => ({ provider: `p${i}`, project_id: 'proj-1', is_active: true }));
+        const { from } = makeDb(
+            { provider_keys: keys, provider_connections: [], custom_providers: [], model_pricing: [] },
+        );
+        const registry = await buildUnifiedModelRegistry({ from } as never, { projectId: 'proj-1', query: {} });
+        expect(registry.partial).toBe(true);
+    });
+
     it('caps synced source reads and marks truncation partial', async () => {
         const synced = Array.from({ length: 2005 }, (_, i) => ({
             provider_connection_id: 'c1',

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { validateGatewayRequest, addGatewayHeaders, handleCorsPreFlight } from '@/lib/gateway-middleware';
 import { embeddedError, dePrefixId, withPrefix, getIdempotencyKey } from '@/lib/embedded/http';
-import { executionVersionInputs, resolveAgentRuntimeConfig } from '@/lib/embedded/agents';
+import { assertExecutionAdmissible, executionVersionInputs, resolveAgentRuntimeConfig } from '@/lib/embedded/agents';
 import { registerRunController, unregisterRunController } from '@/lib/embedded/run-abort';
 import { appendRunEvent, canTransition } from '@/lib/embedded/runs';
 import { scheduleEmbeddedWebhook } from '@/lib/embedded/dispatch-webhook';
@@ -103,8 +103,7 @@ function serializeRun(row: Record<string, unknown>) {
     };
 }
 
-async function executeRun(runId: string): Promise<void> {
-    const executorStartedAt = Date.now();
+async function executeRun(runId: string): Promise<void> {    const executorStartedAt = Date.now();
     let attemptedModel: string | null = null;
     const supabase = createAdminClient();
     // Atomic claim: only one executor moves queued → running. A run that was
@@ -123,11 +122,25 @@ async function executeRun(runId: string): Promise<void> {
         agent_version_id: string | null; installation_id: string | null;
         external_user_id: string | null; input_ref: Record<string, unknown>;
     };
+    // Re-verify pause at execution start: admission may long predate it.
+    // A paused agent or installation fails loudly instead of running stale.
+    await assertExecutionAdmissible(supabase as never, {
+        project_id: run.project_id,
+        agent_id: run.agent_id,
+        installation_id: run.installation_id,
+    });
     // Cancellation signal: the cancel route aborts this controller so the
     // in-flight provider call stops and failover suppresses retries. The
     // conditional terminal writes below still let a concurrent cancel win.
     const abortController = new AbortController();
     registerRunController(runId, abortController);
+    // Cross-instance backstop: the abort registry only signals this
+    // process. Re-reading status at phase boundaries stops cancelled work
+    // anywhere; the conditional terminal writes still decide the outcome.
+    const throwIfCancelled = async () => {
+        const { data } = await supabase.from('embedded_runs').select('status').eq('id', runId).maybeSingle();
+        if ((data as { status?: string } | null)?.status !== 'running') throw new Error('Chat request aborted');
+    };
     await appendRunEvent(supabase as never, runId, 'run.started', { run_id: runId });
     scheduleEmbeddedWebhook(run.project_id, 'run.started', { run_id: runId, agent_id: run.agent_id });
 
@@ -193,7 +206,7 @@ async function executeRun(runId: string): Promise<void> {
         const skillsPromise = run.installation_id
             ? import('@/lib/embedded/turn-knowledge')
                 .then(({ retrieveTurnSkills }) => retrieveTurnSkills(supabase as never, { installationId: run.installation_id, tenantId: run.tenant_id, versionId: run.agent_version_id }))
-                .catch(() => ({ block: null, skill_version_ids: [] as string[] }))
+                .catch(() => ({ block: null, skill_version_ids: [] as string[], failed: true }))
             : Promise.resolve({ block: null, skill_version_ids: [] as string[] });
         if (run.installation_id) {
             const { data: bindings } = await supabase.from('installation_knowledge_bases').select('knowledge_base_id').eq('installation_id', run.installation_id);
@@ -238,6 +251,9 @@ async function executeRun(runId: string): Promise<void> {
         const skills = await skillsPromise;
         const runSkillsBlock = skills.block;
         const runSkillIds = skills.skill_version_ids;
+        if ((skills as { failed?: boolean }).failed === true) {
+            await appendRunEvent(supabase as never, runId, 'skills.unavailable', { run_id: runId, reason: 'skill read failed; turn runs without skill procedures' });
+        }
 
         const { executeGatewayChat } = await import('@/lib/gateway/chat-executor');
         const systemParts = [
@@ -287,7 +303,9 @@ async function executeRun(runId: string): Promise<void> {
         const MAX_TOOL_ITERATIONS = 5;
         const preGatewayMs = Date.now() - executorStartedAt;
 
-        for (let iteration = 0; ; iteration++) {            if (abortController.signal.aborted) throw new Error('Chat request aborted');
+        for (let iteration = 0; ; iteration++) {
+            if (abortController.signal.aborted) throw new Error('Chat request aborted');
+            await throwIfCancelled();
             const gatewayChatStartedAt = Date.now();
             response = await executeGatewayChat({
                 supabase: supabase as never,
@@ -396,6 +414,7 @@ async function executeRun(runId: string): Promise<void> {
         // A cancel that landed after provider success must not be billed:
         // the terminal write below would lose to it anyway.
         if (abortController.signal.aborted) throw new Error('Chat request aborted');
+        await throwIfCancelled();
 
         // A managed-key run must debit the wallet just like direct Gateway
         // inference. Charge immediately after provider success, even if later
@@ -476,6 +495,7 @@ async function executeRun(runId: string): Promise<void> {
             reasoning_effort_applied: reasoningEffort ?? null,
             knowledge_citations: citations,
             skills_used: runSkillIds,
+            skills_failed: (skills as { failed?: boolean }).failed === true,
             manifest_tools: ((runtime.config ?? {}) as { tools?: unknown }).tools ?? [],
             manifest_policy: ((runtime.config ?? {}) as { policy?: unknown }).policy ?? { browser: { enabled: false }, network: { mode: 'none', allowed_hosts: [] } },
             usage: {

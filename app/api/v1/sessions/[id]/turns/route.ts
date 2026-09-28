@@ -238,6 +238,9 @@ export async function POST(
                 if (insAgentId) {
                     const { checkAgentActivity } = await import('@/lib/embedded/agents');
                     const activity = await checkAgentActivity(adminClient as never, (gatewayCtx as GatewayContext).projectId, insAgentId);
+                    if ('unavailable' in activity) {
+                        return respondError(503, 'Agent pause check unavailable; retry shortly', 'activity_check_unavailable');
+                    }
                     if (!activity.active) {
                         return respondError(403, 'Agent is disabled', 'agent_disabled');
                     }
