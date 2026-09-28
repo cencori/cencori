@@ -129,6 +129,17 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers());
 
 describe('/v1/responses streaming', () => {
+    it('settles an upstream EOF without a terminal choice as a recoverable failure', async () => {
+        mockStreamGatewayChat.mockImplementation(() => (async function* () {
+            yield chunk({ delta: 'Partial draft' });
+        })());
+        const result = await runV1ResponsesExecution(baseParams());
+        if (!result.ok) throw new Error('expected ok');
+        const body = await new Response(result.response.body).text();
+        expect(body).toContain('event: response.done');
+        expect(body).toContain('"status":"failed"');
+        expect(body).toContain('stream ended before sending a completion signal');
+    });
     it('keeps a pending stream alive with standard events and stops its timer at completion', async () => {
         vi.useFakeTimers();
         const { finish } = controllableStream();

@@ -486,6 +486,29 @@ describe('executeGatewayChat failover', () => {
 });
 
 describe('streamGatewayChat', () => {
+    it('stops reading at a terminal choice and records success without requiring EOF', async () => {
+        const stream = streamGatewayChat({
+            supabase: createMockSupabaseForExecutor({ enableFallback: false }) as never,
+            projectId: 'proj-ex', organizationId: 'org-ex', tier: 'free',
+            request: { messages: [], model: 'gpt-4o', stream: true },
+            resolved: {
+                providerName: 'openai', model: 'gpt-4o',
+                provider: {
+                    chat: vi.fn(), countTokens: vi.fn(), getPricing: vi.fn(),
+                    stream: async function* () {
+                        yield { delta: 'Complete', finishReason: 'stop' };
+                        throw new Error('Read beyond terminal choice');
+                    },
+                },
+                router: { hasProvider: () => false, getProvider: vi.fn() },
+            } as never,
+        });
+        const chunks = [];
+        for await (const chunk of stream) chunks.push(chunk);
+        expect(chunks).toHaveLength(1);
+        expect(mockRecordSuccess).toHaveBeenCalledWith('openai::gpt-4o');
+        expect(mockRecordFailure).not.toHaveBeenCalled();
+    });
     afterEach(() => vi.useRealTimers());
 
     it('allows a bounded Maximo drafting pause beyond 60s and forwards transport activity', async () => {

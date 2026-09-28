@@ -808,6 +808,7 @@ export async function runV1ResponsesExecution(
                     })));
                 }, 15_000);
                 let fullText = '';
+                let completed = false;
                 // Real usage from the provider when the adapter reports it.
                 let reportedUsage: TokenUsage | undefined;
                 const collectedToolCalls: Record<string, { id: string; name: string; arguments: string }> = {};
@@ -1284,8 +1285,12 @@ export async function runV1ResponsesExecution(
                                     })
                                 )
                             );
+                            completed = true;
                             controller.close();
                         }
+                    }
+                    if (!completed && !cancelled) {
+                        throw new Error('Provider stream ended before sending a completion signal');
                     }
                 } catch (error) {
                     if (cancelled) return;
