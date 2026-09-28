@@ -10,7 +10,7 @@
 @import "fumadocs-ui/css/shadcn.css";
 @import "fumadocs-ui/css/preset.css";
 
-@custom-variant dark (&:where(html.dark .dashboard-theme *, html.dark .docs-theme *, html .editorial-dark *));
+@custom-variant dark (&:where(html.dark *, html .editorial-dark *));
 
 /* Docs utilities */
 @utility no-scrollbar {
@@ -196,10 +196,9 @@
     }
 }
 
-/* Dark mode lives in the dashboard (and docs) only. `next-themes` still
- * toggles the global `.dark` class, but nothing outside these scopes
- * responds to it — marketing and every other surface keep the light palette.
- * `.editorial-dark` is the opt-in always-dark scope for marketing surfaces. */
+/* Start with the black palette before hydration. An explicit light selection
+ * restores the light root palette; editorial marketing surfaces stay dark. */
+:root:not(.light),
 .developers-theme,
 .editorial-dark,
 :where(html.dark) .dashboard-theme,
@@ -336,6 +335,7 @@
 
     /* Hide the document scrollbar app-wide. Scrolling itself is unaffected. */
     html {
+        background-color: var(--background);
         -ms-overflow-style: none;
         scrollbar-width: none;
     }
