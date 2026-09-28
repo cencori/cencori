@@ -1,0 +1,47 @@
+.banner {
+  display: grid;
+  grid-template-columns: minmax(0, auto) auto;
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;
+  min-height: 2.875rem;
+  padding: 0.75rem 2.25rem;
+  color: #f4f4ef;
+}
+
+.headline {
+  max-width: 44rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
+}
+
+.action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: rgba(244, 244, 239, 0.65);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.arrow {
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .banner {
+    gap: 0.75rem;
+    padding: 0.75rem 1.25rem;
+  }
+
+  .headline {
+    font-size: 0.75rem;
+  }
+
+  .actionText {
+    display: none;
+  }
+}

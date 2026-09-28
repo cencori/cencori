@@ -47,14 +47,26 @@
   font: inherit;
 }
 
+.heroBackdrop {
+  position: relative;
+  isolation: isolate;
+  background: var(--ink);
+}
+
 .hero {
   position: relative;
   min-height: 100vh;
   min-height: 100dvh;
-  isolation: isolate;
   display: grid;
   grid-template-rows: auto 1fr;
-  background: var(--ink);
+}
+
+.heroVisual {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: clip;
+  pointer-events: none;
 }
 
 .heroImage,

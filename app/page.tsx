@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { CencoriFuturePage } from "@/components/future/CencoriFuturePage";
+import { getAllPosts, getPostUrl } from "@/lib/blog";
 
 export const metadata: Metadata = {
   title: "Cencori — The computing infrastructure AI runs on",
@@ -34,5 +35,17 @@ export const metadata: Metadata = {
 };
 
 export default function RootPage() {
-  return <CencoriFuturePage />;
+  const latestPost = getAllPosts().find(
+    (post) => post.category !== "changelog" && !post.externalUrl,
+  );
+
+  return (
+    <CencoriFuturePage
+      recentNews={
+        latestPost
+          ? { title: latestPost.title, href: getPostUrl(latestPost) }
+          : null
+      }
+    />
+  );
 }
