@@ -994,6 +994,10 @@
               "type": "string"
             }
           },
+          "skills_failed": {
+            "type": "boolean",
+            "description": "True when skill retrieval failed; the run proceeded without skill procedures and emitted a skills.unavailable event."
+          },
           "manifest_tools": {
             "type": "array",
             "items": {}
@@ -6571,6 +6575,7 @@
     "/v1/models": {
       "get": {
         "summary": "Unified model registry (only discovery surface)",
+        "description": "Pages rebuild the live catalog per request: concurrent catalog changes can shift entries between pages. Consume a single consistent view by paging quickly without interleaving writes, and treat partial:true as incomplete.",
         "parameters": [
           {
             "name": "provider",

@@ -14,6 +14,13 @@ const UNKNOWN_CREATED = 0;
 // the catalog partial rather than silently dominating it.
 const SYNCED_MODELS_PER_CONNECTION = 2000;
 
+// PostgREST silently caps unbounded selects (default 1000 rows). Every
+// source read states its bound and flags truncation instead.
+const PROVIDER_KEYS_CAP = 500;
+const CONNECTIONS_CAP = 500;
+const CUSTOM_PROVIDERS_CAP = 500;
+const PRICING_ROWS_CAP = 5000;
+
 function toEpochSeconds(value: unknown): number {
     const parsed = typeof value === 'string' ? Date.parse(value) : NaN;
     return Number.isFinite(parsed) ? Math.floor(parsed / 1000) : UNKNOWN_CREATED;
@@ -66,9 +73,11 @@ export async function buildUnifiedModelRegistry(
             .from('provider_keys')
             .select('provider')
             .eq('project_id', projectId)
-            .eq('is_active', true);
+            .eq('is_active', true)
+            .limit(PROVIDER_KEYS_CAP + 1);
         if (keysError) partial = true;
-        for (const row of providerKeys ?? []) {
+        else if ((providerKeys ?? []).length > PROVIDER_KEYS_CAP) partial = true;
+        for (const row of (providerKeys ?? []).slice(0, PROVIDER_KEYS_CAP)) {
             if (row.provider) {
                 managedProviders.add(row.provider);
                 byokProviders.add(row.provider);
@@ -80,9 +89,12 @@ export async function buildUnifiedModelRegistry(
             .from('provider_connections')
             .select('id, provider, status')
             .eq('project_id', projectId)
-            .eq('status', 'active');
+            .eq('status', 'active')
+            .limit(CONNECTIONS_CAP + 1);
         if (connectionsError) partial = true;
-        for (const c of connections ?? []) {
+        const connectionRows = (connections ?? []).slice(0, CONNECTIONS_CAP);
+        if ((connections ?? []).length > CONNECTIONS_CAP) partial = true;
+        for (const c of connectionRows) {
             connectionProvider.set(c.id as string, c.provider as string);
             byokProviders.add(c.provider as string);
             if (q.connectionId && (c.id as string) !== q.connectionId) continue;
@@ -126,11 +138,14 @@ export async function buildUnifiedModelRegistry(
             .from('custom_providers')
             .select('id, name, created_at, custom_models(model_name, display_name, is_active, created_at)')
             .eq('project_id', projectId)
-            .eq('is_active', true);
+            .eq('is_active', true)
+            .limit(CUSTOM_PROVIDERS_CAP + 1);
         if (customError) partial = true;
-        if (Array.isArray(projectCustomProviders)) {
+        const customRows = (projectCustomProviders ?? []).slice(0, CUSTOM_PROVIDERS_CAP);
+        if ((projectCustomProviders ?? []).length > CUSTOM_PROVIDERS_CAP) partial = true;
+        if (Array.isArray(customRows)) {
             const seen = new Set<string>();
-            for (const provider of projectCustomProviders) {
+            for (const provider of customRows) {
                 const tag = `custom:${provider.id}`;
                 const models = ((provider.custom_models as unknown[]) ?? [])
                     .filter((m) => (m as { model_name?: string; is_active?: boolean })?.model_name && (m as { is_active?: boolean }).is_active !== false)
@@ -147,9 +162,10 @@ export async function buildUnifiedModelRegistry(
         }
     }
 
-    const { data: pricingRows, error: pricingError } = await supabase.from('model_pricing').select('*').eq('is_active', true);
+    const { data: pricingRows, error: pricingError } = await supabase.from('model_pricing').select('*').eq('is_active', true).limit(PRICING_ROWS_CAP + 1);
     if (pricingError) partial = true;
-    const activePricing = (pricingRows ?? []).filter(
+    if ((pricingRows ?? []).length > PRICING_ROWS_CAP) partial = true;
+    const activePricing = ((pricingRows ?? []).slice(0, PRICING_ROWS_CAP)).filter(
         (row) =>
             !(row as { pricing_expires_at?: string }).pricing_expires_at ||
             Date.parse((row as { pricing_expires_at: string }).pricing_expires_at) > Date.now() ||

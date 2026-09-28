@@ -36,8 +36,10 @@ async function resolveTenant(supabase: ReturnType<typeof createAdminClient>, pro
 }
 
 async function enrich(supabase: ReturnType<typeof createAdminClient>, row: Record<string, unknown>) {
-    const { data: kbs } = await supabase.from('installation_knowledge_bases').select('knowledge_base_id').eq('installation_id', row.id as string);
-    const { data: conns } = await supabase.from('installation_connections').select('connection_id').eq('installation_id', row.id as string);
+    const { data: kbs, error: kbError } = await supabase.from('installation_knowledge_bases').select('knowledge_base_id').eq('installation_id', row.id as string);
+    if (kbError) throw new Error(`Failed to load knowledge grants: ${kbError.message}`);
+    const { data: conns, error: connError } = await supabase.from('installation_connections').select('connection_id').eq('installation_id', row.id as string);
+    if (connError) throw new Error(`Failed to load connection grants: ${connError.message}`);
     return {
         ...row,
         knowledge_base_ids: ((kbs ?? []) as Array<{ knowledge_base_id: string }>).map((k) => k.knowledge_base_id),
@@ -171,10 +173,12 @@ export async function POST(req: NextRequest) {
     const ins = installation as Record<string, unknown>;
 
     for (const kbId of body.knowledge_base_ids ?? []) {
-        await supabase.from('installation_knowledge_bases').upsert({ installation_id: ins.id as string, knowledge_base_id: dePrefixId(kbId) }, { onConflict: 'installation_id,knowledge_base_id' });
+        const { error: kbError } = await supabase.from('installation_knowledge_bases').upsert({ installation_id: ins.id as string, knowledge_base_id: dePrefixId(kbId) }, { onConflict: 'installation_id,knowledge_base_id' });
+        if (kbError) return addGatewayHeaders(embeddedError(500, 'invalid_request_error', `Failed to grant knowledge base: ${kbError.message}`, { requestId }), { requestId });
     }
     for (const connId of body.connection_ids ?? []) {
-        await supabase.from('installation_connections').upsert({ installation_id: ins.id as string, connection_id: connId }, { onConflict: 'installation_id,connection_id' });
+        const { error: connError } = await supabase.from('installation_connections').upsert({ installation_id: ins.id as string, connection_id: connId }, { onConflict: 'installation_id,connection_id' });
+        if (connError) return addGatewayHeaders(embeddedError(500, 'invalid_request_error', `Failed to grant connection: ${connError.message}`, { requestId }), { requestId });
     }
 
     // Missing-requirements check from version requirements_json.

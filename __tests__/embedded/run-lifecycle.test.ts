@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { checkAgentActivity, executionVersionInputs } from '@/lib/embedded/agents';
+import { checkAgentActivity, assertExecutionAdmissible, executionVersionInputs } from '@/lib/embedded/agents';
 import { abortRun, isRunAborted, registerRunController, unregisterRunController } from '@/lib/embedded/run-abort';
 import { encodeRunRequest } from '@/lib/embedded/run-request';
 
@@ -100,8 +100,8 @@ describe('checkAgentActivity', () => {
         await expect(checkAgentActivity(activityDb([{}]) as never, 'p', 'a')).resolves.toEqual({ active: true, found: true });
     });
 
-    it('fails open on lookup errors so admission never wedges', async () => {
-        await expect(checkAgentActivity(throwingDb() as never, 'p', 'a')).resolves.toEqual({ active: true, found: false });
+    it('fails closed-unavailable on lookup errors so paused work cannot slip through', async () => {
+        await expect(checkAgentActivity(throwingDb() as never, 'p', 'a')).resolves.toEqual({ active: true, found: false, unavailable: true });
     });
 });
 
@@ -117,6 +117,37 @@ describe('run abort registry', () => {
         expect(abortRun('missing')).toBe(false);
         unregisterRunController('run-1');
         expect(isRunAborted('run-1')).toBe(false);
+    });
+});
+
+describe('execution admissibility at start', () => {
+    const scopeDb = (agents: Array<Record<string, unknown>>, installations: Array<Record<string, unknown>>) => {
+        const leaf = (table: string) => ({
+            maybeSingle: async () => ({
+                data: (table === 'agents' ? agents : installations)[0] ?? null,
+                error: null,
+            }),
+        });
+        return {
+            from: (table: string) => ({
+                select: () => ({ eq: () => ({ eq: () => leaf(table), maybeSingle: () => leaf(table).maybeSingle() }) }),
+            }),
+        };
+    };
+
+    it('stops paused agents and inactive installations', async () => {
+        await expect(assertExecutionAdmissible(
+            scopeDb([{ is_active: false }], [{ status: 'active' }]) as never,
+            { project_id: 'p', agent_id: 'a', installation_id: 'i1' },
+        )).rejects.toThrow('Agent is disabled');
+        await expect(assertExecutionAdmissible(
+            scopeDb([{ is_active: true }], [{ status: 'disabled' }]) as never,
+            { project_id: 'p', agent_id: 'a', installation_id: 'i1' },
+        )).rejects.toThrow('Agent installation is not active');
+        await expect(assertExecutionAdmissible(
+            scopeDb([{ is_active: true }], [{ status: 'active' }]) as never,
+            { project_id: 'p', agent_id: 'a', installation_id: 'i1' },
+        )).resolves.toBeUndefined();
     });
 });
 

@@ -208,4 +208,20 @@ describe('usage summary truncation', () => {
         };
         expect(res.__body.unresolved_rows).toBe(1);
     });
+
+    it('distinguishes unresolved zero-cost rows from genuinely free ones', async () => {
+        const { GET } = await import('@/app/api/v1/usage/events/route');
+        const { from } = makeDb({
+            ai_requests: [
+                usageRow('e1', '2026-09-25T00:00:02Z', { cost_usd: 0, cencori_charge_usd: 0, metadata: { billing_reconciliation_required: true } }),
+                usageRow('e2', '2026-09-25T00:00:03Z', { cost_usd: 0, cencori_charge_usd: 0, metadata: {} }),
+            ],
+        });
+        (globalThis as Record<string, unknown>).__fakeDb = { from };
+        const res = (await GET(req('http://x/v1/usage/events?since=2026-09-01T00:00:00Z&until=2026-10-01T00:00:00Z'))) as {
+            __body: { data: Array<{ id: string; billing_state: string }> };
+        };
+        const states = Object.fromEntries(res.__body.data.map((r) => [r.id, r.billing_state]));
+        expect(states).toEqual({ e2: 'final', e1: 'unresolved' });
+    });
 });

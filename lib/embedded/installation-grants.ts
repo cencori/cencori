@@ -54,7 +54,10 @@ export async function validateInstallationGrants(
             return { ok: false, error: { status: 409, code: 'knowledge_base_unavailable', message: `Knowledge base is not active: ${raw}` } };
         }
         const kbTenant = (kb.tenant_id as string | null) ?? null;
-        const shared = kb.scope_type === 'platform' || kbTenant === null;
+        // Shared means project-visible: platform scope, or tenant scope with
+        // no tenant binding. Group scope is never implicitly shared — a null
+        // tenant on a group row does not grant cross-tenant access.
+        const shared = kb.scope_type === 'platform' || (kbTenant === null && kb.scope_type !== 'group');
         if (!shared && kb.scope_type === 'group') {
             return { ok: false, error: { status: 403, code: 'knowledge_base_scope_mismatch', message: `Group-scoped knowledge base cannot be granted here: ${raw}` } };
         }
