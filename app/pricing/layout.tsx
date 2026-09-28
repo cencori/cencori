@@ -1,4 +1,4 @@
-import { SiteNav } from "@/components/nav/SiteNav";
+import { ThesisScrollNav } from "@/components/nav/MarketingNav";
 import { SiteFooter } from "@/components/marketing/SiteFooter";
 
 export default function PricingLayout({
@@ -8,8 +8,8 @@ export default function PricingLayout({
 }) {
     return (
         <div className="editorial-dark min-h-screen bg-background text-foreground">
-            <SiteNav solid />
-            {children}
+            <ThesisScrollNav />
+            <main className="flex-1 pt-20">{children}</main>
             <SiteFooter />
         </div>
     );
