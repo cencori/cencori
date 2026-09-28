@@ -25,10 +25,11 @@ export async function generateMetadata({ params }: BlogPostPageProps): Promise<M
     // metadataBase (cencori.com). Building an absolute URL here from
     // NEXT_PUBLIC_APP_URL leaked cencori.vercel.app into the card tags in
     // production, and X's crawler gets a 404 on that domain — no preview card.
-    // Newsroom cover art is a bare square used by cards and listing views.
-    // Social previews use the generated landscape composition so the title,
-    // category, and date remain legible when the article is shared.
-    const ogImage = `/newsroom/og/v1/${post.slug}.jpg`;
+    // Share the cover artwork as-is so generated labels do not overlap it.
+    // Posts without cover artwork retain the generated social image.
+    const ogImage = post.coverImage
+        ? { url: post.coverImage, alt: post.title }
+        : { url: `/newsroom/og/v1/${post.slug}.jpg`, width: 1200, height: 630, alt: post.title };
 
     return {
         title: post.title,
@@ -39,13 +40,13 @@ export async function generateMetadata({ params }: BlogPostPageProps): Promise<M
             type: "article",
             publishedTime: post.date,
             authors: post.authorDetails.map((a) => a.name),
-            images: [{ url: ogImage, width: 1200, height: 630, alt: post.title }],
+            images: [ogImage],
         },
         twitter: {
             card: "summary_large_image",
             title: post.title,
             description: post.excerpt,
-            images: [ogImage],
+            images: [ogImage.url],
         },
     };
 }
