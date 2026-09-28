@@ -505,6 +505,7 @@ export async function* streamGatewayChat(params: {
                     originalModel: model,
                     billingMode: usedFallback ? hedgeFallbackBillingMode! : resolved.billingMode,
                 };
+                if (racedChunk.value.finishReason) break;
             }
 
             if (winner === 'secondary') {
@@ -553,6 +554,7 @@ export async function* streamGatewayChat(params: {
                         originalModel: model,
                         billingMode: resolved.billingMode,
                     };
+                    if (chunk.finishReason) break;
                 }
                 await recordSuccess(primaryCircuit);
                 return;
@@ -636,6 +638,7 @@ export async function* streamGatewayChat(params: {
                     originalModel: model,
                     billingMode: fallbackBillingMode,
                 };
+                if (chunk.finishReason) break;
             }
 
             await recordSuccess(fallbackCircuit);
