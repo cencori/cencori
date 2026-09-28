@@ -127,6 +127,21 @@ beforeEach(() => {
 });
 
 describe('/v1/responses streaming', () => {
+    it.each(['low', 'medium', 'high', 'xhigh', 'max'])('forwards Responses reasoning %s to the provider', async effort => {
+        mockStreamGatewayChat.mockImplementation(() => (async function* () {
+            yield chunk({ delta: 'OK', finishReason: 'stop' });
+        })());
+        const result = await runV1ResponsesExecution(baseParams({
+            body: { model: 'maximo-atlas-1.3', input: 'Hello', stream: true, reasoning: { effort, summary: 'auto' } },
+            model: 'maximo-atlas-1.3',
+        }));
+        if (!result.ok) throw new Error('expected ok');
+        await new Response(result.response.body).text();
+        expect(mockStreamGatewayChat).toHaveBeenCalledWith(expect.objectContaining({
+            request: expect.objectContaining({ reasoningEffort: effort }),
+        }));
+    });
+
     it('releases the approved final text while pricing is still pending', async () => {
         const { finish } = controllableStream();
         let releasePricing!: (pricing: { inputPer1KTokens: number; outputPer1KTokens: number; cencoriMarkupPercentage: number }) => void;

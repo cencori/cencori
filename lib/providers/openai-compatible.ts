@@ -116,6 +116,21 @@ export function openAICompatibleHeaders(providerName: string): Record<string, st
     return headers;
 }
 
+/** Only providers and model families with a documented effort control receive it. */
+export function openAICompatibleReasoningEffort(
+    providerName: string,
+    request: Pick<UnifiedChatRequest, 'model' | 'reasoningEffort'>,
+): OpenAI.ReasoningEffort | undefined {
+    if (providerName === 'maximo' && /^maximo-atlas-1\.[23]$/.test(request.model)) {
+        // Maximo supports Low through Max; max extends the OpenAI SDK's enum.
+        const effort = request.reasoningEffort;
+        return effort && ['low', 'medium', 'high', 'xhigh', 'max'].includes(effort)
+            ? effort as OpenAI.ReasoningEffort
+            : undefined;
+    }
+    return openAIReasoningEffort(request);
+}
+
 /**
  * Generic OpenAI-compatible provider
  * Works with any provider that implements the OpenAI API format
@@ -183,7 +198,7 @@ export class OpenAICompatibleProvider extends AIProvider {
                 messages: toOpenAIMessages(request.messages) as any,
                 temperature: request.temperature ?? 0.7,
                 max_tokens: request.maxTokens,
-                ...(openAIReasoningEffort(request) ? { reasoning_effort: openAIReasoningEffort(request) } : {}),
+                ...(openAICompatibleReasoningEffort(this.providerName, request) ? { reasoning_effort: openAICompatibleReasoningEffort(this.providerName, request) } : {}),
                 stream: false,
                 user: request.userId,
                 tools: this.toOpenAITools(request),
@@ -267,14 +282,14 @@ export class OpenAICompatibleProvider extends AIProvider {
                 messages: toOpenAIMessages(request.messages) as any,
                 temperature: request.temperature ?? 0.7,
                 max_tokens: request.maxTokens,
-                ...(openAIReasoningEffort(request) ? { reasoning_effort: openAIReasoningEffort(request) } : {}),
+                ...(openAICompatibleReasoningEffort(this.providerName, request) ? { reasoning_effort: openAICompatibleReasoningEffort(this.providerName, request) } : {}),
                 stream: true,
                 user: request.userId,
                 tools: this.toOpenAITools(request),
                 tool_choice: request.toolChoice as any,
                 frequency_penalty: request.frequencyPenalty,
                 presence_penalty: request.presencePenalty,
-            });
+            }, { signal: request.signal });
 
             // Track tool calls across chunks (they stream incrementally)
             const toolCallsInProgress: Map<number, { id: string; name: string; arguments: string }> = new Map();

@@ -35,7 +35,8 @@ export function openAIReasoningEffort(request: Pick<UnifiedChatRequest, 'model' 
     // elsewhere risks a 400, so non-reasoning models silently omit it.
     if (!request.reasoningEffort) return undefined;
     const reasoningModel = /^(?:gpt-[56](?:[.-]|$)|o[1-9](?:[.-]|$))/.test(request.model);
-    return reasoningModel ? request.reasoningEffort : undefined;
+    // The SDK types predate the max effort used by newer reasoning models.
+    return reasoningModel ? request.reasoningEffort as OpenAI.ReasoningEffort : undefined;
 }
 
 export class OpenAIProvider extends AIProvider {

@@ -69,6 +69,7 @@ export type ResponsesRequest = {
     tools?: ResponsesTool[];
     tool_choice?: 'auto' | 'none' | 'required' | { type: 'function'; name: string };
     temperature?: number;
+    reasoning?: { effort?: UnifiedChatRequest['reasoningEffort']; summary?: 'auto' | 'concise' | 'detailed' | null };
     max_output_tokens?: number;
     top_p?: number;
     store?: boolean;
@@ -559,6 +560,7 @@ export async function runV1ResponsesExecution(
             messages,
             model: resolved.model,
             temperature: body.temperature,
+            reasoningEffort: body.reasoning?.effort,
             maxTokens: body.max_output_tokens,
             stream: body.stream || false,
             tools: functionTools.length > 0 ? functionTools : undefined,
