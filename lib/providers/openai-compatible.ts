@@ -131,6 +131,15 @@ export function openAICompatibleReasoningEffort(
     return openAIReasoningEffort(request);
 }
 
+function isCompleteArgumentsObject(value: string): boolean {
+    try {
+        const parsed: unknown = JSON.parse(value);
+        return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed);
+    } catch {
+        return false;
+    }
+}
+
 /**
  * Generic OpenAI-compatible provider
  * Works with any provider that implements the OpenAI API format
@@ -340,7 +349,15 @@ export class OpenAICompatibleProvider extends AIProvider {
                         const existing = toolCallsInProgress.get(tc.index);
                         if (existing) {
                             if (tc.function?.arguments) {
-                                existing.arguments += tc.function.arguments;
+                                // Maximo replays the fully assembled call before its finish frame.
+                                // A confirmed snapshot of this same call is not an argument delta.
+                                // Ordinary fragments, including repeated text, still append.
+                                const replaysSnapshot = this.providerName === 'maximo'
+                                    && tc.id === existing.id
+                                    && tc.function.name === existing.name
+                                    && tc.function.arguments === existing.arguments
+                                    && isCompleteArgumentsObject(tc.function.arguments);
+                                if (!replaysSnapshot) existing.arguments += tc.function.arguments;
                             }
                         } else {
                             toolCallsInProgress.set(tc.index, {

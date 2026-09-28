@@ -18,6 +18,45 @@ beforeEach(() => safeFetch.mockReset());
 afterEach(() => vi.useRealTimers());
 
 describe('compatible provider SSE transport', () => {
+    it('does not append Maximo’s replay of completed arguments a second time', async () => {
+        const args = '{"text":"synthetic draft"}';
+        safeFetch.mockResolvedValue(new Response(new ReadableStream<Uint8Array>({
+            start(controller) {
+                controller.enqueue(frame({ tool_calls: [{ index: 0, id: 'draft-1', type: 'function', function: { name: 'write_draft', arguments: '' } }] }));
+                controller.enqueue(frame({ tool_calls: [{ index: 0, function: { arguments: '{"text":' } }] }));
+                controller.enqueue(frame({ tool_calls: [{ index: 0, function: { arguments: '"synthetic draft"}' } }] }));
+                // Observed on the real wire: id/name/full arguments repeat with finish_reason null.
+                controller.enqueue(frame({ tool_calls: [{ index: 0, id: 'draft-1', type: 'function', function: { name: 'write_draft', arguments: args } }] }));
+                controller.enqueue(frame({}, 'tool_calls'));
+                controller.close();
+            },
+        }), { headers: { 'Content-Type': 'text/event-stream' } }));
+        const chunks = [];
+        for await (const chunk of new OpenAICompatibleProvider('maximo', 'synthetic-key').stream(request)) chunks.push(chunk);
+        const tool = chunks.at(-1)?.toolCalls?.[0];
+        expect(tool?.function.arguments).toBe(args);
+        expect(JSON.parse(tool!.function.arguments)).toEqual({ text: 'synthetic draft' });
+    });
+
+    it('preserves repeated argument fragments and distinct calls with identical payloads', async () => {
+        safeFetch.mockResolvedValue(new Response(new ReadableStream<Uint8Array>({
+            start(controller) {
+                for (const index of [0, 1]) {
+                    controller.enqueue(frame({ tool_calls: [{ index, id: `draft-${index}`, type: 'function', function: { name: 'write_draft', arguments: '{"text":"' } }] }));
+                    controller.enqueue(frame({ tool_calls: [{ index, function: { arguments: 'ha' } }] }));
+                    controller.enqueue(frame({ tool_calls: [{ index, function: { arguments: 'ha' } }] }));
+                    controller.enqueue(frame({ tool_calls: [{ index, function: { arguments: '"}' } }] }));
+                }
+                controller.enqueue(frame({}, 'tool_calls'));
+                controller.close();
+            },
+        }), { headers: { 'Content-Type': 'text/event-stream' } }));
+        const chunks = [];
+        for await (const chunk of new OpenAICompatibleProvider('maximo', 'synthetic-key').stream(request)) chunks.push(chunk);
+        const tools = chunks.at(-1)?.toolCalls;
+        expect(tools?.map(tool => tool.id)).toEqual(['draft-0', 'draft-1']);
+        expect(tools?.map(tool => JSON.parse(tool.function.arguments))).toEqual([{ text: 'haha' }, { text: 'haha' }]);
+    });
     it('settles a finished tool call without waiting for a missing DONE marker or EOF', async () => {
         const cancel = vi.fn();
         const body = new ReadableStream<Uint8Array>({
