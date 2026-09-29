@@ -284,7 +284,6 @@ async function executeRun(runId: string): Promise<void> {    const executorStart
         );
         const { resolveActionNetworkPolicy, checkEgress } = await import('@/lib/embedded/net-policy');
         const runNetPolicy = await resolveActionNetworkPolicy(supabase as never, { project_id: run.project_id, run_id: runId, approval_policy: {} });
-        const { checkSpendBudgets } = await import('@/lib/embedded/budgets');
 
         const baseMessages: import('@/lib/providers/base').UnifiedMessage[] = [
             ...(systemParts.length > 0 ? [{ role: 'system' as const, content: systemParts.join('\n\n') }] : []),
@@ -335,9 +334,10 @@ async function executeRun(runId: string): Promise<void> {    const executorStart
             const calls = (response.toolCalls ?? []).filter((tc) => tc.function?.name);
             if (calls.length === 0 || iteration >= MAX_TOOL_ITERATIONS) break;
 
-            const spend = await checkSpendBudgets(supabase as never, { projectId: run.project_id, tenantId: run.tenant_id, installationId: run.installation_id, agentId: run.agent_id });
+            const { enforceSpendGate } = await import('@/lib/embedded/budgets');
+            const spend = await enforceSpendGate(supabase as never, { projectId: run.project_id, tenantId: run.tenant_id, installationId: run.installation_id, agentId: run.agent_id });
             if (!spend.ok) {
-                throw Object.assign(new Error(`${spend.scope} spend budget exceeded`), { status: 402, code: 'budget_exceeded' });
+                throw Object.assign(new Error(spend.message), { status: spend.status, code: spend.code });
             }
 
             const assistantCalls = calls.map((tc) => ({ id: tc.id, type: 'function' as const, function: { name: tc.function.name, arguments: tc.function.arguments } }));
@@ -692,10 +692,9 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ agentId: s
             if (rate.retryAfterSeconds) res.headers.set('Retry-After', String(rate.retryAfterSeconds));
             return addGatewayHeaders(res, { requestId });
         }
-        const { checkSpendBudgets } = await import('@/lib/embedded/budgets');
         const [concurrency, budget] = await Promise.all([
             checkRunConcurrency(supabase as never, installationId, tenantId, tier),
-            checkSpendBudgets(supabase as never, { projectId: validation.context.projectId, tenantId, installationId, agentId }),
+            (await import('@/lib/embedded/budgets')).enforceSpendGate(supabase as never, { projectId: validation.context.projectId, tenantId, installationId, agentId }),
         ]);
         if (!concurrency.ok) {
             const res = embeddedError(429, concurrency.code, concurrency.message, { requestId });
@@ -703,7 +702,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ agentId: s
             return addGatewayHeaders(res, { requestId });
         }
         if (!budget.ok) {
-            return addGatewayHeaders(embeddedError(402, 'budget_exceeded', `${budget.scope} spend budget exceeded (spent $${(budget.spent ?? 0).toFixed(2)} of $${(budget.budget ?? 0).toFixed(2)})`, { requestId }), { requestId });
+            return addGatewayHeaders(embeddedError(budget.status, budget.code, budget.message, { requestId }), { requestId });
         }
     }
 

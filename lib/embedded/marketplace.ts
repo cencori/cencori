@@ -50,13 +50,18 @@ export async function installMarketplaceVersion(supabase: Admin, input: Marketpl
 
     const { data: source } = await supabase
         .from('agent_versions')
-        .select('id, agent_id, version, status, visibility, config_json, requirements_json, agents!inner(id, name, description)')
+        .select('id, agent_id, version, status, visibility, config_json, requirements_json')
         .eq('id', dePrefixId(input.versionId.trim()))
         .eq('status', 'published')
         .eq('visibility', 'public')
         .maybeSingle();
     if (!source) return fail(404, 'invalid_request_error', 'Public agent version not found');
-    const src = source as Record<string, unknown> & {
+    const { data: sourceAgent } = await supabase
+        .from('agents')
+        .select('id, name, description')
+        .eq('id', (source as { agent_id: string }).agent_id)
+        .maybeSingle();
+    const src = { ...(source as Record<string, unknown>), agents: (sourceAgent ?? {}) as { name: string; description: string | null } } as Record<string, unknown> & {
         agent_id: string; version: string; config_json: Record<string, unknown>; requirements_json: Record<string, unknown>;
         agents: { name: string; description: string | null };
     };

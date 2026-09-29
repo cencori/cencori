@@ -21,11 +21,17 @@ function fakeDb(tables: Record<string, Array<Record<string, unknown>>>) {
     return { from: api.from };
 }
 
-const skillRow = (id: string, tenant: string | null = null) => ({
+const skillRow = (id: string) => ({
     id,
     content: `procedure-${id}`,
     status: 'published',
-    skills: { id: `s-${id}`, tenant_id: tenant, status: 'active' },
+    skill_id: `s-${id}`,
+});
+
+const skillParent = (id: string, tenant: string | null = null) => ({
+    id: `s-${id}`,
+    tenant_id: tenant,
+    status: 'active',
 });
 
 describe('retrieveTurnSkills version pinning', () => {
@@ -37,6 +43,7 @@ describe('retrieveTurnSkills version pinning', () => {
                 { skill_version_id: 'sk-new', agent_version_id: 'v-pinned' },
             ],
             skill_versions: [skillRow('sk-old'), skillRow('sk-new')],
+            skills: [skillParent('sk-old'), skillParent('sk-new')],
         });
         // Live lookup (no pin): old skills.
         const live = await retrieveTurnSkills(db as never, { installationId: 'ins1', tenantId: null });

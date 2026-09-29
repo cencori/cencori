@@ -221,6 +221,9 @@ export async function validateManifest(
     }
 
     // Skills: references must resolve to published, non-archived skill versions.
+    // Two queries, never an embedded join: skills links skill_versions both
+    // ways (skill_id + published_skill_version_id), which PostgREST rejects
+    // as ambiguous.
     for (const s of m.skills) {
         if (!s.skill_version_id.trim()) {
             errors.push('skill reference missing skill_version_id');
@@ -228,15 +231,19 @@ export async function validateManifest(
         }
         const { data: sv } = await supabase
             .from('skill_versions')
-            .select('id, status, skills!inner(id, project_id, status)')
+            .select('id, status, skill_id')
             .eq('id', s.skill_version_id.replace(/^(skv_)/, ''))
             .maybeSingle();
-        const row = sv as { id?: string; status?: string; skills?: { project_id?: string; status?: string } } | null;
-        if (!row || row.skills?.project_id !== opts.projectId) {
+        const row = sv as { id?: string; status?: string; skill_id?: string } | null;
+        const { data: parent } = row?.skill_id
+            ? await supabase.from('skills').select('id, project_id, status').eq('id', row.skill_id as string).maybeSingle()
+            : { data: null };
+        const skill = parent as { project_id?: string; status?: string } | null;
+        if (!row || skill?.project_id !== opts.projectId) {
             errors.push(`skill version '${s.skill_version_id}' not found in this project`);
         } else if (row.status !== 'published') {
             errors.push(`skill version '${s.skill_version_id}' is not published`);
-        } else if (row.skills?.status === 'archived') {
+        } else if (skill?.status === 'archived') {
             errors.push(`skill for version '${s.skill_version_id}' is archived`);
         }
     }

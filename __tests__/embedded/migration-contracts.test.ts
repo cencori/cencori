@@ -18,6 +18,10 @@ const grantSwapSql = readFileSync(
     resolve(process.cwd(), 'supabase/migrations/20260926_000002_installation_grant_swap.sql'),
     'utf8'
 );
+const grantSwapAtomicSql = readFileSync(
+    resolve(process.cwd(), 'supabase/migrations/20260926_000004_installation_patch_atomic.sql'),
+    'utf8'
+);
 
 describe('embedded migration contracts', () => {
     it('uses null-safe equality for every retry identity field in the race fallback', () => {
@@ -79,6 +83,18 @@ describe('embedded migration contracts', () => {
         );
         expect(grantSwapSql).toContain(
             'GRANT EXECUTE ON FUNCTION public.replace_installation_grants(uuid, uuid[], text[])'
+        );
+    });
+
+    it('applies row patch and grant swap in one atomic call', () => {
+        expect(grantSwapAtomicSql).toContain('DROP FUNCTION IF EXISTS public.replace_installation_grants(uuid, uuid[], text[])');
+        expect(grantSwapAtomicSql).toContain('p_row_patch jsonb DEFAULT NULL');
+        expect(grantSwapAtomicSql).toContain('UPDATE public.agent_installations SET');
+        expect(grantSwapAtomicSql).toContain(
+            'REVOKE ALL ON FUNCTION public.replace_installation_grants(uuid, uuid[], text[], jsonb)'
+        );
+        expect(grantSwapAtomicSql).toContain(
+            'GRANT EXECUTE ON FUNCTION public.replace_installation_grants(uuid, uuid[], text[], jsonb)'
         );
     });
 });

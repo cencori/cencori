@@ -31,6 +31,8 @@ vi.mock('@/lib/embedded/limits', () => ({
 
 vi.mock('@/lib/embedded/budgets', () => ({
     checkSpendBudgets: async () => ({ ok: true }),
+    enforceSpendGate: async () => ({ ok: true }),
+    pauseBreachedScope: async () => undefined,
 }));
 
 vi.mock('@/lib/embedded/net-policy', async (importOriginal) => ({
