@@ -13,13 +13,45 @@ vi.mock('@/lib/supabaseAdmin', () => ({ createAdminClient: () => (globalThis as 
 
 vi.mock('next/server', () => ({
     NextRequest: class {},
-    NextResponse: {
-        json: (body: unknown, init?: { status?: number }) => ({ __body: body, status: init?.status ?? 200 }),
+    NextResponse: class {
+        status: number;
+        headers: Headers;
+        body: unknown;
+        __body?: unknown;
+        static json(body: unknown, init?: { status?: number }) {
+            const res = new (this as unknown as new () => {
+                status: number;
+                __body?: unknown;
+            })();
+            res.__body = body;
+            res.status = init?.status ?? 200;
+            return res;
+        }
+        constructor(body?: unknown, init?: { status?: number; headers?: Record<string, string> }) {
+            this.body = body;
+            this.status = init?.status ?? 200;
+            this.headers = new Headers(init?.headers);
+        }
     },
 }));
 
 vi.mock('@/lib/gateway/chat-executor', () => ({
     executeGatewayChat: (...args: unknown[]) => (globalThis as Record<string, unknown>).__gatewayScript?.(...args),
+    streamGatewayChat: (...args: unknown[]) => (globalThis as Record<string, unknown>).__gatewayStream?.(...args),
+}));
+
+vi.mock('@/lib/gateway/providers-setup', async (importOriginal) => ({
+    ...(await importOriginal<Record<string, unknown>>()),
+    resolveGatewayProvider: async () => ({
+        providerName: 'openai',
+        model: 'gpt-4o',
+        provider: {
+            getPricing: async () => ({ inputPer1KTokens: 0, outputPer1KTokens: 0, cencoriMarkupPercentage: 0 }),
+            countTokens: async () => 5,
+        },
+        router: {},
+        billingMode: 'standard',
+    }),
 }));
 
 vi.mock('@/lib/project-credit-billing', () => ({ chargeProjectUsageCredits: async () => true }));
@@ -220,8 +252,7 @@ describe('direct-run hosted MCP loop', () => {
         expect(tables.actions).toHaveLength(0);
     });
 
-    it('fails loudly with pending actions for approval-gated tools', async () => {
-        const { POST } = await import('@/app/api/v1/agents/[agentId]/runs/route');
+    it('fails loudly with pending actions for approval-gated tools', async () => {        const { POST } = await import('@/app/api/v1/agents/[agentId]/runs/route');
         const { db, tables } = seedDb(
             [{ server_id: 'srv1', tool: 'deleteIndex' }],
             [{ name: 'deleteIndex', description: 'Drop it', inputSchema: { type: 'object' }, annotations: { destructiveHint: true } }],
@@ -245,5 +276,61 @@ describe('direct-run hosted MCP loop', () => {
         expect(tables.actions).toHaveLength(1);
         expect(tables.actions[0].status).toBe('pending');
         expect(tables.actions[0].tool_name).toBe('mcp__srv1__deleteIndex');
+    });
+
+    it('streams word-by-word deltas, tool events, and completion over SSE', async () => {
+        const { POST } = await import('@/app/api/v1/agents/[agentId]/runs/route');
+        const { db, tables } = seedDb(
+            [{ server_id: 'mcp_srv1', tool: 'search' }],
+            [{ name: 'search', description: 'Search docs', inputSchema: { type: 'object' }, annotations: { readOnlyHint: true } }],
+        );
+        (globalThis as Record<string, unknown>).__fakeDb = db;
+        mcpCalls.length = 0;
+
+        let calls = 0;
+        (globalThis as Record<string, unknown>).__gatewayStream = async function* () {
+            calls++;
+            if (calls === 1) {
+                yield { delta: 'hel' };
+                yield { delta: 'lo', toolCalls: [{ id: 'c1', type: 'function', function: { name: 'mcp__srv1__search', arguments: '{}' } }] };
+                return;
+            }
+            yield { delta: 'done' };
+            yield { delta: '', usage: { promptTokens: 20, completionTokens: 5, totalTokens: 25 } };
+        };
+
+        const res = (await POST(
+            req('http://x/v1/agents/agent-1/runs', { input: { task: 'what?' }, mode: 'streaming' }),
+            { params: Promise.resolve({ agentId: 'agent-1' }) },
+        )) as { headers: Headers; body: ReadableStream<Uint8Array> };
+
+        expect(res.headers.get('Content-Type')).toBe('text/event-stream');
+        let text = '';
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        for (;;) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            text += decoder.decode(value, { stream: true });
+        }
+        const events = text.split('\n\n').filter(Boolean).map((block) => {
+            const event = (/^event: (.+)$/m.exec(block)?.[1] ?? 'data').trim();
+            const data = (/^data: (.+)$/m.exec(block)?.[1] ?? '').trim();
+            return { event, data: data === '[DONE]' ? null : JSON.parse(data) };
+        });
+        const kinds = events.map((e) => e.event);
+        expect(kinds[0]).toBe('run.queued');
+        expect(kinds).toContain('run.started');
+        expect(kinds).toContain('text.delta');
+        expect(kinds).toContain('tool_call.completed');
+        expect(kinds[kinds.length - 2]).toBe('run.completed');
+        expect(events[kinds.length - 1]).toEqual({ event: 'data', data: null });
+        // Word-by-word: the model text arrived as deltas, not one blob.
+        const deltas = events.filter((e) => e.event === 'text.delta').map((e) => (e.data as { delta: string }).delta).join('');
+        expect(deltas).toBe('hellodone');
+        // Terminal state matches sync semantics: completed row, one metering row.
+        expect(tables.embedded_runs[0].status).toBe('completed');
+        expect(tables.ai_requests).toHaveLength(1);
+        expect(mcpCalls).toHaveLength(1);
     });
 });

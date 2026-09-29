@@ -4803,7 +4803,7 @@
     "/v1/agents/{agentId}/runs": {
       "get": {
         "summary": "List agent run history",
-        "description": "Paginated run history for one agent: queued, running, cancelled, failed, and completed runs. Usage rows cannot substitute for this collection.",
+        "description": "Paginated run history for one agent: queued, running, cancelled, failed, and completed runs. Usage rows cannot substitute for this collection.",        "description": "Paginated run history for one agent: queued, running, cancelled, failed, and completed runs. Usage rows cannot substitute for this collection.",
         "responses": {
           "200": {
             "description": "Run history",
@@ -4869,7 +4869,18 @@
       },
       "post": {
         "summary": "Create background run (idempotent)",
+        "description": "Modes: sync waits and returns the finished run (201); background enqueues and returns immediately (202); streaming executes inline while emitting server-sent events (200 text/event-stream: run.queued, run.started, text.delta, tool_call.completed, run.completed or run.failed, then [DONE]). Billing, metering, and the terminal row are identical across modes. Long streams are bounded by serverless execution time — on disconnect the run keeps going and stays pollable.",
         "responses": {
+          "200": {
+            "description": "Run event stream (mode streaming)",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
           "202": {
             "description": "Run",
             "content": {
