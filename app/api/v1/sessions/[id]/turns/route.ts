@@ -355,6 +355,22 @@ export async function POST(
 
         const activeGatewayCtx = gatewayCtx;
 
+        // Spend gate: turns are metered work like runs. On breach the scope
+        // pauses (unless the budget asks for alert-only) and the turn is refused.
+        {
+            const scoped = session as { tenant_id?: string | null; installation_id?: string | null };
+            const { enforceSpendGate } = await import('@/lib/embedded/budgets');
+            const turnBudget = await enforceSpendGate(adminClient as never, {
+                projectId: activeGatewayCtx.projectId,
+                tenantId: scoped.tenant_id ?? null,
+                installationId: scoped.installation_id ?? null,
+                agentId,
+            });
+            if (!turnBudget.ok) {
+                return respondError(turnBudget.status, turnBudget.message, turnBudget.code);
+            }
+        }
+
         // ── Convert input to unified messages for security pipeline ──
         const inputMessages: UnifiedMessage[] = typeof input === 'string'
             ? [{ role: 'user' as const, content: input }]

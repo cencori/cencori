@@ -119,16 +119,22 @@ export async function delegateSubagent(
     // RPC below; this read is a fast-fail only and never a limit decision.
 
     // Child version must exist in-project and be published; ancestry walk blocks indirect cycles.
+    // Two queries, never an embedded join: agent_versions links agents both
+    // ways (agent_id + agents.stable_version_id back-reference), which
+    // PostgREST rejects as ambiguous.
     const { data: childVersion } = await supabase
         .from('agent_versions')
-        .select('id, agent_id, status, config_json, agents!inner(id, project_id)')
+        .select('id, agent_id, status, config_json')
         .eq('id', childVersionId)
-        .eq('agents.project_id', opts.projectId)
         .maybeSingle();
-    if (!childVersion || (childVersion.status as string) !== 'published') {
+    const childAgentId = (childVersion as { agent_id?: string } | null)?.agent_id ?? null;
+    const { data: childAgent } = childAgentId
+        ? await supabase.from('agents').select('id, project_id').eq('id', childAgentId).maybeSingle()
+        : { data: null };
+    const childProjectId = (childAgent as { project_id?: string } | null)?.project_id ?? null;
+    if (!childVersion || (childVersion.status as string) !== 'published' || childProjectId !== opts.projectId || !childAgentId) {
         throw Object.assign(new Error('Child agent version is not published in this project'), { status: 409 });
     }
-    const childAgentId = (childVersion.agent_id as string);
     const ancestors = await ancestorVersionIds(supabase, parent.id);
     if (ancestors.has(childVersionId)) {
         throw Object.assign(new Error('Delegation would create a cycle'), { status: 409 });

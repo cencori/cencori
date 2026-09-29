@@ -75,12 +75,29 @@ export async function retrieveTurnSkills(
         if (ids.length === 0) return empty;
         const { data: versions } = await supabase
             .from('skill_versions')
-            .select('id, content, status, skills!inner(id, tenant_id, status)')
+            .select('id, content, status, skill_id')
             .in('id', ids)
             .eq('status', 'published');
-        const usable = ((versions ?? []) as unknown as Array<{ id: string; content: string; skills: { tenant_id: string | null; status: string } | Array<{ tenant_id: string | null; status: string }> }>)
-            .map((v) => ({ ...v, skills: Array.isArray(v.skills) ? v.skills[0] : v.skills }))
-            .filter((v) => v.skills && (v.skills.status ?? 'active') !== 'archived')
+        // Two queries, never an embedded join: skills links skill_versions
+        // both ways, which PostgREST rejects as ambiguous.
+        const skillIds = [...new Set(((versions ?? []) as Array<{ skill_id?: string }>).map((v) => v.skill_id).filter(Boolean))] as string[];
+        const { data: parents } = skillIds.length > 0
+            ? await supabase.from('skills').select('id, tenant_id, status').in('id', skillIds)
+            : { data: [] as Array<Record<string, unknown>> };
+        const parentById = new Map(((parents ?? []) as Array<{ id: string; tenant_id: string | null; status: string }>).map((s) => [s.id, s]));
+        interface UsableSkill {
+            id: string;
+            content: string;
+            skills: { tenant_id: string | null; status: string };
+        }
+        const usable: UsableSkill[] = (
+            ((versions ?? []) as unknown as Array<{ id: string; content: string; skill_id: string }>).map((v) => ({
+                ...v,
+                skills: parentById.get(v.skill_id) ?? null,
+            })) as Array<{ id: string; content: string; skills: { tenant_id: string | null; status: string } | null }>
+        )
+            .filter((v): v is { id: string; content: string; skills: { tenant_id: string | null; status: string } } => v.skills !== null)
+            .filter((v) => (v.skills.status ?? 'active') !== 'archived')
             // Fail closed: a tenant-private skill loads only on exact tenant
             // match. Missing session tenant context loads nothing private.
             .filter((v) => !v.skills.tenant_id || (opts.tenantId !== null && v.skills.tenant_id === opts.tenantId));

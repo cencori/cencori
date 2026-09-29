@@ -17,21 +17,24 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ versionId: 
     const { versionId } = await ctx.params;
     const { data, error } = await supabase
         .from('agent_versions')
-        .select('id, agent_id, version, visibility, status, config_json, requirements_json, published_at, created_at, agents!inner(id, name, description)')
+        .select('id, agent_id, version, visibility, status, config_json, requirements_json, published_at, created_at')
         .eq('id', dePrefixId(versionId))
         .eq('status', 'published')
         .in('visibility', ['public', 'unlisted'])
         .maybeSingle();
     if (error || !data) return addGatewayHeaders(embeddedError(404, 'invalid_request_error', 'Agent version not found', { requestId }), { requestId });
     const v = data as Record<string, unknown>;
+    const { data: agent, error: agentError } = await supabase.from('agents').select('id, name, description').eq('id', v.agent_id as string).maybeSingle();
+    if (agentError) return addGatewayHeaders(embeddedError(500, 'invalid_request_error', agentError.message, { requestId }), { requestId });
+    const agentRow = (agent ?? {}) as Record<string, unknown>;
     return addGatewayHeaders(
         NextResponse.json({
             version_id: v.id,
             agent_id: v.agent_id,
             version: v.version,
             visibility: v.visibility,
-            name: ((v.agents ?? {}) as Record<string, unknown>).name ?? null,
-            description: ((v.agents ?? {}) as Record<string, unknown>).description ?? null,
+            name: (agentRow.name as string | null) ?? null,
+            description: (agentRow.description as string | null) ?? null,
             config: v.config_json ?? {},
             requirements: v.requirements_json ?? {},
             published_at: v.published_at ?? null,
