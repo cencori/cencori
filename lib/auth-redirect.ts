@@ -91,6 +91,30 @@ export function getConsoleOrigin(currentOrigin: string): string | null {
 }
 
 /**
+ * Console base URL for server-generated links (emails, Stripe return URLs,
+ * checkout success URLs). Prefers the request's console counterpart so local
+ * dev maps :3000 → console.localhost:3000, then NEXT_PUBLIC_CONSOLE_URL,
+ * then the production console. Already-on-console origins are returned as-is.
+ */
+export function resolveConsoleBaseUrl(requestOrigin?: string): string {
+    if (requestOrigin) {
+        try {
+            const url = new URL(requestOrigin);
+            if (isConsoleHostname(url.hostname)) return url.origin;
+            const counterpart = getConsoleOrigin(requestOrigin);
+            if (counterpart) return counterpart;
+        } catch {
+            // Fall through to env/default.
+        }
+    }
+    const fromEnv = normalizeOrigin(process.env.NEXT_PUBLIC_CONSOLE_URL);
+    if (fromEnv) return fromEnv;
+    return process.env.NODE_ENV === "development"
+        ? "http://console.localhost:3000"
+        : "https://console.cencori.com";
+}
+
+/**
  * Default post-login destination: `/home` when already on the console host,
  * the absolute console home when on a main-app host (session cookies are
  * shared via `.cencori.com` in prod; in dev the login itself must happen on

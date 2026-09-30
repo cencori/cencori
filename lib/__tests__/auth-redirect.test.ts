@@ -1,10 +1,18 @@
 import { describe, expect, test } from "vitest";
-import { resolveAuthRedirectTargets, getConsoleOrigin, getConsoleUrl, getPostLoginDefault } from "@/lib/auth-redirect";
+import { resolveAuthRedirectTargets, getConsoleOrigin, getConsoleUrl, getPostLoginDefault, resolveConsoleBaseUrl } from "@/lib/auth-redirect";
 
 describe("getConsoleUrl", () => {
     test("builds absolute dashboard-intent links on the console host", () => {
         expect(getConsoleUrl("/home", "https://console.cencori.com")).toBe("https://console.cencori.com/home");
         expect(getConsoleUrl("signup", "http://console.localhost:3000")).toBe("http://console.localhost:3000/signup");
+    });
+});
+
+describe("resolveConsoleBaseUrl", () => {
+    test("resolves request origins to their console counterpart", () => {
+        expect(resolveConsoleBaseUrl("https://cencori.com")).toBe("https://console.cencori.com");
+        expect(resolveConsoleBaseUrl("https://console.cencori.com/home")).toBe("https://console.cencori.com");
+        expect(resolveConsoleBaseUrl("http://localhost:3000")).toBe("http://console.localhost:3000");
     });
 });
 

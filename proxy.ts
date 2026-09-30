@@ -10,6 +10,7 @@ import {
   CONSOLE_INTERNAL_PREFIX,
   buildScopedConsolePath,
   getCanonicalConsoleRedirect,
+  getConsoleOriginForHostname,
   getConsoleRoute,
   getConsoleSurface,
   isConsoleHostname,
@@ -534,6 +535,152 @@ export async function proxy(request: NextRequest) {
       }
 
       return applySecurityHeaders(redirectResponse);
+    }
+  }
+
+  // Dashboard retirement — the main site is marketing/docs only. All
+  // authenticated product URLs live on console.cencori.com (or
+  // console.localhost in dev). Redirect main-host dashboard shapes to the
+  // console host in one hop, seeding the active-workspace cookies so the
+  // flat console URL (/home, /logs, /billing, …) resolves immediately.
+  // Preview deployments (*.vercel.app) have no console counterpart, so they
+  // keep the legacy same-host behavior via the compat blocks below.
+  const consoleOrigin = getConsoleOriginForHostname(hostname);
+  if (consoleOrigin && !isConsoleSubdomain && !isFile && !isScanSubdomain) {
+    const buildConsoleRedirect = (
+      canonicalPath: string,
+      organizationSlug: string | null,
+      projectSlug: string | null,
+      settingsTab?: "api",
+    ) => {
+      const url = new URL(canonicalPath, consoleOrigin);
+      url.search = request.nextUrl.search;
+      if (settingsTab) url.searchParams.set("tab", settingsTab);
+      const redirectResponse = NextResponse.redirect(url, 308);
+      const cookieOptions = {
+        httpOnly: true,
+        maxAge: LAST_ORG_MAX_AGE,
+        path: "/",
+        sameSite: "lax" as const,
+        secure: url.protocol === "https:",
+      };
+      if (organizationSlug) {
+        redirectResponse.cookies.set(ACTIVE_ORG_COOKIE, organizationSlug, cookieOptions);
+        redirectResponse.cookies.set(LAST_ORG_COOKIE, organizationSlug, cookieOptions);
+      }
+      if (projectSlug) {
+        redirectResponse.cookies.set(ACTIVE_PROJECT_COOKIE, projectSlug, cookieOptions);
+      } else if (organizationSlug) {
+        redirectResponse.cookies.set(ACTIVE_PROJECT_COOKIE, "", {
+          ...cookieOptions,
+          maxAge: 0,
+        });
+      }
+      return applySecurityHeaders(redirectResponse);
+    };
+
+    const redirectHostOnly = (targetPath: string) => {
+      const url = new URL(targetPath, consoleOrigin);
+      url.search = request.nextUrl.search;
+      return applySecurityHeaders(NextResponse.redirect(url, 308));
+    };
+
+    // /dashboard -> console /home (workspace resolves via cookies/server).
+    if (pathname === "/dashboard" || pathname === "/dashboard/") {
+      return redirectHostOnly("/home");
+    }
+
+    // /account/* and /onboarding* are app routes — move them to console.
+    if (
+      pathname === "/account" ||
+      pathname.startsWith("/account/") ||
+      pathname === "/onboarding" ||
+      pathname.startsWith("/onboarding/")
+    ) {
+      return redirectHostOnly(pathname);
+    }
+
+    // /dashboard/agent-setup is an authenticated token flow — console-only.
+    if (pathname === "/dashboard/agent-setup" || pathname.startsWith("/dashboard/agent-setup/")) {
+      return redirectHostOnly(pathname);
+    }
+
+    // Legacy /dashboard/organizations/* -> rewrite to new shape, then to console flat.
+    if (pathname.startsWith("/dashboard/organizations")) {
+      const rewritten = rewriteLegacyOrganizationsPath(pathname);
+      if (rewritten) {
+        if (rewritten === "/dashboard") return redirectHostOnly("/home");
+        if (rewritten === "/onboarding") return redirectHostOnly("/onboarding");
+        const canonical = getCanonicalConsoleRedirect(rewritten);
+        if (canonical) {
+          return buildConsoleRedirect(
+            canonical.canonicalPath,
+            canonical.organizationSlug,
+            canonical.projectSlug,
+            canonical.settingsTab,
+          );
+        }
+        return redirectHostOnly(rewritten);
+      }
+    }
+
+    // Legacy /dashboard/{org}/* polish -> strip prefix, then to console flat.
+    if (pathname.startsWith("/dashboard/")) {
+      const segments = pathname.split("/").filter(Boolean);
+      if (segments.length >= 2) {
+        const firstAfter = segments[1];
+        const ACCOUNT_ROUTES = new Set([
+          "profile",
+          "settings",
+          "connected-accounts",
+          "security",
+        ]);
+        if (ACCOUNT_ROUTES.has(firstAfter)) {
+          const rest = segments.slice(2).join("/");
+          return redirectHostOnly("/account/" + firstAfter + (rest ? "/" + rest : ""));
+        }
+        const stripped = "/" + segments.slice(1).join("/");
+        const canonical = getCanonicalConsoleRedirect(stripped);
+        if (canonical) {
+          return buildConsoleRedirect(
+            canonical.canonicalPath,
+            canonical.organizationSlug,
+            canonical.projectSlug,
+            canonical.settingsTab,
+          );
+        }
+        // Single-segment /dashboard/{org} -> console /home with org context.
+        const orgSlug = extractOrgSlugFromPath(stripped);
+        if (orgSlug && stripped.split("/").filter(Boolean).length === 1) {
+          return buildConsoleRedirect("/home", orgSlug, null);
+        }
+        return redirectHostOnly(stripped);
+      }
+    }
+
+    // Top-level /{org}/* dashboard routes -> console flat URLs.
+    if (!pathname.startsWith("/api/")) {
+      const orgSlug = extractOrgSlugFromPath(pathname);
+      if (orgSlug) {
+        const canonical = getCanonicalConsoleRedirect(pathname);
+        if (canonical) {
+          return buildConsoleRedirect(
+            canonical.canonicalPath,
+            canonical.organizationSlug,
+            canonical.projectSlug,
+            canonical.settingsTab,
+          );
+        }
+        const segments = pathname.split("/").filter(Boolean);
+        // Bare /{org} -> console /home with org context.
+        if (segments.length === 1) {
+          return buildConsoleRedirect("/home", orgSlug, null);
+        }
+        // Scoped routes without a flat equivalent (e.g. /{org}/~/projects/new)
+        // still move to the console host; the console serves the scoped tree
+        // as a compat alias and canonicalizes where possible.
+        return redirectHostOnly(pathname);
+      }
     }
   }
 

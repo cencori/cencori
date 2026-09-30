@@ -20,8 +20,8 @@ describe("Cencori checkout contract", () => {
   });
 
   test("returns customers to the organization billing route", () => {
-    expect(getStripeCheckoutReturnUrl("https://cencori.com", "arcie")).toBe(
-      "https://cencori.com/arcie/~/billing?checkout_session_id={CHECKOUT_SESSION_ID}",
+    expect(getStripeCheckoutReturnUrl("https://console.cencori.com", "arcie")).toBe(
+      "https://console.cencori.com/arcie/~/billing?checkout_session_id={CHECKOUT_SESSION_ID}",
     );
   });
 

@@ -11,7 +11,9 @@ export default function robots(): MetadataRoute.Robots {
                     '/api/og',       // Backward compatibility for existing shared links
                 ],
                 disallow: [
-                    '/dashboard/',      // Don't index authenticated app
+                    '/dashboard/',      // Legacy dashboard path (now redirects to console)
+                    '/account/',        // Authenticated app (console-only)
+                    '/onboarding/',     // Authenticated app (console-only)
                     '/api/',            // Don't index API routes
                     '/sso-callback/',   // Auth callbacks
                 ],

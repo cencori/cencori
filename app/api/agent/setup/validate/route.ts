@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
+import { getConsoleUrl } from "@/lib/auth-redirect";
 import crypto from "crypto";
 
 // POST /api/agent/setup/validate
@@ -111,7 +112,7 @@ export async function GET(req: NextRequest) {
                 model: config?.model || "gpt-4o-mini",
             };
         }),
-        dashboard_url: `https://cencori.com/${org.slug}/${project.slug}`,
+        dashboard_url: getConsoleUrl("/home"),
     });
 }
 

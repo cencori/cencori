@@ -24,7 +24,7 @@ await cencori.chat.completions.create({
    CENCORI_API_KEY=your_api_key_here
    CENCORI_USER_ID=demo-user-1
    ```
-   Get a key at https://cencori.com/dashboard.
+   Get a key at https://console.cencori.com/settings?tab=api.
 
 3. **Run:**
    ```bash

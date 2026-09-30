@@ -95,8 +95,8 @@ export async function POST(request: NextRequest) {
       ],
       linksHeader: 'To get started:',
       links: [
-        { label: 'Create your first project', url: 'https://cencori.com/dashboard' },
-        { label: 'Generate an API key', url: 'https://cencori.com/dashboard' },
+        { label: 'Create your first project', url: 'https://console.cencori.com/home' },
+        { label: 'Generate an API key', url: 'https://console.cencori.com/settings?tab=api' },
         { label: 'Connect your application', url: 'https://cencori.com/docs/installation' },
       ],
       ctaText: 'Upgrade to Pro',

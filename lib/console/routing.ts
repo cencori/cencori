@@ -68,6 +68,35 @@ export function isConsoleHostname(hostname: string): boolean {
 }
 
 /**
+ * Console origin counterpart for a main-app hostname.
+ *
+ * Returns null when there is no console counterpart (already on console,
+ * product subdomains like scan/pitch/design, preview deployments, unknown
+ * hosts). Port is preserved for local development.
+ */
+export function getConsoleOriginForHostname(hostname: string): string | null {
+  const [rawHost, rawPort] = hostname.split(":");
+  const normalized = rawHost.toLowerCase();
+  if (
+    normalized === "console.cencori.com" ||
+    normalized === "console.localhost"
+  ) {
+    return null;
+  }
+  if (normalized === "cencori.com" || normalized === "www.cencori.com") {
+    return "https://console.cencori.com";
+  }
+  if (
+    normalized === "localhost" ||
+    normalized === "127.0.0.1" ||
+    normalized === "::1"
+  ) {
+    return `http://console.localhost${rawPort ? `:${rawPort}` : ""}`;
+  }
+  return null;
+}
+
+/**
  * Resolve the public console URL to its product scope.
  *
  * Project pages stay intentionally short because the selected project lives
