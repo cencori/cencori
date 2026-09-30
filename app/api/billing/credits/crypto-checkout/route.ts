@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabaseAdmin';
 import { createServerClient } from '@/lib/supabaseServer';
 import { createPaymentSession } from '@/lib/coincircuit';
 import { CREDIT_TOPUP_PACKS } from '@/lib/bachsClient';
+import { resolveConsoleBaseUrl } from '@/lib/auth-redirect';
 
 type CreditPack = 'starter' | 'growth' | 'scale';
 
@@ -84,7 +85,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const appBaseUrl = (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_URL || req.nextUrl.origin).replace(/\/$/, '');
+    const apiBaseUrl = (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_URL || req.nextUrl.origin).replace(/\/$/, '');
+    const consoleBaseUrl = resolveConsoleBaseUrl(req.nextUrl.origin);
     const amount = String(PACK_DOLLAR_AMOUNTS[pack]);
     const customerEmail = org.billing_email || user.email || '';
 
@@ -97,8 +99,8 @@ export async function POST(req: NextRequest) {
         email: customerEmail,
         firstName: org.name,
       },
-      successUrl: `${appBaseUrl}/dashboard/${org.slug}/billing?success=true&topup=true`,
-      webhookUrl: `${appBaseUrl}/api/billing/coincircuit-webhook`,
+      successUrl: `${consoleBaseUrl}/${org.slug}/~/billing?success=true&topup=true`,
+      webhookUrl: `${apiBaseUrl}/api/billing/coincircuit-webhook`,
       metadata: {
         purchase_type: 'credits_topup',
         credit_pack: pack,

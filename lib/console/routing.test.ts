@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildScopedConsolePath,
   getCanonicalConsoleRedirect,
+  getConsoleOriginForHostname,
   getConsoleRoute,
   isConsoleHostname,
 } from "./routing";
@@ -11,6 +12,16 @@ describe("console routing", () => {
     expect(isConsoleHostname("console.cencori.com")).toBe(true);
     expect(isConsoleHostname("console.localhost:3000")).toBe(true);
     expect(isConsoleHostname("cencori.com")).toBe(false);
+  });
+
+  it("resolves the console counterpart only for main-app hosts", () => {
+    expect(getConsoleOriginForHostname("cencori.com")).toBe("https://console.cencori.com");
+    expect(getConsoleOriginForHostname("www.cencori.com")).toBe("https://console.cencori.com");
+    expect(getConsoleOriginForHostname("localhost:3000")).toBe("http://console.localhost:3000");
+    expect(getConsoleOriginForHostname("console.cencori.com")).toBeNull();
+    expect(getConsoleOriginForHostname("console.localhost:3000")).toBeNull();
+    expect(getConsoleOriginForHostname("scan.cencori.com")).toBeNull();
+    expect(getConsoleOriginForHostname("my-preview.vercel.app")).toBeNull();
   });
 
   it("classifies project routes without exposing tenant slugs", () => {

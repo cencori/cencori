@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import { getConsoleUrl } from "@/lib/auth-redirect";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
 import { Loader2, CheckCircle, XCircle, Mail } from "lucide-react";
@@ -25,7 +26,7 @@ function InvitePageContent() {
     const [isAccepting, setIsAccepting] = useState(false);
     const [user, setUser] = useState<{ email: string } | null>(null);
     const [authChecked, setAuthChecked] = useState(false);
-    const [orgSlug, setOrgSlug] = useState<string | null>(null);
+    const [, setOrgSlug] = useState<string | null>(null);
 
     useEffect(() => {
         if (!token) {
@@ -143,7 +144,7 @@ function InvitePageContent() {
                     <h1 className="text-lg font-semibold mb-2">Invalid Invite</h1>
                     <p className="text-sm text-muted-foreground mb-6">{errorMessage}</p>
                     <Button asChild variant="outline">
-                        <Link href="/dashboard">Go to Dashboard</Link>
+                        <Link href={getConsoleUrl("/home")}>Go to Dashboard</Link>
                     </Button>
                 </div>
             </div>
@@ -162,7 +163,7 @@ function InvitePageContent() {
                         You've successfully joined {inviteDetails?.organizationName || "the organization"}.
                     </p>
                     <Button asChild>
-                        <Link href={orgSlug ? `/${orgSlug}` : "/dashboard"}>
+                        <Link href={getConsoleUrl("/home")}>
                             Go to Organization
                         </Link>
                     </Button>

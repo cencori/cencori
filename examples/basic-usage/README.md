@@ -15,7 +15,7 @@ This example demonstrates how to use the Cencori SDK to make AI requests.
    CENCORI_API_KEY=your_api_key_here
    ```
 
-   Get your API key from: https://cencori.com/dashboard
+   Get your API key from: https://console.cencori.com/settings?tab=api
 
 3. **Run the example:**
    ```bash

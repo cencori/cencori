@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { resolveConsoleBaseUrl } from '@/lib/auth-redirect';
 
 const SENDBYTE_API_KEY = process.env.SENDBYTE_API_KEY || process.env.RESEND_API_KEY;
 const FROM_EMAIL = process.env.RESEND_BUDGET_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || '';
@@ -31,6 +32,7 @@ export async function POST(req: NextRequest) {
         const subject = isOverBudget
             ? `Budget exceeded for ${projectName}`
             : `Budget alert: ${projectName} at ${threshold}%`;
+        const consoleBaseUrl = resolveConsoleBaseUrl(req.nextUrl.origin);
 
         const html = `
 <!DOCTYPE html>
@@ -82,7 +84,7 @@ export async function POST(req: NextRequest) {
             ` : ''}
 
             <div style="text-align: center;">
-                <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard" 
+                <a href="${consoleBaseUrl}/home" 
                    style="display: inline-block; background: #18181b; color: white; text-decoration: none; padding: 10px 24px; border-radius: 6px; font-size: 14px; font-weight: 500;">
                     View Dashboard
                 </a>
@@ -92,7 +94,7 @@ export async function POST(req: NextRequest) {
 
         <p style="text-align: center; margin-top: 24px; font-size: 12px; color: #a1a1aa;">
             You're receiving this because budget alerts are enabled for ${projectName}.<br>
-            <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard" style="color: #71717a;">Manage alert settings</a>
+            <a href="${consoleBaseUrl}/billing" style="color: #71717a;">Manage alert settings</a>
         </p>
     </div>
 </body>

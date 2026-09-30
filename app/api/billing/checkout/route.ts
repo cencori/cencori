@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getStripeCheckoutReturnUrl, parseCheckoutSelection } from "@/lib/billing/checkout-contract";
+import { resolveConsoleBaseUrl } from "@/lib/auth-redirect";
 import { getAvailableUpgradePlans } from "@/lib/billing/plans";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { createServerClient } from "@/lib/supabaseServer";
@@ -15,11 +16,10 @@ type CheckoutRequestBody = {
 };
 
 function getAppBaseUrl(req: NextRequest): string {
-  return (
-    process.env.NEXT_PUBLIC_APP_URL ||
-    process.env.NEXT_PUBLIC_URL ||
-    req.nextUrl.origin
-  ).replace(/\/$/, "");
+  // Stripe return URLs land in the dashboard, which is console-only.
+  // Resolve the console origin so customers return to console.cencori.com
+  // (scoped URL seeds the active workspace via the console canonical redirect).
+  return resolveConsoleBaseUrl(req.nextUrl.origin);
 }
 
 function getIdempotencyKey(req: NextRequest, orgId: string): string | undefined {

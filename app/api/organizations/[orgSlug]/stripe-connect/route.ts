@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabaseServer";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { writeAuditLog, getAuditActor } from "@/lib/audit-log";
+import { resolveConsoleBaseUrl } from "@/lib/auth-redirect";
 
 async function getOrgAsAdmin(orgSlug: string) {
     const supabase = await createServerClient();
@@ -76,7 +77,8 @@ export async function POST(
     try {
         const { createConnectAccount } = await import("@/lib/stripe-connect");
         const body = await req.json();
-        const returnUrl = body.return_url || `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/${orgSlug}/billing/stripe-connect`;
+        const consoleBase = resolveConsoleBaseUrl(req.nextUrl.origin);
+        const returnUrl = body.return_url || `${consoleBase}/${orgSlug}/~/billing`;
         const refreshUrl = body.refresh_url || returnUrl;
 
         const { accountId, onboardingUrl } = await createConnectAccount(
