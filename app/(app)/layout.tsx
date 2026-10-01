@@ -26,7 +26,6 @@ import { EnvironmentProvider, useEnvironment } from "@/lib/contexts/EnvironmentC
 import { ReactQueryProvider } from "@/lib/providers/ReactQueryProvider";
 import { SessionProvider } from "@/lib/contexts/SessionContext";
 import { useQuery } from "@tanstack/react-query";
-import posthog from "posthog-js";
 import { cn } from "@/lib/utils";
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import {
@@ -90,14 +89,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       if (mounted) {
         setAuthState({ loading: false, user: dashboardUser });
-        // Identify user in PostHog
-        try {
-          posthog.identify(sessionUser.id, {
-            email: sessionUser.email,
-            name: sessionUser.user_metadata?.name ?? sessionUser.user_metadata?.full_name,
-            created_at: sessionUser.created_at,
-          });
-        } catch { /* non-critical */ }
+        // Analytics identification rides after hydration, off the critical
+        // path — the static import would otherwise join the initial bundle
+        // for a call that only matters once a session exists.
+        void import("posthog-js").then((mod) => {
+          try {
+            mod.default.identify(sessionUser.id, {
+              email: sessionUser.email,
+              name: sessionUser.user_metadata?.name ?? sessionUser.user_metadata?.full_name,
+              created_at: sessionUser.created_at,
+            });
+          } catch { /* non-critical */ }
+        }).catch(() => { /* non-critical */ });
       }
     }
     check();
