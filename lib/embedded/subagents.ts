@@ -258,6 +258,10 @@ export async function delegateSubagent(
         // hand-edited config can never inject an invalid value.
         const childEffort = (config as { reasoning_effort?: unknown }).reasoning_effort;
         const childPin = (config as { provider_connection_id?: unknown }).provider_connection_id;
+        const { data: childAgentRow } = await supabase.from('agents').select('name').eq('id', childAgentId).maybeSingle();
+        const childAgentName = typeof (childAgentRow as { name?: unknown } | null)?.name === 'string'
+            ? ((childAgentRow as { name: string }).name.trim().slice(0, 120))
+            : '';
         let response: Awaited<ReturnType<typeof executeGatewayChat>>;
         const gatewayChatStartedAt = Date.now();
         try {
@@ -268,6 +272,7 @@ export async function delegateSubagent(
                 tier: opts.tier,
                 request: {
                     messages: [
+                        ...(childAgentName ? [{ role: 'system' as const, content: `Your name is "${childAgentName}". Always introduce yourself as ${childAgentName} when asked who you are.` }] : []),
                         ...(config.instructions || config.system_prompt ? [{ role: 'system' as const, content: (config.instructions ?? config.system_prompt) as string }] : []),
                         ...(contextBlock ? [{ role: 'system' as const, content: contextBlock }] : []),
                         { role: 'user' as const, content: JSON.stringify({ delegated_task: opts.input ?? {} }).slice(0, 4000) },

@@ -225,15 +225,23 @@ export function EmbeddedAgentsDashboard({ orgSlug, projectSlug }: { orgSlug: str
     }
 
     async function saveDraft() {
-        if (!selectedAgent || !selectedVersion) return;
+        if (!selectedAgent || !selectedVersion) return false;
         const result = await act("save_draft", { agent_id: selectedAgent.id, version_id: selectedVersion.id, ...form });
-        if (result) { setDirty(false); toast.success("Changes saved", { description: "Run a test before publishing." }); }
+        if (result) { setDirty(false); toast.success("Changes saved", { description: "Run a test before publishing." }); return true; }
+        return false;
     }
 
     async function runTest(message?: string) {
         if (!selectedAgent || !selectedVersion || !projectId) return;
         const input = (message ?? testInput).trim();
         if (!input || !!busy) return;
+        // The test runs against the saved draft in the database, not the
+        // live form state. Persist unsaved Name/Model/Instructions first so
+        // what the user sees is what gets tested.
+        if (dirty) {
+            const saved = await saveDraft();
+            if (!saved) return;
+        }
         const userMessage: TestMessage = { id: `user-${Date.now()}`, role: "user", content: input };
         setTestMessages((current) => [...current, userMessage]);
         setTestInput("");
@@ -387,7 +395,7 @@ export function EmbeddedAgentsDashboard({ orgSlug, projectSlug }: { orgSlug: str
                         {error && <div role="alert" className="mb-6 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3.5 py-3 text-xs text-destructive"><CircleAlert className="h-4 w-4 shrink-0" />{error}</div>}
                         {tab === "setup" && (() => {
                             const testing = busy === "test_version";
-                            const canSend = canManage && !busy && !dirty && !!form.model && !!testInput.trim();
+                            const canSend = canManage && !busy && !!form.model && !!testInput.trim();
                             return <div className="grid w-full max-w-[1600px] gap-8 xl:min-h-0 xl:flex-1 xl:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] xl:gap-0">
                                 <div className="max-w-2xl space-y-7 xl:min-h-0 xl:max-w-none xl:overflow-y-auto xl:overscroll-contain xl:pb-8 xl:pr-8 xl:pt-8">
                                     <Field label="Name" value={form.name} onChange={(value) => updateForm("name", value)} placeholder="Agent name" disabled={!visualEditable || !canManage} />
@@ -442,6 +450,7 @@ export function EmbeddedAgentsDashboard({ orgSlug, projectSlug }: { orgSlug: str
                                             )}
                                         </div>
                                         <div className="mx-auto mt-4 w-full max-w-2xl shrink-0">
+                                            {dirty && <p className="mb-2 text-[11px] leading-4 text-muted-foreground">Unsaved name, model, or instructions will be saved before this test runs.</p>}
                                             <div className="relative flex flex-col rounded-2xl border border-transparent bg-[#f3f3f1] p-3 transition-all hover:bg-[#e9e9e5] focus-within:border-border/60 dark:bg-[#181818] dark:hover:bg-[#212121]">
                                                 <textarea ref={testComposerRef} value={testInput} onChange={handleTestComposerInput} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void runTest(); } }} placeholder="Ask this agent to do something its customers would ask..." rows={2} disabled={testing} className="max-h-40 min-h-[48px] w-full resize-none bg-transparent py-1.5 text-base leading-relaxed placeholder:text-muted-foreground/50 focus:outline-none md:text-xs" />
                                                 <div className="mt-2 flex items-center justify-end gap-3 select-none">
