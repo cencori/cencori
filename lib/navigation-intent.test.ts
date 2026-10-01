@@ -2,8 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 import {
     abortOnNavigationIntent,
     announceNavigationIntent,
+    announceSettingsTab,
     isAbortError,
     onNavigationIntent,
+    onSettingsTab,
 } from "./navigation-intent";
 
 describe("navigation intent", () => {
@@ -30,5 +32,15 @@ describe("navigation intent", () => {
     it("recognizes aborted requests without hiding other failures", () => {
         expect(isAbortError(new DOMException("Aborted", "AbortError"))).toBe(true);
         expect(isAbortError(new Error("Network failed"))).toBe(false);
+    });
+
+    it("delivers settings tab switches without navigating", () => {
+        const listener = vi.fn();
+        const unsubscribe = onSettingsTab(listener);
+
+        announceSettingsTab("api");
+
+        expect(listener).toHaveBeenCalledWith({ tab: "api" });
+        unsubscribe();
     });
 });

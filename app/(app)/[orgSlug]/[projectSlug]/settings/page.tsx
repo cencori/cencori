@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, use } from "react";
+import React, { useState, use, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabaseClient";
@@ -51,6 +51,7 @@ import { GenerateKeyDialog } from "@/components/api-keys/GenerateKeyDialog";
 import { SUPPORTED_PROVIDERS, getModelsForProvider } from "@/lib/providers/config";
 import { cn } from "@/lib/utils";
 import { normalizeWebhookResponse } from "@/lib/webhook-response";
+import { onSettingsTab } from "@/lib/navigation-intent";
 
 interface ProjectData {
   id: string;
@@ -197,7 +198,29 @@ export default function ProjectSettingsPage({ params }: PageProps) {
   const queryClient = useQueryClient();
   const { organizations, projects, updateProject: updateProjectContext } = useOrganizationProject();
   const requestedTab = searchParams.get('tab');
-  const activeSettingsTab: ProjectSettingsTab = isProjectSettingsTab(requestedTab) ? requestedTab : 'general';
+  // Tab switches from the sidebar subnav arrive as an event while already
+  // on this page — instant local swap, no navigation, no remount. Real
+  // navigations (deep links, refresh, back/forward) flow through the URL
+  // and reset the override.
+  const [tabOverride, setTabOverride] = useState<ProjectSettingsTab | null>(null);
+  useEffect(() => {
+    setTabOverride(null);
+  }, [requestedTab]);
+  useEffect(() => {
+    return onSettingsTab(({ tab }) => {
+      if (!isProjectSettingsTab(tab)) return;
+      setTabOverride(tab);
+      try {
+        const params = new URLSearchParams(window.location.search);
+        params.set("tab", tab);
+        window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
+      } catch {
+        // URL sync is cosmetic; the tab already switched.
+      }
+    });
+  }, []);
+  const activeSettingsTab: ProjectSettingsTab = tabOverride
+    ?? (isProjectSettingsTab(requestedTab) ? requestedTab : 'general');
 
   // Local form state
   const [projectName, setProjectName] = useState("");
