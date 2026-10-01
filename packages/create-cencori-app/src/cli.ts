@@ -394,7 +394,7 @@ async function main(): Promise<void> {
                     verifySpinner.succeed('API key verified');
                 } else if (verification === 'invalid') {
                     verifySpinner.fail('Invalid API key');
-                    console.log(chalk.gray(`  Get one at ${chalk.cyan('https://cencori.com/dashboard')}`));
+                    console.log(chalk.gray(`  Get one at ${chalk.cyan('https://console.cencori.com/settings?tab=api')}`));
                     console.log();
                     process.exit(1);
                 } else {

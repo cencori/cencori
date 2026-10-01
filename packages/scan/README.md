@@ -76,7 +76,7 @@ The AI will:
 
 Your API key is saved to `~/.cencorirc` for future scans.
 
-**Get your free API key at [cencori.com/dashboard](https://cencori.com/dashboard)**
+**Get your free API key at [console.cencori.com](https://console.cencori.com/settings?tab=api)**
 
 ### Interactive Auto-Fix
 
@@ -351,7 +351,7 @@ Cencori Scan collects **anonymous usage metrics** to improve the product:
 ## Links
 
 - **Documentation**: [cencori.com/docs](https://cencori.com/docs)
-- **Dashboard**: [cencori.com/dashboard](https://cencori.com/dashboard)
+- **Dashboard**: [console.cencori.com](https://console.cencori.com/home)
 - **Web Scanner**: [scan.cencori.com](https://scan.cencori.com)
 
 ## License

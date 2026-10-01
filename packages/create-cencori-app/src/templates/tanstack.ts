@@ -114,13 +114,13 @@ dist/
 `;
 
     // ── .env ──
-    files['.env'] = `# Get a project API key at https://cencori.com/dashboard
+    files['.env'] = `# Get a project API key at https://console.cencori.com/settings?tab=api
 # Then confirm provider access in Project > Providers
 CENCORI_API_KEY=${options.apiKey || ''}
 `;
 
     // ── .env.example ──
-    files['.env.example'] = `# Get a project API key at https://cencori.com/dashboard
+    files['.env.example'] = `# Get a project API key at https://console.cencori.com/settings?tab=api
 # Then confirm provider access in Project > Providers
 CENCORI_API_KEY=csk_...
 `;
@@ -898,7 +898,7 @@ export function Chat() {
                         </div>
 
                         <div className="welcome-buttons">
-                            <a href="https://cencori.com/dashboard/organizations" target="_blank" rel="noopener noreferrer" className="btn-primary">
+                            <a href="https://console.cencori.com/home" target="_blank" rel="noopener noreferrer" className="btn-primary">
                                 Dashboard
                             </a>
                             <a href="https://cencori.com/docs" target="_blank" rel="noopener noreferrer" className="btn-secondary">
@@ -1027,7 +1027,7 @@ AI app powered by [Cencori](https://cencori.com).
 \`\`\`bash
 # 1. Add your API key
 #    Open .env and set CENCORI_API_KEY=csk_...
-#    Get a key at https://cencori.com/dashboard
+#    Get a key at https://console.cencori.com/settings?tab=api
 #    Confirm provider access in Project > Providers
 
 # 2. Start the frontend and local API server

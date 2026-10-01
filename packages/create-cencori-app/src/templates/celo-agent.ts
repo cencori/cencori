@@ -37,7 +37,7 @@ output/
 `;
 
     files['.env'] = `# Cencori is the default agent infrastructure.
-# Get a project key: https://cencori.com/dashboard/organizations/settings
+# Get a project key: https://console.cencori.com/settings?tab=api
 # Create an agent-scoped key: POST /v1/agents/:id/keys
 CENCORI_API_KEY=${options.apiKey || ''}
 CENCORI_AGENT_ID=
@@ -58,7 +58,7 @@ DEMO_MAX_SPEND_USD=0.10
 `;
 
     files['.env.example'] = `# Cencori is the default agent infrastructure.
-# Get a project key: https://cencori.com/dashboard/organizations/settings
+# Get a project key: https://console.cencori.com/settings?tab=api
 # Create an agent-scoped key: POST /v1/agents/:id/keys
 CENCORI_API_KEY=csk_...
 CENCORI_AGENT_ID=

@@ -235,7 +235,7 @@ async function promptForApiKey(): Promise<string | undefined> {
     console.log(chalk.gray('  AI-powered auto-fix requires an API key.'));
     console.log();
     console.log(`  Get your free API key at:`);
-    console.log(`  ${chalk.cyan('https://cencori.com/dashboard')} → API Keys`);
+    console.log(`  ${chalk.cyan('https://console.cencori.com/settings?tab=api')} → API Keys`);
     console.log();
 
     try {
