@@ -974,7 +974,7 @@ export function handleCorsPreFlight(): NextResponse {
 
 /**
  * Log a request to the ai_requests table with full cost tracking.
- * Returns the inserted row id (used by post-success hooks like RagMetrics),
+ * Returns the inserted row id (used by post-success hooks),
  * or null when the insert fails — logging must never throw.
  */
 export async function logGatewayRequest(context: GatewayContext, params: LogRequestParams): Promise<string | null> {

@@ -10,7 +10,6 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Copy, Check, Trash2, Globe, Clock, Webhook, Server, AlertTriangle, Plus, MoreHorizontal, RefreshCw, DollarSign, Bell, Loader2, ArrowUpRight } from "lucide-react";
 import { ArrowPathIcon } from "@heroicons/react/24/outline";
-import { RagMetricsLogo } from "@/components/icons/BrandIcons";
 import { toast } from "@/components/ui/toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MinimalScrollArea } from "@/components/ui/scroll-area";
@@ -44,7 +43,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Switch } from "@/components/ui/switch";
 import { GeoAnalyticsSection } from "@/components/dashboard/GeoAnalyticsSection";
 import { WebhooksManager } from "@/components/dashboard/WebhooksManager";
 import { GenerateKeyDialog } from "@/components/api-keys/GenerateKeyDialog";
@@ -271,10 +269,7 @@ export default function ProjectSettingsPage({ params }: PageProps) {
   const [isSavingNetworkPolicy, setIsSavingNetworkPolicy] = useState(false);
   const [copiedEndpoint, setCopiedEndpoint] = useState(false);
 
-  // RagMetrics state
-  const [ragmetricsEnabled, setRagmetricsEnabled] = useState(false);
-  const [ragmetricsApiKey, setRagmetricsApiKey] = useState('');
-  const [isSavingIntegrations, setIsSavingIntegrations] = useState(false);
+  // Integrations state
   const [showSuggestModal, setShowSuggestModal] = useState(false);
   const [suggestion, setSuggestion] = useState('');
   const [isSubmittingSuggestion, setIsSubmittingSuggestion] = useState(false);
@@ -375,8 +370,6 @@ export default function ProjectSettingsPage({ params }: PageProps) {
     circuit_breaker_failure_threshold: number;
     circuit_breaker_timeout_seconds: number;
     fallback_model: string | null;
-    ragmetrics_enabled: boolean;
-    ragmetrics_api_key: string;
   }
 
   const { data: providerSettings } = useQuery<{ settings: ProviderSettingsData }>({
@@ -406,8 +399,6 @@ export default function ProjectSettingsPage({ params }: PageProps) {
       setCircuitBreakerEnabled(s.circuit_breaker_enabled ?? true);
       setCircuitBreakerFailureThreshold(String(s.circuit_breaker_failure_threshold || 5));
       setCircuitBreakerTimeoutSeconds(String(s.circuit_breaker_timeout_seconds || 60));
-      setRagmetricsEnabled(s.ragmetrics_enabled ?? false);
-      setRagmetricsApiKey(s.ragmetrics_api_key || '');
       setProviderSettingsDirty(false);
     }
   }, [providerSettings]);
@@ -1906,229 +1897,6 @@ export default function ProjectSettingsPage({ params }: PageProps) {
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
-              <div className="rounded-lg border border-border/35 bg-muted/30 p-5 flex flex-col">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg overflow-hidden flex items-center justify-center">
-                      <RagMetricsLogo className="w-full h-full object-cover" />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-semibold">RagMetrics Evaluation</h3>
-                      <p className="text-[10px] text-muted-foreground">Governance Engine</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 pt-1">
-                    <span className={cn(
-                      "text-[9px] font-bold uppercase tracking-[0.14em]",
-                      ragmetricsEnabled ? "text-emerald-500" : "text-muted-foreground/50"
-                    )}>
-                      {ragmetricsEnabled ? 'Enabled' : 'Disabled'}
-                    </span>
-                    <Switch
-                      id="ragmetrics-enabled"
-                      checked={ragmetricsEnabled}
-                      onCheckedChange={async (checked) => {
-                        setRagmetricsEnabled(checked);
-                        try {
-                          const response = await fetch(`/api/projects/${project.id}/settings`, {
-                            method: 'PATCH',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ ragmetrics_enabled: checked })
-                          });
-                          if (!response.ok) throw new Error();
-                          queryClient.invalidateQueries({ queryKey: ["providerSettings", project.id] });
-                        } catch {
-                          setRagmetricsEnabled(!checked);
-                          toast.error('Failed to update integration');
-                        }
-                      }}
-                      className="scale-75 origin-right"
-                    />
-                  </div>
-                </div>
-
-                <p className="text-xs text-muted-foreground mb-4 flex-1">
-                  Live AI output evaluation and hallucination detection.
-                </p>
-
-                <ul className="space-y-1.5 mb-6">
-                  <li className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Check className="w-3 h-3 text-emerald-500" />
-                    Automated faithfulness scoring
-                  </li>
-                  <li className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Check className="w-3 h-3 text-emerald-500" />
-                    Real-time hallucination alerts
-                  </li>
-                  <li className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Check className="w-3 h-3 text-emerald-500" />
-                    Context-aware verification
-                  </li>
-                </ul>
-
-                <div className="pt-4 border-t border-border/30">
-                  {ragmetricsApiKey ? (
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        className="flex-1 h-8 rounded-full text-xs border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/5"
-                        disabled
-                      >
-                        Connected
-                      </Button>
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
-                            <MoreHorizontal className="h-3.5 w-3.5" />
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-[400px]">
-                          <DialogHeader>
-                            <DialogTitle className="text-sm">Update RagMetrics API Key</DialogTitle>
-                            <DialogDescription className="text-xs">
-                              Enter a new API key to replace the existing one.
-                            </DialogDescription>
-                          </DialogHeader>
-                          <div className="space-y-3 py-3">
-                            <div className="space-y-1.5">
-                              <Label htmlFor="ragmetrics-key-update" className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
-                                API Key
-                              </Label>
-                              <Input
-                                id="ragmetrics-key-update"
-                                type="password"
-                                placeholder="rm_live_..."
-                                defaultValue={ragmetricsApiKey}
-                                onChange={(e) => setRagmetricsApiKey(e.target.value)}
-                                className="h-8 text-[11px] font-mono bg-secondary/30 border-border/30"
-                              />
-                            </div>
-                          </div>
-                          <DialogFooter className="gap-2">
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              className="text-xs h-8"
-                              onClick={async () => {
-                                setRagmetricsApiKey('');
-                                setRagmetricsEnabled(false);
-                                try {
-                                  await fetch(`/api/projects/${project.id}/settings`, {
-                                    method: 'PATCH',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ ragmetrics_enabled: false, ragmetrics_api_key: '' })
-                                  });
-                                  toast.success('RagMetrics disconnected');
-                                  queryClient.invalidateQueries({ queryKey: ["providerSettings", project.id] });
-                                } catch {
-                                  toast.error('Failed to disconnect');
-                                }
-                              }}
-                            >
-                              Disconnect
-                            </Button>
-                            <Button
-                              size="sm"
-                              className="text-xs h-8"
-                              onClick={async () => {
-                                setIsSavingIntegrations(true);
-                                try {
-                                  const response = await fetch(`/api/projects/${project.id}/settings`, {
-                                    method: 'PATCH',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ ragmetrics_api_key: ragmetricsApiKey, ragmetrics_enabled: true })
-                                  });
-                                  if (!response.ok) throw new Error();
-                                  toast.success('API key updated');
-                                  queryClient.invalidateQueries({ queryKey: ["providerSettings", project.id] });
-                                } catch {
-                                  toast.error('Failed to update API key');
-                                } finally {
-                                  setIsSavingIntegrations(false);
-                                }
-                              }}
-                              disabled={isSavingIntegrations}
-                            >
-                              {isSavingIntegrations ? <Loader2 className="mr-1.5 h-3 w-3 animate-spin" /> : null}
-                              Save
-                            </Button>
-                          </DialogFooter>
-                        </DialogContent>
-                      </Dialog>
-                    </div>
-                  ) : (
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button className="w-full h-8 rounded-full text-xs">
-                          Connect
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="sm:max-w-[400px]">
-                        <DialogHeader>
-                          <DialogTitle className="flex items-center gap-2 text-sm">
-                            <div className="w-6 h-6 rounded overflow-hidden">
-                              <RagMetricsLogo className="w-full h-full object-cover" />
-                            </div>
-                            Connect RagMetrics
-                          </DialogTitle>
-                          <DialogDescription className="text-xs">
-                            Paste your RagMetrics API key to enable live AI evaluation on every request.
-                          </DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-3 py-3">
-                          <div className="space-y-1.5">
-                            <Label htmlFor="ragmetrics-key-connect" className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
-                              API Key
-                            </Label>
-                            <Input
-                              id="ragmetrics-key-connect"
-                              type="password"
-                              placeholder="rm_live_..."
-                              value={ragmetricsApiKey}
-                              onChange={(e) => setRagmetricsApiKey(e.target.value)}
-                              className="h-8 text-[11px] font-mono bg-secondary/30 border-border/30"
-                            />
-                            <p className="text-[10px] text-muted-foreground/60">
-                              Find your key at{' '}
-                              <a href="https://app.ragmetrics.ai/dashboard/keys" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground transition-colors">
-                                app.ragmetrics.ai → Keys
-                              </a>
-                            </p>
-                          </div>
-                        </div>
-                        <DialogFooter>
-                          <Button
-                            className="w-full text-xs h-8"
-                            disabled={!ragmetricsApiKey || isSavingIntegrations}
-                            onClick={async () => {
-                              setIsSavingIntegrations(true);
-                              try {
-                                const response = await fetch(`/api/projects/${project.id}/settings`, {
-                                  method: 'PATCH',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({ ragmetrics_enabled: true, ragmetrics_api_key: ragmetricsApiKey })
-                                });
-                                if (!response.ok) throw new Error();
-                                setRagmetricsEnabled(true);
-                                toast.success('RagMetrics connected successfully');
-                                queryClient.invalidateQueries({ queryKey: ["providerSettings", project.id] });
-                              } catch {
-                                toast.error('Failed to connect RagMetrics');
-                              } finally {
-                                setIsSavingIntegrations(false);
-                              }
-                            }}
-                          >
-                            {isSavingIntegrations ? <Loader2 className="mr-1.5 h-3 w-3 animate-spin" /> : null}
-                            {isSavingIntegrations ? 'Connecting...' : 'Save & Connect'}
-                          </Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
-                  )}
-                </div>
-              </div>
 
 
               {/* Placeholder for future integrations */}

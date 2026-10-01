@@ -10,7 +10,7 @@ import {
 import { StatusBadge } from './StatusBadge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Copy, Check, Loader2 } from 'lucide-react';
+import { Copy, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/components/ui/toast';
 
@@ -39,10 +39,6 @@ interface RequestDetail {
         severity: string;
         risk_score: number;
     }>;
-    evaluation_status?: 'pending' | 'completed' | 'failed' | 'skipped';
-    evaluation_score?: number | null;
-    evaluation_details?: Record<string, any> | null;
-    evaluation_at?: string | null;
 }
 
 interface RequestDetailModalProps {
@@ -257,12 +253,6 @@ export function RequestDetailModal({ projectId, requestId, open, onOpenChange }:
                             >
                                 Metrics
                             </TabsTrigger>
-                            <TabsTrigger
-                                value="evaluation"
-                                className="relative h-10 rounded-none border-b-2 border-transparent bg-transparent px-0 pb-4 text-xs font-medium text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none"
-                            >
-                                Evaluation
-                            </TabsTrigger>
                         </TabsList>
 
                         <TabsContent value="request" className="mt-3 space-y-2">
@@ -338,60 +328,6 @@ export function RequestDetailModal({ projectId, requestId, open, onOpenChange }:
                                         : request.status === 'error'
                                             ? 'No response data — the request failed.'
                                             : 'No response payload was recorded for this request.'}
-                                </div>
-                            )}
-                        </TabsContent>
-
-
-                        <TabsContent value="evaluation" className="mt-3 space-y-4">
-                            <div className="flex items-center justify-between">
-                                <h4 className="text-xs font-medium">RagMetrics Assessment</h4>
-                                {request.evaluation_status === 'completed' && (
-                                    <span className={cn(
-                                        "text-[10px] font-medium px-1.5 py-0.5 rounded",
-                                        (request.evaluation_score || 0) >= 0.8 ? "bg-emerald-500/10 text-emerald-500" :
-                                        (request.evaluation_score || 0) >= 0.5 ? "bg-amber-500/10 text-amber-500" : "bg-red-500/10 text-red-500"
-                                    )}>
-                                        SCORE: {(request.evaluation_score || 0).toFixed(2)}
-                                    </span>
-                                )}
-                            </div>
-
-                            {request.evaluation_status === 'completed' ? (
-                                <div className="space-y-3">
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div className="rounded-md border border-border/40 p-2.5">
-                                            <p className="text-[10px] text-muted-foreground mb-0.5">Status</p>
-                                            <p className="text-xs font-medium text-emerald-500">Completed</p>
-                                        </div>
-                                        <div className="rounded-md border border-border/40 p-2.5">
-                                            <p className="text-[10px] text-muted-foreground mb-0.5">Evaluated At</p>
-                                            <p className="text-xs font-medium">{request.evaluation_at ? formatDate(request.evaluation_at) : '—'}</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Evaluation Details</p>
-                                        <pre className="rounded-md bg-secondary/50 p-3 text-[11px] font-mono whitespace-pre-wrap break-words max-h-[150px] overflow-y-auto">
-                                            {JSON.stringify(request.evaluation_details, null, 2)}
-                                        </pre>
-                                    </div>
-                                </div>
-                            ) : request.evaluation_status === 'pending' ? (
-                                <div className="flex flex-col items-center justify-center py-8 space-y-3 border border-dashed border-border/60 rounded-md">
-                                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground/40" />
-                                    <p className="text-xs text-muted-foreground">Evaluation in progress...</p>
-                                </div>
-                            ) : (
-                                <div className="flex flex-col items-center justify-center py-8 space-y-2 border border-dashed border-border/60 rounded-md">
-                                    <p className="text-xs text-muted-foreground">
-                                        {request.evaluation_status === 'failed' ? 'Evaluation failed' : 'Evaluation skipped'}
-                                    </p>
-                                    <p className="text-[10px] text-muted-foreground/60 text-center px-4">
-                                        {request.evaluation_status === 'failed' 
-                                            ? 'The RagMetrics API returned an error or timed out.' 
-                                            : 'RagMetrics is not enabled for this project or this request type.'}
-                                    </p>
                                 </div>
                             )}
                         </TabsContent>

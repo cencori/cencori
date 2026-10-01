@@ -367,16 +367,3 @@ export function CustomAgentLogo({ className, ...props }: IconProps) {
         </svg>
     );
 }
-
-// RagMetrics Logo
-export function RagMetricsLogo({ className, ...props }: any) {
-    return (
-        <div className={cn("relative overflow-hidden flex items-center justify-center", className)} {...props}>
-            <img
-                src="/partners/ragmetrics/logo.png"
-                alt="RagMetrics"
-                className="w-full h-full object-cover"
-            />
-        </div>
-    );
-}

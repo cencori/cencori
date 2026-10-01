@@ -91,10 +91,6 @@ export function formatIncidentDetail(
                 risk_score: incident.risk_score ?? 0,
             },
         ],
-        evaluation_status: 'skipped' as const,
-        evaluation_score: null,
-        evaluation_details: null,
-        evaluation_at: null,
         source: 'security_incident' as const,
     };
 }

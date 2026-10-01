@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireProjectAccess } from '@/lib/require-project-access';
 import { createAdminClient } from '@/lib/supabaseAdmin';
-import { fetchRagMetricsResult } from '@/lib/integrations/ragmetrics';
 import { formatIncidentDetail } from '@/lib/security-incident-log';
 
 export async function GET(
@@ -58,34 +57,6 @@ export async function GET(
             );
         }
 
-        // Just-in-time RagMetrics polling:
-        // If evaluation is pending and we have a run_id, fetch the result now.
-        let evalStatus = request.evaluation_status;
-        let evalScore = request.evaluation_score;
-        let evalDetails = request.evaluation_details;
-        let evalAt = request.evaluation_at;
-
-        if (evalStatus === 'pending' && evalDetails?.run_id) {
-            try {
-                const pollResult = await fetchRagMetricsResult({
-                    projectId,
-                    requestId,
-                    runId: evalDetails.run_id,
-                });
-
-                if (pollResult.status === 'completed') {
-                    evalStatus = 'completed';
-                    evalScore = pollResult.score;
-                    evalDetails = pollResult.details;
-                    evalAt = new Date().toISOString();
-                }
-                // If still pending, we just return the current state
-            } catch (pollErr) {
-                console.warn('[Request Detail] RagMetrics poll failed:', pollErr);
-                // Don't fail the request — just return current state
-            }
-        }
-
         let apiKeyInfo = null;
         if (request.api_key_id) {
             const { data: keyData } = await supabaseAdmin
@@ -127,10 +98,6 @@ export async function GET(
             filtered_reasons: request.filtered_reasons,
             api_key: apiKeyInfo,
             security_incidents: incidents || [],
-            evaluation_status: evalStatus,
-            evaluation_score: evalScore,
-            evaluation_details: evalDetails,
-            evaluation_at: evalAt,
         };
 
         return NextResponse.json(detailedResponse);

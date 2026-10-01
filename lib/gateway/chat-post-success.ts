@@ -1,7 +1,7 @@
 /**
  * Shared post-success chat side effects — used by BOTH chat doors
- * (/api/ai/chat adapter and /api/v1/chat/completions) so payload logging,
- * RagMetrics evaluation, and budget alerts never drift between them again.
+ * (/api/ai/chat adapter and /api/v1/chat/completions) so payload logging
+ * and budget alerts never drift between them again.
  *
  * Everything here is fire-and-forget relative to the response; callers wrap
  * the returned promise in waitUntil() so serverless doesn't freeze the
@@ -20,7 +20,6 @@ import {
     processCustomRules,
 } from '@/lib/safety/custom-data-rules';
 import type { CustomRulesPipelineResult } from '@/lib/gateway/custom-rules';
-import { evaluateWithRagMetrics, extractRAGContext } from '@/lib/integrations/ragmetrics';
 import { checkAndSendBudgetAlerts } from '@/lib/budgets';
 import { truncateForLog } from '@/lib/gateway/log-payload';
 
@@ -117,35 +116,18 @@ export async function buildMaskedLogPayloads(params: {
 }
 
 /**
- * RagMetrics evaluation + budget alerts for a successful chat completion.
+ * Budget alerts for a successful chat completion.
  */
 export async function runChatSuccessSideEffects(params: {
     gatewayCtx: GatewayContext;
-    aiRequestId: string | null;
-    unifiedMessages: UnifiedMessage[];
-    responseText: string;
-    model: string;
-    provider: string;
-    isStreaming: boolean;
 }): Promise<void> {
-    const { gatewayCtx, aiRequestId, unifiedMessages, responseText, model, provider, isStreaming } = params;
+    const { gatewayCtx } = params;
 
     checkAndSendBudgetAlerts(
         gatewayCtx.projectId,
         gatewayCtx.projectName || gatewayCtx.projectId,
         gatewayCtx.organizationId
     ).catch((err) => console.error('[Budget] Alert check failed:', err));
-
-    if (aiRequestId) {
-        evaluateWithRagMetrics({
-            projectId: gatewayCtx.projectId,
-            requestId: aiRequestId,
-            prompt: unifiedMessages.map((m) => `${m.role}: ${m.content}`).join('\n'),
-            response: responseText,
-            context: extractRAGContext(unifiedMessages),
-            metadata: { model, provider, is_streaming: isStreaming },
-        }).catch((err) => console.error('[RagMetrics] Evaluation failed:', err));
-    }
 }
 
 export type ChatLogSuccessMeta = {
@@ -166,7 +148,7 @@ export type ChatLogSuccessMeta = {
 /**
  * Build the logSuccess callback both chat routes hand to
  * runV1ProviderExecution: masked payload logging → ai_requests insert →
- * RagMetrics + budget alerts with the inserted row id. Wrapped in
+ * budget alerts with the inserted row id. Wrapped in
  * waitUntil so a closing stream can't drop the billing row.
  */
 export function makeChatLogSuccess(params: {
@@ -191,7 +173,7 @@ export function makeChatLogSuccess(params: {
                     customRules,
                 });
 
-                const aiRequestId = await logGatewayRequest(gatewayCtx, {
+                await logGatewayRequest(gatewayCtx, {
                     endpoint,
                     model: meta.model,
                     provider: meta.provider,
@@ -219,12 +201,6 @@ export function makeChatLogSuccess(params: {
                 if (meta.status !== 'error') {
                     await runChatSuccessSideEffects({
                         gatewayCtx,
-                        aiRequestId,
-                        unifiedMessages,
-                        responseText: loggedResponse,
-                        model: meta.model,
-                        provider: meta.provider,
-                        isStreaming,
                     });
                 }
             })().catch((err) => console.error('[Gateway] logSuccess pipeline failed:', err))

@@ -24,9 +24,6 @@ interface ProviderSettings {
     circuit_breaker_failure_threshold?: number;
     circuit_breaker_timeout_seconds?: number;
     fallback_model?: string;
-    ragmetrics_enabled?: boolean;
-    ragmetrics_api_key?: string;
-    ragmetrics_config?: any;
 }
 
 export async function PATCH(
@@ -76,9 +73,6 @@ export async function PATCH(
             if (body.circuit_breaker_failure_threshold !== undefined) updateData.circuit_breaker_failure_threshold = body.circuit_breaker_failure_threshold;
             if (body.circuit_breaker_timeout_seconds !== undefined) updateData.circuit_breaker_timeout_seconds = body.circuit_breaker_timeout_seconds;
             if (body.fallback_model !== undefined) updateData.fallback_model = body.fallback_model;
-            if (body.ragmetrics_enabled !== undefined) updateData.ragmetrics_enabled = body.ragmetrics_enabled;
-            if (body.ragmetrics_api_key !== undefined) updateData.ragmetrics_api_key = body.ragmetrics_api_key;
-            if (body.ragmetrics_config !== undefined) updateData.ragmetrics_config = body.ragmetrics_config;
 
             const { error: updateError } = await supabaseAdmin
                 .from("project_settings")
@@ -109,9 +103,6 @@ export async function PATCH(
                     circuit_breaker_failure_threshold: body.circuit_breaker_failure_threshold || 5,
                     circuit_breaker_timeout_seconds: body.circuit_breaker_timeout_seconds || 60,
                     fallback_model: body.fallback_model || null,
-                    ragmetrics_enabled: body.ragmetrics_enabled ?? false,
-                    ragmetrics_api_key: body.ragmetrics_api_key || null,
-                    ragmetrics_config: body.ragmetrics_config || {},
                 });
 
             if (insertError) {
@@ -184,8 +175,6 @@ export async function GET(
                 circuit_breaker_failure_threshold: 5,
                 circuit_breaker_timeout_seconds: 60,
                 fallback_model: null,
-                ragmetrics_enabled: false,
-                ragmetrics_api_key: null,
             },
         });
     } catch (error) {
