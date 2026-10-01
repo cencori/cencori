@@ -2,6 +2,7 @@ import { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { createServerClient } from "@/lib/supabaseServer";
+import { getOrganizationMeta } from "@/lib/server/organization";
 import { isConsoleHostname } from "@/lib/console/routing";
 import OrganizationLayoutClient from "./OrganizationLayoutClient";
 
@@ -15,12 +16,7 @@ export async function generateMetadata({
   const { orgSlug } = await params;
 
   try {
-    const supabase = await createServerClient();
-    const { data: org } = await supabase
-      .from("organizations")
-      .select("name")
-      .eq("slug", orgSlug)
-      .single();
+    const org = await getOrganizationMeta(orgSlug);
 
     if (org?.name) {
       return {

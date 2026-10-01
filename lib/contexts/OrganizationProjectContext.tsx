@@ -12,6 +12,7 @@ export interface Organization {
     slug: string;
     description?: string;
     subscription_tier?: string;
+    credits_balance?: number | string | null;
 }
 
 export interface Project {
@@ -138,10 +139,11 @@ export const OrganizationProjectProvider = ({ children }: { children: ReactNode 
                 })
                 : Promise.resolve(null);
 
-            // Fetch organizations
+            // Fetch organizations (balance rides along so the header pill
+            // can paint from this payload instead of its own round trip).
             const orgsPromise = supabase
                 .from("organizations")
-                .select("id, name, slug, subscription_tier");
+                .select("id, name, slug, subscription_tier, credits_balance");
 
             const [{ data: orgsData, error: orgsError }, contextPayload] = await Promise.all([
                 orgsPromise,
