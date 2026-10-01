@@ -178,11 +178,12 @@ async function prepareRunExecution(args: {
         agent_id: run.agent_id,
         installation_id: run.installation_id,
     });
-    const [{ data: project }, { data: ins }] = await Promise.all([
+    const [{ data: project }, { data: ins }, { data: agentRow }] = await Promise.all([
         supabase.from('projects').select('id, organization_id, organizations!inner(subscription_tier)').eq('id', run.project_id).maybeSingle(),
         run.installation_id
             ? supabase.from('agent_installations').select('agent_version_id, update_channel').eq('id', run.installation_id).maybeSingle()
             : Promise.resolve({ data: null }),
+        supabase.from('agents').select('name').eq('id', run.agent_id).maybeSingle(),
     ]);
     const organizationId = ((project as { organization_id?: string } | null)?.organization_id as string) ?? '';
     if (!organizationId) throw new Error('Run project has no organization');
@@ -279,6 +280,9 @@ async function prepareRunExecution(args: {
     }
 
     const systemParts = [
+        typeof (agentRow as { name?: unknown } | null)?.name === 'string' && ((agentRow as { name: string }).name.trim())
+            ? `Your name is "${(agentRow as { name: string }).name.trim().slice(0, 120)}". Always introduce yourself as ${(agentRow as { name: string }).name.trim().slice(0, 120)} when asked who you are.`
+            : null,
         instructions ? `Instructions: ${instructions}` : null,
         contextSnippets.length > 0
             ? `Company knowledge (cite source IDs [src] in your answer):\n${contextSnippets.map((s, i) => `[${i + 1}] ${s}`).join('\n')}`

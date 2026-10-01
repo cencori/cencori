@@ -236,11 +236,20 @@ export async function POST(request: Request, ctx: Context) {
                 // so a prefixed id fails the debit and blocks the test.
                 const testRequestId = crypto.randomUUID();
                 const gatewayStartedAt = Date.now();
+                const agentName = typeof (agent as { name?: unknown } | null)?.name === 'string'
+                    ? ((agent as { name: string }).name.trim().slice(0, 120))
+                    : '';
+                const testInstructions = simple.manifest.instructions?.trim() ?? '';
+                const testSystemParts = [
+                    '[SANDBOX TEST — no tools, knowledge, or connections]',
+                    agentName ? `Your name is "${agentName}". Always introduce yourself as ${agentName} when asked who you are.` : null,
+                    testInstructions || null,
+                ].filter(Boolean) as string[];
                 const result = await executeGatewayChat({
                     supabase: db as never, projectId, organizationId: access.organizationId, tier,
                     request: {
                         messages: [
-                            ...(simple.manifest.instructions ? [{ role: 'system' as const, content: `[SANDBOX TEST — no tools, knowledge, or connections]\n${simple.manifest.instructions}` }] : []),
+                            { role: 'system' as const, content: testSystemParts.join('\n\n') },
                             { role: 'user' as const, content: input },
                         ],
                         model: simple.manifest.model!, maxTokens: 500,
