@@ -1,15 +1,25 @@
-"use client";
+import type { Metadata, Viewport } from "next";
+import type { ReactNode } from "react";
+import "./pitch.css";
 
-import React from "react";
+export const metadata: Metadata = {
+  title: { absolute: "Cencori Pitch" },
+  description: "Cencori pitch deck.",
+};
+
+export const viewport: Viewport = {
+  themeColor: "#ffffff",
+  colorScheme: "light",
+};
 
 export default function PitchLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-black text-white dark">
-      <main>{children}</main>
+    <div className="pitch-canvas" data-pitch-deck>
+      <main aria-label="Cencori pitch deck">{children}</main>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-export const STORY_PRODUCTS = ["API", "Basecode", "Arcie"] as const;
+export const STORY_PRODUCTS = ["API", "Tensor", "Arcie"] as const;
 export type StoryProduct = (typeof STORY_PRODUCTS)[number];
 
 export type Story = {

@@ -202,7 +202,7 @@ describe('toOpenAIMessages', () => {
 });
 
 /**
- * The turn that used to fail. Basecode's runtime calls `view_image`, the tool answers with an
+ * The turn that used to fail. Tensor's runtime calls `view_image`, the tool answers with an
  * `input_image` part, and the whole conversation is replayed on the next request. Every link of
  * that chain has to hold or the session dies where it stands.
  */

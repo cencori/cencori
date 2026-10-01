@@ -34,10 +34,10 @@ export interface GatewayContext {
     projectId: string;
     organizationId: string;
     apiKeyId: string | null;
-    /** Present only for server-issued Basecode Desktop credentials. */
-    basecodeUserId?: string | null;
-    /** Server-controlled Basecode model class for this entitlement. */
-    basecodeModelPolicy?: 'auto' | 'open_weight' | 'frontier' | 'custom' | null;
+    /** Present only for server-issued Tensor Desktop credentials. */
+    tensorUserId?: string | null;
+    /** Server-controlled Tensor model class for this entitlement. */
+    tensorModelPolicy?: 'auto' | 'open_weight' | 'frontier' | 'custom' | null;
     allowedModels: string[] | null;
     sponsoredModels: string[] | null;
     fullySponsoredKey: boolean;
@@ -509,7 +509,7 @@ return {
 
     if (keyError || !keyData) {
         // A key that matched nothing may still be one this gateway issued and later revoked —
-        // Basecode supersedes its desktop key on every sign-in, so signing in on a second machine
+        // Tensor supersedes its desktop key on every sign-in, so signing in on a second machine
         // silently retires the first one's. Looking the hash up again without the `revoked_at`
         // filter costs one query on a path that has already failed, and buys two things: the row
         // can be attributed to its project and therefore logged, and the caller can be told the key
@@ -550,7 +550,7 @@ return {
                         ? {
                             error: 'API key revoked',
                             message:
-                                'This key has been revoked. Signing in to Basecode again issues a new one.',
+                                'This key has been revoked. Signing in to Tensor again issues a new one.',
                             code: 'revoked_api_key',
                         }
                         : { error: 'Invalid API key', code: 'invalid_api_key' },
@@ -608,8 +608,11 @@ return {
         ? keyData.sponsored_models.filter((model: unknown): model is string => typeof model === 'string')
         : null;
     const fullySponsoredKey = isFullySponsoredApiKey(allowedModels, sponsoredModels);
-    const basecodeUserId =
-        keyData.client_app === 'basecode' && typeof keyData.created_by === 'string'
+    // Desktop keys minted before the Basecode → Tensor rename carry client_app='basecode';
+    // accept both so existing installs keep working.
+    const tensorUserId =
+        (keyData.client_app === 'tensor' || keyData.client_app === 'basecode') &&
+        typeof keyData.created_by === 'string'
             ? keyData.created_by
             : null;
 
@@ -654,8 +657,8 @@ return {
     const creditsBalancePromise = shouldEnforceCredits
         ? import('@/lib/credits').then(({ getCreditsBalance }) => getCreditsBalance(organizationId))
         : Promise.resolve(Number(organization.credits_balance ?? 0));
-    const basecodeAccessPromise = basecodeUserId
-        ? supabase.rpc('basecode_gateway_access', { p_user_id: basecodeUserId })
+    const tensorAccessPromise = tensorUserId
+        ? supabase.rpc('basecode_gateway_access', { p_user_id: tensorUserId })
         : Promise.resolve({ data: null, error: null });
     // Tiered quotas: control-plane reads (polls) draw from a roomy bucket so
     // they cannot starve the write budget, and cancellation is always
@@ -681,7 +684,7 @@ return {
                     ? { limit: MAX_READ_REQUESTS_PER_WINDOW, keySuffix: READ_BUCKET_SUFFIX }
                     : undefined,
             );
-    const [networkDenial, creditsBalance, rateLimitResult, spendCapResult, basecodeAccess] = await Promise.all([
+    const [networkDenial, creditsBalance, rateLimitResult, spendCapResult, tensorAccess] = await Promise.all([
         enforceProjectIngressPolicy({
             supabase,
             projectId: project.id,
@@ -691,21 +694,21 @@ return {
         creditsBalancePromise,
         rateLimitPromise,
         checkSpendCap(project.id),
-        basecodeAccessPromise,
+        tensorAccessPromise,
     ]);
 
     if (networkDenial) return { success: false, response: networkDenial };
 
-    if (basecodeUserId) {
-        if (basecodeAccess.error) {
-            console.error('[GatewayMiddleware] Basecode entitlement lookup failed:', basecodeAccess.error);
+    if (tensorUserId) {
+        if (tensorAccess.error) {
+            console.error('[GatewayMiddleware] Tensor entitlement lookup failed:', tensorAccess.error);
             return {
                 success: false,
                 response: addGatewayHeaders(
                     NextResponse.json(
                         {
-                            error: 'Basecode usage unavailable',
-                            message: 'Basecode could not verify this turn. Try again shortly.',
+                            error: 'Tensor usage unavailable',
+                            message: 'Tensor could not verify this turn. Try again shortly.',
                             code: 'basecode_usage_unavailable',
                         },
                         { status: 503 }
@@ -714,14 +717,14 @@ return {
                 ),
             };
         }
-        const access = basecodeAccess.data as {
+        const access = tensorAccess.data as {
             allowed?: boolean;
             model_policy?: 'auto' | 'open_weight' | 'frontier' | 'custom';
             reason?: string;
             reset_at?: string;
         } | null;
         if (!access?.allowed) {
-            const refusal = describeBasecodeRefusal(access?.reason);
+            const refusal = describeTensorRefusal(access?.reason);
             waitUntil(
                 logGatewayRefusal({
                     apiKeyId: keyData.id,
@@ -747,7 +750,7 @@ return {
                             message: refusal.message,
                             code: refusal.code,
                             reset_at: access?.reset_at ?? null,
-                            ...(refusal.status === 429 ? { upgrade_url: '/basecode' } : {}),
+                            ...(refusal.status === 429 ? { upgrade_url: '/tensor' } : {}),
                         },
                         { status: refusal.status }
                     ),
@@ -869,10 +872,10 @@ return {
         projectId: project.id,
         organizationId,
         apiKeyId: keyData.id,
-        basecodeUserId,
-        basecodeModelPolicy:
-            basecodeUserId
-                ? ((basecodeAccess.data as { model_policy?: GatewayContext['basecodeModelPolicy'] } | null)
+        tensorUserId,
+        tensorModelPolicy:
+            tensorUserId
+                ? ((tensorAccess.data as { model_policy?: GatewayContext['tensorModelPolicy'] } | null)
                     ?.model_policy ?? null)
                 : null,
         allowedModels,
@@ -1046,7 +1049,7 @@ export async function logGatewayRequest(context: GatewayContext, params: LogRequ
 /**
  * What to tell a caller the entitlement check turned down, and why.
  *
- * Every reason except `concurrency_limit` used to be reported as "Basecode usage limit reached",
+ * Every reason except `concurrency_limit` used to be reported as "Tensor usage limit reached",
  * which sent people to the upgrade page over problems an upgrade cannot fix. `turn_not_reserved`
  * is the sharpest example: it means the request reached the gateway without the turn the client is
  * supposed to reserve first — a sequencing fault, and the one reason that carries no `reset_at`,
@@ -1109,7 +1112,7 @@ async function logGatewayRefusal(params: {
     }
 }
 
-export function describeBasecodeRefusal(reason: string | undefined): {
+export function describeTensorRefusal(reason: string | undefined): {
     code: string;
     error: string;
     message: string;
@@ -1119,16 +1122,16 @@ export function describeBasecodeRefusal(reason: string | undefined): {
         case 'concurrency_limit':
             return {
                 code: 'basecode_concurrency_limit',
-                error: 'Basecode turn already running',
-                message: 'Finish the active Basecode turn before starting another.',
+                error: 'Tensor turn already running',
+                message: 'Finish the active Tensor turn before starting another.',
                 status: 409,
             };
         case 'turn_not_reserved':
             return {
                 code: 'basecode_turn_not_reserved',
-                error: 'Basecode turn was not reserved',
+                error: 'Tensor turn was not reserved',
                 message:
-                    'This request arrived without a reserved turn. Basecode reserves one before each '
+                    'This request arrived without a reserved turn. Tensor reserves one before each '
                     + 'turn, so this usually means the request did not come from the app, or the app '
                     + 'is out of date.',
                 status: 409,
@@ -1136,14 +1139,14 @@ export function describeBasecodeRefusal(reason: string | undefined): {
         case 'account_missing':
             return {
                 code: 'basecode_account_missing',
-                error: 'Basecode account not found',
-                message: 'This user has no Basecode billing account. Sign in to Basecode to create one.',
+                error: 'Tensor account not found',
+                message: 'This user has no Tensor billing account. Sign in to Tensor to create one.',
                 status: 403,
             };
         case 'plan_unavailable':
             return {
                 code: 'basecode_plan_unavailable',
-                error: 'Basecode plan unavailable',
+                error: 'Tensor plan unavailable',
                 message: 'The plan on this account is not currently enabled. Contact support.',
                 status: 403,
             };
@@ -1152,8 +1155,8 @@ export function describeBasecodeRefusal(reason: string | undefined): {
             // which is the only one an upgrade or a reset actually resolves.
             return {
                 code: 'basecode_usage_limited',
-                error: 'Basecode usage limit reached',
-                message: 'Your Basecode usage resets automatically. Upgrade or wait for the reset to continue.',
+                error: 'Tensor usage limit reached',
+                message: 'Your Tensor usage resets automatically. Upgrade or wait for the reset to continue.',
                 status: 429,
             };
     }
@@ -1211,20 +1214,20 @@ export async function incrementUsage(context: GatewayContext, costUsd?: number):
 
         await chargeCreditsForRequest(context, costUsd);
 
-        if (context.basecodeUserId) {
+        if (context.tensorUserId) {
             const costMicrousd = Math.max(0, Math.ceil((costUsd ?? 0) * 1_000_000));
-            const { data: recorded, error: basecodeUsageError } = await context.supabase.rpc(
+            const { data: recorded, error: tensorUsageError } = await context.supabase.rpc(
                 'basecode_record_gateway_usage',
                 {
-                    p_user_id: context.basecodeUserId,
+                    p_user_id: context.tensorUserId,
                     p_gateway_request_id: context.requestId,
                     p_cost_microusd: costMicrousd,
                 }
             );
-            if (basecodeUsageError || recorded !== true) {
+            if (tensorUsageError || recorded !== true) {
                 console.error(
-                    `[Gateway] Failed to record Basecode usage for request ${context.requestId}:`,
-                    basecodeUsageError ?? 'no active reservation'
+                    `[Gateway] Failed to record Tensor usage for request ${context.requestId}:`,
+                    tensorUsageError ?? 'no active reservation'
                 );
             }
         }

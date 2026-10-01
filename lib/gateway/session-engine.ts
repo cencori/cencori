@@ -528,7 +528,7 @@ export async function executeSessionTurn(params: TurnExecuteParams): Promise<Tur
     try {
         const resolved = await resolveGatewayProvider({
             supabase, projectId: gatewayCtx.projectId, organizationId: gatewayCtx.organizationId, requestedModel: model,
-            basecodeModelPolicy: gatewayCtx.basecodeModelPolicy,
+            tensorModelPolicy: gatewayCtx.tensorModelPolicy,
             allowedModels: gatewayCtx.allowedModels, sponsoredModels: gatewayCtx.sponsoredModels,
             pinnedConnectionId: pinnedConnectionId ?? null,
         });
@@ -698,7 +698,7 @@ export async function resumeSessionTurn(params: ResumeTurnParams): Promise<TurnE
 
         const resolved = await resolveGatewayProvider({
             supabase, projectId: gatewayCtx.projectId, organizationId: gatewayCtx.organizationId, requestedModel: model,
-            basecodeModelPolicy: gatewayCtx.basecodeModelPolicy,
+            tensorModelPolicy: gatewayCtx.tensorModelPolicy,
             allowedModels: gatewayCtx.allowedModels, sponsoredModels: gatewayCtx.sponsoredModels,
             pinnedConnectionId: storedPin,
         });

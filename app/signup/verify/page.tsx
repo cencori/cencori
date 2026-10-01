@@ -12,7 +12,7 @@ function VerifyContent() {
   const email = searchParams.get("email") ?? "";
   const userId = searchParams.get("userId") ?? "";
   const redirectParam = searchParams.get("redirect") ?? "";
-  const isBasecodeSignUp = redirectParam.startsWith("/basecode/sign-in?");
+  const isTensorSignUp = redirectParam.startsWith("/tensor/sign-in?");
   const preview = searchParams.get("preview") === "true";
 
   const [digits, setDigits] = useState<string[]>(["", "", "", "", "", ""]);
@@ -179,7 +179,7 @@ function VerifyContent() {
             <h1 className="text-xl font-medium">Your email has been verified</h1>
           </div>
           <div className="text-base text-muted-foreground mt-8">
-            <p>{isBasecodeSignUp ? "Returning you to Basecode…" : "Moving you to your workspace…"}</p>
+            <p>{isTensorSignUp ? "Returning you to Tensor…" : "Moving you to your workspace…"}</p>
             <p className="mt-1.5 text-xs text-muted-foreground/60">
               By continuing, you agree to our{" "}
               <Link href="/legal/terms" className="underline hover:text-foreground transition-colors">Terms</Link>{" "}
@@ -211,7 +211,7 @@ function VerifyContent() {
         <Logo variant="mark" className="h-6" />
         <div className="space-y-2">
           <h1 className="text-xl font-medium">
-            {isBasecodeSignUp ? "Verify to continue to Basecode" : "Check your email"}
+            {isTensorSignUp ? "Verify to continue to Tensor" : "Check your email"}
           </h1>
           <p className="text-base text-muted-foreground">
             We sent a 6-digit code to{" "}

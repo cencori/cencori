@@ -581,22 +581,22 @@ export function CencoriFuturePage({
               <article className={styles.pinCard} data-card="">
                 <Link
                   className={styles.pinPoster}
-                  href="/basecode"
-                  aria-label="Explore Basecode"
+                  href="/tensor"
+                  aria-label="Explore Tensor"
                 >
                   <Image
-                    alt="A developer working with Basecode"
+                    alt="A developer working with Tensor"
                     className={styles.pinPosterImage}
                     height={1086}
                     sizes="(max-width: 900px) 100vw, 33vw"
-                    src="/brand/basecode-studio.jpg"
+                    src="/brand/tensor-studio.jpg"
                     width={1448}
                   />
                 </Link>
 
                 <div className={styles.pinStatement}>
                   <h2>
-                    Basecode: A powerful coding agent for everyone, everywhere.
+                    Tensor: A powerful coding agent for everyone, everywhere.
                   </h2>
                 </div>
               </article>

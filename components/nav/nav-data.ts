@@ -8,8 +8,8 @@ export const navigationMenus = [
         label: "Explore products",
         items: [
           {
-            href: "/basecode",
-            label: "Basecode",
+            href: "/tensor",
+            label: "Tensor",
             tagline: "AI software engineering",
             description:
               "AI-native software engineering environment built on Cencori infrastructure.",

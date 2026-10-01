@@ -147,7 +147,7 @@ export async function executeGatewayChat(params: {
     organizationId: string;
     allowedModels?: string[] | null;
     sponsoredModels?: string[] | null;
-    basecodeModelPolicy?: 'auto' | 'open_weight' | 'frontier' | 'custom' | null;
+    tensorModelPolicy?: 'auto' | 'open_weight' | 'frontier' | 'custom' | null;
     tier: SubscriptionTier;
     request: UnifiedChatRequest;
     resolved?: ResolvedGatewayProvider;
@@ -188,7 +188,7 @@ export async function executeGatewayChat(params: {
             projectId: params.projectId,
             organizationId: params.organizationId,
             requestedModel: params.request.model,
-            basecodeModelPolicy: params.basecodeModelPolicy,
+            tensorModelPolicy: params.tensorModelPolicy,
             allowedModels: params.allowedModels,
             sponsoredModels: params.sponsoredModels,
             pinnedConnectionId: params.pinnedConnectionId ?? null,
@@ -385,7 +385,7 @@ export async function* streamGatewayChat(params: {
     organizationId: string;
     allowedModels?: string[] | null;
     sponsoredModels?: string[] | null;
-    basecodeModelPolicy?: 'auto' | 'open_weight' | 'frontier' | 'custom' | null;
+    tensorModelPolicy?: 'auto' | 'open_weight' | 'frontier' | 'custom' | null;
     tier: SubscriptionTier;
     request: UnifiedChatRequest;
     resolved?: ResolvedGatewayProvider;
@@ -402,7 +402,7 @@ export async function* streamGatewayChat(params: {
             projectId: params.projectId,
             organizationId: params.organizationId,
             requestedModel: params.request.model,
-            basecodeModelPolicy: params.basecodeModelPolicy,
+            tensorModelPolicy: params.tensorModelPolicy,
             allowedModels: params.allowedModels,
             sponsoredModels: params.sponsoredModels,
         }));

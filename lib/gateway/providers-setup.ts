@@ -181,7 +181,7 @@ export type ResolvedGatewayProvider = {
     customProviderTag?: string;
 };
 
-const BASECODE_OPEN_WEIGHT_MODEL_MARKERS = [
+const TENSOR_OPEN_WEIGHT_MODEL_MARKERS = [
     'deepseek',
     'glm-',
     'qwen',
@@ -194,20 +194,20 @@ const BASECODE_OPEN_WEIGHT_MODEL_MARKERS = [
     'maximo-atlas',
 ];
 
-export function resolveBasecodePlanModel(
+export function resolveTensorPlanModel(
     requestedModel: string,
     policy: 'auto' | 'open_weight' | 'frontier' | 'custom' | null | undefined,
 ): string {
     if (!policy || policy === 'frontier' || policy === 'custom') return requestedModel;
 
     const normalized = requestedModel.trim().toLowerCase();
-    const askedForAuto = !normalized || normalized === 'auto' || normalized === 'basecode-auto';
-    const isOpenWeight = BASECODE_OPEN_WEIGHT_MODEL_MARKERS.some((marker) =>
+    const askedForAuto = !normalized || normalized === 'auto' || normalized === 'tensor-auto';
+    const isOpenWeight = TENSOR_OPEN_WEIGHT_MODEL_MARKERS.some((marker) =>
         normalized.includes(marker),
     );
 
     if (policy === 'auto') {
-        const autoModel = process.env.BASECODE_AUTO_MODEL?.trim() || 'glm-5.3-flash';
+        const autoModel = process.env.TENSOR_AUTO_MODEL?.trim() || 'glm-5.3-flash';
         if (askedForAuto) return autoModel;
         // Auto is the default on this plan, not the only option. Every request used to be replaced
         // by the auto model whatever it named, so a client offering a choice would have been lying:
@@ -223,10 +223,10 @@ export function resolveBasecodePlanModel(
     if (askedForAuto) {
         // GLM rather than DeepSeek: the DeepSeek quota is spent, so the old default resolved every
         // Builder Auto turn onto a model that cannot answer. The env var still overrides this.
-        return process.env.BASECODE_BUILDER_AUTO_MODEL?.trim() || 'glm-5.3-flash';
+        return process.env.TENSOR_BUILDER_AUTO_MODEL?.trim() || 'glm-5.3-flash';
     }
     if (!isOpenWeight) {
-        throw new ModelAccessDeniedError('basecode-builder', requestedModel);
+        throw new ModelAccessDeniedError('tensor-builder', requestedModel);
     }
     return requestedModel;
 }
@@ -236,7 +236,7 @@ export async function resolveGatewayProvider(params: {
     projectId: string;
     organizationId: string;
     requestedModel: string;
-    basecodeModelPolicy?: 'auto' | 'open_weight' | 'frontier' | 'custom' | null;
+    tensorModelPolicy?: 'auto' | 'open_weight' | 'frontier' | 'custom' | null;
     allowedModels?: string[] | null;
     sponsoredModels?: string[] | null;
     /**
@@ -247,9 +247,9 @@ export async function resolveGatewayProvider(params: {
      */
     pinnedConnectionId?: string | null;
 }): Promise<ResolvedGatewayProvider> {
-    const requestedModel = resolveBasecodePlanModel(
+    const requestedModel = resolveTensorPlanModel(
         params.requestedModel,
-        params.basecodeModelPolicy,
+        params.tensorModelPolicy,
     );
     const router = new ProviderRouter();
     registerDefaultProviders(router);

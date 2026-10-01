@@ -55,11 +55,11 @@ const PRODUCTS = [
       "Fast, reliable compute on any frontier model with autoscaling and regional pinning.",
   },
   {
-    href: "/basecode",
+    href: "/tensor",
     icon: Zap,
     image: "/bc.png",
     light: true,
-    name: "Basecode",
+    name: "Tensor",
     span: true,
     description: "",
   },
@@ -125,7 +125,7 @@ export function DevelopersProducts() {
                         : ""
                   }`}
                 >
-                  {product.href === "/basecode" ? (
+                  {product.href === "/tensor" ? (
                     <>
                       <Image
                         alt={product.name}

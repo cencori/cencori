@@ -286,8 +286,8 @@ export const BACHS_CONFIG = {
     creditsStarter: process.env.BACHS_PRODUCT_CREDITS_STARTER || '',
     creditsGrowth: process.env.BACHS_PRODUCT_CREDITS_GROWTH || '',
     creditsScale: process.env.BACHS_PRODUCT_CREDITS_SCALE || '',
-    basecodeBuilderMonthly: process.env.BACHS_PRODUCT_BASECODE_BUILDER_MONTHLY || '',
-    basecodeProMonthly: process.env.BACHS_PRODUCT_BASECODE_PRO_MONTHLY || '',
+    tensorBuilderMonthly: process.env.BACHS_PRODUCT_BASECODE_BUILDER_MONTHLY || '',
+    tensorProMonthly: process.env.BACHS_PRODUCT_BASECODE_PRO_MONTHLY || '',
   } as const,
 } as const;
 
@@ -371,20 +371,20 @@ export function getProductId(
   return id;
 }
 
-export function getBasecodeProductId(tier: 'builder' | 'pro'): string {
+export function getTensorProductId(tier: 'builder' | 'pro'): string {
   const id =
     tier === 'builder'
-      ? BACHS_CONFIG.products.basecodeBuilderMonthly
-      : BACHS_CONFIG.products.basecodeProMonthly;
-  if (!id) throw new Error(`No Bachs Basecode product configured for ${tier}`);
+      ? BACHS_CONFIG.products.tensorBuilderMonthly
+      : BACHS_CONFIG.products.tensorProMonthly;
+  if (!id) throw new Error(`No Bachs Tensor product configured for ${tier}`);
   return id;
 }
 
-export function getBasecodePlanByProductId(
+export function getTensorPlanByProductId(
   productId: string
 ): 'builder' | 'pro' | null {
-  if (productId === BACHS_CONFIG.products.basecodeBuilderMonthly) return 'builder';
-  if (productId === BACHS_CONFIG.products.basecodeProMonthly) return 'pro';
+  if (productId === BACHS_CONFIG.products.tensorBuilderMonthly) return 'builder';
+  if (productId === BACHS_CONFIG.products.tensorProMonthly) return 'pro';
   return null;
 }
 
@@ -437,8 +437,8 @@ export function getProductTypeFromId(
     return 'credits_topup';
   }
   if (
-    productId === p.basecodeBuilderMonthly ||
-    productId === p.basecodeProMonthly
+    productId === p.tensorBuilderMonthly ||
+    productId === p.tensorProMonthly
   ) {
     return 'basecode_subscription';
   }

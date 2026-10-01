@@ -2,9 +2,8 @@ import type { NextConfig } from "next";
 import { createMDX } from "fumadocs-mdx/next";
 
 const nextConfig: NextConfig = {
-  // The console is exercised on its real subdomain shape in development so
-  // host-based routing and auth behavior are tested before production.
-  allowedDevOrigins: ["console.localhost"],
+  // Exercise local subdomains with the same host-based routing as production.
+  allowedDevOrigins: ["console.localhost", "pitch.localhost"],
   // The Vercel build container (8GB) OOMs when Next forks tsc after a
   // 4-minute webpack compile. The tree typechecks clean — verify with
   // `npm run typecheck` locally or in CI instead of during the build.
@@ -41,6 +40,10 @@ const nextConfig: NextConfig = {
   },
   async rewrites() {
     return [
+      // Legacy desktop API prefix. Rewritten (not redirected) so POST bodies
+      // survive: old builds calling /api/basecode/* reach the same handlers
+      // as /api/tensor/*.
+      { source: "/api/basecode/:path*", destination: "/api/tensor/:path*" },
       // Serve the docs landing page directly so social crawlers receive the
       // introduction metadata without needing to follow a redirect.
       { source: "/docs", destination: "/docs/introduction" },
@@ -78,6 +81,14 @@ const nextConfig: NextConfig = {
       {
         source: "/models",
         destination: "/ai-gateway/models",
+        permanent: true,
+      },
+      // Basecode → Tensor product rename. Old desktop builds and bookmarks
+      // still hit /basecode/*; send them to the matching /tensor/* route
+      // (query strings, including the sign-in params, are preserved).
+      {
+        source: "/basecode/:path*",
+        destination: "/tensor/:path*",
         permanent: true,
       },
       {

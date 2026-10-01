@@ -6,7 +6,7 @@
  * This endpoint fully supports tools, and had no recovery at all: a model that wrote its call as
  * markup instead of emitting a structured one had the syntax pass straight through to the caller
  * and made no call. The fix on /v1/responses did not reach here, which is why it looked fixed —
- * Basecode uses the other door.
+ * Tensor uses the other door.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 

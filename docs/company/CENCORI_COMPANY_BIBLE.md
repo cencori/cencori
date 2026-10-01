@@ -146,7 +146,7 @@ fully managed durable runtime has already shipped.
 
 Gateway supplies model access, Memory supplies persistent context, and Compute
 supplies execution environments. Arcie is the agent layer connecting those
-systems. Basecode is an intended application and proving ground on top.
+systems. Tensor is an intended application and proving ground on top.
 
 See [Arcie Brand and Product Positioning](./ARCIE_POSITIONING.md) for the canonical
 definition, product boundaries, status and approved public language.
