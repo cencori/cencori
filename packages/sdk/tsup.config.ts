@@ -6,6 +6,7 @@ export default defineConfig({
         'vercel/index': 'src/vercel/index.ts',
         'tanstack/index': 'src/tanstack/index.ts',
         'ai/index': 'src/ai/index.ts',
+        'catalog/index': 'src/catalog/index.ts',
         'vision/index': 'src/vision/index.ts',
         'voice/index': 'src/voice/index.ts',
         'documents/index': 'src/documents/index.ts',
