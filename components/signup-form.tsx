@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabaseClient";
-import { isAuthFormTarget, resolveAuthRedirectTargets } from "@/lib/auth-redirect";
+import { isAuthFormTarget, resolveAuthRedirectTargets, getPostLoginDefault } from "@/lib/auth-redirect";
 import {
   clearSignupWelcomeEmailPending,
   markSignupWelcomeEmailPending,
@@ -53,10 +53,10 @@ export function SignupForm({ className, ...props }: SignupFormProps) {
         if (!cancelled && data.session?.user) {
           const { navigationTarget } = resolveAuthRedirectTargets(
             redirectParam,
-            { defaultPath: "/dashboard" },
+            { defaultPath: getPostLoginDefault(window.location.origin) },
           );
           const destination = isAuthFormTarget(navigationTarget)
-            ? "/dashboard"
+            ? getPostLoginDefault(window.location.origin)
             : navigationTarget;
           window.location.assign(destination);
         }
@@ -71,10 +71,10 @@ export function SignupForm({ className, ...props }: SignupFormProps) {
       if (!cancelled && event === "SIGNED_IN" && session?.user) {
         const { navigationTarget } = resolveAuthRedirectTargets(
           redirectParam,
-          { defaultPath: "/dashboard" },
+          { defaultPath: getPostLoginDefault(window.location.origin) },
         );
         const destination = isAuthFormTarget(navigationTarget)
-          ? "/dashboard"
+          ? getPostLoginDefault(window.location.origin)
           : navigationTarget;
         window.location.assign(destination);
       }
@@ -117,7 +117,7 @@ export function SignupForm({ className, ...props }: SignupFormProps) {
       }
 
       const { navigationTarget } = resolveAuthRedirectTargets(redirectParam, {
-        defaultPath: "/dashboard",
+        defaultPath: getPostLoginDefault(window.location.origin),
       });
       // Confirmation link goes through the server callback so the session is
       // exchanged before the destination renders (prevents the login bounce).
@@ -160,7 +160,7 @@ export function SignupForm({ className, ...props }: SignupFormProps) {
     setLoading(true);
     try {
       const { navigationTarget } = resolveAuthRedirectTargets(redirectParam, {
-        defaultPath: "/dashboard",
+        defaultPath: getPostLoginDefault(window.location.origin),
       });
       // Route OAuth through the server callback so the session is exchanged and
       // cookie-set before the destination renders (prevents the login bounce).
