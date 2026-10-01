@@ -21,8 +21,10 @@ import { buildPublicCatalog, filterPublicCatalog } from '@/lib/catalog/public-ca
  *                           audioInput, caching
  */
 
-export const dynamic = 'force-static';
-export const revalidate = 3600;
+export const dynamic = 'force-dynamic';
+// NOTE: force-static would serve a single prerendered snapshot and ignore
+// ?provider / ?type / ?search / ?capability. Per-request rendering + the
+// s-maxage Cache-Control below gives per-URL CDN caching instead.
 
 const PUBLIC_HEADERS = {
     'Access-Control-Allow-Origin': '*',
