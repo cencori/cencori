@@ -50,6 +50,7 @@ Current minimum versions:
 - Cencori Web TypeScript SDK: `cencori@1.6.1`
 - Cencori Web MCP server: `@cencori/mcp@0.7.1`
 - Embedded Agents TypeScript SDK: `cencori@1.7.1`
+- Public catalog helpers (`listCatalogModels`, `listCatalogProviders`, `providerLogoUrl`): `cencori@1.8.0`
 - Embedded Agents Python SDK: not yet published; use the HTTP API for Python integrations
 - Embedded Agents MCP inspection: `@cencori/mcp@0.8.0`
 
@@ -1046,6 +1047,40 @@ await cencori.ai.chat({ model: 'gemini-3.1-pro-preview', messages });
 Flagship model: `claude-opus-5` (Anthropic's most capable, released 2026-07-24).
 It requires Anthropic provider access; use `groq/compound-mini` for a free first test.
 
+## Public Model Catalog (keyless)
+
+Embed Cencori's model/provider shelf — with logos — inside a product.
+No API key; safe for browser bundles. Same data as https://cencori.com/ai-gateway/models.
+Requires `cencori@1.8.0` for the SDK helpers.
+
+Endpoints (GET, CORS `*`, cached):
+- `https://cencori.com/api/models` — models + providers. Filters: `?provider=openai`,
+  `?type=reasoning|chat|code|search|vision|image`, `?search=gpt`, repeatable
+  `?capability=tools` (reasoning, vision, code, search, image, tools,
+  structuredOutput, fileInput, videoInput, audioInput, caching).
+- `https://cencori.com/api/providers` — providers only
+  (`{ id, name, logo_url, model_count, website, docs_url }`).
+- `https://cencori.com/api/providers/:id/logo` — provider logo SVG
+  (monogram fallback; 404 only for unknown ids).
+
+SDK (keyless — do NOT construct a `Cencori` client or send an API key for these):
+
+```typescript
+import { listCatalogModels, listCatalogProviders, providerLogoUrl } from 'cencori';
+// or 'cencori/catalog'
+
+const { data: models } = await listCatalogModels({ provider: 'openai' });
+const { data: providers } = await listCatalogProviders();
+const logo = providerLogoUrl('openai'); // string URL for <img>, no fetch
+```
+
+Rules:
+- Each model row carries `provider_logo_url`; each provider row carries `logo_url`.
+  Prefer `logo_url` over `icon_url` (static icon files do not exist for every vendor).
+- White brand marks (OpenAI, Anthropic) need a dark chip behind the `<img>`.
+- Display only. For per-key availability and billable pricing, use authenticated
+  `GET /v1/models` (`cencori.models.list()`) server-side.
+
 ## MCP Server (for AI agents)
 
 Cencori ships an official Model Context Protocol server, `@cencori/mcp`. Version `0.8.0` includes first-party Web tools and read-only Embedded Agents inspection alongside docs and authenticated platform operations.
@@ -1136,6 +1171,7 @@ When integrating Cencori into a project:
 - TanStack AI: https://cencori.com/docs/integrations/tanstack
 - Authentication: https://cencori.com/docs/api/authentication
 - Chat API: https://cencori.com/docs/api/chat
+- Model Catalog API: https://cencori.com/docs/api/catalog
 - Cencori Web API: https://cencori.com/docs/api/web
 - Build a Web Research Agent: https://cencori.com/docs/guides/build-a-web-research-agent
 - MCP Server: https://cencori.com/docs/mcp
