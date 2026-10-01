@@ -326,9 +326,16 @@ function DangerZoneCard({ org }: { org: OrgRow }) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
     const [confirmText, setConfirmText] = useState('');
+    const [copied, setCopied] = useState(false);
     const [isPending, startTransition] = useTransition();
 
-    const canDelete = confirmText === org.slug;
+    const canDelete = confirmText.trim() === org.name;
+
+    const handleCopyName = async () => {
+        await navigator.clipboard.writeText(org.name);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+    };
 
     const handleDelete = () => {
         startTransition(async () => {
@@ -371,21 +378,29 @@ function DangerZoneCard({ org }: { org: OrgRow }) {
                         </DialogHeader>
                         <div className="space-y-2 pt-2">
                             <label className="text-xs text-muted-foreground">
-                                Type <span className="font-mono text-foreground">{org.slug}</span> to confirm.
+                                Type <span className="font-mono text-foreground">{org.name}</span><button
+                                    type="button"
+                                    onClick={handleCopyName}
+                                    aria-label="Copy organization name"
+                                    title="Copy organization name"
+                                    className="ml-1 inline-flex h-4 w-4 translate-y-[1px] items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                >
+                                    {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
+                                </button> to confirm.
                             </label>
                             <Input
                                 value={confirmText}
                                 onChange={(e) => setConfirmText(e.target.value)}
-                                placeholder={org.slug}
+                                placeholder={org.name}
                                 className="h-8 text-xs font-mono"
                                 disabled={isPending}
                             />
                         </div>
-                        <DialogFooter>
+                        <DialogFooter className="gap-3">
                             <Button
                                 variant="ghost"
                                 size="sm"
-                                className="h-7 text-xs px-3"
+                                className="h-7 text-xs px-3 mr-auto"
                                 onClick={() => {
                                     setOpen(false);
                                     setConfirmText('');
@@ -401,7 +416,7 @@ function DangerZoneCard({ org }: { org: OrgRow }) {
                                 onClick={handleDelete}
                                 disabled={!canDelete || isPending}
                             >
-                                {isPending ? 'Deleting…' : 'Delete Organization'}
+                                {isPending ? 'Deleting…' : 'Delete'}
                             </Button>
                         </DialogFooter>
                     </DialogContent>
