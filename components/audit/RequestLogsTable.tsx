@@ -240,7 +240,7 @@ export function RequestLogsTable({ projectId, environment, filters }: RequestLog
                             <TableRow className="hover:bg-transparent border-b border-border/40">
                                 <TableHead className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider h-8 px-3 w-[180px]">Timestamp</TableHead>
                                 <TableHead className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider h-8 w-[60px]">Status</TableHead>
-                                <TableHead className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider h-8">Path</TableHead>
+                                <TableHead className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider h-8">Model</TableHead>
                                 <TableHead className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider h-8 text-right w-[80px]">Tokens</TableHead>
                                 <TableHead className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider h-8 text-right w-[80px]">Cost</TableHead>
                                 <TableHead className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider h-8 text-right pr-3 w-[80px]">Latency</TableHead>
@@ -260,7 +260,7 @@ export function RequestLogsTable({ projectId, environment, filters }: RequestLog
                                         <StatusBadge status={request.status} variant="code" />
                                     </TableCell>
                                     <TableCell className="py-2 font-mono text-xs text-muted-foreground">
-                                        /ai/v1/chat/{request.model}
+                                        {request.model}
                                     </TableCell>
                                     <TableCell className="py-2 text-right text-xs font-mono text-muted-foreground">
                                         {request.total_tokens.toLocaleString()}
