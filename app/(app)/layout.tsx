@@ -21,7 +21,6 @@ import { CommandPaletteProvider, useCommandPalette } from "@/lib/contexts/Comman
 import { ThemeScope } from "@/components/theme-scope";
 import { MobileNav } from "@/components/dashboard/MobileNav";
 import { CencoriAgentSidebar } from "@/components/dashboard/CencoriAgentSidebar";
-import { DashboardShellSkeleton } from "@/components/dashboard/DashboardShellSkeleton";
 import { EnvironmentProvider, useEnvironment } from "@/lib/contexts/EnvironmentContext";
 import { ReactQueryProvider } from "@/lib/providers/ReactQueryProvider";
 import { SessionProvider } from "@/lib/contexts/SessionContext";
@@ -149,9 +148,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <ReactQueryProvider>
       <SessionProvider>
-        {authState.loading ? (
-          <DashboardShellSkeleton />
-        ) : (
+        {authState.loading ? null : (
           <CommandPaletteProvider>
           <MobileSheetProvider>
             <OrganizationProjectProvider>

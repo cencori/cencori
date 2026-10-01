@@ -3,12 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { DashboardShellSkeleton } from "@/components/dashboard/DashboardShellSkeleton";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const RESOLVE_TIMEOUT_MS = 10_000;
 // If the refreshed render still lands back here, cookies aren't sticking
-// (blocked third-party storage, dropped Set-Cookie). Refreshing again would
-// loop forever on a blank screen, so fail visibly instead.
+// (blocked storage, dropped Set-Cookie). Refreshing again would loop
+// forever, so fail visibly instead.
 const MAX_AUTO_REFRESHES = 1;
 
 export default function ConsoleWorkspaceBootstrapPage() {
@@ -65,17 +65,34 @@ export default function ConsoleWorkspaceBootstrapPage() {
     void resolveWorkspace();
   }, [resolveWorkspace]);
 
-  if (!error) return <DashboardShellSkeleton />;
+  if (!error) {
+    return (
+      <div
+        className="mx-auto w-full max-w-[1360px] px-6 py-8"
+        role="status"
+        aria-label="Loading dashboard"
+      >
+        <div className="mb-8 space-y-2">
+          <Skeleton className="h-5 w-28" />
+          <Skeleton className="h-3 w-72 max-w-full" />
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <Skeleton className="h-36 rounded-xl" />
+          <Skeleton className="h-36 rounded-xl" />
+        </div>
+        <Skeleton className="mt-4 h-64 rounded-xl" />
+        <span className="sr-only">Loading the dashboard</span>
+      </div>
+    );
+  }
 
   return (
-    <DashboardShellSkeleton>
-      <main className="mx-auto flex min-h-[60vh] w-full max-w-lg flex-col items-start justify-center px-6">
-        <h1 className="text-lg font-medium">Console unavailable</h1>
-        <p className="mt-2 text-sm text-muted-foreground">{error}</p>
-        <Button type="button" size="sm" className="mt-5" onClick={() => void resolveWorkspace()}>
-          Try again
-        </Button>
-      </main>
-    </DashboardShellSkeleton>
+    <main className="mx-auto flex min-h-[60vh] w-full max-w-lg flex-col items-start justify-center px-6">
+      <h1 className="text-lg font-medium">Console unavailable</h1>
+      <p className="mt-2 text-sm text-muted-foreground">{error}</p>
+      <Button type="button" size="sm" className="mt-5" onClick={() => void resolveWorkspace()}>
+        Try again
+      </Button>
+    </main>
   );
 }

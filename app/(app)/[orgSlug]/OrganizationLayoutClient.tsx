@@ -240,15 +240,30 @@ export default function OrganizationLayoutClient({
         }
     }, [routeProjectSlug, orgSlug]);
     const stickyProjectSlug = useMemo(() => {
-        if (consoleMode) return activeProject?.slug ?? null;
+        // URL first — it's the address and it's synchronous.
         if (routeProjectSlug) return routeProjectSlug;
+        // Then the resolved console workspace, when it has landed.
+        if (activeProject) return activeProject.slug;
         if (!orgSlug || typeof window === "undefined") return null;
+        const visibleProjects = workspaceProjects.filter((project) =>
+            project.orgSlug === orgSlug || project.organization_id === organization?.id,
+        );
+        // Then the last-visited project, validated against projects this
+        // account can actually see — a stale hint must never invent scope.
+        // This keeps every sidebar and subnav href stable from first paint
+        // instead of flipping org-scope → project-scope when context lands.
         try {
-            return localStorage.getItem(`cencori:last-project:${orgSlug}`);
+            const hint = localStorage.getItem(`cencori:last-project:${orgSlug}`);
+            if (hint && visibleProjects.some((project) => project.slug === hint)) return hint;
         } catch {
-            return null;
+            // Storage unavailable — fall through to the cached list.
         }
-    }, [consoleMode, activeProject, routeProjectSlug, orgSlug]);
+        return (
+            visibleProjects.find((project) => project.orgSlug === orgSlug)?.slug ??
+            visibleProjects[0]?.slug ??
+            null
+        );
+    }, [activeProject, routeProjectSlug, orgSlug, workspaceProjects, organization?.id]);
     const scopeProjectSlug = isInsideProject ? projectSlug : stickyProjectSlug;
     const scopedProjectHref = (subpath: string) =>
         consoleMode ? `/${subpath}` : `${orgBase}/${scopeProjectSlug}${subpath}`;
