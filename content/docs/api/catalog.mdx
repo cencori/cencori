@@ -1,0 +1,146 @@
+---
+title: "Model Catalog API"
+description: "Embed Cencori's public model and provider catalog — with logos — inside your own product. No API key required."
+section: "API Reference"
+order: 3
+---
+
+## Overview
+
+The catalog API ships the same data rendered on [cencori.com/ai-gateway/models](/ai-gateway/models): every provider, every model, context windows, capabilities, and display pricing — plus hotlinkable provider logos.
+
+All three endpoints are **public and keyless**. Call them from a browser bundle safely; never put a secret API key in client-side code to fetch the catalog.
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET https://cencori.com/api/models` | Models + providers (filterable) |
+| `GET https://cencori.com/api/providers` | Providers only (logos, model counts) |
+| `GET https://cencori.com/api/providers/:id/logo` | Provider logo as SVG |
+
+Responses are cached (`s-maxage=3600`), so refetch at most hourly.
+
+## List models
+
+```bash
+curl "https://cencori.com/api/models?provider=openai&type=chat"
+```
+
+Query params (all optional, combinable):
+
+| Param | Example | Matches |
+|-------|---------|---------|
+| `provider` | `?provider=openai` | Provider id (case-insensitive) |
+| `type` | `?type=reasoning` | `chat`, `reasoning`, `code`, `search`, `vision`, `image` |
+| `search` | `?search=gpt` | Name, id, provider, description |
+| `capability` | `?capability=tools&capability=code` | Repeatable or comma-separated: `reasoning`, `vision`, `code`, `search`, `image`, `tools`, `structuredOutput`, `fileInput`, `videoInput`, `audioInput`, `caching` |
+
+Each model row looks like this:
+
+```json
+{
+  "id": "gpt-5",
+  "name": "GPT-5",
+  "provider": "openai",
+  "provider_name": "OpenAI",
+  "provider_logo_url": "https://cencori.com/api/providers/openai/logo",
+  "type": "chat",
+  "types": ["chat"],
+  "context_window": 400000,
+  "context_display": "400K",
+  "description": "Flagship model",
+  "capabilities": { "tools": true },
+  "pricing": {
+    "input_per_million": 5,
+    "output_per_million": 15,
+    "currency": "USD",
+    "input_display": "$5.00",
+    "output_display": "$15.00",
+    "per_image": false,
+    "per_image_usd": null
+  }
+}
+```
+
+Image models bill per image instead: `per_image: true` with `per_image_usd` (e.g. `0.02`) and `"output_display": "per img"`.
+
+## List providers
+
+```bash
+curl "https://cencori.com/api/providers"
+```
+
+```json
+{
+  "object": "list",
+  "data": [
+    {
+      "id": "openai",
+      "name": "OpenAI",
+      "logo_url": "https://cencori.com/api/providers/openai/logo",
+      "website": "https://openai.com",
+      "docs_url": "https://platform.openai.com/docs",
+      "model_count": 32
+    }
+  ],
+  "total": 13
+}
+```
+
+## Logos
+
+Use `logo_url` (or per-model `provider_logo_url`) directly as an image source — it always returns an SVG for known providers and 404s only for unknown ids:
+
+```html
+<img src="https://cencori.com/api/providers/openai/logo" width="20" height="20" alt="OpenAI" />
+```
+
+Two things to know:
+
+- Vendors with a checked-in brand mark serve the real logo; the rest serve a neutral monogram tile so your `<img>` never breaks.
+- Several brand marks are **white** (OpenAI, Anthropic). Render them on a dark chip or they disappear on light backgrounds.
+
+## SDK usage
+
+Install `cencori@^1.8.0`. The catalog helpers are keyless — no client or API key needed, so they are browser-safe:
+
+```typescript
+import { listCatalogModels, listCatalogProviders, providerLogoUrl } from 'cencori';
+// or: import { ... } from 'cencori/catalog';
+
+const { data: models } = await listCatalogModels({ provider: 'openai' });
+const { data: providers } = await listCatalogProviders();
+const logo = providerLogoUrl('openai'); // string, no fetch
+```
+
+React example — a provider shelf with logos:
+
+```tsx
+import { useEffect, useState } from 'react';
+import { listCatalogProviders, type CatalogProvider } from 'cencori';
+
+export function ProviderShelf() {
+  const [providers, setProviders] = useState<CatalogProvider[]>([]);
+  useEffect(() => {
+    listCatalogProviders().then((res) => setProviders(res.data));
+  }, []);
+  return (
+    <ul>
+      {providers.map((p) => (
+        <li key={p.id}>
+          <img src={p.logo_url} width={20} height={20} alt={p.name} />
+          {p.name} · {p.model_count} models
+        </li>
+      ))}
+    </ul>
+  );
+}
+```
+
+## Public catalog vs authenticated models
+
+| Surface | Auth | What you get |
+|---------|------|--------------|
+| `GET /api/models` (+ SDK catalog helpers) | None | Static marketing catalog: display pricing, no per-key availability |
+| `GET /api/v1/models` (`cencori.models.list()`) | Project API key | Per-key availability, DB-backed pricing, BYOK/synced/custom rows |
+
+Use the public surface for browsing and display. Use `/v1/models` server-side when you need to know what a specific key can actually call.
