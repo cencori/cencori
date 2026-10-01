@@ -20,8 +20,9 @@ import { getProvider } from '@/lib/providers/config';
  */
 
 export const runtime = 'nodejs';
-export const dynamic = 'force-static';
-export const revalidate = 86400;
+// Per-request: the [providerId] segment can't be prerendered statically.
+// The s-maxage Cache-Control below still gives CDN caching per logo.
+export const dynamic = 'force-dynamic';
 
 const LOGO_HEADERS = {
     'Access-Control-Allow-Origin': '*',
