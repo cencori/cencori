@@ -565,10 +565,27 @@ export default function OrganizationLayoutClient({
                                             key={project.id}
                                             className="min-h-8 cursor-pointer rounded-lg px-3 py-1 text-[13px] font-medium"
                                             onClick={async () => {
-                                                if (consoleMode && await selectProject(project.id)) {
-                                                    if (!isInsideProject) router.push("/home");
-                                                    router.refresh();
-                                                    return;
+                                                if (consoleMode) {
+                                                    let switched = false;
+                                                    try {
+                                                        switched = await selectProject(project.id);
+                                                    } catch {
+                                                        switched = false;
+                                                    }
+                                                    if (switched) {
+                                                        // Cookies carry the new workspace from here.
+                                                        // Push alone loads fresh RSC; a refresh()
+                                                        // behind it races the navigation and can
+                                                        // strand the UI. Refresh only when the URL
+                                                        // doesn't change (same flat route, new
+                                                        // workspace resolves underneath it).
+                                                        if (!isInsideProject && window.location.pathname !== "/home") {
+                                                            router.push("/home");
+                                                        } else {
+                                                            router.refresh();
+                                                        }
+                                                        return;
+                                                    }
                                                 }
                                                 router.push(`/${orgSlug}/${project.slug}`);
                                             }}
