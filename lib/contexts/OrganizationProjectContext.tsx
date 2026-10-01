@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabaseClient";
 import { ORG_PROJECT_CACHE_KEY } from "@/lib/auth/session-caches";
 import { getConsoleSurface, isConsoleHostname } from "@/lib/console/routing";
@@ -69,6 +70,7 @@ function saveCache(organizations: Organization[], projects: Project[], userId: s
 }
 
 export const OrganizationProjectProvider = ({ children }: { children: ReactNode }) => {
+    const queryClient = useQueryClient();
     const cached = useMemo(() => loadCache(), []);
     const [organizations, setOrganizations] = useState<Organization[]>(cached?.organizations ?? []);
     const [projects, setProjects] = useState<Project[]>(cached?.projects ?? []);
@@ -83,6 +85,11 @@ export const OrganizationProjectProvider = ({ children }: { children: ReactNode 
     const fetchData = useCallback(async () => {
         setLoading(true);
         try {
+            // getSession() reads local storage — near-free. Await it first so
+            // a signed-out tab never fires pointless network requests, then
+            // run the two independent network calls together instead of in
+            // series: the org list and the console workspace context don't
+            // depend on each other.
             const {
                 data: { session },
                 error: sessionError,
@@ -104,10 +111,42 @@ export const OrganizationProjectProvider = ({ children }: { children: ReactNode 
                 setProjects([]);
             }
 
+            // Canonical console URLs intentionally omit tenant slugs. Resolve
+            // the user's selected workspace separately so the shell can keep
+            // rendering the correct organization and project switchers.
+            const isCanonicalConsoleRoute = (
+                typeof window !== "undefined" &&
+                isConsoleHostname(window.location.hostname) &&
+                getConsoleSurface(window.location.pathname) !== null
+            );
+            const contextPromise = isCanonicalConsoleRoute
+                ? fetch("/api/console/context", {
+                    cache: "no-store",
+                    credentials: "same-origin",
+                }).then(async (contextResponse) => {
+                    if (!contextResponse.ok) return null;
+                    return (await contextResponse.json()) as {
+                        workspace?: {
+                            organization?: { id?: string };
+                            project?: { id?: string };
+                        } | null;
+                    };
+                }).catch(() => {
+                    // The slug-based routes remain fully usable if context
+                    // resolution is temporarily unavailable.
+                    return null;
+                })
+                : Promise.resolve(null);
+
             // Fetch organizations
-            const { data: orgsData, error: orgsError } = await supabase
+            const orgsPromise = supabase
                 .from("organizations")
                 .select("id, name, slug, subscription_tier");
+
+            const [{ data: orgsData, error: orgsError }, contextPayload] = await Promise.all([
+                orgsPromise,
+                contextPromise,
+            ]);
 
             if (orgsError) {
                 console.error("Error fetching organizations:", orgsError.message);
@@ -115,7 +154,8 @@ export const OrganizationProjectProvider = ({ children }: { children: ReactNode 
                 setOrganizations(orgsData || []);
             }
 
-            // Fetch projects
+            // Fetch projects — the one true dependency in this chain, since it
+            // needs the organization IDs from above.
             let projectsWithOrgSlug: Project[] = [];
             if (orgsData && orgsData.length > 0) {
                 const orgIds = orgsData.map((org) => org.id);
@@ -137,33 +177,25 @@ export const OrganizationProjectProvider = ({ children }: { children: ReactNode 
                 }
             }
 
-            // Canonical console URLs intentionally omit tenant slugs. Resolve
-            // the user's selected workspace separately so the shell can keep
-            // rendering the correct organization and project switchers.
-            const isCanonicalConsoleRoute = (
-                typeof window !== "undefined" &&
-                isConsoleHostname(window.location.hostname) &&
-                getConsoleSurface(window.location.pathname) !== null
-            );
-            if (isCanonicalConsoleRoute) {
-                try {
-                    const contextResponse = await fetch("/api/console/context", {
-                        cache: "no-store",
-                        credentials: "same-origin",
-                    });
-                    if (contextResponse.ok) {
-                        const payload = await contextResponse.json() as {
-                            workspace?: {
-                                organization?: { id?: string };
-                                project?: { id?: string };
-                            } | null;
-                        };
-                        setActiveOrganizationId(payload.workspace?.organization?.id ?? null);
-                        setActiveProjectId(payload.workspace?.project?.id ?? null);
-                    }
-                } catch {
-                    // The slug-based routes remain fully usable if context
-                    // resolution is temporarily unavailable.
+            if (contextPayload?.workspace) {
+                setActiveOrganizationId(contextPayload.workspace.organization?.id ?? null);
+                setActiveProjectId(contextPayload.workspace.project?.id ?? null);
+            }
+
+            // Seed the sidebar's React Query entries from the same payloads so
+            // it mounts with cache hits instead of refetching the org row and
+            // project list a second time. Shapes match the sidebar queryFns
+            // exactly (org row; [{ slug }] first-project probe).
+            if (orgsData) {
+                for (const org of orgsData) {
+                    queryClient.setQueryData(["orgLayout", org.slug], org);
+                    const firstSlug = projectsWithOrgSlug.find(
+                        (proj) => proj.organization_id === org.id,
+                    )?.slug;
+                    queryClient.setQueryData(
+                        ["sidebarProjects", org.id],
+                        firstSlug ? [{ slug: firstSlug }] : [],
+                    );
                 }
             }
 
@@ -173,7 +205,7 @@ export const OrganizationProjectProvider = ({ children }: { children: ReactNode 
         } finally {
             setLoading(false);
         }
-    }, [cached]);
+    }, [cached, queryClient]);
 
     useEffect(() => {
         fetchData();
