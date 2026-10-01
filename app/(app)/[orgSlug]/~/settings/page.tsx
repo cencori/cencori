@@ -324,6 +324,7 @@ function OrgIdCard({ org }: { org: OrgRow }) {
 
 function DangerZoneCard({ org }: { org: OrgRow }) {
     const router = useRouter();
+    const { organizations } = useOrganizationProject();
     const [open, setOpen] = useState(false);
     const [confirmText, setConfirmText] = useState('');
     const [copied, setCopied] = useState(false);
@@ -342,7 +343,8 @@ function DangerZoneCard({ org }: { org: OrgRow }) {
             const result = await deleteOrganization(org.slug, confirmText);
             if (result.ok) {
                 toast.success('Organization deleted.');
-                router.replace('/dashboard');
+                const nextOrg = organizations.find((item) => item.slug !== org.slug);
+                router.replace(nextOrg ? `/${nextOrg.slug}/~/projects` : '/dashboard');
             } else {
                 toast.error(result.error || 'Could not delete organization.');
             }
