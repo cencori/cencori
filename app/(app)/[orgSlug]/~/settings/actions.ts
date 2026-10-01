@@ -107,12 +107,8 @@ export async function updateOrgSlug(
 
 export async function deleteOrganization(
     orgSlug: string,
-    confirmSlug: string
+    confirmText: string
 ): Promise<ActionResult> {
-    if (confirmSlug.trim() !== orgSlug) {
-        return { ok: false, error: 'The confirmation text does not match.' };
-    }
-
     const auth = await requireOwnerOrAdmin(orgSlug);
     if (!auth.ok) return { ok: false, error: auth.error };
     if (auth.role !== 'owner') {
@@ -120,6 +116,15 @@ export async function deleteOrganization(
     }
 
     const admin = createAdminClient();
+    const { data: org } = await admin
+        .from('organizations')
+        .select('name')
+        .eq('id', auth.orgId)
+        .maybeSingle();
+    if (!org || confirmText.trim() !== org.name) {
+        return { ok: false, error: 'The confirmation text does not match.' };
+    }
+
     const { error } = await admin
         .from('organizations')
         .delete()
