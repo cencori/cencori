@@ -17,7 +17,7 @@ export async function GET(
     try {
         const searchParams = req.nextUrl.searchParams;
         const page = parseInt(searchParams.get('page') || '1');
-        const perPage = parseInt(searchParams.get('per_page') || '50');
+        const perPage = parseInt(searchParams.get('per_page') || '20');
         const status = searchParams.get('status');
         const model = searchParams.get('model');
         // History depth is tier-gated: free 7d, pro 30d, team 90d, enterprise all
@@ -135,8 +135,6 @@ export async function GET(
                 error_message: req.error_message,
                 filtered_reasons: req.filtered_reasons,
                 request_preview: requestPreview,
-                evaluation_status: req.evaluation_status,
-                evaluation_score: req.evaluation_score,
                 source: 'ai_request' as const,
             };
         }) || [];
@@ -185,8 +183,6 @@ export async function GET(
                 error_message: incident.description,
                 filtered_reasons: incidentReasons(incident),
                 request_preview: incident.input_text?.substring(0, 100) || incident.description || '',
-                evaluation_status: 'skipped',
-                evaluation_score: null,
                 source: 'security_incident' as const,
             }));
         }

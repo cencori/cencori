@@ -1,12 +1,9 @@
 'use client';
 
 import { useState, use } from 'react';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { RequestLogsTable } from '@/components/audit/RequestLogsTable';
-import { HttpRequestLogsTable } from '@/components/audit/HttpRequestLogsTable';
-import { LogsBarChart } from '@/components/audit/LogsBarChart';
 import { TimeRangeSelector } from '@/components/audit/TimeRangeSelector';
 import { ExportButton } from '@/components/audit/ExportButton';
 import { Button } from '@/components/ui/button';
@@ -21,7 +18,6 @@ import {
 import { Search, X } from 'lucide-react';
 import { useEnvironment } from '@/lib/contexts/EnvironmentContext';
 import { Skeleton } from '@/components/ui/skeleton';
-import { cn } from '@/lib/utils';
 import { useProjectIdBySlug } from '@/lib/hooks/useQueries';
 
 interface PageProps {
@@ -38,23 +34,13 @@ interface ApiKey {
     environment: string | null;
 }
 
-type LogSource = 'ai' | 'http';
-
 function useProjectId(orgSlug: string, projectSlug: string) {
     return useProjectIdBySlug(orgSlug, projectSlug);
 }
 
 export default function RequestLogsPage({ params }: PageProps) {
     const { orgSlug, projectSlug } = use(params);
-    const searchParams = useSearchParams();
-    const router = useRouter();
-    const pathname = usePathname();
     const { environment } = useEnvironment();
-
-    const sourceParam = searchParams.get('source');
-    const source: LogSource = sourceParam === 'api' || sourceParam === 'web' || sourceParam === 'http'
-        ? 'http'
-        : 'ai';
 
     const [aiFilters, setAiFilters] = useState({
         status: 'all',
@@ -63,17 +49,8 @@ export default function RequestLogsPage({ params }: PageProps) {
         search: '',
         api_key_id: 'all',
     });
-    const [httpFilters, setHttpFilters] = useState({
-        kind: 'all',
-        status: 'all',
-        method: 'all',
-        time_range: '7d',
-        search: '',
-        api_key_id: 'all',
-    });
 
     const [aiSearchInput, setAiSearchInput] = useState('');
-    const [httpSearchInput, setHttpSearchInput] = useState('');
 
     const { data: projectId, isLoading } = useProjectId(orgSlug, projectSlug);
 
@@ -91,19 +68,6 @@ export default function RequestLogsPage({ params }: PageProps) {
         staleTime: 60 * 1000,
     });
 
-    const setLogSource = (nextSource: LogSource) => {
-        const nextParams = new URLSearchParams(searchParams.toString());
-
-        if (nextSource === 'ai') {
-            nextParams.delete('source');
-        } else {
-            nextParams.set('source', nextSource);
-        }
-
-        const queryString = nextParams.toString();
-        router.replace(queryString ? `${pathname}?${queryString}` : pathname, { scroll: false });
-    };
-
     const filteredApiKeys = apiKeys?.filter((key) => {
         if (key.environment) {
             return environment === 'production'
@@ -120,11 +84,6 @@ export default function RequestLogsPage({ params }: PageProps) {
         setAiFilters((prev) => ({ ...prev, search: aiSearchInput }));
     };
 
-    const handleHttpSearchSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        setHttpFilters((prev) => ({ ...prev, search: httpSearchInput }));
-    };
-
     const handleClearAiFilters = () => {
         setAiFilters({
             status: 'all',
@@ -136,32 +95,12 @@ export default function RequestLogsPage({ params }: PageProps) {
         setAiSearchInput('');
     };
 
-    const handleClearHttpFilters = () => {
-        setHttpFilters({
-            kind: 'all',
-            status: 'all',
-            method: 'all',
-            time_range: '7d',
-            search: '',
-            api_key_id: 'all',
-        });
-        setHttpSearchInput('');
-    };
-
     const hasActiveAiFilters =
         aiFilters.status !== 'all'
         || aiFilters.model !== 'all'
         || aiFilters.search.length > 0
         || aiFilters.time_range !== '7d'
         || aiFilters.api_key_id !== 'all';
-
-    const hasActiveHttpFilters =
-        httpFilters.kind !== 'all'
-        || httpFilters.status !== 'all'
-        || httpFilters.method !== 'all'
-        || httpFilters.search.length > 0
-        || httpFilters.time_range !== '7d'
-        || httpFilters.api_key_id !== 'all';
 
     if (!isLoading && !projectId) {
         return (
@@ -179,264 +118,105 @@ export default function RequestLogsPage({ params }: PageProps) {
             <div className="mb-6">
                 <h1 className="text-base font-medium">Logs</h1>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                    {source === 'ai'
-                        ? 'View and monitor all AI requests for this project.'
-                        : 'Monitor unified HTTP traffic across API and web requests for this project.'}
+                    View and monitor all AI requests for this project.
                 </p>
             </div>
 
-            <div className="lg:grid lg:grid-cols-[180px_minmax(0,1fr)] lg:gap-6">
-                <aside className="mb-4 lg:mb-0 lg:-ml-2">
-                    <nav className="flex lg:flex-col gap-2 rounded-md">
-                        <button
-                            type="button"
-                            onClick={() => setLogSource('ai')}
-                            className={cn(
-                                'flex items-center gap-2 h-8 px-2.5 rounded text-xs text-left transition-colors',
-                                source === 'ai'
-                                    ? 'bg-secondary text-foreground font-medium'
-                                    : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60'
-                            )}
+            <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-3 mb-4">
+                    <Select
+                        value={aiFilters.status}
+                        onValueChange={(value) => setAiFilters((prev) => ({ ...prev, status: value }))}
+                    >
+                        <SelectTrigger className="w-[130px] h-7 text-xs shadow-none dark:shadow-xs">
+                            <SelectValue placeholder="All statuses" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all" className="text-xs">All statuses</SelectItem>
+                            <SelectItem value="success" className="text-xs">Success</SelectItem>
+                            <SelectItem value="success_fallback" className="text-xs">Fallback Used</SelectItem>
+                            <SelectItem value="filtered" className="text-xs">Filtered</SelectItem>
+                            <SelectItem value="blocked_output" className="text-xs">Blocked</SelectItem>
+                            <SelectItem value="error" className="text-xs">Error</SelectItem>
+                            <SelectItem value="rate_limited" className="text-xs">Rate Limited</SelectItem>
+                        </SelectContent>
+                    </Select>
+
+                    <Select
+                        value={aiFilters.model}
+                        onValueChange={(value) => setAiFilters((prev) => ({ ...prev, model: value }))}
+                    >
+                        <SelectTrigger className="w-[150px] h-7 text-xs shadow-none dark:shadow-xs">
+                            <SelectValue placeholder="All models" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all" className="text-xs">All models</SelectItem>
+                            <SelectItem value="gpt-5.4" className="text-xs">gpt-5.4</SelectItem>
+                            <SelectItem value="gpt-5.4-pro" className="text-xs">gpt-5.4-pro</SelectItem>
+                            <SelectItem value="gpt-5.3-chat-latest" className="text-xs">gpt-5.3-chat-latest</SelectItem>
+                            <SelectItem value="gpt-5" className="text-xs">gpt-5</SelectItem>
+                            <SelectItem value="gpt-4o" className="text-xs">gpt-4o</SelectItem>
+                            <SelectItem value="claude-opus-4" className="text-xs">claude-opus-4</SelectItem>
+                            <SelectItem value="gemini-3-pro" className="text-xs">gemini-3-pro</SelectItem>
+                            <SelectItem value="gemini-2.5-flash" className="text-xs">gemini-2.5-flash</SelectItem>
+                            <SelectItem value="grok-4" className="text-xs">grok-4</SelectItem>
+                        </SelectContent>
+                    </Select>
+
+                    <TimeRangeSelector
+                        value={aiFilters.time_range}
+                        onChange={(value) => setAiFilters((prev) => ({ ...prev, time_range: value }))}
+                    />
+
+                    <Select
+                        value={aiFilters.api_key_id}
+                        onValueChange={(value) => setAiFilters((prev) => ({ ...prev, api_key_id: value }))}
+                    >
+                        <SelectTrigger className="w-[190px] h-7 text-xs shadow-none dark:shadow-xs">
+                            <SelectValue placeholder="All API keys" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all" className="text-xs">All API keys</SelectItem>
+                            {filteredApiKeys?.map((key) => (
+                                <SelectItem key={key.id} value={key.id} className="text-xs">
+                                    {key.name} ({key.key_prefix}...)
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+
+                    <form onSubmit={handleAiSearchSubmit} className="relative">
+                        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                        <Input
+                            placeholder="Search AI requests..."
+                            value={aiSearchInput}
+                            onChange={(e) => setAiSearchInput(e.target.value)}
+                            className="w-40 sm:w-56 h-7 pl-7 text-xs rounded border-border/50 bg-transparent placeholder:text-muted-foreground/60 shadow-none dark:shadow-xs"
+                        />
+                    </form>
+
+                    {hasActiveAiFilters && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs px-2"
+                            onClick={handleClearAiFilters}
                         >
-                            AI
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setLogSource('http')}
-                            className={cn(
-                                'flex items-center gap-2 h-8 px-2.5 rounded text-xs text-left transition-colors',
-                                source === 'http'
-                                    ? 'bg-secondary text-foreground font-medium'
-                                    : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60'
-                            )}
-                        >
-                            HTTP
-                        </button>
-                    </nav>
-                </aside>
-
-                <div className="min-w-0">
-                    {source === 'ai' ? (
-                        <>
-                            <LogsBarChart
-                                projectId={projectId}
-                                timeRange={aiFilters.time_range}
-                                environment={environment}
-                                source="ai"
-                            />
-
-                            <div className="flex flex-wrap items-center gap-3 mb-4">
-                                <Select
-                                    value={aiFilters.status}
-                                    onValueChange={(value) => setAiFilters((prev) => ({ ...prev, status: value }))}
-                                >
-                                    <SelectTrigger className="w-[130px] h-7 text-xs">
-                                        <SelectValue placeholder="All statuses" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all" className="text-xs">All statuses</SelectItem>
-                                        <SelectItem value="success" className="text-xs">Success</SelectItem>
-                                        <SelectItem value="success_fallback" className="text-xs">Fallback Used</SelectItem>
-                                        <SelectItem value="filtered" className="text-xs">Filtered</SelectItem>
-                                        <SelectItem value="blocked_output" className="text-xs">Blocked</SelectItem>
-                                        <SelectItem value="error" className="text-xs">Error</SelectItem>
-                                        <SelectItem value="rate_limited" className="text-xs">Rate Limited</SelectItem>
-                                    </SelectContent>
-                                </Select>
-
-                                <Select
-                                    value={aiFilters.model}
-                                    onValueChange={(value) => setAiFilters((prev) => ({ ...prev, model: value }))}
-                                >
-                                    <SelectTrigger className="w-[150px] h-7 text-xs">
-                                        <SelectValue placeholder="All models" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all" className="text-xs">All models</SelectItem>
-                                        <SelectItem value="gpt-5.4" className="text-xs">gpt-5.4</SelectItem>
-                                        <SelectItem value="gpt-5.4-pro" className="text-xs">gpt-5.4-pro</SelectItem>
-                                        <SelectItem value="gpt-5.3-chat-latest" className="text-xs">gpt-5.3-chat-latest</SelectItem>
-                                        <SelectItem value="gpt-5" className="text-xs">gpt-5</SelectItem>
-                                        <SelectItem value="gpt-4o" className="text-xs">gpt-4o</SelectItem>
-                                        <SelectItem value="claude-opus-4" className="text-xs">claude-opus-4</SelectItem>
-                                        <SelectItem value="gemini-3-pro" className="text-xs">gemini-3-pro</SelectItem>
-                                        <SelectItem value="gemini-2.5-flash" className="text-xs">gemini-2.5-flash</SelectItem>
-                                        <SelectItem value="grok-4" className="text-xs">grok-4</SelectItem>
-                                    </SelectContent>
-                                </Select>
-
-                                <TimeRangeSelector
-                                    value={aiFilters.time_range}
-                                    onChange={(value) => setAiFilters((prev) => ({ ...prev, time_range: value }))}
-                                />
-
-                                <Select
-                                    value={aiFilters.api_key_id}
-                                    onValueChange={(value) => setAiFilters((prev) => ({ ...prev, api_key_id: value }))}
-                                >
-                                    <SelectTrigger className="w-[190px] h-7 text-xs">
-                                        <SelectValue placeholder="All API keys" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all" className="text-xs">All API keys</SelectItem>
-                                        {filteredApiKeys?.map((key) => (
-                                            <SelectItem key={key.id} value={key.id} className="text-xs">
-                                                {key.name} ({key.key_prefix}...)
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-
-                                <form onSubmit={handleAiSearchSubmit} className="relative">
-                                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
-                                    <Input
-                                        placeholder="Search AI requests..."
-                                        value={aiSearchInput}
-                                        onChange={(e) => setAiSearchInput(e.target.value)}
-                                        className="w-40 sm:w-56 h-7 pl-7 text-xs rounded border-border/50 bg-transparent placeholder:text-muted-foreground/60"
-                                    />
-                                </form>
-
-                                {hasActiveAiFilters && (
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-7 text-xs px-2"
-                                        onClick={handleClearAiFilters}
-                                    >
-                                        <X className="h-3 w-3 mr-1" />
-                                        Clear
-                                    </Button>
-                                )}
-
-                                <div className="ml-auto">
-                                    {projectId ? (
-                                        <ExportButton projectId={projectId} filters={aiFilters} environment={environment} />
-                                    ) : (
-                                        <Skeleton className="h-7 w-16" />
-                                    )}
-                                </div>
-                            </div>
-
-                            <RequestLogsTable projectId={projectId} filters={aiFilters} environment={environment} />
-                        </>
-                    ) : (
-                        <>
-                            <LogsBarChart
-                                projectId={projectId}
-                                timeRange={httpFilters.time_range}
-                                environment={environment}
-                                source="http"
-                            />
-
-                            <div className="flex flex-wrap items-center gap-3 mb-4">
-                                <Select
-                                    value={httpFilters.kind}
-                                    onValueChange={(value) => setHttpFilters((prev) => ({
-                                        ...prev,
-                                        kind: value,
-                                        api_key_id: value === 'web' ? 'all' : prev.api_key_id,
-                                    }))}
-                                >
-                                    <SelectTrigger className="w-[138px] h-7 text-xs">
-                                        <SelectValue placeholder="All traffic" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all" className="text-xs">All traffic</SelectItem>
-                                        <SelectItem value="api" className="text-xs">API only</SelectItem>
-                                        <SelectItem value="web" className="text-xs">Web only</SelectItem>
-                                    </SelectContent>
-                                </Select>
-
-                                <Select
-                                    value={httpFilters.status}
-                                    onValueChange={(value) => setHttpFilters((prev) => ({ ...prev, status: value }))}
-                                >
-                                    <SelectTrigger className="w-[138px] h-7 text-xs">
-                                        <SelectValue placeholder="All statuses" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all" className="text-xs">All statuses</SelectItem>
-                                        <SelectItem value="2xx" className="text-xs">2xx Success</SelectItem>
-                                        <SelectItem value="3xx" className="text-xs">3xx Redirect</SelectItem>
-                                        <SelectItem value="4xx" className="text-xs">4xx Client</SelectItem>
-                                        <SelectItem value="5xx" className="text-xs">5xx Server</SelectItem>
-                                        <SelectItem value="429" className="text-xs">429 Rate Limited</SelectItem>
-                                    </SelectContent>
-                                </Select>
-
-                                <Select
-                                    value={httpFilters.method}
-                                    onValueChange={(value) => setHttpFilters((prev) => ({ ...prev, method: value }))}
-                                >
-                                    <SelectTrigger className="w-[130px] h-7 text-xs whitespace-nowrap">
-                                        <SelectValue placeholder="Method" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all" className="text-xs">All methods</SelectItem>
-                                        <SelectItem value="GET" className="text-xs">GET</SelectItem>
-                                        <SelectItem value="HEAD" className="text-xs">HEAD</SelectItem>
-                                        <SelectItem value="POST" className="text-xs">POST</SelectItem>
-                                        <SelectItem value="PUT" className="text-xs">PUT</SelectItem>
-                                        <SelectItem value="PATCH" className="text-xs">PATCH</SelectItem>
-                                        <SelectItem value="DELETE" className="text-xs">DELETE</SelectItem>
-                                    </SelectContent>
-                                </Select>
-
-                                <TimeRangeSelector
-                                    value={httpFilters.time_range}
-                                    onChange={(value) => setHttpFilters((prev) => ({ ...prev, time_range: value }))}
-                                />
-
-                                <Select
-                                    value={httpFilters.api_key_id}
-                                    onValueChange={(value) => setHttpFilters((prev) => ({ ...prev, api_key_id: value }))}
-                                    disabled={httpFilters.kind === 'web'}
-                                >
-                                    <SelectTrigger className="w-[190px] h-7 text-xs">
-                                        <SelectValue placeholder="All API keys" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all" className="text-xs">All API keys</SelectItem>
-                                        {filteredApiKeys?.map((key) => (
-                                            <SelectItem key={key.id} value={key.id} className="text-xs">
-                                                {key.name} ({key.key_prefix}...)
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-
-                                <form onSubmit={handleHttpSearchSubmit} className="relative">
-                                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
-                                    <Input
-                                        placeholder="Search paths, hosts, caller domains, messages, or request IDs..."
-                                        value={httpSearchInput}
-                                        onChange={(e) => setHttpSearchInput(e.target.value)}
-                                        className="w-56 sm:w-72 h-7 pl-7 text-xs rounded border-border/50 bg-transparent placeholder:text-muted-foreground/60"
-                                    />
-                                </form>
-
-                                {hasActiveHttpFilters && (
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-7 text-xs px-2"
-                                        onClick={handleClearHttpFilters}
-                                    >
-                                        <X className="h-3 w-3 mr-1" />
-                                        Clear
-                                    </Button>
-                                )}
-                            </div>
-
-                            <HttpRequestLogsTable
-                                projectId={projectId}
-                                environment={environment}
-                                filters={httpFilters}
-                            />
-                        </>
+                            <X className="h-3 w-3 mr-1" />
+                            Clear
+                        </Button>
                     )}
+
+                    <div className="ml-auto">
+                        {projectId ? (
+                            <ExportButton projectId={projectId} filters={aiFilters} environment={environment} />
+                        ) : (
+                            <Skeleton className="h-7 w-16" />
+                        )}
+                    </div>
                 </div>
+
+                <RequestLogsTable projectId={projectId} filters={aiFilters} environment={environment} />
             </div>
         </div>
     );

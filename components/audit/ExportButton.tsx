@@ -92,7 +92,7 @@ export function ExportButton({ projectId, filters, environment = 'production' }:
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-7 text-xs" disabled={isExporting}>
+                <Button variant="outline" size="sm" className="h-7 text-xs shadow-none dark:shadow-xs" disabled={isExporting}>
                     {isExporting ? (
                         <>
                             <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />

@@ -112,11 +112,6 @@ vi.mock('@/lib/gateway/output-guard', () => ({
     runGatewayOutputGuard: (...args: any[]) => routeMocks.runGatewayOutputGuard(...args),
 }));
 
-vi.mock('@/lib/integrations/ragmetrics', () => ({
-    evaluateWithRagMetrics: vi.fn(() => Promise.resolve()),
-    extractRAGContext: vi.fn(() => ''),
-}));
-
 vi.mock('@/lib/budgets', () => ({
     checkAndSendBudgetAlerts: vi.fn(() => Promise.resolve()),
 }));

@@ -10,7 +10,7 @@
  * (runV1ProviderExecution with wireFormat: 'cencori').
  *
  * The engine provides: input/output guards, provider failover, server-side
- * max_tokens enforcement, payload-masked logging, RagMetrics, budget
+ * max_tokens enforcement, payload-masked logging, budget
  * alerts, credit idempotency, Redis spend counters — identical on both
  * doors, so features can never drift between them again.
  */

@@ -7,7 +7,7 @@ import { RequestDetailModal } from './RequestDetailModal';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Loader2, FileText } from 'lucide-react';
+import { FileText } from 'lucide-react';
 import { toast } from '@/components/ui/toast';
 import { onNavigationIntent } from '@/lib/navigation-intent';
 
@@ -25,8 +25,6 @@ interface RequestLog {
     error_message?: string;
     filtered_reasons?: string[];
     request_preview: string;
-    evaluation_status?: 'pending' | 'completed' | 'failed' | 'skipped';
-    evaluation_score?: number | null;
 }
 
 interface RequestLogsTableProps {
@@ -68,7 +66,7 @@ export function RequestLogsTable({ projectId, environment, filters }: RequestLog
 
             const params = new URLSearchParams({
                 page: page.toString(),
-                per_page: '50',
+                per_page: '20',
                 environment,
                 ...(filters.status && { status: filters.status }),
                 ...(filters.model && { model: filters.model }),
@@ -124,7 +122,7 @@ export function RequestLogsTable({ projectId, environment, filters }: RequestLog
                                 requests: [
                                     data.request,
                                     ...previousData.requests.filter((request) => request.id !== data.request.id),
-                                ].slice(0, 50),
+                                ].slice(0, 20),
                             };
                         });
                     }
@@ -244,7 +242,6 @@ export function RequestLogsTable({ projectId, environment, filters }: RequestLog
                                 <TableHead className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider h-8 w-[60px]">Status</TableHead>
                                 <TableHead className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider h-8">Path</TableHead>
                                 <TableHead className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider h-8 text-right w-[80px]">Tokens</TableHead>
-                                <TableHead className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider h-8 text-right w-[80px]">Score</TableHead>
                                 <TableHead className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider h-8 text-right w-[80px]">Cost</TableHead>
                                 <TableHead className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider h-8 text-right pr-3 w-[80px]">Latency</TableHead>
                             </TableRow>
@@ -267,20 +264,6 @@ export function RequestLogsTable({ projectId, environment, filters }: RequestLog
                                     </TableCell>
                                     <TableCell className="py-2 text-right text-xs font-mono text-muted-foreground">
                                         {request.total_tokens.toLocaleString()}
-                                    </TableCell>
-                                    <TableCell className="py-2 text-right">
-                                        {request.evaluation_status === 'completed' ? (
-                                            <span className={`text-xs font-mono font-medium ${
-                                                (request.evaluation_score || 0) >= 0.8 ? 'text-emerald-500' :
-                                                (request.evaluation_score || 0) >= 0.5 ? 'text-amber-500' : 'text-red-500'
-                                            }`}>
-                                                {(request.evaluation_score || 0).toFixed(2)}
-                                            </span>
-                                        ) : request.evaluation_status === 'pending' ? (
-                                            <Loader2 className="h-3 w-3 animate-spin ml-auto text-muted-foreground/40" />
-                                        ) : (
-                                            <span className="text-muted-foreground/20">—</span>
-                                        )}
                                     </TableCell>
                                     <TableCell className="py-2 text-right text-xs font-mono text-muted-foreground">
                                         {formatCost(request.cost_usd)}
