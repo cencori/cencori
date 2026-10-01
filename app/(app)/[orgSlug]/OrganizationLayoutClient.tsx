@@ -62,6 +62,7 @@ import { getConsoleRoute } from "@/lib/console/routing";
 import { getMainSiteUrl } from "@/lib/main-site-url";
 import { useOrganizationProject } from "@/lib/contexts/OrganizationProjectContext";
 import { announceNavigationIntent } from "@/lib/navigation-intent";
+import { swapWorkspaceInPath } from "@/lib/workspace-switch";
 
 interface OrganizationData {
     id: string;
@@ -573,21 +574,22 @@ export default function OrganizationLayoutClient({
                                                         switched = false;
                                                     }
                                                     if (switched) {
-                                                        // Cookies carry the new workspace from here.
-                                                        // Push alone loads fresh RSC; a refresh()
-                                                        // behind it races the navigation and can
-                                                        // strand the UI. Refresh only when the URL
-                                                        // doesn't change (same flat route, new
-                                                        // workspace resolves underneath it).
-                                                        if (!isInsideProject && window.location.pathname !== "/home") {
-                                                            router.push("/home");
-                                                        } else {
-                                                            router.refresh();
-                                                        }
+                                                        // Cookies carry the new workspace; the
+                                                        // flat URL stays valid, so refresh keeps
+                                                        // the current page under the new project.
+                                                        router.refresh();
                                                         return;
                                                     }
                                                 }
-                                                router.push(`/${orgSlug}/${project.slug}`);
+                                                // Slug hosts (and the console fallback): keep the
+                                                // subpath, swap the workspace segments.
+                                                const preserved = swapWorkspaceInPath(
+                                                    window.location.pathname,
+                                                    orgSlug,
+                                                    project.slug,
+                                                ) ?? `/${orgSlug}/${project.slug}`;
+                                                announceNavigationIntent(preserved);
+                                                router.push(preserved);
                                             }}
                                         >
                                             <span className="min-w-0 flex-1 truncate">{project.name}</span>
