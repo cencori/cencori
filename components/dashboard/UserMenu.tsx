@@ -127,9 +127,19 @@ export function UserMenu({ organization }: UserMenuProps) {
         setMenuOpen(false);
 
         if (firstProject) {
-            if (isCanonicalConsoleRoute && await selectProject(firstProject.id)) {
-                router.push("/home");
-                router.refresh();
+            // The PUT persists the new workspace as cookies; a plain push
+            // then loads fresh RSC through the proxy. Never chain
+            // router.refresh() behind a push — the refresh targets the old
+            // route and races the navigation, which strands the UI.
+            let switched = false;
+            try {
+                switched = isCanonicalConsoleRoute && await selectProject(firstProject.id);
+            } catch {
+                switched = false;
+            }
+            if (switched) {
+                if (window.location.pathname !== "/home") router.push("/home");
+                else router.refresh();
                 return;
             }
             router.push(`/${nextOrganization.slug}/${firstProject.slug}`);

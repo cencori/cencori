@@ -8,14 +8,24 @@ import { Skeleton } from "@/components/ui/skeleton";
 const RESOLVE_TIMEOUT_MS = 10_000;
 // If the refreshed render still lands back here, cookies aren't sticking
 // (blocked storage, dropped Set-Cookie). Refreshing again would loop
-// forever, so fail visibly instead.
+// forever on a blank screen, so fail visibly instead.
 const MAX_AUTO_REFRESHES = 1;
+// router.refresh() does not remount us — if the refreshed render still
+// resolves to this page, no effect refires and no guard trips. Watchdog
+// turns that silent stall into a visible, retryable error.
+const POST_REFRESH_WATCHDOG_MS = 6_000;
 
 export default function ConsoleWorkspaceBootstrapPage() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const refreshesRef = useRef(0);
   const settledRef = useRef(false);
+
+  useEffect(() => {
+    return () => {
+      settledRef.current = true;
+    };
+  }, []);
 
   const resolveWorkspace = useCallback(async () => {
     setError(null);
@@ -40,6 +50,9 @@ export default function ConsoleWorkspaceBootstrapPage() {
 
       // The context response sets the active workspace cookies. Refreshing
       // keeps the requested public URL while middleware routes it internally.
+      // If we're still mounted after the watchdog window, the refreshed
+      // render resolved back here — cookies didn't apply — so say so
+      // instead of hanging on the skeleton.
       refreshesRef.current += 1;
       if (refreshesRef.current > MAX_AUTO_REFRESHES) {
         throw new Error(
@@ -47,6 +60,13 @@ export default function ConsoleWorkspaceBootstrapPage() {
         );
       }
       router.refresh();
+      setTimeout(() => {
+        if (!settledRef.current) {
+          setError(
+            "Your workspace was found but this page isn't picking it up. Check cookie settings, then try again.",
+          );
+        }
+      }, POST_REFRESH_WATCHDOG_MS);
     } catch (bootstrapError) {
       if (settledRef.current) return;
       setError(
