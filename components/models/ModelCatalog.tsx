@@ -18,6 +18,7 @@ import {
     Stepfun, Baseten, Alibaba, Baidu, ZAI,
 } from "@lobehub/icons";
 import { SUPPORTED_PROVIDERS, type AIModel, type ModelCapabilities } from "@/lib/providers/config";
+import { formatContextWindow, getModelDisplayPrice } from "@/lib/providers/display-pricing";
 import { CENCORI_PROVIDER_LABEL, publicProviderDisplayName, publicProviderLabel } from "@/lib/providers/branding";
 import { Search, ChevronDown, ChevronUp, Copy, Check, Brain, Command, Eye, Code, Globe, Image, Wrench, FileJson, FileInput, Video, Mic, Zap } from "lucide-react";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -205,6 +206,8 @@ const FEATURE_FILTERS: FeatureFilter[] = [
 ];
 
 // ─── Pricing Helper ──────────────────────────────────────────────────────────
+// Single source of truth lives in lib/providers/display-pricing.ts so the
+// public GET /api/models endpoint ships exactly what this page renders.
 
 interface ModelPrice {
     input: string;
@@ -212,146 +215,14 @@ interface ModelPrice {
 }
 
 function getModelPrice(modelId: string, type: string | string[]): ModelPrice {
-    const id = modelId.toLowerCase();
-    const primaryType = Array.isArray(type) ? type[0] : type;
-    
-    // Image models
-    if (primaryType === "image" || id.includes("image") || id.includes("dall-e") || id.includes("imagen")) {
-        if (id.includes("dall-e-3") || id.includes("image-2")) {
-            return { input: "$0.040", output: "per img" };
-        }
-        return { input: "$0.020", output: "per img" };
-    }
-    
-    // GPT-5.6 family (repriced Aug 21 2026 — Sol $4/$20, Terra $2/$12,
-    // Luna $0.20/$1.20). Luna is the cheapest frontier path; don't collapse
-    // it into the generic GPT-5 branch below.
-    if (id.startsWith("gpt-5.6-sol")) return { input: "$4.00", output: "$20.00" };
-    if (id.startsWith("gpt-5.6-terra")) return { input: "$2.00", output: "$12.00" };
-    if (id.startsWith("gpt-5.6-luna")) return { input: "$0.20", output: "$1.20" };
-    // GPT-6 family (September 2026)
-    if (id.startsWith("gpt-6-astra")) return { input: "$10.00", output: "$50.00" };
-    if (id.startsWith("gpt-6-sol")) return { input: "$2.00", output: "$10.00" };
-    if (id.startsWith("gpt-6-luna")) return { input: "$0.20", output: "$0.50" };
-    if (id.startsWith("gpt-5.5-pro")) return { input: "$30.00", output: "$180.00" };
-    // GPT-5 flagship
-    if (id.startsWith("gpt-5.5") || id.startsWith("gpt-5.4") || id.startsWith("gpt-5.3") || id.startsWith("gpt-5.2") || id.startsWith("gpt-5-pro") || id.startsWith("gpt-5")) {
-        if (id.includes("mini")) return { input: "$0.15", output: "$0.60" };
-        if (id.includes("nano")) return { input: "$0.05", output: "$0.20" };
-        return { input: "$5.00", output: "$15.00" };
-    }
-    
-    // GPT-4 & Reasoning
-    if (id.includes("o3-pro")) return { input: "$15.00", output: "$60.00" };
-    if (id.includes("o3-mini") || id.includes("o4-mini")) return { input: "$1.10", output: "$4.40" };
-    if (id.startsWith("o3") || id.startsWith("o1")) return { input: "$3.00", output: "$12.00" };
-    if (id.includes("gpt-4o-mini")) return { input: "$0.15", output: "$0.60" };
-    if (id.includes("gpt-4o") || id.includes("gpt-4-turbo")) return { input: "$2.50", output: "$10.00" };
-    if (id.includes("gpt-4.1")) {
-        if (id.includes("mini")) return { input: "$0.15", output: "$0.60" };
-        if (id.includes("nano")) return { input: "$0.05", output: "$0.20" };
-        return { input: "$2.50", output: "$10.00" };
-    }
-    
-    // Claude
-    if (id === "claude-sonnet-5") {
-        // Introductory $2/$10 made permanent Aug 10 2026 — no expiry.
-        return { input: "$2.00", output: "$10.00" };
-    }
-    if (id === "claude-opus-4.8") {
-        return { input: "$5.00", output: "$25.00" };
-    }
-    if (id === "claude-opus-5") {
-        return { input: "$5.00", output: "$25.00" };
-    }
-    if (id === "claude-opus-5-5") {
-        return { input: "$4.00", output: "$20.00" };
-    }
-    // Priced above the Opus tier. Without this the Fable/Mythos ids match none
-    // of the Claude branches below and fall through to the generic catch-all,
-    // which quoted Fable 5 at $0.50/$1.50 — 20x under its real rate.
-    if (id.startsWith("claude-fable") || id.startsWith("claude-mythos")) {
-        return { input: "$10.00", output: "$50.00" };
-    }
-    if (id.includes("opus")) {
-        return { input: "$15.00", output: "$75.00" };
-    }
-    if (id.includes("sonnet")) {
-        return { input: "$3.00", output: "$15.00" };
-    }
-    if (id.includes("haiku")) {
-        return { input: "$0.25", output: "$1.25" };
-    }
-    
-    // Gemini
-    if (id.includes("gemini")) {
-        if (id.includes("gemini-3.5-flash")) return { input: "$1.50", output: "$9.00" };
-        if (id.includes("pro")) return { input: "$1.25", output: "$5.00" };
-        if (id.includes("flash") || id.includes("lite")) return { input: "$0.075", output: "$0.30" };
-    }
-    
-    // DeepSeek
-    if (id.includes("deepseek")) {
-        if (id.includes("reasoner") || id.includes("speciale") || id.includes("r1")) {
-            return { input: "$0.55", output: "$2.19" };
-        }
-        if (id.includes("flash")) {
-            return { input: "$0.07", output: "$0.14" };
-        }
-        return { input: "$0.14", output: "$0.28" };
-    }
-    
-    // Llama 4 / 3
-    if (id.includes("llama")) {
-        if (id.includes("405b") || id.includes("maverick")) return { input: "$2.66", output: "$2.66" };
-        if (id.includes("70b") || id.includes("versatile") || id.includes("scout")) return { input: "$0.70", output: "$0.90" };
-        if (id.includes("8b") || id.includes("instant") || id.includes("3b")) return { input: "$0.05", output: "$0.08" };
-    }
-    
-    // Qwen / Alibaba
-    if (id.includes("qwen") || id.includes("qwq")) {
-        if (id.includes("72b") || id.includes("max")) return { input: "$0.40", output: "$0.40" };
-        if (id.includes("32b") || id.includes("plus")) return { input: "$0.20", output: "$0.20" };
-        return { input: "$0.10", output: "$0.10" };
-    }
-    
-    // Mistral
-    if (id.includes("mistral") || id.includes("ministral") || id.includes("codestral") || id.includes("devstral") || id.includes("magistral")) {
-        if (id.includes("large")) return { input: "$2.00", output: "$6.00" };
-        if (id.includes("medium")) return { input: "$1.00", output: "$3.00" };
-        if (id.includes("small") || id.includes("8b")) return { input: "$0.20", output: "$0.60" };
-        if (id.includes("3b")) return { input: "$0.06", output: "$0.18" };
-        return { input: "$0.50", output: "$1.50" };
-    }
-
-    // xAI Grok ($2/$6 flagship tier, $1.25/$2.50 for 4.3)
-    if (id.startsWith("grok-")) {
-        if (id.startsWith("grok-4.3")) return { input: "$1.25", output: "$2.50" };
-        return { input: "$2.00", output: "$6.00" };
-    }
-    
-    // Maximo Atlas (1.3 launch rate, then 1.2 standard)
-    if (id === "maximo-atlas-1.3") {
-        return { input: "$0.20", output: "$0.50" };
-    }
-    if (id === "maximo-atlas-1.2") {
-        return { input: "$0.55", output: "$1.50" };
-    }
-
-    // Fallbacks based on context window size / capabilities
-    if (id.includes("pro") || id.includes("large")) return { input: "$1.50", output: "$4.50" };
-    if (id.includes("mini") || id.includes("lite") || id.includes("small")) return { input: "$0.15", output: "$0.60" };
-    if (id.includes("micro") || id.includes("nano")) return { input: "$0.05", output: "$0.15" };
-    
-    return { input: "$0.50", output: "$1.50" };
+    const p = getModelDisplayPrice(modelId, type);
+    return { input: p.input, output: p.output };
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function formatContext(tokens: number): string {
-    if (tokens === 0) return "—";
-    if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(tokens % 1_000_000 === 0 ? 0 : 1)}M`;
-    return `${(tokens / 1_000).toFixed(0)}K`;
+    return formatContextWindow(tokens);
 }
 
 type SortKey = "name" | "contextWindow" | "provider" | "type" | "none";
