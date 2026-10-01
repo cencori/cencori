@@ -23,6 +23,8 @@ import posthog from "posthog-js";
 import { beginIntentionalSignOut, clearClientSessionCaches } from "@/lib/auth/session-caches";
 import { useOrganizationProject } from "@/lib/contexts/OrganizationProjectContext";
 import { getConsoleRoute } from "@/lib/console/routing";
+import { swapWorkspaceInPath } from "@/lib/workspace-switch";
+import { announceNavigationIntent } from "@/lib/navigation-intent";
 
 const UpgradeDialog = dynamic(
     () => import("@/components/billing/UpgradeDialog").then((module) => module.UpgradeDialog),
@@ -127,10 +129,11 @@ export function UserMenu({ organization }: UserMenuProps) {
         setMenuOpen(false);
 
         if (firstProject) {
-            // The PUT persists the new workspace as cookies; a plain push
-            // then loads fresh RSC through the proxy. Never chain
-            // router.refresh() behind a push — the refresh targets the old
-            // route and races the navigation, which strands the UI.
+            // The PUT persists the new workspace as cookies. On console
+            // flat URLs the location is workspace-independent, so a refresh
+            // keeps the current page (logs stays logs) under the new org.
+            // Never chain router.refresh() behind a push — the refresh
+            // targets the old route and races the navigation.
             let switched = false;
             try {
                 switched = isCanonicalConsoleRoute && await selectProject(firstProject.id);
@@ -138,11 +141,13 @@ export function UserMenu({ organization }: UserMenuProps) {
                 switched = false;
             }
             if (switched) {
-                if (window.location.pathname !== "/home") router.push("/home");
-                else router.refresh();
+                router.refresh();
                 return;
             }
-            router.push(`/${nextOrganization.slug}/${firstProject.slug}`);
+            const preserved = swapWorkspaceInPath(pathname, nextOrganization.slug, firstProject.slug)
+                ?? `/${nextOrganization.slug}/${firstProject.slug}`;
+            announceNavigationIntent(`${preserved}${window.location.search}`);
+            router.push(`${preserved}${window.location.search}`);
             return;
         }
 
