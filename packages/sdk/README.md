@@ -320,7 +320,7 @@ export default function Chat() {
 ## Links
 
 - [Documentation](https://cencori.com/docs)
-- [Dashboard](https://cencori.com/dashboard)
+- [Dashboard](https://console.cencori.com/home)
 - [GitHub](https://github.com/cencori/cencori)
 
 ## License
