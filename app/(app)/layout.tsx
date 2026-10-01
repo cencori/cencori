@@ -275,6 +275,11 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
     isCanonicalConsoleRoute ? activeProject ?? undefined : undefined
   );
   const currentOrgId = currentOrg?.id ?? null;
+  // The provider's org payload already carries the balance, so the pill
+  // paints from it with no mount-time request. The 30s interval below keeps
+  // it fresh; initialData is only the first paint.
+  const contextBalance = Number(currentOrg?.credits_balance);
+  const hasContextBalance = Number.isFinite(contextBalance);
 
   const {
     data: orgCreditsData,
@@ -300,6 +305,8 @@ function LayoutContent({ user, avatar, name, children }: LayoutContentProps) {
 
       return data as { credits_balance: number | string | null };
     },
+    initialData: hasContextBalance ? { credits_balance: contextBalance } : undefined,
+    initialDataUpdatedAt: hasContextBalance ? Date.now() : undefined,
     staleTime: 5 * 60 * 1000,
     refetchInterval: 30 * 1000,
   });
