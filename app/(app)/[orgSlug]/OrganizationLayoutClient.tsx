@@ -61,7 +61,7 @@ import { FeedbackMenu } from "@/components/dashboard/FeedbackMenu";
 import { getConsoleRoute } from "@/lib/console/routing";
 import { getMainSiteUrl } from "@/lib/main-site-url";
 import { useOrganizationProject } from "@/lib/contexts/OrganizationProjectContext";
-import { announceNavigationIntent } from "@/lib/navigation-intent";
+import { announceNavigationIntent, announceSettingsTab } from "@/lib/navigation-intent";
 import { swapWorkspaceInPath } from "@/lib/workspace-switch";
 
 interface OrganizationData {
@@ -293,11 +293,16 @@ export default function OrganizationLayoutClient({
         ? "general"
         : searchParams.get("section") === "advanced" ? "advanced" : "general";
     const requestedProjectSettingsTab = searchParams.get("tab");
-    const projectSettingsTab = pendingSubnavEntry === "project-settings"
+    // Local tab switches (sidebar → settings page event + replaceState) don't
+    // touch useSearchParams, so the highlight tracks a local override until
+    // the next real navigation.
+    const [pendingSettingsTab, setPendingSettingsTab] = useState<string | null>(null);
+    const projectSettingsTab = pendingSettingsTab
+        ?? (pendingSubnavEntry === "project-settings"
         ? "general"
         : ["general", "budget", "providers", "infrastructure", "networking", "integrations", "api", "webhooks"].includes(requestedProjectSettingsTab || "")
         ? requestedProjectSettingsTab
-        : "general";
+        : "general");
 
     const isActive = (path: string) => {
         const exactMatchOnly =
@@ -350,6 +355,7 @@ export default function OrganizationLayoutClient({
 
     useEffect(() => {
         setPendingSubnavEntry(null);
+        setPendingSettingsTab(null);
         if (pathname.includes("/observability")) {
             setActiveView("observability");
         } else if (pathname.includes("/ai-gateway")) {
@@ -716,7 +722,22 @@ export default function OrganizationLayoutClient({
                                                     isActive={projectSettingsTab === item.tab}
                                                     size="sm"
                                                 >
-                                                    <Link href={item.href} prefetch={true} onMouseEnter={() => prefetchRoute(item.href)}>
+                                                    <Link
+                                                        href={item.href}
+                                                        prefetch={true}
+                                                        onMouseEnter={() => prefetchRoute(item.href)}
+                                                        onClick={(event) => {
+                                                            // Already on the settings page: swap the
+                                                            // tab locally instead of navigating.
+                                                            // The page syncs ?tab= itself so links
+                                                            // stay shareable. Deep links from
+                                                            // elsewhere remain normal navigations.
+                                                            if (!isProjectSettingsView) return;
+                                                            event.preventDefault();
+                                                            setPendingSettingsTab(item.tab);
+                                                            announceSettingsTab(item.tab);
+                                                        }}
+                                                    >
                                                         <span className="text-sm">{item.label}</span>
                                                     </Link>
                                                 </SidebarMenuButton>
