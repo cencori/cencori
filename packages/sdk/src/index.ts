@@ -75,6 +75,21 @@ export {
     SafetyError,
 } from './errors';
 
+// Public catalog (keyless) — embed the model/provider shelf with logos
+export {
+    listCatalogModels,
+    listCatalogProviders,
+    providerLogoUrl,
+    DEFAULT_CATALOG_BASE_URL,
+    type CatalogModel,
+    type CatalogModelPricing,
+    type CatalogProvider,
+    type CatalogModelsResponse,
+    type CatalogProvidersResponse,
+    type CatalogModelFilters,
+    type CatalogRequestOptions,
+} from './catalog';
+
 // Utilities
 export { fetchWithRetry } from './utils';
 
