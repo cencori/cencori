@@ -41,7 +41,7 @@ describe('API-key model access and sponsorship', () => {
         })).toEqual({ allowed: false, billingMode: 'standard' });
     });
 
-    it('gives the locked Basecode key sponsored Atlas-only access', () => {
+    it('gives the locked Tensor key sponsored Atlas-only access', () => {
         const access = { allowedModels: [atlas], sponsoredModels: [atlas] };
 
         expect(resolveApiKeyModelAccess({

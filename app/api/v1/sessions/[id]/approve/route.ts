@@ -209,7 +209,7 @@ export async function POST(
             projectId: gatewayCtx.projectId,
             organizationId: gatewayCtx.organizationId,
             requestedModel: resumeModel,
-            basecodeModelPolicy: gatewayCtx.basecodeModelPolicy,
+            tensorModelPolicy: gatewayCtx.tensorModelPolicy,
             allowedModels: gatewayCtx.allowedModels,
             sponsoredModels: gatewayCtx.sponsoredModels,
         });

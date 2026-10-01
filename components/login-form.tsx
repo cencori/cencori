@@ -47,7 +47,7 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectParam = searchParams.get("redirect");
-  const isBasecodeSignIn = redirectParam?.startsWith("/basecode/sign-in?") ?? false;
+  const isTensorSignIn = redirectParam?.startsWith("/tensor/sign-in?") ?? false;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ssoInfo, setSsoInfo] = useState<{ sso: boolean; enforce?: boolean; organization?: string; domain?: string } | null>(null);
@@ -223,10 +223,10 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
       </div>
       <div className="text-center">
         <h1 className="text-lg font-medium">
-          {isBasecodeSignIn ? "Sign in to Basecode" : "Welcome back!"}
+          {isTensorSignIn ? "Sign in to Tensor" : "Welcome back!"}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {isBasecodeSignIn
+          {isTensorSignIn
             ? "Continue with your Cencori account"
             : "Enter your email below to login to your account"}
         </p>
@@ -302,7 +302,7 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
             </div>
 
             <Button type="submit" disabled={loading}>
-              {loading ? "Working\u2026" : isBasecodeSignIn ? "Continue with email" : "Login"}
+              {loading ? "Working\u2026" : isTensorSignIn ? "Continue with email" : "Login"}
             </Button>
           </>
         )}

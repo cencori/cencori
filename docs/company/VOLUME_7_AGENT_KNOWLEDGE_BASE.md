@@ -682,7 +682,7 @@ quality or universal feature support across models. Shared execution semantics,
 portable state and reliable recovery are goals that require verification.
 
 Gateway supplies model access, Memory supplies persistent context, and Compute
-supplies execution environments. Basecode is an intended internal proving ground.
+supplies execution environments. Tensor is an intended internal proving ground.
 Do not describe the current Sessions integration as a launched managed Agent API.
 
 See [Arcie Brand and Product Positioning](./ARCIE_POSITIONING.md).

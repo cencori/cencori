@@ -8,7 +8,7 @@ import {
   getBillingInterval,
   getCreditTopupCreditsByProductId,
   getCreditTopupPackConfig,
-  getBasecodePlanByProductId,
+  getTensorPlanByProductId,
   netCreditsAfterFee,
   computePeriodEnd,
   type BachsCollectionData,
@@ -16,9 +16,9 @@ import {
   type BachsWebhookEvent,
 } from '@/lib/bachsClient';
 import {
-  applyVerifiedBasecodePayment,
+  applyVerifiedTensorPayment,
   majorAmountToMinor,
-} from '@/lib/basecode-billing';
+} from '@/lib/tensor-billing';
 import { applyPaidCreditTopup } from '@/lib/billing/paid-credit-topups';
 import { isVerifiedBachsTopupCharge } from '@/lib/billing/verify-paid-topups';
 import {
@@ -162,11 +162,11 @@ async function handleCollectionSucceeded(
 
     case 'basecode_subscription': {
       if (!data.charge_id) {
-        throw new Error('Bachs Basecode collection is missing a charge ID');
+        throw new Error('Bachs Tensor collection is missing a charge ID');
       }
-      const planCode = getBasecodePlanByProductId(productId);
+      const planCode = getTensorPlanByProductId(productId);
       if (!planCode) {
-        throw new Error(`Unknown Bachs Basecode product: ${productId}`);
+        throw new Error(`Unknown Bachs Tensor product: ${productId}`);
       }
 
       // The signed webhook starts the workflow; the independently retrieved
@@ -179,10 +179,10 @@ async function handleCollectionSucceeded(
         charge.currency !== 'USD' ||
         !amountMinor
       ) {
-        throw new Error('Bachs Basecode charge did not verify');
+        throw new Error('Bachs Tensor charge did not verify');
       }
 
-      await applyVerifiedBasecodePayment(supabase, {
+      await applyVerifiedTensorPayment(supabase, {
         provider: 'bachs',
         providerTransactionId: charge.charge_id,
         reference: charge.reference,

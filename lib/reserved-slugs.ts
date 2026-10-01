@@ -73,6 +73,8 @@ export const RESERVED_ORG_SLUGS: ReadonlySet<string> = new Set([
     "newsletter",
     "og",
     "onboarding",
+    "tensor",
+    // Legacy product route; redirects to /tensor. Keep reserved so no org claims it.
     "basecode",
     "pitch",
     "playground",

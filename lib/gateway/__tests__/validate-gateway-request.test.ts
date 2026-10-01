@@ -213,7 +213,7 @@ describe('validateGatewayRequest', () => {
     });
 
     /**
-     * Basecode supersedes its desktop key on every sign-in, so signing in on a second machine
+     * Tensor supersedes its desktop key on every sign-in, so signing in on a second machine
      * retires the first one's key. The first machine then repeats a request that can never succeed,
      * and "Invalid API key" tells it nothing about why or what to do.
      */
