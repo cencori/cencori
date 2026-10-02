@@ -1,7 +1,7 @@
 import BrandPageContent from "@/components/brand/BrandPageContent";
 
 export const metadata = {
-    title: "Brand Assets - Cencori",
+    title: { absolute: "Brand" },
     description: "Download official Cencori logos and brand assets.",
     openGraph: {
         images: ["/brand/og"],
