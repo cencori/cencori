@@ -57,6 +57,7 @@ export default function BrandPageContent() {
                             alt="Cencori logo — black"
                             width={200}
                             height={200}
+                            loading="eager"
                             className="h-auto w-full max-w-[50px] object-contain"
                         />
                     </div>
@@ -66,6 +67,7 @@ export default function BrandPageContent() {
                             alt="Cencori logo — white"
                             width={200}
                             height={200}
+                            loading="eager"
                             className="h-auto w-full max-w-[50px] object-contain"
                         />
                     </div>
@@ -91,6 +93,7 @@ export default function BrandPageContent() {
                             alt="Cencori wordmark — black"
                             width={480}
                             height={58}
+                            loading="eager"
                             className="h-auto w-full max-w-[320px] object-contain"
                         />
                     </div>
@@ -100,6 +103,7 @@ export default function BrandPageContent() {
                             alt="Cencori wordmark — white"
                             width={480}
                             height={58}
+                            loading="eager"
                             className="h-auto w-full max-w-[320px] object-contain"
                         />
                     </div>
