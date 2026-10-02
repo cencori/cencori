@@ -33,7 +33,7 @@ function TransparentAboutNav() {
   );
 }
 
-const SCROLL_SOLID_ROUTES = ["/thesis", "/contact", "/developers", "/ai-gateway", "/newsroom", "/models"];
+const SCROLL_SOLID_ROUTES = ["/thesis", "/contact", "/developers", "/ai-gateway", "/newsroom", "/models", "/brand"];
 
 export function MarketingNav() {
   const pathname = usePathname();
@@ -71,7 +71,7 @@ export function ThesisScrollNav({ developers = false }: { developers?: boolean }
 
   return (
     <div
-      className={`fixed inset-x-0 top-0 z-40 transition-colors duration-300 ${
+      className={`fixed inset-x-0 top-0 z-40 ${
         scrolled ? "bg-background" : "bg-transparent"
       }`}
     >
