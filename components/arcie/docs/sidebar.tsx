@@ -8,7 +8,6 @@ import { ArcieNavMain } from "./nav-main";
 import type { Root } from "fumadocs-core/page-tree";
 import Link from "next/link";
 import * as React from "react";
-import { cn } from "@/lib/utils";
 
 export function ArcieDocsSidebar({
   tree,
@@ -43,9 +42,7 @@ export function ArcieDocsSidebar({
           </span>
         </Link>
       </SidebarHeader>
-      <SidebarContent
-        className={cn("docs-sidebar-top-fade select-none", "pt-2 pb-14")}
-      >
+      <SidebarContent className="select-none pt-2 pb-14">
         <ArcieRenderDefaultOptions
           options={gettingStartedOptions}
           label="Getting Started"

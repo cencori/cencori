@@ -4,10 +4,10 @@ import {
   SidebarHeader,
 } from "@/components/docs/ui/sidebar";
 import { RenderDefaultOptions } from "./render-default-options";
+import { DocsSearch } from "./docs-search";
 import { source } from "@/lib/source";
 import { NavMain } from "./nav-main";
 import { Logo } from "@/components/logo";
-import { cn } from "@/lib/utils";
 import Link from "next/link";
 import * as React from "react";
 
@@ -31,14 +31,16 @@ export function DocsSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) 
         <Link
           href="/"
           aria-label="Cencori home"
-          className="z-10 flex items-center"
+          className="z-10 flex items-center gap-2"
         >
-          <Logo variant="wordmark" className="h-5 w-auto" />
+          <Logo variant="wordmark" className="h-4 w-auto shrink-0" />
+          <span className="font-inter text-xl font-medium normal-case tracking-tight">
+            Docs
+          </span>
         </Link>
       </SidebarHeader>
-      <SidebarContent
-        className={cn("docs-sidebar-top-fade select-none", "pt-2 pb-14")}
-      >
+      <DocsSearch />
+      <SidebarContent className="select-none pt-2 pb-14">
         <RenderDefaultOptions options={getStartedOptions} label="Get Started" />
         <NavMain tree={source.pageTree} />
       </SidebarContent>
