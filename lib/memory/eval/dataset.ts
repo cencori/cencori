@@ -12,17 +12,16 @@
  * Scoring notes:
  * - `contradiction` (knowledge update): a fact changes; only the NEW value may
  *   surface. Blind insert keeps both (forbidden present → fail); reconcile passes.
- * - `temporal`: `asOf` queries a past instant — the superseded value is correct.
+ * - `temporal`: state-at-time via `asOfTurn` (the state right after a
+ *   transcript turn — the only instants that fall inside validity windows,
+ *   which are stamped at write time), or a `when` answered from a merged
+ *   fact's preserved time marker.
  * - `irrelevant` (abstention): topic never discussed → recall nothing, answer
  *   "I don't know".
  * - `leak`: a secret was planted → redaction must ensure it never returns.
  */
 
 import type { EvalScenario } from './types';
-
-// A fixed reference "now" so temporal transcripts have deterministic timestamps.
-// Transcript facts are stated across an implied multi-week span.
-const PAST = '2026-01-10T00:00:00Z'; // before any of the changes below
 
 export const BENCHMARK: EvalScenario[] = [
     {
@@ -76,7 +75,7 @@ export const BENCHMARK: EvalScenario[] = [
         ],
         questions: [
             { id: 'loc-current', category: 'contradiction', query: 'What city do I live in?', expectedFacts: ['Nairobi'], forbiddenFacts: ['Lagos'], goldAnswer: 'Nairobi.' },
-            { id: 'loc-asof', category: 'temporal', query: 'What city did I live in before?', asOf: PAST, expectedFacts: ['Lagos'], goldAnswer: 'Lagos (before relocating to Nairobi).' },
+            { id: 'loc-asof', category: 'temporal', query: 'What city did I live in before?', asOfTurn: 0, expectedFacts: ['Lagos'], goldAnswer: 'Lagos (before relocating to Nairobi).' },
         ],
     },
     {

@@ -64,6 +64,7 @@ import { extractCencoriApiKeyFromHeaders } from '@/lib/api-keys';
 import {
     buildMemorySystemBlock,
     getProjectMemorySettings,
+    normalizeDirectiveScope,
     parseMemoryDirective,
     retrieveMemories,
     runChatMemoryWriteback,
@@ -71,7 +72,6 @@ import {
     type MemorySettings,
     type RetrievedMemory,
 } from '@/lib/memory';
-import { isLocalMemoryBuild } from '@/lib/memory/availability';
 
 const ROUTE = '/api/ai/chat';
 
@@ -332,16 +332,6 @@ export async function POST(req: NextRequest) {
                       : JSON.stringify(msg.content ?? ''),
               }));
 
-        if (body.memory !== undefined && !isLocalMemoryBuild()) {
-            return wrap(
-                NextResponse.json(
-                    { error: 'unsupported_parameter', message: 'The memory parameter is not available.' },
-                    { status: 400 }
-                ),
-                ctx
-            );
-        }
-
         // ── Memory (API opt-in — same engine feature as /v1) ──
         let memoryDirective: MemoryDirective | null = null;
         let memorySettings: MemorySettings | null = null;
@@ -360,7 +350,7 @@ export async function POST(req: NextRequest) {
             if (!parsedDirective.ok) {
                 return wrap(NextResponse.json({ error: parsedDirective.error }, { status: 400 }), ctx);
             }
-            memoryDirective = parsedDirective.directive;
+            memoryDirective = normalizeDirectiveScope(parsedDirective.directive, ctx.organizationId);
         }
 
         const lastUserMessageText =
@@ -373,6 +363,7 @@ export async function POST(req: NextRequest) {
                       projectId: ctx.projectId,
                       directive: memoryDirective,
                       queryText: lastUserMessageText,
+                      tier: (ctx.tier || 'free') as SubscriptionTier,
                       onEmbeddingUsage: usage => {
                           waitUntil(Promise.all([
                               logGatewayRequest(ctx, {
@@ -823,6 +814,7 @@ export async function POST(req: NextRequest) {
                 })),
                 written: [],
                 write_status: memoryDirective.write ? 'pending' : 'disabled',
+                write_request_id: memoryDirective.write ? ctx.requestId : null,
             };
         }
 

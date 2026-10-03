@@ -65,11 +65,22 @@ export interface SearchResult {
 // Scoped memory types (/v1/memory/*)
 // ==================
 
-export type MemoryScope = 'session' | 'user';
+export type MemoryScope = 'session' | 'user' | 'workspace' | 'org';
 
-export interface WriteScopedMemoryOptions {
+/** Scope-key inputs shared by every scoped-memory option shape. */
+export interface MemoryScopeKeys {
     userId?: string;
     sessionId?: string;
+    /** Workspace key for scope='workspace' (a caller-owned team/space id). */
+    workspaceId?: string;
+    /**
+     * Org key for scope='org'. Optional — the server defaults it to the
+     * authenticated organization, the only key org scope can address.
+     */
+    orgId?: string;
+}
+
+export interface WriteScopedMemoryOptions extends MemoryScopeKeys {
     scope?: MemoryScope;
     content: string;
     namespace?: string;
@@ -87,9 +98,7 @@ export interface ScopedMemory {
     createdAt: string;
 }
 
-export interface SearchScopedMemoryOptions {
-    userId?: string;
-    sessionId?: string;
+export interface SearchScopedMemoryOptions extends MemoryScopeKeys {
     scope?: MemoryScope;
     query: string;
     topK?: number;
@@ -126,9 +135,7 @@ export interface ScopedSearchResult {
     latencyMs: number;
 }
 
-export interface ListScopedMemoryOptions {
-    userId?: string;
-    sessionId?: string;
+export interface ListScopedMemoryOptions extends MemoryScopeKeys {
     scope?: MemoryScope;
     namespace?: string;
     limit?: number;
@@ -149,9 +156,8 @@ export interface ScopedMemoryList {
     nextCursor: string | null;
 }
 
-export interface RecallOptions {
+export interface RecallOptions extends MemoryScopeKeys {
     scope?: MemoryScope;
-    sessionId?: string;
     namespace?: string;
     topK?: number;
     threshold?: number;
@@ -175,9 +181,8 @@ export interface RememberExchange {
     assistant?: string;
 }
 
-export interface RememberOptions {
+export interface RememberOptions extends MemoryScopeKeys {
     scope?: MemoryScope;
-    sessionId?: string;
     namespace?: string;
     extract?: { model?: string; prompt?: string; minImportance?: number };
 }
@@ -189,9 +194,76 @@ export interface RememberResult {
     scope: MemoryScope;
 }
 
-export interface ForgetSuggestionsOptions {
-    userId?: string;
-    sessionId?: string;
+export interface WriteBatchOptions extends MemoryScopeKeys {
+    scope?: MemoryScope;
+    namespace?: string;
+    metadata?: Record<string, unknown>;
+    expiresAt?: string;
+    memories: Array<{ content: string; importance?: number }>;
+}
+
+export interface WriteBatchResult {
+    written: Array<{ id: string; content: string; importance: number }>;
+    count: number;
+    requested: number;
+    scope: MemoryScope;
+    scopeKey: string;
+}
+
+export interface ForgetByFilterOptions extends MemoryScopeKeys {
+    scope?: MemoryScope;
+    namespace?: string;
+    /** Forget memories created before this ISO-8601 instant. */
+    before?: string;
+    /** Forget only these memory ids. */
+    ids?: string[];
+}
+
+export interface ForgetByFilterResult {
+    forgotten: number;
+    truncated: boolean;
+    scope: MemoryScope;
+    scopeKey: string;
+}
+
+export interface ExportMemoryOptions extends MemoryScopeKeys {
+    scope?: MemoryScope;
+    namespace?: string;
+    limit?: number;
+    /** ISO created_at of the last memory on the previous page. */
+    cursor?: string;
+}
+
+export interface ExportMemoryResult {
+    scope: MemoryScope;
+    scopeKey: string;
+    exportedAt: string;
+    memories: Array<{
+        id: string;
+        scope: MemoryScope;
+        namespace: string | null;
+        content: string;
+        importance: number;
+        metadata?: Record<string, unknown>;
+        status?: string;
+        createdAt: string | null;
+    }>;
+    count: number;
+    nextCursor: string | null;
+    truncated: boolean;
+}
+
+export interface WriteStatusResult {
+    requestId: string;
+    status: 'pending' | 'success' | 'error';
+    extracted: number | null;
+    written: number | null;
+    scope: string | null;
+    error: string | null;
+    finishedAt: string | null;
+}
+
+export interface ForgetSuggestionsOptions extends MemoryScopeKeys {
     scope?: MemoryScope;
     namespace?: string;
     /** Max suggestions (weakest first). Default 20. */
@@ -215,9 +287,7 @@ export interface ForgetSuggestionsResult {
 }
 
 // ── Entity graph (Layer 5) ──
-export interface RememberGraphOptions {
-    userId?: string;
-    sessionId?: string;
+export interface RememberGraphOptions extends MemoryScopeKeys {
     scope?: MemoryScope;
     namespace?: string;
     user?: string;
@@ -232,9 +302,7 @@ export interface RememberGraphResult {
     costUsd: number;
 }
 
-export interface GraphQueryOptions {
-    userId?: string;
-    sessionId?: string;
+export interface GraphQueryOptions extends MemoryScopeKeys {
     scope?: MemoryScope;
     namespace?: string;
     /** Entity name to start the traversal from. */
@@ -250,9 +318,7 @@ export interface GraphResult {
     message?: string;
 }
 
-export interface ListEntitiesOptions {
-    userId?: string;
-    sessionId?: string;
+export interface ListEntitiesOptions extends MemoryScopeKeys {
     scope?: MemoryScope;
     namespace?: string;
     type?: string;
@@ -421,6 +487,8 @@ export class MemoryClient {
         const params = new URLSearchParams();
         if (options.userId) params.set('userId', options.userId);
         if (options.sessionId) params.set('sessionId', options.sessionId);
+        if (options.workspaceId) params.set('workspaceId', options.workspaceId);
+        if (options.orgId) params.set('orgId', options.orgId);
         if (options.scope) params.set('scope', options.scope);
         if (options.namespace) params.set('namespace', options.namespace);
         if (options.limit) params.set('limit', String(options.limit));
@@ -444,6 +512,8 @@ export class MemoryClient {
         const params = new URLSearchParams();
         if (options.userId) params.set('userId', options.userId);
         if (options.sessionId) params.set('sessionId', options.sessionId);
+        if (options.workspaceId) params.set('workspaceId', options.workspaceId);
+        if (options.orgId) params.set('orgId', options.orgId);
         if (options.scope) params.set('scope', options.scope);
         if (options.namespace) params.set('namespace', options.namespace);
         if (options.limit) params.set('limit', String(options.limit));
@@ -482,6 +552,8 @@ export class MemoryClient {
         const params = new URLSearchParams();
         if (options.userId) params.set('userId', options.userId);
         if (options.sessionId) params.set('sessionId', options.sessionId);
+        if (options.workspaceId) params.set('workspaceId', options.workspaceId);
+        if (options.orgId) params.set('orgId', options.orgId);
         if (options.scope) params.set('scope', options.scope);
         if (options.namespace) params.set('namespace', options.namespace);
         params.set('entity', options.entity);
@@ -496,6 +568,8 @@ export class MemoryClient {
         const params = new URLSearchParams();
         if (options.userId) params.set('userId', options.userId);
         if (options.sessionId) params.set('sessionId', options.sessionId);
+        if (options.workspaceId) params.set('workspaceId', options.workspaceId);
+        if (options.orgId) params.set('orgId', options.orgId);
         if (options.scope) params.set('scope', options.scope);
         if (options.namespace) params.set('namespace', options.namespace);
         if (options.type) params.set('type', options.type);
@@ -525,6 +599,8 @@ export class MemoryClient {
         const { results } = await this.searchUser({
             userId,
             sessionId: options.sessionId,
+            workspaceId: options.workspaceId,
+            orgId: options.orgId,
             scope: options.scope ?? 'user',
             query,
             topK: options.topK,
@@ -591,6 +667,8 @@ export class MemoryClient {
             body: JSON.stringify({
                 userId,
                 sessionId: options.sessionId,
+                workspaceId: options.workspaceId,
+                orgId: options.orgId,
                 scope: options.scope ?? 'user',
                 namespace: options.namespace,
                 user: exchange.user,
@@ -598,6 +676,71 @@ export class MemoryClient {
                 extract: options.extract,
             }),
         });
+    }
+
+    /**
+     * Write up to 50 memories in one call — one quota check, one embedding
+     * call, one reconciliation pass for the whole batch.
+     *
+     * @example
+     * ```typescript
+     * await cencori.memory.writeBatch({
+     *   userId: session.user.id,
+     *   memories: [{ content: 'Prefers dark mode' }, { content: 'Uses TypeScript' }],
+     * });
+     * ```
+     */
+    async writeBatch(options: WriteBatchOptions): Promise<WriteBatchResult> {
+        return this.request<WriteBatchResult>('/v1/memory/write/batch', {
+            method: 'POST',
+            body: JSON.stringify(options),
+        });
+    }
+
+    /**
+     * Forget memories by filter — a hard delete, audit-logged. At least a
+     * scope key is required; narrow with namespace / before / ids.
+     *
+     * @example
+     * ```typescript
+     * await cencori.memory.forgetByFilter({ userId, before: '2026-01-01T00:00:00Z' });
+     * ```
+     */
+    async forgetByFilter(options: ForgetByFilterOptions): Promise<ForgetByFilterResult> {
+        return this.request<ForgetByFilterResult>('/v1/memory/forget', {
+            method: 'POST',
+            body: JSON.stringify(options),
+        });
+    }
+
+    /**
+     * GDPR export — a portable dump of everything stored about a scope key.
+     * Cursor-paginated; walk `nextCursor` until `truncated` is false.
+     *
+     * @example
+     * ```typescript
+     * const dump = await cencori.memory.export({ userId: session.user.id });
+     * ```
+     */
+    async export(options: ExportMemoryOptions): Promise<ExportMemoryResult> {
+        return this.request<ExportMemoryResult>('/v1/memory/export', {
+            method: 'POST',
+            body: JSON.stringify(options),
+        });
+    }
+
+    /**
+     * Confirm an async chat writeback. The chat response carries
+     * `memory.write_request_id` — poll here until `status` leaves `pending`.
+     *
+     * @example
+     * ```typescript
+     * const res = await cencori.chat.completions.create({ model, messages, memory: { userId } });
+     * const receipt = await cencori.memory.writeStatus(res.memory!.write_request_id!);
+     * ```
+     */
+    async writeStatus(requestId: string): Promise<WriteStatusResult> {
+        return this.request<WriteStatusResult>(`/v1/memory/writes/${requestId}`);
     }
 
     // ==================

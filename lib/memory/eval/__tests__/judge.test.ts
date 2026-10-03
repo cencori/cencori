@@ -78,7 +78,27 @@ describe('runJudgedEval orchestration', () => {
     });
 
     it('recalls → answers → judges each gold question, and scores', async () => {
-        const supabase = { from: () => ({ delete: () => ({ eq: () => ({ eq: () => ({ eq: () => ({ eq: async () => ({ error: null }) }) }) }) }) }) } as never;
+        const supabase = {
+            from: () => ({
+                delete: () => ({ eq: () => ({ eq: () => ({ eq: () => ({ eq: async () => ({ error: null }) }) }) }) }),
+                // Validity-instant lookup for asOfTurn (no rows in this mock → app-time fallback).
+                select: () => ({
+                    eq: () => ({
+                        eq: () => ({
+                            eq: () => ({
+                                eq: () => ({
+                                    order: () => ({
+                                        limit: () => ({
+                                            maybeSingle: async () => ({ data: null, error: null }),
+                                        }),
+                                    }),
+                                }),
+                            }),
+                        }),
+                    }),
+                }),
+            }),
+        } as never;
         const answer = vi.fn(async () => 'Rust');
         const judge = vi.fn(async (_q: string, gold: string, gen: string) => gen.toLowerCase().includes(gold.toLowerCase()));
 

@@ -208,6 +208,42 @@ export function getMemoryQuota(tier: SubscriptionTier): number {
   return MEMORY_QUOTA[tier] ?? MEMORY_QUOTA.free;
 }
 
+// ── Memory operations quotas ──
+// Stored count (MEMORY_QUOTA) caps what sits in the DB; operations cap what
+// runs on the shared managed keys. Every opted-in turn costs ~2–3 managed
+// LLM calls (extraction + reconciliation, +1 with the entity graph on) plus
+// embeddings — all absorbed by Cencori. Without an ops cap, one hot tenant
+// can burn the shared Groq/Cerebras/Gemini quota or run up the bill (MON-6).
+// Two dimensions: per-project monthly (protects the shared keys) and per
+// end-user daily (protects against a single hot user). Both enforced in
+// lib/memory/ops-quota.ts via the shared Redis fixed-window limiter.
+export interface MemoryOpsQuota {
+  searches: number;
+  writes: number;
+}
+
+export const MEMORY_OPS_QUOTA: Record<SubscriptionTier, MemoryOpsQuota> = {
+  free: { searches: 10_000, writes: 2_000 },
+  pro: { searches: 500_000, writes: 100_000 },
+  team: { searches: 2_000_000, writes: 500_000 },
+  enterprise: { searches: Number.POSITIVE_INFINITY, writes: Number.POSITIVE_INFINITY },
+};
+
+export function getMemoryOpsQuota(tier: SubscriptionTier): MemoryOpsQuota {
+  return MEMORY_OPS_QUOTA[tier] ?? MEMORY_OPS_QUOTA.free;
+}
+
+export const MEMORY_OPS_USER_DAILY_QUOTA: Record<SubscriptionTier, MemoryOpsQuota> = {
+  free: { searches: 200, writes: 100 },
+  pro: { searches: 2_000, writes: 1_000 },
+  team: { searches: 10_000, writes: 5_000 },
+  enterprise: { searches: Number.POSITIVE_INFINITY, writes: Number.POSITIVE_INFINITY },
+};
+
+export function getMemoryOpsUserDailyQuota(tier: SubscriptionTier): MemoryOpsQuota {
+  return MEMORY_OPS_USER_DAILY_QUOTA[tier] ?? MEMORY_OPS_USER_DAILY_QUOTA.free;
+}
+
 // ── Embedded Agents limits (M4) ──
 // The capability is available on every tier (developer preview); the caps are
 // the gate. Metered per project/tenant/installation; runs additionally carry a

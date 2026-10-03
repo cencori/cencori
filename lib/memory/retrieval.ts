@@ -8,7 +8,9 @@
  */
 
 import type { createAdminClient } from '@/lib/supabaseAdmin';
+import type { SubscriptionTier } from '@/lib/entitlements';
 import { embedForMemory, type MemoryEmbeddingResult } from './embeddings';
+import { checkMemoryOpsQuota, isMemoryOpsExceededError, MemoryOpsExceededError } from './ops-quota';
 import { retrieveGraphMemories } from './graph-recall';
 import { rankMemories, type RankableMemory } from './rank';
 import { listSessionMemories } from './session-store';
@@ -45,6 +47,14 @@ export async function retrieveMemories(params: {
     directive: MemoryDirective;
     queryText: string;
     onEmbeddingUsage?: (usage: MemoryEmbeddingUsage) => void | Promise<void>;
+    /** Subscription tier — enables search ops-quota enforcement when set. */
+    tier?: SubscriptionTier;
+    /**
+     * What to do when the search ops allowance is exhausted: 'skip' returns
+     * [] (chat path — fail-open by contract), 'throw' raises
+     * MemoryOpsExceededError (direct endpoints — 429). Defaults to 'skip'.
+     */
+    ops?: 'skip' | 'throw';
 }): Promise<RetrievedMemory[]> {
     const { supabase, organizationId, projectId, directive, queryText, onEmbeddingUsage } = params;
 
@@ -61,6 +71,21 @@ export async function retrieveMemories(params: {
 
         if (!queryText.trim()) {
             return [];
+        }
+
+        // Ops allowance (MON-6): every retrieval burns a managed embedding on
+        // the shared key. Session scope is Redis-only and never counted.
+        if (params.tier) {
+            const opsStatus = await checkMemoryOpsQuota(projectId, params.tier, directive.scopeKey, 'search');
+            if (!opsStatus.allowed) {
+                if (params.ops === 'throw') {
+                    throw new MemoryOpsExceededError('search', opsStatus);
+                }
+                console.warn(
+                    `[Memory] Search ops quota exceeded (scope=${opsStatus.scope}) project=${projectId} — skipping retrieval`
+                );
+                return [];
+            }
         }
 
         const embeddingResult = await embedForMemory(
@@ -205,6 +230,9 @@ export async function retrieveMemories(params: {
 
         return [...vectorResults, ...graphResults];
     } catch (error) {
+        // Ops denials for direct endpoints must surface as 429 — never
+        // collapse them into the fail-open empty result.
+        if (isMemoryOpsExceededError(error)) throw error;
         console.warn('[Memory] Retrieval failed (fail-open):', error);
         return [];
     }

@@ -19,10 +19,13 @@ import type { SubscriptionTier } from '@/lib/entitlements';
 import {
     MEMORY_CONTENT_MAX_CHARS,
     appendSessionMemories,
+    buildMemoryOpsExceededBody,
     buildQuotaCheckFailedBody,
     buildQuotaExceededBody,
+    checkMemoryOpsQuota,
     checkMemoryQuota,
     getProjectMemorySettings,
+    normalizeDirectiveScope,
     parseMemoryDirective,
     redactFact,
     writeMemories,
@@ -32,6 +35,8 @@ interface WriteMemoryRequest {
     userId?: string;
     sessionId?: string;
     scope?: string;
+    workspaceId?: string;
+    orgId?: string;
     content?: string;
     namespace?: string;
     metadata?: Record<string, unknown>;
@@ -86,12 +91,14 @@ export async function POST(req: NextRequest) {
             userId: body.userId,
             sessionId: body.sessionId,
             scope: body.scope,
+            workspaceId: body.workspaceId,
+            orgId: body.orgId,
             namespace: body.namespace,
         });
         if (!parsed.ok) {
             return respond({ error: 'bad_request', message: parsed.error }, 400);
         }
-        const directive = parsed.directive;
+        const directive = normalizeDirectiveScope(parsed.directive, ctx.organizationId);
 
         const importance =
             typeof body.importance === 'number'
@@ -173,6 +180,12 @@ export async function POST(req: NextRequest) {
             return respond(buildQuotaExceededBody(ctx.projectId, tier, quota.used, quota.limit), 429);
         }
 
+        // Ops allowance (MON-6): managed-LLM spend gate, distinct from rows.
+        const writeOps = await checkMemoryOpsQuota(ctx.projectId, tier, directive.scopeKey, 'write');
+        if (!writeOps.allowed) {
+            return respond(buildMemoryOpsExceededBody(ctx.projectId, tier, 'write', writeOps), 429);
+        }
+
         const result = await writeMemories({
             supabase: ctx.supabase,
             organizationId: ctx.organizationId,
@@ -185,6 +198,12 @@ export async function POST(req: NextRequest) {
             metadata: { ...body.metadata, extractedFrom: 'manual' },
             expiresAt,
         });
+
+        if (result.opsExceeded) {
+            const ops = result.opsStatus
+                ?? await checkMemoryOpsQuota(ctx.projectId, tier, directive.scopeKey, 'write');
+            return respond(buildMemoryOpsExceededBody(ctx.projectId, tier, 'write', ops), 429);
+        }
 
         if (result.written.length === 0) {
             // Either the fact was blocked by a data rule or the insert failed.

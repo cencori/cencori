@@ -15,6 +15,7 @@ import {
 } from '@/lib/gateway-middleware';
 import {
     getProjectMemorySettings,
+    resolveApiScopeKey,
     suggestForForgetting,
     toMemoryId,
     type StrengthInput,
@@ -45,13 +46,21 @@ export async function GET(req: NextRequest) {
 
         const url = new URL(req.url);
         const scope = url.searchParams.get('scope') || 'user';
-        const userId = url.searchParams.get('userId')?.trim() || '';
-        const sessionId = url.searchParams.get('sessionId')?.trim() || '';
-        const namespace = url.searchParams.get('namespace')?.trim() || null;
-        const scopeKey = scope === 'session' ? (sessionId || userId) : userId;
-        if (!scopeKey) {
-            return respond({ error: 'bad_request', message: 'userId is required (or sessionId for session scope).' }, 400);
+        const resolved = resolveApiScopeKey(
+            scope,
+            {
+                userId: url.searchParams.get('userId') ?? '',
+                sessionId: url.searchParams.get('sessionId') ?? '',
+                workspaceId: url.searchParams.get('workspaceId') ?? '',
+                orgId: url.searchParams.get('orgId') ?? '',
+            },
+            ctx.organizationId
+        );
+        if (!resolved.ok) {
+            return respond({ error: 'bad_request', message: resolved.error }, 400);
         }
+        const scopeKey = resolved.scopeKey;
+        const namespace = url.searchParams.get('namespace')?.trim() || null;
 
         const limit = clampInt(url.searchParams.get('limit'), 20, 1, 100);
         const minIdleDays = clampInt(url.searchParams.get('minIdleDays'), 60, 0, 3650);

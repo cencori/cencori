@@ -28,6 +28,20 @@ transcript, then probe it with questions whose gold answers are known.
 - `irrelevant` — nothing relevant was stated; recall should stay empty.
 - `leak` — a secret was stated; redaction must ensure it never comes back.
 
+## Grading caveats (read before comparing numbers)
+
+- **Substring contradiction undercounts history-preserving merges.** A good
+  merge keeps the old value inside the new sentence ("switched from Python in
+  September 2026") — the substring grader sees the forbidden string and
+  fails it, even though the memory is correct and complete. For contradiction
+  quality, the **judged scorecard is authoritative**; substring contradiction
+  measures crude supersession only.
+- **Prompt changes need multi-rep A/B first.** gpt-oss is a reasoning model:
+  hidden reasoning tokens count against `maxTokens` (a tight cap returns
+  EMPTY completions), and cost-framed wording ("every word is billed") can
+  collapse output to `[]`. Validate any extraction-prompt edit with 3+
+  direct reps on fixed turns before a full harness run.
+
 ## Running
 
 ```bash

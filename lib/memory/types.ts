@@ -7,7 +7,19 @@
 
 export type MemoryScope = 'session' | 'user' | 'workspace' | 'org';
 
-/** Scopes accepted in Phase 1. */
+/**
+ * Scopes accepted on every memory door. The store (gateway_memories CHECK
+ * constraint) and all match RPCs already accept all four — no migration.
+ * Workspace partitions a caller-supplied workspace key inside (org, project);
+ * org defaults to the authenticated organization (set by the routes, which
+ * own the auth context the parser never sees).
+ */
+export const SUPPORTED_SCOPES: MemoryScope[] = ['session', 'user', 'workspace', 'org'];
+
+/**
+ * @deprecated Phase 1 subset (session + user). Kept for compat — new code
+ * should use SUPPORTED_SCOPES.
+ */
 export const PHASE1_SCOPES: MemoryScope[] = ['session', 'user'];
 
 /**
@@ -57,6 +69,14 @@ export interface MemoryExtractOverride {
 export interface MemoryDirectiveInput {
     userId?: string;
     sessionId?: string;
+    /** Workspace key for scope='workspace' (a caller-owned team/space id). */
+    workspaceId?: string;
+    /**
+     * Org key for scope='org'. Optional — routes default it to the
+     * authenticated organization, which is the only key org scope can ever
+     * address (every query is filtered by the ctx org regardless).
+     */
+    orgId?: string;
     scope?: string;
     retrieve?: boolean;
     write?: boolean;
@@ -208,15 +228,17 @@ export function parseMemoryDirective(raw: unknown): ParseDirectiveResult {
     const input = raw as MemoryDirectiveInput;
 
     const scope = (input.scope || 'user') as MemoryScope;
-    if (!PHASE1_SCOPES.includes(scope)) {
+    if (!SUPPORTED_SCOPES.includes(scope)) {
         return {
             ok: false,
-            error: `memory.scope must be one of: ${PHASE1_SCOPES.join(', ')}`,
+            error: `memory.scope must be one of: ${SUPPORTED_SCOPES.join(', ')}`,
         };
     }
 
     const userId = typeof input.userId === 'string' ? input.userId.trim() : '';
     const sessionId = typeof input.sessionId === 'string' ? input.sessionId.trim() : '';
+    const workspaceId = typeof input.workspaceId === 'string' ? input.workspaceId.trim() : '';
+    const orgId = typeof input.orgId === 'string' ? input.orgId.trim() : '';
 
     let scopeKey: string;
     if (scope === 'session') {
@@ -224,6 +246,15 @@ export function parseMemoryDirective(raw: unknown): ParseDirectiveResult {
         if (!scopeKey) {
             return { ok: false, error: 'memory.sessionId (or userId) is required for session scope' };
         }
+    } else if (scope === 'workspace') {
+        scopeKey = workspaceId;
+        if (!scopeKey) {
+            return { ok: false, error: 'memory.workspaceId is required for workspace scope' };
+        }
+    } else if (scope === 'org') {
+        // May be empty — routes default it to the authenticated organization
+        // (normalizeDirectiveScope), the only key this scope can address.
+        scopeKey = orgId;
     } else {
         scopeKey = userId;
         if (!scopeKey) {
@@ -260,7 +291,6 @@ export function parseMemoryDirective(raw: unknown): ParseDirectiveResult {
 
     // Graph expansion is on unless explicitly disabled.
     const graph = input.graph !== false;
-
     return {
         ok: true,
         directive: {
@@ -281,4 +311,68 @@ export function parseMemoryDirective(raw: unknown): ParseDirectiveResult {
             graph,
         },
     };
+}
+
+/**
+ * Route-side normalization for directives that need the auth context the
+ * parser never sees. Org scope with no explicit key addresses the
+ * authenticated organization — the only key that scope can ever resolve to,
+ * since every read and write is filtered by the ctx org regardless. Mutates
+ * and returns the (per-request) directive for call-site convenience.
+ */
+export function normalizeDirectiveScope(
+    directive: MemoryDirective,
+    organizationId: string
+): MemoryDirective {
+    if (directive.scope === 'org' && !directive.scopeKey) {
+        directive.scopeKey = organizationId;
+    }
+    return directive;
+}
+
+export interface ApiScopeIds {
+    userId?: string;
+    sessionId?: string;
+    workspaceId?: string;
+    orgId?: string;
+}
+
+/**
+ * Scope-key resolution for the hand-rolled (non-directive) read doors
+ * (graph/entities/forget-suggestions). Same contract as
+ * parseMemoryDirective: session → sessionId||userId, user → userId,
+ * workspace → workspaceId (required), org → orgId or the authenticated
+ * organization.
+ */
+export function resolveApiScopeKey(
+    scope: string,
+    ids: ApiScopeIds,
+    organizationId: string
+):
+    | { ok: true; scope: MemoryScope; scopeKey: string }
+    | { ok: false; error: string } {
+    if (!(SUPPORTED_SCOPES as string[]).includes(scope)) {
+        return { ok: false, error: `scope must be one of: ${SUPPORTED_SCOPES.join(', ')}` };
+    }
+    const s = scope as MemoryScope;
+    const userId = (ids.userId ?? '').trim();
+    const sessionId = (ids.sessionId ?? '').trim();
+    let scopeKey = '';
+    if (s === 'session') scopeKey = sessionId || userId;
+    else if (s === 'workspace') scopeKey = (ids.workspaceId ?? '').trim();
+    else if (s === 'org') scopeKey = (ids.orgId ?? '').trim() || organizationId;
+    else scopeKey = userId;
+    if (!scopeKey) {
+        const need =
+            s === 'session'
+                ? 'sessionId (or userId)'
+                : s === 'workspace'
+                    ? 'workspaceId'
+                    : 'userId';
+        return { ok: false, error: `${need} is required for ${s} scope` };
+    }
+    if (scopeKey.length > 256) {
+        return { ok: false, error: 'scope key must be 256 characters or fewer' };
+    }
+    return { ok: true, scope: s, scopeKey };
 }

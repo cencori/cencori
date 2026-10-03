@@ -33,6 +33,14 @@ export interface EvalQuestion {
     query: string;
     /** For temporal cases: query memory as-of this ISO instant (past state). */
     asOf?: string;
+    /**
+     * For temporal cases: query memory as it stood right after this transcript
+     * turn (0-indexed). Preferred over a fixed `asOf` for homegrown scenarios:
+     * validity windows are stamped at write time, so only an instant captured
+     * during the replay itself can fall between two writes. A fixed past date
+     * (e.g. last January) predates every row and matches nothing by design.
+     */
+    asOfTurn?: number;
     /** Facts that MUST be recalled (case-insensitive substring match). */
     expectedFacts?: string[];
     /**
