@@ -40,6 +40,32 @@ export interface ExtractFactsResult {
     facts: ExtractedFact[];
     costUsd: number;
     model: string;
+    /** Which provider actually answered ('' when the whole chain failed). */
+    provider: string;
+    /** LLM attempts used — 2 when the first attempt produced no parseable output and we retried. */
+    attempts: number;
+}
+
+/**
+ * True only for an explicit `[]` verdict — "nothing worth remembering".
+ * Empty output, prose without an array, and malformed JSON are failure
+ * signals (usually a reasoning model spending its token budget before
+ * emitting) and may be retried; an explicit `[]` must never be.
+ */
+export function isExplicitEmptyVerdict(raw: string): boolean {
+    let text = raw.trim();
+    const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (fenceMatch) {
+        text = fenceMatch[1].trim();
+    }
+    const arrayMatch = text.match(/\[[\s\S]*\]/);
+    if (!arrayMatch) return false;
+    try {
+        const parsed: unknown = JSON.parse(arrayMatch[0]);
+        return Array.isArray(parsed) && parsed.length === 0;
+    } catch {
+        return false;
+    }
 }
 
 export async function extractFacts(params: {
@@ -67,34 +93,56 @@ export async function extractFacts(params: {
 
     try {
         // Fan out across the managed production chain; first provider to answer wins.
-        const response = await callMemoryLlm({
+        // NOTE: do NOT size maxTokens tight. The managed extraction models are
+        // reasoning models: hidden reasoning tokens count against this budget,
+        // and a too-small cap returns an EMPTY completion (proven: 350 → empty
+        // 2/2 on the same prompt that works at 500/800).
+        const exchangeMessages = [
+            { role: 'system', content: systemPrompt },
+            {
+                role: 'user',
+                content:
+                    `Exchange to analyze:\n\n` +
+                    `USER:\n${userText.slice(0, 8000)}\n\n` +
+                    `ASSISTANT:\n${assistantText.slice(0, 8000)}`,
+            },
+        ] as { role: 'system' | 'user' | 'assistant'; content: string }[];
+        let response = await callMemoryLlm({
             supabase,
             projectId,
             organizationId,
             tier,
             requestId,
             preferModel,
-            // NOTE: do NOT size this tight. The managed extraction models are
-            // reasoning models: hidden reasoning tokens count against this
-            // budget, and a too-small cap returns an EMPTY completion (proven:
-            // 350 → empty 2/2, 500/800 → valid facts on the same prompt).
-            // Per-call cost comes from generated tokens, which the brevity
-            // rule in the prompt controls — not this cap.
             maxTokens: 500,
-            messages: [
-                { role: 'system', content: systemPrompt },
-                {
-                    role: 'user',
-                    content:
-                        `Exchange to analyze:\n\n` +
-                        `USER:\n${userText.slice(0, 8000)}\n\n` +
-                        `ASSISTANT:\n${assistantText.slice(0, 8000)}`,
-                },
-            ],
+            messages: exchangeMessages,
         });
+        let attempts = 1;
+        let costUsd = response?.costUsd ?? 0;
+        const firstFacts = response ? parseExtractionOutput(response.content) : [];
+        if (firstFacts.length === 0 && (!response || !isExplicitEmptyVerdict(response.content))) {
+            // One retry: an empty/unparseable completion (or a dead chain) is
+            // usually a spent reasoning budget, not a verdict. An explicit `[]`
+            // never reaches here — it is accepted as-is below.
+            const retry = await callMemoryLlm({
+                supabase,
+                projectId,
+                organizationId,
+                tier,
+                requestId,
+                preferModel,
+                maxTokens: 500,
+                messages: exchangeMessages,
+            });
+            attempts = 2;
+            if (retry) {
+                costUsd += retry.costUsd;
+                response = retry;
+            }
+        }
         if (!response) {
-            // Whole chain exhausted — fail open with zero facts.
-            return { facts: [], costUsd: 0, model: preferModel };
+            // Whole chain exhausted twice — fail open with zero facts.
+            return { facts: [], costUsd, model: preferModel, provider: '', attempts };
         }
 
         const facts = parseExtractionOutput(response.content);
@@ -108,12 +156,14 @@ export async function extractFacts(params: {
 
         return {
             facts: filtered,
-            costUsd: response.costUsd,
+            costUsd,
             model: response.model,
+            provider: response.provider,
+            attempts,
         };
     } catch (error) {
         console.warn('[Memory] Fact extraction failed:', error);
-        return { facts: [], costUsd: 0, model: preferModel };
+        return { facts: [], costUsd: 0, model: preferModel, provider: '', attempts: 1 };
     }
 }
 

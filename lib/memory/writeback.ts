@@ -312,6 +312,8 @@ export interface RememberExchangeResult {
     opsStatus?: MemoryOpsStatus;
     costUsd: number;
     model: string;
+    /** Which provider actually ran extraction ('' when none ran). */
+    provider: string;
     /** Entity-graph outcome for the exchange (absent when the graph is off). */
     graph?: EntityGraphWritebackResult;
 }
@@ -353,7 +355,7 @@ export async function rememberExchange(params: {
             console.warn(
                 `[Memory] Write ops quota exceeded (scope=${opsStatus.scope}) project=${projectId} — dropping remember`
             );
-            return { written: [], extracted: 0, quotaExceeded: false, opsExceeded: true, opsStatus, costUsd: 0, model: resolveMemoryModel(settings.extractionModel) };
+            return { written: [], extracted: 0, quotaExceeded: false, opsExceeded: true, opsStatus, costUsd: 0, model: resolveMemoryModel(settings.extractionModel), provider: '' };
         }
     }
 
@@ -370,7 +372,7 @@ export async function rememberExchange(params: {
     });
 
     if (extraction.facts.length === 0) {
-        return { written: [], extracted: 0, quotaExceeded: false, opsExceeded: false, costUsd: extraction.costUsd, model: extraction.model };
+        return { written: [], extracted: 0, quotaExceeded: false, opsExceeded: false, costUsd: extraction.costUsd, model: extraction.model, provider: extraction.provider };
     }
 
     if (directive.scope === 'session') {
@@ -394,6 +396,7 @@ export async function rememberExchange(params: {
             opsExceeded: false,
             costUsd: extraction.costUsd,
             model: extraction.model,
+            provider: extraction.provider,
         };
     }
 
@@ -440,6 +443,7 @@ export async function rememberExchange(params: {
         opsStatus: result.opsStatus,
         costUsd: extraction.costUsd + result.embeddingCostUsd + (graph?.costUsd ?? 0),
         model: extraction.model,
+        provider: extraction.provider,
         graph,
     };
 }
@@ -583,8 +587,7 @@ export async function runChatMemoryWriteback(params: {
         const totalCost = extraction.costUsd + embeddingCostUsd + (graph?.costUsd ?? 0);
         await logGatewayRequest(gatewayCtx, {
             endpoint: 'memory/writeback',
-            model: extraction.model,
-            // Managed extraction + embeddings run on Google; only BYOK embeddings
+            model: extraction.model,            // Managed extraction + embeddings run on Google; only BYOK embeddings
             // are OpenAI. Reflect what actually ran, not a hardcoded 'openai'.
             provider: embeddingProvider ?? 'google',
             status: quotaExceeded || opsExceeded ? 'error' : 'success',
@@ -599,6 +602,9 @@ export async function runChatMemoryWriteback(params: {
                 extracted: extraction.facts.length,
                 written: writtenCount,
                 scope: directive.scope,
+                extraction_model: extraction.model,
+                extraction_provider: extraction.provider,
+                extraction_attempts: extraction.attempts,
                 embedding_model: embeddingModel,
                 embedding_provider: embeddingProvider,
                 ...(reconciliation

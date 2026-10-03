@@ -18,6 +18,7 @@ const routeMocks = vi.hoisted(() => ({
     checkMemoryQuota: vi.fn(),
     checkMemoryOpsQuota: vi.fn(),
     writeMemories: vi.fn(),
+    rememberExchange: vi.fn(),
     appendSessionMemories: vi.fn(),
     clearSessionMemories: vi.fn(),
     redactFact: vi.fn(),
@@ -50,6 +51,7 @@ vi.mock('@/lib/memory/ops-quota', async importOriginal => {
 
 vi.mock('@/lib/memory/writeback', () => ({
     writeMemories: (...args: unknown[]) => routeMocks.writeMemories(...args),
+    rememberExchange: (...args: unknown[]) => routeMocks.rememberExchange(...args),
     runChatMemoryWriteback: vi.fn(),
 }));
 
@@ -69,6 +71,7 @@ vi.mock('@/lib/memory/redact', () => ({
 import { POST as batchPost } from '@/app/api/v1/memory/write/batch/route';
 import { POST as forgetPost } from '@/app/api/v1/memory/forget/route';
 import { POST as exportPost } from '@/app/api/v1/memory/export/route';
+import { POST as rememberPost } from '@/app/api/v1/memory/remember/route';
 
 const ENABLED_SETTINGS = {
     enabled: true,
@@ -362,6 +365,52 @@ describe('memory contract routes', () => {
             ctx.supabase = { from } as never;
             const res = await exportPost(jsonRequest('http://x/export', { userId: 'u' }));
             expect(res.status).toBe(500);
+        });
+    });
+
+    describe('POST /v1/memory/remember', () => {
+        const exchange = { userId: 'u', user: 'I prefer dark mode.', assistant: 'Noted.' };
+
+        it('returns cost/model/provider and logs the true provider', async () => {
+            routeMocks.rememberExchange.mockResolvedValue({
+                written: [{ id: 'mem_1', content: 'Prefers dark mode', importance: 0.7 }],
+                extracted: 1,
+                quotaExceeded: false,
+                opsExceeded: false,
+                costUsd: 0.002,
+                model: 'openai/gpt-oss-20b',
+                provider: 'groq',
+            });
+            const res = await rememberPost(jsonRequest('http://x/remember', exchange));
+            expect(res.status).toBe(201);
+            const body = await res.json();
+            expect(body).toMatchObject({
+                extracted: 1,
+                count: 1,
+                costUsd: 0.002,
+                model: 'openai/gpt-oss-20b',
+                provider: 'groq',
+            });
+            expect(routeMocks.logGatewayRequest).toHaveBeenCalledWith(
+                ctx,
+                expect.objectContaining({ endpoint: 'memory/remember', provider: 'groq', status: 'success' })
+            );
+        });
+
+        it('maps ops exhaustion to the ops 429 (not the quota 429)', async () => {
+            routeMocks.rememberExchange.mockResolvedValue({
+                written: [],
+                extracted: 0,
+                quotaExceeded: false,
+                opsExceeded: true,
+                opsStatus: { allowed: false, used: 5, limit: 5, resetMs: 1000, scope: 'user' },
+                costUsd: 0,
+                model: 'openai/gpt-oss-20b',
+                provider: 'groq',
+            });
+            const res = await rememberPost(jsonRequest('http://x/remember', exchange));
+            expect(res.status).toBe(429);
+            expect((await res.json()).error.code).toBe('memory_ops_quota_exceeded');
         });
     });
 });

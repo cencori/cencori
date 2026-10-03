@@ -22,7 +22,8 @@ vi.mock('@/lib/gateway-middleware', () => ({
     addGatewayHeaders: (...args: unknown[]) => (routeMocks.addGatewayHeaders as never as (...a: unknown[]) => unknown)(...args),
 }));
 
-import { GET, isValidWriteRequestId } from '@/app/api/v1/memory/writes/[requestId]/route';
+import { GET } from '@/app/api/v1/memory/writes/[requestId]/route';
+import { isValidWriteRequestId } from '@/lib/memory';
 
 function mockSupabase(result: { data: unknown; error: unknown }) {
     const maybeSingle = vi.fn(async () => result);
@@ -81,7 +82,15 @@ describe('GET /v1/memory/writes/:requestId', () => {
             params: Promise.resolve({ requestId: 'req-pending-1' }),
         });
         expect(res.status).toBe(200);
-        expect(await res.json()).toEqual({ requestId: 'req-pending-1', status: 'pending' });
+        expect(await res.json()).toEqual({
+            requestId: 'req-pending-1',
+            status: 'pending',
+            extracted: null,
+            written: null,
+            scope: null,
+            error: null,
+            finishedAt: null,
+        });
         // Isolation: project filter is always applied.
         expect(chain.eqFirst).toHaveBeenCalledWith('project_id', ctx.projectId);
         expect(chain.eqSecond).toHaveBeenCalledWith('request_id', 'req-pending-1');

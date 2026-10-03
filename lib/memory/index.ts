@@ -71,7 +71,7 @@ export {
     MEMORY_FETCH_TOOL_NAME,
 } from './fetch';
 export type { FetchedMemory, MemoryFetchToolResult } from './fetch';
-export { DEFAULT_EXTRACTION_PROMPT, extractFacts, parseExtractionOutput } from './extraction';
+export { DEFAULT_EXTRACTION_PROMPT, extractFacts, isExplicitEmptyVerdict, parseExtractionOutput } from './extraction';
 export {
     normalizeName,
     normalizeEntityKey,
@@ -114,3 +114,5 @@ export type {
 } from './entity-persist';
 export { rememberExchange, runChatMemoryWriteback, writeMemories } from './writeback';
 export type { RememberExchangeResult } from './writeback';
+export { fetchWriteReceipt, isValidWriteRequestId } from './write-receipt';
+export type { WriteReceipt } from './write-receipt';

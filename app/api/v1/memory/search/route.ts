@@ -155,6 +155,9 @@ export async function POST(req: NextRequest) {
                 })),
                 count: results.length,
                 latencyMs: Date.now() - startTime,
+                costUsd: embeddingUsage?.cencoriChargeUsd ?? 0,
+                model: embeddingUsage?.model,
+                provider: embeddingUsage?.provider,
             },
             200
         );

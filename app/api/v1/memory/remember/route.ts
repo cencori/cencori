@@ -131,7 +131,7 @@ export async function POST(req: NextRequest) {
         await logGatewayRequest(ctx, {
             endpoint: 'memory/remember',
             model: result.model,
-            provider: 'openai',
+            provider: result.provider || 'unknown',
             status: result.quotaExceeded || result.opsExceeded ? 'error' : 'success',
             costUsd: result.costUsd,
             cencoriChargeUsd: result.costUsd,
@@ -187,6 +187,9 @@ export async function POST(req: NextRequest) {
                 extracted: result.extracted,
                 count: result.written.length,
                 scope: directive.scope,
+                costUsd: result.costUsd,
+                model: result.model,
+                provider: result.provider || undefined,
             },
             201
         );

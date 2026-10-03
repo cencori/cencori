@@ -17,14 +17,10 @@ import {
     addGatewayHeaders,
     handleCorsPreFlight,
 } from '@/lib/gateway-middleware';
+import { fetchWriteReceipt, isValidWriteRequestId } from '@/lib/memory';
 
 export async function OPTIONS() {
     return handleCorsPreFlight();
-}
-
-/** Gateway request ids are UUIDs; bound the shape before querying. */
-export function isValidWriteRequestId(value: string): boolean {
-    return /^[A-Za-z0-9-]{8,64}$/.test(value);
 }
 
 export async function GET(
@@ -46,39 +42,8 @@ export async function GET(
     }
 
     try {
-        const { data, error } = await ctx.supabase
-            .from('ai_requests')
-            .select('status, metadata, error_message, created_at')
-            .eq('project_id', ctx.projectId)
-            .eq('request_id', requestId)
-            .eq('endpoint', 'memory/writeback')
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
-        if (error) throw error;
-
-        if (!data) {
-            return respond({ requestId, status: 'pending' }, 200);
-        }
-
-        const metadata = (data.metadata ?? {}) as {
-            extracted?: unknown;
-            written?: unknown;
-            scope?: unknown;
-        };
-        return respond(
-            {
-                requestId,
-                status: data.status === 'success' ? 'success' : 'error',
-                extracted: typeof metadata.extracted === 'number' ? metadata.extracted : null,
-                written: typeof metadata.written === 'number' ? metadata.written : null,
-                scope: typeof metadata.scope === 'string' ? metadata.scope : null,
-                error: typeof data.error_message === 'string' ? data.error_message : null,
-                finishedAt: data.created_at,
-            },
-            200
-        );
+        const receipt = await fetchWriteReceipt(ctx.supabase, ctx.projectId, requestId);
+        return respond(receipt, 200);
     } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error';
         return respond({ error: 'internal_error', message }, 500);
