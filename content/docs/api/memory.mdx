@@ -124,6 +124,12 @@ const { results } = await cencori.memory.searchUser({
 await cencori.memory.forget(results[0].id);
 ```
 
+Write paths report what they spent: `remember` / `write` / `write/batch`
+responses include `costUsd` (plus `model` and the actual `provider`), and
+`search` reports its embedding cost. A `201` with `extracted: 0` means the
+exchange held nothing durable — not a failure. On the rare empty first
+completion the extractor retries once before accepting that verdict.
+
 ## Batch writes, forget-by-filter, GDPR export
 
 ```typescript

@@ -96,6 +96,10 @@ export interface ScopedMemory {
     content: string;
     importance: number;
     createdAt: string;
+    /** Billed cost for the call that produced this (write paths). */
+    costUsd?: number;
+    model?: string;
+    provider?: string;
 }
 
 export interface SearchScopedMemoryOptions extends MemoryScopeKeys {
@@ -133,6 +137,10 @@ export interface ScopedSearchResult {
     }>;
     count: number;
     latencyMs: number;
+    /** Billed embedding cost for the search. */
+    costUsd: number;
+    model?: string;
+    provider?: string;
 }
 
 export interface ListScopedMemoryOptions extends MemoryScopeKeys {
@@ -192,6 +200,10 @@ export interface RememberResult {
     extracted: number;
     count: number;
     scope: MemoryScope;
+    /** Billed cost (extraction + embeddings + graph, if any). */
+    costUsd: number;
+    model: string;
+    provider?: string;
 }
 
 export interface WriteBatchOptions extends MemoryScopeKeys {
@@ -208,6 +220,10 @@ export interface WriteBatchResult {
     requested: number;
     scope: MemoryScope;
     scopeKey: string;
+    /** Billed embedding cost for the batch. */
+    costUsd?: number;
+    model?: string;
+    provider?: string;
 }
 
 export interface ForgetByFilterOptions extends MemoryScopeKeys {

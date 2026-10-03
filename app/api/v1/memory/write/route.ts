@@ -249,6 +249,9 @@ export async function POST(req: NextRequest) {
                 importance: written.importance,
                 expiresAt,
                 createdAt: new Date().toISOString(),
+                costUsd: result.embeddingCostUsd,
+                model: result.embeddingModel,
+                provider: result.embeddingProvider,
             },
             201
         );

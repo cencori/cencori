@@ -29,7 +29,7 @@ import {
 import type { SubscriptionTier } from '@/lib/entitlements';
 
 /** Hard cap per forget call — page with `before` cursors for larger purges. */
-export const MEMORY_FORGET_MAX_ROWS = 1000;
+const MEMORY_FORGET_MAX_ROWS = 1000;
 
 interface ForgetMemoryRequest {
     userId?: string;

@@ -27,7 +27,7 @@ import {
 import type { SubscriptionTier } from '@/lib/entitlements';
 
 /** Hard cap per export page — large dumps walk the cursor. */
-export const MEMORY_EXPORT_MAX_LIMIT = 1000;
+const MEMORY_EXPORT_MAX_LIMIT = 1000;
 
 interface ExportMemoryRequest {
     userId?: string;

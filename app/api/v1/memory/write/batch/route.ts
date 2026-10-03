@@ -35,7 +35,7 @@ import {
 } from '@/lib/memory';
 
 /** Hard cap on items per batch — bounds the reconcile candidate fan-out. */
-export const MEMORY_BATCH_MAX_ITEMS = 50;
+const MEMORY_BATCH_MAX_ITEMS = 50;
 
 interface BatchMemoryItem {
     content?: string;
@@ -223,6 +223,9 @@ export async function POST(req: NextRequest) {
                 requested: items.length,
                 scope: directive.scope,
                 scopeKey: directive.scopeKey,
+                costUsd: result.embeddingCostUsd,
+                model: result.embeddingModel,
+                provider: result.embeddingProvider,
             },
             201
         );
