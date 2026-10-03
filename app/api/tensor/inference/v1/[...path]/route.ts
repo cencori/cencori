@@ -22,6 +22,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authenticateTensorDataRequest } from "@/lib/tensor-data";
 import { noStoreHeaders } from "@/lib/tensor-auth";
+import {
+    buildServerTiming,
+    PROXY_AUTH_MS_HEADER,
+    PROXY_LEASE_MS_HEADER,
+} from "@/lib/gateway/performance";
 
 const GATEWAY_BASE =
   process.env.BASECODE_GATEWAY_URL?.trim().replace(/\/+$/, "") || "https://api.cencori.com/v1";
@@ -57,7 +62,9 @@ async function forward(req: NextRequest, path: string[]): Promise<Response> {
     return json({ error: "Not found", code: "unknown_route" }, 404);
   }
 
+  const authStartedAt = Date.now();
   const session = await authenticateTensorDataRequest(req.headers.get("authorization"));
+  const authMs = Date.now() - authStartedAt;
   if (!session) {
     return json({ error: "Sign in to Tensor to continue.", code: "unauthenticated" }, 401);
   }
@@ -79,11 +86,20 @@ async function forward(req: NextRequest, path: string[]): Promise<Response> {
     }
   }
 
+  // The lease RPC is the single biggest pre-dispatch cost on this path
+  // (0.8–1.7s observed). It stays serial — spend must be verified before the
+  // upstream call exists — but its duration is now measured, forwarded to
+  // the gateway log as attribution metadata, and reported back to the
+  // client as a Server-Timing span, so the next investigation subtracts
+  // instead of guessing.
+  let leaseMs: number | null = null;
   if (route.generates) {
+    const leaseStartedAt = Date.now();
     const { data: access, error: accessError } = await session.admin.rpc(
       "basecode_gateway_access",
       { p_user_id: session.user.id },
     );
+    leaseMs = Date.now() - leaseStartedAt;
     if (accessError) {
       console.error("[TensorInference] entitlement lookup failed", accessError);
       return json(
@@ -124,6 +140,8 @@ async function forward(req: NextRequest, path: string[]): Promise<Response> {
       Authorization: `Bearer ${PRODUCT_KEY}`,
       "Content-Type": "application/json",
       "X-Cencori-User-IP": req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "",
+      [PROXY_AUTH_MS_HEADER]: String(authMs),
+      ...(leaseMs !== null ? { [PROXY_LEASE_MS_HEADER]: String(leaseMs) } : {}),
     },
     ...(body === undefined ? {} : { body }),
   });
@@ -132,6 +150,10 @@ async function forward(req: NextRequest, path: string[]): Promise<Response> {
   // endpoints, and buffering here would put the whole answer's generation time back in front of
   // the first token — the exact problem the streaming work removed, and the cost this extra hop is
   // otherwise most likely to reintroduce.
+  const serverTiming = buildServerTiming([
+    { name: 'tensor_auth', durMs: authMs },
+    { name: 'tensor_lease', durMs: leaseMs },
+  ]);
   return new NextResponse(upstream.body, {
     status: upstream.status,
     headers: {
@@ -139,6 +161,7 @@ async function forward(req: NextRequest, path: string[]): Promise<Response> {
       "Content-Type": upstream.headers.get("content-type") ?? "application/json",
       // Proxies that buffer would defeat the streaming above.
       "X-Accel-Buffering": "no",
+      ...(serverTiming ? { "Server-Timing": serverTiming } : {}),
     },
   });
 }

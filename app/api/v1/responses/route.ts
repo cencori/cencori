@@ -1,7 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
-import { extractGatewayCallerIdentity, logApiGatewayRequest } from "@/lib/api-gateway-logs";
+import { extractGatewayCallerIdentity, logApiGatewayRequest, updateApiGatewayRequestPerformance } from "@/lib/api-gateway-logs";
 import {
     validateGatewayRequest,
     addGatewayHeaders,
@@ -30,6 +30,11 @@ import { waitUntil } from "@vercel/functions";
 import { toOpenAiErrorBody } from "@/lib/gateway/guard-types";
 import { runV1ResponsesExecution } from "@/lib/gateway/v1-responses-execute";
 import type { ResponsesRequest } from "@/lib/gateway/v1-responses-execute";
+import {
+    buildServerTiming,
+    GatewayPerformanceTracker,
+    parseProxyEdgeTimings,
+} from "@/lib/gateway/performance";
 import type { SubscriptionTier } from "@/lib/entitlements";
 import { resolveAgentContext } from "@/lib/gateway/agent-context";
 
@@ -96,7 +101,9 @@ export async function OPTIONS() {
 export async function POST(req: NextRequest) {
     const endpoint = '/v1/responses';
     const startedAt = Date.now();
+    const performance = new GatewayPerformanceTracker(startedAt);
     const callerIdentity = extractGatewayCallerIdentity(req.headers);
+    const proxyTimings = parseProxyEdgeTimings(req.headers);
     let gatewayCtx: GatewayContext | null = null;
 
     const respond = (response: NextResponse, errorCode?: string, errorMessage?: string) => {
@@ -119,7 +126,23 @@ export async function POST(req: NextRequest) {
             clientApp: callerIdentity.clientApp,
             errorCode: errorCode || null,
             errorMessage: errorMessage || null,
+            ...(proxyTimings.authMs !== null || proxyTimings.leaseMs !== null
+                ? {
+                    metadata: {
+                        ...(proxyTimings.authMs !== null ? { tensor_proxy_auth_ms: proxyTimings.authMs } : {}),
+                        ...(proxyTimings.leaseMs !== null ? { tensor_proxy_lease_ms: proxyTimings.leaseMs } : {}),
+                    },
+                }
+                : {}),
         });
+        const serverTiming = buildServerTiming([
+            { name: 'tensor_auth', durMs: proxyTimings.authMs },
+            { name: 'tensor_lease', durMs: proxyTimings.leaseMs },
+            { name: 'cencori_preflight', durMs: performance.snapshot().gatewayPreflightMs },
+        ]);
+        if (serverTiming !== null) {
+            response.headers.set('Server-Timing', serverTiming);
+        }
         return addGatewayHeaders(response, { requestId: gatewayCtx.requestId });
     };
 
@@ -468,6 +491,13 @@ export async function POST(req: NextRequest) {
                 }
                 : undefined,
             securityEnabled: inputPipeline.securityEnabled,
+            performance,
+            onPerformance: (metrics) => {
+                waitUntil(updateApiGatewayRequestPerformance(
+                    activeGatewayCtx.requestId,
+                    metrics
+                ));
+            },
         });
 
         if (!execResult.ok) {

@@ -23,6 +23,10 @@ import { resolveGatewayProvider } from '@/lib/gateway/providers-setup';
 import { mapProviderErrorToHttpResponse } from '@/lib/gateway-reliability';
 import type { GatewayContext } from '@/lib/gateway-middleware';
 import type { SubscriptionTier } from '@/lib/entitlements';
+import type {
+    GatewayPerformanceMetrics,
+    GatewayPerformanceTracker,
+} from '@/lib/gateway/performance';
 import { calculateGatewayCharge } from '@/lib/gateway/model-access';
 import type { QuotaCheckResult } from '@/lib/end-user-billing';
 import type { SecurityCheckResult } from '@/lib/safety/multi-layer-check';
@@ -191,6 +195,16 @@ type V1ResponseExecuteParams = {
     shadowMode?: boolean;
     createPendingAction?: (toolCall: ToolCallPayload) => Promise<string | null>;
     createDispatchedAction?: (toolCall: ToolCallPayload) => void;
+    /**
+     * Request-scoped latency tracker. Preflight completes at provider
+     * resolution; provider TTFT and client first byte are marked in the
+     * stream loop / non-stream return below. Without this the Responses
+     * surface — the one Tensor actually speaks — records no TTFT splits at
+     * all, which is why the greeting investigation had server numbers for
+     * chat/completions and nothing for /v1/responses.
+     */
+    performance?: GatewayPerformanceTracker;
+    onPerformance?: (metrics: GatewayPerformanceMetrics) => void;
     /**
      * Explicit dashboard opt-in for the legacy output scanner. Absent/false =
      * output passes with zero risk signals; governance policies still enforce.
@@ -422,6 +436,7 @@ export async function runV1ResponsesExecution(
 
         // Separate function tools from built-in tools
         const { functionTools, builtInTools } = extractTools(body.tools);
+        params.performance?.markPreflightComplete();
 
         // Make files supplied on this request searchable during this request,
         // before built-in file_search is pre-processed.
@@ -611,6 +626,7 @@ export async function runV1ResponsesExecution(
                 request: chatRequest,
                 resolved,
                 requestId: gatewayCtx.requestId,
+                performance: params.performance,
             });
 
             let content = result.content;
@@ -784,6 +800,21 @@ export async function runV1ResponsesExecution(
 
             const annotations = buildAnnotations(content, preProcessResult.toolOutputs);
 
+            // An empty stop settles rather than fails (policy: flag, don't
+            // fail), but it must never be silent: the marker travels in the
+            // stored response and the warning names the turn for log search.
+            const isEmptyCompletion =
+                !content && openAiToolCalls.length === 0 && codeOutputs.length === 0;
+            if (isEmptyCompletion) {
+                console.warn('[Gateway/Responses] Empty completion settled with no message', {
+                    requestId: gatewayCtx.requestId,
+                    responseId,
+                    model: result.actualModel,
+                    provider: result.actualProvider,
+                    promptTokens: result.usage.promptTokens,
+                });
+            }
+
             const json = buildResponsesJson({
                 id: responseId,
                 model: result.actualModel,
@@ -792,7 +823,9 @@ export async function runV1ResponsesExecution(
                 functionCalls: openAiToolCalls,
                 usage: result.usage,
                 annotations,
-                metadata: body.metadata,
+                metadata: isEmptyCompletion
+                    ? { ...(body.metadata ?? {}), cencori_empty_completion: 'true' }
+                    : body.metadata,
                 ...(reasoning ? { reasoning } : {}),
             });
 
@@ -803,6 +836,12 @@ export async function runV1ResponsesExecution(
                     gatewayCtx.organizationId,
                     json,
                 );
+            }
+
+            params.performance?.markClientFirstByte();
+            params.performance?.markComplete(result.usage.completionTokens);
+            if (params.performance) {
+                params.onPerformance?.(params.performance.snapshot());
             }
 
             return { ok: true, response: NextResponse.json(json) };
@@ -918,6 +957,7 @@ export async function runV1ResponsesExecution(
                     releasedRawLength = releaseEnd;
                     if (!delta) return;
                     emittedText = approvedText;
+                    params.performance?.markClientFirstByte();
                     controller.enqueue(
                         encoder.encode(
                             buildResponsesStreamChunk({
@@ -945,9 +985,13 @@ export async function runV1ResponsesExecution(
                         },
                         resolved,
                         requestId: gatewayCtx.requestId,
+                        performance: params.performance,
                     })) {
                         if (chunk.usage) {
                             reportedUsage = chunk.usage;
+                        }
+                        if (chunk.delta || chunk.reasoning || (chunk.toolCalls && chunk.toolCalls.length > 0)) {
+                            params.performance?.markProviderFirstToken();
                         }
                         if (chunk.delta) {
                             fullText += chunk.delta;
@@ -1083,6 +1127,7 @@ export async function runV1ResponsesExecution(
                                     ? fullText.slice(emittedText.length)
                                     : '';
                                 if (remainder) {
+                                    params.performance?.markClientFirstByte();
                                     controller.enqueue(
                                         encoder.encode(
                                             buildResponsesStreamChunk({
@@ -1289,6 +1334,20 @@ export async function runV1ResponsesExecution(
 
                             const annotations = buildAnnotations(fullText, collectedBuiltinToolOutputs);
 
+                            const isEmptyCompletion =
+                                !fullText
+                                && toolCallValues.length === 0
+                                && collectedBuiltinToolOutputs.length === 0;
+                            if (isEmptyCompletion) {
+                                console.warn('[Gateway/Responses] Empty completion settled with no message', {
+                                    requestId: gatewayCtx.requestId,
+                                    responseId,
+                                    model: chunk.actualModel,
+                                    provider: chunk.actualProvider,
+                                    promptTokens,
+                                });
+                            }
+
                             const response = buildResponsesJson({
                                 id: responseId,
                                 model: chunk.actualModel,
@@ -1302,7 +1361,9 @@ export async function runV1ResponsesExecution(
                                 })),
                                 usage: { promptTokens, completionTokens, totalTokens, cacheReadTokens },
                                 annotations,
-                                metadata: body.metadata,
+                                metadata: isEmptyCompletion
+                                    ? { ...(body.metadata ?? {}), cencori_empty_completion: 'true' }
+                                    : body.metadata,
                                 ...(fullReasoning ? { reasoning: fullReasoning } : {}),
                             });
 
@@ -1313,6 +1374,15 @@ export async function runV1ResponsesExecution(
                                     gatewayCtx.organizationId,
                                     response,
                                 );
+                            }
+
+                            // First-wins marks: a tool-only or empty turn never
+                            // released text, so the terminal event is its first
+                            // byte for TTFT purposes.
+                            params.performance?.markClientFirstByte();
+                            params.performance?.markComplete(completionTokens);
+                            if (params.performance) {
+                                params.onPerformance?.(params.performance.snapshot());
                             }
 
                             controller.enqueue(
