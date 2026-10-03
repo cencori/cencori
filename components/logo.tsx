@@ -10,8 +10,8 @@ export function Logo({ variant = "full", className = "" }: { variant?: "mark" | 
   let darkSrc = "/logo white.svg";
 
   if (isWordmark) {
-    lightSrc = "/logos/bw.png";
-    darkSrc = "/logos/ww.png";
+    lightSrc = "/logos/b.png";
+    darkSrc = "/logos/w.png";
   } else if (isMark) {
     lightSrc = "/black.png";
     darkSrc = "/white.png";

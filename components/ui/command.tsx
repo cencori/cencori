@@ -33,7 +33,7 @@ function CommandDialog({
   return (
     <Dialog {...props}>
       <DialogContent
-        className="overflow-hidden p-0 shadow-lg border-border/50 bg-background/95 backdrop-blur-xl"
+        className="overflow-hidden rounded-2xl! p-0 shadow-lg border-border/50 bg-background/95 backdrop-blur-xl"
         showCloseButton={showCloseButton}
       >
         <VisuallyHidden.Root>

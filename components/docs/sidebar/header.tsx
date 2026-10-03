@@ -1,5 +1,6 @@
 import { SidebarHeader, SidebarTrigger } from "@/components/docs/ui/sidebar";
 import { AskAITrigger } from "@/components/docs/layout/ask-ai-trigger";
+import { DashboardButton } from "@/components/docs/layout/dashboard-button";
 import ThemeSwitcher from "./theme-switcher";
 
 const DocsHeader = () => {
@@ -10,6 +11,7 @@ const DocsHeader = () => {
       </div>
       <div className="pointer-events-auto relative z-10 flex h-full items-center gap-2 pr-3 pl-6">
         <AskAITrigger />
+        <DashboardButton />
         <ThemeSwitcher />
       </div>
     </SidebarHeader>
