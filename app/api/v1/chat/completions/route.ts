@@ -56,7 +56,11 @@ import type { ToolCallPayload } from "@/lib/gateway/v1-types";
 import type { SubscriptionTier } from "@/lib/entitlements";
 import type { UnifiedMessage } from "@/lib/providers/base";
 import { resolveAgentContext } from "@/lib/gateway/agent-context";
-import { GatewayPerformanceTracker } from "@/lib/gateway/performance";
+import {
+    GatewayPerformanceTracker,
+    buildServerTiming,
+    parseProxyEdgeTimings,
+} from "@/lib/gateway/performance";
 import {
     applySpeedProfile,
     resolveGatewayRoutingProfile,
@@ -226,6 +230,10 @@ export async function POST(req: NextRequest) {
     const startedAt = Date.now();
     const performance = new GatewayPerformanceTracker(startedAt);
     const callerIdentity = extractGatewayCallerIdentity(req.headers);
+    // Edge timings measured by the Tensor proxy before this request existed
+    // (auth + billing lease). Logged as attribution metadata and echoed in
+    // Server-Timing so client-measured TTFT decomposes fully.
+    const proxyTimings = parseProxyEdgeTimings(req.headers);
     let gatewayCtx: GatewayContext | null = null;
     let routingProfile: GatewayRoutingProfile = 'balanced';
     let fastLaneResponse = false;
@@ -251,6 +259,14 @@ export async function POST(req: NextRequest) {
             clientApp: callerIdentity.clientApp,
             errorCode: errorCode || null,
             errorMessage: errorMessage || null,
+            ...(proxyTimings.authMs !== null || proxyTimings.leaseMs !== null
+                ? {
+                    metadata: {
+                        ...(proxyTimings.authMs !== null ? { tensor_proxy_auth_ms: proxyTimings.authMs } : {}),
+                        ...(proxyTimings.leaseMs !== null ? { tensor_proxy_lease_ms: proxyTimings.leaseMs } : {}),
+                    },
+                }
+                : {}),
         });
         const finalMetrics = performance.snapshot();
         if (finalMetrics.totalCompletionMs !== null) {
@@ -267,8 +283,13 @@ export async function POST(req: NextRequest) {
             response.headers.set('X-Cencori-Fast-Lane', 'true');
         }
         const preflight = performance.snapshot().gatewayPreflightMs;
-        if (preflight !== null) {
-            response.headers.set('Server-Timing', `cencori_preflight;dur=${preflight}`);
+        const serverTiming = buildServerTiming([
+            { name: 'tensor_auth', durMs: proxyTimings.authMs },
+            { name: 'tensor_lease', durMs: proxyTimings.leaseMs },
+            { name: 'cencori_preflight', durMs: preflight },
+        ]);
+        if (serverTiming !== null) {
+            response.headers.set('Server-Timing', serverTiming);
         }
         return addGatewayHeaders(response, { requestId: gatewayCtx.requestId });
     };

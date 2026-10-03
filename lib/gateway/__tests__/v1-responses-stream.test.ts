@@ -287,6 +287,28 @@ describe('/v1/responses streaming', () => {
         expect(body).toContain('event: response.output_text.done');
     });
 
+    /** An empty stop settles (flag, don't fail) — and says so on the response itself. */
+    it('marks a streamed turn that produced no message', async () => {
+        mockStreamGatewayChat.mockImplementation(() =>
+            (async function* () {
+                yield chunk({
+                    delta: '',
+                    finishReason: 'stop',
+                    usage: { promptTokens: 9, completionTokens: 0, totalTokens: 9 },
+                });
+            })()
+        );
+
+        const result = await runV1ResponsesExecution(baseParams({
+            body: { model: 'gpt-4o', input: 'Hello', stream: true, store: false },
+        }));
+        if (!result.ok) throw new Error('expected ok');
+        const body = await new Response(result.response.body).text();
+        expect(body).toContain('event: response.done');
+        expect(body).toContain('"status":"completed"');
+        expect(body).toContain('"cencori_empty_completion":"true"');
+    });
+
     /** The whole point of the holdback: incremental release must not cost the guard its veto. */
     it('stops releasing once the guard rejects the output', async () => {
         (runGatewayOutputGuard as ReturnType<typeof vi.fn>).mockResolvedValue({
