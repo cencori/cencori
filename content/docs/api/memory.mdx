@@ -122,6 +122,33 @@ const { results } = await cencori.memory.searchUser({
 await cencori.memory.forget(results[0].id);
 ```
 
+## Batch writes, forget-by-filter, GDPR export
+
+```typescript
+// Seed up to 50 facts in one call — one quota check, one embedding call.
+await cencori.memory.writeBatch({
+  userId: session.user.id,
+  memories: [{ content: 'Prefers dark mode' }, { content: 'Uses TypeScript', importance: 0.9 }],
+});
+
+// Forget everything before a date (namespace / ids filters also work).
+// Real row removal, audit-logged — not an annotation.
+await cencori.memory.forgetByFilter({ userId: session.user.id, before: '2026-01-01T00:00:00Z' });
+
+// GDPR export — walk nextCursor until truncated is false, hand the dump over.
+const dump = await cencori.memory.export({ userId: session.user.id });
+```
+
+## Quotas — stored count and operation allowances
+
+Two independent gates. Stored count caps rows per project (free 1,000 / pro
+100,000 / team 500,000); writes 429 `memory_quota_exceeded` while reads keep
+working. Operation allowances cap managed-LLM volume per project per month
+*and* per end-user per day (free 10k/2k + 200/100 daily, pro 500k/100k +
+2000/1000 daily); exhaustion 429s `memory_ops_quota_exceeded`. Both carry an
+`upgradeUrl`, `used`/`limit`, and (for ops) `retryAfterMs`. Chat retrieval
+fails open past either gate — the reply still sends, memory is just skipped.
+
 ## Temporal recall — `asOf`
 
 Memory is bi-temporal: when a fact changes, the old one isn't deleted, it's **superseded**. Current recall returns only what's true now, but you can ask what was true at any past instant with `asOf`.
