@@ -122,6 +122,57 @@ export async function embedForMemory(
     return embedWithGemini(inputs);
 }
 
+/** How many times a single managed embedding call is attempted. */
+const EMBED_MAX_ATTEMPTS = 3;
+/** Base backoff between attempts (doubled per attempt, plus jitter). */
+const EMBED_RETRY_BASE_MS = 1000;
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+/**
+ * Only transient failures retry: 429/5xx/timeouts/network blips. Auth,
+ * quota-exhaustion-as-400, bad-request and not-found errors fail fast —
+ * retrying those burns budget for nothing. Exported for tests.
+ */
+export function isEmbedRetryable(error: unknown): boolean {
+    const msg = error instanceof Error ? error.message : String(error);
+    if (/\[40[0134]\b/.test(msg)) return false;
+    if (/\[429\b|\[50\d\b|\[502\b|\[503\b|\[504\b/.test(msg)) return true;
+    if (/timed?\s?out|timeout|ECONNRESET|ENOTFOUND|ETIMEDOUT|EAI_AGAIN|fetch failed|network/i.test(msg)) return true;
+    return false;
+}
+
+/**
+ * One managed embedding call with backoff. A single 429/503 mid-batch must
+ * not fail the whole batch (or the write): 429s cluster under burst load and
+ * usually clear within seconds. Non-retryable errors throw immediately.
+ */
+async function embedContentWithRetry(
+    // Narrowed against the SDK's model type: real embedContent accepts more
+    // input shapes and returns a richer response; both directions are
+    // assignable here.
+    model: { embedContent: (request: EmbedContentRequest) => Promise<any> },
+    request: EmbedContentRequest
+): Promise<number[]> {
+    let lastError: unknown = null;
+    for (let attempt = 1; attempt <= EMBED_MAX_ATTEMPTS; attempt++) {
+        try {
+            const result = await model.embedContent(request);
+            return result.embedding.values;
+        } catch (error) {
+            lastError = error;
+            if (attempt === EMBED_MAX_ATTEMPTS || !isEmbedRetryable(error)) throw error;
+            const backoffMs = EMBED_RETRY_BASE_MS * 2 ** (attempt - 1) + Math.random() * 250;
+            console.warn(
+                `[Memory] Embedding attempt ${attempt}/${EMBED_MAX_ATTEMPTS} failed, retrying in ${Math.round(backoffMs)}ms:`,
+                error instanceof Error ? error.message.slice(0, 160) : error
+            );
+            await sleep(backoffMs);
+        }
+    }
+    throw lastError;
+}
+
 /** Managed path — Google gemini-embedding-001 at 1536 dims. */
 async function embedWithGemini(inputs: string[]): Promise<MemoryEmbeddingResult> {
     // Memory-dedicated key (MEMORY_GEMINI_API_KEY) when set, else the shared
@@ -146,8 +197,8 @@ async function embedWithGemini(inputs: string[]): Promise<MemoryEmbeddingResult>
             content: { role: 'user', parts: [{ text }] },
             outputDimensionality: MEMORY_EMBEDDING_DIMENSIONS,
         };
-        const result = await model.embedContent(request);
-        embeddings.push(result.embedding.values);
+        const result = await embedContentWithRetry(model, request);
+        embeddings.push(result);
         totalTokens += Math.ceil(text.length / 4);
     }
 

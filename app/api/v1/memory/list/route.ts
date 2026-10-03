@@ -13,6 +13,7 @@ import {
 } from '@/lib/gateway-middleware';
 import {
     listSessionMemories,
+    normalizeDirectiveScope,
     parseMemoryDirective,
     toMemoryId,
 } from '@/lib/memory';
@@ -38,12 +39,14 @@ export async function GET(req: NextRequest) {
             userId: searchParams.get('userId') ?? undefined,
             sessionId: searchParams.get('sessionId') ?? undefined,
             scope: searchParams.get('scope') ?? undefined,
+            workspaceId: searchParams.get('workspaceId') ?? undefined,
+            orgId: searchParams.get('orgId') ?? undefined,
             namespace: searchParams.get('namespace') ?? undefined,
         });
         if (!parsed.ok) {
             return respond({ error: 'bad_request', message: parsed.error }, 400);
         }
-        const directive = parsed.directive;
+        const directive = normalizeDirectiveScope(parsed.directive, ctx.organizationId);
 
         const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '50', 10) || 50));
 

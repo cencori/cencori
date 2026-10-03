@@ -93,9 +93,14 @@ async function getCircuitState(provider: string): Promise<CircuitState> {
 
     if (redisClient) {
         try {
-            const data = await redisClient.get(`${CIRCUIT_PREFIX}${provider}`);
-            if (data) {
+            const data: unknown = await redisClient.get(`${CIRCUIT_PREFIX}${provider}`);
+            if (typeof data === 'string' && data) {
                 return JSON.parse(data) as CircuitState;
+            }
+            // Upstash returns already-deserialized values: an object here is
+            // a hit, not a parse error (JSON.parse would see "[object Object]").
+            if (data && typeof data === 'object') {
+                return data as CircuitState;
             }
         } catch (error) {
             console.warn('[CircuitBreaker] Redis read error:', error);

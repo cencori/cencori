@@ -1,9 +1,12 @@
 /**
- * POST /v1/memory/write — write a single memory.
+ * POST /v1/memory/write/batch — write up to 50 memories in one call.
  *
- * Auth: gateway API key (validateGatewayRequest). Org/project always come
- * from the authenticated context. Quota is the write gate; reads are never
- * gated. Content is PII-redacted before it persists.
+ * One quota check, one ops unit, one embedding call, one reconciliation pass
+ * for the whole batch — bulk seeding without N round trips. Per-item content
+ * is validated (required, 10KB cap); PII redaction runs per fact inside
+ * writeMemories and blocked facts are dropped.
+ *
+ * Auth: gateway API key. Org/project always from the authenticated context.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -31,17 +34,24 @@ import {
     writeMemories,
 } from '@/lib/memory';
 
-interface WriteMemoryRequest {
+/** Hard cap on items per batch — bounds the reconcile candidate fan-out. */
+export const MEMORY_BATCH_MAX_ITEMS = 50;
+
+interface BatchMemoryItem {
+    content?: string;
+    importance?: number;
+}
+
+interface BatchWriteRequest {
     userId?: string;
     sessionId?: string;
     scope?: string;
     workspaceId?: string;
     orgId?: string;
-    content?: string;
     namespace?: string;
     metadata?: Record<string, unknown>;
-    importance?: number;
     expiresAt?: string;
+    memories?: BatchMemoryItem[];
 }
 
 export async function OPTIONS() {
@@ -58,11 +68,8 @@ export async function POST(req: NextRequest) {
     const respond = (body: unknown, status: number) =>
         addGatewayHeaders(NextResponse.json(body, { status }), { requestId: ctx.requestId });
 
-    // Kept outside the try so the failure paths can still log what was sent.
-    let contentForLog = '';
-
     try {
-        const body: WriteMemoryRequest = await req.json();
+        const body: BatchWriteRequest = await req.json();
 
         const settings = await getProjectMemorySettings(ctx.supabase, ctx.projectId);
         if (!settings.enabled) {
@@ -72,16 +79,15 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        const content = typeof body.content === 'string' ? body.content.trim() : '';
-        contentForLog = content;
-        if (!content) {
-            return respond({ error: 'bad_request', message: 'content is required' }, 400);
+        const items = Array.isArray(body.memories) ? body.memories : [];
+        if (items.length === 0) {
+            return respond({ error: 'bad_request', message: 'memories must be a non-empty array' }, 400);
         }
-        if (content.length > MEMORY_CONTENT_MAX_CHARS) {
+        if (items.length > MEMORY_BATCH_MAX_ITEMS) {
             return respond(
                 {
                     error: 'bad_request',
-                    message: `content exceeds the ${MEMORY_CONTENT_MAX_CHARS}-character limit per memory`,
+                    message: `memories is capped at ${MEMORY_BATCH_MAX_ITEMS} items per batch`,
                 },
                 400
             );
@@ -99,11 +105,29 @@ export async function POST(req: NextRequest) {
             return respond({ error: 'bad_request', message: parsed.error }, 400);
         }
         const directive = normalizeDirectiveScope(parsed.directive, ctx.organizationId);
+        const tier = ctx.tier as SubscriptionTier;
 
-        const importance =
-            typeof body.importance === 'number'
-                ? Math.min(1, Math.max(0, body.importance))
-                : 0.5;
+        const facts: { content: string; importance: number }[] = [];
+        for (let i = 0; i < items.length; i++) {
+            const content = typeof items[i]?.content === 'string' ? (items[i].content as string).trim() : '';
+            if (!content) {
+                return respond({ error: 'bad_request', message: `memories[${i}].content is required` }, 400);
+            }
+            if (content.length > MEMORY_CONTENT_MAX_CHARS) {
+                return respond(
+                    {
+                        error: 'bad_request',
+                        message: `memories[${i}].content exceeds the ${MEMORY_CONTENT_MAX_CHARS}-character limit per memory`,
+                    },
+                    400
+                );
+            }
+            const importance =
+                typeof items[i]?.importance === 'number'
+                    ? Math.min(1, Math.max(0, items[i].importance as number))
+                    : 0.5;
+            facts.push({ content, importance });
+        }
 
         let expiresAt: string | null = null;
         if (body.expiresAt !== undefined) {
@@ -117,70 +141,37 @@ export async function POST(req: NextRequest) {
             expiresAt = new Date(parsedExpiry).toISOString();
         }
 
-        const tier = ctx.tier as SubscriptionTier;
-
         // ── Session scope: Redis, no embedding, no quota ──
         if (directive.scope === 'session') {
-            const redacted = await redactFact(ctx.supabase, ctx.projectId, content);
-            if (redacted.blocked) {
-                return respond(
-                    { error: 'memory_content_blocked', message: 'Memory content could not be safely stored.' },
-                    403,
-                );
+            const stored: { content: string; importance: number }[] = [];
+            for (const fact of facts) {
+                const redacted = await redactFact(ctx.supabase, ctx.projectId, fact.content);
+                if (!redacted.blocked) stored.push({ content: redacted.content, importance: fact.importance });
             }
-            const stored = await appendSessionMemories(
+            const ok = await appendSessionMemories(
                 ctx.organizationId,
                 ctx.projectId,
                 directive.scopeKey,
-                [{ content: redacted.content, importance }],
+                stored,
                 settings.sessionTtlSeconds
             );
-            if (stored === false) {
-                await logGatewayRequest(ctx, {
-                    endpoint: 'memory/write',
-                    model: 'none',
-                    provider: 'redis',
-                    status: 'error',
-                    errorMessage: 'Session memory store unavailable',
-                    requestPayload: promptPayload(content, { scope: 'session' }),
-                });
+            if (!ok) {
                 return respond(
                     { error: 'memory_store_unavailable', message: 'Session memory could not be stored.' },
-                    503,
+                    503
                 );
             }
-
-            await logGatewayRequest(ctx, {
-                endpoint: 'memory/write',
-                model: 'none',
-                provider: 'none',
-                status: 'success',
-                metadata: { scope: 'session', content_length: content.length },
-                requestPayload: promptPayload(content, { scope: 'session' }),
-                responsePayload: textResponsePayload(redacted.content, { stored: true }),
-            });
-
-            return respond(
-                {
-                    id: 'mem_session',
-                    scope: 'session',
-                    scopeKey: directive.scopeKey,
-                    content: redacted.content,
-                    importance,
-                    createdAt: new Date().toISOString(),
-                },
-                201
-            );
+            return respond({ written: stored.length, requested: items.length, scope: 'session' }, 201);
         }
 
-        // ── User scope: quota → redact → embed → insert ──
         const quota = await checkMemoryQuota(ctx.supabase, ctx.projectId, tier);
         if (!quota.allowed) {
             if (quota.error) return respond(buildQuotaCheckFailedBody(), 503);
             return respond(buildQuotaExceededBody(ctx.projectId, tier, quota.used, quota.limit), 429);
         }
 
-        // Ops allowance (MON-6): managed-LLM spend gate, distinct from rows.
+        // One batch = one write op: a single embedding call + a single
+        // reconciliation pass covers every item.
         const writeOps = await checkMemoryOpsQuota(ctx.projectId, tier, directive.scopeKey, 'write');
         if (!writeOps.allowed) {
             return respond(buildMemoryOpsExceededBody(ctx.projectId, tier, 'write', writeOps), 429);
@@ -194,8 +185,8 @@ export async function POST(req: NextRequest) {
             scope: directive.scope,
             scopeKey: directive.scopeKey,
             namespace: directive.namespace,
-            facts: [{ content, importance }],
-            metadata: { ...body.metadata, extractedFrom: 'manual' },
+            facts,
+            metadata: { ...body.metadata, extractedFrom: 'manual_batch' },
             expiresAt,
         });
 
@@ -205,25 +196,6 @@ export async function POST(req: NextRequest) {
             return respond(buildMemoryOpsExceededBody(ctx.projectId, tier, 'write', ops), 429);
         }
 
-        if (result.written.length === 0) {
-            // Either the fact was blocked by a data rule or the insert failed.
-            await logGatewayRequest(ctx, {
-                endpoint: 'memory/write',
-                model: result.embeddingModel ?? 'unknown',
-                provider: result.embeddingProvider ?? 'unknown',
-                status: 'error',
-                errorMessage: 'Memory was not written (blocked by data rules or storage failure)',
-                requestPayload: promptPayload(content, { scope: directive.scope }),
-            });
-            return respond(
-                {
-                    error: 'memory_not_written',
-                    message: 'Memory was not written — blocked by a data rule or a storage failure.',
-                },
-                422
-            );
-        }
-
         await logGatewayRequest(ctx, {
             endpoint: 'memory/write',
             model: result.embeddingModel ?? 'unknown',
@@ -231,40 +203,32 @@ export async function POST(req: NextRequest) {
             status: 'success',
             costUsd: result.embeddingCostUsd,
             cencoriChargeUsd: result.embeddingCostUsd,
-            metadata: { scope: directive.scope, content_length: content.length },
-            requestPayload: promptPayload(content, { scope: directive.scope }),
-            // Post-redaction — what was actually stored.
-            responsePayload: textResponsePayload(result.written[0]?.content ?? '', { stored: true }),
+            metadata: { scope: directive.scope, requested: items.length, written: result.written.length, batch: true },
+            requestPayload: promptPayload(`${items.length} memories`, { scope: directive.scope }),
+            responsePayload: textResponsePayload(
+                result.written.map(m => m.content).join('\n'),
+                { stored: true }
+            ),
         });
         await incrementUsage(ctx, result.embeddingCostUsd);
 
-        const written = result.written[0];
         return respond(
             {
-                id: written.id,
+                written: result.written.map(m => ({
+                    id: m.id,
+                    content: m.content,
+                    importance: m.importance,
+                })),
+                count: result.written.length,
+                requested: items.length,
                 scope: directive.scope,
                 scopeKey: directive.scopeKey,
-                namespace: directive.namespace,
-                content: written.content, // post-redaction
-                importance: written.importance,
-                expiresAt,
-                createdAt: new Date().toISOString(),
             },
             201
         );
     } catch (error) {
-        console.error('[Memory] Write API error:', error);
+        console.error('[Memory] Batch write API error:', error);
         const message = error instanceof Error ? error.message : 'Unknown error';
-
-        await logGatewayRequest(ctx, {
-            endpoint: 'memory/write',
-            model: 'unknown',
-            provider: 'unknown',
-            status: 'error',
-            errorMessage: message,
-            requestPayload: promptPayload(contentForLog),
-        });
-
         return respond({ error: 'internal_error', message }, 500);
     }
 }

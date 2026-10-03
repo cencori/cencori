@@ -83,6 +83,8 @@ export interface ChatCompletionResponse {
         retrieved: Array<{ id: string; score: number; content: string }>;
         written: Array<{ id: string; content: string }>;
         write_status: 'pending' | 'disabled';
+        /** Chat request id backing the async writeback — poll GET /v1/memory/writes/:id. Null when write is disabled. */
+        write_request_id?: string | null;
     };
 }
 

@@ -31,6 +31,7 @@ import { promptPayload } from '@/lib/gateway/log-payload';
 import {
     buildMemoryBlock,
     getProjectMemorySettings,
+    normalizeDirectiveScope,
     parseMemoryDirective,
     retrieveMemories,
     runChatMemoryWriteback,
@@ -38,7 +39,6 @@ import {
     type MemorySettings,
     type RetrievedMemory,
 } from "@/lib/memory";
-import { isLocalMemoryBuild } from "@/lib/memory/availability";
 import { installedTurnTools } from '@/lib/embedded/turn-tools';
 import { intersectBrowserEnabled, intersectNetworkPolicy, type NetworkPolicy } from '@/lib/embedded/net-policy';
 import type { CapabilityManifest } from '@/lib/embedded/manifest';
@@ -406,10 +406,6 @@ export async function POST(
                 return [];
             });
 
-        if (body.memory !== undefined && !isLocalMemoryBuild()) {
-            return respondError(400, "The memory parameter is not available.", "unsupported_parameter");
-        }
-
         // ── Memory directive (API opt-in: presence of `memory` enables it) ──
         // Mirrors the chat-completions door so a session turn can recall
         // user-scoped facts and persist new ones — the same memory that
@@ -426,7 +422,7 @@ export async function POST(
             if (!parsedDirective.ok) {
                 return respondError(400, parsedDirective.error, "invalid_memory_directive");
             }
-            memoryDirective = parsedDirective.directive;
+            memoryDirective = normalizeDirectiveScope(parsedDirective.directive, activeGatewayCtx.organizationId);
         }
 
         // Retrieval runs in parallel with the input pipeline; fail-open ([]).
@@ -440,6 +436,7 @@ export async function POST(
                     projectId: activeGatewayCtx.projectId,
                     directive: memoryDirective,
                     queryText: lastUserMessageText,
+                    tier: (activeGatewayCtx.tier || "free") as SubscriptionTier,
                     onEmbeddingUsage: usage => {
                         waitUntil(Promise.all([
                             logGatewayRequest(activeGatewayCtx, {
@@ -725,6 +722,12 @@ export async function POST(
                 "X-Cencori-Memory-Write",
                 memoryDirective.write ? "async" : "disabled",
             );
+            if (memoryDirective.write) {
+                execResult.response.headers.set(
+                    "X-Cencori-Memory-Write-Request",
+                    activeGatewayCtx.requestId,
+                );
+            }
         }
 
         return respond(execResult.response);

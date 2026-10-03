@@ -93,13 +93,22 @@ function userDirective(
     };
 }
 
-/** Reset + replay a scenario's transcript through the real write path. */
-async function buildScenarioMemory(config: RunEvalConfig, scenario: EvalScenario): Promise<void> {
+/**
+ * Reset + replay a scenario's transcript through the real write path.
+ * Returns one validity instant per turn for temporal questions (`asOfTurn`):
+ * the latest row-validity start right after that turn. Read back from the DB
+ * (not the app clock) — app and DB clocks skew by hundreds of ms, enough to
+ * land an app-stamped instant outside the very window it targets. A turn that
+ * writes nothing reuses the previous instant (its state is unchanged).
+ */
+async function buildScenarioMemory(config: RunEvalConfig, scenario: EvalScenario): Promise<string[]> {
     const { supabase, organizationId, projectId, tier, reconcile } = config;
     const topK = config.topK ?? 6;
     await resetScenarioMemory(supabase, organizationId, projectId, scenario.userId);
     const settings = await getProjectMemorySettings(supabase, projectId);
     const writeDirective = userDirective(scenario.userId, topK, null, config.graph ?? false);
+    const turnTimestamps: string[] = [];
+    let lastInstant: string | null = null;
     for (const turn of scenario.transcript) {
         await rememberExchange({
             supabase, organizationId, projectId, tier,
@@ -107,26 +116,55 @@ async function buildScenarioMemory(config: RunEvalConfig, scenario: EvalScenario
             userText: turn.user, assistantText: turn.assistant, reconcile,
             graph: config.graph ?? false,
         });
+        const { data } = await supabase
+            .from('gateway_memories')
+            .select('valid_from')
+            .eq('organization_id', organizationId)
+            .eq('project_id', projectId)
+            .eq('scope', 'user')
+            .eq('scope_key', scenario.userId)
+            .order('valid_from', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+        const instant: string = ((data as { valid_from?: string } | null)?.valid_from ?? lastInstant)
+            ?? new Date().toISOString();
+        lastInstant = instant;
+        turnTimestamps.push(instant);
     }
+    return turnTimestamps;
+}
+
+/** Resolve a question's as-of instant: explicit ISO, or the replay timestamp after a turn. */
+export function resolveAsOf(question: EvalQuestion, turnTimestamps: string[]): string | null {
+    if (question.asOf) return question.asOf;
+    if (question.asOfTurn != null && turnTimestamps[question.asOfTurn]) {
+        return turnTimestamps[question.asOfTurn];
+    }
+    return null;
 }
 
 /** Recall for one question (honoring its optional as-of), returning the contents. */
-async function recallForQuestion(config: RunEvalConfig, scenario: EvalScenario, question: EvalQuestion): Promise<string[]> {
+async function recallForQuestion(
+    config: RunEvalConfig,
+    scenario: EvalScenario,
+    question: EvalQuestion,
+    turnTimestamps: string[] = []
+): Promise<string[]> {
     const recalled = await retrieveMemories({
         supabase: config.supabase,
         organizationId: config.organizationId,
         projectId: config.projectId,
-        directive: userDirective(scenario.userId, config.topK ?? 6, question.asOf ?? null, config.graph ?? false),
+        directive: userDirective(scenario.userId, config.topK ?? 6, resolveAsOf(question, turnTimestamps), config.graph ?? false),
         queryText: question.query,
     });
     return recalled.map(m => m.content);
 }
 
 async function runScenario(config: RunEvalConfig, scenario: EvalScenario): Promise<QuestionResult[]> {
-    await buildScenarioMemory(config, scenario);
+    const turnTimestamps = await buildScenarioMemory(config, scenario);
     const results: QuestionResult[] = [];
     for (const question of scenario.questions) {
-        const recalled = await recallForQuestion(config, scenario, question);
+        const recalled = await recallForQuestion(config, scenario, question, turnTimestamps);
         results.push(gradeQuestion(question, recalled));
     }
     return results;
@@ -184,10 +222,10 @@ export async function runJudgedEval(
 
     const results: JudgedResult[] = [];
     for (const scenario of scenarios) {
-        await buildScenarioMemory(config, scenario);
+        const turnTimestamps = await buildScenarioMemory(config, scenario);
         for (const question of scenario.questions) {
             if (!question.goldAnswer) continue;
-            const recalled = await recallForQuestion(config, scenario, question);
+            const recalled = await recallForQuestion(config, scenario, question, turnTimestamps);
             const generated = await answer(question.query, recalled);
             const correct = await judge(question.query, question.goldAnswer, generated);
             results.push(gradeAnswer(question, generated, correct));

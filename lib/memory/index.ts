@@ -11,12 +11,16 @@ export {
     MEMORY_CONTENT_MAX_CHARS,
     MEMORY_MANAGED_MODEL,
     PHASE1_SCOPES,
+    SUPPORTED_SCOPES,
     fromMemoryId,
+    normalizeDirectiveScope,
     parseMemoryDirective,
+    resolveApiScopeKey,
     resolveMemoryModel,
     toMemoryId,
 } from './types';
 export type {
+    ApiScopeIds,
     ExtractedFact,
     MemoryDirective,
     MemoryDirectiveInput,
@@ -30,7 +34,12 @@ export type {
 } from './types';
 
 export { getProjectMemorySettings } from './settings';
-export { embedForMemory, MEMORY_EMBEDDING_MODEL, MEMORY_EMBEDDING_DIMENSIONS } from './embeddings';
+export {
+    embedForMemory,
+    isEmbedRetryable,
+    MEMORY_EMBEDDING_MODEL,
+    MEMORY_EMBEDDING_DIMENSIONS,
+} from './embeddings';
 export {
     appendSessionMemories,
     clearSessionMemories,
@@ -39,6 +48,13 @@ export {
 } from './session-store';
 export { buildQuotaCheckFailedBody, buildQuotaExceededBody, checkMemoryQuota } from './quota';
 export type { MemoryQuotaStatus } from './quota';
+export {
+    buildMemoryOpsExceededBody,
+    checkMemoryOpsQuota,
+    isMemoryOpsExceededError,
+    MemoryOpsExceededError,
+} from './ops-quota';
+export type { MemoryOpsOp, MemoryOpsStatus } from './ops-quota';
 export {
     buildMemorySystemBlock,
     buildMemoryIndexBlock,

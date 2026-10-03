@@ -20,15 +20,12 @@ import {
     persistEntityGraph,
     traverseGraph,
     normalizeName,
+    resolveApiScopeKey,
     type GraphEdge,
 } from '@/lib/memory';
 
 export async function OPTIONS() {
     return handleCorsPreFlight();
-}
-
-function resolveScopeKey(scope: string, userId: string, sessionId: string): string {
-    return scope === 'session' ? sessionId || userId : userId;
 }
 
 // ── Write: extract + persist ─────────────────────────────────────────────────
@@ -47,13 +44,21 @@ export async function POST(req: NextRequest) {
 
         const body = await req.json();
         const scope = typeof body.scope === 'string' ? body.scope : 'user';
-        const userId = typeof body.userId === 'string' ? body.userId.trim() : '';
-        const sessionId = typeof body.sessionId === 'string' ? body.sessionId.trim() : '';
-        const namespace = typeof body.namespace === 'string' && body.namespace.trim() ? body.namespace.trim() : null;
-        const scopeKey = resolveScopeKey(scope, userId, sessionId);
-        if (!scopeKey) {
-            return respond({ error: 'bad_request', message: 'userId is required (or sessionId for session scope).' }, 400);
+        const resolved = resolveApiScopeKey(
+            scope,
+            {
+                userId: typeof body.userId === 'string' ? body.userId : '',
+                sessionId: typeof body.sessionId === 'string' ? body.sessionId : '',
+                workspaceId: typeof body.workspaceId === 'string' ? body.workspaceId : '',
+                orgId: typeof body.orgId === 'string' ? body.orgId : '',
+            },
+            ctx.organizationId
+        );
+        if (!resolved.ok) {
+            return respond({ error: 'bad_request', message: resolved.error }, 400);
         }
+        const scopeKey = resolved.scopeKey;
+        const namespace = typeof body.namespace === 'string' && body.namespace.trim() ? body.namespace.trim() : null;
 
         const userText = typeof body.user === 'string' ? body.user : typeof body.text === 'string' ? body.text : '';
         const assistantText = typeof body.assistant === 'string' ? body.assistant : '';
@@ -109,15 +114,23 @@ export async function GET(req: NextRequest) {
     try {
         const url = new URL(req.url);
         const scope = url.searchParams.get('scope') || 'user';
-        const userId = url.searchParams.get('userId')?.trim() || '';
-        const sessionId = url.searchParams.get('sessionId')?.trim() || '';
+        const resolved = resolveApiScopeKey(
+            scope,
+            {
+                userId: url.searchParams.get('userId') ?? '',
+                sessionId: url.searchParams.get('sessionId') ?? '',
+                workspaceId: url.searchParams.get('workspaceId') ?? '',
+                orgId: url.searchParams.get('orgId') ?? '',
+            },
+            ctx.organizationId
+        );
+        if (!resolved.ok) {
+            return respond({ error: 'bad_request', message: resolved.error }, 400);
+        }
+        const scopeKey = resolved.scopeKey;
         const namespace = url.searchParams.get('namespace')?.trim() || null;
         const entityQuery = url.searchParams.get('entity')?.trim() || '';
         const hops = Math.min(4, Math.max(1, parseInt(url.searchParams.get('hops') || '2', 10) || 2));
-        const scopeKey = resolveScopeKey(scope, userId, sessionId);
-        if (!scopeKey) {
-            return respond({ error: 'bad_request', message: 'userId is required (or sessionId for session scope).' }, 400);
-        }
         if (!entityQuery) {
             return respond({ error: 'bad_request', message: '`entity` (name to start from) is required.' }, 400);
         }

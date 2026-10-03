@@ -12,12 +12,15 @@ import type { SubscriptionTier } from '@/lib/entitlements';
 import { embedForMemory } from './embeddings';
 import { runEntityGraphWriteback, type EntityGraphWritebackResult } from './entity-persist';
 import { extractFacts } from './extraction';
+import { checkMemoryOpsQuota } from './ops-quota';
+import type { MemoryOpsStatus } from './ops-quota';
 import { checkMemoryQuota } from './quota';
 import { redactFact } from './redact';
 import { reconcileFacts, hashContent, type ReconcileCandidate, type ReconcilePlan } from './reconcile';
 import { appendSessionMemories } from './session-store';
 import {
     MEMORY_CONTENT_MAX_CHARS,
+    resolveMemoryModel,
     toMemoryId,
     type ExtractedFact,
     type MemoryDirective,
@@ -55,6 +58,10 @@ export interface WriteMemoriesParams {
 export interface WriteMemoriesResult {
     written: WrittenMemory[];
     quotaExceeded: boolean;
+    /** True when the write was dropped by the ops allowance (MON-6), not the stored-count quota. */
+    opsExceeded?: boolean;
+    /** The denying ops status, for accurate 429 bodies. */
+    opsStatus?: MemoryOpsStatus;
     embeddingCostUsd: number;
     embeddingModel?: string;
     embeddingProvider?: 'openai' | 'google';
@@ -77,6 +84,16 @@ export async function writeMemories(params: WriteMemoriesParams): Promise<WriteM
     const quota = await checkMemoryQuota(supabase, projectId, tier);
     if (!quota.allowed) {
         return { written: [], quotaExceeded: true, embeddingCostUsd: 0 };
+    }
+
+    // Ops allowance (MON-6): extraction + reconciliation + embeddings all run
+    // on shared managed keys. Denial here saves the LLM spend, not just rows.
+    const opsStatus = await checkMemoryOpsQuota(projectId, tier, scopeKey, 'write');
+    if (!opsStatus.allowed) {
+        console.warn(
+            `[Memory] Write ops quota exceeded (scope=${opsStatus.scope}) project=${projectId} — dropping write`
+        );
+        return { written: [], quotaExceeded: false, opsExceeded: true, opsStatus, embeddingCostUsd: 0 };
     }
 
     // Redact before anything persists; drop blocked facts.
@@ -289,6 +306,10 @@ export interface RememberExchangeResult {
     written: WrittenMemory[];
     extracted: number;
     quotaExceeded: boolean;
+    /** True when the exchange was dropped by the ops allowance (MON-6). */
+    opsExceeded: boolean;
+    /** The denying ops status, for accurate 429 bodies. */
+    opsStatus?: MemoryOpsStatus;
     costUsd: number;
     model: string;
     /** Entity-graph outcome for the exchange (absent when the graph is off). */
@@ -324,6 +345,18 @@ export async function rememberExchange(params: {
 }): Promise<RememberExchangeResult> {
     const { supabase, organizationId, projectId, tier, directive, settings, userText, assistantText, requestId } = params;
 
+    // Ops allowance before extraction (MON-6): a capped project must not burn
+    // managed extraction calls. Session scope is Redis-only and ungated.
+    if (directive.scope !== 'session') {
+        const opsStatus = await checkMemoryOpsQuota(projectId, tier, directive.scopeKey, 'write');
+        if (!opsStatus.allowed) {
+            console.warn(
+                `[Memory] Write ops quota exceeded (scope=${opsStatus.scope}) project=${projectId} — dropping remember`
+            );
+            return { written: [], extracted: 0, quotaExceeded: false, opsExceeded: true, opsStatus, costUsd: 0, model: resolveMemoryModel(settings.extractionModel) };
+        }
+    }
+
     const extraction = await extractFacts({
         supabase,
         projectId,
@@ -337,7 +370,7 @@ export async function rememberExchange(params: {
     });
 
     if (extraction.facts.length === 0) {
-        return { written: [], extracted: 0, quotaExceeded: false, costUsd: extraction.costUsd, model: extraction.model };
+        return { written: [], extracted: 0, quotaExceeded: false, opsExceeded: false, costUsd: extraction.costUsd, model: extraction.model };
     }
 
     if (directive.scope === 'session') {
@@ -358,6 +391,7 @@ export async function rememberExchange(params: {
             written: items.map(i => ({ id: 'mem_session', content: i.content, importance: i.importance })),
             extracted: extraction.facts.length,
             quotaExceeded: false,
+            opsExceeded: false,
             costUsd: extraction.costUsd,
             model: extraction.model,
         };
@@ -402,6 +436,8 @@ export async function rememberExchange(params: {
         written: result.written,
         extracted: extraction.facts.length,
         quotaExceeded: result.quotaExceeded,
+        opsExceeded: result.opsExceeded ?? false,
+        opsStatus: result.opsStatus,
         costUsd: extraction.costUsd + result.embeddingCostUsd + (graph?.costUsd ?? 0),
         model: extraction.model,
         graph,
@@ -424,6 +460,32 @@ export async function runChatMemoryWriteback(params: {
     const tier = gatewayCtx.tier as SubscriptionTier;
 
     try {
+        // Ops allowance first (MON-6): a capped project must not burn managed
+        // extraction/reconciliation calls. Session scope is Redis-only, ungated.
+        if (directive.scope !== 'session') {
+            const writeOps = await checkMemoryOpsQuota(gatewayCtx.projectId, tier, directive.scopeKey, 'write');
+            if (!writeOps.allowed) {
+                console.warn(
+                    `[Memory] Write ops quota exceeded (scope=${writeOps.scope}) project=${gatewayCtx.projectId} request=${gatewayCtx.requestId}`
+                );
+                await logGatewayRequest(gatewayCtx, {
+                    endpoint: 'memory/writeback',
+                    model: 'memory-writeback',
+                    provider: 'google',
+                    status: 'error',
+                    errorMessage: 'memory_ops_quota_exceeded',
+                    metadata: { scope: directive.scope, stage: 'ops_quota_exceeded', ops_scope: writeOps.scope },
+                    requestPayload: {
+                        messages: toLoggedMessages([
+                            { role: 'user', content: userText },
+                            { role: 'assistant', content: assistantText },
+                        ]),
+                    },
+                });
+                return;
+            }
+        }
+
         const extraction = await extractFacts({
             supabase,
             projectId: gatewayCtx.projectId,
@@ -444,6 +506,7 @@ export async function runChatMemoryWriteback(params: {
         // What actually landed, post-redaction — logged as the writeback's result.
         let writtenFacts: Array<{ content: string }> = [];
         let quotaExceeded = false;
+        let opsExceeded = false;
         let embeddingCostUsd = 0;
         let embeddingModel: string | undefined;
         let embeddingProvider: 'openai' | 'google' | undefined;
@@ -487,6 +550,7 @@ export async function runChatMemoryWriteback(params: {
             writtenCount = result.written.length;
             writtenFacts = result.written;
             quotaExceeded = result.quotaExceeded;
+            opsExceeded = result.opsExceeded ?? false;
             embeddingCostUsd = result.embeddingCostUsd;
             embeddingModel = result.embeddingModel;
             embeddingProvider = result.embeddingProvider;
@@ -523,10 +587,14 @@ export async function runChatMemoryWriteback(params: {
             // Managed extraction + embeddings run on Google; only BYOK embeddings
             // are OpenAI. Reflect what actually ran, not a hardcoded 'openai'.
             provider: embeddingProvider ?? 'google',
-            status: quotaExceeded ? 'error' : 'success',
+            status: quotaExceeded || opsExceeded ? 'error' : 'success',
             costUsd: totalCost,
             cencoriChargeUsd: totalCost,
-            errorMessage: quotaExceeded ? 'memory_quota_exceeded' : undefined,
+            errorMessage: opsExceeded
+                ? 'memory_ops_quota_exceeded'
+                : quotaExceeded
+                    ? 'memory_quota_exceeded'
+                    : undefined,
             metadata: {
                 extracted: extraction.facts.length,
                 written: writtenCount,

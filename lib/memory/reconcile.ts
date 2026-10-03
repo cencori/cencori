@@ -72,6 +72,12 @@ Rules:
 - Prefer UPDATE over ADD when a new fact conflicts with, replaces, or refines an existing memory — never leave two memories that state different values for the same single-valued attribute.
 - Each existing memory may be targeted by at most one UPDATE or DELETE.
 - Keep rewritten text a single self-contained sentence, no more than 300 characters.
+- Preserve time markers across a merge: when either side carries a when
+  ("last month", "in March", "since 2025"), the rewrite keeps it. A merged
+  fact without its when is unanswerable to "when did this change" later.
+  Example: EXISTING "The user builds backend services in Python." + NEW "The
+  user switched everything to Rust last month" → UPDATE to "The user builds
+  backend services in Rust (switched from Python last month)."
 
 Respond with ONLY JSON (no prose, no code fences):
 {"operations": [{"action": "ADD", "new": 0}, {"action": "UPDATE", "new": 1, "existing": 2, "content": "..."}, {"action": "NOOP", "new": 3}, {"action": "DELETE", "existing": 0}]}`;

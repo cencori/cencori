@@ -449,7 +449,7 @@ export default function OrganizationLayoutClient({
         { href: scopeProjectSlug ? scopedProjectHref("security") : orgProductHref("security"), icon: <HugeiconsIcon icon={AiLockIcon} className="!h-5 !w-5" />, label: "Security" },
         // Memory belongs to the selected project, so keep it available while an
         // organization-level page is open instead of reshaping the sidebar.
-        ...(scopeProjectSlug && process.env.NODE_ENV !== "production"
+        ...(scopeProjectSlug
             ? [{ href: consoleMode ? "/memory" : `${orgBase}/${scopeProjectSlug}/memory`, icon: <HugeiconsIcon icon={AiBrain02Icon} className="!h-5 !w-5" />, label: "Memory" }]
             : []),
         // Deployments stays attached to the selected project for the same stable

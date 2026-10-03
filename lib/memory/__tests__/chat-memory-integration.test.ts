@@ -214,6 +214,7 @@ describe('chat completions memory integration', () => {
             retrieved: [{ id: 'mem_1', score: 0.9, content: 'Prefers dark mode' }],
             written: [],
             write_status: 'pending',
+            write_request_id: 'req-contract-test',
         });
     });
 

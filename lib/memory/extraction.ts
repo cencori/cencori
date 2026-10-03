@@ -23,8 +23,10 @@ export const DEFAULT_EXTRACTION_PROMPT = `You extract durable facts about the us
 
 Rules:
 - Only extract facts worth remembering across future conversations: preferences, context about their work or projects, constraints, decisions, corrections.
+- Capture dated events and changes WITH their when: job switches, moves, purchases, issues, deadlines ("switched to Rust last month", "moved to Berlin in March"). The date is part of the fact — a change without its when is half a memory.
 - Skip small talk, one-off requests, and anything relevant only to this exchange.
 - Never include secrets, passwords, API keys, or verbatim sensitive data (emails, phone numbers, government IDs) — describe the fact without the sensitive value if needed.
+- If an exchange mixes secrets with benign facts, still extract the benign facts and drop only the secret itself — a password in the turn must not erase everything else said alongside it.
 - Each fact must be a single, self-contained sentence.
 
 Respond with ONLY a JSON array (no prose, no code fences):
@@ -72,6 +74,12 @@ export async function extractFacts(params: {
             tier,
             requestId,
             preferModel,
+            // NOTE: do NOT size this tight. The managed extraction models are
+            // reasoning models: hidden reasoning tokens count against this
+            // budget, and a too-small cap returns an EMPTY completion (proven:
+            // 350 → empty 2/2, 500/800 → valid facts on the same prompt).
+            // Per-call cost comes from generated tokens, which the brevity
+            // rule in the prompt controls — not this cap.
             maxTokens: 500,
             messages: [
                 { role: 'system', content: systemPrompt },

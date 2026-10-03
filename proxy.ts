@@ -193,18 +193,11 @@ function isLocalComputePath(pathname: string): boolean {
   );
 }
 
-/** Memory product surfaces are local-only until the product is launched. */
-function isLocalMemoryPath(pathname: string): boolean {
-  return (
-    pathname === "/memory" ||
-    /^\/[^/]+\/[^/]+\/memory(?:\/|$)/.test(pathname) ||
-    /^\/api\/projects\/[^/]+\/memory(?:\/|$)/.test(pathname) ||
-    pathname === "/api/memory" ||
-    pathname.startsWith("/api/memory/") ||
-    pathname === "/api/v1/memory" ||
-    pathname.startsWith("/api/v1/memory/") ||
-    pathname === "/api/ai/rag"
-  );
+/** Memory shipped — see the per-item gates below (compute stays local-only). */
+function isLocalRagPath(pathname: string): boolean {
+  // /api/ai/rag was grouped with the memory block but is not part of the
+  // memory contract; it stays local-only until its own launch decision.
+  return pathname === "/api/ai/rag";
 }
 
 /**
@@ -453,7 +446,7 @@ export async function proxy(request: NextRequest) {
 
   if (
     !isLocalHostname(domain) &&
-    (isLocalComputePath(pathname) || isLocalMemoryPath(pathname))
+    (isLocalComputePath(pathname) || isLocalRagPath(pathname))
   ) {
     if (pathname.startsWith("/api/")) {
       return applySecurityHeaders(

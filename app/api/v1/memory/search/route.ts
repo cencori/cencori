@@ -14,9 +14,13 @@ import {
     incrementUsage,
 } from '@/lib/gateway-middleware';
 import { promptPayload } from '@/lib/gateway/log-payload';
+import type { SubscriptionTier } from '@/lib/entitlements';
 import {
     MEMORY_EMBEDDING_MODEL,
+    buildMemoryOpsExceededBody,
     getProjectMemorySettings,
+    isMemoryOpsExceededError,
+    normalizeDirectiveScope,
     parseMemoryDirective,
     retrieveMemories,
 } from '@/lib/memory';
@@ -25,6 +29,8 @@ interface SearchMemoryRequest {
     userId?: string;
     sessionId?: string;
     scope?: string;
+    workspaceId?: string;
+    orgId?: string;
     query?: string;
     topK?: number;
     threshold?: number;
@@ -74,6 +80,8 @@ export async function POST(req: NextRequest) {
             userId: body.userId,
             sessionId: body.sessionId,
             scope: body.scope,
+            workspaceId: body.workspaceId,
+            orgId: body.orgId,
             topK: body.topK,
             threshold: body.threshold,
             namespace: body.namespace,
@@ -85,6 +93,8 @@ export async function POST(req: NextRequest) {
         if (!parsed.ok) {
             return respond({ error: 'bad_request', message: parsed.error }, 400);
         }
+        // Org scope with no explicit key addresses the authenticated org.
+        normalizeDirectiveScope(parsed.directive, ctx.organizationId);
 
         const embeddingUsageRef: { current: {
             totalTokens: number;
@@ -100,6 +110,8 @@ export async function POST(req: NextRequest) {
             projectId: ctx.projectId,
             directive: parsed.directive,
             queryText: query,
+            tier: ctx.tier as SubscriptionTier,
+            ops: 'throw',
             onEmbeddingUsage: usage => {
                 embeddingUsageRef.current = usage;
             },
@@ -148,6 +160,22 @@ export async function POST(req: NextRequest) {
         );
     } catch (error) {
         console.error('[Memory] Search API error:', error);
+
+        if (isMemoryOpsExceededError(error)) {
+            await logGatewayRequest(ctx, {
+                endpoint: 'memory/search',
+                model: 'unknown',
+                provider: 'unknown',
+                status: 'error',
+                errorMessage: 'memory_ops_quota_exceeded',
+                requestPayload: promptPayload(queryForLog),
+            });
+            return respond(
+                buildMemoryOpsExceededBody(ctx.projectId, ctx.tier as SubscriptionTier, error.op, error.status),
+                429
+            );
+        }
+
         const message = error instanceof Error ? error.message : 'Unknown error';
 
         await logGatewayRequest(ctx, {

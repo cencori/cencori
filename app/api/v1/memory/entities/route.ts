@@ -9,6 +9,7 @@ import {
     addGatewayHeaders,
     handleCorsPreFlight,
 } from '@/lib/gateway-middleware';
+import { resolveApiScopeKey } from '@/lib/memory';
 
 export async function OPTIONS() {
     return handleCorsPreFlight();
@@ -24,15 +25,23 @@ export async function GET(req: NextRequest) {
     try {
         const url = new URL(req.url);
         const scope = url.searchParams.get('scope') || 'user';
-        const userId = url.searchParams.get('userId')?.trim() || '';
-        const sessionId = url.searchParams.get('sessionId')?.trim() || '';
+        const resolved = resolveApiScopeKey(
+            scope,
+            {
+                userId: url.searchParams.get('userId') ?? '',
+                sessionId: url.searchParams.get('sessionId') ?? '',
+                workspaceId: url.searchParams.get('workspaceId') ?? '',
+                orgId: url.searchParams.get('orgId') ?? '',
+            },
+            ctx.organizationId
+        );
+        if (!resolved.ok) {
+            return respond({ error: 'bad_request', message: resolved.error }, 400);
+        }
+        const scopeKey = resolved.scopeKey;
         const namespace = url.searchParams.get('namespace')?.trim() || null;
         const type = url.searchParams.get('type')?.trim() || null;
         const limit = Math.min(200, Math.max(1, parseInt(url.searchParams.get('limit') || '50', 10) || 50));
-        const scopeKey = scope === 'session' ? sessionId || userId : userId;
-        if (!scopeKey) {
-            return respond({ error: 'bad_request', message: 'userId is required (or sessionId for session scope).' }, 400);
-        }
 
         let query = ctx.supabase
             .from('memory_entities')

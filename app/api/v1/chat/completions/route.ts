@@ -43,6 +43,7 @@ import { promptPayload } from '@/lib/gateway/log-payload';
 import {
     buildMemoryBlock,
     getProjectMemorySettings,
+    normalizeDirectiveScope,
     parseMemoryDirective,
     retrieveMemories,
     runChatMemoryWriteback,
@@ -55,7 +56,6 @@ import type { ToolCallPayload } from "@/lib/gateway/v1-types";
 import type { SubscriptionTier } from "@/lib/entitlements";
 import type { UnifiedMessage } from "@/lib/providers/base";
 import { resolveAgentContext } from "@/lib/gateway/agent-context";
-import { isLocalMemoryBuild } from "@/lib/memory/availability";
 import { GatewayPerformanceTracker } from "@/lib/gateway/performance";
 import {
     applySpeedProfile,
@@ -530,14 +530,6 @@ export async function POST(req: NextRequest) {
 
         const activeGatewayCtx = gatewayCtx;
 
-        if (body.memory !== undefined && !isLocalMemoryBuild()) {
-            return respondError(
-                400,
-                "The memory parameter is not available.",
-                "unsupported_parameter"
-            );
-        }
-
         // ── Memory directive (API opt-in: presence of `memory` enables it) ──
         let memoryDirective: MemoryDirective | null = null;
         let memorySettings: MemorySettings | null = null;
@@ -552,7 +544,7 @@ export async function POST(req: NextRequest) {
             if (!parsedDirective.ok) {
                 return respondError(400, parsedDirective.error, "invalid_memory_directive");
             }
-            memoryDirective = parsedDirective.directive;
+            memoryDirective = normalizeDirectiveScope(parsedDirective.directive, gatewayCtx.organizationId);
         }
 
         const pipelineMessages: UnifiedMessage[] = isVisionRequest
@@ -581,6 +573,7 @@ export async function POST(req: NextRequest) {
                     projectId: activeGatewayCtx.projectId,
                     directive: memoryDirective,
                     queryText: lastUserMessageText,
+                    tier: (activeGatewayCtx.tier || "free") as SubscriptionTier,
                     onEmbeddingUsage: usage => {
                         waitUntil(Promise.all([
                             logGatewayRequest(activeGatewayCtx, {
@@ -998,7 +991,8 @@ export async function POST(req: NextRequest) {
 
             // Attach the memory summary. `written` is always [] here —
             // extraction runs async after the response flushes; clients can
-            // confirm via GET /v1/memory/list.
+            // confirm via GET /v1/memory/writes/:requestId using
+            // write_request_id below.
             if (memoryDirective) {
                 (responseJson as Record<string, unknown>).memory = {
                     retrieved: retrievedMemories.map((m) => ({
@@ -1008,6 +1002,7 @@ export async function POST(req: NextRequest) {
                     })),
                     written: [],
                     write_status: memoryDirective.write ? 'pending' : 'disabled',
+                    write_request_id: memoryDirective.write ? activeGatewayCtx.requestId : null,
                 };
             }
 
@@ -1024,6 +1019,12 @@ export async function POST(req: NextRequest) {
                 'X-Cencori-Memory-Write',
                 memoryDirective.write ? 'async' : 'disabled'
             );
+            if (memoryDirective.write) {
+                execResult.response.headers.set(
+                    'X-Cencori-Memory-Write-Request',
+                    activeGatewayCtx.requestId
+                );
+            }
         }
         return respond(execResult.response);
 

@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { fromMemoryId, parseMemoryDirective, toMemoryId } from '../types';
+import {
+    fromMemoryId,
+    normalizeDirectiveScope,
+    parseMemoryDirective,
+    resolveApiScopeKey,
+    SUPPORTED_SCOPES,
+    toMemoryId,
+} from '../types';
 
 describe('parseMemoryDirective — graph expansion', () => {
     it('walks the entity graph by default', () => {
@@ -77,9 +84,27 @@ describe('parseMemoryDirective', () => {
         expect(parseMemoryDirective({ scope: 'session' }).ok).toBe(false);
     });
 
-    it('rejects non-Phase-1 scopes', () => {
+    it('requires workspaceId for workspace scope', () => {
         expect(parseMemoryDirective({ userId: 'u', scope: 'workspace' }).ok).toBe(false);
-        expect(parseMemoryDirective({ userId: 'u', scope: 'org' }).ok).toBe(false);
+        expect(parseMemoryDirective({ scope: 'workspace', workspaceId: '   ' }).ok).toBe(false);
+        const parsed = parseMemoryDirective({ scope: 'workspace', workspaceId: 'team_7' });
+        expect(parsed.ok).toBe(true);
+        if (parsed.ok) {
+            expect(parsed.directive.scope).toBe('workspace');
+            expect(parsed.directive.scopeKey).toBe('team_7');
+        }
+    });
+
+    it('accepts org scope with an optional key (routes default to the auth org)', () => {
+        const bare = parseMemoryDirective({ scope: 'org' });
+        expect(bare.ok).toBe(true);
+        if (bare.ok) expect(bare.directive.scopeKey).toBe('');
+        const keyed = parseMemoryDirective({ scope: 'org', orgId: 'org_9' });
+        expect(keyed.ok).toBe(true);
+        if (keyed.ok) expect(keyed.directive.scopeKey).toBe('org_9');
+    });
+
+    it('rejects unknown scopes', () => {
         expect(parseMemoryDirective({ userId: 'u', scope: 'global' }).ok).toBe(false);
     });
 
@@ -146,5 +171,37 @@ describe('memory id helpers', () => {
         expect(toMemoryId('abc-123')).toBe('mem_abc-123');
         expect(fromMemoryId('mem_abc-123')).toBe('abc-123');
         expect(fromMemoryId('abc-123')).toBe('abc-123');
+    });
+});
+
+describe('scope helpers', () => {
+    it('supports all four scopes', () => {
+        expect(SUPPORTED_SCOPES).toEqual(['session', 'user', 'workspace', 'org']);
+    });
+
+    it('normalizeDirectiveScope defaults bare org scope to the auth org', () => {
+        const bare = parseMemoryDirective({ scope: 'org' });
+        expect(bare.ok).toBe(true);
+        if (!bare.ok) return;
+        expect(normalizeDirectiveScope(bare.directive, 'org_ctx').scopeKey).toBe('org_ctx');
+        const keyed = parseMemoryDirective({ scope: 'org', orgId: 'org_9' });
+        expect(keyed.ok).toBe(true);
+        if (!keyed.ok) return;
+        expect(normalizeDirectiveScope(keyed.directive, 'org_ctx').scopeKey).toBe('org_9');
+    });
+
+    it('resolveApiScopeKey mirrors the directive contract', () => {
+        expect(resolveApiScopeKey('workspace', { workspaceId: 'team_7' }, 'org_x')).toEqual({
+            ok: true,
+            scope: 'workspace',
+            scopeKey: 'team_7',
+        });
+        expect(resolveApiScopeKey('workspace', { userId: 'u' }, 'org_x').ok).toBe(false);
+        expect(resolveApiScopeKey('org', {}, 'org_x')).toEqual({
+            ok: true,
+            scope: 'org',
+            scopeKey: 'org_x',
+        });
+        expect(resolveApiScopeKey('global', { userId: 'u' }, 'org_x').ok).toBe(false);
     });
 });

@@ -56,7 +56,7 @@ console.log(response.memory?.retrieved); // facts injected into this reply
 |-------|------|---------|-------------|
 | `userId` | string | — | End-user this memory belongs to. Scope defaults to `user`. |
 | `sessionId` | string | — | Pass with `scope: "session"` for ephemeral, per-chat memory. |
-| `scope` | `"session" \| "user"` | `"user"` | `session` clears on session end (Redis); `user` persists across sessions, devices, and new chats (Postgres + pgvector). |
+| `scope` | `"session" \| "user" \| "workspace" \| "org"` | `"user"` | `session` clears on session end (Redis); `user` persists across sessions, devices, and new chats (Postgres + pgvector); `workspace` partitions a caller-supplied `workspaceId` (team memory); `org` keys the authenticated organization (company playbook, defaults automatically). |
 | `retrieve` | boolean | `true` | Pull top-K relevant memories and inject them ahead of the user turn. |
 | `write` | boolean | `true` | After the reply, extract facts from the exchange and persist them. |
 | `topK` | number | `5` | How many memories to inject. |
@@ -75,12 +75,13 @@ The response carries a `memory` block:
   "memory": {
     "retrieved": [{ "id": "mem_xxx", "score": 0.82, "content": "Prefers TypeScript" }],
     "written": [],
-    "write_status": "pending"
+    "write_status": "pending",
+    "write_request_id": "f2f55531-0a92-4d45-8e78-6624d390c75d"
   }
 }
 ```
 
-Writeback runs asynchronously after the response, so `written` is empty and `write_status` is `pending` on the same request — the facts are available on the next turn. The streaming response also sets an `X-Cencori-Memory-Retrieved` header with the injected count.
+Writeback runs asynchronously after the response, so `written` is empty and `write_status` is `pending` on the same request — the facts are available on the next turn. `write_request_id` is the receipt: poll `GET /v1/memory/writes/:requestId` until `status` leaves `pending` (`success` carries `extracted`/`written` counts, `error` carries the reason). The streaming response also sets `X-Cencori-Memory-Retrieved` and `X-Cencori-Memory-Write-Request` headers with the injected count and the same receipt.
 
 ## Direct memory endpoints
 
@@ -89,6 +90,8 @@ The full REST surface. `remember` and `search` back the `recall`/`remember` path
 | Path | Purpose |
 |------|---------|
 | `POST /v1/memory/write` | Write a single scoped memory (raw content, no extraction) |
+| `POST /v1/memory/write/batch` | Write up to 50 memories in one call (one quota check, one embedding call) |
+| `POST /v1/memory/forget` | Forget memories by filter (`namespace` / `before` / `ids`) — hard delete, audit-logged |
 | `POST /v1/memory/remember` | Extract durable facts from a `{ user, assistant }` exchange and store them |
 | `POST /v1/memory/search` | Semantic search over a user's memories |
 | `GET /v1/memory/list` | Paginate a user's memories |
@@ -98,6 +101,8 @@ The full REST surface. `remember` and `search` back the `recall`/`remember` path
 | `GET /v1/memory/graph` | Traverse the graph outward from an entity (multi-hop) |
 | `GET /v1/memory/entities` | List the entities in a user's memory graph |
 | `DELETE /v1/memory/:id` | Forget a memory — a hard delete, not an annotation |
+| `GET /v1/memory/writes/:requestId` | Confirm an async chat writeback (`pending` → `success` / `error`) |
+| `POST /v1/memory/export` | GDPR export — portable dump of a scope key (cursor-paginated) |
 
 ```typescript
 // Seed a fact

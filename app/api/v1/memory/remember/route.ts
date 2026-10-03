@@ -19,10 +19,13 @@ import { toLoggedMessages, toLoggedText } from '@/lib/gateway/log-payload';
 import type { SubscriptionTier } from '@/lib/entitlements';
 import {
     MEMORY_CONTENT_MAX_CHARS,
+    buildMemoryOpsExceededBody,
     buildQuotaExceededBody,
     buildQuotaCheckFailedBody,
+    checkMemoryOpsQuota,
     checkMemoryQuota,
     getProjectMemorySettings,
+    normalizeDirectiveScope,
     parseMemoryDirective,
     rememberExchange,
 } from '@/lib/memory';
@@ -31,6 +34,8 @@ interface RememberRequest {
     userId?: string;
     sessionId?: string;
     scope?: string;
+    workspaceId?: string;
+    orgId?: string;
     namespace?: string;
     user?: string;
     assistant?: string;
@@ -85,6 +90,8 @@ export async function POST(req: NextRequest) {
             userId: body.userId,
             sessionId: body.sessionId,
             scope: body.scope,
+            workspaceId: body.workspaceId,
+            orgId: body.orgId,
             namespace: body.namespace,
             extract: body.extract,
             write: true,
@@ -92,7 +99,7 @@ export async function POST(req: NextRequest) {
         if (!parsed.ok) {
             return respond({ error: 'bad_request', message: parsed.error }, 400);
         }
-        const directive = parsed.directive;
+        const directive = normalizeDirectiveScope(parsed.directive, ctx.organizationId);
         const tier = ctx.tier as SubscriptionTier;
 
         // Gate user-scope writes on quota up front (session scope is ungated).
@@ -101,6 +108,11 @@ export async function POST(req: NextRequest) {
             if (!quota.allowed) {
                 if (quota.error) return respond(buildQuotaCheckFailedBody(), 503);
                 return respond(buildQuotaExceededBody(ctx.projectId, tier, quota.used, quota.limit), 429);
+            }
+            // Ops allowance (MON-6): managed-LLM spend gate, distinct from rows.
+            const writeOps = await checkMemoryOpsQuota(ctx.projectId, tier, directive.scopeKey, 'write');
+            if (!writeOps.allowed) {
+                return respond(buildMemoryOpsExceededBody(ctx.projectId, tier, 'write', writeOps), 429);
             }
         }
 
@@ -120,10 +132,14 @@ export async function POST(req: NextRequest) {
             endpoint: 'memory/remember',
             model: result.model,
             provider: 'openai',
-            status: result.quotaExceeded ? 'error' : 'success',
+            status: result.quotaExceeded || result.opsExceeded ? 'error' : 'success',
             costUsd: result.costUsd,
             cencoriChargeUsd: result.costUsd,
-            errorMessage: result.quotaExceeded ? 'memory_quota_exceeded' : undefined,
+            errorMessage: result.opsExceeded
+                ? 'memory_ops_quota_exceeded'
+                : result.quotaExceeded
+                    ? 'memory_quota_exceeded'
+                    : undefined,
             metadata: {
                 scope: directive.scope,
                 extracted: result.extracted,
@@ -147,6 +163,12 @@ export async function POST(req: NextRequest) {
 
         if (result.costUsd > 0) {
             await incrementUsage(ctx, result.costUsd);
+        }
+
+        if (result.opsExceeded) {
+            const ops = result.opsStatus
+                ?? await checkMemoryOpsQuota(ctx.projectId, tier, directive.scopeKey, 'write');
+            return respond(buildMemoryOpsExceededBody(ctx.projectId, tier, 'write', ops), 429);
         }
 
         if (result.quotaExceeded) {
