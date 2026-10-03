@@ -35,6 +35,29 @@ export function utf8Bytes(value: string): number {
     return new TextEncoder().encode(value).byteLength;
 }
 
+/** Best-effort reasoning text for budget accounting; null when unreadable. */
+function extractTraceText(item: Record<string, unknown>): string | null {
+    for (const key of ['content', 'text', 'summary'] as const) {
+        const value = item[key];
+        if (typeof value === 'string' && value) return value;
+    }
+    const summary = item.summary;
+    if (Array.isArray(summary)) {
+        const texts = summary
+            .map((part) => {
+                if (typeof part === 'string') return part;
+                if (part && typeof part === 'object'
+                    && typeof (part as Record<string, unknown>).text === 'string') {
+                    return (part as Record<string, unknown>).text as string;
+                }
+                return '';
+            })
+            .filter(Boolean);
+        if (texts.length > 0) return texts.join('\n');
+    }
+    return null;
+}
+
 export function validateResponsesInput(input: unknown): string | null {
     if (typeof input === 'string') {
         if (!input.trim()) return 'Input must not be empty.';
@@ -103,6 +126,22 @@ export function validateResponsesInput(input: unknown): string | null {
             totalTextBytes += measured.textBytes;
             const overBudget = chargeImages(measured);
             if (overBudget) return overBudget;
+        } else if (item.type === 'reasoning') {
+            // A thinking trace the provider returned on an earlier turn
+            // (OpenAI `summary` parts, or plain `content`/`text`). Thinking-mode
+            // providers require their own trace back verbatim; rejecting it
+            // here is what made every follow-up turn untranslatable and the
+            // retry fail deterministically with a provider 400. Readability is
+            // checked at translation time and reported as a translator drop
+            // rather than failing the turn at the door.
+            const trace = extractTraceText(item);
+            if (trace !== null) {
+                const traceBytes = utf8Bytes(trace);
+                if (traceBytes > MAX_TEXT_FIELD_BYTES) {
+                    return 'Reasoning trace exceeds the 1 MiB limit.';
+                }
+                totalTextBytes += traceBytes;
+            }
         } else if (item.type === 'file') {
             fileCount += 1;
             if (fileCount > MAX_INLINE_FILES) return `Input may contain at most ${MAX_INLINE_FILES} inline files.`;

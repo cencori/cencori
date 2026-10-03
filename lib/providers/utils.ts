@@ -21,6 +21,12 @@ export interface OpenAIMessage {
     content: string | OpenAIContentPart[];
     tool_call_id?: string;
     tool_calls?: ToolCall[];
+    /**
+     * Thinking trace a reasoning provider returned on this turn.
+     * Only ever present on assistant messages the gateway captured it on;
+     * providers that do not understand it ignore unknown fields.
+     */
+    reasoning_content?: string;
 }
 
 /**
@@ -67,6 +73,12 @@ export interface GeminiMessage {
 
 /**
  * Convert unified messages to OpenAI format
+ *
+ * `reasoningContent` rides on the assistant turn it was captured on, so a
+ * thinking-mode provider gets its own trace back verbatim. Pairing is
+ * order-preserving: this maps one-to-one and never inserts, drops, or
+ * reorders turns — contiguity of a tool block is decided upstream by the
+ * translator, not here.
  */
 export function toOpenAIMessages(messages: UnifiedMessage[]): OpenAIMessage[] {
     return messages.map(msg => ({
@@ -74,6 +86,7 @@ export function toOpenAIMessages(messages: UnifiedMessage[]): OpenAIMessage[] {
         content: toOpenAIContent(msg),
         ...(msg.toolCallId ? { tool_call_id: msg.toolCallId } : {}),
         ...(msg.tool_calls && msg.tool_calls.length > 0 ? { tool_calls: msg.tool_calls } : {}),
+        ...(msg.role === 'assistant' && msg.reasoningContent ? { reasoning_content: msg.reasoningContent } : {}),
     }));
 }
 

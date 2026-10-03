@@ -34,6 +34,14 @@ export interface UnifiedMessage {
     toolCallId?: string;
     /** Tool calls made by the model (for assistant role messages) */
     tool_calls?: ToolCall[];
+    /**
+     * Provider reasoning for an assistant turn (DeepSeek `reasoning_content`).
+     * Thinking-mode providers require their own reasoning to be passed back
+     * on subsequent requests; dropping it turns the next turn into a 400.
+     * Carried out-of-band from `content` so guards, logging and token
+     * estimation keep reading visible text only.
+     */
+    reasoningContent?: string;
 }
 
 /**
@@ -139,6 +147,8 @@ export interface UnifiedChatResponse {
     finishReason?: 'stop' | 'length' | 'content_filter' | 'tool_calls' | 'error';
     /** Tool calls requested by the model */
     toolCalls?: ToolCall[];
+    /** Provider reasoning trace (DeepSeek `reasoning_content`), when the model produced one. */
+    reasoning?: string;
 }
 
 /**
@@ -151,6 +161,8 @@ export interface StreamChunk {
     error?: string;
     /** Tool calls in this chunk (streamed incrementally) */
     toolCalls?: ToolCall[];
+    /** Reasoning-trace delta (DeepSeek `reasoning_content`); accumulates like `delta`. */
+    reasoning?: string;
     /**
      * Final token usage, emitted once on the terminal chunk by adapters whose
      * provider reports it. Absent on every earlier chunk, and absent entirely

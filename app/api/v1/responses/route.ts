@@ -15,7 +15,10 @@ import { checkEndUserQuota, recordEndUserUsage, type QuotaCheckResult } from "@/
 import type { UnifiedMessage } from "@/lib/providers/base";
 import { runGatewayInputPipeline } from "@/lib/gateway/input-guard";
 import { warmGatewayProjectConfig } from "@/lib/gateway/request-config";
-import { normalizeResponsesContent, toolOutputTurns } from "@/lib/gateway/responses-content";
+import {
+    translateResponsesInputItems,
+    type TranslatableInputItem,
+} from "@/lib/gateway/responses-translate";
 import {
     MAX_TEXT_FIELD_BYTES,
     utf8Bytes,
@@ -294,41 +297,20 @@ export async function POST(req: NextRequest) {
         const activeGatewayCtx = gatewayCtx;
 
         // ── Convert input to unified messages for security pipeline ──
-        const inputMessages: UnifiedMessage[] = [];
-        if (instructions) {
-            inputMessages.push({ role: 'system', content: instructions });
+        // Single shared translator (lib/gateway/responses-translate.ts): the
+        // execution layer translates again only when these are absent, and
+        // drift between the two is how balanced histories reached providers
+        // unbalanced. Drops are warned here, before dispatch.
+        const translatedInput = translateResponsesInputItems(
+            (input ?? []) as TranslatableInputItem[] | string,
+            instructions,
+        );
+        if (translatedInput.dropped.length > 0) {
+            console.warn('[Gateway/Responses] Translator dropped input items before dispatch', {
+                dropped: translatedInput.dropped,
+            });
         }
-        if (typeof input === 'string') {
-            inputMessages.push({ role: 'user', content: input });
-        } else {
-            for (const item of input) {
-                if (item.type === 'message') {
-                    const { text, images } = normalizeResponsesContent(item.content);
-                    inputMessages.push({
-                        role: item.role,
-                        content: text,
-                        ...(images.length ? { images } : {}),
-                    });
-                } else if (item.type === 'function_call') {
-                    inputMessages.push({
-                        role: 'assistant',
-                        content: '',
-                        tool_calls: [{
-                            id: item.call_id || item.id,
-                            type: 'function',
-                            function: { name: item.name, arguments: item.arguments },
-                        }],
-                    });
-                } else if (item.type === 'function_call_output') {
-                    inputMessages.push(...toolOutputTurns(item.output, item.call_id));
-                } else if (item.type === 'file') {
-                    inputMessages.push({
-                        role: 'user',
-                        content: `[File: ${item.filename}]${item.mime_type ? ` (${item.mime_type})` : ''}\n\n${item.content}`,
-                    });
-                }
-            }
-        }
+        const inputMessages: UnifiedMessage[] = translatedInput.messages;
 
         // Data-plane split: warm per-project config in one fetch (see chat route).
         await warmGatewayProjectConfig(adminClient, gatewayCtx.projectId);
