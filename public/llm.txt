@@ -414,6 +414,12 @@ const res = await cencori.chat.completions.create({
 await cencori.memory.write({ userId: user.id, content: 'Prefers TypeScript.' });
 const { results } = await cencori.memory.searchUser({ userId: user.id, query: 'preferences' });
 
+// Batch, forget-by-filter, GDPR export, write receipts.
+await cencori.memory.writeBatch({ userId: user.id, memories: [{ content: 'A' }, { content: 'B' }] });
+await cencori.memory.forgetByFilter({ userId: user.id, before: '2026-01-01T00:00:00Z' });
+const dump = await cencori.memory.export({ userId: user.id }); // walk nextCursor until truncated is false
+const receipt = await cencori.memory.writeStatus(res.memory.write_request_id); // pending → success/error
+
 // Forgetting (candidates only — never auto-deleted) and the entity graph.
 const { suggestions } = await cencori.memory.forgetSuggestions({ userId: user.id });
 await cencori.memory.rememberGraph({ userId: user.id, user: message, assistant: reply });
@@ -421,13 +427,21 @@ const { nodes, edges } = await cencori.memory.graph({ userId: user.id, entity: '
 ```
 
 `memory` field / `searchUser` / `recall` options:
-- `scope`: `"user"` (persists) or `"session"` (ephemeral). Default `user`.
+- `scope`: `"session"` (ephemeral, Redis), `"user"` (default, persists),
+  `"workspace"` (+ `workspaceId`, team memory), `"org"` (company playbook —
+  defaults to your authenticated organization, the only key it can address).
 - `topK`, `threshold`, `namespace` — retrieval controls.
 - `asOf` (ISO 8601) — temporal recall: memory as it was valid at a past instant,
   including facts later superseded (contradictions supersede, they don't delete).
 - `mode`: `"inject"` (default, full contents) or `"index"` (compact table of
   contents — the model fetches full notes on demand via `cencori.memory.fetch(id)`
   or the exported `MEMORY_FETCH_TOOL` function tool). Use `index` for agents.
+
+Chat responses carry `memory.write_request_id` when `write` is on — poll
+`GET /v1/memory/writes/:id` until `status` leaves `pending` (async writeback
+confirmation). Metering: stored-memory counts per tier plus monthly
+search/write operation allowances per project and per end-user (429
+`memory_quota_exceeded` / `memory_ops_quota_exceeded` with upgrade URLs).
 
 ## SDK Chat Response Shape
 
@@ -1103,9 +1117,9 @@ Minimal client config:
 
 Tool tiers:
 - Public (no key): `search_docs`, `get_doc`, `list_docs`, `get_integration_guide` (returns this llm.txt setup contract), and `how_to_*` guidance tools.
-- Read (key): Web (`web_search`, `web_fetch`, `web_extract`, `get_web_browser_job`), gateway (`list_models`, `get_metrics`, `get_health`, `check_quota`), agents, memory, sessions, and governance list/get tools.
+- Read (key): Web (`web_search`, `web_fetch`, `web_extract`, `get_web_browser_job`), gateway (`list_models`, `get_metrics`, `get_health`, `check_quota`), agents, memory, sessions, and governance list/get tools. Memory reads: `list_memories`, `search_memory`, `get_memory`, `list_memory_entities`, `get_memory_graph`, `get_forget_suggestions`, `export_memories` (GDPR dump).
 - Write (`CENCORI_MCP_WRITE=1`): Web (`web_browse`, `web_crawl`, `request_web_takedown`), inference (`generate_text`, `generate_rag`, `create_embeddings`, `moderate_content`, `generate_image`, vision, documents, `text_to_speech`, `transcribe_audio`) plus `remember_memory`, `write_memory`, `create_namespace`, `create_agent`, `update_agent`, `create_session`, `add_session_turn`, and governance drafts (`create_policy`, `install_template`). Policy activation stays manual.
-- Destructive (`CENCORI_MCP_DESTRUCTIVE=1`): `delete_memory`, `delete_agent`, `delete_session`, `approve_session`, `reject_session`.
+- Destructive (`CENCORI_MCP_DESTRUCTIVE=1`): `delete_memory`, `forget_memories` (by filter: namespace / before / ids), `delete_agent`, `delete_session`, `approve_session`, `reject_session`.
 
 Feature selection: `CENCORI_MCP_FEATURES` accepts `docs`, `guidance`, `gateway`, `agents`, `memory`, `sessions`, `web`, `governance`, `multimodal`, and `embedded`. Omit it to enable all features allowed by the key and action-tier flags.
 

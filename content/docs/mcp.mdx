@@ -130,7 +130,7 @@ Restart the MCP server after changing environment variables.
 - Web: `web_search`, `web_fetch`, `web_extract`, `get_web_browser_job`
 - Gateway: `list_models`, `get_metrics`, `get_health`, `check_quota`
 - Agents: `list_agents`, `get_agent`, `poll_agent_actions`
-- Memory: list, semantic search, get, entities, graph, and forget suggestions
+- Memory: list, semantic search, get, entities, graph, forget suggestions, and GDPR export
 - Sessions: list, get, and events
 - Governance: policies, roles, change requests, ledger, evidence, and templates
 - Embedded Agents: tenants, versions, installations, runs, actions, knowledge, skills, provider connections, usage, webhooks, and remote MCP snapshots
@@ -148,7 +148,7 @@ To expose only Embedded Agents inspection, set `CENCORI_MCP_FEATURES=embedded`. 
 
 ### Destructive
 
-`delete_memory`, `delete_agent`, `delete_session`, `approve_session`, and `reject_session`.
+`delete_memory`, `forget_memories` (by filter), `delete_agent`, `delete_session`, `approve_session`, and `reject_session`.
 
 ## Security model
 

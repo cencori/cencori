@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 
 const SIGNUP_URL = '/signup';
 const DOCS_URL = '/docs';
-const WAITLIST_URL = 'mailto:memory@cencori.com?subject=Cencori%20Memory%20%E2%80%94%20early%20access';
+const WAITLIST_URL = 'mailto:memory@cencori.com?subject=Cencori%20Memory';
 
 /* ------------------------------------------------------------------ */
 /* Bordered frame primitives                                          */
@@ -145,7 +145,7 @@ const PIPELINE = [
     {
         step: '01',
         title: 'Retrieve',
-        body: 'The latest user message is embedded. pgvector query, scoped to (org, userId), returns top-K memories above the relevance threshold. ~40ms.',
+        body: 'The latest user message is embedded. pgvector query, scoped to (org, userId), returns top-K memories above the relevance threshold. Runs alongside the input guards, so the chat rarely waits on it.',
     },
     {
         step: '02',
@@ -155,7 +155,7 @@ const PIPELINE = [
     {
         step: '03',
         title: 'Complete',
-        body: 'Provider dispatch — OpenAI, Anthropic, Google, whoever. BYOK if set. Response streams back. Latency-neutral vs. no-memory case.',
+        body: 'Provider dispatch — OpenAI, Anthropic, Google, whoever. BYOK if set. Response streams back; retrieval overlaps the input pipeline so memory adds no separate round trip.',
     },
     {
         step: '04',

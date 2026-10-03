@@ -104,6 +104,26 @@ const response = await cencori.ai.rag({
 | `cencori.ai.generateImage()` | Image generation |
 | `cencori.ai.embeddings()` | Vector embeddings |
 | `cencori.ai.rag()` | RAG with memory search |
-| `cencori.memory.store()` | Store memory |
-| `cencori.memory.search()` | Semantic search |
+| `cencori.memory.store()` | Store memory (namespace store) |
+| `cencori.memory.search()` | Semantic search (namespace store) |
 | `cencori.telemetry.reportWebRequest()` | Report web traffic to dashboard |
+
+## Scoped memory (per-user, cross-session)
+
+The namespace store above is for RAG corpora. For remembering *end users*
+across sessions, use the scoped memory surface — full reference at
+[Memory API](/docs/api/memory):
+
+```typescript
+// Any model: recall() → inject-ready string; remember() persists the exchange.
+const context = await cencori.memory.recall(userId, message);
+// ...your own model call with `context` as a system message...
+await cencori.memory.remember(userId, { user: message, assistant: reply });
+
+// Scopes: session (ephemeral) · user (default) · workspace (+ workspaceId) · org.
+// Batch writes, forget-by-filter, GDPR export, and async write receipts:
+await cencori.memory.writeBatch({ userId, memories: [{ content: 'Prefers dark mode' }] });
+await cencori.memory.forgetByFilter({ userId, before: '2026-01-01T00:00:00Z' });
+const dump = await cencori.memory.export({ userId });
+const receipt = await cencori.memory.writeStatus(res.memory.write_request_id);
+```
