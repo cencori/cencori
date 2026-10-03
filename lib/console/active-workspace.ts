@@ -3,6 +3,7 @@ import "server-only";
 import { cache } from "react";
 import { cookies } from "next/headers";
 import { createServerClient } from "@/lib/supabaseServer";
+import { withSupabaseRetry } from "@/lib/supabase-retry";
 import {
   ACTIVE_ORG_COOKIE,
   ACTIVE_PROJECT_COOKIE,
@@ -32,16 +33,25 @@ export interface ActiveConsoleWorkspace {
  */
 export const getActiveConsoleWorkspace = cache(async (): Promise<ActiveConsoleWorkspace | null> => {
   const supabase = await createServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  // Auth + workspace reads each get 4 attempts with backoff: a single
+  // Vercel->Supabase socket blip (UND_ERR_SOCKET/ECONNRESET, Oct 2026
+  // incident) must not take down /home, /login, /billing, /memory.
+  const { data: { user } } = await withSupabaseRetry(
+    () => supabase.auth.getUser(),
+    { operation: "console auth.getUser" },
+  );
   if (!user) return null;
 
   const cookieStore = await cookies();
   const preferredOrgSlug = cookieStore.get(ACTIVE_ORG_COOKIE)?.value ?? null;
   const preferredProjectSlug = cookieStore.get(ACTIVE_PROJECT_COOKIE)?.value ?? null;
 
-  const { data: organizations, error: organizationsError } = await supabase
-    .from("organizations")
-    .select("id, name, slug, subscription_tier");
+  const { data: organizations, error: organizationsError } = await withSupabaseRetry(
+    () => supabase
+      .from("organizations")
+      .select("id, name, slug, subscription_tier"),
+    { operation: "console organizations" },
+  );
 
   if (organizationsError) {
     throw new Error(`Could not load console organizations: ${organizationsError.message}`);
@@ -49,10 +59,13 @@ export const getActiveConsoleWorkspace = cache(async (): Promise<ActiveConsoleWo
   if (!organizations?.length) return null;
 
   const organizationIds = organizations.map((organization) => organization.id);
-  const { data: projects, error: projectsError } = await supabase
-    .from("projects")
-    .select("id, name, slug, organization_id")
-    .in("organization_id", organizationIds);
+  const { data: projects, error: projectsError } = await withSupabaseRetry(
+    () => supabase
+      .from("projects")
+      .select("id, name, slug, organization_id")
+      .in("organization_id", organizationIds),
+    { operation: "console projects" },
+  );
 
   if (projectsError) {
     throw new Error(`Could not load console projects: ${projectsError.message}`);

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies, headers } from "next/headers";
 import { createServerClient } from "@/lib/supabaseServer";
+import { withSupabaseRetry } from "@/lib/supabase-retry";
 import { getActiveConsoleWorkspace } from "@/lib/console/active-workspace";
 import {
   ACTIVE_ORG_COOKIE,
@@ -62,11 +63,15 @@ export async function PUT(request: Request) {
 
   // RLS is the authorization boundary. A project outside the user's
   // organizations resolves to no row and can never become active context.
-  const { data: project, error: projectError } = await supabase
-    .from("projects")
-    .select("id, name, slug, organization_id")
-    .eq("id", projectId)
-    .maybeSingle();
+  // Retried: same Vercel->Supabase socket blips that took down /home hit here.
+  const { data: project, error: projectError } = await withSupabaseRetry(
+    () => supabase
+      .from("projects")
+      .select("id, name, slug, organization_id")
+      .eq("id", projectId)
+      .maybeSingle(),
+    { operation: "console context select project" },
+  );
 
   if (projectError) {
     return NextResponse.json({ error: "Could not select project" }, { status: 500 });
@@ -75,11 +80,14 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: "Project not found" }, { status: 404 });
   }
 
-  const { data: organization, error: organizationError } = await supabase
-    .from("organizations")
-    .select("id, name, slug, subscription_tier")
-    .eq("id", project.organization_id)
-    .maybeSingle();
+  const { data: organization, error: organizationError } = await withSupabaseRetry(
+    () => supabase
+      .from("organizations")
+      .select("id, name, slug, subscription_tier")
+      .eq("id", project.organization_id)
+      .maybeSingle(),
+    { operation: "console context select organization" },
+  );
 
   if (organizationError) {
     return NextResponse.json({ error: "Could not select organization" }, { status: 500 });
