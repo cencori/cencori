@@ -158,6 +158,20 @@ export default function BrandPageContent() {
                     and we&apos;ll agree on language that does.
                 </p>
             </section>
+            <section id="contact" className="mx-auto mt-16 max-w-2xl scroll-mt-24 text-left font-inter">
+                <h2 className="text-3xl font-semibold">Contact</h2>
+                <p className="mt-4 text-[1rem] leading-relaxed tracking-[-0.005em] text-white">
+                    If you have any questions about the system, or need help
+                    setting up branding, reach out to{" "}
+                    <a
+                        href="mailto:bola@cencori.com"
+                        className="underline underline-offset-4"
+                    >
+                        bola@cencori.com
+                    </a>
+                    .
+                </p>
+            </section>
         </main>
     );
 }
