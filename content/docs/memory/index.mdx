@@ -1,0 +1,44 @@
+---
+title: "Cencori Memory"
+description: "The memory layer of the AI cloud. One product with two entry points: a flag on any gateway request, or a standalone API for any model and stack."
+section: "Product"
+order: 1
+---
+
+Cencori Memory gives your product a memory of its users — preferences, decisions, project context — that survives new chats, new devices, and provider swaps. One client, one key, one store. Two ways in.
+
+**A new chat is not a memory reset. It's a fresh conversation with a model that already knows the user.**
+
+## The two doors
+
+**Native — one flag on any gateway request.** Best recall: we see the real prompt, the response, and the model, and we inject at the optimal point.
+
+```typescript
+const res = await cencori.chat.completions.create({
+  model: 'gpt-4o',
+  messages,
+  memory: { userId: session.user.id },
+});
+```
+
+**Standalone — bring any model and stack.** The same store behind `cencori.memory.*`, no gateway required. Start here, go native whenever — your memory comes with you.
+
+```typescript
+const context = await cencori.memory.recall(userId, message);
+// ...your own OpenAI / Anthropic / local call with `context` as a system message...
+await cencori.memory.remember(userId, { user: message, assistant: reply });
+```
+
+## Scopes
+
+Every memory belongs to exactly one scope: `session` (ephemeral, per-chat), `user` (the default — survives everything), `workspace` (team memory, keyed by your `workspaceId`), `org` (company playbook, keyed by your authenticated organization). Retrieval and writes are independent flags; PII is redacted before anything persists; regions pin at write; forget is real deletion, audit-logged.
+
+## What it costs
+
+Stored-memory counts per tier plus monthly operation allowances per project and per end-user — one fill gauge, reads never blocked, writes 429 with an upgrade URL when a tier fills. See the [full API reference](/docs/api/memory) for endpoint shapes, quotas, and the async write-receipt flow.
+
+## Go deeper
+
+- [Memory API reference](/docs/api/memory) — every endpoint, option, and error code
+- [MCP bridge](/docs/mcp) — read memory from Cursor, Claude Desktop, any MCP client
+- [MemoryInspector](https://cencori.com/memory) — GDPR-ready "what we know about you" UI

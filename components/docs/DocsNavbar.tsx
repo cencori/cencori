@@ -58,6 +58,7 @@ const sidebarItems = [
         items: [
             { title: "Authentication", href: "/docs/api/authentication" },
             { title: "Chat", href: "/docs/api/chat" },
+            { title: "Memory", href: "/docs/memory" },
             { title: "Metrics", href: "/docs/api/metrics" },
             { title: "Projects Setup", href: "/docs/api/projects" },
             { title: "API Keys Setup", href: "/docs/api/api-keys" },
