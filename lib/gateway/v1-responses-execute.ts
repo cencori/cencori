@@ -7,6 +7,11 @@
 import { NextResponse } from 'next/server';
 import { recoverXmlToolCalls, releasableLength } from '@/lib/gateway/tool-call-xml';
 import {
+    translateResponsesInputItems,
+    translateResponsesOutputItems,
+    validateToolPairing,
+} from '@/lib/gateway/responses-translate';
+import {
     type TokenUsage,
     type UnifiedMessage,
     type Tool,
@@ -29,9 +34,7 @@ import {
 import { runGatewayOutputGuard } from '@/lib/gateway/output-guard';
 import { runGatewayInputPipeline } from '@/lib/gateway/input-guard';
 import {
-    normalizeResponsesContent,
     type ResponsesContentPart,
-    toolOutputTurns,
 } from '@/lib/gateway/responses-content';
 import {
     preProcessBuiltInTools,
@@ -58,7 +61,8 @@ export type ResponseInputItem =
     | { type: 'message'; role: 'user' | 'assistant' | 'system'; content: string | ResponsesContentPart[] }
     | { type: 'function_call'; id: string; call_id: string; name: string; arguments: string; status?: string }
     | { type: 'function_call_output'; call_id: string; output: string | ResponsesContentPart[] }
-    | { type: 'file'; filename: string; content: string; mime_type?: string };
+    | { type: 'file'; filename: string; content: string; mime_type?: string }
+    | { type: 'reasoning'; summary?: unknown; content?: unknown; text?: unknown };
 
 export type ResponsesTool = ResponsesBuiltInTool | Tool;
 
@@ -111,6 +115,8 @@ export type ResponsesOutputItem = {
     call_id?: string;
     name?: string;
     arguments?: string;
+    /** Thinking trace, OpenAI Responses shape. Replayed verbatim on the next turn. */
+    summary?: Array<{ type: string; text?: string }>;
     output?: Record<string, unknown>;
     error?: string;
 };
@@ -202,59 +208,14 @@ function parseInputToMessages(
     input: string | ResponseInputItem[],
     instructions?: string,
 ): UnifiedMessage[] {
-    const messages: UnifiedMessage[] = [];
-
-    if (instructions) {
-        messages.push({ role: 'system', content: instructions });
+    // Single shared translator (see responses-translate.ts): the route already
+    // translated once for the security pipeline, and this path only runs when
+    // it did not (no pre-parsed messages). Two independent translators is how
+    // balanced histories reached providers unbalanced.
+    const { messages, dropped } = translateResponsesInputItems(input, instructions);
+    if (dropped.length > 0) {
+        console.warn('[Gateway/Responses] Translator dropped input items before dispatch', { dropped });
     }
-
-    if (typeof input === 'string') {
-        messages.push({ role: 'user', content: input });
-        return messages;
-    }
-
-    for (const item of input) {
-        switch (item.type) {
-            case 'message': {
-                const { text, images } = normalizeResponsesContent(item.content);
-                messages.push({
-                    role: item.role,
-                    content: text,
-                    ...(images.length ? { images } : {}),
-                });
-                break;
-            }
-            case 'function_call':
-                // The call itself, not just its id. This used to push an assistant turn with empty
-                // content and a bare `toolCallId`, which dropped the tool name and arguments on the
-                // floor: on its eighth request an agent was replaying seven blank assistant turns,
-                // so neither the model nor the request log could see what had already been called.
-                // `tool_calls` is the shape the provider adapters already serialize.
-                messages.push({
-                    role: 'assistant',
-                    content: '',
-                    toolCallId: item.call_id,
-                    tool_calls: [
-                        {
-                            id: item.call_id,
-                            type: 'function',
-                            function: { name: item.name, arguments: item.arguments },
-                        },
-                    ],
-                });
-                break;
-            case 'function_call_output':
-                messages.push(...toolOutputTurns(item.output, item.call_id));
-                break;
-            case 'file':
-                messages.push({
-                    role: 'user',
-                    content: `[File: ${item.filename}]${item.mime_type ? ` (${item.mime_type})` : ''}\n\n${item.content}`,
-                });
-                break;
-        }
-    }
-
     return messages;
 }
 
@@ -305,8 +266,25 @@ function buildResponsesJson(params: {
     annotations?: Array<{ type: string; start_index: number; end_index: number; url: string; title?: string }>;
     error?: { code: string; message: string };
     metadata?: Record<string, string>;
+    /**
+     * Provider thinking trace (DeepSeek `reasoning_content`), emitted as a
+     * `reasoning` output item ahead of the message — generation order — so
+     * the client stores it and the next turn's translation can echo it back.
+     * Without this the trace is dropped at the boundary and every follow-up
+     * turn 400s deterministically.
+     */
+    reasoning?: string;
 }): ResponsesResponse {
     const output: ResponsesOutputItem[] = [];
+
+    if (params.reasoning) {
+        output.push({
+            id: generateId('rsn'),
+            type: 'reasoning',
+            status: 'completed',
+            summary: [{ type: 'summary_text', text: params.reasoning }],
+        });
+    }
 
     if (params.content) {
         output.push({
@@ -505,26 +483,60 @@ export async function runV1ResponsesExecution(
             });
         }
 
-        // Resolve previous_response_id: fetch prior response and prepend its output
+        // Resolve previous_response_id: fetch prior response and replay its output
+        // through the shared translator — the same shapes as live input, full
+        // `tool_calls` and reasoning included. The old replay emitted a bare
+        // `toolCallId` with no calls, so chained runs replayed tool history
+        // the provider could not see and 400'd on pairing.
         if (body.previous_response_id) {
             const prior = await getResponse(params.supabase, gatewayCtx.projectId, body.previous_response_id);
             if (prior) {
-                const priorMessages: UnifiedMessage[] = [];
-                for (const item of prior.output) {
-                    if (item.type === 'message' && item.content?.[0]?.text) {
-                        priorMessages.push({ role: 'assistant', content: item.content[0].text });
-                    }
-                    if (item.type === 'function_call') {
-                        priorMessages.push({
-                            role: 'assistant',
-                            content: '',
-                            toolCallId: item.call_id || item.id,
-                        });
-                    }
+                const { messages: priorMessages, dropped: priorDropped } =
+                    translateResponsesOutputItems(prior.output);
+                if (priorDropped.length > 0) {
+                    console.warn('[Gateway/Responses] Translator dropped stored items before dispatch', {
+                        requestId: gatewayCtx.requestId,
+                        responseId: body.previous_response_id,
+                        dropped: priorDropped,
+                    });
                 }
                 let insertAt = 0;
                 while (insertAt < messages.length && messages[insertAt].role === 'system') insertAt++;
                 messages.splice(insertAt, 0, ...priorMessages);
+            }
+        }
+
+        // Fail fast on unbalanced tool history: an assistant turn declaring a
+        // call no `tool` turn answers (or vice versa) is a provider 400 after
+        // seconds of burned generation. The translator warns on every drop
+        // above; this catches histories that arrived unbalanced, before any
+        // provider sees them. Split blocks stay warnings — tolerated by some
+        // providers, rejected by strict ones.
+        const pairingViolations = validateToolPairing(messages);
+        if (pairingViolations.length > 0) {
+            console.warn('[Gateway/Responses] Tool pairing check before provider dispatch', {
+                requestId: gatewayCtx.requestId,
+                model: resolved.model,
+                violations: pairingViolations,
+            });
+            const hard = pairingViolations.filter((v) => v.kind !== 'split_block');
+            if (hard.length > 0) {
+                const first = hard[0];
+                const detail = first.kind === 'dangling_call'
+                    ? `assistant tool call '${first.id}' has no answering tool message`
+                    : `tool message for '${first.id}' answers a call the history never declares`;
+                return {
+                    ok: false,
+                    status: 400,
+                    body: {
+                        error: {
+                            message: `Unbalanced tool history: ${detail}. Resend the turn with every function_call paired to its function_call_output.`,
+                            type: 'invalid_request_error',
+                            code: 'unbalanced_tool_history',
+                        },
+                        status: 'failed',
+                    },
+                };
             }
         }
 
@@ -604,6 +616,13 @@ export async function runV1ResponsesExecution(
             let content = result.content;
             if (effectiveTokenMap.size > 0) {
                 content = deTokenize(content, effectiveTokenMap);
+            }
+            // Same placeholder treatment as visible text: the trace is
+            // replayed to the provider, not shown, but stored markers must
+            // not leak into it either.
+            let reasoning = result.reasoning;
+            if (reasoning && effectiveTokenMap.size > 0) {
+                reasoning = deTokenize(reasoning, effectiveTokenMap);
             }
 
             // Extract structured output from tool call if response_format was json_schema
@@ -774,6 +793,7 @@ export async function runV1ResponsesExecution(
                 usage: result.usage,
                 annotations,
                 metadata: body.metadata,
+                ...(reasoning ? { reasoning } : {}),
             });
 
             if (body.store !== false) {
@@ -815,6 +835,9 @@ export async function runV1ResponsesExecution(
                 }, 15_000);
                 let fullText = '';
                 let completed = false;
+                // Thinking trace, accumulated exactly like visible text and
+                // persisted as a `reasoning` output item at completion.
+                let fullReasoning = '';
                 // Real usage from the provider when the adapter reports it.
                 let reportedUsage: TokenUsage | undefined;
                 const collectedToolCalls: Record<string, { id: string; name: string; arguments: string }> = {};
@@ -929,6 +952,9 @@ export async function runV1ResponsesExecution(
                         if (chunk.delta) {
                             fullText += chunk.delta;
                         }
+                        if (chunk.reasoning) {
+                            fullReasoning += chunk.reasoning;
+                        }
 
                         if (chunk.toolCalls) {
                             for (const tc of chunk.toolCalls) {
@@ -977,6 +1003,9 @@ export async function runV1ResponsesExecution(
                         if (chunk.finishReason) {
                             if (effectiveTokenMap.size > 0) {
                                 fullText = deTokenize(fullText, effectiveTokenMap);
+                                if (fullReasoning) {
+                                    fullReasoning = deTokenize(fullReasoning, effectiveTokenMap);
+                                }
                             }
 
                             // Extract structured output before scanning so the
@@ -1274,6 +1303,7 @@ export async function runV1ResponsesExecution(
                                 usage: { promptTokens, completionTokens, totalTokens, cacheReadTokens },
                                 annotations,
                                 metadata: body.metadata,
+                                ...(fullReasoning ? { reasoning: fullReasoning } : {}),
                             });
 
                             if (body.store !== false) {

@@ -16,8 +16,10 @@ import { dePrefixId } from "@/lib/embedded/http";
 import { denyOnScopeMismatch, hasClientPermission } from "@/lib/embedded/session-auth";
 import { checkEndUserQuota, recordEndUserUsage, type QuotaCheckResult } from "@/lib/end-user-billing";
 import type { UnifiedMessage } from "@/lib/providers/base";
-import type { ResponseInputItem } from "@/lib/gateway/v1-responses-execute";
-import { normalizeResponsesContent, toolOutputTurns } from "@/lib/gateway/responses-content";
+import {
+    translateResponsesInputItems,
+    type TranslatableInputItem,
+} from "@/lib/gateway/responses-translate";
 import { runGatewayInputPipeline } from "@/lib/gateway/input-guard";
 import { buildMaskedLogPayloads } from "@/lib/gateway/chat-post-success";
 import { toOpenAiErrorBody } from "@/lib/gateway/guard-types";
@@ -372,39 +374,17 @@ export async function POST(
         }
 
         // ── Convert input to unified messages for security pipeline ──
-        const inputMessages: UnifiedMessage[] = typeof input === 'string'
-            ? [{ role: 'user' as const, content: input }]
-            : (input as ResponseInputItem[]).flatMap(item => {
-                if (item.type === 'message') {
-                    const { text, images } = normalizeResponsesContent(item.content);
-                    return [{
-                        role: item.role,
-                        content: text,
-                        ...(images.length ? { images } : {}),
-                    }] as UnifiedMessage[];
-                }
-                if (item.type === 'function_call') {
-                    return [{
-                        role: 'assistant',
-                        content: '',
-                        tool_calls: [{
-                            id: item.call_id || item.id,
-                            type: 'function' as const,
-                            function: { name: item.name, arguments: item.arguments },
-                        }],
-                    }] as unknown as UnifiedMessage[];
-                }
-                if (item.type === 'function_call_output') {
-                    return toolOutputTurns(item.output, item.call_id) as UnifiedMessage[];
-                }
-                if (item.type === 'file') {
-                    return [{
-                        role: 'user',
-                        content: `[Attached file: ${item.filename}]\n${item.content}`,
-                    }] as UnifiedMessage[];
-                }
-                return [];
+        // Shared translator: same shapes as /v1/responses (full tool_calls,
+        // reasoning echo, contiguous tool blocks). Drops warn, never vanish.
+        const translatedTurnInput = translateResponsesInputItems(
+            (input ?? []) as TranslatableInputItem[] | string,
+        );
+        if (translatedTurnInput.dropped.length > 0) {
+            console.warn('[Gateway/Sessions] Translator dropped input items before dispatch', {
+                dropped: translatedTurnInput.dropped,
             });
+        }
+        const inputMessages: UnifiedMessage[] = translatedTurnInput.messages;
 
         // ── Memory directive (API opt-in: presence of `memory` enables it) ──
         // Mirrors the chat-completions door so a session turn can recall

@@ -167,7 +167,14 @@ describe('validateResponsesInput', () => {
     });
 
     it('still rejects an unsupported item type', () => {
-        expect(validateResponsesInput([{ type: 'reasoning', summary: [] }])).toBe('Unsupported input item type.');
+        expect(validateResponsesInput([{ type: 'telepathy', content: 'hi' }])).toBe('Unsupported input item type.');
+    });
+
+    /** Thinking traces must round-trip: rejecting them broke every follow-up turn. */
+    it('accepts a reasoning item carrying a summary', () => {
+        expect(validateResponsesInput([
+            { type: 'reasoning', summary: [{ type: 'summary_text', text: 'trace' }] },
+        ])).toBeNull();
     });
 });
 
