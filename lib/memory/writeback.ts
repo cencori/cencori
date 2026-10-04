@@ -323,6 +323,8 @@ export interface RememberExchangeResult {
     attemptErrors: string[];
     /** Extraction LLM attempts used (2 when the first attempt was retried). */
     attempts: number;
+    /** Facts parsed before the minImportance filter (distinguishes outage from filtering). */
+    parsedCount: number;
     /** Entity-graph outcome for the exchange (absent when the graph is off). */
     graph?: EntityGraphWritebackResult;
 }
@@ -364,7 +366,7 @@ export async function rememberExchange(params: {
             console.warn(
                 `[Memory] Write ops quota exceeded (scope=${opsStatus.scope}) project=${projectId} — dropping remember`
             );
-            return { written: [], extracted: 0, quotaExceeded: false, opsExceeded: true, opsStatus, costUsd: 0, model: resolveMemoryModel(settings.extractionModel), provider: '', attemptErrors: [], attempts: 0 };
+            return { written: [], extracted: 0, quotaExceeded: false, opsExceeded: true, opsStatus, costUsd: 0, model: resolveMemoryModel(settings.extractionModel), provider: '', attemptErrors: [], attempts: 0, parsedCount: 0 };
         }
     }
 
@@ -381,7 +383,7 @@ export async function rememberExchange(params: {
     });
 
     if (extraction.facts.length === 0) {
-        return { written: [], extracted: 0, quotaExceeded: false, opsExceeded: false, costUsd: extraction.costUsd, model: extraction.model, provider: extraction.provider, attemptErrors: extraction.attemptErrors, attempts: extraction.attempts };
+        return { written: [], extracted: 0, quotaExceeded: false, opsExceeded: false, costUsd: extraction.costUsd, model: extraction.model, provider: extraction.provider, attemptErrors: extraction.attemptErrors, attempts: extraction.attempts, parsedCount: extraction.parsedCount };
     }
 
     if (directive.scope === 'session') {
@@ -408,6 +410,7 @@ export async function rememberExchange(params: {
             provider: extraction.provider,
             attemptErrors: extraction.attemptErrors,
             attempts: extraction.attempts,
+            parsedCount: extraction.parsedCount,
         };
     }
 
@@ -458,6 +461,7 @@ export async function rememberExchange(params: {
         provider: extraction.provider,
         attemptErrors: extraction.attemptErrors,
         attempts: extraction.attempts,
+        parsedCount: extraction.parsedCount,
         graph,
     };
 }
@@ -615,11 +619,13 @@ export async function runChatMemoryWriteback(params: {
                     : undefined,
             metadata: {
                 extracted: extraction.facts.length,
+                parsed: extraction.parsedCount,
                 written: writtenCount,
                 scope: directive.scope,
                 extraction_model: extraction.model,
                 extraction_provider: extraction.provider,
                 extraction_attempts: extraction.attempts,
+                extraction_attempt_errors: extraction.attemptErrors.slice(-2),
                 embedding_model: embeddingModel,
                 embedding_provider: embeddingProvider,
                 ...(reconciliation

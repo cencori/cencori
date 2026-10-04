@@ -46,6 +46,12 @@ export interface ExtractFactsResult {
     attempts: number;
     /** Truncated per-attempt failure causes across all attempts (for log triage). */
     attemptErrors: string[];
+    /**
+     * Facts parsed BEFORE the minImportance filter. When extracted is 0 but
+     * parsedCount is not, the model found material and the bar dropped it —
+     * a filtering story, not an outage. Logged, never billed differently.
+     */
+    parsedCount: number;
 }
 
 /**
@@ -145,7 +151,7 @@ export async function extractFacts(params: {
         }
         if (!response) {
             // Whole chain exhausted twice — fail open with zero facts.
-            return { facts: [], costUsd, model: preferModel, provider: '', attempts, attemptErrors };
+            return { facts: [], costUsd, model: preferModel, provider: '', attempts, attemptErrors, parsedCount: 0 };
         }
 
         const facts = parseExtractionOutput(response.content);
@@ -164,10 +170,11 @@ export async function extractFacts(params: {
             provider: response.provider,
             attempts,
             attemptErrors,
+            parsedCount: facts.length,
         };
     } catch (error) {
         console.warn('[Memory] Fact extraction failed:', error);
-        return { facts: [], costUsd: 0, model: preferModel, provider: '', attempts: 1, attemptErrors: [] };
+        return { facts: [], costUsd: 0, model: preferModel, provider: '', attempts: 1, attemptErrors: [], parsedCount: 0 };
     }
 }
 
