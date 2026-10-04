@@ -83,6 +83,59 @@ describe('checkMemoryOpsQuota', () => {
     });
 });
 
+describe('checkMemoryOpsQuota custom project caps', () => {
+    beforeEach(() => {
+        mockedCheck.mockReset();
+        mockedCheck.mockResolvedValue(allow());
+    });
+
+    it('an explicit custom cap wins over the tier default', async () => {
+        mockedCheck.mockResolvedValueOnce(deny());
+        const status = await checkMemoryOpsQuota('proj_1', 'pro', 'user_a', 'write', {
+            maxWritesMonthly: 5000,
+        });
+        expect(mockedCheck.mock.calls[0][1]).toBe(5000);
+        expect(status).toMatchObject({ allowed: false, scope: 'project', limit: 5000 });
+    });
+
+    it('an explicit custom cap wins even over enterprise infinity', async () => {
+        mockedCheck.mockResolvedValueOnce(deny());
+        const status = await checkMemoryOpsQuota('proj_1', 'enterprise', 'user_a', 'write', {
+            maxWritesMonthly: 100,
+        });
+        expect(mockedCheck).toHaveBeenCalledTimes(1);
+        expect(status).toMatchObject({ allowed: false, limit: 100 });
+    });
+
+    it('null custom caps fall through to the tier default', async () => {
+        await checkMemoryOpsQuota('proj_1', 'pro', 'user_a', 'search', {
+            maxSearchesMonthly: null,
+            maxWritesMonthly: null,
+        });
+        expect(mockedCheck.mock.calls[0][1]).toBe(getMemoryOpsQuota('pro').searches);
+    });
+
+    it('non-positive custom caps fall through to the tier default', async () => {
+        await checkMemoryOpsQuota('proj_1', 'pro', 'user_a', 'write', { maxWritesMonthly: 0 });
+        expect(mockedCheck.mock.calls[0][1]).toBe(getMemoryOpsQuota('pro').writes);
+        await checkMemoryOpsQuota('proj_1', 'pro', 'user_a', 'write', { maxWritesMonthly: -50 });
+        // Each check consumes two calls (project-monthly, then user-daily).
+        expect(mockedCheck.mock.calls[2][1]).toBe(getMemoryOpsQuota('pro').writes);
+    });
+
+    it('search and write customs apply to their own op only', async () => {
+        await checkMemoryOpsQuota('proj_1', 'pro', 'user_a', 'search', {
+            maxSearchesMonthly: 111,
+            maxWritesMonthly: 222,
+        });
+        expect(mockedCheck.mock.calls[0][1]).toBe(111);
+        await checkMemoryOpsQuota('proj_1', 'pro', 'user_a', 'write', {
+            maxSearchesMonthly: 111,
+            maxWritesMonthly: 222,
+        });
+        expect(mockedCheck.mock.calls[2][1]).toBe(222);
+    });
+});
 describe('buildMemoryOpsExceededBody', () => {
     it('matches the 429 payload shape', () => {
         const body = buildMemoryOpsExceededBody('proj_xxx', 'free', 'write', {

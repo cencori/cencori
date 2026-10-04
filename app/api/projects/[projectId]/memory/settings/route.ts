@@ -90,6 +90,20 @@ export async function PATCH(
         if (maxPerExchange != null) update.max_memories_per_exchange = Math.round(maxPerExchange);
         const sessionTtl = clampNumber(body.sessionTtlSeconds, 300, 60 * 60 * 24 * 30);
         if (sessionTtl != null) update.session_ttl_seconds = Math.round(sessionTtl);
+        // Custom monthly ops allowances (pilot/enterprise contracts). Null
+        // clears back to the tier default. Positive integers only.
+        if (body.maxSearchesMonthly === null) {
+            update.max_searches_monthly = null;
+        } else {
+            const cap = clampNumber(body.maxSearchesMonthly, 1, 100_000_000);
+            if (cap != null) update.max_searches_monthly = Math.round(cap);
+        }
+        if (body.maxWritesMonthly === null) {
+            update.max_writes_monthly = null;
+        } else {
+            const cap = clampNumber(body.maxWritesMonthly, 1, 100_000_000);
+            if (cap != null) update.max_writes_monthly = Math.round(cap);
+        }
 
         if (Object.keys(update).length <= 2) {
             return NextResponse.json({ error: 'No supported settings in request' }, { status: 400 });
@@ -98,7 +112,20 @@ export async function PATCH(
         const { error } = await supabase
             .from('project_memory_settings')
             .upsert(update, { onConflict: 'project_id' });
-        if (error) throw error;
+        if (error) {
+            // Pre-migration databases lack the cap columns — say so plainly
+            // instead of a generic 500.
+            if (/max_(searches|writes)_monthly/.test(error.message)) {
+                return NextResponse.json(
+                    {
+                        error: 'Custom ops caps need migration 20261004_000000_memory_custom_ops_caps applied.',
+                        code: 'memory_settings_migration_pending',
+                    },
+                    { status: 503 }
+                );
+            }
+            throw error;
+        }
 
         // The gateway reads settings through Redis; without this the change
         // doesn't take effect until the cache expires.

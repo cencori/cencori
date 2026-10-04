@@ -172,7 +172,7 @@ export async function POST(req: NextRequest) {
 
         // One batch = one write op: a single embedding call + a single
         // reconciliation pass covers every item.
-        const writeOps = await checkMemoryOpsQuota(ctx.projectId, tier, directive.scopeKey, 'write');
+        const writeOps = await checkMemoryOpsQuota(ctx.projectId, tier, directive.scopeKey, 'write', settings);
         if (!writeOps.allowed) {
             return respond(buildMemoryOpsExceededBody(ctx.projectId, tier, 'write', writeOps), 429);
         }
@@ -188,6 +188,7 @@ export async function POST(req: NextRequest) {
             facts,
             metadata: { ...body.metadata, extractedFrom: 'manual_batch' },
             expiresAt,
+            settings,
         });
 
         if (result.opsExceeded) {

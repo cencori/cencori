@@ -54,7 +54,7 @@ export {
     isMemoryOpsExceededError,
     MemoryOpsExceededError,
 } from './ops-quota';
-export type { MemoryOpsOp, MemoryOpsStatus } from './ops-quota';
+export type { MemoryOpsOp, MemoryOpsOverrides, MemoryOpsStatus } from './ops-quota';
 export {
     buildMemorySystemBlock,
     buildMemoryIndexBlock,

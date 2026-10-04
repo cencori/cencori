@@ -130,6 +130,6 @@ describe('writeMemories ops enforcement', () => {
         expect(result.opsExceeded).toBe(true);
         expect(result.written).toEqual([]);
         expect(result.opsStatus?.scope).toBe('user');
-        expect(mockedOps).toHaveBeenCalledWith('proj_1', 'free', 'user_a', 'write');
+        expect(mockedOps).toHaveBeenCalledWith('proj_1', 'free', 'user_a', 'write', undefined);
     });
 });

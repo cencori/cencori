@@ -22,6 +22,8 @@ interface MemorySettings {
     minImportance: number;
     maxMemoriesPerExchange: number;
     sessionTtlSeconds: number;
+    maxSearchesMonthly: number | null;
+    maxWritesMonthly: number | null;
 }
 
 interface SettingsResponse {
@@ -187,6 +189,36 @@ export function MemorySettingsPanel({ projectId }: MemorySettingsPanelProps) {
                             <SelectItem value="2592000" className="text-xs">30 days</SelectItem>
                         </SelectContent>
                     </Select>
+                </Row>
+
+                <Row
+                    title="Monthly search allowance"
+                    description="Custom cap on retrieval operations per month for pilot or enterprise contracts. Empty means the tier default. Reads past the cap skip injection instead of failing the chat."
+                >
+                    <Input
+                        type="number" min={1} step={1}
+                        value={draft.maxSearchesMonthly ?? ''}
+                        placeholder="Tier default"
+                        onChange={(event) => patch({
+                            maxSearchesMonthly: event.target.value === '' ? null : Math.max(1, Math.round(Number(event.target.value))),
+                        })}
+                        className="h-8 w-[132px] border-border/30 bg-transparent text-xs shadow-none"
+                    />
+                </Row>
+
+                <Row
+                    title="Monthly write allowance"
+                    description="Custom cap on write operations per month. Past the cap, writes 429 with an upgrade prompt instead of burning managed-model spend."
+                >
+                    <Input
+                        type="number" min={1} step={1}
+                        value={draft.maxWritesMonthly ?? ''}
+                        placeholder="Tier default"
+                        onChange={(event) => patch({
+                            maxWritesMonthly: event.target.value === '' ? null : Math.max(1, Math.round(Number(event.target.value))),
+                        })}
+                        className="h-8 w-[132px] border-border/30 bg-transparent text-xs shadow-none"
+                    />
                 </Row>
             </div>
 

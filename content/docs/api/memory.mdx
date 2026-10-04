@@ -157,6 +157,11 @@ working. Operation allowances cap managed-LLM volume per project per month
 `upgradeUrl`, `used`/`limit`, and (for ops) `retryAfterMs`. Chat retrieval
 fails open past either gate — the reply still sends, memory is just skipped.
 
+Pilot and enterprise contracts can pin a project below (or above) its tier
+with custom monthly allowances (`maxSearchesMonthly` / `maxWritesMonthly` in
+project memory settings, dashboard Controls tab). An explicit custom cap
+always wins — including over unlimited tiers.
+
 ## Temporal recall — `asOf`
 
 Memory is bi-temporal: when a fact changes, the old one isn't deleted, it's **superseded**. Current recall returns only what's true now, but you can ask what was true at any past instant with `asOf`.

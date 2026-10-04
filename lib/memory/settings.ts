@@ -59,6 +59,17 @@ export async function getProjectMemorySettings(
                 // Column added after the table shipped — absent (pre-migration)
                 // reads as the default, not as disabled.
                 graphEnabled: row.graph_enabled !== false,
+                // Custom ops caps (migration 20261004). Absent pre-migration →
+                // null → tier default. Positive integers only; anything else
+                // is treated as unset rather than as zero (zero would brick).
+                maxSearchesMonthly:
+                    typeof row.max_searches_monthly === 'number' && row.max_searches_monthly > 0
+                        ? Math.floor(row.max_searches_monthly)
+                        : null,
+                maxWritesMonthly:
+                    typeof row.max_writes_monthly === 'number' && row.max_writes_monthly > 0
+                        ? Math.floor(row.max_writes_monthly)
+                        : null,
             };
         }
     } catch (error) {

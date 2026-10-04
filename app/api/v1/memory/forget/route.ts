@@ -122,7 +122,7 @@ export async function POST(req: NextRequest) {
         }
 
         // A forget is a mutation: count one write op.
-        const writeOps = await checkMemoryOpsQuota(ctx.projectId, tier, directive.scopeKey, 'write');
+        const writeOps = await checkMemoryOpsQuota(ctx.projectId, tier, directive.scopeKey, 'write', settings);
         if (!writeOps.allowed) {
             return respond(buildMemoryOpsExceededBody(ctx.projectId, tier, 'write', writeOps), 429);
         }
