@@ -60,11 +60,66 @@ describe('translateResponsesInputItems', () => {
             {
                 role: 'assistant',
                 content: '',
-                tool_call_id: 'call-1',
                 tool_calls: [{ id: 'call-1', type: 'function', function: { name: 'shell', arguments: '{"cmd":"ls"}' } }],
             },
             { role: 'tool', content: 'ok', tool_call_id: 'call-1' },
         ]);
+    });
+
+    it('merges a parallel fan-out into one assistant turn carrying every call', () => {
+        const { messages, dropped } = translateResponsesInputItems([
+            { type: 'function_call', id: 'fc-1', call_id: 'call-1', name: 'read_a', arguments: '{}' },
+            { type: 'function_call', id: 'fc-2', call_id: 'call-2', name: 'read_b', arguments: '{}' },
+            { type: 'function_call', id: 'fc-3', call_id: 'call-3', name: 'read_c', arguments: '{}' },
+            { type: 'function_call_output', call_id: 'call-1', output: 'a' },
+            { type: 'function_call_output', call_id: 'call-2', output: 'b' },
+            { type: 'function_call_output', call_id: 'call-3', output: 'c' },
+        ]);
+        expect(dropped).toEqual([]);
+        expect(validateToolPairing(messages)).toEqual([]);
+        expect(messages.map((m) => m.role)).toEqual(['assistant', 'tool', 'tool', 'tool']);
+        expect(messages[0].tool_calls?.map((c) => c.id)).toEqual(['call-1', 'call-2', 'call-3']);
+        // The canonical wire shape: one turn, every call, tools adjacent.
+        expect(toOpenAIMessages(messages)[0]).toEqual({
+            role: 'assistant',
+            content: '',
+            tool_calls: [
+                { id: 'call-1', type: 'function', function: { name: 'read_a', arguments: '{}' } },
+                { id: 'call-2', type: 'function', function: { name: 'read_b', arguments: '{}' } },
+                { id: 'call-3', type: 'function', function: { name: 'read_c', arguments: '{}' } },
+            ],
+        });
+    });
+
+    it('keeps sequential call/output pairs on separate adjacent turns', () => {
+        const { messages, dropped } = translateResponsesInputItems([
+            { type: 'function_call', id: 'fc-1', call_id: 'call-1', name: 'a', arguments: '{}' },
+            { type: 'function_call_output', call_id: 'call-1', output: 'a-out' },
+            { type: 'function_call', id: 'fc-2', call_id: 'call-2', name: 'b', arguments: '{}' },
+            { type: 'function_call_output', call_id: 'call-2', output: 'b-out' },
+        ]);
+        expect(dropped).toEqual([]);
+        expect(validateToolPairing(messages)).toEqual([]);
+        expect(messages.map((m) => m.role)).toEqual(['assistant', 'tool', 'assistant', 'tool']);
+    });
+
+    it('merges a reasoning trace into the call run it accompanies', () => {
+        const { messages, dropped } = translateResponsesInputItems([
+            { type: 'reasoning', summary: [{ type: 'summary_text', text: 'trace' }] },
+            { type: 'function_call', id: 'fc-1', call_id: 'call-1', name: 'shell', arguments: '{}' },
+            { type: 'function_call_output', call_id: 'call-1', output: 'ok' },
+        ]);
+        expect(dropped).toEqual([]);
+        expect(messages).toEqual([
+            {
+                role: 'assistant',
+                content: '',
+                reasoningContent: 'trace',
+                tool_calls: [{ id: 'call-1', type: 'function', function: { name: 'shell', arguments: '{}' } }],
+            },
+            { role: 'tool', content: 'ok', toolCallId: 'call-1' },
+        ]);
+        expect(toOpenAIMessages(messages)[0]).toMatchObject({ reasoning_content: 'trace' });
     });
 
     it('never splits a tool block with its own image-caption follow-up', () => {
@@ -114,7 +169,6 @@ describe('translateResponsesOutputItems', () => {
             {
                 role: 'assistant',
                 content: '',
-                toolCallId: 'call-1',
                 tool_calls: [{ id: 'call-1', type: 'function', function: { name: 'shell', arguments: '{"cmd":"ls"}' } }],
             },
         ]);

@@ -84,7 +84,10 @@ export function toOpenAIMessages(messages: UnifiedMessage[]): OpenAIMessage[] {
     return messages.map(msg => ({
         role: msg.role,
         content: toOpenAIContent(msg),
-        ...(msg.toolCallId ? { tool_call_id: msg.toolCallId } : {}),
+        // `tool_call_id` is only meaningful on `tool` turns. Emitting it on
+        // assistant turns is at best ignored and at worst a strictness trip
+        // on providers that validate turn shapes.
+        ...(msg.role === 'tool' && msg.toolCallId ? { tool_call_id: msg.toolCallId } : {}),
         ...(msg.tool_calls && msg.tool_calls.length > 0 ? { tool_calls: msg.tool_calls } : {}),
         ...(msg.role === 'assistant' && msg.reasoningContent ? { reasoning_content: msg.reasoningContent } : {}),
     }));
