@@ -143,6 +143,7 @@ export async function POST(req: NextRequest) {
             metadata: {
                 scope: directive.scope,
                 extracted: result.extracted,
+                parsed: result.parsedCount,
                 written: result.written.length,
                 extraction_attempts: result.attempts ?? undefined,
                 extraction_attempt_errors: result.attemptErrors?.slice(-2),

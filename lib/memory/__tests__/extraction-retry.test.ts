@@ -71,6 +71,7 @@ describe('extractFacts retry', () => {
         expect(result.facts).toEqual([{ content: 'Prefers dark mode', importance: 0.7 }]);
         expect(result.attempts).toBe(2);
         expect(result.provider).toBe('groq');
+        expect(result.parsedCount).toBe(1);
         expect(result.attemptErrors).toEqual(['openai/gpt-oss-20b: timed out']);
         expect(mockedCall).toHaveBeenCalledTimes(2);
     });
@@ -92,14 +93,13 @@ describe('extractFacts retry', () => {
         expect(mockedCall).toHaveBeenCalledTimes(1);
     });
 
-    it('gives up after the retry and reports attempts', async () => {
-        mockedCall.mockRejectedValue(new MemoryLlmExhaustedError(['openai/gpt-oss-20b: 429']));
+    it('reports parsedCount separately from filtered facts (no retry on filtering)', async () => {
+        mockedCall.mockResolvedValueOnce(llmResult('[{"fact": "Trivia", "importance": 0.1}]'));
         const result = await extractFacts(base());
         expect(result.facts).toEqual([]);
-        expect(result.attempts).toBe(2);
-        expect(result.provider).toBe('');
-        expect(result.attemptErrors).toEqual(['openai/gpt-oss-20b: 429', 'openai/gpt-oss-20b: 429']);
-        expect(mockedCall).toHaveBeenCalledTimes(2);
+        expect(result.parsedCount).toBe(1);
+        expect(result.attempts).toBe(1);
+        expect(mockedCall).toHaveBeenCalledTimes(1);
     });
 
     it('collects per-attempt causes when the chain is exhausted', async () => {
