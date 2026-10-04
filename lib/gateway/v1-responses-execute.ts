@@ -115,7 +115,7 @@ export type ResponsesOutputItem = {
         type: 'output_text' | 'refusal';
         text?: string;
         annotations?: Array<unknown>;
-    }>;
+    }> | string;
     call_id?: string;
     name?: string;
     arguments?: string;
@@ -296,6 +296,12 @@ function buildResponsesJson(params: {
             id: generateId('rsn'),
             type: 'reasoning',
             status: 'completed',
+            // The full trace in BOTH shapes: `summary` for OpenAI-shape
+            // readers, `content` for pipelines that serialize reasoning
+            // items through a content field. A reader keeping only one of
+            // them still holds the whole trace — a stored item with text in
+            // neither is what made client-side echo impossible.
+            content: params.reasoning,
             summary: [{ type: 'summary_text', text: params.reasoning }],
         });
     }

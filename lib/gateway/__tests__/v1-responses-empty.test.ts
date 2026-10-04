@@ -133,4 +133,16 @@ describe('empty completions', () => {
         expect(snapshot.clientTtftMs).not.toBeNull();
         expect(snapshot.totalCompletionMs).not.toBeNull();
     });
+
+    it('carries the thinking trace in both content and summary shapes', async () => {
+        mockExecuteGatewayChat.mockResolvedValue(providerResult({ reasoning: 'full trace text' }));
+        const result = await runV1ResponsesExecution(baseParams());
+        if (!result.ok) throw new Error('expected ok');
+        const json = await result.response.json() as {
+            output: Array<{ type: string; content?: unknown; summary?: Array<{ text?: string }> }>;
+        };
+        const reasoning = json.output.find((item) => item.type === 'reasoning');
+        expect(reasoning?.content).toBe('full trace text');
+        expect(reasoning?.summary).toEqual([{ type: 'summary_text', text: 'full trace text' }]);
+    });
 });

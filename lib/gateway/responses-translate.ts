@@ -45,7 +45,7 @@ export type TranslatableInputItem =
 export type TranslatableOutputItem =
     | { type: 'message'; content?: Array<{ text?: string }> }
     | { type: 'function_call'; id: string; call_id?: string; name?: string; arguments?: string }
-    | { type: 'reasoning'; summary?: unknown }
+    | { type: 'reasoning'; summary?: unknown; content?: unknown }
     | { type: string };
 
 export type TranslationResult = {
@@ -257,7 +257,8 @@ export function translateResponsesOutputItems(output: TranslatableOutputItem[]):
         }
         switch (item.type) {
             case 'message': {
-                const text = (item as { content?: Array<{ text?: string }> }).content?.[0]?.text;
+                const content = (item as { content?: Array<{ text?: string }> | string }).content;
+                const text = Array.isArray(content) ? content[0]?.text : undefined;
                 if (typeof text === 'string') {
                     messages.push({ role: 'assistant', content: text });
                 } else {
