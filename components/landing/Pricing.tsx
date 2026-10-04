@@ -35,6 +35,7 @@ const tiers: Array<{
         features: [
             "1 active project",
             "100+ AI models",
+            "1,000 memory store",
             "Community support",
             "No credit card required",
         ],
@@ -55,6 +56,7 @@ const tiers: Array<{
         features: [
             "Unlimited projects",
             "Monetization",
+            "100,000 memory store",
             "Full security pipeline",
             "Jailbreak detection",
             "PII masking & audit trails",
@@ -77,6 +79,7 @@ const tiers: Array<{
         features: [
             "Unlimited projects",
             "Monetization",
+            "500,000 memory store",
             "Full security pipeline",
             "PII masking & jailbreak detection",
             "Team seats & collaboration",
@@ -95,6 +98,7 @@ const tiers: Array<{
         },
         features: [
             "Unlimited requests & projects",
+            "Unlimited memory",
             "Dedicated support & SLAs",
             "SSO & SAML",
             "RBAC & custom residency",
@@ -151,6 +155,36 @@ const matrixSections: Array<{
             {
                 feature: "Semantic cache",
                 values: { free: false, pro: true, team: true, enterprise: true },
+            },
+        ],
+    },
+    {
+        title: "Memory",
+        description: "The memory layer of the AI cloud. Reads never block; writes 429 with an upgrade path when a tier fills.",
+        rows: [
+            {
+                feature: "Stored memories per project",
+                values: { free: "1,000", pro: "100,000", team: "500,000", enterprise: "Unlimited" },
+            },
+            {
+                feature: "Monthly operations (search / write)",
+                values: { free: "10k / 2k", pro: "500k / 100k", team: "2M / 500k", enterprise: "Unlimited" },
+            },
+            {
+                feature: "Memory scopes",
+                values: { free: "session + user", pro: "All scopes", team: "All scopes", enterprise: "All scopes" },
+            },
+            {
+                feature: "MCP memory bridge",
+                values: { free: false, pro: true, team: true, enterprise: true },
+            },
+            {
+                feature: "Region pinning",
+                values: { free: "Default region", pro: "US / EU", team: "US / EU", enterprise: "Custom regions" },
+            },
+            {
+                feature: "GDPR export & hard-forget",
+                values: { free: true, pro: true, team: true, enterprise: true },
             },
         ],
     },
