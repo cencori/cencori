@@ -7,7 +7,7 @@
  * fans out across cost-controlled managed providers in order and returns the
  * first success.
  *
- *   Groq GPT-OSS 20B  →  Cerebras GPT-OSS 120B
+ *   Cerebras GPT-OSS 120B  →  Groq GPT-OSS 20B
  *
  * Generation is deliberately Google-free: Gemini does only embeddings for
  * memory (its dedicated project has generative models retired for new projects
@@ -18,8 +18,9 @@
  *   into an unfunded paid provider.
  *
  * Each attempt disables the gateway's own fallback (`googleOnly`) so it is
- * exactly one provider; the fan-out across providers is done HERE. Never throws
- * — returns null when the whole chain is exhausted, and the caller fails open.
+ * exactly one provider; the fan-out across providers is done HERE. Throws
+ * MemoryLlmExhaustedError (with per-attempt causes) when every provider
+ * failed — every caller fails open.
  */
 
 import { executeGatewayChat } from '@/lib/gateway/chat-executor';
@@ -30,16 +31,18 @@ import type { SubscriptionTier } from '@/lib/entitlements';
 type SupabaseAdmin = ReturnType<typeof createAdminClient>;
 
 /**
- * Ordered list of managed production models to try. Each resolves to a distinct
- * provider (Groq / Cerebras by default). Override via MEMORY_LLM_CHAIN
- * (comma-separated) without a deploy.
+ * Ordered list of managed production models to try. Cerebras 120b is primary:
+ * it runs on our paid quota (no free-tier roulette), answers warm in ~1s,
+ * and validated identical recall shape to Groq 20b. Groq 20b stays second as
+ * the free fallback. Override via MEMORY_LLM_CHAIN (comma-separated) without
+ * a deploy.
  */
 export const MEMORY_LLM_CHAIN: string[] = (process.env.MEMORY_LLM_CHAIN
     ?.split(',')
     .map(s => s.trim())
     .filter(Boolean)) ?? [
-    'openai/gpt-oss-20b',       // Groq — fast, low-cost structured extraction (primary)
-    'gpt-oss-120b',             // Cerebras — provider-diverse, higher-quality fallback
+    'gpt-oss-120b',             // Cerebras — paid primary: no free-tier roulette, ~1s warm
+    'openai/gpt-oss-20b',       // Groq — fast, low-cost free fallback
     // Gemini is intentionally NOT here: memory's generation stays Google-free
     // (Gemini serves embeddings only). Add a current Gemini model to
     // MEMORY_LLM_CHAIN for a 3rd fallback if you want one.

@@ -47,9 +47,11 @@ export const DEFAULT_RETRIEVAL_THRESHOLD: Record<'openai' | 'google', number> = 
  * are less predictable than the explicit production model ids.
  *
  * OpenAI/Anthropic/etc. are intentionally NOT allowed — a memory call must not
- * cascade into an unfunded paid provider. Anything unrecognized coerces here.
+ * cascade into an unfunded paid provider. Anything unrecognized coerces to
+ * the default below (currently the paid Cerebras leg, so coercion lands on
+ * quota we control).
  */
-export const MEMORY_MANAGED_MODEL = 'openai/gpt-oss-20b';
+export const MEMORY_MANAGED_MODEL = 'gpt-oss-120b';
 
 const ALLOWED_MEMORY_MODEL = /^(?:gpt-oss-120b|openai\/gpt-oss-20b)$/i;
 
@@ -186,8 +188,9 @@ export interface MemorySettings {
 
 export const DEFAULT_MEMORY_SETTINGS: MemorySettings = {
     enabled: true,
-    // Routine generative work uses Groq GPT-OSS 20B. Embeddings remain pinned
-    // separately to the project's existing embedding space.
+    // Paid Cerebras 120b by default (deterministic quota); Groq 20b stays the
+    // free fallback in the chain. Embeddings remain pinned separately to the
+    // project's existing embedding space.
     extractionModel: MEMORY_MANAGED_MODEL,
     extractionPrompt: null,
     minImportance: 0.5,
