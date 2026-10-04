@@ -134,8 +134,8 @@ export function SharedChatUI({ messages, title, createdAt }: SharedChatUIProps) 
     // ... existing render logic ...
 
     return (
-        <div className="min-h-screen bg-background flex flex-col items-center">
-            <SiteNav solid />
+        <div className="min-h-screen bg-background flex flex-col items-stretch">
+            <SiteNav solid className="w-full" />
 
             {/* Chat Content */}
             <main className="flex-1 w-full max-w-3xl mx-auto px-4 py-8 space-y-8 mt-20 pb-32">
