@@ -11,6 +11,16 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Invalid messages" }, { status: 400 });
         }
 
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+        if (!supabaseUrl || !serviceRoleKey) {
+            console.error("Share API misconfigured: missing Supabase env (URL or SERVICE_ROLE_KEY).");
+            return NextResponse.json(
+                { error: "Sharing is temporarily unavailable (server misconfigured)." },
+                { status: 500 },
+            );
+        }
+
         // 1. Try to identify the user for attribution (optional)
         let userId: string | null = null;
         try {
@@ -23,19 +33,28 @@ export async function POST(req: NextRequest) {
         }
 
         // 2. Use Service Role for insertion (Bypass RLS for robust public sharing)
-        const adminAuthClient = createClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.SUPABASE_SERVICE_ROLE_KEY!,
-            {
-                auth: {
-                    autoRefreshToken: false,
-                    persistSession: false,
-                },
-            }
-        );
+        const adminAuthClient = createClient(supabaseUrl, serviceRoleKey, {
+            auth: {
+                autoRefreshToken: false,
+                persistSession: false,
+            },
+        });
+
+        // Sanitize: keep only role/content, cap size to prevent abuse/oversized rows.
+        const cleanMessages = messages
+            .filter(
+                (m: any) =>
+                    m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string",
+            )
+            .slice(0, 200)
+            .map((m: any) => ({ role: m.role, content: m.content.slice(0, 20_000) }));
+
+        if (cleanMessages.length === 0) {
+            return NextResponse.json({ error: "Invalid messages" }, { status: 400 });
+        }
 
         // Derive a title
-        const firstUserMessage = messages.find((m: any) => m.role === "user");
+        const firstUserMessage = cleanMessages.find((m: any) => m.role === "user");
         let title = "AI Conversation";
         if (firstUserMessage && firstUserMessage.content) {
             title = firstUserMessage.content.slice(0, 50);
@@ -45,7 +64,7 @@ export async function POST(req: NextRequest) {
         const { data, error } = await adminAuthClient
             .from("shared_chats")
             .insert({
-                content: messages,
+                content: cleanMessages,
                 title: title,
                 user_id: userId,
             })
@@ -58,7 +77,12 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: error.message }, { status: 500 });
         }
 
-        const url = `${new URL(req.url).origin}/chat/${data.id}`;
+        // Prefer explicit site URL in prod (req.url origin can be a preview/internal host).
+        const siteUrl =
+            process.env.NEXT_PUBLIC_SITE_URL ||
+            process.env.NEXT_PUBLIC_APP_URL ||
+            new URL(req.url).origin;
+        const url = `${siteUrl.replace(/\/$/, "")}/chat/${data.id}`;
 
         return NextResponse.json({ id: data.id, url });
     } catch (error) {

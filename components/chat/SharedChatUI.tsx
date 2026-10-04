@@ -164,9 +164,27 @@ export function SharedChatUI({ messages, title, createdAt }: SharedChatUIProps) 
                                         <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground" title="Not helpful">
                                             <ThumbsDown className="h-3 w-3" />
                                         </Button>
-                                        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground" onClick={() => {
-                                            navigator.clipboard.writeText(message.content);
-                                            toast.success("Message copied");
+                                        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground" onClick={async () => {
+                                            try {
+                                                await navigator.clipboard.writeText(message.content);
+                                                toast.success("Message copied");
+                                            } catch {
+                                                try {
+                                                    const textarea = document.createElement("textarea");
+                                                    textarea.value = message.content;
+                                                    textarea.setAttribute("readonly", "");
+                                                    textarea.style.position = "fixed";
+                                                    textarea.style.opacity = "0";
+                                                    document.body.appendChild(textarea);
+                                                    textarea.select();
+                                                    const ok = document.execCommand("copy");
+                                                    document.body.removeChild(textarea);
+                                                    if (ok) toast.success("Message copied");
+                                                    else throw new Error("copy failed");
+                                                } catch {
+                                                    toast.error("Failed to copy");
+                                                }
+                                            }
                                         }} title="Copy">
                                             <Copy className="h-3 w-3" />
                                         </Button>

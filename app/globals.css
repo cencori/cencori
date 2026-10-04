@@ -128,19 +128,33 @@
 }
 
 .agent-thinking-shimmer {
+    position: relative;
     display: inline-block;
+    /* Base text is always painted: legible in light and dark even if the
+       sweep animation is disabled or background-clip:text is unsupported. */
+    color: var(--muted-foreground);
+}
+
+.agent-thinking-shimmer::after {
+    content: attr(data-text);
+    position: absolute;
+    inset: 0;
     color: transparent;
     background-image: linear-gradient(
         100deg,
-        var(--muted-foreground) 30%,
+        transparent 30%,
         var(--foreground) 48%,
-        var(--muted-foreground) 66%
+        transparent 66%
     );
     background-position: 180% 50%;
+    background-repeat: no-repeat;
     background-size: 240% 100%;
     background-clip: text;
     -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
     animation: agent-thinking-shimmer 1.9s linear infinite;
+    will-change: background-position;
+    pointer-events: none;
 }
 
 @keyframes deployment-building-shimmer {
@@ -182,7 +196,11 @@
 @media (prefers-reduced-motion: reduce) {
     .agent-thinking-shimmer {
         color: var(--muted-foreground);
-        background: none;
+        animation: none;
+    }
+
+    .agent-thinking-shimmer::after {
+        content: none;
         animation: none;
     }
 
