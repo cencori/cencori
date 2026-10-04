@@ -74,18 +74,26 @@ async function main() {
     const cfg = { supabase, projectId, organizationId, tier: 'pro' as const };
 
     const answerFn = async (query: string, recalled: string[]) => {
-        const r = await callMemoryLlm({ ...cfg, maxTokens: 120, messages: [
-            { role: 'system' as const, content: ANSWER_SYSTEM_PROMPT },
-            { role: 'user' as const, content: buildAnswerUserMessage(query, recalled) },
-        ] });
-        return r?.content?.trim() ?? '';
+        try {
+            const r = await callMemoryLlm({ ...cfg, maxTokens: 120, messages: [
+                { role: 'system' as const, content: ANSWER_SYSTEM_PROMPT },
+                { role: 'user' as const, content: buildAnswerUserMessage(query, recalled) },
+            ] });
+            return r.content?.trim() ?? '';
+        } catch {
+            return '';
+        }
     };
     const judgeFn = async (query: string, gold: string, generated: string) => {
-        const r = await callMemoryLlm({ ...cfg, maxTokens: 20, messages: [
-            { role: 'system' as const, content: JUDGE_SYSTEM_PROMPT },
-            { role: 'user' as const, content: buildJudgeUserMessage(query, gold, generated) },
-        ] });
-        return parseJudgeVerdict(r?.content ?? '');
+        try {
+            const r = await callMemoryLlm({ ...cfg, maxTokens: 20, messages: [
+                { role: 'system' as const, content: JUDGE_SYSTEM_PROMPT },
+                { role: 'user' as const, content: buildJudgeUserMessage(query, gold, generated) },
+            ] });
+            return parseJudgeVerdict(r.content ?? '');
+        } catch {
+            return false;
+        }
     };
 
     const run = await runJudgedEval({ ...cfg, reconcile, graph, scenarios }, answerFn, judgeFn);

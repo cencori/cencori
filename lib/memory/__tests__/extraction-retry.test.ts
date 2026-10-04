@@ -7,11 +7,12 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../llm', () => ({
-    callMemoryLlm: vi.fn(),
-}));
+vi.mock('../llm', async importOriginal => {
+    const actual = await importOriginal<typeof import('../llm')>();
+    return { ...actual, callMemoryLlm: vi.fn() };
+});
 
-import { callMemoryLlm } from '../llm';
+import { callMemoryLlm, MemoryLlmExhaustedError } from '../llm';
 import { extractFacts, isExplicitEmptyVerdict } from '../extraction';
 import type { MemorySettings } from '../types';
 
@@ -64,12 +65,13 @@ describe('extractFacts retry', () => {
 
     it('retries once on empty output then succeeds', async () => {
         mockedCall
-            .mockResolvedValueOnce(null)
+            .mockRejectedValueOnce(new MemoryLlmExhaustedError(['openai/gpt-oss-20b: timed out']))
             .mockResolvedValueOnce(llmResult('[{"fact": "Prefers dark mode", "importance": 0.7}]'));
         const result = await extractFacts(base());
         expect(result.facts).toEqual([{ content: 'Prefers dark mode', importance: 0.7 }]);
         expect(result.attempts).toBe(2);
         expect(result.provider).toBe('groq');
+        expect(result.attemptErrors).toEqual(['openai/gpt-oss-20b: timed out']);
         expect(mockedCall).toHaveBeenCalledTimes(2);
     });
 
@@ -91,11 +93,28 @@ describe('extractFacts retry', () => {
     });
 
     it('gives up after the retry and reports attempts', async () => {
-        mockedCall.mockResolvedValueOnce(null).mockResolvedValueOnce(null);
+        mockedCall.mockRejectedValue(new MemoryLlmExhaustedError(['openai/gpt-oss-20b: 429']));
         const result = await extractFacts(base());
         expect(result.facts).toEqual([]);
         expect(result.attempts).toBe(2);
         expect(result.provider).toBe('');
+        expect(result.attemptErrors).toEqual(['openai/gpt-oss-20b: 429', 'openai/gpt-oss-20b: 429']);
+        expect(mockedCall).toHaveBeenCalledTimes(2);
+    });
+
+    it('collects per-attempt causes when the chain is exhausted', async () => {
+        mockedCall.mockRejectedValue(
+            new MemoryLlmExhaustedError(['openai/gpt-oss-20b: 429 rate limited', 'gpt-oss-120b: 429 rate limited'])
+        );
+        const result = await extractFacts(base());
+        expect(result.facts).toEqual([]);
+        expect(result.attempts).toBe(2);
+        expect(result.attemptErrors).toEqual([
+            'openai/gpt-oss-20b: 429 rate limited',
+            'gpt-oss-120b: 429 rate limited',
+            'openai/gpt-oss-20b: 429 rate limited',
+            'gpt-oss-120b: 429 rate limited',
+        ]);
         expect(mockedCall).toHaveBeenCalledTimes(2);
     });
 

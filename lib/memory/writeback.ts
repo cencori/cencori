@@ -314,6 +314,10 @@ export interface RememberExchangeResult {
     model: string;
     /** Which provider actually ran extraction ('' when none ran). */
     provider: string;
+    /** Truncated per-attempt extraction failure causes (for log triage). */
+    attemptErrors: string[];
+    /** Extraction LLM attempts used (2 when the first attempt was retried). */
+    attempts: number;
     /** Entity-graph outcome for the exchange (absent when the graph is off). */
     graph?: EntityGraphWritebackResult;
 }
@@ -355,7 +359,7 @@ export async function rememberExchange(params: {
             console.warn(
                 `[Memory] Write ops quota exceeded (scope=${opsStatus.scope}) project=${projectId} — dropping remember`
             );
-            return { written: [], extracted: 0, quotaExceeded: false, opsExceeded: true, opsStatus, costUsd: 0, model: resolveMemoryModel(settings.extractionModel), provider: '' };
+            return { written: [], extracted: 0, quotaExceeded: false, opsExceeded: true, opsStatus, costUsd: 0, model: resolveMemoryModel(settings.extractionModel), provider: '', attemptErrors: [], attempts: 0 };
         }
     }
 
@@ -372,7 +376,7 @@ export async function rememberExchange(params: {
     });
 
     if (extraction.facts.length === 0) {
-        return { written: [], extracted: 0, quotaExceeded: false, opsExceeded: false, costUsd: extraction.costUsd, model: extraction.model, provider: extraction.provider };
+        return { written: [], extracted: 0, quotaExceeded: false, opsExceeded: false, costUsd: extraction.costUsd, model: extraction.model, provider: extraction.provider, attemptErrors: extraction.attemptErrors, attempts: extraction.attempts };
     }
 
     if (directive.scope === 'session') {
@@ -397,6 +401,8 @@ export async function rememberExchange(params: {
             costUsd: extraction.costUsd,
             model: extraction.model,
             provider: extraction.provider,
+            attemptErrors: extraction.attemptErrors,
+            attempts: extraction.attempts,
         };
     }
 
@@ -444,6 +450,8 @@ export async function rememberExchange(params: {
         costUsd: extraction.costUsd + result.embeddingCostUsd + (graph?.costUsd ?? 0),
         model: extraction.model,
         provider: extraction.provider,
+        attemptErrors: extraction.attemptErrors,
+        attempts: extraction.attempts,
         graph,
     };
 }

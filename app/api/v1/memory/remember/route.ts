@@ -144,6 +144,8 @@ export async function POST(req: NextRequest) {
                 scope: directive.scope,
                 extracted: result.extracted,
                 written: result.written.length,
+                extraction_attempts: result.attempts ?? undefined,
+                extraction_attempt_errors: result.attemptErrors?.slice(-2),
             },
             requestPayload: {
                 messages: toLoggedMessages([
