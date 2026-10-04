@@ -183,6 +183,16 @@ describe('translateResponsesOutputItems', () => {
             { role: 'assistant', content: '', reasoningContent: 'stored trace' },
         ]);
     });
+
+    it('replays a reasoning trace kept only in the content field', () => {
+        const { messages, dropped } = translateResponsesOutputItems([
+            { type: 'reasoning', content: 'content-held trace' },
+        ]);
+        expect(dropped).toEqual([]);
+        expect(messages).toEqual([
+            { role: 'assistant', content: '', reasoningContent: 'content-held trace' },
+        ]);
+    });
 });
 
 describe('validateToolPairing', () => {

@@ -43,6 +43,22 @@ describe('DeepSeek thinking trace round-trip', () => {
         expect(result.reasoning).toBe('The trace.');
     });
 
+    it('captures a fallback reasoning field when reasoning_content is absent', async () => {
+        safeFetch.mockResolvedValue(new Response(JSON.stringify({
+            id: 'chatcmpl-test',
+            object: 'chat.completion',
+            model: 'deepseek-v4-pro',
+            choices: [{
+                index: 0,
+                message: { role: 'assistant', content: 'Hi.', reasoning: 'Fallback trace.' },
+                finish_reason: 'stop',
+            }],
+            usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
+        }), { headers: { 'Content-Type': 'application/json' } }));
+        const result = await new OpenAICompatibleProvider('deepseek', 'synthetic-key').chat(request);
+        expect(result.reasoning).toBe('Fallback trace.');
+    });
+
     it('accumulates reasoning_content deltas across a stream', async () => {
         safeFetch.mockResolvedValue(new Response(new ReadableStream<Uint8Array>({
             start(controller) {

@@ -235,7 +235,8 @@ export type ResponseInputItem =
     | { type: 'message'; role: 'user' | 'assistant' | 'system'; content: string | ResponseContentPart[] }
     | { type: 'function_call'; id: string; call_id: string; name: string; arguments: string; status?: string }
     | { type: 'function_call_output'; call_id: string; output: string | ResponseContentPart[] }
-    | { type: 'file'; filename: string; content: string; mime_type?: string };
+    | { type: 'file'; filename: string; content: string; mime_type?: string }
+    | { type: 'reasoning'; summary?: Array<{ type: string; text?: string }> | string; content?: string; text?: string };
 
 /**
  * Built-in tool types for the Responses API
@@ -307,10 +308,12 @@ export interface ResponsesOutputItem {
     type: 'message' | 'function_call' | 'web_search_call' | 'file_search_call' | 'code_interpreter_call' | 'reasoning';
     status?: 'completed' | 'failed' | 'in_progress';
     role?: 'assistant';
-    content?: Array<{ type: 'output_text' | 'refusal'; text?: string; annotations?: UrlCitation[] }>;
+    content?: Array<{ type: 'output_text' | 'refusal'; text?: string; annotations?: UrlCitation[] }> | string;
     call_id?: string;
     name?: string;
     arguments?: string;
+    /** Thinking trace: full text in both shapes so content- and summary-readers each hold it. */
+    summary?: Array<{ type: string; text?: string }>;
     output?: Record<string, unknown>;
     error?: string;
 }

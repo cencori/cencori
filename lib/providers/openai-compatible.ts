@@ -116,6 +116,20 @@ export function openAICompatibleHeaders(providerName: string): Record<string, st
     return headers;
 }
 
+/** Thinking-trace fields across vendors: DeepSeek `reasoning_content`,
+ *  with `reasoning` (plain string) accepted as a fallback. Anything else —
+ *  nulls, part lists — is not a replayable trace and is ignored here. */
+function readReasoningText(value: unknown): string | undefined {
+    if (!value || typeof value !== 'object') return undefined;
+    const record = value as Record<string, unknown>;
+    for (const key of ['reasoning_content', 'reasoning'] as const) {
+        if (typeof record[key] === 'string' && (record[key] as string)) {
+            return record[key] as string;
+        }
+    }
+    return undefined;
+}
+
 /** Only providers and model families with a documented effort control receive it. */
 export function openAICompatibleReasoningEffort(
     providerName: string,
@@ -244,10 +258,7 @@ export class OpenAICompatibleProvider extends AIProvider {
             // beside `content`, and requires it back on the next request.
             // The Responses layer persists and replays it; dropping it here
             // is what turned every follow-up turn into a 400.
-            const reasoningContent =
-                typeof (message as unknown as { reasoning_content?: unknown } | undefined)?.reasoning_content === 'string'
-                    ? (message as unknown as { reasoning_content: string }).reasoning_content
-                    : undefined;
+            const reasoningContent = readReasoningText(message);
             const toolCalls: ToolCall[] | undefined = message?.tool_calls?.map(tc => {
                 if (tc.type === 'function') {
                     return {
@@ -339,10 +350,7 @@ export class OpenAICompatibleProvider extends AIProvider {
                 const toolCallDeltas = chunk.choices[0]?.delta?.tool_calls;
                 // Thinking-trace delta, same streaming shape as content.
                 // Accumulated by the caller exactly like `delta`.
-                const reasoningDelta =
-                    typeof (chunk.choices[0]?.delta as { reasoning_content?: unknown } | undefined)?.reasoning_content === 'string'
-                        ? (chunk.choices[0]?.delta as { reasoning_content: string }).reasoning_content
-                        : '';
+                const reasoningDelta = readReasoningText(chunk.choices[0]?.delta) ?? '';
 
                 // Read usage if the provider volunteers it, but don't request
                 // it with stream_options: this adapter fronts a dozen vendors
