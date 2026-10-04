@@ -10,6 +10,7 @@ import {
     translateResponsesInputItems,
     translateResponsesOutputItems,
     validateToolPairing,
+    findTracelessCallTurns,
 } from '@/lib/gateway/responses-translate';
 import {
     type TokenUsage,
@@ -559,6 +560,15 @@ export async function runV1ResponsesExecution(
                     },
                 };
             }
+        }
+
+        const tracelessCallIds = findTracelessCallTurns(messages);
+        if (tracelessCallIds.length > 0) {
+            console.warn('[Gateway/Responses] Tool-call turn without its thinking trace; provider may require reasoning_content back', {
+                requestId: gatewayCtx.requestId,
+                model: resolved.model,
+                callIds: tracelessCallIds,
+            });
         }
 
         // Handle response_format: json_schema → hidden structured output tool
