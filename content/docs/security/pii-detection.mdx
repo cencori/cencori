@@ -1,166 +1,100 @@
 ---
 title: "PII Detection"
-description: "Detect and redact Personally Identifiable Information (PII) in real-time. Configure custom rules and redaction strategies."
+description: "Opt-in PII blocking for gateway prompts. Enable per project; output enforcement needs a governance policy."
 section: "Security"
 order: 2
 ---
 
-Cencori Scan automatically detects sensitive data in both **prompts** (uploaded to AI) and **responses** (returned to users).
+> Gateway PII checks are **explicit opt-in and off by default**. If you send synthetic emails, SSNs, or test cards and get `200 OK` with unmasked data, that is the expected default — enable scanning first. This page covers the gateway. For repo scanning, see [Cencori Scan](/docs/security/scan).
 
-## Supported Entities
+## How enabling works
 
-We currently detect 25+ types of PII and secrets with high-precision models.
+1. Go to **Project > Security**.
+2. Turn on **Enable security scanning** (`security_settings.security_enabled`).
+3. Keep `filter_pii` on and tune the **Safety Threshold** slider.
 
-| Category | Entities |
-|----------|----------|
-| **Financial** | Credit Card Numbers, IBAN, Swift Codes, Bitcoin Addresses |
-| **Personal** | Email, Phone Number, SSN (US), Passport Numbers, IP Addresses |
-| **Secrets** | OpenAI Keys, AWS Keys, Slack Tokens, Private Keys (PEM) |
-| **Network** | MAC Addresses, IPv4, IPv6 |
+No row or `false` = no input scan, no PII detection, no output scan, on every tier, for both BYOK and managed keys. Creating an active custom data rule or governance policy is itself opt-in and enforces regardless of the master switch.
 
-## Redaction Modes
+Do not use `.cencorirc` for gateway PII — that file configures the [Scan CLI](/docs/security/scan) only.
 
-You can configure how Cencori handles detected PII via the Dashboard or `cencorirc`.
+## What input blocking actually detects
 
-| Mode | Behavior | Example Output |
-|------|----------|----------------|
-| **Mask** | Partially hides the data (default). | `user@example.com` -> `u***@example.com` |
-| **Redact** | Replaces with a placeholder type. | `user@example.com` -> `<EMAIL_ADDRESS>` |
-| **Block** | Rejects the request entirely. | `CENCORI_403: PII Detected` |
-| **Off** | Logs the detection but allows pass-through. | `user@example.com` |
+When enabled, the input guard scores the last user message against heuristics (not a 25+ entity ML model):
 
-## Configuration
+| Category | What fires |
+|----------|------------|
+| **Email** | Standard `name@domain.tld` plus obfuscated `dot` / `[at]` variants |
+| **Phone** | NANP-like `123-456-7890` with optional country code |
+| **SSN (US)** | `123-45-6789` |
+| **Credit card** | 13–19 digit runs with Luhn pass, or digit runs with card context (`card`, `payment`, etc.) |
+| **Injection keywords** | `ignore previous instructions`, `you are now`, `jailbreak`, `bypass`, etc. (counts toward the same score) |
 
-To configure PII rules programmatically (e.g., for Cencori Scan CLI):
+Score is compared against your Safety Threshold. On block the gateway returns `403` with `code: security_violation` (or `data_rule_block` for custom rules), logs a `security_incidents` row, and the request never reaches the provider.
 
-```json
-{
-  "error": "Request blocked due to PII detection",
-  "code": "PII_DETECTED",
-  "status": 403,
-  "details": {
-    "patterns_detected": ["EMAIL", "PHONE_NUMBER"],
-    "incident_id": "inc_abc123"
-    
-// .cencorirc
-{
-  "pii": {
-    "email": "mask",
-    "credit_card": "block",
-    "ssn": "redact",
-    "phone": "off"
-  }
-}
-```
-The request never reaches the AI provider, protecting your users' data.
+There is no per-field Mask / Redact / Block / Off mode, and no client-visible masking like `u***@example.com`. The gateway either **blocks (403)** or **passes through (200 with original text)**. Tokenize / redact actions from custom data rules or governance policies protect the upstream provider only — the token map is detokenized before the response returns to you, so your client still sees the original.
 
-## Handling PII Detection in Your Code
+## Handling blocks in code
 
 ```typescript
 try {
   const response = await cencori.ai.chat({
     model: 'gpt-4o',
-    messages: [{ 
-      role: 'user', 
-      content: userInput // May contain PII
-    }],
+    messages: [{ role: 'user', content: userInput }],
   });
-  
   return response.content;
 } catch (error: any) {
-  if (error.code === 'PII_DETECTED') {
-    // Handle PII detection gracefully
+  if (error.code === 'security_violation' || error.code === 'data_rule_block') {
     return {
       error: 'Your message contains sensitive information. Please remove personal details.',
-      pii_types: error.details.patterns_detected
+      reasons: error.reasons,
     };
   }
-  
   throw error;
 }
 ```
 
-## Redaction Mode (Coming Soon)
+Actual error shape is flat (`error`, `message`, `code`, `reasons`) in the 4xx range — see [Error Reference](/docs/api/errors). There is no `PII_DETECTED` code with `details.patterns_detected`.
 
-Instead of blocking, you can enable automatic redaction. Cencori will replace PII with placeholders:
+## Output PII is not blocked by this switch
 
-```text
-Original:
-"My email is john@example.com and my phone is 555-1234"
+Enabling the master switch alone does **not** block PII in model responses. The legacy output scanner is intentionally non-blocking (broad heuristics caused false-positive stream failures). To enforce output:
 
-Redacted:
-"My email is [EMAIL_REDACTED] and my phone is [PHONE_REDACTED]"
-```
+- Install a governance template with output rules (e.g. **PCI-DSS Card-Data Protection**, **NDPR PII Redaction**) in **Governance**, then request activation + teammate approval, or
+- Create an active custom data rule for the output direction.
 
-This allows the request to proceed while protecting sensitive data.
+Without one of those, output SSN / card data returns `200 OK` unmasked even with scanning on. If you need proof for an audit, test input blocking and output policy separately.
 
-## Viewing PII Incidents in Dashboard
+## Viewing PII incidents
 
-All PII detection events are logged as security incidents. To view:
+Incidents are only written when a guard actually fires. With scanning off, expect no incidents.
 
 1. Navigate to your project dashboard
 2. Click "Security" in the sidebar
-3. Filter by "PII Detection" incident type
-4. View details including:
-   - Which PII types were detected
-   - Timestamp and user info
-   - The triggering request (PII redacted)
+3. Filter by PII / jailbreak incident type
 
-## Custom Patterns (Enterprise)
+## Custom patterns
 
-Enterprise customers can add custom PII patterns specific to their business:
-- Employee IDs (e.g., EMP-12345)
-- Internal project codes
-- Customer reference numbers
-- Industry-specific identifiers (medical record numbers, account IDs)
+Use dashboard custom data rules for business IDs (e.g. `ORD-\d{6}`, employee IDs). For output redaction and approval-gated flows, prefer [Governance](/docs/security/governance) policies over regex alone.
 
-Contact sales to configure custom patterns for your organization.
+## False positives
 
-## Handling False Positives
+Fictional data (e.g. `test@example.com`) can score as PII. Mitigations:
 
-Sometimes legitimate content is flagged as PII:
+- Lower the Safety Threshold (more lenient)
+- Turn off `filter_pii` for non-production projects
+- Narrow custom rules; keep gateway `passthrough: true` / `fast_lane: true` only for callers that run their own safety layers (it skips all guards)
 
-> [!TIP]
-> **Example: Fictional Data**
-> "Create a sample user profile with email test@example.com" might be flagged, even though it's fictional.
+## Best practices
 
-> [!NOTE]
-> **Solution: Whitelist Domains**
-> Configure Cencori to allow specific domains or patterns in your project settings.
+- Keep scanning **off** for speed unless you need enforcement; turn it **on** for production projects handling real user data.
+- Educate users to avoid sharing personal information in prompts — the gateway is a block, not a mask.
+- Review incidents weekly; adjust threshold rather than assuming per-type Mask/Redact settings exist.
+- For healthcare / finance strict compliance, combine input blocking + a governance output policy (deny-by-default) + audit ledger evidence packs.
 
-## Best Practices
+## Compliance benefits
 
-- Enable PII detection for all production projects
-- Educate users to avoid sharing personal information in prompts
-- Review PII incidents weekly to identify patterns
-- Use redaction mode for non-critical PII (e.g., names in support tickets)
-- Block mode for strict compliance (healthcare, finance)
-- Monitor false positive rates and adjust sensitivity
-
-## Compliance Benefits
-
-PII detection helps you comply with:
+When enabled and logged, PII blocking supports:
 - **GDPR:** Prevent unauthorized processing of personal data
 - **HIPAA:** Protect patient health information
 - **SOC 2:** Demonstrate data protection controls
 - **CCPA:** California Consumer Privacy Act compliance
-## Custom Regex Rules
-
-You can add custom detectors for business-specific data (e.g., User IDs, Order Numbers).
-
-```json
-// .cencorirc
-{
-  "custom_rules": [
-    {
-      "name": "internal_order_id",
-      "regex": "ORD-\\d{6}",
-      "action": "redact"
-    }
-  ]
-}
-```
-
-## False Positives
-
-If legitimate data is being flagged, you can whitelist specific values or contexts in the Dashboard > Security > Whitelist.

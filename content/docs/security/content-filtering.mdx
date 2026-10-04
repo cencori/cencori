@@ -1,34 +1,36 @@
 ---
 title: "Content Filtering"
-description: "Filter harmful output from AI models. Configure thresholds for hate, violence, and self-harm."
+description: "Opt-in harmful-content checks. Enable per project; output enforcement needs a policy."
 section: "Security"
 order: 4
 ---
 
-Content Filtering ensures your application doesn't generate toxic, harmful, or brand-damaging content. Cencori unifies moderation across all providers.
+> Content filtering is **explicit opt-in and off by default**. Enable in **Project > Security** before expecting blocks.
 
 ## Categories
 
-We map provider-specific safety settings to a unified schema:
+When enabled, input scoring covers harmful/injection keywords unified across providers (not provider-native safety settings):
 
-| Category | Definition |
+| Category | What fires |
 |----------|------------|
-| **Hate** | Content that expresses, incites, or promotes hate based on identity. |
-| **Violence** | Content that depicts death, violence, or physical injury. |
-| **Self-Harm** | Content that encourages self-mutilation or suicide. |
-| **Sexual** | Content meant to arouse sexual excitement or depicts sexual violence. |
+| **Hate / Violence / Self-Harm / Sexual** | Provider-mapped moderation via the standalone [Moderation API](/docs/api/moderation) when called explicitly; gateway input guard scores injection/PII keywords and jailbreak signals toward the Safety Threshold |
+| **Jailbreak / Injection** | See [Prompt Injection](/docs/security/prompt-injection) |
+| **PII** | See [PII Detection](/docs/security/pii-detection) |
 
-## Thresholds
+There are no fixed Low (0.8) / Medium (0.5) / High (0.2) gateway cutoffs. You get one **Safety Threshold** slider in **Project > Security** (higher = stricter). Input score is compared against that value; output uses threshold − 0.1 internally when a governance policy enables output evaluation.
 
-You can tune the sensitivity for each category. Scores range from `0.0` (Safe) to `1.0` (Harmful).
+## Output note
 
-- **Low (0.8)**: Only blocks extreme content.
-- **Medium (0.5)**: Default. Blocks clear violations.
-- **High (0.2)**: Strict. Blocks ambiguous content.
+The gateway does **not** auto-block toxic output via the master switch. For output categories, either:
+
+- Call the standalone Moderation API explicitly, or
+- Install a [Governance](/docs/security/governance) policy with output rules (block / redact / require_approval).
+
+This avoids false-positive stream terminations from broad substring heuristics (e.g. normal coding answers mentioning "vulnerability").
 
 ## Webhooks & Alerts
 
-Receive real-time notifications when your application generates flagged content.
+Receive notifications when a guard actually fires (no events fire while scanning is off):
 
 1.  Go to **Dashboard > Settings > Webhooks**.
 2.  Add an endpoint URL (e.g., your Slack webhook or pagerduty).

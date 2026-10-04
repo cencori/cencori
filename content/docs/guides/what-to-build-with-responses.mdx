@@ -275,10 +275,10 @@ For numeric work today, have the model emit structured output (recipe 3) and do 
 
 ## What every recipe gets for free
 
-None of these bypass your controls. Every request above passes through the same pipeline as any gateway call:
+None of these bypass your controls when controls are enabled. Every request above passes through the same pipeline as any gateway call:
 
-- **Input guard** — prompt-injection and jailbreak detection, PII detection and tokenization before the prompt reaches a provider
-- **Output guard** — the response is checked, and tokenized values are restored on the way back to you
+- **Input guard (opt-in)** — prompt-injection and jailbreak detection, PII blocking before the prompt reaches a provider. Off by default; enable in **Project > Security**.
+- **Output guard** — legacy output scanning alone never blocks; output enforcement requires a governance policy or custom data rule. Tokenized values are restored on the way back to you, so the client still sees the original.
 - **Audit logging** — model, provider, tokens, cost, latency, and end user recorded per request
 - **Failover** — provider outages route to a fallback without changing your code
 - **Cost tracking** — provider cost and your charge, per request

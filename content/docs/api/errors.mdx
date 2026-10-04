@@ -76,7 +76,7 @@ The AI endpoints return these via `error` (and `code` where meaningful):
 | `provider_timeout` | 504 | Long-running provider job (e.g. AssemblyAI polling) expired |
 | `internal_error` | 500 | Unexpected server failure |
 
-Security guards (input/output) return their own blocked responses with `error`, `message`, and `reasons` in the 4xx range.
+Security guards (input/output) return their own blocked responses with `error`, `message`, and `reasons` in the 4xx range — but only when enabled. Input blocks require **Project > Security > Enable security scanning**; output blocks additionally require a governance policy or active custom data rule. With everything off (default), PII and injections return `200 OK` unmodified.
 
 ## Rate Limit Headers
 

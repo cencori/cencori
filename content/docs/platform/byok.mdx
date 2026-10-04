@@ -1,11 +1,11 @@
 ---
 title: "Bring Your Own Key (BYOK)"
-description: "Connect your own provider API keys for provider-level control while keeping Cencori routing, security, and observability."
+description: "Connect your own provider API keys for provider-level control while keeping Cencori routing, observability, and opt-in security."
 section: "Platform"
 order: 5
 ---
 
-**Bring Your Own Key (BYOK)** allows you to use your existing API keys (OpenAI, Anthropic, Google, etc.) within Cencori. This gives you control over provider access while still using Cencori's observability, routing, and security.
+**Bring Your Own Key (BYOK)** allows you to use your existing API keys (OpenAI, Anthropic, Google, etc.) within Cencori. This gives you control over provider access while still using Cencori's observability and routing. Security scanning behaves identically for BYOK and managed keys — it runs only after explicit opt-in.
 
 ## Why Use BYOK?
 
@@ -50,3 +50,5 @@ At a zero credit balance, requests that identify an active project BYOK key befo
 ## Security
 
 Your keys are encrypted at rest using AES-256 encryption. They are strictly used for making requests to the respective provider and are never logged or exposed via the API.
+
+Security scanning is not automatic for BYOK or managed keys. It is explicit opt-in via **Project > Security > Enable security scanning** (default off). A `200 OK` with unmasked PII or unblocked injections means the project has no active guard — not a BYOK bypass. Output blocking additionally requires a governance policy or custom data rule; the master switch alone does not block output.

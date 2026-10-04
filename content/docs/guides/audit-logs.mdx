@@ -28,11 +28,13 @@ AI request logs capture every AI request processed through the Cencori gateway. 
 - Provider used (including failover details)
 - Status code (success/error)
 
-### Security Metadata
+### Security Metadata (populated only when guards/policies fire)
 - PII detection results
 - Content filter flags
 - Prompt injection score
 - Security incidents linked
+
+With scanning off (default) these fields are empty / zero-risk — requests still log with model, tokens, cost, and latency.
 
 ## Viewing Logs in the Dashboard
 

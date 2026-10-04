@@ -31,7 +31,7 @@ Cencori does all three. You add one package and move on.
 One endpoint, 100+ models. Send a request with any supported model ID and Cencori routes it to the right provider.
 
 - **Routing & failover** — if a provider is down, requests are rerouted automatically
-- **Security scanning** — PII is masked and prompt injections are blocked before the request leaves Cencori
+- **Opt-in security scanning** — PII / prompt-injection checks run only after you enable them in **Project > Security**. Default is off, so new projects pass traffic through unchanged.
 - **Logs** — every request is logged with the full prompt, response, token count, cost, and latency
 
 ### Monetization
@@ -64,7 +64,7 @@ Meter AI usage per user and charge them for it. Cencori tracks every token, appl
       <GhostBox className="py-10 flex flex-col items-center justify-center text-center">
         <span className="text-lg font-bold tracking-tight">Scan</span>
         <GhostDashedLine className="w-16 my-3" />
-        <span className="text-xs text-muted-foreground">Block PII, injections</span>
+        <span className="text-xs text-muted-foreground">Opt-in PII, injection checks</span>
       </GhostBox>
       <GhostBox className="py-10 flex flex-col items-center justify-center text-center">
         <span className="text-lg font-bold tracking-tight">Bill</span>
@@ -107,7 +107,7 @@ console.log(response.content);
 console.log(response.usage); // tokens tracked and billed to user_123
 ```
 
-That's it. The request is routed, scanned, logged, and billed — in one call.
+That's it. The request is routed, logged, and billed — in one call. Security scanning is off by default; enable it in **Project > Security** if you need input blocking, then add a governance policy or custom data rule if you also need output enforcement.
 
 ---
 
@@ -119,4 +119,4 @@ That's it. The request is routed, scanned, logged, and billed — in one call.
 | **[Add to an existing app](/docs/getting-started/existing-product)** | Wire Cencori into a Next.js or Python backend you already have. |
 | **[AI Gateway](/docs/ai/gateway)** | See all supported models, routing, and failover options. |
 | **[Monetization](/docs/platform/monetization)** | Set up Stripe Connect, wallets, and pricing. |
-| **[Security](/docs/security/scan)** | Configure PII masking and prompt injection rules. |
+| **[Security](/docs/security/scan)** | Enable opt-in PII / prompt-injection checks and governance policies. |

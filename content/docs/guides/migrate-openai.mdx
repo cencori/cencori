@@ -9,7 +9,7 @@ order: 2
 
 If you're currently using the OpenAI SDK directly, switching to Cencori gives you immediate access to:
 
-- **Built-in Security:** Automatic PII detection and prompt injection protection
+- **Opt-in Security:** PII detection and prompt injection blocking (off by default; enable in Project > Security)
 - **Complete Logging:** Every request logged with full metadata
 - **Multi-Provider Support:** Switch to Anthropic or Gemini without code changes
 - **Cost Tracking:** Real-time cost monitoring and analytics
@@ -46,7 +46,7 @@ const cencori = new Cencori({
   apiKey: process.env.CENCORI_API_KEY,
 });
 
-// Automatic security scanning
+// Security scanning is opt-in (Project > Security)
 // Request logging built-in
 // Multi-provider support
 const response = await cencori.ai.chat({
@@ -164,7 +164,7 @@ const response = await cencori.ai.chat({
 ```
 
 ### Security Monitoring
-View security incidents in your dashboard - no configuration needed. Cencori automatically detects PII leaks, prompt injection, and harmful content.
+Enable scanning in **Project > Security** to detect PII and prompt injection on inputs. Output enforcement additionally requires a governance policy or custom data rule. With scanning off (default), requests pass through as `200 OK` and no incidents are logged.
 
 ### Cost Breakdown
 See exact costs per request, per model, per provider in real-time. Compare costs across different models easily.

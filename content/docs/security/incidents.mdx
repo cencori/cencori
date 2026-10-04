@@ -7,17 +7,19 @@ order: 6
 
 ## What are Security Incidents?
 
-A security incident is any event where Cencori detects suspicious, malicious, or policy-violating activity in an AI request or response. All incidents are logged for review and compliance.
+A security incident is any event where an **enabled** guard blocks or flags policy-violating activity in an AI request or response. Scanning is off by default, so projects with no active guard log no incidents. All fired incidents are logged for review and compliance.
 
 ## Incident Types
 
-| Type | Description | Default Action |
+| Type | Description | Action when guard is enabled |
 |------|-------------|----------------|
-| **PII Detection** | Personal data found in prompt | Block |
-| **Prompt Injection** | Attempt to manipulate AI behavior | Block |
-| **Content Filter** | Harmful content detected | Block |
+| **PII Detection** | Personal data found in prompt | Block (input) |
+| **Prompt Injection** | Attempt to manipulate AI behavior | Block (input) |
+| **Content Filter** | Harmful content matched by policy | Block (only via governance / custom rule for output) |
 | **Rate Limit** | Usage quota exceeded | Block |
 | **Suspicious Pattern** | Unusual usage detected | Log |
+
+With the master switch off and no custom rule or governance policy, PII / injection / content rows do not fire — requests return `200 OK` and no incident is written.
 
 ## Severity Levels
 
