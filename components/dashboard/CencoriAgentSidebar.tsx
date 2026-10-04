@@ -75,7 +75,7 @@ function getSurfaceLabel(pathname: string, section: string | null) {
 function ThinkingState() {
     return (
         <div className="py-3 text-xs" role="status" aria-live="polite">
-            <span className="agent-thinking-shimmer">Thinking</span>
+            <span className="agent-thinking-shimmer" data-text="Thinking">Thinking</span>
         </div>
     );
 }

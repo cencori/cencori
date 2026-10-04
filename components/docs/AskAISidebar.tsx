@@ -214,8 +214,45 @@ export function AskAISidebar({ open, onClose }: AskAISidebarProps) {
         }
     };
 
-    const copyMessage = (content: string) => {
-        navigator.clipboard.writeText(content);
+    const copyTextToClipboard = async (text: string): Promise<boolean> => {
+        // Primary path: async Clipboard API. On Safari/iOS this can reject with
+        // NotAllowedError when called after an `await` (user activation expired),
+        // so callers must not treat a clipboard failure as a share failure.
+        try {
+            if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(text);
+                return true;
+            }
+        } catch {
+            // Fall through to the legacy path below.
+        }
+        // Legacy fallback: hidden textarea + execCommand works in older Safari
+        // and other contexts where the async API is unavailable/blocked.
+        try {
+            const textarea = document.createElement("textarea");
+            textarea.value = text;
+            textarea.setAttribute("readonly", "");
+            textarea.style.position = "fixed";
+            textarea.style.opacity = "0";
+            document.body.appendChild(textarea);
+            textarea.select();
+            const ok = document.execCommand("copy");
+            document.body.removeChild(textarea);
+            return ok;
+        } catch {
+            return false;
+        }
+    };
+
+    const copyMessage = async (content: string) => {
+        const ok = await copyTextToClipboard(content);
+        if (ok) {
+            toast.success("Message copied");
+        } else {
+            toast.error("Failed to copy", {
+                description: "Your browser blocked clipboard access.",
+            });
+        }
     };
 
     const regenerate = () => {
@@ -246,14 +283,14 @@ export function AskAISidebar({ open, onClose }: AskAISidebarProps) {
         const text = getConversationText();
         if (!text) return;
 
-        try {
-            await navigator.clipboard.writeText(text);
+        const ok = await copyTextToClipboard(text);
+        if (ok) {
             toast.success("Conversation copied", {
                 description: "The conversation transcript has been copied to your clipboard.",
             });
-        } catch (err) {
+        } else {
             toast.error("Failed to copy", {
-                description: "There was an error copying to clipboard.",
+                description: "Your browser blocked clipboard access. Select and copy manually.",
             });
         }
     };
@@ -268,23 +305,68 @@ export function AskAISidebar({ open, onClose }: AskAISidebarProps) {
             const response = await fetch("/api/chat/share", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ messages }),
+                body: JSON.stringify({
+                    messages: messages.map((m) => ({ role: m.role, content: m.content })),
+                }),
             });
 
-            if (!response.ok) throw new Error("Failed to share");
+            if (!response.ok) {
+                let detail = "Something went wrong while creating the link.";
+                try {
+                    const errBody = await response.json();
+                    if (errBody?.error) detail = errBody.error;
+                } catch {
+                    // Keep generic message.
+                }
+                throw new Error(detail);
+            }
 
             const { url } = await response.json();
 
             toast.dismiss(loadingToast);
 
-            await navigator.clipboard.writeText(url);
-            toast.success("Link copied to clipboard", {
-                description: "Share this link to show your conversation.",
+            // Link creation already succeeded — clipboard is best-effort only.
+            // On mobile Safari clipboard-write after an async fetch loses user
+            // activation and rejects; surfacing the URL with a direct-gesture
+            // Copy/Share action keeps sharing usable there.
+            const copied = await copyTextToClipboard(url);
+            if (copied) {
+                toast.success("Link copied to clipboard", {
+                    description: url,
+                });
+                return;
+            }
+
+            const canNativeShare =
+                typeof navigator !== "undefined" && typeof (navigator as any).share === "function";
+            toast.success("Share link created", {
+                description: url,
+                action: {
+                    label: canNativeShare ? "Share" : "Copy",
+                    onClick: async () => {
+                        if (canNativeShare) {
+                            try {
+                                await (navigator as any).share({ url });
+                                return;
+                            } catch {
+                                // User cancelled or share failed — fall through to copy.
+                            }
+                        }
+                        const retryOk = await copyTextToClipboard(url);
+                        if (retryOk) {
+                            toast.success("Link copied to clipboard");
+                        } else {
+                            // Last resort: select the URL so the user can long-press/copy.
+                            window.prompt("Copy this link:", url);
+                        }
+                    },
+                },
             });
         } catch (err) {
+            console.error("Share conversation failed:", err);
             toast.dismiss(loadingToast);
             toast.error("Failed to share conversation", {
-                description: "Something went wrong while creating the link.",
+                description: err instanceof Error ? err.message : "Something went wrong while creating the link.",
             });
         }
     };
