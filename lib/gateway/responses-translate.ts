@@ -18,7 +18,10 @@
  *   `toOpenAIMessages` emits as `reasoning_content`. Thinking-mode providers
  *   require their own trace back verbatim.
  * - `function_call` always carries its name and arguments as `tool_calls`
- *   (the bare-`toolCallId` shape that dropped them is gone everywhere).
+ *   (the bare-`toolCallId` shape that dropped them is gone everywhere), and
+ *   a contiguous run of calls shares ONE assistant turn — the canonical
+ *   parallel-call shape. One turn per call is what 400'd parallel fan-outs
+ *   on strict providers while sequential histories passed.
  * - A contiguous run of `function_call_output` items emits every `tool` turn
  *   before any image-caption `user` turn, so nothing the translator itself
  *   generates can split a tool block and trip strict pairing checks.
@@ -85,6 +88,50 @@ function translateFileItem(item: { filename: string; content: string; mime_type?
 }
 
 /**
+ * One assistant turn under construction. A parallel fan-out arrives as
+ * consecutive `function_call` items (with the turn's `reasoning` beside
+ * them); the chat wire format carries those as ONE assistant message with
+ * N `tool_calls`, and strict providers 400 when each call rides its own
+ * turn instead. Sequential histories (call, output, call, output) flush
+ * between turns, so each pair keeps the adjacency it already had.
+ */
+class PendingAssistantTurn {
+    private calls: Array<{ id: string; name: string; args: string }> = [];
+    private reasoning: string[] = [];
+
+    get empty(): boolean {
+        return this.calls.length === 0 && this.reasoning.length === 0;
+    }
+
+    addCall(id: string, name: string, args: string): void {
+        this.calls.push({ id, name, args });
+    }
+
+    addReasoning(text: string): void {
+        this.reasoning.push(text);
+    }
+
+    flush(): UnifiedMessage | null {
+        if (this.empty) return null;
+        const turn: UnifiedMessage = {
+            role: 'assistant',
+            content: '',
+            ...(this.reasoning.length > 0 ? { reasoningContent: this.reasoning.join('\n') } : {}),
+        };
+        if (this.calls.length > 0) {
+            turn.tool_calls = this.calls.map((call) => ({
+                id: call.id,
+                type: 'function' as const,
+                function: { name: call.name, arguments: call.args },
+            }));
+        }
+        this.calls = [];
+        this.reasoning = [];
+        return turn;
+    }
+}
+
+/**
  * Translate Responses input items to chat turns. One item in, the same turns
  * out, in order — except image-caption follow-ups, which wait for the end of
  * their tool-output run (see module doc).
@@ -114,11 +161,22 @@ export function translateResponsesInputItems(
         deferredImages = [];
     };
 
+    // Parallel calls accumulate into one assistant turn; anything else flushes.
+    const pending = new PendingAssistantTurn();
+    const flushPending = () => {
+        const turn = pending.flush();
+        if (turn) messages.push(turn);
+    };
+
     for (const item of input) {
         // A non-output item ends the tool-output run: captions flush first so
-        // they land after the whole block, never inside it.
+        // they land after the whole block, never inside it. A pending call
+        // run flushes too — its answers, if any, belong to earlier turns.
         if (item.type !== 'function_call_output' && deferredImages.length > 0) {
             flushDeferredImages();
+        }
+        if (item.type !== 'function_call' && item.type !== 'reasoning' && !pending.empty) {
+            flushPending();
         }
         switch (item.type) {
             case 'message': {
@@ -139,18 +197,7 @@ export function translateResponsesInputItems(
                     name: string;
                     arguments: string;
                 };
-                messages.push({
-                    role: 'assistant',
-                    content: '',
-                    toolCallId: call.call_id,
-                    tool_calls: [
-                        {
-                            id: call.call_id,
-                            type: 'function',
-                            function: { name: call.name, arguments: call.arguments },
-                        },
-                    ],
-                });
+                pending.addCall(call.call_id, call.name, call.arguments);
                 break;
             }
             case 'function_call_output': {
@@ -178,7 +225,7 @@ export function translateResponsesInputItems(
                     dropped.push('reasoning item with no readable summary or text');
                     break;
                 }
-                messages.push({ role: 'assistant', content: '', reasoningContent: text });
+                pending.addReasoning(text);
                 break;
             }
             default:
@@ -186,6 +233,7 @@ export function translateResponsesInputItems(
                 break;
         }
     }
+    flushPending();
     flushDeferredImages();
 
     return { messages, dropped };
@@ -200,8 +248,13 @@ export function translateResponsesInputItems(
 export function translateResponsesOutputItems(output: TranslatableOutputItem[]): TranslationResult {
     const messages: UnifiedMessage[] = [];
     const dropped: string[] = [];
+    const pending = new PendingAssistantTurn();
 
     for (const item of output) {
+        if (item.type !== 'function_call' && item.type !== 'reasoning' && !pending.empty) {
+            const turn = pending.flush();
+            if (turn) messages.push(turn);
+        }
         switch (item.type) {
             case 'message': {
                 const text = (item as { content?: Array<{ text?: string }> }).content?.[0]?.text;
@@ -219,18 +272,7 @@ export function translateResponsesOutputItems(output: TranslatableOutputItem[]):
                     dropped.push(`stored function_call item '${callId}' with no name or arguments`);
                     break;
                 }
-                messages.push({
-                    role: 'assistant',
-                    content: '',
-                    toolCallId: callId,
-                    tool_calls: [
-                        {
-                            id: callId,
-                            type: 'function',
-                            function: { name: call.name, arguments: call.arguments },
-                        },
-                    ],
-                });
+                pending.addCall(callId, call.name, call.arguments);
                 break;
             }
             case 'reasoning': {
@@ -239,7 +281,7 @@ export function translateResponsesOutputItems(output: TranslatableOutputItem[]):
                     dropped.push('stored reasoning item with no readable summary');
                     break;
                 }
-                messages.push({ role: 'assistant', content: '', reasoningContent: text });
+                pending.addReasoning(text);
                 break;
             }
             default:
@@ -250,6 +292,8 @@ export function translateResponsesOutputItems(output: TranslatableOutputItem[]):
                 break;
         }
     }
+    const trailing = pending.flush();
+    if (trailing) messages.push(trailing);
 
     return { messages, dropped };
 }
