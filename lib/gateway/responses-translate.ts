@@ -359,3 +359,25 @@ export function validateToolPairing(messages: UnifiedMessage[]): PairingViolatio
 
     return violations;
 }
+
+/**
+ * Tool-call turns in a thinking thread that carry no trace. A thread holds
+ * reasoning if and only if the provider thought on it, so a call turn
+ * without its sibling trace is the exact shape the provider rejects with
+ * "`reasoning_content` must be passed back" — and it arrives specifically
+ * via resume-after-interrupt, where the interrupted turn persisted its
+ * calls but its trace never completed, so no echo can restore it.
+ * Warn-only: a turn the provider genuinely produced tracelessly must
+ * still dispatch.
+ */
+export function findTracelessCallTurns(messages: UnifiedMessage[]): string[] {
+    const threadHasReasoning = messages.some(
+        (msg) => msg.role === 'assistant' && !!msg.reasoningContent,
+    );
+    if (!threadHasReasoning) return [];
+    return messages.flatMap((msg) =>
+        msg.role === 'assistant' && (msg.tool_calls?.length ?? 0) > 0 && !msg.reasoningContent
+            ? msg.tool_calls!.map((call) => call.id)
+            : [],
+    );
+}

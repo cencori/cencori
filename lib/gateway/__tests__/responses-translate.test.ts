@@ -5,6 +5,7 @@ import {
     translateResponsesInputItems,
     translateResponsesOutputItems,
     validateToolPairing,
+    findTracelessCallTurns,
 } from '../responses-translate';
 import { toOpenAIMessages } from '@/lib/providers/utils';
 
@@ -241,5 +242,43 @@ describe('validateToolPairing', () => {
         ]);
         expect(violations).toEqual([{ kind: 'split_block', id: 'call-2', index: 2 }]);
         expect(violations.some((v) => v.kind !== 'split_block')).toBe(false);
+    });
+});
+
+describe('findTracelessCallTurns', () => {
+    const tracedCall = (id: string) => ({
+        role: 'assistant' as const,
+        content: '',
+        reasoningContent: 'trace',
+        tool_calls: [{ id, type: 'function' as const, function: { name: 'shell', arguments: '{}' } }],
+    });
+    const untracedCall = (id: string) => ({
+        role: 'assistant' as const,
+        content: '',
+        tool_calls: [{ id, type: 'function' as const, function: { name: 'shell', arguments: '{}' } }],
+    });
+
+    it('returns empty when the thread never thought', () => {
+        expect(findTracelessCallTurns([
+            { role: 'user', content: 'run it' },
+            untracedCall('call-1'),
+            { role: 'tool' as const, content: 'ok', toolCallId: 'call-1' },
+        ])).toEqual([]);
+    });
+
+    it('returns empty when every call turn carries its trace', () => {
+        expect(findTracelessCallTurns([
+            tracedCall('call-1'),
+            { role: 'tool' as const, content: 'ok', toolCallId: 'call-1' },
+        ])).toEqual([]);
+    });
+
+    it('names the call ids on traceless turns in a thinking thread', () => {
+        expect(findTracelessCallTurns([
+            tracedCall('call-1'),
+            { role: 'tool' as const, content: 'ok', toolCallId: 'call-1' },
+            untracedCall('call-2'),
+            { role: 'tool' as const, content: 'ok', toolCallId: 'call-2' },
+        ])).toEqual(['call-2']);
     });
 });
