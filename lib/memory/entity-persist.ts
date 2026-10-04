@@ -62,22 +62,27 @@ export async function extractEntities(params: {
     const preferModel = resolveMemoryModel(params.model);
     try {
         // Fan out across the managed production chain; first provider to answer wins.
-        const response = await callMemoryLlm({
-            supabase: params.supabase,
-            projectId: params.projectId,
-            organizationId: params.organizationId,
-            tier: params.tier,
-            requestId: params.requestId,
-            preferModel,
-            maxTokens: 800,
-            messages: [
-                { role: 'system', content: ENTITY_EXTRACTION_PROMPT },
-                {
-                    role: 'user',
-                    content: `USER:\n${params.userText.slice(0, 8000)}\n\nASSISTANT:\n${params.assistantText.slice(0, 8000)}`,
-                },
-            ],
-        });
+        let response;
+        try {
+            response = await callMemoryLlm({
+                supabase: params.supabase,
+                projectId: params.projectId,
+                organizationId: params.organizationId,
+                tier: params.tier,
+                requestId: params.requestId,
+                preferModel,
+                maxTokens: 800,
+                messages: [
+                    { role: 'system', content: ENTITY_EXTRACTION_PROMPT },
+                    {
+                        role: 'user',
+                        content: `USER:\n${params.userText.slice(0, 8000)}\n\nASSISTANT:\n${params.assistantText.slice(0, 8000)}`,
+                    },
+                ],
+            });
+        } catch {
+            response = null;
+        }
         if (!response) {
             return { extraction: { entities: [], relations: [] }, costUsd: 0, model: preferModel };
         }

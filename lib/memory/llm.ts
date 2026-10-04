@@ -72,6 +72,18 @@ export interface MemoryLlmResult {
     model: string;
     provider: string;
     costUsd: number;
+    /** Truncated per-attempt failure messages (empty when the first attempt succeeded). */
+    attemptErrors: string[];
+}
+
+/** Thrown when every provider in the chain failed. Carries the per-attempt causes. */
+export class MemoryLlmExhaustedError extends Error {
+    attemptErrors: string[];
+    constructor(attemptErrors: string[]) {
+        super('Memory LLM fan-out exhausted — all providers failed.');
+        this.name = 'MemoryLlmExhaustedError';
+        this.attemptErrors = attemptErrors;
+    }
 }
 
 /** Build the attempt order, pinning a configured chain member first. */
@@ -84,11 +96,14 @@ function orderedChain(preferModel?: string): string[] {
 
 /**
  * Run a memory generative call across the provider chain. Returns the first
- * provider that answers, or null if every provider failed (rate-limited/errored).
+ * provider that answers. Throws MemoryLlmExhaustedError (with per-attempt
+ * causes) when every provider failed — every caller fails open, and the
+ * causes land in request logs for triage instead of a bare null.
  */
-export async function callMemoryLlm(params: MemoryLlmParams): Promise<MemoryLlmResult | null> {
+export async function callMemoryLlm(params: MemoryLlmParams): Promise<MemoryLlmResult> {
     const chain = orderedChain(params.preferModel);
     let attempts = 0;
+    const attemptErrors: string[] = [];
 
     for (const model of chain) {
         attempts++;
@@ -115,13 +130,15 @@ export async function callMemoryLlm(params: MemoryLlmParams): Promise<MemoryLlmR
                 model: response.actualModel ?? model,
                 provider: response.actualProvider,
                 costUsd: response.cost?.cencoriChargeUsd ?? 0,
+                attemptErrors,
             };
         } catch (error) {
             const msg = error instanceof Error ? error.message : String(error);
+            attemptErrors.push(`${model}: ${msg.slice(0, 160)}`);
             console.warn(`[Memory] LLM provider '${model}' failed (${attempts}/${chain.length}), trying next:`, msg);
         }
     }
 
     console.warn('[Memory] LLM fan-out exhausted — all providers failed.');
-    return null;
+    throw new MemoryLlmExhaustedError(attemptErrors);
 }

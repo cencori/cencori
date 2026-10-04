@@ -257,19 +257,24 @@ export async function reconcileFacts(params: ReconcileParams): Promise<Reconcile
 
     try {
         // Fan out across the managed production chain; first provider to answer wins.
-        const response = await callMemoryLlm({
-            supabase,
-            projectId,
-            organizationId,
-            tier,
-            requestId,
-            preferModel: resolveMemoryModel(model),
-            maxTokens: 800,
-            messages: [
-                { role: 'system', content: RECONCILE_SYSTEM_PROMPT },
-                { role: 'user', content: buildReconcileUserMessage(remaining, candidates) },
-            ],
-        });
+        let response;
+        try {
+            response = await callMemoryLlm({
+                supabase,
+                projectId,
+                organizationId,
+                tier,
+                requestId,
+                preferModel: resolveMemoryModel(model),
+                maxTokens: 800,
+                messages: [
+                    { role: 'system', content: RECONCILE_SYSTEM_PROMPT },
+                    { role: 'user', content: buildReconcileUserMessage(remaining, candidates) },
+                ],
+            });
+        } catch {
+            response = null;
+        }
         if (!response) {
             // Whole chain exhausted — fail open to all-ADD (never drop a fact).
             const plan = allAdd(true).plan;

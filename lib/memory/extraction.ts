@@ -7,7 +7,7 @@
  */
 
 import type { createAdminClient } from '@/lib/supabaseAdmin';
-import { callMemoryLlm } from './llm';
+import { callMemoryLlm, MemoryLlmExhaustedError, type MemoryLlmResult } from './llm';
 import type { SubscriptionTier } from '@/lib/entitlements';
 import {
     MEMORY_CONTENT_MAX_CHARS,
@@ -44,6 +44,8 @@ export interface ExtractFactsResult {
     provider: string;
     /** LLM attempts used — 2 when the first attempt produced no parseable output and we retried. */
     attempts: number;
+    /** Truncated per-attempt failure causes across all attempts (for log triage). */
+    attemptErrors: string[];
 }
 
 /**
@@ -107,42 +109,43 @@ export async function extractFacts(params: {
                     `ASSISTANT:\n${assistantText.slice(0, 8000)}`,
             },
         ] as { role: 'system' | 'user' | 'assistant'; content: string }[];
-        let response = await callMemoryLlm({
-            supabase,
-            projectId,
-            organizationId,
-            tier,
-            requestId,
-            preferModel,
-            maxTokens: 500,
-            messages: exchangeMessages,
-        });
-        let attempts = 1;
-        let costUsd = response?.costUsd ?? 0;
+        let attempts = 0;
+        let costUsd = 0;
+        const attemptErrors: string[] = [];
+        const runOnce = async (): Promise<MemoryLlmResult | null> => {
+            attempts++;
+            try {
+                const r = await callMemoryLlm({
+                    supabase,
+                    projectId,
+                    organizationId,
+                    tier,
+                    requestId,
+                    preferModel,
+                    maxTokens: 500,
+                    messages: exchangeMessages,
+                });
+                costUsd += r.costUsd;
+                return r;
+            } catch (error) {
+                if (error instanceof MemoryLlmExhaustedError) {
+                    attemptErrors.push(...error.attemptErrors);
+                    return null;
+                }
+                throw error;
+            }
+        };
+        let response = await runOnce();
         const firstFacts = response ? parseExtractionOutput(response.content) : [];
         if (firstFacts.length === 0 && (!response || !isExplicitEmptyVerdict(response.content))) {
             // One retry: an empty/unparseable completion (or a dead chain) is
             // usually a spent reasoning budget, not a verdict. An explicit `[]`
             // never reaches here — it is accepted as-is below.
-            const retry = await callMemoryLlm({
-                supabase,
-                projectId,
-                organizationId,
-                tier,
-                requestId,
-                preferModel,
-                maxTokens: 500,
-                messages: exchangeMessages,
-            });
-            attempts = 2;
-            if (retry) {
-                costUsd += retry.costUsd;
-                response = retry;
-            }
+            response = (await runOnce()) ?? response;
         }
         if (!response) {
             // Whole chain exhausted twice — fail open with zero facts.
-            return { facts: [], costUsd, model: preferModel, provider: '', attempts };
+            return { facts: [], costUsd, model: preferModel, provider: '', attempts, attemptErrors };
         }
 
         const facts = parseExtractionOutput(response.content);
@@ -160,10 +163,11 @@ export async function extractFacts(params: {
             model: response.model,
             provider: response.provider,
             attempts,
+            attemptErrors,
         };
     } catch (error) {
         console.warn('[Memory] Fact extraction failed:', error);
-        return { facts: [], costUsd: 0, model: preferModel, provider: '', attempts: 1 };
+        return { facts: [], costUsd: 0, model: preferModel, provider: '', attempts: 1, attemptErrors: [] };
     }
 }
 
