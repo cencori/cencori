@@ -181,7 +181,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Ops allowance (MON-6): managed-LLM spend gate, distinct from rows.
-        const writeOps = await checkMemoryOpsQuota(ctx.projectId, tier, directive.scopeKey, 'write');
+        const writeOps = await checkMemoryOpsQuota(ctx.projectId, tier, directive.scopeKey, 'write', settings);
         if (!writeOps.allowed) {
             return respond(buildMemoryOpsExceededBody(ctx.projectId, tier, 'write', writeOps), 429);
         }
@@ -197,6 +197,7 @@ export async function POST(req: NextRequest) {
             facts: [{ content, importance }],
             metadata: { ...body.metadata, extractedFrom: 'manual' },
             expiresAt,
+            settings,
         });
 
         if (result.opsExceeded) {

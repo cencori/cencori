@@ -184,6 +184,13 @@ export interface MemorySettings {
      * multi-hop recall.
      */
     graphEnabled: boolean;
+    /**
+     * Optional per-project monthly operation allowances. Null = tier default
+     * (lib/entitlements.ts). Set for pilot/custom contracts to cap a project
+     * below (or above) its tier — e.g. 5,000 turns/mo.
+     */
+    maxSearchesMonthly: number | null;
+    maxWritesMonthly: number | null;
 }
 
 export const DEFAULT_MEMORY_SETTINGS: MemorySettings = {
@@ -197,6 +204,8 @@ export const DEFAULT_MEMORY_SETTINGS: MemorySettings = {
     maxMemoriesPerExchange: 5,
     sessionTtlSeconds: 86400,
     graphEnabled: true,
+    maxSearchesMonthly: null,
+    maxWritesMonthly: null,
 };
 
 /** Metering unit: a single memory's content is capped at 10KB. */

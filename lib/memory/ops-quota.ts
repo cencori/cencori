@@ -54,6 +54,16 @@ export function isMemoryOpsExceededError(error: unknown): error is MemoryOpsExce
 }
 
 /**
+ * Per-project custom monthly allowances (pilot/enterprise contracts).
+ * Null fields fall through to the tier default. Callers that already hold
+ * the project settings pass them; otherwise the tier default applies.
+ */
+export interface MemoryOpsOverrides {
+    maxSearchesMonthly?: number | null;
+    maxWritesMonthly?: number | null;
+}
+
+/**
  * Check (and consume one unit of) the ops allowance for a memory operation.
  * Project-monthly is checked first so shared-key protection binds before any
  * single user is blamed. Session scope is never counted — it is Redis-only,
@@ -63,11 +73,17 @@ export async function checkMemoryOpsQuota(
     projectId: string,
     tier: SubscriptionTier,
     scopeKey: string,
-    op: MemoryOpsOp
+    op: MemoryOpsOp,
+    overrides?: MemoryOpsOverrides | null
 ): Promise<MemoryOpsStatus> {
     const field = op === 'search' ? 'searches' : 'writes';
-
-    const monthlyLimit = getMemoryOpsQuota(tier)[field];
+    const custom = op === 'search' ? overrides?.maxSearchesMonthly : overrides?.maxWritesMonthly;
+    // An explicit custom cap always wins — including over enterprise infinity.
+    // Null/undefined/absent-nonpositive falls through to the tier default.
+    const monthlyLimit =
+        typeof custom === 'number' && Number.isFinite(custom) && custom > 0
+            ? Math.floor(custom)
+            : getMemoryOpsQuota(tier)[field];
     if (Number.isFinite(monthlyLimit)) {
         const m = await checkCustomRateLimit(
             `memory_ops:v1:${projectId}:${op}:month`,

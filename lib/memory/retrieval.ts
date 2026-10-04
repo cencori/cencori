@@ -20,6 +20,7 @@ import {
     toMemoryId,
     type MemoryDirective,
     type MemoryRetrievalMode,
+    type MemorySettings,
     type RetrievedMemory,
 } from './types';
 
@@ -50,6 +51,11 @@ export async function retrieveMemories(params: {
     /** Subscription tier — enables search ops-quota enforcement when set. */
     tier?: SubscriptionTier;
     /**
+     * Project settings the caller already holds (carries custom monthly ops
+     * caps). When omitted, tier defaults apply.
+     */
+    settings?: MemorySettings;
+    /**
      * What to do when the search ops allowance is exhausted: 'skip' returns
      * [] (chat path — fail-open by contract), 'throw' raises
      * MemoryOpsExceededError (direct endpoints — 429). Defaults to 'skip'.
@@ -76,7 +82,7 @@ export async function retrieveMemories(params: {
         // Ops allowance (MON-6): every retrieval burns a managed embedding on
         // the shared key. Session scope is Redis-only and never counted.
         if (params.tier) {
-            const opsStatus = await checkMemoryOpsQuota(projectId, params.tier, directive.scopeKey, 'search');
+            const opsStatus = await checkMemoryOpsQuota(projectId, params.tier, directive.scopeKey, 'search', params.settings);
             if (!opsStatus.allowed) {
                 if (params.ops === 'throw') {
                     throw new MemoryOpsExceededError('search', opsStatus);

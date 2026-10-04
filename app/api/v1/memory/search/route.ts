@@ -112,6 +112,7 @@ export async function POST(req: NextRequest) {
             queryText: query,
             tier: ctx.tier as SubscriptionTier,
             ops: 'throw',
+            settings,
             onEmbeddingUsage: usage => {
                 embeddingUsageRef.current = usage;
             },

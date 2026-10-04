@@ -342,7 +342,8 @@ describe('memory contract routes', () => {
                 ctx.projectId,
                 ctx.tier,
                 'u',
-                'search'
+                'search',
+                ENABLED_SETTINGS
             );
         });
 

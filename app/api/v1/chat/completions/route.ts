@@ -595,6 +595,7 @@ export async function POST(req: NextRequest) {
                     directive: memoryDirective,
                     queryText: lastUserMessageText,
                     tier: (activeGatewayCtx.tier || "free") as SubscriptionTier,
+                    settings: memorySettings ?? undefined,
                     onEmbeddingUsage: usage => {
                         waitUntil(Promise.all([
                             logGatewayRequest(activeGatewayCtx, {

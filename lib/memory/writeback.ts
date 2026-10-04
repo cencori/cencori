@@ -47,6 +47,11 @@ export interface WriteMemoriesParams {
     metadata?: Record<string, unknown>;
     expiresAt?: string | null;
     /**
+     * Project settings the caller already holds (carries custom monthly ops
+     * caps). When omitted, tier defaults apply.
+     */
+    settings?: MemorySettings;
+    /**
      * Run Layer-1 conflict resolution (ADD/UPDATE/DELETE/NOOP) before persisting.
      * Defaults to true. Set false for the eval-harness baseline (blind insert).
      */
@@ -88,7 +93,7 @@ export async function writeMemories(params: WriteMemoriesParams): Promise<WriteM
 
     // Ops allowance (MON-6): extraction + reconciliation + embeddings all run
     // on shared managed keys. Denial here saves the LLM spend, not just rows.
-    const opsStatus = await checkMemoryOpsQuota(projectId, tier, scopeKey, 'write');
+    const opsStatus = await checkMemoryOpsQuota(projectId, tier, scopeKey, 'write', params.settings);
     if (!opsStatus.allowed) {
         console.warn(
             `[Memory] Write ops quota exceeded (scope=${opsStatus.scope}) project=${projectId} — dropping write`
@@ -354,7 +359,7 @@ export async function rememberExchange(params: {
     // Ops allowance before extraction (MON-6): a capped project must not burn
     // managed extraction calls. Session scope is Redis-only and ungated.
     if (directive.scope !== 'session') {
-        const opsStatus = await checkMemoryOpsQuota(projectId, tier, directive.scopeKey, 'write');
+        const opsStatus = await checkMemoryOpsQuota(projectId, tier, directive.scopeKey, 'write', settings);
         if (!opsStatus.allowed) {
             console.warn(
                 `[Memory] Write ops quota exceeded (scope=${opsStatus.scope}) project=${projectId} — dropping remember`
@@ -417,6 +422,7 @@ export async function rememberExchange(params: {
         facts: extraction.facts,
         reconcile: params.reconcile,
         reconcileModel: extraction.model,
+        settings,
         metadata: {
             extractedFrom: 'chat',
             modelUsed: extraction.model,
@@ -475,7 +481,7 @@ export async function runChatMemoryWriteback(params: {
         // Ops allowance first (MON-6): a capped project must not burn managed
         // extraction/reconciliation calls. Session scope is Redis-only, ungated.
         if (directive.scope !== 'session') {
-            const writeOps = await checkMemoryOpsQuota(gatewayCtx.projectId, tier, directive.scopeKey, 'write');
+            const writeOps = await checkMemoryOpsQuota(gatewayCtx.projectId, tier, directive.scopeKey, 'write', settings);
             if (!writeOps.allowed) {
                 console.warn(
                     `[Memory] Write ops quota exceeded (scope=${writeOps.scope}) project=${gatewayCtx.projectId} request=${gatewayCtx.requestId}`
@@ -553,6 +559,7 @@ export async function runChatMemoryWriteback(params: {
                 namespace: directive.namespace,
                 facts: extraction.facts,
                 reconcileModel: extraction.model,
+                settings,
                 metadata: {
                     extractedFrom: 'chat',
                     modelUsed: extraction.model,
