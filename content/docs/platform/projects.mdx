@@ -58,10 +58,13 @@ Set project-wide defaults for your AI integration:
 - **Spend Cap**: Enforce a hard limit on monthly spending.
 
 ### Security Policies
-Configure project-wide security settings:
-- **PII Filtering**: Enable/disable automatic redaction.
+Security scanning is explicit opt-in (default off). Configure in **Project > Security**:
+- **Master switch**: `Enable security scanning`. Off (or no settings row) = no input/output checks on any tier, BYOK or managed.
+- **PII / Jailbreak / Prompt Injection toggles**: `filter_pii`, `filter_jailbreaks`, `filter_prompt_injection` gate sub-checks when the master switch is on.
+- **Safety Threshold**: slider value the input score is compared against (stricter = higher).
 - **Content Moderation**: Set thresholds for hate/violence categories.
-- **Custom Rules**: Whitelist/blacklist specific prompt patterns.
+- **Custom Rules**: Whitelist/blacklist specific prompt patterns. Creating an active rule enforces it even if the master switch is off.
+- **Governance policies**: separate opt-in for output enforcement. Install a template in **Governance**, then request activation + teammate approval. Required if you need output PII blocking.
 
 ### Integrations
 Connect your project to external tools:

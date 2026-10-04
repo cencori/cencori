@@ -126,7 +126,7 @@ Everything that built-in providers get:
 
 | Feature | How it works |
 | :--- | :--- |
-| **Security filtering** | PII detection and prompt injection blocking run on every request before it reaches your model |
+| **Security filtering (opt-in)** | PII detection and prompt injection blocking run before your model only after you enable **Project > Security**. Default off; output blocking needs a governance policy or custom rule. |
 | **Rate limiting** | Project-level and per-key limits enforced at the gateway |
 | **Monetization** | Pass `user: "..."` to meter, limit, and charge per user |
 | **Observability** | Every request logged with model, latency, tokens, cost, status, user |

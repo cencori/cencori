@@ -18,10 +18,10 @@ Understanding the flow of a single request helps clarify where value is added:
 
 1.  **Application**: Your code calls the Cencori SDK.
 2.  **Edge Network**: Request hits the nearest Cencori Edge node (deployed globally across 35+ regions).
-3.  **Security Scan**: Payload is analyzed for PII, prompt injection, and policy violations. *Latency: &lt;10ms*.
+3.  **Security Scan (opt-in, off by default)**: If enabled in **Project > Security**, payload is analyzed for PII, prompt injection, and policy violations. *Latency: &lt;10ms*. When off, this step is skipped and traffic passes through as `200 OK`.
 4.  **Routing Engine**: Cencori determines the optimal provider based on cost, status, and your project rules.
 5.  **Provider Execution**: Request is forwarded to OpenAI/Anthropic/Google.
-6.  **Observability**: Response is logged, token usage is calculated, and async evals are triggered.
+6.  **Observability**: Response is logged, token usage is calculated, and async evals are triggered. Output blocking requires a governance policy or custom rule — the master switch alone does not block output.
 7.  **Response**: Final payload is returned to your application.
 
 > **Cold Starts**: Cencori's edge network is built on warm execution environments. There is **zero cold-start latency** for standard API requests.
@@ -64,7 +64,7 @@ Why choose Cencori over other solutions?
 | Feature | Cencori (CIP) | Helicone / Portkey | LangChain / LangSmith |
 |---------|---------------|-------------------|-----------------------|
 | **Primary Goal** | Production Infrastructure | Observability & Logging | Prototyping Framework |
-| **Security (PII/Injection)** | **Native / Built-in** | Plugin / External | Manual Implementation |
+| **Security (PII/Injection)** | **Native / Opt-in (off by default)** | Plugin / External | Manual Implementation |
 | **Unified SDK** | **Yes (One API)** | No (Proxy only) | Yes (Abstractions) |
 | **Multi-Provider** | **Native** | Native | Native |
 | **Latency Impact** | **< 15ms** | ~50-100ms | N/A (Client-side) |
@@ -73,4 +73,4 @@ Why choose Cencori over other solutions?
 
 - **Gateway**: The unified entry point for all AI requests.
 - **Billing**: The economic engine. Meter, limit, and charge users for AI usage.
-- **Scan**: The security engine that inspects requests for vulnerabilities (PII and injection protection).
+- **Scan**: The opt-in security engine that inspects requests for vulnerabilities (PII and injection protection) when enabled in Project > Security. Custom rules and governance policies are separate opt-ins.

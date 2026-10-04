@@ -31,7 +31,7 @@ Cencori provides the five foundational building blocks required to ship and scal
 ### 1. AI Gateway (The Entryway)
 The secure, unified API for all your AI models.
 - **Multi-Provider Support** — One API for OpenAI, Anthropic, Gemini, Llama, and more.
-- **Native Security** — Automatic PII detection, prompt injection protection, and content filtering.
+- **Opt-in Security** — PII detection and prompt injection blocking when you enable it in Project > Security (off by default; identical for BYOK and managed keys).
 - **Streaming & SSE** — Real-time responses with built-in token counting and cost tracking.
 - **Global Observability** — Complete audit logs and analytics for every request.
 
@@ -186,7 +186,7 @@ for chunk := range stream {
 }
 ```
 
-**That's it!** Cencori handles security, logging, and cost tracking automatically.
+**That's it!** Cencori handles logging and cost tracking automatically. Security scanning is opt-in in Project > Security.
 
 ### 5. AI Memory (Context Store)
 
@@ -242,7 +242,7 @@ return result.toUIMessageStreamResponse();
 - `useChat()` / `useCompletion()` - React hooks for chat UIs
 - `streamUI()` - Generative UI with React Server Components
 
-**Same Cencori benefits:** Safety filtering, analytics, cost tracking, multi-provider support.
+**Same Cencori benefits:** Opt-in safety filtering (enable in Project > Security), analytics, cost tracking, multi-provider support.
 
 ---
 
@@ -310,12 +310,15 @@ Transparent, prepaid pricing model:
 - Transparent markup on provider costs
 - Detailed cost breakdown by provider
 
-### **Built-in Security**
+### **Built-in Security (Opt-in)**
 
-Every request goes through automatic safety filters:
-- **PII Detection** - Blocks emails, phone numbers, SSNs, credit cards
-- **Content Safety** - Filters harmful keywords and prompt injection attempts
-- **Safety Scores** - Every request gets a safety score for compliance
+Enable per project in Project > Security (off by default). When on:
+
+- **PII Detection** - Blocks emails, phone numbers, SSNs, credit cards on inputs (`403 security_violation`)
+- **Content Safety** - Scores injection / jailbreak heuristics against your Safety Threshold
+- **Safety Scores** - Blocked requests log safety scores and incidents for compliance
+
+Output blocking additionally requires a governance policy or custom data rule — the master switch alone does not block outputs. `passthrough: true` / `fast_lane: true` skips all guards. Behavior is identical for BYOK and managed keys.
 
 ### **Global Observability**
 
