@@ -304,7 +304,7 @@ export function TensorWaitlistChat({ onClose }: { onClose: () => void }) {
     <section
       id="waitlist"
       aria-label="Tensor waitlist chat"
-      className="mx-auto flex h-full min-h-0 w-full max-w-2xl flex-1 flex-col overflow-hidden px-5 pb-4 pt-2 md:px-8"
+      className="mx-auto flex h-full min-h-0 w-full max-w-2xl flex-1 flex-col overflow-hidden px-5 pb-4 pt-2 touch-manipulation md:px-8"
     >
       {/* header */}
       <div className={`flex items-center justify-between transition-opacity duration-500 ${fading}`}>
@@ -327,7 +327,7 @@ export function TensorWaitlistChat({ onClose }: { onClose: () => void }) {
       </div>
 
       {/* thread */}
-      <div ref={scrollRef} className={`scrollbar-hide mt-6 min-h-0 flex-1 overflow-y-auto pb-4 transition-opacity duration-500 ${fading}`} aria-live="polite">
+      <div ref={scrollRef} className={`scrollbar-hide mt-6 min-h-0 flex-1 overflow-y-auto overscroll-contain pb-4 transition-opacity duration-500 [touch-action:pan-y] ${fading}`} aria-live="polite">
         <div className="flex flex-col">
           {!booted || (messages.length === 0 && thinking) ? (
             <p className="w-fit bg-[linear-gradient(100deg,rgba(255,255,255,0.35)_30%,#fff_48%,rgba(255,255,255,0.35)_66%)] bg-[length:240%_100%] bg-clip-text text-sm text-transparent" style={{ animation: "agent-thinking-shimmer 2.4s linear infinite" }}>
@@ -453,7 +453,7 @@ export function TensorWaitlistChat({ onClose }: { onClose: () => void }) {
               placeholder={placeholders(currentField)}
               aria-label="Reply to Tensor"
               autoComplete="off"
-              className="min-w-0 flex-1 bg-transparent text-[0.85rem] font-normal leading-[1.55] tracking-[-0.012em] text-white placeholder:text-white/30 focus:outline-none"
+              className="min-w-0 flex-1 bg-transparent text-base font-normal leading-[1.55] tracking-[-0.012em] text-white placeholder:text-white/30 focus:outline-none sm:text-[0.85rem]"
             />
             <button
               type="submit"
