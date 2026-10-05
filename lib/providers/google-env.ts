@@ -30,7 +30,7 @@ export function getMemoryGoogleApiKey(): string | null {
 
 /**
  * Dedicated memory API key for a given provider, so memory's generative fan-out
- * (Cerebras → Groq → Gemini) runs on its OWN quota buckets, never competing with
+ * (Cerebras → Vercel) runs on its OWN quota buckets, never competing with
  * chat traffic. Returns undefined when no dedicated key is set — the caller then
  * uses the shared managed key for that provider (nothing breaks if unconfigured).
  *

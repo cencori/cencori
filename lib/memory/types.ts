@@ -41,10 +41,12 @@ export const DEFAULT_RETRIEVAL_THRESHOLD: Record<'openai' | 'google', number> = 
  * Memory is a MANAGED product: extraction + reconciliation + entity extraction
  * run on a Cencori-managed model, never a customer's BYOK key. Allowed managed
  * generative models are the explicit production GPT-OSS endpoints:
- * `openai/gpt-oss-20b` on Groq and `gpt-oss-120b` on Cerebras. Gemini remains the
- * managed embedding provider, but it is deliberately not part of generative
- * Memory processing. Compound is excluded because its pricing/access semantics
- * are less predictable than the explicit production model ids.
+ * `gpt-oss-120b` on Cerebras and `vercel/openai/gpt-oss-20b|120b` on the Vercel
+ * AI Gateway. Groq is out of the memory mix (free-tier binds account-wide);
+ * Gemini remains the managed embedding provider, but it is deliberately not
+ * part of generative Memory processing. Compound is excluded because its
+ * pricing/access semantics are less predictable than the explicit production
+ * model ids.
  *
  * OpenAI/Anthropic/etc. are intentionally NOT allowed — a memory call must not
  * cascade into an unfunded paid provider. Anything unrecognized coerces to
@@ -53,7 +55,7 @@ export const DEFAULT_RETRIEVAL_THRESHOLD: Record<'openai' | 'google', number> = 
  */
 export const MEMORY_MANAGED_MODEL = 'gpt-oss-120b';
 
-const ALLOWED_MEMORY_MODEL = /^(?:gpt-oss-120b|openai\/gpt-oss-20b|vercel\/openai\/gpt-oss-(?:20b|120b))$/i;
+const ALLOWED_MEMORY_MODEL = /^(?:gpt-oss-120b|vercel\/openai\/gpt-oss-(?:20b|120b))$/i;
 
 /** Coerce a configured/overridden model to an allowed managed memory model. */
 export function resolveMemoryModel(model: string | null | undefined): string {

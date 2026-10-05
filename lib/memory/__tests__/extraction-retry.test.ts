@@ -20,7 +20,7 @@ const mockedCall = vi.mocked(callMemoryLlm);
 
 const SETTINGS: MemorySettings = {
     enabled: true,
-    extractionModel: 'openai/gpt-oss-20b',
+    extractionModel: 'gpt-oss-120b',
     extractionPrompt: null,
     minImportance: 0.5,
     maxMemoriesPerExchange: 5,
@@ -42,7 +42,7 @@ function base() {
 }
 
 function llmResult(content: string) {
-    return { content, model: 'openai/gpt-oss-20b', provider: 'groq', costUsd: 0.001 };
+    return { content, model: 'gpt-oss-120b', provider: 'cerebras', costUsd: 0.001 };
 }
 
 describe('isExplicitEmptyVerdict', () => {
@@ -65,14 +65,14 @@ describe('extractFacts retry', () => {
 
     it('retries once on empty output then succeeds', async () => {
         mockedCall
-            .mockRejectedValueOnce(new MemoryLlmExhaustedError(['openai/gpt-oss-20b: timed out']))
+            .mockRejectedValueOnce(new MemoryLlmExhaustedError(['gpt-oss-120b: timed out']))
             .mockResolvedValueOnce(llmResult('[{"fact": "Prefers dark mode", "importance": 0.7}]'));
         const result = await extractFacts(base());
         expect(result.facts).toEqual([{ content: 'Prefers dark mode', importance: 0.7 }]);
         expect(result.attempts).toBe(2);
-        expect(result.provider).toBe('groq');
+        expect(result.provider).toBe('cerebras');
         expect(result.parsedCount).toBe(1);
-        expect(result.attemptErrors).toEqual(['openai/gpt-oss-20b: timed out']);
+        expect(result.attemptErrors).toEqual(['gpt-oss-120b: timed out']);
         expect(mockedCall).toHaveBeenCalledTimes(2);
     });
 
@@ -104,16 +104,16 @@ describe('extractFacts retry', () => {
 
     it('collects per-attempt causes when the chain is exhausted', async () => {
         mockedCall.mockRejectedValue(
-            new MemoryLlmExhaustedError(['openai/gpt-oss-20b: 429 rate limited', 'gpt-oss-120b: 429 rate limited'])
+            new MemoryLlmExhaustedError(['gpt-oss-120b: 429 rate limited', 'vercel/openai/gpt-oss-20b: 429 rate limited'])
         );
         const result = await extractFacts(base());
         expect(result.facts).toEqual([]);
         expect(result.attempts).toBe(2);
         expect(result.attemptErrors).toEqual([
-            'openai/gpt-oss-20b: 429 rate limited',
             'gpt-oss-120b: 429 rate limited',
-            'openai/gpt-oss-20b: 429 rate limited',
+            'vercel/openai/gpt-oss-20b: 429 rate limited',
             'gpt-oss-120b: 429 rate limited',
+            'vercel/openai/gpt-oss-20b: 429 rate limited',
         ]);
         expect(mockedCall).toHaveBeenCalledTimes(2);
     });

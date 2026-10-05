@@ -75,7 +75,7 @@ import { POST as rememberPost } from '@/app/api/v1/memory/remember/route';
 
 const ENABLED_SETTINGS = {
     enabled: true,
-    extractionModel: 'openai/gpt-oss-20b',
+    extractionModel: 'gpt-oss-120b',
     extractionPrompt: null,
     minImportance: 0.5,
     maxMemoriesPerExchange: 5,
@@ -379,8 +379,8 @@ describe('memory contract routes', () => {
                 quotaExceeded: false,
                 opsExceeded: false,
                 costUsd: 0.002,
-                model: 'openai/gpt-oss-20b',
-                provider: 'groq',
+                model: 'gpt-oss-120b',
+                provider: 'cerebras',
             });
             const res = await rememberPost(jsonRequest('http://x/remember', exchange));
             expect(res.status).toBe(201);
@@ -389,12 +389,12 @@ describe('memory contract routes', () => {
                 extracted: 1,
                 count: 1,
                 costUsd: 0.002,
-                model: 'openai/gpt-oss-20b',
-                provider: 'groq',
+                model: 'gpt-oss-120b',
+                provider: 'cerebras',
             });
             expect(routeMocks.logGatewayRequest).toHaveBeenCalledWith(
                 ctx,
-                expect.objectContaining({ endpoint: 'memory/remember', provider: 'groq', status: 'success' })
+                expect.objectContaining({ endpoint: 'memory/remember', provider: 'cerebras', status: 'success' })
             );
         });
 
@@ -406,8 +406,8 @@ describe('memory contract routes', () => {
                 opsExceeded: true,
                 opsStatus: { allowed: false, used: 5, limit: 5, resetMs: 1000, scope: 'user' },
                 costUsd: 0,
-                model: 'openai/gpt-oss-20b',
-                provider: 'groq',
+                model: 'gpt-oss-120b',
+                provider: 'cerebras',
             });
             const res = await rememberPost(jsonRequest('http://x/remember', exchange));
             expect(res.status).toBe(429);
