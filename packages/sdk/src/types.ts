@@ -109,6 +109,17 @@ export interface ChatResponse {
         completionTokens: number;
         totalTokens: number;
     };
+    /** Billed cost in USD, when the server reports it. */
+    costUsd?: number;
+    /** Actual serving provider, when the server reports it. */
+    provider?: string;
+    /** Request id for support correlation (X-Request-Id). */
+    requestId?: string | null;
+    /** Input-guard classification the gateway verdicts (absent when unscanned). */
+    safety?: {
+        scanned: boolean;
+        input?: { safe: boolean; layer: string; riskScore: number; reasons: string[] };
+    };
 }
 
 /**

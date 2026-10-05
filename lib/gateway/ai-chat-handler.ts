@@ -17,6 +17,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { promptPayload } from '@/lib/gateway/log-payload';
+import { buildInputSafetyBlock, safetyHeaders } from '@/lib/gateway/safety-response';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { waitUntil } from '@vercel/functions';
 import type { UnifiedMessage, Tool, UnifiedChatRequest } from '@/lib/providers/base';
@@ -785,6 +786,9 @@ export async function POST(req: NextRequest) {
 
         // ── Streaming: engine already emits legacy chunks ──
         if (isStreaming) {
+            for (const [header, value] of Object.entries(safetyHeaders(buildInputSafetyBlock(inputPipeline)))) {
+                execResult.response.headers.set(header, value);
+            }
             if (memoryDirective) {
                 execResult.response.headers.set(
                     'X-Cencori-Memory-Retrieved',
@@ -840,6 +844,8 @@ export async function POST(req: NextRequest) {
                 write_request_id: memoryDirective.write ? ctx.requestId : null,
             };
         }
+
+        responseBody.safety = buildInputSafetyBlock(inputPipeline);
 
         const finalResponse = NextResponse.json(responseBody);
         if (cacheWriteEligible) {

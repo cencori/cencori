@@ -24,6 +24,7 @@ import {
     buildQuotaExceededBody,
     checkMemoryOpsQuota,
     checkMemoryQuota,
+    detectMemoryInjection,
     getProjectMemorySettings,
     normalizeDirectiveScope,
     parseMemoryDirective,
@@ -123,6 +124,20 @@ export async function POST(req: NextRequest) {
         if (directive.scope === 'session') {
             const redacted = await redactFact(ctx.supabase, ctx.projectId, content);
             if (redacted.blocked) {
+                return respond(
+                    { error: 'memory_content_blocked', message: 'Memory content could not be safely stored.' },
+                    403,
+                );
+            }
+            if (detectMemoryInjection(redacted.content).risky) {
+                await logGatewayRequest(ctx, {
+                    endpoint: 'memory/write',
+                    model: 'none',
+                    provider: 'none',
+                    status: 'error',
+                    errorMessage: 'Memory content blocked: injection-carrying fact',
+                    requestPayload: promptPayload(content, { scope: 'session' }),
+                });
                 return respond(
                     { error: 'memory_content_blocked', message: 'Memory content could not be safely stored.' },
                     403,

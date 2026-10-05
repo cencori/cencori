@@ -200,15 +200,48 @@ console.log(response.toolCalls);
 
 ## Error Handling
 
-Handle transient errors, security blocks (only when scanning / policies are enabled), and rate limits in your application:
+The SDK throws typed errors — never a bare message. Every failure carries the
+HTTP status, the machine-readable `code`, the `requestId` for support
+correlation, and any retry hint the server sent. Transient failures (rate
+limits, 5xx, network blips) retry automatically with backoff, honoring the
+server's `Retry-After`; 4xx fail fast — except 429s, which retry then surface
+as `RateLimitError` with the hint intact.
 
 ```typescript
+import { CencoriError, RateLimitError } from 'cencori';
+
 try {
   await cencori.ai.chat({
     model: 'gpt-4o',
     messages: [{ role: 'user', content: 'Hello!' }],
   });
 } catch (error) {
-  console.error(error);
+  if (error instanceof RateLimitError) {
+    console.log('back off for', error.retryAfterMs, 'ms');
+  } else if (error instanceof CencoriError) {
+    // error.statusCode, error.code, error.requestId, error.isRetryable
+    console.log(error.code, error.requestId);
+  }
 }
 ```
+
+## Safety classification
+
+Every chat response carries what the input guards verdicts — so a 200 whose
+model resisted an attack is distinguishable from a request that was never
+scanned:
+
+```json
+{
+  "choices": [ ... ],
+  "safety": {
+    "scanned": true,
+    "input": { "safe": false, "layer": "jailbreak", "riskScore": 0.86, "reasons": ["..."] }
+  }
+}
+```
+
+Streams carry the same verdict as headers (`X-Cencori-Safety-Scanned`,
+`X-Cencori-Safety-Input`, `X-Cencori-Safety-Score`). `scanned: false` means
+the request ran the passthrough lane (your own safety layers apply). Only
+category-level reasons are exposed — never matched excerpts.

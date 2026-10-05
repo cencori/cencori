@@ -27,6 +27,7 @@ import {
     buildQuotaExceededBody,
     checkMemoryOpsQuota,
     checkMemoryQuota,
+    filterInjectedFacts,
     getProjectMemorySettings,
     normalizeDirectiveScope,
     parseMemoryDirective,
@@ -148,11 +149,17 @@ export async function POST(req: NextRequest) {
                 const redacted = await redactFact(ctx.supabase, ctx.projectId, fact.content);
                 if (!redacted.blocked) stored.push({ content: redacted.content, importance: fact.importance });
             }
+            const { clean: safeStored, dropped } = filterInjectedFacts(stored);
+            if (dropped.length > 0) {
+                console.warn(
+                    `[Memory] Dropped ${dropped.length} injection-carrying batch facts (project=${ctx.projectId})`
+                );
+            }
             const ok = await appendSessionMemories(
                 ctx.organizationId,
                 ctx.projectId,
                 directive.scopeKey,
-                stored,
+                safeStored,
                 settings.sessionTtlSeconds
             );
             if (!ok) {
@@ -161,7 +168,7 @@ export async function POST(req: NextRequest) {
                     503
                 );
             }
-            return respond({ written: stored.length, requested: items.length, scope: 'session' }, 201);
+            return respond({ written: safeStored.length, requested: items.length, scope: 'session' }, 201);
         }
 
         const quota = await checkMemoryQuota(ctx.supabase, ctx.projectId, tier);

@@ -30,6 +30,7 @@ import { executeSessionTurn, expireStaleSessions } from "@/lib/gateway/session-e
 import type { TurnRequestBody } from "@/lib/gateway/session-types";
 import { waitUntil } from "@vercel/functions";
 import { promptPayload } from '@/lib/gateway/log-payload';
+import { buildInputSafetyBlock, safetyHeaders } from '@/lib/gateway/safety-response';
 import {
     buildMemoryBlock,
     getProjectMemorySettings,
@@ -709,6 +710,10 @@ export async function POST(
                     activeGatewayCtx.requestId,
                 );
             }
+        }
+
+        for (const [header, value] of Object.entries(safetyHeaders(buildInputSafetyBlock(inputPipeline)))) {
+            execResult.response.headers.set(header, value);
         }
 
         return respond(execResult.response);

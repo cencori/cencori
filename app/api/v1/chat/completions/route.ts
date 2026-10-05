@@ -40,6 +40,7 @@ import {
 } from "@/lib/gateway/chat-vision-router";
 import { waitUntil } from "@vercel/functions";
 import { promptPayload } from '@/lib/gateway/log-payload';
+import { buildInputSafetyBlock, safetyHeaders } from '@/lib/gateway/safety-response';
 import {
     buildMemoryBlock,
     getProjectMemorySettings,
@@ -1050,10 +1051,18 @@ export async function POST(req: NextRequest) {
                 };
             }
 
+            // Safety classification: what the input guards verdicts, so a 200
+            // whose model "resisted on its own" is distinguishable from a
+            // request that was never scanned.
+            (responseJson as Record<string, unknown>).safety = buildInputSafetyBlock(inputPipeline);
+
             return respond(NextResponse.json(responseJson));
         }
 
         maybeLogPromptUsage();
+        for (const [header, value] of Object.entries(safetyHeaders(buildInputSafetyBlock(inputPipeline)))) {
+            execResult.response.headers.set(header, value);
+        }
         if (memoryDirective) {
             execResult.response.headers.set(
                 'X-Cencori-Memory-Retrieved',

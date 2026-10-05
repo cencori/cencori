@@ -65,6 +65,12 @@ export {
 export type { MemoryEmbeddingUsage } from './retrieval';
 export { redactFact } from './redact';
 export {
+    detectMemoryInjection,
+    filterInjectedFacts,
+    MEMORY_INJECTION_DROP_THRESHOLD,
+} from './guards';
+export type { MemoryInjectionVerdict } from './guards';
+export {
     fetchMemoryById,
     executeMemoryFetchTool,
     MEMORY_FETCH_TOOL,

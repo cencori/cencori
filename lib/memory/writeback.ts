@@ -12,6 +12,7 @@ import type { SubscriptionTier } from '@/lib/entitlements';
 import { embedForMemory } from './embeddings';
 import { runEntityGraphWriteback, type EntityGraphWritebackResult } from './entity-persist';
 import { extractFacts } from './extraction';
+import { filterInjectedFacts } from './guards';
 import { checkMemoryOpsQuota } from './ops-quota';
 import type { MemoryOpsStatus } from './ops-quota';
 import { checkMemoryQuota } from './quota';
@@ -67,6 +68,8 @@ export interface WriteMemoriesResult {
     opsExceeded?: boolean;
     /** The denying ops status, for accurate 429 bodies. */
     opsStatus?: MemoryOpsStatus;
+    /** Facts dropped by the injection scan (prompt-injection defense) — never persisted. */
+    injectionDropped?: number;
     embeddingCostUsd: number;
     embeddingModel?: string;
     embeddingProvider?: 'openai' | 'google';
@@ -117,16 +120,28 @@ export async function writeMemories(params: WriteMemoriesParams): Promise<WriteM
         return { written: [], quotaExceeded: false, embeddingCostUsd: 0 };
     }
 
+    // Injection scan (prompt-injection defense): facts carrying override
+    // language never persist — critical for shared workspace/org scopes, where
+    // one writer's poison would reach every reader's context.
+    const { clean: safe, dropped } = filterInjectedFacts(redacted);
+    const injectionDropped = dropped.length;
+    if (injectionDropped > 0) {
+        console.warn(`[Memory] Dropped ${injectionDropped} injection-carrying facts (project=${projectId})`);
+    }
+    if (safe.length === 0) {
+        return { written: [], quotaExceeded: false, embeddingCostUsd: 0, injectionDropped };
+    }
+
     // Embed the new facts once — reused both to find reconciliation candidates
     // and (for ADDs) as the stored vector.
     const embedding = await embedForMemory(
         supabase,
         projectId,
         organizationId,
-        redacted.map(f => f.content)
+        safe.map(f => f.content)
     );
     const embeddingByContent = new Map<string, number[]>();
-    redacted.forEach((f, i) => embeddingByContent.set(f.content, embedding.embeddings[i]));
+    safe.forEach((f, i) => embeddingByContent.set(f.content, embedding.embeddings[i]));
 
     let totalCostUsd = embedding.cencoriChargeUsd;
 
@@ -136,7 +151,7 @@ export async function writeMemories(params: WriteMemoriesParams): Promise<WriteM
 
     if (reconcileEnabled) {
         const candidateMap = new Map<string, ReconcileCandidate>();
-        for (let i = 0; i < redacted.length; i++) {
+        for (let i = 0; i < safe.length; i++) {
             const { data: cands, error: candErr } = await supabase.rpc('match_gateway_memories_for_write', {
                 p_org_id: organizationId,
                 p_project_id: projectId,
@@ -168,14 +183,14 @@ export async function writeMemories(params: WriteMemoriesParams): Promise<WriteM
             organizationId,
             tier,
             model: params.reconcileModel || DEFAULT_RECONCILE_MODEL,
-            facts: redacted.map(f => ({ content: f.content, importance: f.importance })),
+            facts: safe.map(f => ({ content: f.content, importance: f.importance })),
             candidates: [...candidateMap.values()],
         });
         plan = reconciled.plan;
         totalCostUsd += reconciled.costUsd;
     } else {
         plan = {
-            adds: redacted.map(f => ({ content: f.content, importance: f.importance })),
+            adds: safe.map(f => ({ content: f.content, importance: f.importance })),
             updates: [],
             deletes: [],
             noops: 0,
@@ -183,7 +198,7 @@ export async function writeMemories(params: WriteMemoriesParams): Promise<WriteM
         };
     }
 
-    const redactionByContent = new Map(redacted.map(f => [f.content, f.redactions]));
+    const redactionByContent = new Map(safe.map(f => [f.content, f.redactions]));
     const written: WrittenMemory[] = [];
 
     // ── Apply DELETEs (supersede stale/contradicted facts) ───────────────────
@@ -278,6 +293,7 @@ export async function writeMemories(params: WriteMemoriesParams): Promise<WriteM
                 embeddingCostUsd: totalCostUsd,
                 embeddingModel: embedding.model,
                 embeddingProvider: embedding.provider,
+                injectionDropped,
                 reconciliation: reconcileEnabled
                     ? { added: 0, updated: plan.updates.length, superseded: plan.deletes.length, noop: plan.noops, fellBack: plan.fellBack }
                     : undefined,
@@ -295,6 +311,7 @@ export async function writeMemories(params: WriteMemoriesParams): Promise<WriteM
         embeddingCostUsd: totalCostUsd,
         embeddingModel: embedding.model,
         embeddingProvider: embedding.provider,
+        injectionDropped,
         reconciliation: reconcileEnabled
             ? {
                 added: plan.adds.length,
@@ -393,15 +410,21 @@ export async function rememberExchange(params: {
             if (result.blocked) continue;
             items.push({ content: result.content, importance: fact.importance });
         }
+        const { clean: sessionItems, dropped } = filterInjectedFacts(items);
+        if (dropped.length > 0) {
+            console.warn(
+                `[Memory] Dropped ${dropped.length} injection-carrying session facts (project=${projectId})`
+            );
+        }
         await appendSessionMemories(
             organizationId,
             projectId,
             directive.scopeKey,
-            items,
+            sessionItems,
             settings.sessionTtlSeconds
         );
         return {
-            written: items.map(i => ({ id: 'mem_session', content: i.content, importance: i.importance })),
+            written: sessionItems.map(i => ({ id: 'mem_session', content: i.content, importance: i.importance })),
             extracted: extraction.facts.length,
             quotaExceeded: false,
             opsExceeded: false,
@@ -536,22 +559,30 @@ export async function runChatMemoryWriteback(params: {
         let graph: EntityGraphWritebackResult | undefined;
 
         if (directive.scope === 'session') {
-            // Redact, then append to the Redis session list (no embeddings).
+            // Redact, injection-scan, then append to the Redis session list
+            // (no embeddings). Session memory injects wholesale into context,
+            // so override language is dropped here, not just at recall.
             const items: { content: string; importance: number }[] = [];
             for (const fact of extraction.facts) {
                 const result = await redactFact(supabase, gatewayCtx.projectId, fact.content);
                 if (result.blocked) continue;
                 items.push({ content: result.content, importance: fact.importance });
             }
+            const { clean: sessionItems, dropped } = filterInjectedFacts(items);
+            if (dropped.length > 0) {
+                console.warn(
+                    `[Memory] Dropped ${dropped.length} injection-carrying session facts (project=${gatewayCtx.projectId})`
+                );
+            }
             await appendSessionMemories(
                 gatewayCtx.organizationId,
                 gatewayCtx.projectId,
                 directive.scopeKey,
-                items,
+                sessionItems,
                 settings.sessionTtlSeconds
             );
-            writtenCount = items.length;
-            writtenFacts = items;
+            writtenCount = sessionItems.length;
+            writtenFacts = sessionItems;
         } else {
             const result = await writeMemories({
                 supabase,

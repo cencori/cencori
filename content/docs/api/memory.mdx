@@ -387,6 +387,8 @@ function MemorySettings({ userId }: { userId: string }) {
 ## Governance
 
 - **PII redaction runs before writeback.** The raw value never persists — the gateway's PII pipeline tokenizes SSNs, redacts names, etc. on any string headed for storage.
+- **Injection screening runs before writeback.** Stored facts are scanned for instruction-override language ("ignore previous instructions" and kin). Hits are dropped, never persisted — critical for shared workspace/org scopes, where one writer's poison would otherwise reach every reader. Recall screens again as defense in depth for older rows.
+- **Injected context is marked untrusted.** Every recalled block labels stored notes UNTRUSTED data-never-instructions with an explicit conflict rule: notes that fight system instructions are ignored by the model.
 - **Hard boundary at the organization.** Under no code path can a memory written by one org be read by another. Enforced in SQL and property-tested against the live database.
 - **Forget is real deletion.** `DELETE /v1/memory/:id` removes the row and its embedding.
 - **Opt-in per request.** No `memory` field means no memory. Nothing is stored unless you ask for it.

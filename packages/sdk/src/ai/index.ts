@@ -23,12 +23,16 @@ import type {
     ResponsesResponse,
     ToolCall,
 } from '../types';
+import { fetchWithRetry } from '../utils';
+import { throwCencoriError } from '../errors';
 
 // API Response types
 interface OpenAIChatResponse {
     id?: string;
     model?: string;
     cost_usd?: number;
+    provider?: string;
+    safety?: ChatResponse['safety'];
     content?: string;
     finish_reason?: string;
     toolCalls?: Array<{
@@ -107,7 +111,7 @@ export class AINamespace {
      * });
      */
     async chat(request: ChatRequest): Promise<ChatResponse> {
-        const response = await fetch(`${this.config.baseUrl}/api/ai/chat`, {
+        const response = await fetchWithRetry(`${this.config.baseUrl}/api/ai/chat`, {
             method: 'POST',
             headers: {
                 'CENCORI_API_KEY': this.config.apiKey,
@@ -127,8 +131,8 @@ export class AINamespace {
         });
 
         if (!response.ok) {
-            const errorData = await response.json().catch(() => ({ error: 'Unknown error' })) as { error?: string };
-            throw new Error(`Cencori API error: ${errorData.error || response.statusText}`);
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+            throwCencoriError(response, errorData as Parameters<typeof throwCencoriError>[1]);
         }
 
         const data = await response.json() as OpenAIChatResponse;
@@ -155,6 +159,10 @@ export class AINamespace {
                 completionTokens: data.usage?.completion_tokens ?? 0,
                 totalTokens: data.usage?.total_tokens ?? 0,
             },
+            costUsd: data.cost_usd,
+            provider: data.provider,
+            requestId: response.headers.get('X-Request-Id'),
+            safety: data.safety,
         };
     }
 
@@ -168,7 +176,7 @@ export class AINamespace {
      * }
      */
     async *chatStream(request: ChatRequest): AsyncGenerator<StreamChunk, void, unknown> {
-        const response = await fetch(`${this.config.baseUrl}/api/ai/chat`, {
+        const response = await fetchWithRetry(`${this.config.baseUrl}/api/ai/chat`, {
             method: 'POST',
             headers: {
                 'CENCORI_API_KEY': this.config.apiKey,
@@ -188,8 +196,8 @@ export class AINamespace {
         });
 
         if (!response.ok) {
-            const errorData = await response.json().catch(() => ({ error: 'Unknown error' })) as { error?: string };
-            throw new Error(`Cencori API error: ${errorData.error || response.statusText}`);
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+            throwCencoriError(response, errorData as Parameters<typeof throwCencoriError>[1]);
         }
 
         if (!response.body) {
@@ -264,7 +272,7 @@ export class AINamespace {
      * });
      */
     async embeddings(request: EmbeddingRequest): Promise<EmbeddingResponse> {
-        const response = await fetch(`${this.config.baseUrl}/api/ai/embeddings`, {
+        const response = await fetchWithRetry(`${this.config.baseUrl}/api/ai/embeddings`, {
             method: 'POST',
             headers: {
                 'CENCORI_API_KEY': this.config.apiKey,
@@ -278,8 +286,8 @@ export class AINamespace {
         });
 
         if (!response.ok) {
-            const errorData = await response.json().catch(() => ({ error: 'Unknown error' })) as { error?: string };
-            throw new Error(`Cencori API error: ${errorData.error || response.statusText}`);
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+            throwCencoriError(response, errorData as Parameters<typeof throwCencoriError>[1]);
         }
 
         const data = await response.json() as OpenAIEmbeddingResponse;
@@ -318,7 +326,7 @@ export class AINamespace {
         ];
 
         // Use function calling to enforce JSON schema
-        const response = await fetch(`${this.config.baseUrl}/api/ai/chat`, {
+        const response = await fetchWithRetry(`${this.config.baseUrl}/api/ai/chat`, {
             method: 'POST',
             signal: request.signal,
             headers: {
@@ -348,8 +356,8 @@ export class AINamespace {
         });
 
         if (!response.ok) {
-            const errorData = await response.json().catch(() => ({ error: 'Unknown error' })) as { error?: string };
-            throw new Error(`Cencori API error: ${errorData.error || response.statusText}`);
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+            throwCencoriError(response, errorData as Parameters<typeof throwCencoriError>[1]);
         }
 
         const data = await response.json() as OpenAIChatResponse;
@@ -390,7 +398,7 @@ export class AINamespace {
      * console.log(response.images[0].url);
      */
     async generateImage(request: ImageGenerationRequest): Promise<ImageGenerationResponse> {
-        const response = await fetch(`${this.config.baseUrl}/api/ai/images/generate`, {
+        const response = await fetchWithRetry(`${this.config.baseUrl}/api/ai/images/generate`, {
             method: 'POST',
             headers: {
                 'CENCORI_API_KEY': this.config.apiKey,
@@ -409,8 +417,8 @@ export class AINamespace {
         });
 
         if (!response.ok) {
-            const errorData = await response.json().catch(() => ({ error: 'Unknown error' })) as { error?: string; message?: string };
-            throw new Error(`Cencori API error: ${errorData.message || errorData.error || response.statusText}`);
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+            throwCencoriError(response, errorData as Parameters<typeof throwCencoriError>[1]);
         }
 
         const data = await response.json() as {
@@ -447,7 +455,7 @@ export class AINamespace {
      * console.log(response.sources); // retrieved context
      */
     async rag(request: RagRequest): Promise<RagResponse> {
-        const response = await fetch(`${this.config.baseUrl}/api/ai/rag`, {
+        const response = await fetchWithRetry(`${this.config.baseUrl}/api/ai/rag`, {
             method: 'POST',
             headers: {
                 'CENCORI_API_KEY': this.config.apiKey,
@@ -468,8 +476,8 @@ export class AINamespace {
         });
 
         if (!response.ok) {
-            const errorData = await response.json().catch(() => ({ error: 'Unknown error' })) as { error?: string };
-            throw new Error(`Cencori API error: ${errorData.error || response.statusText}`);
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+            throwCencoriError(response, errorData as Parameters<typeof throwCencoriError>[1]);
         }
 
         const data = await response.json() as RagApiResponse;
@@ -508,7 +516,7 @@ export class AINamespace {
      * console.log(response.output[0].content?.[0]?.text);
      */
     async responses(request: ResponsesRequest): Promise<ResponsesResponse> {
-        const response = await fetch(`${this.config.baseUrl}/v1/responses`, {
+        const response = await fetchWithRetry(`${this.config.baseUrl}/v1/responses`, {
             method: 'POST',
             headers: {
                 'CENCORI_API_KEY': this.config.apiKey,
@@ -537,8 +545,8 @@ export class AINamespace {
         });
 
         if (!response.ok) {
-            const errorData = await response.json().catch(() => ({ error: 'Unknown error' })) as { error?: string };
-            throw new Error(`Cencori API error: ${errorData.error || response.statusText}`);
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+            throwCencoriError(response, errorData as Parameters<typeof throwCencoriError>[1]);
         }
 
         return response.json() as Promise<ResponsesResponse>;
@@ -559,7 +567,7 @@ export class AINamespace {
      * }
      */
     async *responsesStream(request: ResponsesRequest): AsyncGenerator<{ type: string; data: Record<string, unknown> }, void, unknown> {
-        const response = await fetch(`${this.config.baseUrl}/v1/responses`, {
+        const response = await fetchWithRetry(`${this.config.baseUrl}/v1/responses`, {
             method: 'POST',
             headers: {
                 'CENCORI_API_KEY': this.config.apiKey,
@@ -588,8 +596,8 @@ export class AINamespace {
         });
 
         if (!response.ok) {
-            const errorData = await response.json().catch(() => ({ error: 'Unknown error' })) as { error?: string };
-            throw new Error(`Cencori API error: ${errorData.error || response.statusText}`);
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+            throwCencoriError(response, errorData as Parameters<typeof throwCencoriError>[1]);
         }
 
         if (!response.body) {
@@ -647,7 +655,7 @@ export class AINamespace {
      * }
      */
     async *ragStream(request: RagRequest): AsyncGenerator<RagStreamChunk, void, unknown> {
-        const response = await fetch(`${this.config.baseUrl}/api/ai/rag`, {
+        const response = await fetchWithRetry(`${this.config.baseUrl}/api/ai/rag`, {
             method: 'POST',
             headers: {
                 'CENCORI_API_KEY': this.config.apiKey,
@@ -668,8 +676,8 @@ export class AINamespace {
         });
 
         if (!response.ok) {
-            const errorData = await response.json().catch(() => ({ error: 'Unknown error' })) as { error?: string };
-            throw new Error(`Cencori API error: ${errorData.error || response.statusText}`);
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+            throwCencoriError(response, errorData as Parameters<typeof throwCencoriError>[1]);
         }
 
         if (!response.body) {
