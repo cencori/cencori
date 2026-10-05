@@ -124,17 +124,14 @@ describe('parseReconcilePlan', () => {
 });
 
 describe('resolveMemoryModel (managed production GPT-OSS models)', () => {
-    it('allows the explicit Groq and Cerebras production models', () => {
+    it('allows the explicit Cerebras and Vercel production models', () => {
         expect(resolveMemoryModel('gpt-oss-120b')).toBe('gpt-oss-120b');
-        expect(resolveMemoryModel('openai/gpt-oss-20b')).toBe('openai/gpt-oss-20b');
-    });
-
-    it('allows the Vercel AI Gateway legs', () => {
         expect(resolveMemoryModel('vercel/openai/gpt-oss-20b')).toBe('vercel/openai/gpt-oss-20b');
         expect(resolveMemoryModel('vercel/openai/gpt-oss-120b')).toBe('vercel/openai/gpt-oss-120b');
     });
 
     it('coerces retired, non-managed, unknown, or empty choices to the managed default', () => {
+        expect(resolveMemoryModel('openai/gpt-oss-20b')).toBe(MEMORY_MANAGED_MODEL);
         expect(resolveMemoryModel('gemini-2.5-flash')).toBe(MEMORY_MANAGED_MODEL);
         expect(resolveMemoryModel('groq/compound')).toBe(MEMORY_MANAGED_MODEL);
         expect(resolveMemoryModel('openai/gpt-oss-120b')).toBe(MEMORY_MANAGED_MODEL);
