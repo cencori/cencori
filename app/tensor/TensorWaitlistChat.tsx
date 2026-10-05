@@ -453,7 +453,7 @@ export function TensorWaitlistChat({ onClose }: { onClose: () => void }) {
               placeholder={placeholders(currentField)}
               aria-label="Reply to Tensor"
               autoComplete="off"
-              className="min-w-0 flex-1 bg-transparent text-base font-normal leading-[1.55] tracking-[-0.012em] text-white placeholder:text-white/30 focus:outline-none sm:text-[0.85rem]"
+              className="min-w-0 flex-1 bg-transparent text-[16px] font-normal leading-[1.55] tracking-[-0.012em] text-white placeholder:text-white/30 focus:outline-none sm:text-[0.85rem]"
             />
             <button
               type="submit"
