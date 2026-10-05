@@ -51,9 +51,14 @@ describe('extractFacts memory-key isolation', () => {
     });
 
     it('passes the dedicated per-provider memory keys through to the executor', async () => {
-        mocks.getMemoryProviderKey.mockImplementation((p: string) =>
-            ({ google: 'mem-google', cerebras: 'mem-cerebras', vercel: 'mem-vercel' }) as Record<string, string>)[p]
-        );
+        mocks.getMemoryProviderKey.mockImplementation((p: string) => {
+            const keys: Record<string, string> = {
+                google: 'mem-google',
+                cerebras: 'mem-cerebras',
+                vercel: 'mem-vercel',
+            };
+            return keys[p];
+        });
 
         const res = await extractFacts(baseParams);
 

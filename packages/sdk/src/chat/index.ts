@@ -17,6 +17,8 @@
  */
 
 import type { CencoriConfig } from '../types';
+import { fetchWithRetry } from '../utils';
+import { throwCencoriError } from '../errors';
 
 export interface ChatMemoryOptions {
     userId?: string;
@@ -86,6 +88,13 @@ export interface ChatCompletionResponse {
         /** Chat request id backing the async writeback — poll GET /v1/memory/writes/:id. Null when write is disabled. */
         write_request_id?: string | null;
     };
+    /** Request id for support correlation (X-Request-Id). */
+    requestId?: string | null;
+    /** Input-guard classification the gateway verdicts (absent when unstreamed/skipped). */
+    safety?: {
+        scanned: boolean;
+        input?: { safe: boolean; layer: string; riskScore: number; reasons: string[] };
+    };
 }
 
 export interface ChatCompletionChunk {
@@ -96,6 +105,11 @@ export interface ChatCompletionChunk {
 export interface ChatCompletionStream extends AsyncIterable<ChatCompletionChunk> {
     /** Number of memories injected into this request (from X-Cencori-Memory-Retrieved). */
     memoriesRetrieved: number;
+    /** Input-guard verdict from the stream-open headers (absent when unscanned). */
+    safety?: {
+        scanned: boolean;
+        input?: { safe: boolean; riskScore: number };
+    };
 }
 
 class Completions {
@@ -120,25 +134,20 @@ class Completions {
      * relevant facts before the model call and persist new ones after it.
      */
     async create(params: ChatCompletionCreateParams): Promise<ChatCompletionResponse> {
-        const response = await fetch(this.endpoint(), {
+        const response = await fetchWithRetry(this.endpoint(), {
             method: 'POST',
             headers: this.headers(),
             body: JSON.stringify({ ...params, stream: false }),
         });
 
         if (!response.ok) {
-            const errorData = await response.json().catch(() => ({})) as {
-                error?: { message?: string } | string;
-                message?: string;
-            };
-            const message =
-                typeof errorData.error === 'object'
-                    ? errorData.error?.message
-                    : errorData.error || errorData.message;
-            throw new Error(`Cencori API error: ${message || response.statusText}`);
+            const errorData = await response.json().catch(() => ({}));
+            throwCencoriError(response, errorData as Parameters<typeof throwCencoriError>[1]);
         }
 
-        return response.json() as Promise<ChatCompletionResponse>;
+        const body = (await response.json()) as ChatCompletionResponse;
+        body.requestId = response.headers.get('X-Request-Id');
+        return body;
     }
 
     /**
@@ -146,22 +155,38 @@ class Completions {
      * stream completes; `memoriesRetrieved` reports the injected count.
      */
     async stream(params: ChatCompletionCreateParams): Promise<ChatCompletionStream> {
-        const response = await fetch(this.endpoint(), {
+        const response = await fetchWithRetry(this.endpoint(), {
             method: 'POST',
             headers: this.headers(),
             body: JSON.stringify({ ...params, stream: true }),
         });
 
-        if (!response.ok || !response.body) {
-            const errorData = await response.json().catch(() => ({})) as { error?: unknown };
-            throw new Error(`Cencori API error: ${JSON.stringify(errorData.error) || response.statusText}`);
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throwCencoriError(response, errorData as Parameters<typeof throwCencoriError>[1]);
+        }
+
+        if (!response.body) {
+            throw new Error('Response body is null');
         }
 
         const memoriesRetrieved = Number(response.headers.get('X-Cencori-Memory-Retrieved') || 0);
+        const safetyScanned = response.headers.get('X-Cencori-Safety-Scanned');
         const body = response.body;
 
         const iterable: ChatCompletionStream = {
             memoriesRetrieved,
+            ...(safetyScanned == null
+                ? {}
+                : {
+                    safety: {
+                        scanned: safetyScanned === 'true',
+                        input: {
+                            safe: response.headers.get('X-Cencori-Safety-Input') !== 'flagged',
+                            riskScore: Number(response.headers.get('X-Cencori-Safety-Score') || 0),
+                        },
+                    },
+                }),
             async *[Symbol.asyncIterator]() {
                 const reader = body.getReader();
                 const decoder = new TextDecoder();

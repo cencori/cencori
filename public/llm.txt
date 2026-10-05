@@ -443,6 +443,17 @@ confirmation). Metering: stored-memory counts per tier plus monthly
 search/write operation allowances per project and per end-user (429
 `memory_quota_exceeded` / `memory_ops_quota_exceeded` with upgrade URLs).
 
+Stored facts are scanned for instruction-override language before they persist
+(hits are dropped, never stored) and every recalled block is marked UNTRUSTED
+data-never-instructions — see Governance in the Memory API docs.
+
+Chat responses carry a `safety` block with the input-guard verdict
+(`scanned`, `safe`, `layer`, `riskScore`, category `reasons`); streams carry
+the same verdict as `X-Cencori-Safety-*` headers. The SDK throws typed
+`CencoriError`s (status, machine `code`, `requestId`, `retryAfterMs`,
+`isRetryable`) and retries transient failures with backoff — never swallow
+the error object.
+
 ## SDK Chat Response Shape
 
 `cencori.ai.chat()` returns a TypeScript SDK response with camelCase usage fields:
