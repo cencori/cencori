@@ -909,7 +909,9 @@
           "id",
           "tenant_id",
           "agent_id",
-          "status"
+          "status",
+          "knowledge_base_ids",
+          "connection_ids"
         ]
       },
       "InstallationList": {

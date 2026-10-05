@@ -12,6 +12,31 @@ queued → running → completed | failed | cancelled | expired
                  ↘ requires_action (approval-gated tools)
 ```
 
+## Failure diagnostics
+
+A failed run always carries a structured envelope — never a bare message.
+Through the project proxy routes, failures normalize to `{ error, code,
+message, requestId, timestamp, upstream_status }`, so a runtime failure is
+distinguishable from a proxy failure without parsing text. Pair any report
+with its `requestId`.
+
+Usage and cost attribution follows the inference path: turns executed through
+the Cencori gateway record per-request `usage` and `costUsd` (see Chat), and
+memory operations report their own `costUsd`. Turns your own runtime executes
+directly against providers are metered by that runtime — route them through
+the gateway (or tag them with your run id in your own logs) if you need
+per-run cost joined to ours.
+
+## Safety boundary
+
+Prompt-injection scanning, content filtering, and the `safety` verdict apply
+to model calls routed through the Cencori gateway — including the memory
+write path, which drops override-language facts before they persist. A
+self-hosted runtime calling providers directly bypasses all of it: route
+agent inference through the gateway (or a project key with scanning enabled)
+to inherit input guards, output scanning, and per-response classification.
+Scanning is per-project opt-in — check it is enabled before pen-testing it.
+
 `POST /v1/agents/:id/runs` is idempotent (`Idempotency-Key` scoped to your project; same key + different body is `409`). Suspended tenants accept no new runs. Poll `GET /v1/runs/:id`, page through the durable JSON event log at `GET .../events?after=`, and cancel with `POST .../cancel` — cancellation wins executor races via conditional claims and cascades to active child runs.
 
 Three modes: `sync` waits and returns the finished run, `background` enqueues and returns `202` immediately, and `streaming` executes inline while emitting server-sent events (`run.queued`, `run.started`, `text.delta` word-by-word, `tool_call.completed`, then `run.completed` or `run.failed`, then `[DONE]`). Billing, metering, and the terminal row are identical across modes. A disconnect never cancels the run — keep polling `GET /v1/runs/:id`.

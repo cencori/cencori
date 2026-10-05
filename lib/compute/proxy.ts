@@ -50,8 +50,17 @@ export async function resolveAgentBase(projectId: string, agentId: string): Prom
     return { ok: true, baseUrl: `https://${agent.hostname}` };
 }
 
-/** Forward a JSON contract call to the runtime and relay its response verbatim. */
+/** Forward a JSON contract call to the runtime and relay its response verbatim.
+ *
+ * Successes pass through untouched. Failures are normalized into a structured
+ * envelope — { error, code, message, requestId, timestamp, upstream_status } —
+ * so callers never have to parse free text (or an empty body) to tell a
+ * runtime failure from a proxy failure. The runtime's own code/message are
+ * preserved verbatim inside the envelope when present.
+ */
 export async function forwardJson(baseUrl: string, path: string, method: 'GET' | 'POST', body?: string): Promise<Response> {
+    const requestId = `req_${crypto.randomUUID().slice(0, 8)}`;
+    const timestamp = new Date().toISOString();
     let upstream: Response;
     try {
         upstream = await fetch(`${baseUrl}${path}`, {
@@ -61,13 +70,53 @@ export async function forwardJson(baseUrl: string, path: string, method: 'GET' |
         });
     } catch {
         return NextResponse.json(
-            { error: 'runtime_unreachable', message: 'Could not reach the agent runtime.' },
+            {
+                error: 'runtime_unreachable',
+                code: 'runtime_unreachable',
+                message: 'Could not reach the agent runtime.',
+                requestId,
+                timestamp,
+            },
             { status: 502 },
         );
     }
     const text = await upstream.text();
-    return new Response(text || '{}', {
-        status: upstream.status,
-        headers: { 'content-type': 'application/json' },
-    });
+    if (upstream.ok) {
+        return new Response(text || '{}', {
+            status: upstream.status,
+            headers: { 'content-type': 'application/json' },
+        });
+    }
+    let envelope: Record<string, unknown> | null = null;
+    try {
+        const parsed: unknown = text ? JSON.parse(text) : null;
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            envelope = parsed as Record<string, unknown>;
+        }
+    } catch {
+        envelope = null;
+    }
+    const code =
+        typeof envelope?.code === 'string'
+            ? envelope.code
+            : typeof envelope?.error === 'string'
+                ? envelope.error
+                : `runtime_error_${upstream.status}`;
+    const message =
+        typeof envelope?.message === 'string'
+            ? envelope.message
+            : typeof envelope?.error === 'string' && envelope.error !== code
+                ? envelope.error
+                : `Agent runtime failed with status ${upstream.status}.`;
+    return NextResponse.json(
+        {
+            error: code,
+            code,
+            message,
+            requestId,
+            timestamp,
+            upstream_status: upstream.status,
+        },
+        { status: upstream.status },
+    );
 }
