@@ -10,6 +10,7 @@ import {
   type TensorWaitlistFieldKey,
   type TensorWaitlistFields,
 } from "@/lib/tensor-waitlist";
+import { gateEmail, gateReply } from "@/lib/tensor-email-gate";
 import { generateWithFallback } from "@/lib/scan/ai-client";
 
 type ChatMsg = { role: "user" | "assistant"; content: string };
@@ -49,7 +50,7 @@ ${history || "(none)"}
 Rules:
 - The user's LAST message answers CURRENT FIELD (unless they clearly correct an earlier field like "actually my email is X" — then update that field instead).
 - Accept natural answers: "none", "skip", "other: windsurf + zed", comma lists for multi-select.
-- For email: only accept valid emails. If invalid, ask again briefly.
+- For email: only accept valid emails. If invalid, ask again briefly. Test/fake/throwaway addresses (test@, asdf, temp-mail) are rejected — ask for a real inbox.
 - For option fields: map fuzzy matches to the exact option string (e.g. "asap" -> "Immediately", "copilot" -> "GitHub Copilot"). Keep custom "Other" text as-is.
 - Reply in Tensor voice: short (1-2 sentences), warm, confident, no emojis. Acknowledge what they said, then ask the next question naturally. Never list all remaining questions.
 - If everything except anythingElse is filled, give a 1-sentence recap + ask "Anything else you want us to know? (you can say skip)".
@@ -60,6 +61,53 @@ Return STRICT JSON only, no markdown fences, with this shape:
 
 nextField = the next empty required field after applying updates, or "anythingElse" if only that remains, or null when done (all required filled AND anythingElse asked).
 done = true only when nextField is null.`;
+}
+
+const DEEPSEEK_MODEL = "deepseek-v4-pro";
+const DEEPSEEK_TIMEOUT_MS = 35_000;
+
+/**
+ * Primary brain for the waitlist agent: DeepSeek V4 Pro (OpenAI-compatible).
+ * Returns the raw text on success, null when unconfigured or failed —
+ * the caller falls through to the shared provider chain, then rules.
+ */
+async function generateWithDeepSeek(prompt: string): Promise<string | null> {
+  const apiKey = process.env.DEEPSEEK_API_KEY;
+  if (!apiKey) return null;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), DEEPSEEK_TIMEOUT_MS);
+  try {
+    const res = await fetch("https://api.deepseek.com/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: DEEPSEEK_MODEL,
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0,
+        response_format: { type: "json_object" },
+      }),
+    });
+    if (!res.ok) {
+      console.warn(`[tensor-waitlist-agent] deepseek HTTP ${res.status}`);
+      return null;
+    }
+    const data = (await res.json()) as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+    return data.choices?.[0]?.message?.content?.trim() || null;
+  } catch (err) {
+    console.warn(
+      "[tensor-waitlist-agent] deepseek failed:",
+      err instanceof Error ? err.message : err,
+    );
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function tryParseAgentJson(text: string): { reply: string; updates: Record<string, unknown>; nextField: string | null; done: boolean } | null {
@@ -115,11 +163,24 @@ export async function POST(req: Request) {
     });
   }
 
-  // Try LLM for natural parsing + reply.
+  // Try LLM for natural parsing + reply — DeepSeek V4 Pro first,
+  // then the shared provider chain, then the rule-based fallback below.
+  let text: string | null = null;
+  let provider = "fallback";
   try {
-    const result = await generateWithFallback(buildPrompt(messages, collected, currentField));
-    if (result?.text) {
-      const parsed = tryParseAgentJson(result.text);
+    const prompt = buildPrompt(messages, collected, currentField);
+    text = await generateWithDeepSeek(prompt);
+    if (text) {
+      provider = DEEPSEEK_MODEL;
+    } else {
+      const chained = await generateWithFallback(prompt);
+      if (chained?.text) {
+        text = chained.text;
+        provider = chained.provider;
+      }
+    }
+    if (text) {
+      const parsed = tryParseAgentJson(text);
       if (parsed) {
         const next: TensorWaitlistFields = { ...collected };
         // Apply + validate LLM updates.
@@ -130,6 +191,20 @@ export async function POST(req: Request) {
           const check = validateTensorField(key, raw, next);
           if (check.ok) {
             (next as Record<string, unknown>)[key] = check.normalized;
+          }
+        }
+        // Silent fake-email gate: refuse garbage inboxes the moment one lands.
+        if ("workEmail" in parsed.updates && next.workEmail.trim() !== "") {
+          const gate = await gateEmail(next.workEmail);
+          if (gate !== "ok") {
+            next.workEmail = "";
+            return NextResponse.json({
+              reply: gateReply(gate),
+              collected: next,
+              currentField: "workEmail" as TensorWaitlistFieldKey,
+              done: false,
+              provider,
+            });
           }
         }
         // Recompute truth from validation (LLM can be optimistic).
@@ -157,13 +232,13 @@ export async function POST(req: Request) {
         if (computed === null && !askedAnything && !done) {
           computed = "anythingElse";
         }
-        if (computed === null && askedAnything && /^\s*(skip|no|nope|nothing|n\/a|na)\s*$/i.test(lastUser)) {
+        if (computed === null && askedAnything && /^\s*(skip|no|nope|nothing|n\/a|na)[\s.!]*$/i.test(lastUser)) {
           return NextResponse.json({
             reply: parsed.reply || "Perfect — you're in. Submitting your spot now.",
             collected: next,
             currentField: null,
             done: true,
-            provider: result.provider,
+            provider,
           });
         }
         return NextResponse.json({
@@ -171,7 +246,7 @@ export async function POST(req: Request) {
           collected: next,
           currentField: computed,
           done,
-          provider: result.provider,
+          provider,
         });
       }
     }
@@ -198,6 +273,19 @@ export async function POST(req: Request) {
     return NextResponse.json({ reply: retry, collected, currentField, done: false, provider: "fallback" });
   }
   const next = { ...collected, [currentField]: check.normalized } as TensorWaitlistFields;
+  if (currentField === "workEmail" && next.workEmail.trim() !== "") {
+    const gate = await gateEmail(next.workEmail);
+    if (gate !== "ok") {
+      next.workEmail = "";
+      return NextResponse.json({
+        reply: gateReply(gate),
+        collected: next,
+        currentField: "workEmail" as TensorWaitlistFieldKey,
+        done: false,
+        provider: "fallback",
+      });
+    }
+  }
   const following = nextMissingField(next);
   if (following === null) {
     // Ask optional anythingElse once before submitting.

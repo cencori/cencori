@@ -8,6 +8,7 @@ import {
   type TensorWaitlistFieldKey,
   type TensorWaitlistFields,
 } from "@/lib/tensor-waitlist";
+import { gateReply, quickGateEmail } from "@/lib/tensor-email-quick";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
@@ -46,6 +47,7 @@ export function TensorWaitlistChat({ onClose }: { onClose: () => void }) {
   const [thinking, setThinking] = useState(false);
   const [multiSel, setMultiSel] = useState<string[]>([]);
   const [submitState, setSubmitState] = useState<"idle" | "submitting" | "done" | "error">("idle");
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [booted, setBooted] = useState(false);
   const [stage, setStage] = useState<"chat" | "leaving" | "final">("chat");
   const [finalIn, setFinalIn] = useState(false);
@@ -88,6 +90,7 @@ export function TensorWaitlistChat({ onClose }: { onClose: () => void }) {
 
   async function submitWaitlist(data: TensorWaitlistFields) {
     setSubmitState("submitting");
+    setSubmitError(null);
     try {
       const res = await fetch("/api/waitlist", {
         method: "POST",
@@ -110,7 +113,10 @@ export function TensorWaitlistChat({ onClose }: { onClose: () => void }) {
           anythingElse: data.anythingElse,
         }),
       });
-      if (!res.ok) throw new Error("submit failed");
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(body?.error || `save failed (${res.status})`);
+      }
       setSubmitState("done");
       setMessages((prev) => [
         ...prev,
@@ -119,12 +125,11 @@ export function TensorWaitlistChat({ onClose }: { onClose: () => void }) {
           content: `You're on the list, ${data.name.split(" ")[0] || "friend"}. We'll reach out at ${data.workEmail} as soon as your Tensor seat opens.`,
         },
       ]);
-    } catch {
+    } catch (err) {
       setSubmitState("error");
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: "Couldn't save that just now — hit resend and I'll retry." },
-      ]);
+      // Single error slot — never appended to the thread, so retries
+      // replace it instead of stacking.
+      setSubmitError(err instanceof Error ? err.message : "save failed");
     }
   }
 
@@ -158,6 +163,7 @@ export function TensorWaitlistChat({ onClose }: { onClose: () => void }) {
     setCollected(emptyTensorWaitlist());
     setCurrentField("name");
     setSubmitState("idle");
+    setSubmitError(null);
     setStage("chat");
     setFinalIn(false);
     setInput("");
@@ -168,6 +174,19 @@ export function TensorWaitlistChat({ onClose }: { onClose: () => void }) {
   function sendText(raw: string) {
     const text = raw.trim();
     if (!text || thinking || submitState === "done") return;
+    // Instant bounce for obvious fakes — no round-trip, no thinking delay.
+    if (currentField === "workEmail") {
+      const quick = quickGateEmail(text);
+      if (quick !== "ok") {
+        setMessages((prev) => [
+          ...prev,
+          { role: "user", content: text },
+          { role: "assistant", content: gateReply(quick) },
+        ]);
+        setInput("");
+        return;
+      }
+    }
     const history: Msg[] = [...messages, { role: "user", content: text }];
     setMessages(history);
     setInput("");
@@ -272,10 +291,13 @@ export function TensorWaitlistChat({ onClose }: { onClose: () => void }) {
           ) : null}
           {submitState === "error" ? (
             <div className="mt-4">
+              <p className="text-[13px] leading-relaxed text-white/80">
+                Couldn&apos;t save that just now{submitError ? ` (${submitError})` : ""} — hit resend and I&apos;ll retry.
+              </p>
               <button
                 type="button"
                 onClick={() => void submitWaitlist(collected)}
-                className="rounded-full bg-white px-4 py-2 text-xs font-medium text-black transition-colors hover:bg-white/85"
+                className="mt-3 rounded-full bg-white px-4 py-2 text-xs font-medium text-black transition-colors hover:bg-white/85"
               >
                 Resend
               </button>
