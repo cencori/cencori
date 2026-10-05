@@ -262,6 +262,22 @@ export async function runV1ProviderExecution(
         };
 
         if (params.tools && params.tools.length > 0 && resolved.provider.supportsTools === false) {
+            try {
+                params.logSuccess({
+                    provider: resolved.providerName,
+                    model: resolved.model,
+                    status: 'error',
+                    promptTokens: 0,
+                    completionTokens: 0,
+                    totalTokens: 0,
+                    providerCostUsd: 0,
+                    cencoriChargeUsd: 0,
+                    markupPercentage: 0,
+                    errorMessage: `Tool calling is not implemented for provider '${resolved.providerName}'.`,
+                });
+            } catch {
+                // Logging must never break the error response.
+            }
             return {
                 ok: false,
                 status: 400,
@@ -1101,6 +1117,28 @@ export async function runV1ProviderExecution(
                     },
                 },
             };
+        }
+        // Pre-provider failures (bad provider, pricing 503, access 403, BYOK
+        // decrypt, router errors) previously returned with zero ai_requests
+        // rows — the dashboard showed empty while requests failed (Bachs-Docs).
+        // Log every resolution/execution failure as an error row so failures
+        // are always visible. Never throws.
+        try {
+            const message = error instanceof Error ? error.message : 'Provider execution failed';
+            params.logSuccess({
+                provider: 'cencori',
+                model: params.model,
+                status: 'error',
+                promptTokens: 0,
+                completionTokens: 0,
+                totalTokens: 0,
+                providerCostUsd: 0,
+                cencoriChargeUsd: 0,
+                markupPercentage: 0,
+                errorMessage: message,
+            });
+        } catch {
+            // Logging must never break the error response.
         }
         return v1ProviderFailureResult(error, undefined, params.model);
     }
