@@ -347,7 +347,8 @@ describe('validateGatewayRequest', () => {
         }
     });
 
-    it('requires prepaid credits for free-tier managed inference but not control-plane writes', async () => {
+        it('requires prepaid credits for free-tier managed inference but not control-plane writes', async () => {
+
         mockGetCreditsBalance.mockResolvedValue(0);
         mockGetCachedApiKeyConfig.mockResolvedValue({
             data: buildKeyData({ tier: 'free', creditsBalance: 0 }),
@@ -363,6 +364,42 @@ describe('validateGatewayRequest', () => {
 
         const controlPlane = await validateGatewayRequest(authRequest('/api/v1/agents'));
         expect(controlPlane.success).toBe(true);
+    });
+
+    it('lets a zero-balance pro org through on control-plane reads while metered writes still 403', async () => {
+        mockGetCreditsBalance.mockResolvedValue(0);
+        mockSupabaseFrom.mockImplementation((table: string) => {
+            if (table === 'api_keys') {
+                return {
+                    select: () => ({
+                        eq: () => ({
+                            is: () => ({
+                                single: async () => ({
+                                    data: buildKeyData({ tier: 'pro', creditsBalance: 0 }),
+                                    error: null,
+                                }),
+                            }),
+                        }),
+                    }),
+                };
+            }
+            return { select: () => ({ eq: () => ({ single: async () => ({ data: null, error: null }) }) }) };
+        });
+
+        const read = await validateGatewayRequest(
+            new NextRequest('http://localhost/api/v1/agent-installations', {
+                method: 'GET',
+                headers: { Authorization: `Bearer ${TEST_API_KEY}` },
+            })
+        );
+        expect(read.success).toBe(true);
+
+        const write = await validateGatewayRequest(authRequest('/api/v1/memory/remember'));
+        expect(write.success).toBe(false);
+        if (!write.success) {
+            expect(write.response.status).toBe(403);
+            expect((await write.response.json()).code).toBe('credit_balance_exhausted');
+        }
     });
 
     it('does not trust an API-key cache entry with an old positive wallet balance', async () => {

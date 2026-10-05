@@ -771,7 +771,11 @@ return {
         })
         : false;
 
-    if (shouldEnforceCredits && creditsBalance <= 0 && !zeroBalanceByok) {
+    if (shouldEnforceCredits && creditsBalance <= 0 && !zeroBalanceByok && isMeteredGatewayRequest(req.method, route)) {
+        // Zero balance blocks only calls that would spend managed-model money.
+        // Control-plane reads (and other non-metered calls) neither consume
+        // credits nor require them — blocking agent bootstrap over pennies
+        // breaks agents for no revenue protection. Rate limits still apply.
         // A zero-balance refusal used to return before any log was written, so an
         // org that ran out of credits saw failing requests and an idle console.
         // Record the refusal like every other pre-provider denial.
