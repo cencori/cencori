@@ -5,18 +5,39 @@ import {
   Add01Icon,
   ArrowDown01Icon,
   ArrowRight01Icon,
-  BellIcon,
   BookOpen02Icon,
   CommandLineIcon,
   Database01Icon,
   FolderGitIcon,
-  GitPullRequestCreateArrowIcon,
   HelpCircleIcon,
   PencilEdit01Icon,
   PlusSignCircleIcon,
   SearchIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+
+// Inline stroke icons (not dependent on the hugeicons package version —
+// missing package exports crash SSR prerender, so version-gated icons
+// live here instead).
+function TensorBellIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" width="15" height="15" stroke="currentColor" strokeWidth={1.35} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M10 2.75a4.5 4.5 0 0 0-4.5 4.5c0 3.5-1.25 4.75-1.25 4.75h11.5s-1.25-1.25-1.25-4.75A4.5 4.5 0 0 0 10 2.75Z" />
+      <path d="M8.25 15a1.75 1.75 0 0 0 3.5 0" />
+    </svg>
+  );
+}
+
+function TensorPullRequestIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" width="14" height="14" stroke="currentColor" strokeWidth={1.35} strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="5.5" cy="5" r="2" />
+      <circle cx="5.5" cy="15" r="2" />
+      <circle cx="14.5" cy="9.5" r="2" />
+      <path d="M5.5 7v6M14.5 11.5c0 2-2.5 2-4.5 2H7.5" />
+    </svg>
+  );
+}
 
 function TensorLeftSidebarIcon() {
   return (
@@ -328,7 +349,7 @@ export function TensorMock() {
             </div>
             <div className="flex cursor-default items-center gap-2 rounded-md px-1 -mx-1 py-1 transition-colors hover:bg-white/5 hover:text-[#EDE6D9]">
               <span className="shrink-0 text-[#EDE6D9]/80">
-                <HugeiconsIcon icon={GitPullRequestCreateArrowIcon} size={14} strokeWidth={1.45} aria-hidden="true" />
+                <TensorPullRequestIcon />
               </span>
               <span>Pull requests</span>
             </div>
@@ -394,7 +415,7 @@ export function TensorMock() {
               <HugeiconsIcon icon={HelpCircleIcon} size={15} strokeWidth={1.5} aria-hidden="true" />
             </span>
             <span className="shrink-0 cursor-default rounded-md p-1 -m-1 text-[#EDE6D9]/50 transition-colors hover:bg-white/10 hover:text-[#EDE6D9]">
-              <HugeiconsIcon icon={BellIcon} size={15} strokeWidth={1.5} aria-hidden="true" />
+              <TensorBellIcon />
             </span>
           </div>
         </div>
