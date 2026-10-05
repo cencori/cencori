@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { TensorMock } from "./TensorMock";
 import { TensorWaitlistChat } from "./TensorWaitlistChat";
 
@@ -8,6 +8,7 @@ export function TensorPageShell() {
   const [mode, setMode] = useState<"landing" | "chat">("landing");
   const [leaving, setLeaving] = useState(false);
   const [chatVisible, setChatVisible] = useState(false);
+  const mainRef = useRef<HTMLElement>(null);
 
   // Deep-link: /tensor#waitlist opens straight into the agent.
   useEffect(() => {
@@ -16,6 +17,24 @@ export function TensorPageShell() {
       setChatVisible(true);
     }
   }, []);
+
+  // Follow the visual viewport while chatting. Mobile Safari's URL bar
+  // and keyboard resize the visual viewport without resizing the layout
+  // viewport — svh/dvh alone jump or leave the input covered. Pinning the
+  // shell height to visualViewport keeps the thread + composer glued.
+  useEffect(() => {
+    if (mode !== "chat" || typeof window === "undefined" || !window.visualViewport) return;
+    const vv = window.visualViewport;
+    const sync = () => {
+      mainRef.current?.style.setProperty("height", `${vv.height}px`);
+    };
+    sync();
+    vv.addEventListener("resize", sync);
+    return () => {
+      vv.removeEventListener("resize", sync);
+      mainRef.current?.style.removeProperty("height");
+    };
+  }, [mode]);
 
   const openChat = useCallback(() => {
     if (mode === "chat") return;
@@ -46,7 +65,11 @@ export function TensorPageShell() {
 
   return (
     <div className="marketing-theme dark relative isolate min-h-screen bg-black text-white [color-scheme:dark]">
-      <main className={`relative flex flex-col ${mode === "chat" ? "h-[100svh] overflow-hidden" : "min-h-screen"}`}>
+      <main
+        ref={mainRef}
+        style={mode === "chat" ? { height: "100dvh" } : undefined}
+        className={`relative flex flex-col ${mode === "chat" ? "h-[100svh] overflow-hidden overscroll-none" : "min-h-screen"}`}
+      >
         {mode === "landing" ? (
           <div
             className={`flex flex-1 flex-col justify-center pt-16 transition-all duration-500 ease-out ${
