@@ -645,6 +645,28 @@ export async function POST(req: NextRequest) {
                     ...(inputPipeline.matched_rules ? { matched_rules: inputPipeline.matched_rules } : {}),
                 }
                 : toOpenAiErrorBody(inputPipeline);
+            // Input blocks already write security_incidents, but without an
+            // ai_requests row the dashboard metrics stay empty and failed
+            // requests look "gone". Write an error row so failures are visible.
+            try {
+                void logGatewayRequest(activeGatewayCtx, {
+                    endpoint,
+                    model,
+                    provider: 'cencori',
+                    status: inputPipeline.status === 429 ? 'rate_limited' : inputPipeline.status === 403 ? 'filtered' : 'error',
+                    promptTokens: 0,
+                    completionTokens: 0,
+                    totalTokens: 0,
+                    costUsd: 0,
+                    providerCostUsd: 0,
+                    cencoriChargeUsd: 0,
+                    markupPercentage: 0,
+                    errorMessage: inputPipeline.message,
+                    requestPayload: { messages: pipelineMessages, model, stream: shouldStream },
+                });
+            } catch {
+                // Logging must never break the error response.
+            }
             return respond(
                 NextResponse.json(errorBody, { status: inputPipeline.status }),
                 inputPipeline.code,
@@ -1053,6 +1075,29 @@ export async function POST(req: NextRequest) {
     } catch (error: unknown) {
         console.error("Gateway Error:", error);
         const message = error instanceof Error ? error.message : "Internal server error";
+        // Outer failures (body parse, agent resolution, unexpected throws)
+        // previously returned 500 with no ai_requests row. Log when context exists.
+        try {
+            if (gatewayCtx) {
+                void logGatewayRequest(gatewayCtx, {
+                    endpoint,
+                    model: 'unknown',
+                    provider: 'cencori',
+                    status: 'error',
+                    promptTokens: 0,
+                    completionTokens: 0,
+                    totalTokens: 0,
+                    costUsd: 0,
+                    providerCostUsd: 0,
+                    cencoriChargeUsd: 0,
+                    markupPercentage: 0,
+                    errorMessage: message,
+                    requestPayload: {},
+                });
+            }
+        } catch {
+            // Logging must never break the error response.
+        }
         return respondError(500, message, 'internal_error');
     }
 }

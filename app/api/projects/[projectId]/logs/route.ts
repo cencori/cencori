@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireProjectAccess } from '@/lib/require-project-access';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { getProjectTier } from '@/lib/require-tier-feature';
-import { clampTimeRange } from '@/lib/entitlements';
+import { clampTimeRange, LOG_RETENTION_RANGE } from '@/lib/entitlements';
 import { mapIncidentTypeToStatus, incidentReasons } from '@/lib/security-incident-log';
 
 export async function GET(
@@ -20,11 +20,17 @@ export async function GET(
         const perPage = parseInt(searchParams.get('per_page') || '20');
         const status = searchParams.get('status');
         const model = searchParams.get('model');
-        // History depth is tier-gated: free 7d, pro 30d, team 90d, enterprise all
+        // History depth is tier-gated: free 7d, pro 30d, team 90d, enterprise all.
+        // Surface the clamp so the UI can tell "no rows (filtered)" apart from
+        // "no rows (retention limit)" instead of silently narrowing the window.
         const tier = (await getProjectTier(projectId)) || 'free';
-        const timeRange = clampTimeRange(tier, searchParams.get('time_range') || '24h');
+        const requestedTimeRange = searchParams.get('time_range') || '24h';
+        const timeRange = clampTimeRange(tier, requestedTimeRange);
+        const tierMax = LOG_RETENTION_RANGE[tier] ?? LOG_RETENTION_RANGE.free;
         const search = searchParams.get('search');
-        const environment = searchParams.get('environment') || 'production';
+        // Environments retired — one key, production. No environment filtering;
+        // all rows for the project are returned. The param is accepted for
+        // backward compat and ignored.
         const apiKeyId = searchParams.get('api_key_id');
 
         let startTime: Date | null = null;
@@ -66,8 +72,7 @@ export async function GET(
         let query = supabaseAdmin
             .from('ai_requests')
             .select('*', { count: 'exact' })
-            .eq('project_id', projectId)
-            .eq('environment', environment);
+            .eq('project_id', projectId);
 
         if (apiKeyId && apiKeyId !== 'all') {
             query = query.eq('api_key_id', apiKeyId);
@@ -86,7 +91,15 @@ export async function GET(
         }
 
         if (search) {
-            query = query.or(`error_message.ilike.%${search}%,request_payload->>messages->>0->>content.ilike.%${search}%`);
+            // PostgREST `or` splits on commas, and `->>` returns text while
+            // `->` traverses JSON — the old
+            // `request_payload->>messages->>0->>content` chain was invalid and
+            // made search fail closed. Sanitize + use the correct traversal.
+            const sanitized = search.replace(/[,%()"]/g, ' ').trim().slice(0, 100);
+            if (sanitized) {
+                const escaped = sanitized.replace(/%/g, '\\%').replace(/_/g, '\\_');
+                query = query.or(`error_message.ilike.%${escaped}%,request_payload->messages->0->>content.ilike.%${escaped}%`);
+            }
         }
 
         const offset = (page - 1) * perPage;
@@ -123,6 +136,8 @@ export async function GET(
                 created_at: req.created_at,
                 status: req.status,
                 model: req.model,
+                provider: req.provider,
+                environment: req.environment,
                 api_key_id: req.api_key_id,
                 api_key_name: keyInfo?.name || (req.api_key_id ? 'Unknown' : 'No key'),
                 api_key_prefix: keyInfo?.prefix || (req.api_key_id ? 'unknown' : 'no-key'),
@@ -199,6 +214,13 @@ export async function GET(
                 per_page: perPage,
                 total: totalWithIncidents,
                 total_pages: Math.ceil(totalWithIncidents / perPage),
+            },
+            meta: {
+                requested_time_range: requestedTimeRange,
+                applied_time_range: timeRange,
+                tier,
+                tier_max_time_range: tierMax,
+                time_range_clamped: requestedTimeRange !== timeRange,
             },
         });
 
