@@ -39,20 +39,74 @@ function placeholders(field: TensorWaitlistFieldKey | null): string {
   }
 }
 
+const STORAGE_KEY = "tensor-waitlist-progress-v1";
+const MAX_STORED_MESSAGES = 30;
+
+type StoredProgress = {
+  messages: Msg[];
+  collected: TensorWaitlistFields;
+  currentField: TensorWaitlistFieldKey | null;
+  submitState: "idle" | "done" | "error";
+};
+
+function loadProgress(): StoredProgress | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<StoredProgress>;
+    if (!Array.isArray(parsed.messages) || typeof parsed.collected !== "object" || !parsed.collected) return null;
+    const messages = parsed.messages
+      .filter((m) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
+      .slice(-MAX_STORED_MESSAGES);
+    if (messages.length === 0) return null;
+    return {
+      messages,
+      collected: { ...emptyTensorWaitlist(), ...parsed.collected },
+      currentField: parsed.currentField ?? null,
+      submitState: parsed.submitState === "done" || parsed.submitState === "error" ? parsed.submitState : "idle",
+    };
+  } catch {
+    return null;
+  }
+}
+
 export function TensorWaitlistChat({ onClose }: { onClose: () => void }) {
-  const [messages, setMessages] = useState<Msg[]>([]);
-  const [collected, setCollected] = useState<TensorWaitlistFields>(() => emptyTensorWaitlist());
-  const [currentField, setCurrentField] = useState<TensorWaitlistFieldKey | null>("name");
+  const [restored] = useState<StoredProgress | null>(() => loadProgress());
+  const [messages, setMessages] = useState<Msg[]>(() => restored?.messages ?? []);
+  const [collected, setCollected] = useState<TensorWaitlistFields>(() => restored?.collected ?? emptyTensorWaitlist());
+  const [currentField, setCurrentField] = useState<TensorWaitlistFieldKey | null>(() => restored?.currentField ?? "name");
   const [input, setInput] = useState("");
   const [thinking, setThinking] = useState(false);
   const [multiSel, setMultiSel] = useState<string[]>([]);
-  const [submitState, setSubmitState] = useState<"idle" | "submitting" | "done" | "error">("idle");
+  const [submitState, setSubmitState] = useState<"idle" | "submitting" | "done" | "error">(() => restored?.submitState ?? "idle");
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [booted, setBooted] = useState(false);
-  const [stage, setStage] = useState<"chat" | "leaving" | "final">("chat");
-  const [finalIn, setFinalIn] = useState(false);
+  const [booted, setBooted] = useState(() => restored !== null);
+  const [stage, setStage] = useState<"chat" | "leaving" | "final">(() => (restored?.submitState === "done" ? "final" : "chat"));
+  const [finalIn, setFinalIn] = useState(() => restored?.submitState === "done");
   const scrollRef = useRef<HTMLDivElement>(null);
   const startedRef = useRef(false);
+
+  // Persist progress so a refresh / accidental close resumes mid-conversation.
+  // Never stores thinking state; "submitting" resolves to idle on reload
+  // (no auto-resubmit — avoids double-saving to the webhook).
+  useEffect(() => {
+    try {
+      if (messages.length === 0) {
+        window.localStorage.removeItem(STORAGE_KEY);
+        return;
+      }
+      const snapshot: StoredProgress = {
+        messages: messages.slice(-MAX_STORED_MESSAGES),
+        collected,
+        currentField,
+        submitState: submitState === "done" || submitState === "error" ? submitState : "idle",
+      };
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
+    } catch {
+      // Storage full or blocked — the chat still works, just without resume.
+    }
+  }, [messages, collected, currentField, submitState]);
 
   const scrollDown = useCallback(() => {
     const el = scrollRef.current;
@@ -133,13 +187,15 @@ export function TensorWaitlistChat({ onClose }: { onClose: () => void }) {
     }
   }
 
-  // Boot: fetch greeting once.
+  // Boot: fetch greeting once — unless progress was restored, in which
+  // case we resume silently right where they left off.
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
+    if (restored) return;
     setBooted(true);
     void talk([], emptyTensorWaitlist(), "name");
-  }, [talk]);
+  }, [talk, restored]);
 
   // After submit: let the closing messages land, then fade everything out
   // and swap to the dead-centered card (footer stays, owned by the shell).
@@ -159,6 +215,11 @@ export function TensorWaitlistChat({ onClose }: { onClose: () => void }) {
   }, [stage]);
 
   function resetChat() {
+    try {
+      window.localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // ignore — chat still resets in memory.
+    }
     setMessages([]);
     setCollected(emptyTensorWaitlist());
     setCurrentField("name");
@@ -246,7 +307,7 @@ export function TensorWaitlistChat({ onClose }: { onClose: () => void }) {
       className="mx-auto flex h-full min-h-0 w-full max-w-2xl flex-1 flex-col overflow-hidden px-5 pb-4 pt-2 md:px-8"
     >
       {/* header */}
-      <div className={`flex items-center justify-start transition-opacity duration-500 ${fading}`}>
+      <div className={`flex items-center justify-between transition-opacity duration-500 ${fading}`}>
         <button
           type="button"
           onClick={onClose}
@@ -254,6 +315,15 @@ export function TensorWaitlistChat({ onClose }: { onClose: () => void }) {
         >
           ← Back
         </button>
+        {messages.length > 0 && submitState !== "done" ? (
+          <button
+            type="button"
+            onClick={resetChat}
+            className="px-0 py-1 text-sm text-white/40 transition-colors hover:text-white"
+          >
+            Start over
+          </button>
+        ) : null}
       </div>
 
       {/* thread */}
