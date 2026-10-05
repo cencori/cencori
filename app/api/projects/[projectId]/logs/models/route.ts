@@ -18,7 +18,7 @@ export async function GET(
 
     try {
         const searchParams = req.nextUrl.searchParams;
-        const environment = searchParams.get('environment') || 'production';
+        // Environments retired — ignored for backward compat.
         // History depth is tier-gated: free 7d, pro 30d, team 90d, enterprise all
         const tier = (await getProjectTier(projectId)) || 'free';
         const timeRange = clampTimeRange(tier, searchParams.get('time_range') || '90d');
@@ -53,7 +53,6 @@ export async function GET(
             .from('ai_requests')
             .select('model')
             .eq('project_id', projectId)
-            .eq('environment', environment)
             .order('created_at', { ascending: false })
             .limit(RECENT_ROW_LIMIT);
 
