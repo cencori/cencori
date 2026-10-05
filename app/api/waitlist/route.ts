@@ -1,13 +1,54 @@
 import { NextResponse } from "next/server";
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { email, productName } = body;
+    const {
+      email,
+      productName,
+      // Tensor conversational waitlist (all optional except email for backwards compat)
+      name,
+      workEmail,
+      company,
+      role,
+      building,
+      planInterested,
+      timeline,
+      currentTools,
+      priorities,
+      budget,
+      heardAbout,
+      anythingElse,
+      source,
+    } = body;
 
-    if (!email) {
-      return NextResponse.json({ error: "Email is required" }, { status: 400 });
+    const resolvedEmail: string = workEmail || email;
+
+    if (!resolvedEmail || !EMAIL_RE.test(String(resolvedEmail))) {
+      return NextResponse.json({ error: "Valid email is required" }, { status: 400 });
     }
+
+    const payload = {
+      email: resolvedEmail,
+      productName: productName || "tensor",
+      timestamp: new Date().toISOString(),
+      source: source || "Cencori Website",
+      // Full Tensor agent fields — webhook consumers (Sheets/Zapier) get everything.
+      name: name || undefined,
+      workEmail: workEmail || resolvedEmail,
+      company: company || undefined,
+      role: role || undefined,
+      building: building || undefined,
+      planInterested: planInterested || undefined,
+      timeline: timeline || undefined,
+      currentTools: Array.isArray(currentTools) ? currentTools : currentTools || undefined,
+      priorities: Array.isArray(priorities) ? priorities : priorities || undefined,
+      budget: budget || undefined,
+      heardAbout: heardAbout || undefined,
+      anythingElse: anythingElse || undefined,
+    };
 
     // Connect to Google Sheets via Webhook (Zapier/Make/n8n)
     const webhookUrl = process.env.WAITLIST_WEBHOOK_URL;
@@ -18,12 +59,7 @@ export async function POST(req: Request) {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          email,
-          productName,
-          timestamp: new Date().toISOString(),
-          source: "Cencori Website",
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
@@ -35,7 +71,7 @@ export async function POST(req: Request) {
       }
     } else {
       // If no webhook is configured, just log it for testing purposes
-      console.log(`[Waitlist Debug] Email: ${email}, Product: ${productName}`);
+      console.log(`[Waitlist Debug] ${JSON.stringify(payload)}`);
     }
 
     return NextResponse.json({ success: true });
