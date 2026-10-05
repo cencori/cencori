@@ -56,6 +56,12 @@ const MODEL_PROVIDER_OVERRIDES: Record<string, string> = {
     'openai/gpt-oss-safeguard-20b': 'groq',
     'moonshotai/kimi-k2-instruct': 'groq',
     'allam-2-7b': 'groq',
+    // Vercel AI Gateway legs. The `vercel/` prefix is routing-only: the
+    // gateway serves the catalog id, so normalizeModelName strips exactly one
+    // leading `vercel/` (sending the full prefixed id upstream 404s — same
+    // lesson as Groq's namespaced ids, inverted).
+    'vercel/openai/gpt-oss-20b': 'vercel',
+    'vercel/openai/gpt-oss-120b': 'vercel',
     // Google Gemma, served on the Gemini API. No `gemini-` prefix to match on,
     // and the bare `gemma-4-31b` above is the (unfunded) Cerebras id — these
     // carry the `-it` suffix Google publishes.
@@ -253,6 +259,14 @@ export class ProviderRouter {
             //    routed. Verified against Groq on 2026-09-10.
             if (NAMESPACED_MODEL_ID_PROVIDERS.has(detectedProvider ?? '')) {
                 return MODEL_ALIASES[modelName] || modelName;
+            }
+            // Vercel AI Gateway: `vercel/` is routing-only; upstream serves the
+            // catalog id (`openai/gpt-oss-20b`). Strip exactly one leading
+            // segment — the generic rule below would keep the full name because
+            // the prefix matches the provider, and that 404s upstream.
+            if (detectedProvider === 'vercel' && modelName.startsWith('vercel/')) {
+                const stripped = modelName.slice('vercel/'.length);
+                return MODEL_ALIASES[stripped] || stripped;
             }
             const [prefix] = modelName.split('/');
             if (detectedProvider && prefix === detectedProvider) {

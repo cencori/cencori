@@ -35,12 +35,14 @@ export function getMemoryGoogleApiKey(): string | null {
  * uses the shared managed key for that provider (nothing breaks if unconfigured).
  *
  *   MEMORY_GEMINI_API_KEY / MEMORY_GROQ_API_KEY / MEMORY_CEREBRAS_API_KEY
+ *   + AI_GATEWAY_API_KEY (Vercel AI Gateway leg — billed as Gateway Credits)
  */
 export function getMemoryProviderKey(provider: string): string | undefined {
     const envByProvider: Record<string, string | undefined> = {
         google: process.env.MEMORY_GEMINI_API_KEY,
         groq: process.env.MEMORY_GROQ_API_KEY,
         cerebras: process.env.MEMORY_CEREBRAS_API_KEY,
+        vercel: process.env.AI_GATEWAY_API_KEY,
     };
     const value = envByProvider[provider];
     return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;

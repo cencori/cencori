@@ -42,10 +42,11 @@ export const MEMORY_LLM_CHAIN: string[] = (process.env.MEMORY_LLM_CHAIN
     .map(s => s.trim())
     .filter(Boolean)) ?? [
     'gpt-oss-120b',             // Cerebras — paid primary: no free-tier roulette, ~1s warm
+    'vercel/openai/gpt-oss-20b', // Vercel AI Gateway — paid, zero-markup, multi-backend failover inside
     'openai/gpt-oss-20b',       // Groq — fast, low-cost free fallback
     // Gemini is intentionally NOT here: memory's generation stays Google-free
     // (Gemini serves embeddings only). Add a current Gemini model to
-    // MEMORY_LLM_CHAIN for a 3rd fallback if you want one.
+    // MEMORY_LLM_CHAIN for a 4th fallback if you want one.
 ];
 
 /** Dedicated memory keys per provider (falls back to shared managed key when unset). */
@@ -54,6 +55,7 @@ function memoryProviderKeys(): Record<string, string | undefined> {
         google: getMemoryProviderKey('google'),
         groq: getMemoryProviderKey('groq'),
         cerebras: getMemoryProviderKey('cerebras'),
+        vercel: getMemoryProviderKey('vercel'),
     };
 }
 

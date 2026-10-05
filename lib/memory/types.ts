@@ -53,7 +53,7 @@ export const DEFAULT_RETRIEVAL_THRESHOLD: Record<'openai' | 'google', number> = 
  */
 export const MEMORY_MANAGED_MODEL = 'gpt-oss-120b';
 
-const ALLOWED_MEMORY_MODEL = /^(?:gpt-oss-120b|openai\/gpt-oss-20b)$/i;
+const ALLOWED_MEMORY_MODEL = /^(?:gpt-oss-120b|openai\/gpt-oss-20b|vercel\/openai\/gpt-oss-(?:20b|120b))$/i;
 
 /** Coerce a configured/overridden model to an allowed managed memory model. */
 export function resolveMemoryModel(model: string | null | undefined): string {
