@@ -56,7 +56,24 @@ export function publicFailureMessage(
     provider: string,
     model: string | undefined,
 ): string {
-    if (!model || !isCencoriServed(provider, model)) return message;
+    if (!model || !isCencoriServed(provider, model)) {
+        // Bare `gpt-oss-120b` routes to Cerebras (unfunded 402), not Groq.
+        // Bachs-Docs hit this as "Groq failing". Point them at the namespaced id.
+        const lower = message.toLowerCase();
+        const modelId: string = typeof model === 'string' ? model : '';
+        const isGptOss = modelId.includes('gpt-oss');
+        if (isGptOss && provider === 'cerebras' &&
+            (lower.includes('402') || lower.includes('payment') || lower.includes('unfunded') ||
+             lower.includes('billing') || lower.includes('credit') || lower.includes('top up') ||
+             lower.includes('payment_required'))) {
+            return `${message} The bare \`gpt-oss-120b\` id routes to Cerebras (currently unfunded). For Groq, send \`openai/gpt-oss-120b\` (or \`openai/gpt-oss-20b\`) with your Groq key.`;
+        }
+        if (isGptOss && provider === 'groq' &&
+            (lower.includes('does not exist') || lower.includes('model not found') || lower.includes('404'))) {
+            return `${message} Groq expects the namespaced id (e.g. \`openai/gpt-oss-120b\`) — the bare form 404s upstream.`;
+        }
+        return message;
+    }
     if (!message.startsWith('All providers exhausted')) return message;
     return 'No capacity is currently available for this model. Retry shortly, or use a different model.';
 }

@@ -590,6 +590,22 @@ export async function runV1ResponsesExecution(
         }
 
         if (functionTools.length > 0 && resolved.provider.supportsTools === false) {
+            try {
+                params.logSuccess({
+                    provider: resolved.providerName,
+                    model: resolved.model,
+                    status: 'error',
+                    promptTokens: 0,
+                    completionTokens: 0,
+                    totalTokens: 0,
+                    providerCostUsd: 0,
+                    cencoriChargeUsd: 0,
+                    markupPercentage: 0,
+                    errorMessage: `Tool calling is not implemented for provider '${resolved.providerName}'.`,
+                });
+            } catch {
+                // Logging must never break the error response.
+            }
             return {
                 ok: false,
                 status: 400,
@@ -890,6 +906,11 @@ export async function runV1ResponsesExecution(
                 }, 15_000);
                 let fullText = '';
                 let completed = false;
+                // Tracks whether an ai_requests row was already written for this
+                // stream (success or output-block). The catch below must not
+                // write a second error row when post-log steps (storeResponse,
+                // enqueue) throw after a successful settlement.
+                let successLogged = false;
                 // Thinking trace, accumulated exactly like visible text and
                 // persisted as a `reasoning` output item at completion.
                 let fullReasoning = '';
@@ -1215,6 +1236,7 @@ export async function runV1ResponsesExecution(
                                     markupPercentage,
                                     errorMessage: outputCheck.message,
                                 });
+                                successLogged = true;
                                 params.incrementUsage(cencoriChargeUsd);
                                 params.recordEndUserUsage({
                                     promptTokens,
@@ -1338,6 +1360,7 @@ export async function runV1ResponsesExecution(
                                     arguments: tc.arguments,
                                 })),
                             });
+                            successLogged = true;
                             params.incrementUsage(cencoriChargeUsd);
                             params.recordEndUserUsage({
                                 promptTokens,
@@ -1423,23 +1446,25 @@ export async function runV1ResponsesExecution(
                     // real cause — rate limits, an exhausted provider, a retired model — left
                     // behind in the gateway. Carry it on the response the client actually reads.
                     const message = error instanceof Error ? error.message : 'Stream failed';
-                    if (isCreditExhausted(error)) {
-                        try {
-                            params.logSuccess({
-                                provider: 'cencori',
-                                model: body.model || model,
-                                status: 'error',
-                                promptTokens: 0,
-                                completionTokens: 0,
-                                totalTokens: 0,
-                                providerCostUsd: 0,
-                                cencoriChargeUsd: 0,
-                                markupPercentage: 0,
-                                errorMessage: message,
-                            });
-                        } catch {
-                            // Logging must never break the error response.
-                        }
+                    // Don't double-log when settlement already wrote a row and a
+                    // post-log step (storeResponse, enqueue) threw afterwards.
+                    if (!successLogged) {
+                    try {
+                        params.logSuccess({
+                            provider: 'cencori',
+                            model: body.model || model,
+                            status: 'error',
+                            promptTokens: 0,
+                            completionTokens: 0,
+                            totalTokens: 0,
+                            providerCostUsd: 0,
+                            cencoriChargeUsd: 0,
+                            markupPercentage: 0,
+                            errorMessage: message,
+                        });
+                    } catch {
+                        // Logging must never break the error response.
+                    }
                     }
                     const failedResponse = buildResponsesJson({
                         id: responseId,
@@ -1517,6 +1542,25 @@ export async function runV1ResponsesExecution(
                     status: 'failed',
                 },
             };
+        }
+        // Same invisibility gap as /v1/chat/completions: pre-provider failures
+        // must still write an error row so the dashboard shows why requests failed.
+        try {
+            const message = error instanceof Error ? error.message : 'Provider execution failed';
+            params.logSuccess({
+                provider: 'cencori',
+                model: params.model,
+                status: 'error',
+                promptTokens: 0,
+                completionTokens: 0,
+                totalTokens: 0,
+                providerCostUsd: 0,
+                cencoriChargeUsd: 0,
+                markupPercentage: 0,
+                errorMessage: message,
+            });
+        } catch {
+            // Logging must never break the error response.
         }
         return providerFailureResult(error, params.model);
     }

@@ -29,7 +29,6 @@ interface RequestLog {
 
 interface RequestLogsTableProps {
     projectId?: string;
-    environment: 'production' | 'test';
     filters: {
         status?: string;
         model?: string;
@@ -44,9 +43,16 @@ interface RequestLogsResponse {
     pagination: {
         total_pages: number;
     };
+    meta?: {
+        requested_time_range: string;
+        applied_time_range: string;
+        tier: string;
+        tier_max_time_range: string;
+        time_range_clamped: boolean;
+    };
 }
 
-export function RequestLogsTable({ projectId, environment, filters }: RequestLogsTableProps) {
+export function RequestLogsTable({ projectId, filters }: RequestLogsTableProps) {
     const queryClient = useQueryClient();
     const [page, setPage] = useState(1);
     const [selectedRequest, setSelectedRequest] = useState<string | null>(null);
@@ -54,10 +60,9 @@ export function RequestLogsTable({ projectId, environment, filters }: RequestLog
     const queryKey = useMemo(() => [
         'request-logs',
         projectId,
-        environment,
         page,
         filters,
-    ] as const, [environment, filters, page, projectId]);
+    ] as const, [filters, page, projectId]);
 
     const { data, isLoading, isFetching, error } = useQuery<RequestLogsResponse>({
         queryKey,
@@ -67,7 +72,6 @@ export function RequestLogsTable({ projectId, environment, filters }: RequestLog
             const params = new URLSearchParams({
                 page: page.toString(),
                 per_page: '20',
-                environment,
                 ...(filters.status && { status: filters.status }),
                 ...(filters.model && { model: filters.model }),
                 ...(filters.time_range && { time_range: filters.time_range }),
@@ -88,6 +92,7 @@ export function RequestLogsTable({ projectId, environment, filters }: RequestLog
 
     const requests = data?.requests || [];
     const totalPages = data?.pagination.total_pages || 1;
+    const meta = data?.meta;
 
     useEffect(() => {
         setPage(1);
@@ -217,21 +222,41 @@ export function RequestLogsTable({ projectId, environment, filters }: RequestLog
     }
 
     if (requests.length === 0) {
+        const isFiltered = (filters.status && filters.status !== 'all')
+            || (filters.model && filters.model !== 'all')
+            || (filters.search && filters.search.length > 0)
+            || (filters.api_key_id && filters.api_key_id !== 'all');
         return (
+            <div>
+                {meta?.time_range_clamped && (
+                    <div className="mb-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+                        Showing {meta.applied_time_range} — your plan keeps {meta.tier_max_time_range} of history
+                        (requested {meta.requested_time_range}). Try a shorter range.
+                    </div>
+                )}
             <div className="text-center py-16 flex flex-col items-center justify-center">
                 <div className="w-10 h-10 rounded-md bg-secondary flex items-center justify-center mb-3">
                     <FileText className="h-5 w-5 text-muted-foreground" />
                 </div>
                 <p className="text-sm font-medium mb-1">No requests found</p>
                 <p className="text-xs text-muted-foreground">
-                    Try adjusting your filters or make some AI requests
+                    {isFiltered
+                        ? 'No rows match these filters — try clearing them.'
+                        : 'Make an AI request and it will show up here.'}
                 </p>
+            </div>
             </div>
         );
     }
 
     return (
         <>
+            {meta?.time_range_clamped && (
+                <div className="mb-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+                    Showing {meta.applied_time_range} — your plan keeps {meta.tier_max_time_range} of history
+                    (requested {meta.requested_time_range}).
+                </div>
+            )}
             {/* Desktop Table */}
             <div className="bg-card border border-border/40 rounded-md overflow-hidden">
                 <div className="hidden md:block overflow-x-auto">

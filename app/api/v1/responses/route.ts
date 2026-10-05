@@ -352,6 +352,25 @@ export async function POST(req: NextRequest) {
             const errorBody = inputPipeline.assistantMessage
                 ? { ...toOpenAiErrorBody(inputPipeline), message: inputPipeline.assistantMessage, ...(inputPipeline.reasons ? { reasons: inputPipeline.reasons } : {}), ...(inputPipeline.matched_rules ? { matched_rules: inputPipeline.matched_rules } : {}) }
                 : toOpenAiErrorBody(inputPipeline);
+            try {
+                void logGatewayRequest(activeGatewayCtx, {
+                    endpoint,
+                    model,
+                    provider: 'cencori',
+                    status: inputPipeline.status === 429 ? 'rate_limited' : inputPipeline.status === 403 ? 'filtered' : 'error',
+                    promptTokens: 0,
+                    completionTokens: 0,
+                    totalTokens: 0,
+                    costUsd: 0,
+                    providerCostUsd: 0,
+                    cencoriChargeUsd: 0,
+                    markupPercentage: 0,
+                    errorMessage: inputPipeline.message,
+                    requestPayload: { messages: inputMessages, model, stream: body.stream || false },
+                });
+            } catch {
+                // Logging must never break the error response.
+            }
             return respond(NextResponse.json(errorBody, { status: inputPipeline.status }), inputPipeline.code, inputPipeline.message);
         }
 
@@ -513,6 +532,27 @@ export async function POST(req: NextRequest) {
     } catch (error: unknown) {
         console.error("Responses API Error:", error);
         const message = error instanceof Error ? error.message : "Internal server error";
+        try {
+            if (gatewayCtx) {
+                void logGatewayRequest(gatewayCtx, {
+                    endpoint,
+                    model: 'unknown',
+                    provider: 'cencori',
+                    status: 'error',
+                    promptTokens: 0,
+                    completionTokens: 0,
+                    totalTokens: 0,
+                    costUsd: 0,
+                    providerCostUsd: 0,
+                    cencoriChargeUsd: 0,
+                    markupPercentage: 0,
+                    errorMessage: message,
+                    requestPayload: {},
+                });
+            }
+        } catch {
+            // Logging must never break the error response.
+        }
         return respondError(500, message, 'internal_error');
     }
 }

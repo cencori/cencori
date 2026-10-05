@@ -16,7 +16,6 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Search, X } from 'lucide-react';
-import { useEnvironment } from '@/lib/contexts/EnvironmentContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useProjectIdBySlug } from '@/lib/hooks/useQueries';
 
@@ -40,7 +39,6 @@ function useProjectId(orgSlug: string, projectSlug: string) {
 
 export default function RequestLogsPage({ params }: PageProps) {
     const { orgSlug, projectSlug } = use(params);
-    const { environment } = useEnvironment();
 
     const [aiFilters, setAiFilters] = useState({
         status: 'all',
@@ -55,10 +53,9 @@ export default function RequestLogsPage({ params }: PageProps) {
     const { data: projectId, isLoading } = useProjectId(orgSlug, projectSlug);
 
     const { data: modelOptions } = useQuery<string[]>({
-        queryKey: ['log-models', projectId, environment, aiFilters.time_range],
+        queryKey: ['log-models', projectId, aiFilters.time_range],
         queryFn: async () => {
             const params = new URLSearchParams({
-                environment,
                 time_range: aiFilters.time_range,
             });
             const response = await fetch(`/api/projects/${projectId}/logs/models?${params}`);
@@ -71,7 +68,7 @@ export default function RequestLogsPage({ params }: PageProps) {
     });
 
     const { data: apiKeys } = useQuery<ApiKey[]>({
-        queryKey: ['api-keys-filter', projectId, environment],
+        queryKey: ['api-keys-filter', projectId],
         queryFn: async () => {
             const { data } = await supabase
                 .from('api_keys')
@@ -84,16 +81,8 @@ export default function RequestLogsPage({ params }: PageProps) {
         staleTime: 60 * 1000,
     });
 
-    const filteredApiKeys = apiKeys?.filter((key) => {
-        if (key.environment) {
-            return environment === 'production'
-                ? key.environment === 'production'
-                : key.environment === 'test';
-        }
-
-        const isTestKey = key.key_prefix?.includes('_test') || key.key_prefix?.includes('test_');
-        return environment === 'production' ? !isTestKey : isTestKey;
-    });
+    // No environments anymore — one key, production. Show all active keys.
+    const filteredApiKeys = apiKeys;
 
     const handleAiSearchSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -226,14 +215,14 @@ export default function RequestLogsPage({ params }: PageProps) {
 
                     <div className="ml-auto">
                         {projectId ? (
-                            <ExportButton projectId={projectId} filters={aiFilters} environment={environment} />
+                            <ExportButton projectId={projectId} filters={aiFilters} environment="production" />
                         ) : (
                             <Skeleton className="h-7 w-16" />
                         )}
                     </div>
                 </div>
 
-                <RequestLogsTable projectId={projectId} filters={aiFilters} environment={environment} />
+                <RequestLogsTable projectId={projectId} filters={aiFilters} />
             </div>
         </div>
     );
