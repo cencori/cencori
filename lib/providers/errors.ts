@@ -107,9 +107,14 @@ export function normalizeProviderError(provider: string, error: unknown): Provid
     }
 
     // Model not found
+    // Groq's actual string is "The model 'gpt-oss-120b' does not exist or you
+    // do not have access to it" — contains "does not exist", not "model not
+    // found", so it previously fell through to generic 502. Match both.
     if (errorLower.includes('model not found') ||
         errorLower.includes('model_not_found') ||
-        errorLower.includes('unsupported model')) {
+        errorLower.includes('unsupported model') ||
+        errorLower.includes('model does not exist') ||
+        errorLower.includes('does not exist')) {
         return new ModelNotFoundError(provider, 'unknown', error);
     }
 
