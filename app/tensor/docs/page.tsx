@@ -39,7 +39,7 @@ export default function TensorDocsPage() {
             <section id="get-started" aria-labelledby="get-started-title">
               <h2 id="get-started-title">Get started</h2>
               <ol>
-                <li>Get Tensor from the <Link className="underline underline-offset-4" href="/tensor#download">download section</Link> and open the desktop app.</li>
+                <li>Get Tensor from the <Link className="underline underline-offset-4" href="/tensor#waitlist">waitlist</Link> and open the desktop app.</li>
                 <li>Sign in with your Cencori account. When the browser prompts you to return to Tensor, continue into the app.</li>
                 <li>Choose a project folder, or start a new task by describing what you want to build.</li>
                 <li>Choose a model in the composer, send your request, and follow the task’s progress. Review file changes in the review panel and respond to any approval requests.</li>
