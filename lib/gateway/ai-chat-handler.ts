@@ -413,6 +413,28 @@ export async function POST(req: NextRequest) {
             });
 
         if (!inputPipeline.ok) {
+            // Input blocks already write security_incidents, but without an
+            // ai_requests row the dashboard metrics stay empty (Bachs-Docs).
+            try {
+                void logGatewayRequest(ctx, {
+                    endpoint: ROUTE,
+                    model: model ?? 'unknown',
+                    provider: 'cencori',
+                    status: inputPipeline.status === 429 ? 'rate_limited' : inputPipeline.status === 403 ? 'filtered' : 'error',
+                    promptTokens: 0,
+                    completionTokens: 0,
+                    totalTokens: 0,
+                    costUsd: 0,
+                    providerCostUsd: 0,
+                    cencoriChargeUsd: 0,
+                    markupPercentage: 0,
+                    endUserId: endUserId || undefined,
+                    errorMessage: inputPipeline.message,
+                    requestPayload: { messages: unifiedMessages, model },
+                });
+            } catch {
+                // Logging must never break the error response.
+            }
             return wrap(
                 NextResponse.json(
                     {
