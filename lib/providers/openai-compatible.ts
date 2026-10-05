@@ -35,6 +35,14 @@ export const OPENAI_COMPATIBLE_ENDPOINTS: Record<string, { baseURL: string; name
         baseURL: 'https://api.groq.com/openai/v1',
         name: 'Groq',
     },
+    // Vercel AI Gateway — unified inference front door (zero markup, provider
+    // list prices). Memory uses it as a routed leg for GPT-OSS; upstream
+    // expects the catalog model id (e.g. `openai/gpt-oss-20b`), see the
+    // vercel strip rule in router.normalizeModelName.
+    vercel: {
+        baseURL: 'https://ai-gateway.vercel.sh/v1',
+        name: 'Vercel AI Gateway',
+    },
     together: {
         baseURL: 'https://api.together.xyz/v1',
         name: 'Together AI',

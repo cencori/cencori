@@ -129,6 +129,11 @@ describe('resolveMemoryModel (managed production GPT-OSS models)', () => {
         expect(resolveMemoryModel('openai/gpt-oss-20b')).toBe('openai/gpt-oss-20b');
     });
 
+    it('allows the Vercel AI Gateway legs', () => {
+        expect(resolveMemoryModel('vercel/openai/gpt-oss-20b')).toBe('vercel/openai/gpt-oss-20b');
+        expect(resolveMemoryModel('vercel/openai/gpt-oss-120b')).toBe('vercel/openai/gpt-oss-120b');
+    });
+
     it('coerces retired, non-managed, unknown, or empty choices to the managed default', () => {
         expect(resolveMemoryModel('gemini-2.5-flash')).toBe(MEMORY_MANAGED_MODEL);
         expect(resolveMemoryModel('groq/compound')).toBe(MEMORY_MANAGED_MODEL);

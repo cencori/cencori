@@ -30,6 +30,9 @@ const OPENAI_COMPATIBLE_ENV_VARS: Record<string, string[]> = {
     xai: ['XAI_API_KEY'],
     deepseek: ['DEEPSEEK_API_KEY'],
     groq: ['GROQ_API_KEY'],
+    // Vercel AI Gateway (unified inference front door, zero markup). Key is
+    // the AI Gateway API key (vck_…), billed as AI Gateway Credits on Vercel.
+    vercel: ['AI_GATEWAY_API_KEY'],
     mistral: ['MISTRAL_API_KEY'],
     together: ['TOGETHER_API_KEY'],
     perplexity: ['PERPLEXITY_API_KEY'],
@@ -194,6 +197,12 @@ const TENSOR_OPEN_WEIGHT_MODEL_MARKERS = [
     'maximo-atlas',
 ];
 
+const TENSOR_AUTO_ALLOWED_MODEL_MARKERS = [
+    'deepseek-v4-flash',
+    'maximo-atlas-1.3',
+    'maximo-atlas-1.2',
+];
+
 export function resolveTensorPlanModel(
     requestedModel: string,
     policy: 'auto' | 'open_weight' | 'frontier' | 'custom' | null | undefined,
@@ -205,15 +214,19 @@ export function resolveTensorPlanModel(
     const isOpenWeight = TENSOR_OPEN_WEIGHT_MODEL_MARKERS.some((marker) =>
         normalized.includes(marker),
     );
+    const isAutoAllowed = TENSOR_AUTO_ALLOWED_MODEL_MARKERS.some((marker) =>
+        normalized.includes(marker),
+    );
 
     if (policy === 'auto') {
-        const autoModel = process.env.TENSOR_AUTO_MODEL?.trim() || 'glm-5.3-flash';
+        const autoModel = process.env.TENSOR_AUTO_MODEL?.trim() || 'deepseek-v4-flash';
         if (askedForAuto) return autoModel;
-        // Auto is the default on this plan, not the only option. Every request used to be replaced
-        // by the auto model whatever it named, so a client offering a choice would have been lying:
-        // the pick was discarded and every turn ran on the same model. An open-weight model named
-        // explicitly is now served.
-        if (isOpenWeight) return requestedModel;
+        // Free/auto is request-counted, not cost-weighted, so it must stay pinned to
+        // the cheap weak models (flash + atlas). Anything else — including expensive
+        // open-weight like glm-5.3-flash — falls back to the server auto model
+        // rather than blowing the free cost envelope.
+        if (isAutoAllowed) return requestedModel;
+        if (isOpenWeight) return autoModel;
         // A frontier model is not an error here, it is simply not on this plan, and the auto model
         // answers instead — which is what this policy did for every request before. Refusing would
         // break callers that have always been quietly substituted.
