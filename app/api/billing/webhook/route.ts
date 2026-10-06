@@ -20,7 +20,7 @@ import {
   majorAmountToMinor,
 } from '@/lib/tensor-billing';
 import { applyPaidCreditTopup } from '@/lib/billing/paid-credit-topups';
-import { isVerifiedBachsTopupCharge } from '@/lib/billing/verify-paid-topups';
+import { getBachsTopupVerificationFailure } from '@/lib/billing/verify-paid-topups';
 import {
   buildOrganizationSubscriptionUpdate,
   type SubscriptionLifecycleEventType,
@@ -111,14 +111,33 @@ async function handleCollectionSucceeded(
 
       const pack = getCreditTopupPackConfig(productId);
       const charge = await getCharge(data.charge_id);
-      if (!pack || !isVerifiedBachsTopupCharge({
-        charge,
-        chargeId: data.charge_id,
-        organizationId: orgId,
-        productId,
-        minimumAmountMinor: pack.price,
-      })) {
-        throw new Error('Bachs credits top-up charge did not verify');
+      const verificationFailure = !pack
+        ? 'unknown_pack'
+        : getBachsTopupVerificationFailure({
+          charge,
+          chargeId: data.charge_id,
+          organizationId: orgId,
+          productId,
+          minimumAmountMinor: pack.price,
+        });
+      if (verificationFailure) {
+        console.error('[Bachs Webhook] Credits top-up charge failed verification', {
+          charge_id: data.charge_id,
+          reason: verificationFailure,
+          status: charge?.status ?? null,
+          currency: charge?.currency ?? null,
+          amount: charge?.amount ?? null,
+          minimumAmountMinor: pack?.price ?? null,
+          metadataPurchaseTypeEcho: charge?.metadata?.purchase_type ?? null,
+          metadataOrgEchoMatches: charge?.metadata?.org_id === orgId,
+          chargeProductIds: Array.isArray(charge?.product_cart)
+            ? charge.product_cart.map((item) => item?.product_id ?? null)
+            : null,
+          eventProductId: productId,
+        });
+        throw new Error(
+          `Bachs credits top-up charge did not verify: ${verificationFailure}`
+        );
       }
 
       // The new grant ledger starts empty at rollout. Do not mint a second,
