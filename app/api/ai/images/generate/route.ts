@@ -239,7 +239,64 @@ export async function POST(req: NextRequest) {
         }
         body.prompt = inputPipeline.messages[0]?.content ?? prompt;
 
-        const { normalized: model, apiModel } = normalizeModelName(requestedModel || 'dall-e-3');
+        // BYOK-only auto-router (`auto` / `cencori-auto`): endpoint-implied
+        // `image` task across the project's active BYOK keys. Fails closed
+        // with 402 `byok_required` when no priced BYOK image model fits the
+        // requested size/quality/options.
+        let autoRouted: { provider: string; model: string } | null = null;
+        let requestedModelResolved = requestedModel;
+        {
+            const { isAutoRouterModel, resolveAutoModelForTask } = await import('@/lib/gateway/auto-router');
+            if (typeof requestedModelResolved === 'string' && isAutoRouterModel(requestedModelResolved)) {
+                const { mapProviderErrorToHttpResponse } = await import('@/lib/gateway-reliability');
+                const requestedCount = body.n ?? 1;
+                const requestedSize = body.size || '1024x1024';
+                try {
+                    const resolved = await resolveAutoModelForTask({
+                        supabase: ctx.supabase as never,
+                        projectId: ctx.projectId,
+                        task: 'image',
+                        verify: async (provider, candidate) => {
+                            // n>1 is only served by dall-e-2 through this endpoint.
+                            if (requestedCount > 1 && candidate !== 'dall-e-2') {
+                                throw new Error(`${candidate} does not support n>1`);
+                            }
+                            const qualityForCandidate = candidate.startsWith('gpt-image')
+                                ? (mapOpenAIQuality(body.quality) || 'medium')
+                                : (body.quality || 'standard');
+                            if (provider === 'google'
+                                && (requestedSize !== '1024x1024' || qualityForCandidate !== 'standard'
+                                    || body.style !== undefined || body.responseFormat === 'url')) {
+                                throw new Error(`${candidate} does not support the requested image options`);
+                            }
+                            const { data, error } = await ctx.supabase
+                                .from('gateway_image_pricing')
+                                .select('price_per_image')
+                                .eq('provider', provider)
+                                .eq('model_name', candidate)
+                                .eq('size', requestedSize)
+                                .eq('quality', qualityForCandidate)
+                                .eq('is_active', true)
+                                .maybeSingle();
+                            const price = Number((data as { price_per_image?: unknown } | null)?.price_per_image);
+                            if (error || !data || !Number.isFinite(price) || price < 0) {
+                                throw new Error(`pricing_unavailable for ${candidate}`);
+                            }
+                        },
+                    });
+                    requestedModelResolved = resolved.model;
+                    autoRouted = { provider: resolved.provider, model: resolved.model };
+                } catch (autoError) {
+                    const failure = mapProviderErrorToHttpResponse(autoError, undefined, requestedModel);
+                    return addGatewayHeaders(
+                        NextResponse.json({ error: failure.error, message: failure.message }, { status: failure.status }),
+                        { requestId: ctx.requestId }
+                    );
+                }
+            }
+        }
+
+        const { normalized: model, apiModel } = normalizeModelName(requestedModelResolved || 'dall-e-3');
         if (!(model in IMAGE_MODELS)) {
             return addGatewayHeaders(
                 NextResponse.json({ error: 'unsupported_model', message: `Unsupported image model: ${model}` }, { status: 400 }),
@@ -306,6 +363,21 @@ export async function POST(req: NextRequest) {
 
         if (providerKey?.is_active && providerKey.encrypted_key) {
             providerApiKey = decryptApiKey(providerKey.encrypted_key, ctx.organizationId);
+        } else if (autoRouted) {
+            // Auto-router is BYOK-only: never fall back to a managed key.
+            const { ByokRequiredError } = await import('@/lib/gateway/auto-router');
+            const { mapProviderErrorToHttpResponse } = await import('@/lib/gateway-reliability');
+            const failure = mapProviderErrorToHttpResponse(
+                new ByokRequiredError(
+                    `Auto-router resolved ${autoRouted.model} but no active BYOK key remains for ${provider}. Add your own key in project settings to use \`auto\`.`
+                ),
+                undefined,
+                requestedModel,
+            );
+            return addGatewayHeaders(
+                NextResponse.json({ error: failure.error, message: failure.message }, { status: failure.status }),
+                { requestId: ctx.requestId }
+            );
         } else {
             if (provider === 'openai') providerApiKey = process.env.OPENAI_API_KEY;
             else if (provider === 'google') providerApiKey = getGoogleApiKey() || undefined;
@@ -370,7 +442,10 @@ export async function POST(req: NextRequest) {
             providerCostUsd: providerCost,
             cencoriChargeUsd: cencoriCharge,
             markupPercentage: 0,
-            metadata: { prompt_length: prompt.length, numImages: requestedImageCount, size, quality },
+            metadata: {
+                prompt_length: prompt.length, numImages: requestedImageCount, size, quality,
+                ...(autoRouted ? { auto_routed: true, auto_requested_model: requestedModel } : {}),
+            },
             errorMessage: outputCheck.ok ? undefined : outputCheck.message,
             requestPayload: promptPayload(body.prompt, { model, size, quality, n: requestedImageCount }),
             // Generated images are referenced, never inlined — b64 payloads are

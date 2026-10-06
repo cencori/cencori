@@ -245,3 +245,7 @@ Streams carry the same verdict as headers (`X-Cencori-Safety-Scanned`,
 `X-Cencori-Safety-Input`, `X-Cencori-Safety-Score`). `scanned: false` means
 the request ran the passthrough lane (your own safety layers apply). Only
 category-level reasons are exposed — never matched excerpts.
+
+## Auto-router (`auto` / `cencori-auto`)
+
+Pass `model: 'auto'` to route by task across the project's active BYOK keys only — image content → vision model, code/tool calls → code-capable model, analytical prompts → reasoning model, otherwise a cheap fast model. No usable BYOK key returns `402 byok_required`; it never falls back to managed keys and works at a zero credit balance. `cencori-auto` forces the BYOK router when a Tensor plan mapping would otherwise own bare `auto`. Details: [BYOK auto-router](/docs/platform/byok#auto-router).

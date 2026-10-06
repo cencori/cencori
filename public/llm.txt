@@ -1072,6 +1072,34 @@ await cencori.ai.chat({ model: 'gemini-3.1-pro-preview', messages });
 Flagship model: `claude-opus-5` (Anthropic's most capable, released 2026-07-24).
 It requires Anthropic provider access; use `groq/compound-mini` for a free first test.
 
+## BYOK Auto-Router
+
+`model: 'auto'` (aliases `'cencori-auto'`, `'cencori/auto'`) task-routes across the
+project's active BYOK keys only. Never falls back to managed keys, never spends
+Cencori credits, works at a zero credit balance. No usable key returns
+`402 byok_required` (message lists available BYOK providers).
+
+- Chat (`/api/ai/chat`, `/api/ai/completions`, `/v1/chat/completions`,
+  `/v1/responses`, sessions, agents): prompt classifies to vision (image
+  content), code (code signals/tool calls), reasoning (long/analytical),
+  else fast. `cencori-auto` forces the BYOK router when a Tensor plan mapping
+  would own bare `auto`. Do not combine with a pinned `connection_id` (400).
+  Chat allowlists still apply; responses are never cached for `auto`.
+- Embeddings (`POST /api/ai/embeddings`): cheapest priced BYOK model first
+  (`text-embedding-3-small` → `text-embedding-3-large` → Google → Cohere).
+- Images (`POST /api/ai/images/generate`): quality-ordered
+  (`gpt-image-1` → `dall-e-3` → `dall-e-2` → Google). `n > 1` only matches
+  `dall-e-2`.
+- Speech (`POST /api/ai/audio/speech`): latency-ordered (`tts-1` →
+  `tts-1-hd` → Deepgram → Cartesia → Spitch → ElevenLabs). A voice that does
+  not belong to the resolved model falls back to that model's default voice.
+
+```typescript
+await cencori.ai.chat({ model: 'auto', messages });
+await cencori.ai.embeddings({ model: 'auto', input: 'Hello world' });
+await cencori.ai.generateImage({ prompt: 'A city at sunset', model: 'auto' });
+```
+
 ## Public Model Catalog (keyless)
 
 Embed Cencori's model/provider shelf — with logos — inside a product.

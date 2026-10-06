@@ -91,8 +91,70 @@ export async function POST(req: NextRequest) {
         }
         const guardedInput = inputPipeline.messages[0]?.content ?? body.input;
 
+        // BYOK-only auto-router (`auto` / `cencori-auto`): endpoint-implied
+        // `speech` task across the project's active BYOK keys. Fails closed
+        // with 402 `byok_required` when no priced BYOK voice model fits.
+        // An incompatible voice/format for the resolved model falls back to
+        // that model's defaults instead of 400ing the `auto` request.
+        let autoRequestedModel: string | null = null;
+        {
+            const { isAutoRouterModel, resolveAutoModelForTask } = await import('@/lib/gateway/auto-router');
+            const { VOICE_MODELS } = await import('@/lib/audio/speech');
+            if (typeof body.model === 'string' && isAutoRouterModel(body.model)) {
+                autoRequestedModel = body.model;
+                const requestedFormat = body.response_format;
+                try {
+                    const resolved = await resolveAutoModelForTask({
+                        supabase: ctx.supabase as never,
+                        projectId: ctx.projectId,
+                        task: 'speech',
+                        verify: async (provider, candidate) => {
+                            const info = VOICE_MODELS[candidate];
+                            if (!info) throw new Error(`pricing_unavailable for ${candidate}`);
+                            if (requestedFormat && !info.formats.includes(requestedFormat)) {
+                                throw new Error(`${candidate} does not support format ${requestedFormat}`);
+                            }
+                            // BYOK-only: candidate must have an active project key.
+                            const { data: keyRow } = await ctx.supabase
+                                .from('provider_keys')
+                                .select('encrypted_key, is_active')
+                                .eq('project_id', ctx.projectId)
+                                .eq('provider', provider)
+                                .eq('is_active', true)
+                                .maybeSingle();
+                            if (!(keyRow as { encrypted_key?: string } | null)?.encrypted_key) {
+                                throw new Error(`no BYOK key for ${provider}`);
+                            }
+                            await getUsageUnitPricingFromDB(provider, candidate, 'characters');
+                        },
+                    });
+                    const info = VOICE_MODELS[resolved.model];
+                    body.model = resolved.model;
+                    model = resolved.model;
+                    if (body.provider && body.provider !== resolved.provider) {
+                        delete body.provider;
+                    }
+                    provider = resolved.provider;
+                    if (body.voice && info.voices.length > 0 && !info.voices.includes(body.voice)) {
+                        delete body.voice;
+                    }
+                    if (requestedFormat && !info.formats.includes(requestedFormat)) {
+                        body.response_format = 'mp3';
+                    }
+                } catch (autoError) {
+                    if (autoError instanceof Error && (autoError as { code?: unknown }).code === 'byok_required') {
+                        return addGatewayHeaders(
+                            NextResponse.json({ error: 'byok_required', message: autoError.message }, { status: 402 }),
+                            { requestId: ctx.requestId }
+                        );
+                    }
+                    throw autoError;
+                }
+            }
+        }
+
         // Resolve provider/model and confirm pricing exists BEFORE the billable
-        // provider call, so a missing pricing row fails closed.
+        // provider call, so a missing pricing row fails closed instead of charging for dropped audio.
         const resolved = resolveProviderModel(body);
         model = resolved.model;
         provider = resolved.provider;
@@ -119,7 +181,10 @@ export async function POST(req: NextRequest) {
             providerCostUsd: providerCost,
             cencoriChargeUsd: cencoriCharge,
             markupPercentage: 0,
-            metadata: { streaming },
+            metadata: {
+                streaming,
+                ...(autoRequestedModel ? { auto_routed: true, auto_requested_model: autoRequestedModel } : {}),
+            },
             requestPayload: promptPayload(guardedInput, {
                 model: resolved.model,
                 voice: body.voice,

@@ -13,7 +13,7 @@ import { applyPinnedConnection, registerByokKey, resolveProviderKeyRow } from '@
 import { getGoogleApiKey } from '@/lib/providers/google-env';
 import { resolveCustomProviderForProject } from '@/lib/providers/custom-provider-routing';
 import type { AIProvider } from '@/lib/providers/base';
-import { ModelAccessDeniedError } from '@/lib/providers/errors';
+import { InvalidRequestError, ModelAccessDeniedError } from '@/lib/providers/errors';
 import {
     assertApiKeyModelAccess,
     resolveProviderBillingMode,
@@ -23,6 +23,15 @@ import {
     getCachedProviderConfig,
     setCachedProviderConfig,
 } from '@/lib/config-cache';
+import {
+    ByokRequiredError,
+    candidatesForTask,
+    classifyAutoTask,
+    formatByokSetupHint,
+    getActiveByokInventory,
+    isAutoRouterModel,
+    type AutoTask,
+} from '@/lib/gateway/auto-router';
 
 type SupabaseAdmin = ReturnType<typeof createAdminClient>;
 
@@ -182,6 +191,23 @@ export type ResolvedGatewayProvider = {
     provider: AIProvider;
     billingMode: GatewayBillingMode;
     customProviderTag?: string;
+    /**
+     * Set for `auto` / `cencori-auto` resolutions. Fallback must stay
+     * BYOK-only: never fall back to a managed (credit-billed) provider.
+     */
+    byokOnly?: boolean;
+    autoRouted?: {
+        requestedModel: string;
+        task: AutoTask;
+        providerName: string;
+        model: string;
+    };
+};
+
+export type AutoRouterInput = {
+    text?: string | null;
+    tools?: unknown[] | null;
+    hasImage?: boolean;
 };
 
 const TENSOR_OPEN_WEIGHT_MODEL_MARKERS = [
@@ -259,13 +285,56 @@ export async function resolveGatewayProvider(params: {
      * back to another key).
      */
     pinnedConnectionId?: string | null;
+    /**
+     * Task signals for `auto` / `cencori-auto`. Callers pass the already-
+     * guarded message text, tools, and image presence so the router can pick
+     * a task-appropriate BYOK model.
+     */
+    autoRouterInput?: AutoRouterInput | null;
 }): Promise<ResolvedGatewayProvider> {
+    // BYOK auto-router (`cencori-auto` / `cencori/auto`) is explicit and always
+    // wins over the Tensor plan rewrite. Bare `auto` is ambiguous: Tensor
+    // Desktop uses it for its server auto model, so with a Tensor policy it
+    // follows the Tensor mapping; without one (or after mapping, when the
+    // result is still auto-like) it is the BYOK router.
+    const rawNormalized = params.requestedModel.trim().toLowerCase();
+    const isExplicitCencoriAuto =
+        rawNormalized === 'cencori-auto' || rawNormalized === 'cencori/auto';
+    if (isExplicitCencoriAuto) {
+        const router = new ProviderRouter();
+        registerDefaultProviders(router);
+        return resolveAutoGatewayProvider({
+            router,
+            supabase: params.supabase,
+            projectId: params.projectId,
+            organizationId: params.organizationId,
+            requestedModel: params.requestedModel.trim(),
+            allowedModels: params.allowedModels,
+            sponsoredModels: params.sponsoredModels,
+            pinnedConnectionId: params.pinnedConnectionId ?? null,
+            autoRouterInput: params.autoRouterInput ?? null,
+        });
+    }
     const requestedModel = resolveTensorPlanModel(
         params.requestedModel,
         params.tensorModelPolicy,
     );
     const router = new ProviderRouter();
     registerDefaultProviders(router);
+
+    if (isAutoRouterModel(requestedModel)) {
+        return resolveAutoGatewayProvider({
+            router,
+            supabase: params.supabase,
+            projectId: params.projectId,
+            organizationId: params.organizationId,
+            requestedModel,
+            allowedModels: params.allowedModels,
+            sponsoredModels: params.sponsoredModels,
+            pinnedConnectionId: params.pinnedConnectionId ?? null,
+            autoRouterInput: params.autoRouterInput ?? null,
+        });
+    }
 
     const customProvider = await resolveCustomProviderForProject({
         supabase: params.supabase,
@@ -364,4 +433,123 @@ export async function resolveGatewayProvider(params: {
         billingMode,
         customProviderTag: customProvider?.providerTag,
     };
+}
+
+/**
+ * BYOK-only auto-router: `auto` / `cencori-auto` → concrete provider+model
+ * chosen for the task, from the project's active BYOK keys only. Fails closed
+ * with {@link ByokRequiredError} (402) when no BYOK key — or no priced,
+ * allowed BYOK model — can serve the task. Never touches managed credit
+ * billing: the resolved billing mode is always `byok` (or `sponsored`).
+ */
+async function resolveAutoGatewayProvider(args: {
+    router: ProviderRouter;
+    supabase: SupabaseAdmin;
+    projectId: string;
+    organizationId: string;
+    requestedModel: string;
+    allowedModels?: string[] | null;
+    sponsoredModels?: string[] | null;
+    pinnedConnectionId?: string | null;
+    autoRouterInput?: AutoRouterInput | null;
+}): Promise<ResolvedGatewayProvider> {
+    if (args.pinnedConnectionId) {
+        throw new InvalidRequestError(
+            'cencori',
+            'Pinned provider connections cannot be combined with the auto-router. Use a concrete model with `connection_id` instead.',
+        );
+    }
+
+    const task = classifyAutoTask({
+        text: args.autoRouterInput?.text ?? null,
+        tools: args.autoRouterInput?.tools ?? null,
+        hasImage: args.autoRouterInput?.hasImage ?? false,
+    });
+
+    const inventory = await getActiveByokInventory(
+        args.supabase as never,
+        args.projectId,
+    );
+    if (inventory.providers.size === 0) {
+        throw new ByokRequiredError(
+            `Auto-router requires a BYOK key. ${formatByokSetupHint(inventory.providers)}`,
+        );
+    }
+
+    const ranked = candidatesForTask(task).filter((c) =>
+        inventory.providers.has(c.provider.toLowerCase()),
+    );
+    // Last resort: per-provider dashboard default models (user-verified to
+    // work with their key), then any remaining BYOK provider is already
+    // covered above. De-dupe while preserving rank order.
+    const seen = new Set<string>();
+    const ordered: { provider: string; model: string }[] = [];
+    for (const c of ranked) {
+        const key = `${c.provider.toLowerCase()}:${c.model.toLowerCase()}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        ordered.push(c);
+    }
+    for (const [provider, defaultModel] of inventory.defaultModels) {
+        if (!inventory.providers.has(provider)) continue;
+        const key = `${provider}:${defaultModel.trim().toLowerCase()}`;
+        if (!defaultModel.trim() || seen.has(key)) continue;
+        seen.add(key);
+        ordered.push({ provider, model: defaultModel.trim() });
+    }
+
+    let lastPricingError: unknown = null;
+    for (const candidate of ordered) {
+        const providerName = candidate.provider.toLowerCase();
+        const model = candidate.model;
+        try {
+            // Key-level allowlist still applies to auto: a restricted key must
+            // not reach models outside its grant via the router.
+            const accessMode = assertApiKeyModelAccess({
+                allowedModels: args.allowedModels,
+                sponsoredModels: args.sponsoredModels,
+                provider: providerName,
+                model,
+            });
+            const byokResult = await initializeBYOKProviders(
+                args.router,
+                args.supabase,
+                args.projectId,
+                args.organizationId,
+                providerName,
+            );
+            if (!byokResult.success || !byokResult.usesByok) continue;
+            const provider = args.router.getProvider(providerName);
+            await provider.getPricing(model);
+            const billingMode = resolveProviderBillingMode(accessMode, true);
+            return {
+                router: args.router,
+                providerName,
+                model,
+                provider,
+                billingMode,
+                byokOnly: true,
+                autoRouted: {
+                    requestedModel: args.requestedModel,
+                    task,
+                    providerName,
+                    model,
+                },
+            };
+        } catch (error) {
+            if (error instanceof ByokRequiredError) throw error;
+            // ModelAccessDenied (restricted key) and pricing gaps just skip to
+            // the next BYOK candidate — the 402 below explains the outcome.
+            lastPricingError = error;
+            continue;
+        }
+    }
+
+    const detail =
+        lastPricingError instanceof Error
+            ? ` Last error: ${lastPricingError.message}`
+            : '';
+    throw new ByokRequiredError(
+        `Auto-router found BYOK key(s) for [${[...inventory.providers].sort().join(', ')}] but no priced, allowed model for '${task}' tasks.${detail} ${formatByokSetupHint(inventory.providers)}`,
+    );
 }

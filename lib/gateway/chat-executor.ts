@@ -192,6 +192,11 @@ export async function executeGatewayChat(params: {
             allowedModels: params.allowedModels,
             sponsoredModels: params.sponsoredModels,
             pinnedConnectionId: params.pinnedConnectionId ?? null,
+            autoRouterInput: {
+                text: params.request.messages?.map((m) => m.content ?? '').join('\n') ?? null,
+                tools: (params.request.tools as unknown[] | null) ?? null,
+                hasImage: false,
+            },
         }));
 
     // Dedicated per-provider memory key override (Cerebras/Groq/Google), so the
@@ -314,6 +319,8 @@ export async function executeGatewayChat(params: {
             fallbackProviderName
         );
         if (!initialized.success) continue;
+        // Auto-router is BYOK-only: never fall back to a managed key.
+        if (resolved.byokOnly && !initialized.usesByok) continue;
 
         try {
             const fallbackProvider = router.getProvider(fallbackProviderName);
@@ -405,6 +412,11 @@ export async function* streamGatewayChat(params: {
             tensorModelPolicy: params.tensorModelPolicy,
             allowedModels: params.allowedModels,
             sponsoredModels: params.sponsoredModels,
+            autoRouterInput: {
+                text: params.request.messages?.map((m) => m.content ?? '').join('\n') ?? null,
+                tools: (params.request.tools as unknown[] | null) ?? null,
+                hasImage: false,
+            },
         }));
 
     await assertManagedCreditsAvailable(resolved.billingMode, params.organizationId, params.tier);
@@ -459,6 +471,8 @@ export async function* streamGatewayChat(params: {
                             candidate
                         );
                         if (!initialized.success) continue;
+                        // Auto-router is BYOK-only: never fall back to a managed key.
+                        if (resolved.byokOnly && !initialized.usesByok) continue;
 
                         const fallbackProvider = router.getProvider(candidate);
                         const fallbackModel = await getFallbackModel(
@@ -611,6 +625,8 @@ export async function* streamGatewayChat(params: {
             fallbackProviderName
         );
         if (!initialized.success) continue;
+        // Auto-router is BYOK-only: never fall back to a managed key.
+        if (resolved.byokOnly && !initialized.usesByok) continue;
 
         let fallbackEmitted = false;
         try {

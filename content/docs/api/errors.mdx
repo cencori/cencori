@@ -40,7 +40,7 @@ Fields by failure class:
 | `200` | OK | Request succeeded |
 | `400` | Bad Request | Invalid parameters, unsupported format/voice/model, file too large, provider rejected the request |
 | `401` | Unauthorized | Missing or invalid API key |
-| `402` | Payment Required | Spend cap reached |
+| `402` | Payment Required | Spend cap reached, or `auto` with no usable BYOK key (`byok_required`) |
 | `403` | Forbidden | Domain not allowed, network policy, frozen billing, credit exhaustion |
 | `429` | Too Many Requests | Per-minute rate limit exceeded |
 | `500` | Internal Error | Server-side error |
@@ -63,6 +63,7 @@ These come from the shared gateway middleware before the endpoint runs:
 | `rate_limit_exceeded` | 429 | Per-project per-minute limit hit; body carries `retry_after_ms`, header carries `Retry-After` |
 | `rate_limit_unavailable` | 503 | Rate-limit backend down and fail-open is disabled |
 | `spend_cap_reached` | 402 | Monthly spend cap hit |
+| `byok_required` | 402 | `model: 'auto'` / `'cencori-auto'` with no usable BYOK key — none configured, or none priced/allowed for the task. Add a provider key in Project > Providers. Works at a zero credit balance; never falls back to managed keys |
 
 ## Endpoint-level Codes
 
@@ -100,5 +101,6 @@ try {
 ## Troubleshooting
 
 - **`credit_balance_exhausted` (403)** — top up in `Organization → Billing`. Free/Enterprise tiers aren't credit-gated.
+- **`byok_required` (402)** — the project has no active BYOK key for the `auto` task (chat, embeddings, images, or speech). Add the provider key in Project > Providers; the error message lists the available BYOK providers. An image prompt with only text-model keys 402s the same way.
 - **`rate_limit_exceeded` (429)** — 60 requests/min per project for all tiers. Back off for `Retry-After` seconds or use a second project.
 - **`provider_error` (400)** — read the `message`; the truncated upstream body is included.

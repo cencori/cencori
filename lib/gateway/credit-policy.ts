@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server';
 import type { createAdminClient } from '@/lib/supabaseAdmin';
 import { ProviderRouter } from '@/lib/providers/router';
 import { resolveCustomProviderForProject } from '@/lib/providers/custom-provider-routing';
+import { isAutoRouterModel } from '@/lib/gateway/auto-router';
 
 type AdminClient = ReturnType<typeof createAdminClient>;
 
@@ -67,6 +68,15 @@ export async function isProvenByokRequest(params: {
                 : params.defaultModel;
     const model = explicitModel || defaultModel;
     if (!model) return false;
+
+    // Auto-router is BYOK-only and fails closed with 402 `byok_required`
+    // when no key exists. Bypass the generic zero-balance block so the caller
+    // gets the actionable BYOK message instead of `credit_balance_exhausted`.
+    // Chat tasks classify from the prompt; embeddings/images/audio tasks are
+    // endpoint-implied (`embed` / `image` / `speech`) in their routes.
+    if (isAutoRouterModel(model)) {
+        return true;
+    }
 
     try {
         if (pathname === '/api/ai/chat'

@@ -439,6 +439,11 @@ export async function runV1ResponsesExecution(
             tensorModelPolicy: gatewayCtx.tensorModelPolicy,
             allowedModels: gatewayCtx.allowedModels,
             sponsoredModels: gatewayCtx.sponsoredModels,
+            autoRouterInput: {
+                text: params.messages?.map((m) => m.content ?? '').join('\n') ?? inputText ?? null,
+                tools: (body.tools as unknown[] | null) ?? null,
+                hasImage: false,
+            },
         });
 
         // Separate function tools from built-in tools
