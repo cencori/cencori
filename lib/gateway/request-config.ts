@@ -77,10 +77,12 @@ export function seedGatewayProjectBundle(projectId: string, bundle: GatewayProje
         GATEWAY_CACHE_TTLS.NETWORK_CONFIG,
     );
 
-    // Security settings (tier-independent shape; the reader gates on tier).
+    // Security settings (resolved via toCachedSecuritySettings: null row =
+    // lexical secure default, explicit security_enabled false = disabled).
     seedLocalCacheEntry(
         gatewayCacheKeys.security(projectId),
         toCachedSecuritySettings(asRecord(bundle.security) as {
+            security_enabled?: boolean | null;
             safety_threshold?: number | null;
             filter_jailbreaks?: boolean | null;
             filter_pii?: boolean | null;

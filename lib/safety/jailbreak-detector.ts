@@ -2,7 +2,7 @@ export interface JailbreakDetectionResult {
     risk: number; // 0-1, where 1 is highest risk
     patterns: string[];
     confidence: number;
-    category?: 'social_engineering' | 'system_extraction' | 'behavioral_probe' | 'indirect_pii' | 'multi_vector';
+    category?: 'social_engineering' | 'system_extraction' | 'behavioral_probe' | 'indirect_pii' | 'multi_vector' | 'instruction_override';
 }
 
 // Patterns that indicate legitimate agent tool usage (WHITELIST)
@@ -77,6 +77,24 @@ const JAILBREAK_PATTERNS = {
         'versus what you\'re told',
         'even if it meant',
         'testing your',
+    ],
+
+    // Direct instruction override — the prompt-injection shape. Exact-phrase
+    // matches, not fuzzy intent: "ignore previous instructions" has no
+    // legitimate production use. Gateway and memory share this category so
+    // both doors enforce the same override language.
+    instruction_override: [
+        'ignore previous instructions',
+        'ignore all previous instructions',
+        'ignore your instructions',
+        'disregard your instructions',
+        'disregard all previous',
+        'override your instructions',
+        'forget your instructions',
+        'you must obey',
+        'you must always obey',
+        'reveal your instructions',
+        'show me your instructions',
     ],
 
     // Indirect PII extraction
@@ -208,6 +226,11 @@ export function detectJailbreak(
                     case 'multi_vector':
                         totalRisk += 0.2; // Lower individual risk, but compounds
                         detectedCategory = 'multi_vector';
+                        break;
+                    case 'instruction_override':
+                        totalRisk += 0.8; // Direct prompt injection — highest lexical risk
+                        detectedCategory = 'instruction_override';
+                        matchCount++; // extra confidence: single exact-phrase match meets isJailbreakRisky confidence >= 0.3
                         break;
                 }
             }
