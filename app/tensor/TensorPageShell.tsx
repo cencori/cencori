@@ -18,6 +18,47 @@ export function TensorPageShell() {
     }
   }, []);
 
+  // Lock the window while chatting. iOS Safari's answer to a focused
+  // input is to scroll the WINDOW to reveal it — against the old (tall)
+  // layout, before visualViewport shrinks. That leaves scrollY stuck > 0
+  // while our shell has already shrunk: composer pinned to the top, void
+  // below, user dragging it back by hand. position:fixed on body removes
+  // Safari's freedom to scroll entirely; the visualViewport pin below
+  // remains the sole layout authority. Plus a guard that snaps any drift
+  // straight back to the top.
+  useEffect(() => {
+    if (mode !== "chat" || typeof document === "undefined") return;
+    const scrollY = window.scrollY;
+    const body = document.body;
+    const prev = {
+      position: body.style.position,
+      top: body.style.top,
+      left: body.style.left,
+      right: body.style.right,
+      width: body.style.width,
+      overflow: body.style.overflow,
+    };
+    body.style.position = "fixed";
+    body.style.top = `-${scrollY}px`;
+    body.style.left = "0";
+    body.style.right = "0";
+    body.style.width = "100%";
+    body.style.overflow = "hidden";
+    const vv = window.visualViewport;
+    const guard = () => {
+      if (window.scrollY !== 0) window.scrollTo(0, 0);
+    };
+    vv?.addEventListener("scroll", guard);
+    return () => {
+      vv?.removeEventListener("scroll", guard);
+      body.style.position = prev.position;
+      body.style.top = prev.top;
+      body.style.left = prev.left;
+      body.style.right = prev.right;
+      body.style.width = prev.width;
+      body.style.overflow = prev.overflow;
+    };
+  }, [mode]);
   // Follow the visual viewport while chatting. Mobile Safari's URL bar
   // and keyboard resize the visual viewport without resizing the layout
   // viewport — svh/dvh alone jump or leave the input covered. Pinning the
