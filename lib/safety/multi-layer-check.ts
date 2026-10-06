@@ -19,16 +19,23 @@ export interface SecurityCheckResult {
     };
 }
 
+/**
+ * Resolved per-project config. Production callers obtain this from
+ * getProjectSecurityConfig(): never-configured projects get lexical scanners
+ * on, explicit opt-out (security_enabled false) gets everything off.
+ * Direct calls with `undefined` remain pass-through (all scanners off) for
+ * tests and back-compat — that is NOT the production default.
+ */
 export interface ProjectSecurityConfig {
-    /** Explicit dashboard opt-in. Absent/false = every scanner below is off. */
+    /** Master switch from getProjectSecurityConfig. Undefined = pass-through off. */
     enabled?: boolean;
     inputThreshold?: number; // 0-1, default 0.5
-    outputThreshold?: number; // 0-1, default 0.6 (more strict)
+    outputThreshold?: number; // 0-1, default 0.6 (slightly more lenient than input)
     jailbreakThreshold?: number; // 0-1, default 0.7
-    enableOutputScanning?: boolean; // default false
-    enableJailbreakDetection?: boolean; // default false
-    enableObfuscatedPII?: boolean; // default false
-    enableIntentAnalysis?: boolean; // default false
+    enableOutputScanning?: boolean; // default false when config absent; true via lexical secure default
+    enableJailbreakDetection?: boolean; // default false when config absent; true via lexical secure default
+    enableObfuscatedPII?: boolean; // default false when config absent; true via lexical secure default
+    enableIntentAnalysis?: boolean; // default false when config absent; true via lexical secure default
 }
 
 /**
@@ -39,8 +46,10 @@ export function checkInputSecurity(
     conversationHistory?: Array<{ role: string; content: string }>,
     config?: ProjectSecurityConfig
 ): SecurityCheckResult {
-    // No defaults: without an explicit opt-in config every scanner stays off
-    // and the check is a pass-through (also skipping the regex work).
+    // Pass-through when no resolved config is supplied (tests / direct calls).
+    // Production gateway/memory paths always supply a resolved config from
+    // getProjectSecurityConfig(), where never-configured means lexical on.
+    // Skipping regex work here also keeps the undefined-config fast path.
     const enableJailbreak = config?.enableJailbreakDetection ?? false;
     const enableObfuscatedPII = config?.enableObfuscatedPII ?? false;
     const enableIntentAnalysis = config?.enableIntentAnalysis ?? false;
