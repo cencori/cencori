@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
+import { createAdminClient } from "@/lib/supabaseAdmin";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function asStringArray(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map(String).slice(0, 20);
+  if (typeof value === "string" && value.trim() !== "") return [value];
+  return [];
+}
 
 export async function POST(req: Request) {
   try {
@@ -30,48 +37,75 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Valid email is required" }, { status: 400 });
     }
 
-    const payload = {
-      email: resolvedEmail,
-      productName: productName || "tensor",
-      timestamp: new Date().toISOString(),
-      source: source || "Cencori Website",
-      // Full Tensor agent fields — webhook consumers (Sheets/Zapier) get everything.
-      name: name || undefined,
-      workEmail: workEmail || resolvedEmail,
-      company: company || undefined,
-      role: role || undefined,
-      building: building || undefined,
-      planInterested: planInterested || undefined,
-      timeline: timeline || undefined,
-      currentTools: Array.isArray(currentTools) ? currentTools : currentTools || undefined,
-      priorities: Array.isArray(priorities) ? priorities : priorities || undefined,
-      budget: budget || undefined,
-      heardAbout: heardAbout || undefined,
-      anythingElse: anythingElse || undefined,
-    };
+    const normalizedEmail = String(resolvedEmail).trim().toLowerCase();
+    const tools = asStringArray(currentTools);
+    const prios = asStringArray(priorities);
 
-    // Connect to Google Sheets via Webhook (Zapier/Make/n8n)
-    const webhookUrl = process.env.WAITLIST_WEBHOOK_URL;
-
-    if (webhookUrl) {
-      const response = await fetch(webhookUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+    // Primary record: Supabase is the source of truth. One row per email —
+    // resubmits refresh the answers in place instead of duplicating.
+    try {
+      const admin = createAdminClient();
+      const { error: dbError } = await admin.from("tensor_waitlist").upsert(
+        {
+          email: normalizedEmail,
+          name: name || null,
+          work_email: workEmail || normalizedEmail,
+          company: company || null,
+          role: role || null,
+          building: building || null,
+          plan_interested: planInterested || null,
+          timeline: timeline || null,
+          current_tools: tools,
+          priorities: prios,
+          budget: budget || null,
+          heard_about: heardAbout || null,
+          anything_else: anythingElse || null,
+          product_name: productName || "tensor",
+          source: source || "Cencori Website",
+          updated_at: new Date().toISOString(),
         },
-        body: JSON.stringify(payload),
-      });
+        { onConflict: "email" },
+      );
+      if (dbError) throw dbError;
+    } catch (dbError) {
+      console.error("Waitlist DB save failed:", dbError);
+      return NextResponse.json({ error: "Failed to save to waitlist" }, { status: 500 });
+    }
 
-      if (!response.ok) {
-        console.error("Webhook failed:", await response.text());
-        // We still return 200 to the client so they see a success message,
-        // but we log the error internally. Or we can return 500.
-        // For waitlists, it's safer to return 500 if we actually failed to save it.
-        return NextResponse.json({ error: "Failed to save to waitlist" }, { status: 500 });
+    // Best-effort forward to Google Sheets via Webhook (Zapier/Make/n8n).
+    // A webhook failure must never fail the signup anymore — Supabase
+    // already has it. Log and move on.
+    const webhookUrl = process.env.WAITLIST_WEBHOOK_URL;
+    if (webhookUrl) {
+      try {
+        const response = await fetch(webhookUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: normalizedEmail,
+            productName: productName || "tensor",
+            timestamp: new Date().toISOString(),
+            source: source || "Cencori Website",
+            name: name || undefined,
+            workEmail: workEmail || normalizedEmail,
+            company: company || undefined,
+            role: role || undefined,
+            building: building || undefined,
+            planInterested: planInterested || undefined,
+            timeline: timeline || undefined,
+            currentTools: tools.length > 0 ? tools : undefined,
+            priorities: prios.length > 0 ? prios : undefined,
+            budget: budget || undefined,
+            heardAbout: heardAbout || undefined,
+            anythingElse: anythingElse || undefined,
+          }),
+        });
+        if (!response.ok) {
+          console.error("Waitlist webhook forward failed:", await response.text());
+        }
+      } catch (webhookError) {
+        console.error("Waitlist webhook forward failed:", webhookError);
       }
-    } else {
-      // If no webhook is configured, just log it for testing purposes
-      console.log(`[Waitlist Debug] ${JSON.stringify(payload)}`);
     }
 
     return NextResponse.json({ success: true });
