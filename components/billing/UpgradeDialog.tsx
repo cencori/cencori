@@ -129,19 +129,57 @@ function PaymentForm({
     onSubmittingChange(true);
     onError(null);
 
-    const result = await checkoutState.checkout.confirm({
-      redirect: "if_required",
-      returnUrl: getReturnUrl(orgSlug, sessionId, returnPath),
-    });
+    try {
+      const confirmRequest = checkoutState.checkout.confirm({
+        redirect: "if_required",
+        returnUrl: getReturnUrl(orgSlug, sessionId, returnPath),
+      });
+      const timeout = new Promise<never>((_, reject) => {
+        window.setTimeout(() => {
+          reject(
+            new Error(
+              "Payment confirmation timed out. Check your connection and try again — you have not been charged twice.",
+            ),
+          );
+        }, 60_000);
+      });
+      const result = await Promise.race([confirmRequest, timeout]);
 
-    if (result.type === "error") {
-      onError(result.error.message || "Payment could not be completed. Try again.");
+      if (result.type === "error") {
+        onError(result.error.message || "Payment could not be completed. Try again.");
+        setSubmitting(false);
+        onSubmittingChange(false);
+        return;
+      }
+
+      try {
+        window.location.assign(getReturnUrl(orgSlug, result.session.id || sessionId, returnPath));
+      } catch (redirectError) {
+        onError(
+          redirectError instanceof Error
+            ? redirectError.message
+            : "Payment succeeded but redirect failed. Refresh the billing page to confirm activation.",
+        );
+        setSubmitting(false);
+        onSubmittingChange(false);
+        return;
+      }
+
+      // Safety net: if navigation is blocked (CSP/popup blocker) reset so the
+      // button doesn't stay on "Processing" forever.
+      window.setTimeout(() => {
+        setSubmitting(false);
+        onSubmittingChange(false);
+      }, 5_000);
+    } catch (confirmError) {
+      onError(
+        confirmError instanceof Error
+          ? confirmError.message
+          : "Payment could not be completed. Try again.",
+      );
       setSubmitting(false);
       onSubmittingChange(false);
-      return;
     }
-
-    window.location.assign(getReturnUrl(orgSlug, result.session.id || sessionId, returnPath));
   };
 
   const canConfirm =
