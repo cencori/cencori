@@ -65,6 +65,9 @@ export function TensorPageShell() {
 
   return (
     <div className="marketing-theme dark relative isolate min-h-screen bg-black text-white [color-scheme:dark]">
+      {mode === "chat" ? (
+        <style>{`[data-cookie-consent]{display:none!important}`}</style>
+      ) : null}
       <main
         ref={mainRef}
         style={mode === "chat" ? { height: "100dvh" } : undefined}
