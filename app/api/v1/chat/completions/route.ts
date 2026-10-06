@@ -72,6 +72,7 @@ import {
     isFastLaneRequest,
 } from "@/lib/gateway/fast-lane";
 import { warmGatewayProjectConfig } from "@/lib/gateway/request-config";
+import { isAutoRouterModel } from "@/lib/gateway/auto-router";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -452,7 +453,7 @@ export async function POST(req: NextRequest) {
 
         let effectiveMaxTokens = body.max_tokens;
         let hedgeDelayMs: number | undefined;
-        if (routingProfile === 'speed' && !isVisionRequest) {
+        if (routingProfile === 'speed' && !isVisionRequest && !isAutoRouterModel(model)) {
             const speed = applySpeedProfile({
                 model,
                 maxTokens: effectiveMaxTokens,
@@ -488,6 +489,7 @@ export async function POST(req: NextRequest) {
                 || Boolean(
                     endUserQuota.allowedModels
                     && endUserQuota.allowedModels.length > 0
+                    && !isAutoRouterModel(model)
                     && !endUserQuota.allowedModels.includes(model)
                 );
 
@@ -706,10 +708,40 @@ export async function POST(req: NextRequest) {
             const guardedPrompt = guardedMessages
                 .map((message) => `${message.role}: ${message.content}`)
                 .join('\n');
+            // Auto-router + vision: resolve `auto` to a concrete BYOK vision
+            // model first — the vision analyzer only knows real model ids.
+            let visionModel = model;
+            if (isAutoRouterModel(model)) {
+                const { resolveGatewayProvider } = await import("@/lib/gateway/providers-setup");
+                try {
+                    const autoResolved = await resolveGatewayProvider({
+                        supabase: adminClient,
+                        projectId: activeGatewayCtx.projectId,
+                        organizationId: activeGatewayCtx.organizationId,
+                        requestedModel: model,
+                        allowedModels: activeGatewayCtx.allowedModels,
+                        sponsoredModels: activeGatewayCtx.sponsoredModels,
+                        autoRouterInput: {
+                            text: guardedPrompt,
+                            tools: (tools as unknown[] | null) ?? null,
+                            hasImage: true,
+                        },
+                    });
+                    visionModel = autoResolved.model;
+                } catch (autoError) {
+                    const { mapProviderErrorToHttpResponse } = await import("@/lib/gateway-reliability");
+                    const failure = mapProviderErrorToHttpResponse(autoError, undefined, model);
+                    return respond(
+                        NextResponse.json({ error: { message: failure.message, type: 'invalid_request_error', code: failure.error } }, { status: failure.status }),
+                        failure.error,
+                        failure.message
+                    );
+                }
+            }
             const visionResponse = await runVisionChat({
                 ctx: activeGatewayCtx,
                 rawMessages: visionSourceMessages,
-                requestedModel: model,
+                requestedModel: visionModel,
                 maxTokens: effectiveMaxTokens,
                 temperature: body.temperature,
                 stream: shouldStream,
@@ -768,7 +800,10 @@ export async function POST(req: NextRequest) {
         // facts must never be cached (semantic cache matches project-wide —
         // user A's facts could serve user B), and lookups against such
         // prompts are useless. Skip the cache in both directions.
-        if (gatewayCtx && !tools && !skipCache && !memoryDirective?.retrieve && !fastLane) {
+        // Auto-router responses are never cached: the concrete model depends
+        // on the project's BYOK set at request time, so an `auto` cache key
+        // could serve a model the current key set can no longer reach.
+        if (gatewayCtx && !tools && !skipCache && !memoryDirective?.retrieve && !fastLane && !isAutoRouterModel(model)) {
             try {
                 // Try cache first - use cached config if available
                 const cachedConfig = await getCachedCacheConfig(gatewayCtx.projectId);

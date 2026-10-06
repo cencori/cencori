@@ -68,6 +68,10 @@ console.log(response.embeddings.length); // 3
 | text-embedding-004 | Google | 768 | Multilingual |
 | embed-english-v3.0 | Cohere | 1024 | English text |
 
+## Auto-router (`auto` / `cencori-auto`)
+
+Pass `model: 'auto'` to resolve the cheapest priced BYOK embedding model for the project (`text-embedding-3-small` → `text-embedding-3-large` → Google → Cohere). BYOK-only: no usable key returns `402 byok_required`, and it never falls back to managed keys. Details: [BYOK auto-router](/docs/platform/byok#auto-router).
+
 ## HTTP API
 
 ```bash

@@ -110,7 +110,7 @@ When using the `api.cencori.com` subdomain, set the base URL to `https://api.cen
 
 | Field | Type | Required | Notes |
 |-------|------|----------|-------|
-| `model` | string | Yes | Any model routed through Cencori |
+| `model` | string | Yes | Any model routed through Cencori (`'auto'` / `'cencori-auto'` task-routes across BYOK keys — see [BYOK auto-router](/docs/platform/byok#auto-router)) |
 | `input` | string or array | Yes | Text prompt or array of input items |
 | `instructions` | string | No | System-level instructions for the model |
 | `tools` | array | No | Built-in tools and function definitions |

@@ -37,6 +37,7 @@ import {
 } from "@/lib/gateway/performance";
 import type { SubscriptionTier } from "@/lib/entitlements";
 import { resolveAgentContext } from "@/lib/gateway/agent-context";
+import { isAutoRouterModel } from "@/lib/gateway/auto-router";
 
 import type { ToolCallPayload } from '@/lib/gateway/v1-types';
 
@@ -267,6 +268,7 @@ export async function POST(req: NextRequest) {
                 || Boolean(
                     endUserQuota.allowedModels
                     && endUserQuota.allowedModels.length > 0
+                    && !isAutoRouterModel(model)
                     && !endUserQuota.allowedModels.includes(model)
                 );
 

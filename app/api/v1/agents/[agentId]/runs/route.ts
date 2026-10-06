@@ -823,6 +823,11 @@ async function executeRunStream(runId: string, emit: StreamEmit): Promise<void> 
             organizationId: prep.organizationId,
             requestedModel: prep.model,
             pinnedConnectionId: prep.pinnedConnectionId,
+            autoRouterInput: {
+                text: prep.baseMessages?.map((m) => m.content ?? '').join('\n') ?? null,
+                tools: (prep.runMcpTools as unknown[] | null) ?? null,
+                hasImage: false,
+            },
         });
         const pricing = await resolved.provider.getPricing(resolved.model);
         const callModel = async (messages: UnifiedMessage[]): Promise<ModelCallResult> => {

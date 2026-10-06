@@ -311,6 +311,11 @@ export async function POST(req: NextRequest) {
             requestedModel,
             allowedModels: ctx.allowedModels,
             sponsoredModels: ctx.sponsoredModels,
+            autoRouterInput: {
+                text: unifiedMessages?.map((m) => m.content ?? '').join('\n') ?? null,
+                tools: null,
+                hasImage: false,
+            },
         });
         const response = await executeGatewayChat({
             supabase: ctx.supabase,

@@ -133,6 +133,20 @@ export function mapProviderErrorToHttpResponse(
      */
     model?: string
 ): ProviderHttpErrorDetails {
+    // BYOK-only auto-router gate: fail closed with 402 before any provider
+    // mapping. Checked first so the actionable setup message survives.
+    if (
+        error instanceof Error &&
+        ((error as { code?: unknown }).code === 'byok_required' ||
+            error.name === 'ByokRequiredError')
+    ) {
+        return {
+            status: 402,
+            error: 'byok_required',
+            message: error.message,
+            provider: 'cencori',
+        };
+    }
     const providerError = error instanceof ProviderError
         ? error
         : providerHint

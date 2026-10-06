@@ -16,7 +16,7 @@ export function registerAudioTools(server: McpServer, client: PlatformClient): v
             description: 'Synthesize speech from text. Returns audio. Incurs usage/cost.',
             inputSchema: {
                 input: z.string().min(1).describe('The text to speak.'),
-                model: z.string().optional().describe('TTS model. Defaults to tts-1.'),
+                model: z.string().optional().describe('TTS model. Defaults to tts-1. Use auto or cencori-auto to resolve a latency-ordered BYOK voice model.'),
                 voice: z.string().optional().describe('Voice id/name (provider-specific).'),
                 response_format: z.string().optional().describe('Audio format, e.g. mp3, wav, opus.'),
                 provider: z.string().optional().describe('Override the TTS provider.'),

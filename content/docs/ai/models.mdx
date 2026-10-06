@@ -29,3 +29,18 @@ const result = await cencori.ai.chat({
   ]
 })
 ```
+
+## Auto (`auto` / `cencori-auto`)
+
+`auto` is a BYOK-only task router, not a model. It resolves to a concrete provider + model from the project's active BYOK keys — chat classifies the prompt (`vision` / `code` / `reasoning` / `fast`), while embeddings, image generation, and speech resolve from the endpoint. No BYOK key (or no key that can serve the task) returns `402 byok_required`; it never falls back to managed keys or spends credits.
+
+```typescript
+const result = await cencori.ai.chat({
+  model: 'auto', // or 'cencori-auto' to force the BYOK router
+  messages: [
+    { role: 'user', content: 'Hello!' }
+  ]
+})
+```
+
+`auto` also works as `model` for embeddings, `generateImage`, and speech. Full behavior, candidate order, and edge cases: [Bring Your Own Key](/docs/platform/byok#auto-router).

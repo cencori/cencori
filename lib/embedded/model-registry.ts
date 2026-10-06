@@ -272,6 +272,56 @@ export async function buildUnifiedModelRegistry(
         });
     }
 
+    // BYOK-only auto-router (`auto` / `cencori-auto`): task-routed across the
+    // project's active BYOK keys, never billed to Cencori credits. Listed
+    // here so callers discover it; availability is explicit — without any
+    // BYOK key the reason is `provider_connection_required`. Chat tasks
+    // classify from the prompt (code / reasoning / fast / vision);
+    // embeddings, image generation, and text-to-speech resolve from the
+    // endpoint (`embed` / `image` / `speech`).
+    {
+        const hasAnyByok = byokProviders.size > 0;
+        const autoIds = [
+            { id: 'auto', name: 'Auto' },
+            { id: 'cencori-auto', name: 'Cencori Auto' },
+        ];
+        for (const auto of autoIds) {
+            const access = resolveApiKeyModelAccess({
+                allowedModels: keyAccess?.allowedModels ?? null,
+                sponsoredModels: keyAccess?.sponsoredModels ?? null,
+                provider: 'cencori',
+                model: auto.id,
+            });
+            const available = access.allowed && hasAnyByok;
+            models.push({
+                id: auto.id,
+                object: 'model',
+                created: UNKNOWN_CREATED,
+                owned_by: 'cencori',
+                name: `${auto.name} (BYOK)`,
+                provider: 'cencori',
+                source: 'byok',
+                connection_id: null,
+                types: ['chat', 'embeddings', 'images', 'audio'],
+                context_window: 200000,
+                status: 'active',
+                available,
+                unavailable_reason: !access.allowed
+                    ? 'model_not_allowed'
+                    : !hasAnyByok
+                        ? 'provider_connection_required'
+                        : null,
+                reasoning_supported: true,
+                byok_supported: true,
+                managed_access: false,
+                pricing_status: 'unknown',
+                pricing: null,
+                description:
+                    'Auto-routes by task across your BYOK keys: chat (code / reasoning / fast / vision), embeddings, image generation, and text-to-speech. Requires at least one active provider key.',
+            });
+        }
+    }
+
     let filtered = models;
     if (q.provider) filtered = filtered.filter((m) => m.owned_by === q.provider || m.provider === q.provider);
     if (q.type) filtered = filtered.filter((m) => m.types.includes(q.type as string));
@@ -299,6 +349,16 @@ export async function buildUnifiedModelRegistry(
         connection_status: managedProviders.has(p.id) ? 'configured' : byokProviders.has(p.id) ? 'byok' : 'not_configured',
         model_count: byProvider.get(p.id) ?? 0,
     }));
+    if (byProvider.has('cencori')) {
+        const hasAnyByok = byokProviders.size > 0;
+        providers.push({
+            id: 'cencori',
+            name: 'Cencori Auto',
+            supports_byok: true,
+            connection_status: hasAnyByok ? 'byok' : 'not_configured',
+            model_count: byProvider.get('cencori') ?? 0,
+        });
+    }
 
     return { models: distinct, providers, partial };
 }

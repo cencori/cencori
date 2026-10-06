@@ -141,6 +141,7 @@ To expose only Embedded Agents inspection, set `CENCORI_MCP_FEATURES=embedded`. 
 
 - Web: `web_browse`, `web_crawl`, `request_web_takedown`
 - Inference: text, RAG, embeddings, moderation, images, vision, documents, TTS, and transcription
+- Model params accept `auto` / `cencori-auto` on BYOK projects: the gateway task-routes across the project's provider keys (chat, embeddings, images, TTS) instead of billing Cencori credits. See [BYOK auto-router](/docs/platform/byok#auto-router).
 - Memory: `remember_memory`, `write_memory`, `create_namespace`
 - Agents: `create_agent`, `update_agent`
 - Sessions: `create_session`, `add_session_turn`

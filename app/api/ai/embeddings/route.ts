@@ -152,8 +152,45 @@ export async function POST(req: NextRequest) {
                 { requestId: ctx.requestId }
             );
         }
-        const { input, model = 'text-embedding-3-small', dimensions, encodingFormat } = body;
+        const { input, dimensions, encodingFormat } = body;
+        let model = body.model ?? 'text-embedding-3-small';
         requestedModel = model;
+
+        // BYOK-only auto-router (`auto` / `cencori-auto`): endpoint-implied
+        // `embed` task across the project's active BYOK keys. Fails closed
+        // with 402 `byok_required` when no priced BYOK embedding model exists.
+        let autoRouted: { provider: string; model: string } | null = null;
+        {
+            const { isAutoRouterModel, resolveAutoModelForTask } = await import('@/lib/gateway/auto-router');
+            if (isAutoRouterModel(model)) {
+                try {
+                    const resolved = await resolveAutoModelForTask({
+                        supabase: ctx.supabase as never,
+                        projectId: ctx.projectId,
+                        task: 'embed',
+                        verify: async (provider, candidate) => {
+                            await getPricingFromDB(provider, candidate);
+                        },
+                    });
+                    model = resolved.model;
+                    requestedModel = resolved.model;
+                    autoRouted = { provider: resolved.provider, model: resolved.model };
+                } catch (autoError) {
+                    const failure = mapProviderErrorToHttpResponse(autoError, undefined, body.model);
+                    return addGatewayHeaders(
+                        NextResponse.json(
+                            {
+                                error: failure.error,
+                                message: failure.message,
+                                ...(failure.provider ? { provider: failure.provider } : {}),
+                            },
+                            { status: failure.status }
+                        ),
+                        { requestId: ctx.requestId }
+                    );
+                }
+            }
+        }
 
         const inputs = typeof input === 'string' ? [input] : input;
         inputsForLog = Array.isArray(inputs) ? inputs : [];
@@ -247,6 +284,20 @@ export async function POST(req: NextRequest) {
 
         if (providerKey?.encrypted_key) {
             providerApiKey = decryptApiKey(providerKey.encrypted_key, ctx.organizationId);
+        } else if (autoRouted) {
+            // Auto-router is BYOK-only: never fall back to a managed key.
+            const { ByokRequiredError } = await import('@/lib/gateway/auto-router');
+            const failure = mapProviderErrorToHttpResponse(
+                new ByokRequiredError(
+                    `Auto-router resolved ${autoRouted.model} but no active BYOK key remains for ${provider}. Add your own key in project settings to use \`auto\`.`
+                ),
+                undefined,
+                body.model,
+            );
+            return addGatewayHeaders(
+                NextResponse.json({ error: failure.error, message: failure.message }, { status: failure.status }),
+                { requestId: ctx.requestId }
+            );
         } else {
             switch (provider) {
                 case 'openai': providerApiKey = process.env.OPENAI_API_KEY ?? null; break;
@@ -319,6 +370,7 @@ export async function POST(req: NextRequest) {
                 semanticCacheRead: 'disabled',
                 semanticCacheWrite: 'disabled',
                 embeddingDimensions: result.data[0]?.embedding.length ?? null,
+                ...(autoRouted ? { auto_routed: true, auto_requested_model: body.model } : {}),
             },
         });
         await incrementUsage(ctx, cencoriCharge);

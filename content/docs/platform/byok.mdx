@@ -47,6 +47,36 @@ See [Credits System](/docs/platform/credits) and [Billing & Usage](/docs/platfor
 
 At a zero credit balance, requests that identify an active project BYOK key before execution can still proceed without a Cencori usage deduction. Ambiguous or multi-provider operations may require credits until their key source can be proven; a managed fallback will not run against an empty wallet.
 
+## Auto-router
+
+Pass `model: 'auto'` (aliases `cencori-auto`, `cencori/auto`) on any supported endpoint and Cencori picks a concrete provider + model for the task, routed **only** across the project's active BYOK keys. There is no managed-credit fallback: without a usable BYOK key the request fails closed with `402 byok_required`.
+
+```typescript
+const response = await cencori.ai.chat({
+  model: 'auto',
+  messages: [{ role: 'user', content: 'Refactor this function…' }],
+});
+```
+
+### How the task is chosen
+
+| Endpoint | Task | Selection |
+|----------|------|-----------|
+| Chat (`/api/ai/chat`, `/api/ai/completions`, `/v1/chat/completions`, `/v1/responses`, sessions, agents) | `vision` / `code` / `reasoning` / `fast` | Classified from the request: image content → vision; code signals or tool calls → code; long/analytical prompts → reasoning; otherwise fast (cheap) |
+| Embeddings (`/api/ai/embeddings`) | `embed` | Endpoint-implied; cheapest priced BYOK embedding model first (`text-embedding-3-small` → `text-embedding-3-large` → Google → Cohere) |
+| Images (`/api/ai/images/generate`) | `image` | Endpoint-implied; quality-ordered (`gpt-image-1` → `dall-e-3` → `dall-e-2` → Google). Requests with `n > 1` only match `dall-e-2`; Google-incompatible options (non-1024 size, style, URL output) match OpenAI only |
+| Speech (`/api/ai/audio/speech`) | `speech` | Endpoint-implied; latency-ordered (`tts-1` → `tts-1-hd` → Deepgram → Cartesia → Spitch → ElevenLabs). A voice that doesn't belong to the resolved model falls back to that model's default voice |
+
+Candidates are intersected with the project's active BYOK providers and each must have a priced row for the task — unpriced or unkeyed entries are skipped. For chat, a per-provider dashboard **Default Model** acts as a last-resort candidate. Key-level model allowlists still apply: a restricted key can't reach outside its grant via the router.
+
+### Rules
+
+- **BYOK-only.** Auto never spends managed keys or Cencori credits, and works at a zero credit balance. If the resolved provider's key disappears mid-flight, the request 402s instead of falling back.
+- **`402 byok_required`.** Returned when no BYOK key exists, or when keys exist but none can serve the task (e.g. only a text-only key with an image prompt). The message names the available BYOK providers.
+- **No `connection_id` pinning.** Combining `auto` with a pinned provider connection is a `400` — use a concrete model with `connection_id` instead.
+- **Responses aren't cached** for `auto` (the concrete model depends on the key set at request time), and the speed profile doesn't rewrite `auto` requests.
+- **Tensor Desktop:** bare `auto` with a Tensor plan follows the Tensor model mapping. `cencori-auto` is explicit and always takes the BYOK router.
+
 ## Security
 
 Your keys are encrypted at rest using AES-256 encryption. They are strictly used for making requests to the respective provider and are never logged or exposed via the API.

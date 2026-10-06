@@ -66,3 +66,7 @@ Body: {
   "provider": "openai"
 }
 ```
+
+## Auto-router (`auto` / `cencori-auto`)
+
+Pass `model: 'auto'` to resolve a quality-ordered BYOK image model for the project (`gpt-image-1` → `dall-e-3` → `dall-e-2` → Google), verified against image pricing for the requested size/quality. `n > 1` only matches `dall-e-2`; Google-incompatible options match OpenAI only. BYOK-only: no usable key returns `402 byok_required`, and it never falls back to managed keys. Details: [BYOK auto-router](/docs/platform/byok#auto-router).

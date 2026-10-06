@@ -531,6 +531,11 @@ export async function executeSessionTurn(params: TurnExecuteParams): Promise<Tur
             tensorModelPolicy: gatewayCtx.tensorModelPolicy,
             allowedModels: gatewayCtx.allowedModels, sponsoredModels: gatewayCtx.sponsoredModels,
             pinnedConnectionId: pinnedConnectionId ?? null,
+            autoRouterInput: {
+                text: [...(inputMessages ?? []).map((m) => m.content ?? ''), inputText ?? ''].join('\n') || null,
+                tools: (tools as unknown[] | null) ?? null,
+                hasImage: false,
+            },
         });
 
         const { functionTools, builtInTools } = extractTools(tools);
@@ -701,6 +706,12 @@ export async function resumeSessionTurn(params: ResumeTurnParams): Promise<TurnE
             tensorModelPolicy: gatewayCtx.tensorModelPolicy,
             allowedModels: gatewayCtx.allowedModels, sponsoredModels: gatewayCtx.sponsoredModels,
             pinnedConnectionId: storedPin,
+            // Resume path: the full turn messages are reconstructed after
+            // resolution, so classify on the stored input text. A model switch
+            // mid-turn is possible if the original classification used richer
+            // context, but the BYOK gate (not the exact task pick) is what
+            // must stay consistent here.
+            autoRouterInput: { text: inputText ?? null, tools: null, hasImage: false },
         });
 
         // Reconstruct assistant text and tool calls from events

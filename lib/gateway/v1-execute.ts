@@ -244,6 +244,11 @@ export async function runV1ProviderExecution(
             tensorModelPolicy: params.gatewayCtx.tensorModelPolicy,
             allowedModels: params.gatewayCtx.allowedModels,
             sponsoredModels: params.gatewayCtx.sponsoredModels,
+            autoRouterInput: {
+                text: params.messages?.map((m) => m.content ?? '').join('\n') ?? null,
+                tools: (params.tools as unknown[] | null) ?? null,
+                hasImage: false,
+            },
         });
         params.performance?.markPreflightComplete();
 

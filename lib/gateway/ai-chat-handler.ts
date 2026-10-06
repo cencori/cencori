@@ -471,7 +471,12 @@ export async function POST(req: NextRequest) {
         }
 
         // ── Model resolution (legacy chain, incl. hardcoded fallback) ──
-        const resolvedModel = model === 'auto' || model === 'cencori/auto' ? null : model;
+        // `auto` / `cencori-auto` is the BYOK-only auto-router (task-based).
+        // Preserve it so runV1ProviderExecution resolves it via BYOK keys;
+        // only fall back to defaults when no model was requested at all.
+        const { isAutoRouterModel: isAutoModel } = await import('@/lib/gateway/auto-router');
+        const requestedIsAuto = typeof model === 'string' && isAutoModel(model);
+        const resolvedModel = requestedIsAuto ? model!.trim() : (model || null);
         let requestedModel =
             resolvedModel || agentConfigModel || ctx.defaultModel || 'gemini-2.5-flash';
         // Policy `route` directive (PRD M1): override the model per governance
@@ -661,10 +666,37 @@ export async function POST(req: NextRequest) {
                 .map((message) => `${message.role}: ${message.content}`)
                 .join('\n');
             try {
+                // Auto-router + vision: resolve `auto` to a concrete BYOK
+                // vision model first — the vision analyzer only knows real
+                // model ids. BYOK gate (402) surfaces here when no key exists.
+                let visionModel = requestedModel;
+                if (requestedIsAuto) {
+                    const { resolveGatewayProvider } = await import('@/lib/gateway/providers-setup');
+                    try {
+                        const autoResolved = await resolveGatewayProvider({
+                            supabase,
+                            projectId: ctx.projectId,
+                            organizationId: ctx.organizationId,
+                            requestedModel,
+                            allowedModels: ctx.allowedModels,
+                            sponsoredModels: ctx.sponsoredModels,
+                            autoRouterInput: {
+                                text: guardedPrompt,
+                                tools: (tools as unknown[] | null) ?? null,
+                                hasImage: true,
+                            },
+                        });
+                        visionModel = autoResolved.model;
+                    } catch (autoError) {
+                        const { mapProviderErrorToHttpResponse } = await import('@/lib/gateway-reliability');
+                        const failure = mapProviderErrorToHttpResponse(autoError, undefined, requestedModel);
+                        return wrap(NextResponse.json({ error: failure.message, code: failure.error }, { status: failure.status }), ctx);
+                    }
+                }
                 const response = await runVisionChat({
                     ctx,
                     rawMessages: visionSourceMessages,
-                    requestedModel,
+                    requestedModel: visionModel,
                     maxTokens,
                     temperature,
                     stream: isStreaming,

@@ -44,7 +44,7 @@ export function registerMultimodalTools(server: McpServer, client: PlatformClien
             title: 'Generate text (chat completion)',
             description: 'Run a chat completion through the Cencori gateway. Incurs usage/cost.',
             inputSchema: {
-                model: z.string().describe('Model id, e.g. groq/compound-mini or claude-opus-5.'),
+                model: z.string().describe('Model id, e.g. groq/compound-mini or claude-opus-5. Use auto or cencori-auto to task-route across the project BYOK keys.'),
                 messages: messageSchema,
                 temperature: z.number().min(0).max(2).optional(),
                 max_tokens: z.number().int().positive().optional(),
@@ -61,7 +61,7 @@ export function registerMultimodalTools(server: McpServer, client: PlatformClien
             title: 'RAG chat over a memory namespace',
             description: 'Answer a question grounded in stored memories for a namespace. Incurs usage/cost.',
             inputSchema: {
-                model: z.string().describe('Model id for the answer.'),
+                model: z.string().describe('Model id for the answer. Use auto or cencori-auto to task-route across the project BYOK keys.'),
                 messages: messageSchema,
                 namespace: z.string().min(1).describe('Memory namespace to retrieve context from.'),
                 limit: z.number().int().positive().optional().describe('Max memories to retrieve.'),
@@ -79,7 +79,7 @@ export function registerMultimodalTools(server: McpServer, client: PlatformClien
             description: 'Generate vector embeddings for text. Incurs usage/cost.',
             inputSchema: {
                 input: z.union([z.string(), z.array(z.string())]).describe('Text or array of texts to embed.'),
-                model: z.string().optional().describe('Embedding model. Defaults to text-embedding-3-small.'),
+                model: z.string().optional().describe('Embedding model. Defaults to text-embedding-3-small. Use auto or cencori-auto to resolve the cheapest priced BYOK embedding model.'),
                 dimensions: z.number().int().positive().optional(),
             },
             annotations: WRITE_ANNOTATIONS,
@@ -109,7 +109,7 @@ export function registerMultimodalTools(server: McpServer, client: PlatformClien
             description: 'Generate image(s) from a text prompt. Incurs usage/cost.',
             inputSchema: {
                 prompt: z.string().min(1).describe('Text prompt describing the image.'),
-                model: z.string().optional(),
+                model: z.string().optional().describe('Image model. Use auto or cencori-auto to resolve a quality-ordered BYOK image model.'),
                 n: z.number().int().positive().optional().describe('Number of images.'),
                 size: z.string().optional().describe('Image size, e.g. 1024x1024.'),
             },

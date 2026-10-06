@@ -250,6 +250,10 @@ curl -X POST https://cencori.com/api/ai/audio/transcriptions \
   -F response_format=verbose_json
 ```
 
+## Auto-router (`auto` / `cencori-auto`)
+
+Pass `model: 'auto'` to `POST /api/ai/audio/speech` to resolve a latency-ordered BYOK voice model for the project (`tts-1` → `tts-1-hd` → Deepgram → Cartesia → Spitch → ElevenLabs), verified against unit pricing and the requested format. A `voice` that doesn't belong to the resolved model falls back to that model's default voice. BYOK-only: no usable key returns `402 byok_required`, and it never falls back to managed keys. Details: [BYOK auto-router](/docs/platform/byok#auto-router).
+
 ### Voice discovery
 
 ```bash
@@ -269,6 +273,7 @@ Errors use the shared flat envelope — see the [Error Reference](/docs/api/erro
 
 - `400 bad_request` — unsupported model/voice/format, temperature/speed out of range, missing file, **file > 25MB**, **input > 4096 chars**
 - `400 provider_not_configured` — no managed or BYOK key for the provider
+- `402 byok_required` — `model: 'auto'` with no usable BYOK voice model (no key, or none priced for the task)
 - `400 provider_error` / `502` — upstream provider failed
 - `403 credit_balance_exhausted` — credit-gated org out of credits (free tier is not credit-gated)
 - `429 rate_limit_exceeded` — 60 requests/min per project (see [Rate Limiting](/docs/platform/ai-gateway/rate-limiting))
