@@ -427,7 +427,7 @@ function isCreditExhausted(error: unknown): boolean {
 // ── Streaming ──
 
 function buildResponsesStreamChunk(params: {
-    type: 'response.in_progress' | 'response.output_text.delta' | 'response.output_text.done' | 'response.function_call_arguments.delta' | 'response.function_call_arguments.done' | 'response.web_search_call.completed' | 'response.file_search_call.completed' | 'response.code_interpreter_call.completed' | 'response.done';
+    type: 'response.in_progress' | 'response.output_text.delta' | 'response.output_text.done' | 'response.function_call_arguments.delta' | 'response.function_call_arguments.done' | 'response.web_search_call.completed' | 'response.file_search_call.completed' | 'response.code_interpreter_call.completed' | 'response.output_item.added' | 'response.output_item.done' | 'response.reasoning_text.delta' | 'response.done';
     data: Record<string, unknown>;
 }): string {
     return `event: ${params.type}\ndata: ${JSON.stringify(params.data)}\n\n`;
@@ -960,6 +960,55 @@ export async function runV1ResponsesExecution(
                 // Thinking trace, accumulated exactly like visible text and
                 // persisted as a `reasoning` output item at completion.
                 let fullReasoning = '';
+                /**
+                 * The thinking trace, streamed as the model produces it rather than held to the
+                 * end. A thinking model spends most of each step here, and held back it was a
+                 * silent stretch of seconds before the whole step landed at once. Sent as the
+                 * Responses events a client streams reasoning from: the item opens, its text
+                 * arrives in deltas, and it closes before the reply or any call begins.
+                 *
+                 * Held to the end, as before, while placeholders stand in for redacted values:
+                 * swapping them back needs the whole text, and a raw placeholder must not reach
+                 * the client.
+                 */
+                const streamsReasoning = effectiveTokenMap.size === 0;
+                let reasoningItemId: string | null = null;
+                let reasoningClosed = false;
+                const streamReasoning = (delta: string) => {
+                    if (!streamsReasoning || reasoningClosed || !delta) return;
+                    if (!reasoningItemId) {
+                        reasoningItemId = generateId('rsn');
+                        controller.enqueue(encoder.encode(buildResponsesStreamChunk({
+                            type: 'response.output_item.added',
+                            data: {
+                                output_index: 0,
+                                item: { id: reasoningItemId, type: 'reasoning', summary: [], content: [] },
+                            },
+                        })));
+                    }
+                    params.performance?.markClientFirstByte();
+                    controller.enqueue(encoder.encode(buildResponsesStreamChunk({
+                        type: 'response.reasoning_text.delta',
+                        data: { item_id: reasoningItemId, output_index: 0, content_index: 0, delta },
+                    })));
+                };
+                /** Closes the streamed trace with its whole text, before anything after it is sent. */
+                const closeReasoning = () => {
+                    if (!reasoningItemId || reasoningClosed) return;
+                    reasoningClosed = true;
+                    controller.enqueue(encoder.encode(buildResponsesStreamChunk({
+                        type: 'response.output_item.done',
+                        data: {
+                            output_index: 0,
+                            item: {
+                                id: reasoningItemId,
+                                type: 'reasoning',
+                                summary: [{ type: 'summary_text', text: fullReasoning }],
+                                content: [{ type: 'reasoning_text', text: fullReasoning }],
+                            },
+                        },
+                    })));
+                };
                 // Real usage from the provider when the adapter reports it.
                 let reportedUsage: TokenUsage | undefined;
                 const collectedToolCalls: Record<string, { id: string; name: string; arguments: string }> = {};
@@ -1027,6 +1076,7 @@ export async function runV1ResponsesExecution(
 
                 /** Emits everything approved so far that the client has not already received. */
                 const releaseApprovedText = () => {
+                    closeReasoning();
                     const releaseEnd = safeReleaseEnd(
                         Math.max(releasedRawLength, fullText.length - holdbackChars)
                     );
@@ -1081,6 +1131,11 @@ export async function runV1ResponsesExecution(
                         }
                         if (chunk.reasoning) {
                             fullReasoning += chunk.reasoning;
+                            streamReasoning(chunk.reasoning);
+                        }
+                        // The model has moved on from thinking to its reply or its calls.
+                        if (chunk.delta || (chunk.toolCalls && chunk.toolCalls.length > 0)) {
+                            closeReasoning();
                         }
 
                         if (chunk.toolCalls) {
@@ -1130,6 +1185,7 @@ export async function runV1ResponsesExecution(
                         }
 
                         if (chunk.finishReason) {
+                            closeReasoning();
                             if (effectiveTokenMap.size > 0) {
                                 fullText = deTokenize(fullText, effectiveTokenMap);
                                 if (fullReasoning) {
@@ -1475,11 +1531,16 @@ export async function runV1ResponsesExecution(
                                 params.onPerformance?.(params.performance.snapshot());
                             }
 
+                            // A trace already streamed and closed is not sent again: the client
+                            // would store it twice. The stored response keeps it, for replays.
+                            const streamedResponse = reasoningClosed
+                                ? { ...response, output: response.output.filter((item) => item.type !== 'reasoning') }
+                                : response;
                             controller.enqueue(
                                 encoder.encode(
                                     buildResponsesStreamChunk({
                                         type: 'response.done',
-                                        data: { response },
+                                        data: { response: streamedResponse },
                                     })
                                 )
                             );
