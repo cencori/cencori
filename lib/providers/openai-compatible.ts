@@ -131,6 +131,18 @@ export function openAICompatibleHeaders(providerName: string): Record<string, st
     return headers;
 }
 
+/**
+ * Providers whose thinking models take their trace back as `reasoning_content`
+ * on assistant turns: DeepSeek requires it after a tool call (400 without),
+ * and Kimi (Moonshot) and GLM (Z.ai) expect it across tool calls. Everyone
+ * else gets history without it, as they always had.
+ */
+const REASONING_ECHO_PROVIDERS: ReadonlySet<string> = new Set(['deepseek', 'moonshot', 'zai']);
+
+export function echoesReasoning(providerName: string): boolean {
+    return REASONING_ECHO_PROVIDERS.has(providerName);
+}
+
 /** Thinking-trace fields across vendors: DeepSeek `reasoning_content`,
  *  with `reasoning` (plain string) accepted as a fallback. Anything else —
  *  nulls, part lists — is not a replayable trace and is ignored here. */
@@ -266,7 +278,9 @@ export class OpenAICompatibleProvider extends AIProvider {
         try {
             const completion = await this.clientFor(transport).chat.completions.create({
                 model: request.model,
-                messages: toOpenAIMessages(request.messages) as any,
+                messages: toOpenAIMessages(request.messages, {
+                    echoReasoning: echoesReasoning(this.providerName),
+                }) as any,
                 temperature: request.temperature ?? 0.7,
                 max_tokens: request.maxTokens,
                 ...(openAICompatibleReasoningEffort(this.providerName, request) ? { reasoning_effort: openAICompatibleReasoningEffort(this.providerName, request) } : {}),
@@ -406,7 +420,9 @@ export class OpenAICompatibleProvider extends AIProvider {
                 : this.client;
             const stream = await client.chat.completions.create({
                 model: request.model,
-                messages: toOpenAIMessages(request.messages) as any,
+                messages: toOpenAIMessages(request.messages, {
+                    echoReasoning: echoesReasoning(this.providerName),
+                }) as any,
                 temperature: request.temperature ?? 0.7,
                 max_tokens: request.maxTokens,
                 ...(openAICompatibleReasoningEffort(this.providerName, request) ? { reasoning_effort: openAICompatibleReasoningEffort(this.providerName, request) } : {}),

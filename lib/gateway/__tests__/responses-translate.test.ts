@@ -45,10 +45,15 @@ describe('translateResponsesInputItems', () => {
             { role: 'user', content: 'think hard' },
             { role: 'assistant', content: '', reasoningContent: 'the trace' },
         ]);
-        // And the provider wire format echoes it back verbatim.
-        expect(toOpenAIMessages(messages)).toEqual([
+        // And the provider wire format echoes it back verbatim, to a provider that takes it.
+        expect(toOpenAIMessages(messages, { echoReasoning: true })).toEqual([
             { role: 'user', content: 'think hard' },
             { role: 'assistant', content: '', reasoning_content: 'the trace' },
+        ]);
+        // Anyone else gets the history without the vendor field, as before echoing existed.
+        expect(toOpenAIMessages(messages)).toEqual([
+            { role: 'user', content: 'think hard' },
+            { role: 'assistant', content: '' },
         ]);
     });
 
@@ -124,7 +129,9 @@ describe('translateResponsesInputItems', () => {
             },
             { role: 'tool', content: 'ok', toolCallId: 'call-1' },
         ]);
-        expect(toOpenAIMessages(messages)[0]).toMatchObject({ reasoning_content: 'trace' });
+        expect(toOpenAIMessages(messages, { echoReasoning: true })[0]).toMatchObject({
+            reasoning_content: 'trace',
+        });
     });
 
     it('never splits a tool block with its own image-caption follow-up', () => {
@@ -286,3 +293,72 @@ describe('findTracelessCallTurns', () => {
         ])).toEqual(['call-2']);
     });
 });
+
+describe('a thinking model reply with text and a tool call', () => {
+    /**
+     * What Tensor's runtime echoes after DeepSeek thinks, says what it will do, and calls a tool:
+     * three items for one response. Split into separate turns, the trace landed on a text-only
+     * turn and the turn with `tool_calls` went without it, and DeepSeek 400'd the follow-up.
+     */
+    it('is one assistant turn carrying the trace, the text and the call together', () => {
+        const { messages, dropped } = translateResponsesInputItems([
+            { type: 'message', role: 'user', content: 'what is this project?' },
+            {
+                type: 'reasoning',
+                summary: [{ type: 'summary_text', text: 'read the repo first' }],
+                content: [{ type: 'reasoning_text', text: 'read the repo first' }],
+            },
+            { type: 'message', role: 'assistant', content: [{ type: 'output_text', text: "I'll look at the repo." }] },
+            { type: 'function_call', id: 'fc-1', call_id: 'call-1', name: 'exec_command', arguments: '{"cmd":"ls"}' },
+            { type: 'function_call_output', call_id: 'call-1', output: 'README.md' },
+            {
+                type: 'reasoning',
+                summary: [{ type: 'summary_text', text: 'now read the readme' }],
+            },
+            { type: 'function_call', id: 'fc-2', call_id: 'call-2', name: 'exec_command', arguments: '{"cmd":"cat README.md"}' },
+            { type: 'function_call_output', call_id: 'call-2', output: '# Tensor' },
+        ] as never);
+        expect(dropped).toEqual([]);
+        expect(validateToolPairing(messages)).toEqual([]);
+
+        const wire = toOpenAIMessages(messages, { echoReasoning: true });
+        expect(wire).toEqual([
+            { role: 'user', content: 'what is this project?' },
+            {
+                role: 'assistant',
+                content: "I'll look at the repo.",
+                reasoning_content: 'read the repo first',
+                tool_calls: [{ id: 'call-1', type: 'function', function: { name: 'exec_command', arguments: '{"cmd":"ls"}' } }],
+            },
+            { role: 'tool', content: 'README.md', tool_call_id: 'call-1' },
+            // The next response keeps its own trace on its own call.
+            {
+                role: 'assistant',
+                content: '',
+                reasoning_content: 'now read the readme',
+                tool_calls: [
+                    { id: 'call-2', type: 'function', function: { name: 'exec_command', arguments: '{"cmd":"cat README.md"}' } },
+                ],
+            },
+            { role: 'tool', content: '# Tensor', tool_call_id: 'call-2' },
+        ]);
+        // Every assistant turn that calls a tool carries its thinking: what DeepSeek checks.
+        for (const turn of wire.filter((message) => message.tool_calls)) {
+            expect(turn.reasoning_content).toBeTruthy();
+        }
+    });
+
+    it('keeps two replies in a row as two turns', () => {
+        const { messages } = translateResponsesInputItems([
+            { type: 'message', role: 'user', content: 'hi' },
+            { type: 'message', role: 'assistant', content: 'Hello.' },
+            { type: 'message', role: 'assistant', content: 'Anything else?' },
+        ] as never);
+        expect(messages).toEqual([
+            { role: 'user', content: 'hi' },
+            { role: 'assistant', content: 'Hello.' },
+            { role: 'assistant', content: 'Anything else?' },
+        ]);
+    });
+});
+
