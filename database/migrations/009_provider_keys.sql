@@ -6,9 +6,11 @@ CREATE TABLE IF NOT EXISTS provider_keys (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     provider TEXT NOT NULL CHECK (provider IN (
-        'openai', 'anthropic', 'google', 'mistral', 'groq', 
+        'openai', 'anthropic', 'google', 'mistral', 'groq',
         'cohere', 'together', 'perplexity', 'openrouter', 'xai',
-        'meta', 'huggingface', 'qwen', 'deepseek'
+        'meta', 'huggingface', 'qwen', 'deepseek',
+        'zai', 'cerebras', 'maximo', 'helix', 'bai', 'centaur',
+        'deepgram', 'cartesia', 'spitch', 'assemblyai', 'elevenlabs'
     )),
     encrypted_key TEXT NOT NULL,
     key_hint TEXT, -- Last 4 characters for display (e.g., "...Qx4F")
