@@ -63,6 +63,18 @@ export function extractReasoningText(item: { summary?: unknown; content?: unknow
     for (const candidate of [item.content, item.text]) {
         if (typeof candidate === 'string' && candidate) return candidate;
     }
+    // The Responses shape, and the one the gateway now emits: `content` as a list of
+    // `reasoning_text` (or `text`) parts, which a client echoes back as it stored it.
+    if (Array.isArray(item.content)) {
+        const texts = item.content
+            .map((part) =>
+                part && typeof part === 'object' && typeof (part as Record<string, unknown>).text === 'string'
+                    ? ((part as Record<string, unknown>).text as string)
+                    : '',
+            )
+            .filter(Boolean);
+        if (texts.length > 0) return texts.join('\n');
+    }
     const summary = item.summary;
     if (typeof summary === 'string' && summary) return summary;
     if (Array.isArray(summary)) {
