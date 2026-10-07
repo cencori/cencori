@@ -38,6 +38,7 @@ import {
     STREAM_GUARD_HOLDBACK_CHARS,
 } from '@/lib/gateway/stream-guard';
 import { runGatewayOutputGuard } from '@/lib/gateway/output-guard';
+import { orgHasOutputPolicies } from '@/lib/governance/policy-enforcement';
 import { runGatewayInputPipeline } from '@/lib/gateway/input-guard';
 import {
     type ResponsesContentPart,
@@ -911,9 +912,19 @@ export async function runV1ResponsesExecution(
         const streamAbort = new AbortController();
         let cancelled = false;
         let heartbeat: ReturnType<typeof setInterval> | undefined;
+        // Holdback and per-batch guard only matter when a policy can stop or
+        // redact output (see v1-execute). The completion check still runs.
+        const streamGuardActivePromise = orgHasOutputPolicies(
+            params.supabase,
+            gatewayCtx.organizationId,
+            gatewayCtx.projectId,
+        );
         const stream = new ReadableStream({
             async start(controller) {
                 const encoder = new TextEncoder();
+                const streamGuardActive = await streamGuardActivePromise;
+                const holdbackChars = streamGuardActive ? STREAM_GUARD_HOLDBACK_CHARS : 0;
+                const emitBatchChars = streamGuardActive ? STREAM_GUARD_EMIT_BATCH_CHARS : 1;
                 // The runtime's idle clock advances on parsed SSE events, not comments.
                 // This standard event keeps the connection alive without fake assistant text.
                 heartbeat = setInterval(() => {
@@ -1010,7 +1021,7 @@ export async function runV1ResponsesExecution(
                 /** Emits everything approved so far that the client has not already received. */
                 const releaseApprovedText = () => {
                     const releaseEnd = safeReleaseEnd(
-                        Math.max(releasedRawLength, fullText.length - STREAM_GUARD_HOLDBACK_CHARS)
+                        Math.max(releasedRawLength, fullText.length - holdbackChars)
                     );
                     if (releaseEnd <= releasedRawLength) return;
 
@@ -1084,9 +1095,11 @@ export async function runV1ResponsesExecution(
                         // the block, so nothing the guard rejected can reach the client.
                         if (releasesIncrementally && !guardBlockedRelease && !chunk.finishReason) {
                             const releasableCharacters =
-                                fullText.length - releasedRawLength - STREAM_GUARD_HOLDBACK_CHARS;
-                            if (releasableCharacters >= STREAM_GUARD_EMIT_BATCH_CHARS) {
-                                const incrementalCheck = await runGatewayOutputGuard({
+                                fullText.length - releasedRawLength - holdbackChars;
+                            if (releasableCharacters >= emitBatchChars) {
+                                const incrementalCheck = !streamGuardActive
+                                    ? { ok: true as const }
+                                    : await runGatewayOutputGuard({
                                     supabase: params.supabase,
                                     projectId: gatewayCtx.projectId,
                                     apiKeyId: gatewayCtx.apiKeyId,

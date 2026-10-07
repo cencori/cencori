@@ -18,6 +18,7 @@ import {
     STREAM_GUARD_HOLDBACK_CHARS,
 } from '@/lib/gateway/stream-guard';
 import { runGatewayOutputGuard } from '@/lib/gateway/output-guard';
+import { orgHasOutputPolicies } from '@/lib/governance/policy-enforcement';
 import { recoverXmlToolCalls, releasableLength } from '@/lib/gateway/tool-call-xml';
 import { mapProviderErrorToHttpResponse } from '@/lib/gateway-reliability';
 import { buildCencoriChatResponse } from '@/lib/gateway/ai-chat-support';
@@ -521,8 +522,23 @@ export async function runV1ProviderExecution(
 
         const isCencoriWire = params.wireFormat === 'cencori';
 
+        // The rolling holdback and per-batch guard exist so a policy can stop
+        // or redact output before the client sees it. With no policy able to
+        // act on output there is nothing to wait for: release each chunk as it
+        // arrives. The full-output check at completion still runs.
+        const streamGuardActivePromise = params.skipOutputGuard
+            ? Promise.resolve(false)
+            : orgHasOutputPolicies(
+                params.supabase,
+                params.gatewayCtx.organizationId,
+                params.gatewayCtx.projectId,
+            );
+
         const stream = new ReadableStream({
             async start(controller) {
+                const streamGuardActive = await streamGuardActivePromise;
+                const holdbackChars = streamGuardActive ? STREAM_GUARD_HOLDBACK_CHARS : 0;
+                const emitBatchChars = streamGuardActive ? STREAM_GUARD_EMIT_BATCH_CHARS : 1;
                 const encoder = new TextEncoder();
                 let fullText = '';
                 let tokenLimitReached = false;
@@ -617,7 +633,7 @@ export async function runV1ProviderExecution(
                 ) => {
                     const proposedEnd = flushAll
                         ? fullText.length
-                        : Math.max(releasedRawLength, fullText.length - STREAM_GUARD_HOLDBACK_CHARS);
+                        : Math.max(releasedRawLength, fullText.length - holdbackChars);
                     const releaseEnd = adjustReleaseEndForTokenPlaceholders(proposedEnd);
                     if (releaseEnd <= releasedRawLength) return;
 
@@ -631,7 +647,7 @@ export async function runV1ProviderExecution(
                     releasedRawLength = releaseEnd;
                 };
 
-                const checkCurrentOutput = () => params.skipOutputGuard
+                const checkCurrentOutput = () => !streamGuardActive
                     ? Promise.resolve({ ok: true as const })
                     : runGatewayOutputGuard({
                         supabase: params.supabase,
@@ -1052,8 +1068,8 @@ export async function runV1ProviderExecution(
                         const releasableCharacters =
                             fullText.length
                             - releasedRawLength
-                            - STREAM_GUARD_HOLDBACK_CHARS;
-                        if (releasableCharacters >= STREAM_GUARD_EMIT_BATCH_CHARS) {
+                            - holdbackChars;
+                        if (releasableCharacters >= emitBatchChars) {
                             const outputCheck = await checkCurrentOutput();
                             if (!outputCheck.ok) {
                                 await closeBlockedStream(

@@ -24,6 +24,13 @@ vi.mock('@/lib/gateway/output-guard', () => ({
     runGatewayOutputGuard: vi.fn().mockResolvedValue({ ok: true }),
 }));
 
+const mockOrgHasOutputPolicies = vi.fn();
+
+vi.mock('@/lib/governance/policy-enforcement', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('@/lib/governance/policy-enforcement')>()),
+    orgHasOutputPolicies: (...args: unknown[]) => mockOrgHasOutputPolicies(...args),
+}));
+
 import { runV1ProviderExecution } from '@/lib/gateway/v1-execute';
 import { runGatewayOutputGuard } from '@/lib/gateway/output-guard';
 import { createMockGatewayContext, toUnifiedMessages } from '@/lib/gateway/__tests__/fixtures';
@@ -195,6 +202,8 @@ describe('cencori wire format — non-stream superset', () => {
 describe('cencori wire format — stream', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        // Guarded-tail tests below assume a policy that can act on output.
+        mockOrgHasOutputPolicies.mockResolvedValue(true);
         (runGatewayOutputGuard as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true });
         mockResolveGatewayProvider.mockResolvedValue({
             providerName: 'openai',
@@ -448,6 +457,42 @@ describe('cencori wire format — stream', () => {
         while (!(await reader.read()).done) {
             // Drain the response so settlement completes.
         }
+    });
+
+    /** No policy can act on output, so nothing is held back for the guard to inspect. */
+    it('releases every chunk at once when no output policy exists', async () => {
+        mockOrgHasOutputPolicies.mockResolvedValue(false);
+        let finishStream!: () => void;
+        const finishGate = new Promise<void>((resolve) => {
+            finishStream = resolve;
+        });
+        mockStreamGatewayChat.mockReturnValue(
+            (async function* () {
+                const meta = {
+                    actualProvider: 'openai',
+                    actualModel: 'gpt-4o',
+                    usedFallback: false,
+                    originalProvider: 'openai',
+                    originalModel: 'gpt-4o',
+                };
+                yield { ...meta, delta: 'Hi' };
+                await finishGate;
+                yield { ...meta, delta: '', finishReason: 'stop' };
+            })()
+        );
+
+        const result = await runV1ProviderExecution(baseParams({ stream: true }));
+        if (!result.ok) throw new Error('expected ok');
+        const reader = result.response.body!.getReader();
+        const firstPayload = new TextDecoder().decode((await reader.read()).value);
+
+        expect(firstPayload).toContain('"delta":"Hi"');
+        finishStream();
+        while (!(await reader.read()).done) {
+            // Drain the response so settlement completes.
+        }
+        // Only the completion check ran.
+        expect(runGatewayOutputGuard).toHaveBeenCalledTimes(1);
     });
 
     it('openai mode still emits [DONE] after an output block (unchanged)', async () => {

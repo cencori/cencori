@@ -31,6 +31,13 @@ vi.mock('@/lib/gateway/output-guard', () => ({
 
 vi.mock('@/lib/supabaseAdmin', () => ({ createAdminClient: vi.fn() }));
 
+const mockOrgHasOutputPolicies = vi.fn();
+
+vi.mock('@/lib/governance/policy-enforcement', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('@/lib/governance/policy-enforcement')>()),
+    orgHasOutputPolicies: (...args: unknown[]) => mockOrgHasOutputPolicies(...args),
+}));
+
 import { runGatewayOutputGuard } from '@/lib/gateway/output-guard';
 import { runV1ResponsesExecution } from '@/lib/gateway/v1-responses-execute';
 import { STREAM_GUARD_HOLDBACK_CHARS } from '@/lib/gateway/stream-guard';
@@ -119,6 +126,8 @@ function joinedDeltaText(text: string): string {
 beforeEach(() => {
     vi.clearAllMocks();
     (runGatewayOutputGuard as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true });
+    // The guard-veto tests below need a policy that can act on output.
+    mockOrgHasOutputPolicies.mockResolvedValue(true);
     mockResolveGatewayProvider.mockResolvedValue({
         providerName: 'openai',
         router: { hasProvider: () => true, getProvider: () => mockProvider },
@@ -426,6 +435,47 @@ describe('/v1/responses streaming', () => {
         expect(result.response.headers.get('X-Accel-Buffering')).toBe('no');
         expect(result.response.headers.get('Cache-Control')).toContain('no-transform');
         await new Response(result.response.body).text();
+    });
+});
+
+/**
+ * The holdback exists so a policy can veto output before the client sees it. An org with no
+ * policy that can act on output has nothing to wait for, so the tail is not held.
+ */
+describe('/v1/responses streaming with no output policy', () => {
+    beforeEach(() => mockOrgHasOutputPolicies.mockResolvedValue(false));
+
+    it('releases everything received so far, with no held tail', async () => {
+        const { finish } = controllableStream();
+
+        const result = await runV1ResponsesExecution(baseParams());
+        if (!result.ok) throw new Error('expected ok');
+        const reader = result.response.body!.getReader();
+        const first = new TextDecoder().decode((await reader.read()).value);
+
+        expect(joinedDeltaText(first)).toBe('A'.repeat(STREAM_GUARD_HOLDBACK_CHARS + 40));
+
+        finish();
+        while (!(await reader.read()).done) {
+            // Drain so settlement completes.
+        }
+    });
+
+    it('skips the per-batch guard but keeps the completion check', async () => {
+        mockStreamGatewayChat.mockImplementation(() =>
+            (async function* () {
+                yield chunk({ delta: 'B'.repeat(60) });
+                yield chunk({ delta: 'C'.repeat(60) });
+                yield chunk({ delta: '', finishReason: 'stop' });
+            })()
+        );
+
+        const result = await runV1ResponsesExecution(baseParams());
+        if (!result.ok) throw new Error('expected ok');
+        const body = await new Response(result.response.body).text();
+
+        expect(joinedDeltaText(body)).toBe('B'.repeat(60) + 'C'.repeat(60));
+        expect(runGatewayOutputGuard).toHaveBeenCalledTimes(1);
     });
 });
 
