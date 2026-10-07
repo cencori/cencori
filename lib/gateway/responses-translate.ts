@@ -110,9 +110,15 @@ function translateFileItem(item: { filename: string; content: string; mime_type?
 class PendingAssistantTurn {
     private calls: Array<{ id: string; name: string; args: string }> = [];
     private reasoning: string[] = [];
+    private text: string[] = [];
 
     get empty(): boolean {
-        return this.calls.length === 0 && this.reasoning.length === 0;
+        return this.calls.length === 0 && this.reasoning.length === 0 && this.text.length === 0;
+    }
+
+    /** Whether the turn has gone past its thinking: a reply or a call is already in it. */
+    get answered(): boolean {
+        return this.calls.length > 0 || this.text.length > 0;
     }
 
     addCall(id: string, name: string, args: string): void {
@@ -123,11 +129,15 @@ class PendingAssistantTurn {
         this.reasoning.push(text);
     }
 
+    addText(text: string): void {
+        if (text) this.text.push(text);
+    }
+
     flush(): UnifiedMessage | null {
         if (this.empty) return null;
         const turn: UnifiedMessage = {
             role: 'assistant',
-            content: '',
+            content: this.text.join('\n'),
             ...(this.reasoning.length > 0 ? { reasoningContent: this.reasoning.join('\n') } : {}),
         };
         if (this.calls.length > 0) {
@@ -139,6 +149,7 @@ class PendingAssistantTurn {
         }
         this.calls = [];
         this.reasoning = [];
+        this.text = [];
         return turn;
     }
 }
@@ -187,7 +198,19 @@ export function translateResponsesInputItems(
         if (item.type !== 'function_call_output' && deferredImages.length > 0) {
             flushDeferredImages();
         }
-        if (item.type !== 'function_call' && item.type !== 'reasoning' && !pending.empty) {
+        // One model response arrives as reasoning, then its reply text, then its calls; on the
+        // chat wire it is ONE assistant turn carrying all three. Splitting it put the trace on a
+        // text-only turn and left the turn with `tool_calls` without it, which DeepSeek thinking
+        // mode rejects ("`reasoning_content` ... must be passed back"). So an assistant message
+        // joins the turn being built, and only a user turn or a tool output ends it.
+        const assistantText =
+            item.type === 'message' && (item as { role: string }).role === 'assistant';
+        if (
+            item.type !== 'function_call' &&
+            item.type !== 'reasoning' &&
+            !assistantText &&
+            !pending.empty
+        ) {
             flushPending();
         }
         switch (item.type) {
@@ -195,6 +218,13 @@ export function translateResponsesInputItems(
                 const { text, images } = normalizeResponsesContent(
                     (item as { content: unknown }).content,
                 );
+                if (assistantText && images.length === 0) {
+                    // A second reply after the first has been given is a new response.
+                    if (pending.answered) flushPending();
+                    pending.addText(text);
+                    break;
+                }
+                if (assistantText) flushPending();
                 messages.push({
                     role: (item as { role: 'user' | 'assistant' | 'system' }).role,
                     content: text,
@@ -237,6 +267,8 @@ export function translateResponsesInputItems(
                     dropped.push('reasoning item with no readable summary or text');
                     break;
                 }
+                // Thinking after a reply or a call is the next response's, not this one's.
+                if (pending.answered) flushPending();
                 pending.addReasoning(text);
                 break;
             }
@@ -262,17 +294,19 @@ export function translateResponsesOutputItems(output: TranslatableOutputItem[]):
     const dropped: string[] = [];
     const pending = new PendingAssistantTurn();
 
+    // A stored response is one model turn: its reasoning, its reply and its calls are replayed
+    // as ONE assistant turn, as live input is (see translateResponsesInputItems).
     for (const item of output) {
-        if (item.type !== 'function_call' && item.type !== 'reasoning' && !pending.empty) {
-            const turn = pending.flush();
-            if (turn) messages.push(turn);
-        }
         switch (item.type) {
             case 'message': {
                 const content = (item as { content?: Array<{ text?: string }> | string }).content;
                 const text = Array.isArray(content) ? content[0]?.text : undefined;
                 if (typeof text === 'string') {
-                    messages.push({ role: 'assistant', content: text });
+                    if (pending.answered) {
+                        const turn = pending.flush();
+                        if (turn) messages.push(turn);
+                    }
+                    pending.addText(text);
                 } else {
                     dropped.push('stored message item with no text');
                 }
@@ -293,6 +327,10 @@ export function translateResponsesOutputItems(output: TranslatableOutputItem[]):
                 if (text === null) {
                     dropped.push('stored reasoning item with no readable summary');
                     break;
+                }
+                if (pending.answered) {
+                    const turn = pending.flush();
+                    if (turn) messages.push(turn);
                 }
                 pending.addReasoning(text);
                 break;
