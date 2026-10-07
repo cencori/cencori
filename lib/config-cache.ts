@@ -574,3 +574,47 @@ export async function invalidateTensorAccess(userId: string): Promise<void> {
         // The TTL bounds staleness.
     }
 }
+
+/**
+ * A Tensor access token Supabase has already verified, and the user it named.
+ *
+ * Every Tensor model call and every turn reservation re-verified the caller's token with a round
+ * trip to Supabase Auth, because this project signs tokens with a shared secret and publishes no
+ * keys to check them locally. The verdict is kept for a minute, keyed by a hash of the token (never
+ * the token), and never past the token's own expiry. A session revoked in that minute keeps
+ * working until the entry lapses — the same window an access token already has by design.
+ */
+const TENSOR_USER_TTL_SECONDS = 60;
+
+function tensorUserKey(tokenHash: string) {
+    return `${CONFIG_PREFIX}tensor-user:${tokenHash}`;
+}
+
+export async function getCachedTensorUser<T = unknown>(tokenHash: string): Promise<T | null> {
+    if (!redisConfigured) return null;
+    try {
+        return (await redis.get<T>(tensorUserKey(tokenHash))) ?? null;
+    } catch {
+        return null;
+    }
+}
+
+export async function setCachedTensorUser(
+    tokenHash: string,
+    user: unknown,
+    tokenExpiresAtSeconds: number | null,
+): Promise<void> {
+    if (!redisConfigured) return;
+    const untilExpiry =
+        tokenExpiresAtSeconds === null
+            ? TENSOR_USER_TTL_SECONDS
+            : Math.floor(tokenExpiresAtSeconds - Date.now() / 1000) - 5;
+    const ttl = Math.min(TENSOR_USER_TTL_SECONDS, untilExpiry);
+    if (ttl <= 0) return;
+    try {
+        await redis.set(tensorUserKey(tokenHash), user, { ex: ttl });
+    } catch {
+        // A miss only costs the round trip.
+    }
+}
+

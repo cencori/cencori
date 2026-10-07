@@ -1,4 +1,6 @@
+import { createHash } from "node:crypto";
 import type { User } from "@supabase/supabase-js";
+import { getCachedTensorUser, setCachedTensorUser } from "@/lib/config-cache";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 
 export type TensorDataSession = {
@@ -14,9 +16,29 @@ export async function authenticateTensorDataRequest(
   if (!token || token.length > 4096) return null;
 
   const admin = createAdminClient();
+  // Verified once with Supabase, then reused briefly: this runs before every model call of every
+  // turn, and the round trip was most of a call's pre-dispatch time.
+  const tokenHash = createHash("sha256").update(token).digest("hex");
+  const cached = await getCachedTensorUser<User>(tokenHash);
+  if (cached?.id) return { admin, user: cached };
   const { data, error } = await admin.auth.getUser(token);
   if (error || !data.user) return null;
+  void setCachedTensorUser(tokenHash, data.user, tokenExpiry(token));
   return { admin, user: data.user };
+}
+
+/** The token's `exp`, read without verifying it: it only bounds how long a verified answer lasts. */
+function tokenExpiry(token: string): number | null {
+  try {
+    const payload = token.split(".")[1];
+    if (!payload) return null;
+    const claims = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as {
+      exp?: unknown;
+    };
+    return typeof claims.exp === "number" ? claims.exp : null;
+  } catch {
+    return null;
+  }
 }
 
 export function isUuid(value: unknown): value is string {
