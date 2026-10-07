@@ -18,6 +18,7 @@
 import { decryptApiKey } from '@/lib/encryption';
 import { dePrefixId } from '@/lib/embedded/http';
 import type { ProviderRouter } from './router';
+import type { ProviderTransportOptions } from './base';
 import { AnthropicProvider } from './anthropic';
 import { CohereProvider } from './cohere';
 import { GeminiProvider } from './gemini';
@@ -209,30 +210,31 @@ export async function resolveProviderKey(
 /**
  * Register a decrypted BYOK key against the router. Shared by the dashboard
  * path, the embedded fallback, and exact connection pins so all three power
- * agents identically.
+ * agents identically. An optional transport lets gateway callers attach
+ * per-call fetch/timeout/retry/telemetry without rebuilding providers.
  */
-export function registerByokKey(router: ProviderRouter, targetProvider: string, apiKey: string): boolean {
+export function registerByokKey(router: ProviderRouter, targetProvider: string, apiKey: string, transport?: ProviderTransportOptions): boolean {
     if (targetProvider === 'google') {
-        router.registerProvider(targetProvider, new GeminiProvider(apiKey));
+        router.registerProvider(targetProvider, new GeminiProvider(apiKey, transport));
         return true;
     }
     if (targetProvider === 'openai') {
-        router.registerProvider(targetProvider, new OpenAIProvider(apiKey));
+        router.registerProvider(targetProvider, new OpenAIProvider(apiKey, transport));
         return true;
     }
     if (targetProvider === 'anthropic') {
-        router.registerProvider(targetProvider, new AnthropicProvider(apiKey));
+        router.registerProvider(targetProvider, new AnthropicProvider(apiKey, transport ? { transport } : undefined));
         return true;
     }
     if (isOpenAICompatible(targetProvider)) {
         router.registerProvider(
             targetProvider,
-            new OpenAICompatibleProvider(targetProvider, apiKey)
+            new OpenAICompatibleProvider(targetProvider, apiKey, undefined, undefined, transport)
         );
         return true;
     }
     if (targetProvider === 'cohere') {
-        router.registerProvider(targetProvider, new CohereProvider(apiKey));
+        router.registerProvider(targetProvider, new CohereProvider(apiKey, transport));
         return true;
     }
     return false;

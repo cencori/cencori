@@ -84,6 +84,25 @@ export interface UnifiedChatRequest {
     signal?: AbortSignal;
     /** Internal transport activity, including SSE heartbeats discarded by SDK decoders. */
     onStreamActivity?: () => void;
+    /**
+     * Per-request timeout override (milliseconds). Bounds a single provider
+     * attempt, including retries scheduled by the transport. Falls back to the
+     * request/client transport timeout, then the adapter default.
+     */
+    timeoutMs?: number;
+    /**
+     * Fail the request when its computed provider cost exceeds this USD
+     * amount. Enforced after unary calls (exact) — streaming calls enforce it
+     * when the final usage is tallied. Never silently ignored: when set, an
+     * over-budget call throws BudgetExceededError instead of returning.
+     */
+    maxCostUsd?: number;
+    /**
+     * Per-request transport override. Lets a caller attach its own fetch,
+     * timeout, retry, and telemetry hooks to one call without minting a new
+     * provider instance — the answer to the `globalThis.fetch` workaround.
+     */
+    transport?: ProviderTransportOptions;
     temperature?: number;
     maxTokens?: number;
     stream?: boolean;
@@ -289,6 +308,262 @@ export function calculateProviderTokenCost(
         + (cacheReadTokens / 1000) * cacheReadRate
         + (cacheWriteTokens / 1000) * cacheWriteRate
         + (safeCompletionTokens / 1000) * outputRate;
+}
+
+import { BudgetExceededError, ProviderError, RateLimitError } from './errors';
+
+/**
+ * First-class transport controls for provider adapters.
+ *
+ * Every adapter hard-wired `fetch`, `timeout`, and `maxRetries` at
+ * construction, which forced downstream agent runtimes to monkey-patch
+ * `globalThis.fetch` for tracing, proxying, or telemetry. These options are
+ * the supported alternative: injectable per instance (constructor) or per
+ * call (`UnifiedChatRequest.transport`), with the historical behaviour as the
+ * default so existing callers see zero change.
+ */
+
+/** Drop-in fetch compatible with the OpenAI/Anthropic SDK `fetch` option. */
+export type ProviderFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+
+export interface ProviderAttemptEvent {
+    provider: string;
+    model: string;
+    /** 1-based attempt number. */
+    attempt: number;
+}
+
+export interface ProviderRetryEvent extends ProviderAttemptEvent {
+    error: unknown;
+    nextDelayMs: number;
+}
+
+export interface ProviderSettledEvent {
+    provider: string;
+    model: string;
+    attempts: number;
+    latencyMs: number;
+    error?: unknown;
+}
+
+export interface ProviderTransportHooks {
+    /** Fires before every attempt, including the first. Must never throw — hook errors are swallowed. */
+    onAttempt?: (event: ProviderAttemptEvent) => void;
+    /** Fires when a failed attempt will be retried. Must never throw. */
+    onRetry?: (event: ProviderRetryEvent) => void;
+    /** Fires exactly once per call, success or failure. Must never throw. */
+    onSettled?: (event: ProviderSettledEvent) => void;
+}
+
+export interface ProviderTransportOptions {
+    /**
+     * Custom fetch implementation (tracing proxy, test stub, telemetry
+     * wrapper). Adapters that already route through `safeProviderFetch` keep
+     * it as the default; adapters on the SDK/global default keep that.
+     * The SSRF guard is only as strong as the fetch you inject — wrap
+     * `safeProviderFetch`, don't replace it, unless you mean to.
+     */
+    fetch?: ProviderFetch;
+    /** Per-attempt timeout in milliseconds. */
+    timeoutMs?: number;
+    /** Retries after the first attempt. SDK clients stay at 0 unless set — the gateway owns cross-provider failover. */
+    maxRetries?: number;
+    /** Base delay for exponential retry backoff. Doubles per attempt. */
+    retryBaseDelayMs?: number;
+    hooks?: ProviderTransportHooks;
+}
+
+/** Historical adapter behaviour, preserved as the default. */
+export const DEFAULT_PROVIDER_TIMEOUT_MS = 55_000;
+export const DEFAULT_PROVIDER_MAX_RETRIES = 0;
+export const DEFAULT_PROVIDER_RETRY_BASE_DELAY_MS = 500;
+/** Upper bound so a misconfigured `maxRetries` cannot loop a call for minutes. */
+export const MAX_PROVIDER_RETRIES = 10;
+
+export interface ResolvedProviderTransport {
+    /** Undefined means "whatever this adapter used before" — never a silent behaviour change. */
+    fetch?: ProviderFetch;
+    timeoutMs: number;
+    maxRetries: number;
+    retryBaseDelayMs: number;
+    hooks?: ProviderTransportHooks;
+}
+
+function normalizeTimeoutMs(value: unknown, fallback: number): number {
+    return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+/**
+ * Resolve the effective transport for one call. Precedence, highest first:
+ * per-request `timeoutMs`, per-request `transport`, constructor transport,
+ * adapter legacy default. Out-of-range values are sanitized, never thrown —
+ * transport resolution must not fail a call that validation already passed.
+ */
+export function resolveProviderTransport(
+    clientTransport?: ProviderTransportOptions,
+    request?: Pick<UnifiedChatRequest, 'transport' | 'timeoutMs'> | null,
+    fallback?: { timeoutMs?: number; maxRetries?: number },
+): ResolvedProviderTransport {
+    const fallbackTimeout = normalizeTimeoutMs(fallback?.timeoutMs, DEFAULT_PROVIDER_TIMEOUT_MS);
+    const timeoutMs = normalizeTimeoutMs(
+        request?.timeoutMs ?? request?.transport?.timeoutMs ?? clientTransport?.timeoutMs,
+        fallbackTimeout,
+    );
+    const rawRetries = request?.transport?.maxRetries ?? clientTransport?.maxRetries ?? fallback?.maxRetries ?? DEFAULT_PROVIDER_MAX_RETRIES;
+    const maxRetries = typeof rawRetries === 'number' && Number.isFinite(rawRetries)
+        ? Math.min(MAX_PROVIDER_RETRIES, Math.max(0, Math.floor(rawRetries)))
+        : DEFAULT_PROVIDER_MAX_RETRIES;
+    const retryBaseDelayMs = normalizeTimeoutMs(
+        request?.transport?.retryBaseDelayMs ?? clientTransport?.retryBaseDelayMs,
+        DEFAULT_PROVIDER_RETRY_BASE_DELAY_MS,
+    );
+    return {
+        fetch: request?.transport?.fetch ?? clientTransport?.fetch,
+        timeoutMs,
+        maxRetries,
+        retryBaseDelayMs,
+        hooks: request?.transport?.hooks ?? clientTransport?.hooks,
+    };
+}
+
+/**
+ * Combine the caller's cancellation signal with a per-attempt timeout. A new
+ * timeout signal is created per call, so every retry attempt gets a fresh
+ * deadline rather than sharing one clock across the whole call.
+ *
+ * The returned `timedOut` reports whether OUR deadline fired while the caller
+ * was still live — adapters use it to classify SDK-wrapped aborts as
+ * retryable timeouts instead of opaque failures.
+ */
+export function attemptSignal(
+    signal?: AbortSignal | null,
+    timeoutMs: number = DEFAULT_PROVIDER_TIMEOUT_MS,
+): { signal: AbortSignal | undefined; timedOut: () => boolean } {
+    const timeoutSignal = AbortSignal.timeout(normalizeTimeoutMs(timeoutMs, DEFAULT_PROVIDER_TIMEOUT_MS));
+    if (!signal) return { signal: timeoutSignal, timedOut: () => timeoutSignal.aborted };
+    if (signal.aborted) return { signal, timedOut: () => false };
+    const combined = AbortSignal.any([signal, timeoutSignal]);
+    return { signal: combined, timedOut: () => timeoutSignal.aborted && !signal.aborted };
+}
+
+/**
+ * Backwards-compatible convenience over {@link attemptSignal} for call sites
+ * (streams) that only need the combined signal.
+ */
+export function transportSignal(signal?: AbortSignal | null, timeoutMs: number = DEFAULT_PROVIDER_TIMEOUT_MS): AbortSignal | undefined {
+    return attemptSignal(signal, timeoutMs).signal;
+}
+
+/**
+ * Enforce a caller-supplied cost budget against a finished call. No-op when
+ * the request carries no budget. Throws BudgetExceededError (never
+ * retryable) carrying cost and usage for the caller's circuit-breaker.
+ */
+export function enforceRequestBudget(args: {
+    provider: string;
+    model: string;
+    costUsd: number;
+    budgetUsd?: number | null;
+    usage?: TokenUsage;
+}): void {
+    const { provider, model, costUsd, budgetUsd, usage } = args;
+    if (budgetUsd === undefined || budgetUsd === null) return;
+    if (typeof budgetUsd !== 'number' || !Number.isFinite(budgetUsd) || budgetUsd < 0) return;
+    if (costUsd > budgetUsd) {
+        throw new BudgetExceededError(provider, model, costUsd, budgetUsd, usage);
+    }
+}
+
+function sleepMs(ms: number, signal?: AbortSignal | null): Promise<void> {
+    if (ms <= 0) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+        if (signal?.aborted) {
+            reject(signal.reason ?? new Error('Aborted'));
+            return;
+        }
+        const timer = setTimeout(() => {
+            signal?.removeEventListener('abort', onAbort);
+            resolve();
+        }, ms);
+        const onAbort = () => {
+            clearTimeout(timer);
+            reject(signal?.reason ?? new Error('Aborted'));
+        };
+        signal?.addEventListener('abort', onAbort, { once: true });
+    });
+}
+
+function isRetryableFailure(error: unknown, callerSignal?: AbortSignal | null): boolean {
+    // Caller cancellation is never retried — only our own attempt timeout is.
+    if (callerSignal?.aborted) return false;
+    if (error instanceof ProviderError) return error.retryable;
+    if (error instanceof Error && error.name === 'AbortError') return true;
+    const status = (error as { status?: unknown })?.status;
+    if (typeof status === 'number') {
+        return status === 429 || status === 408 || (status >= 500 && status < 600);
+    }
+    return false;
+}
+
+function safeHook(fn: (() => void) | undefined): void {
+    if (!fn) return;
+    try {
+        fn();
+    } catch {
+        // Telemetry must never break the call it observes.
+    }
+}
+
+/**
+ * Run one unary provider call with provider-enforced retry, backoff, and
+ * telemetry. Only failures classified retryable (`ProviderError.retryable`,
+ * HTTP 408/429/5xx, attempt timeouts) are retried; everything else — auth,
+ * bad requests, budget overruns, caller cancellation — fails fast on the
+ * first attempt. Streaming calls must not use this: a partially-yielded
+ * stream cannot be replayed, so streams surface the first error immediately.
+ */
+export async function runWithProviderRetry<T>(args: {
+    provider: string;
+    model: string;
+    transport: ResolvedProviderTransport;
+    callerSignal?: AbortSignal | null;
+    operation: () => Promise<T>;
+}): Promise<T> {
+    const { provider, model, transport, callerSignal, operation } = args;
+    const maxAttempts = 1 + transport.maxRetries;
+    const startTime = Date.now();
+    let lastError: unknown = null;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        safeHook(() => transport.hooks?.onAttempt?.({ provider, model, attempt }));
+        try {
+            const result = await operation();
+            safeHook(() => transport.hooks?.onSettled?.({
+                provider, model, attempts: attempt, latencyMs: Date.now() - startTime,
+            }));
+            return result;
+        } catch (error) {
+            lastError = error;
+            const exhausted = attempt >= maxAttempts;
+            if (exhausted || !isRetryableFailure(error, callerSignal)) {
+                safeHook(() => transport.hooks?.onSettled?.({
+                    provider, model, attempts: attempt, latencyMs: Date.now() - startTime, error,
+                }));
+                throw error;
+            }
+            let nextDelayMs = transport.retryBaseDelayMs * 2 ** (attempt - 1);
+            if (error instanceof RateLimitError && typeof error.retryAfter === 'number' && Number.isFinite(error.retryAfter)) {
+                nextDelayMs = Math.min(Math.max(error.retryAfter * 1000, 0), 60_000);
+            }
+            safeHook(() => transport.hooks?.onRetry?.({ provider, model, attempt, error, nextDelayMs }));
+            await sleepMs(nextDelayMs, callerSignal);
+        }
+    }
+
+    safeHook(() => transport.hooks?.onSettled?.({
+        provider, model, attempts: maxAttempts, latencyMs: Date.now() - startTime, error: lastError,
+    }));
+    throw lastError;
 }
 
 /**

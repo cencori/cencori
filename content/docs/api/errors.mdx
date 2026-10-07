@@ -46,7 +46,7 @@ Fields by failure class:
 | `500` | Internal Error | Server-side error |
 | `502` | Bad Gateway | Provider failed (timeout, upstream 5xx) |
 | `503` | Service Unavailable | Rate-limit backend unavailable (fail-closed) or network policy unavailable |
-| `504` | Gateway Timeout | Provider request exceeded the 55s budget |
+| `504` | Gateway Timeout | Provider request exceeded the attempt timeout (default 60s idle/attempt bound; `timeout_ms` overrides per request) |
 
 ## Gateway-level Codes
 
@@ -64,6 +64,7 @@ These come from the shared gateway middleware before the endpoint runs:
 | `rate_limit_unavailable` | 503 | Rate-limit backend down and fail-open is disabled |
 | `spend_cap_reached` | 402 | Monthly spend cap hit |
 | `byok_required` | 402 | `model: 'auto'` / `'cencori-auto'` with no usable BYOK key — none configured, or none priced/allowed for the task. Add a provider key in Project > Providers. Works at a zero credit balance; never falls back to managed keys |
+| `budget_exceeded` | 402 | Per-request `max_cost_usd` budget overrun. Unary calls fail before returning (no partial spend beyond the call); streams surface it at final tally. The message carries actual vs budget cost — use it as a stop signal for the issuing loop |
 
 ## Endpoint-level Codes
 
@@ -102,5 +103,6 @@ try {
 
 - **`credit_balance_exhausted` (403)** — top up in `Organization → Billing`. Free/Enterprise tiers aren't credit-gated.
 - **`byok_required` (402)** — the project has no active BYOK key for the `auto` task (chat, embeddings, images, or speech). Add the provider key in Project > Providers; the error message lists the available BYOK providers. An image prompt with only text-model keys 402s the same way.
+- **`budget_exceeded` (402)** — the call overspent its per-request `max_cost_usd`. Lower the budget pressure (smaller `max_tokens`, cheaper model) or raise the budget; agent loops should stop on this code, not retry into it.
 - **`rate_limit_exceeded` (429)** — 60 requests/min per project for all tiers. Back off for `Retry-After` seconds or use a second project.
 - **`provider_error` (400)** — read the `message`; the truncated upstream body is included.

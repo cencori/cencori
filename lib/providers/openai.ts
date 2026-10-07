@@ -15,10 +15,17 @@ import {
     ToolCall,
     TokenUsage,
     splitOpenAICachedTokens,
+    ProviderTransportOptions,
+    ResolvedProviderTransport,
+    attemptSignal,
+    enforceRequestBudget,
+    resolveProviderTransport,
+    runWithProviderRetry,
+    transportSignal,
 } from './base';
 import { getPricingFromDB } from './pricing';
 import { toOpenAIMessages, estimateTokenCount } from './utils';
-import { normalizeProviderError } from './errors';
+import { normalizeProviderError, ServiceUnavailableError } from './errors';
 
 export function openAICompletionLimits(request: Pick<UnifiedChatRequest, 'model' | 'maxTokens' | 'temperature'>) {
     // GPT-6 defaults to reasoning effort "medium", which rejects sampling
@@ -43,8 +50,10 @@ export class OpenAIProvider extends AIProvider {
     readonly providerName = 'openai';
     readonly supportsTools = true;
     private client: OpenAI;
+    private readonly transport?: ProviderTransportOptions;
+    private readonly defaultTimeoutMs: number;
 
-    constructor(apiKey?: string) {
+    constructor(apiKey?: string, transport?: ProviderTransportOptions) {
         super();
 
         const key = apiKey || process.env.OPENAI_API_KEY;
@@ -52,15 +61,49 @@ export class OpenAIProvider extends AIProvider {
             throw new Error('OpenAI API key is required - either pass it or set OPENAI_API_KEY env var');
         }
 
+        this.transport = transport;
+        const resolved = resolveProviderTransport(transport);
+        this.defaultTimeoutMs = resolved.timeoutMs;
+
         this.client = new OpenAI({
             apiKey: key,
-            timeout: 55_000,
+            ...(resolved.fetch ? { fetch: resolved.fetch } : {}),
+            timeout: resolved.timeoutMs,
+            maxRetries: 0,
+        });
+    }
+
+    /**
+     * Per-call client view: the shared client unless this call overrides
+     * fetch or timeout. This adapter historically runs on the SDK/global
+     * default fetch — that stays the default.
+     */
+    private clientFor(transport: ResolvedProviderTransport): OpenAI {
+        const fetch = transport.fetch;
+        if (!fetch && transport.timeoutMs === this.defaultTimeoutMs) {
+            return this.client;
+        }
+        return this.client.withOptions({
+            ...(fetch ? { fetch } : {}),
+            timeout: transport.timeoutMs,
             maxRetries: 0,
         });
     }
 
     async chat(request: UnifiedChatRequest): Promise<UnifiedChatResponse> {
+        const transport = resolveProviderTransport(this.transport, request);
+        return runWithProviderRetry({
+            provider: this.providerName,
+            model: request.model,
+            transport,
+            callerSignal: request.signal,
+            operation: () => this.executeChat(request, transport),
+        });
+    }
+
+    private async executeChat(request: UnifiedChatRequest, transport: ResolvedProviderTransport): Promise<UnifiedChatResponse> {
         const startTime = Date.now();
+        const { signal, timedOut } = attemptSignal(request.signal, transport.timeoutMs);
 
         try {
             // Convert tools to OpenAI format
@@ -73,7 +116,7 @@ export class OpenAIProvider extends AIProvider {
                 },
             }));
 
-            const completion = await this.client.chat.completions.create({
+            const completion = await this.clientFor(transport).chat.completions.create({
                 model: request.model,
                 messages: toOpenAIMessages(request.messages) as any,
                 ...openAICompletionLimits(request),
@@ -85,7 +128,7 @@ export class OpenAIProvider extends AIProvider {
                 frequency_penalty: request.frequencyPenalty,
                 presence_penalty: request.presencePenalty,
                 prompt_cache_key: request.promptCacheKey,
-            }, { signal: request.signal });
+            }, { signal, timeout: transport.timeoutMs, maxRetries: 0 });
 
             const usage = completion.usage!;
             const pricing = await this.getPricing(request.model);
@@ -102,6 +145,18 @@ export class OpenAIProvider extends AIProvider {
             );
 
             const cencoriCharge = providerCost;
+
+            enforceRequestBudget({
+                provider: this.providerName,
+                model: request.model,
+                costUsd: providerCost,
+                budgetUsd: request.maxCostUsd,
+                usage: {
+                    promptTokens: usage.prompt_tokens,
+                    completionTokens: usage.completion_tokens,
+                    totalTokens: usage.total_tokens,
+                },
+            });
 
             // Parse finish reason
             const finishReason = completion.choices[0].finish_reason;
@@ -154,11 +209,16 @@ export class OpenAIProvider extends AIProvider {
                 toolCalls,
             };
         } catch (error) {
+            if (timedOut()) {
+                throw new ServiceUnavailableError(this.providerName, error);
+            }
             throw normalizeProviderError(this.providerName, error);
         }
     }
 
     async *stream(request: UnifiedChatRequest): AsyncGenerator<StreamChunk> {
+        // Streams never retry: a partially-yielded stream cannot be replayed.
+        const transport = resolveProviderTransport(this.transport, request);
         try {
             // Convert tools to OpenAI format
             const tools: ChatCompletionTool[] | undefined = request.tools?.map(t => ({
@@ -170,7 +230,7 @@ export class OpenAIProvider extends AIProvider {
                 },
             }));
 
-            const stream = await this.client.chat.completions.create({
+            const stream = await this.clientFor(transport).chat.completions.create({
                 model: request.model,
                 messages: toOpenAIMessages(request.messages) as any,
                 ...openAICompletionLimits(request),
@@ -185,6 +245,10 @@ export class OpenAIProvider extends AIProvider {
                 // Without this OpenAI reports no usage on a stream at all, and
                 // the gateway has to fall back to estimating tokens from text.
                 stream_options: { include_usage: true },
+            }, {
+                signal: transportSignal(request.signal, transport.timeoutMs),
+                timeout: transport.timeoutMs,
+                maxRetries: 0,
             });
 
             // Track tool calls across chunks (they stream incrementally)

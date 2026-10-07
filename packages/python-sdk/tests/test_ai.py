@@ -55,6 +55,28 @@ class TestChat:
         call_args = mock.call_args
         assert call_args[1]["json"]["maxTokens"] == 100
 
+    def test_chat_with_request_controls(self, api_key: str, mock_chat_response: Dict[str, Any]) -> None:
+        """Test chat forwards timeout_ms and max_cost_usd; omits them when unset."""
+        client = Cencori(api_key=api_key)
+
+        with patch.object(client, "_request", return_value=mock_chat_response) as mock:
+            client.ai.chat(
+                messages=[{"role": "user", "content": "Hello!"}],
+                timeout_ms=10_000,
+                max_cost_usd=0.05,
+            )
+
+        payload = mock.call_args[1]["json"]
+        assert payload["timeout_ms"] == 10_000
+        assert payload["max_cost_usd"] == 0.05
+
+        with patch.object(client, "_request", return_value=mock_chat_response) as mock:
+            client.ai.chat(messages=[{"role": "user", "content": "Hello!"}])
+
+        payload = mock.call_args[1]["json"]
+        assert "timeout_ms" not in payload
+        assert "max_cost_usd" not in payload
+
 
 class TestCompletions:
     """Test completions method."""

@@ -12,17 +12,25 @@ import {
     StreamChunk,
     ModelPricing,
     TokenUsage,
+    ProviderTransportOptions,
+    ResolvedProviderTransport,
+    attemptSignal,
+    enforceRequestBudget,
+    resolveProviderTransport,
+    runWithProviderRetry,
+    transportSignal,
 } from './base';
 import { getPricingFromDB } from './pricing';
 import { toGeminiMessages } from './utils';
-import { normalizeProviderError } from './errors';
+import { normalizeProviderError, ServiceUnavailableError } from './errors';
 import { getGoogleApiKey } from './google-env';
 
 export class GeminiProvider extends AIProvider {
     readonly providerName = 'google';
     private client: GoogleGenerativeAI;
+    private readonly transport?: ProviderTransportOptions;
 
-    constructor(apiKey?: string) {
+    constructor(apiKey?: string, transport?: ProviderTransportOptions) {
         super();
 
         const key = apiKey || getGoogleApiKey();
@@ -30,11 +38,28 @@ export class GeminiProvider extends AIProvider {
             throw new Error('Gemini API key is required. Set GOOGLE_GENERATIVE_AI_API_KEY, GOOGLE_AI_API_KEY, or GEMINI_API_KEY.');
         }
 
+        // NOTE: the Google SDK exposes no fetch/timeout injection — it uses
+        // the global fetch. A custom `transport.fetch` is therefore ignored
+        // by this adapter (documented, not silent); timeout, retry, hooks,
+        // and budget are still provider-enforced via signal + wrapper.
+        this.transport = transport;
         this.client = new GoogleGenerativeAI(key);
     }
 
     async chat(request: UnifiedChatRequest): Promise<UnifiedChatResponse> {
+        const transport = resolveProviderTransport(this.transport, request);
+        return runWithProviderRetry({
+            provider: this.providerName,
+            model: request.model,
+            transport,
+            callerSignal: request.signal,
+            operation: () => this.executeChat(request, transport),
+        });
+    }
+
+    private async executeChat(request: UnifiedChatRequest, transport: ResolvedProviderTransport): Promise<UnifiedChatResponse> {
         const startTime = Date.now();
+        const { signal, timedOut } = attemptSignal(request.signal, transport.timeoutMs);
 
         try {
             const model = this.client.getGenerativeModel({ model: request.model });
@@ -51,7 +76,7 @@ export class GeminiProvider extends AIProvider {
             });
 
             // Send the message
-            const result = await chat.sendMessage(prompt, { signal: request.signal });
+            const result = await chat.sendMessage(prompt, { signal });
             const response = result.response;
             const text = response.text();
 
@@ -85,6 +110,18 @@ export class GeminiProvider extends AIProvider {
             );
             const cencoriCharge = providerCost;
 
+            enforceRequestBudget({
+                provider: this.providerName,
+                model: request.model,
+                costUsd: providerCost,
+                budgetUsd: request.maxCostUsd,
+                usage: {
+                    promptTokens,
+                    completionTokens,
+                    totalTokens: promptTokens + completionTokens,
+                },
+            });
+
             return {
                 content: text,
                 model: request.model,
@@ -103,11 +140,16 @@ export class GeminiProvider extends AIProvider {
                 latencyMs: Date.now() - startTime,
             };
         } catch (error) {
+            if (timedOut()) {
+                throw new ServiceUnavailableError(this.providerName, error);
+            }
             throw normalizeProviderError(this.providerName, error);
         }
     }
 
     async *stream(request: UnifiedChatRequest): AsyncGenerator<StreamChunk> {
+        // Streams never retry: a partially-yielded stream cannot be replayed.
+        const transport = resolveProviderTransport(this.transport, request);
         try {
             const model = this.client.getGenerativeModel({ model: request.model });
 
@@ -121,7 +163,9 @@ export class GeminiProvider extends AIProvider {
                 },
             });
 
-            const result = await chat.sendMessageStream(prompt);
+            const result = await chat.sendMessageStream(prompt, {
+                signal: transportSignal(request.signal, transport.timeoutMs),
+            });
 
             for await (const chunk of result.stream) {
                 yield {

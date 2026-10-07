@@ -1,5 +1,6 @@
 import {
     AuthenticationError,
+    BudgetExceededError,
     ContentFilterError,
     InvalidRequestError,
     ModelNotFoundError,
@@ -240,6 +241,18 @@ export function mapProviderErrorToHttpResponse(
         return {
             status: 503,
             error: 'pricing_unavailable',
+            message,
+            provider: label,
+        };
+    }
+
+    // Caller-supplied per-request budget overrun: the spend already happened,
+    // so this is a machine-readable stop signal for the issuing loop, not a
+    // provider outage. 402 keeps it in the billing family with byok_required.
+    if (providerError instanceof BudgetExceededError) {
+        return {
+            status: 402,
+            error: 'budget_exceeded',
             message,
             provider: label,
         };

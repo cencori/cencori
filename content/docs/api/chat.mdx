@@ -116,6 +116,8 @@ When configuring an SDK, set the base URL to `https://api.cencori.com/v1`, not t
 | `tools` | array | No | Function/tool definitions |
 | `toolChoice` | string or object | No | Tool selection mode |
 | `userId` or `user` | string | No | End-user identifier for attribution and Monetization |
+| `timeout_ms` | number | No | Per-request provider timeout in ms (1–300000, capped). Bounds one provider attempt |
+| `max_cost_usd` | number | No | Per-request cost budget in USD. Unary calls fail before returning; streams surface it at final tally as HTTP 402 `budget_exceeded` |
 
 ## OpenAI-Compatible Response Shape
 

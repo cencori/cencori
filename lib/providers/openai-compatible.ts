@@ -16,10 +16,17 @@ import {
     ToolCall,
     TokenUsage,
     splitOpenAICachedTokens,
+    ProviderTransportOptions,
+    ResolvedProviderTransport,
+    attemptSignal,
+    enforceRequestBudget,
+    resolveProviderTransport,
+    runWithProviderRetry,
+    transportSignal,
 } from './base';
 import { getPricingFromDB } from './pricing';
 import { toOpenAIMessages, estimateTokenCount } from './utils';
-import { normalizeProviderError } from './errors';
+import { normalizeProviderError, ServiceUnavailableError } from './errors';
 import { openAIReasoningEffort } from './openai';
 import { safeProviderFetch } from '@/lib/security/outbound-url';
 
@@ -172,12 +179,16 @@ export class OpenAICompatibleProvider extends AIProvider {
     private client: OpenAI;
     private displayName: string;
     private pricingOverride?: ModelPricing;
+    private readonly transport?: ProviderTransportOptions;
+    /** Constructor-resolved defaults (fetch filled in) — the no-override hot path reuses `client` verbatim. */
+    private readonly defaultTransport: ResolvedProviderTransport;
 
-    constructor(providerName: string, apiKey: string, customBaseURL?: string, pricingOverride?: ModelPricing) {
+    constructor(providerName: string, apiKey: string, customBaseURL?: string, pricingOverride?: ModelPricing, transport?: ProviderTransportOptions) {
         super();
 
         this.providerName = providerName;
         this.pricingOverride = pricingOverride;
+        this.transport = transport;
 
         const config = OPENAI_COMPATIBLE_ENDPOINTS[providerName];
         if (!config && !customBaseURL) {
@@ -186,17 +197,34 @@ export class OpenAICompatibleProvider extends AIProvider {
 
         this.displayName = config?.name || providerName;
         const baseURL = customBaseURL || config.baseURL;
+        const resolved = resolveProviderTransport(transport);
+        this.defaultTransport = { ...resolved, fetch: resolved.fetch ?? safeProviderFetch };
 
         // Initialize OpenAI client with custom base URL
         this.client = new OpenAI({
             apiKey,
             baseURL,
-            fetch: safeProviderFetch,
-            timeout: 55_000,
+            fetch: this.defaultTransport.fetch,
+            timeout: this.defaultTransport.timeoutMs,
+            // Retries are provider-enforced (runWithProviderRetry, with hooks)
+            // rather than SDK-hidden, so every attempt is observable.
             maxRetries: 0,
             // Some providers need extra headers
             defaultHeaders: this.getDefaultHeaders(providerName),
         });
+    }
+
+    /**
+     * Per-call client view: the shared client unless this call overrides
+     * fetch or timeout, in which case a scoped client is minted via
+     * withOptions (the same mechanism the stream path already uses).
+     */
+    private clientFor(transport: ResolvedProviderTransport): OpenAI {
+        const fetch = transport.fetch ?? this.defaultTransport.fetch;
+        if (fetch === this.defaultTransport.fetch && transport.timeoutMs === this.defaultTransport.timeoutMs) {
+            return this.client;
+        }
+        return this.client.withOptions({ fetch, timeout: transport.timeoutMs, maxRetries: 0 });
     }
 
     /**
@@ -221,10 +249,22 @@ export class OpenAICompatibleProvider extends AIProvider {
     }
 
     async chat(request: UnifiedChatRequest): Promise<UnifiedChatResponse> {
+        const transport = resolveProviderTransport(this.transport, request);
+        return runWithProviderRetry({
+            provider: this.providerName,
+            model: request.model,
+            transport,
+            callerSignal: request.signal,
+            operation: () => this.executeChat(request, transport),
+        });
+    }
+
+    private async executeChat(request: UnifiedChatRequest, transport: ResolvedProviderTransport): Promise<UnifiedChatResponse> {
         const startTime = Date.now();
+        const { signal, timedOut } = attemptSignal(request.signal, transport.timeoutMs);
 
         try {
-            const completion = await this.client.chat.completions.create({
+            const completion = await this.clientFor(transport).chat.completions.create({
                 model: request.model,
                 messages: toOpenAIMessages(request.messages) as any,
                 temperature: request.temperature ?? 0.7,
@@ -236,7 +276,7 @@ export class OpenAICompatibleProvider extends AIProvider {
                 tool_choice: request.toolChoice as any,
                 frequency_penalty: request.frequencyPenalty,
                 presence_penalty: request.presencePenalty,
-            }, { signal: request.signal });
+            }, { signal, timeout: transport.timeoutMs, maxRetries: 0 });
 
             // Handle usage - some providers may not return it
             const usage = completion.usage || {
@@ -258,6 +298,18 @@ export class OpenAICompatibleProvider extends AIProvider {
                 cached
             );
             const cencoriCharge = providerCost;
+
+            enforceRequestBudget({
+                provider: this.providerName,
+                model: request.model,
+                costUsd: providerCost,
+                budgetUsd: request.maxCostUsd,
+                usage: {
+                    promptTokens: usage.prompt_tokens,
+                    completionTokens: usage.completion_tokens,
+                    totalTokens: usage.total_tokens,
+                },
+            });
 
             const finishReason = completion.choices[0]?.finish_reason;
 
@@ -308,20 +360,37 @@ export class OpenAICompatibleProvider extends AIProvider {
                 ...(reasoningContent ? { reasoning: reasoningContent } : {}),
             };
         } catch (error) {
+            // Our attempt deadline fired while the caller was still live: a
+            // retryable timeout, whatever the SDK wrapped the abort as.
+            if (timedOut()) {
+                throw new ServiceUnavailableError(this.providerName, error);
+            }
             throw normalizeProviderError(this.providerName, error);
         }
     }
 
     async *stream(request: UnifiedChatRequest): AsyncGenerator<StreamChunk> {
+        // Streams never retry: a partially-yielded stream cannot be replayed,
+        // so the first error surfaces immediately. Per-call timeout and custom
+        // fetch still apply.
+        const transport = resolveProviderTransport(this.transport, request, {
+            timeoutMs: this.providerName === 'maximo' ? 120_000 : undefined,
+        });
+        const fetchImpl = transport.fetch ?? this.defaultTransport.fetch ?? safeProviderFetch;
         try {
             // Keep activity scoped to this request; the shared client may serve concurrent turns.
             // Large Maximo tool drafts can pause during reasoning/prefill. Match the
             // gateway's bounded 120s quiet window instead of aborting headers at 55s.
-            const client = request.onStreamActivity || this.providerName === 'maximo'
+            const needsScopedClient = Boolean(request.onStreamActivity) ||
+                this.providerName === 'maximo' ||
+                fetchImpl !== this.defaultTransport.fetch ||
+                transport.timeoutMs !== this.defaultTransport.timeoutMs;
+            const client = needsScopedClient
                 ? this.client.withOptions({
-                    ...(this.providerName === 'maximo' ? { timeout: 120_000 } : {}),
+                    timeout: transport.timeoutMs,
+                    maxRetries: 0,
                     fetch: async (input, init) => {
-                        const response = await safeProviderFetch(input, init);
+                        const response = await fetchImpl(input, init);
                         if (!response.body) return response;
                         const body = response.body.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({
                             transform(bytes, controller) {
@@ -347,7 +416,11 @@ export class OpenAICompatibleProvider extends AIProvider {
                 tool_choice: request.toolChoice as any,
                 frequency_penalty: request.frequencyPenalty,
                 presence_penalty: request.presencePenalty,
-            }, { signal: request.signal });
+            }, {
+                signal: transportSignal(request.signal, transport.timeoutMs),
+                timeout: transport.timeoutMs,
+                maxRetries: 0,
+            });
 
             // Track tool calls across chunks (they stream incrementally)
             const toolCallsInProgress: Map<number, { id: string; name: string; arguments: string }> = new Map();
@@ -466,9 +539,10 @@ export class OpenAICompatibleProvider extends AIProvider {
  */
 export function createOpenAICompatibleProvider(
     providerName: string,
-    apiKey: string
+    apiKey: string,
+    transport?: ProviderTransportOptions
 ): OpenAICompatibleProvider {
-    return new OpenAICompatibleProvider(providerName, apiKey);
+    return new OpenAICompatibleProvider(providerName, apiKey, undefined, undefined, transport);
 }
 
 /**

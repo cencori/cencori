@@ -301,6 +301,10 @@ export interface ResponsesRequest {
     include?: string[];
     stream?: boolean;
     user?: string;
+    /** Per-request provider timeout in milliseconds (positive, capped server-side at 300000). */
+    timeout_ms?: number;
+    /** Per-request cost budget in USD (non-negative). Overruns surface as HTTP 402 `budget_exceeded`. */
+    max_cost_usd?: number;
 }
 
 /**
