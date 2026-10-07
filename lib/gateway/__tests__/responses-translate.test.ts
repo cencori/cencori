@@ -20,6 +20,10 @@ describe('extractReasoningText', () => {
 
     it('reads plain content and text spellings', () => {
         expect(extractReasoningText({ content: 'trace' })).toBe('trace');
+        // The Responses shape a client stores and echoes back: content parts.
+        expect(
+            extractReasoningText({ content: [{ type: 'reasoning_text', text: 'part one' }, { type: 'text', text: 'part two' }] }),
+        ).toBe('part one\npart two');
         expect(extractReasoningText({ text: 'trace' })).toBe('trace');
         expect(extractReasoningText({ summary: 'trace' })).toBe('trace');
     });

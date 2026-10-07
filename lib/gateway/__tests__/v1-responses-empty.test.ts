@@ -142,7 +142,9 @@ describe('empty completions', () => {
             output: Array<{ type: string; content?: unknown; summary?: Array<{ text?: string }> }>;
         };
         const reasoning = json.output.find((item) => item.type === 'reasoning');
-        expect(reasoning?.content).toBe('full trace text');
+        // A list of reasoning_text parts, never a bare string: Tensor's runtime types `content` as
+        // that list, and a string failed to parse the whole item, which was then dropped.
+        expect(reasoning?.content).toEqual([{ type: 'reasoning_text', text: 'full trace text' }]);
         expect(reasoning?.summary).toEqual([{ type: 'summary_text', text: 'full trace text' }]);
     });
 });

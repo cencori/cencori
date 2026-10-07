@@ -119,7 +119,7 @@ export type ResponsesOutputItem = {
     status?: 'completed' | 'failed' | 'in_progress';
     role?: 'assistant';
     content?: Array<{
-        type: 'output_text' | 'refusal';
+        type: 'output_text' | 'refusal' | 'reasoning_text';
         text?: string;
         annotations?: Array<unknown>;
     }> | string;
@@ -308,7 +308,14 @@ function buildResponsesJson(params: {
             // items through a content field. A reader keeping only one of
             // them still holds the whole trace — a stored item with text in
             // neither is what made client-side echo impossible.
-            content: params.reasoning,
+            //
+            // `content` is a list of `reasoning_text` parts, as the Responses
+            // format defines it, never a bare string. Tensor's runtime types
+            // the field as that list, and a string there failed to parse the
+            // WHOLE item, summary and all; it was dropped on arrival, so the
+            // trace never reached the transcript and DeepSeek 400'd the next
+            // tool follow-up ("`reasoning_content` ... must be passed back").
+            content: [{ type: 'reasoning_text', text: params.reasoning }],
             summary: [{ type: 'summary_text', text: params.reasoning }],
         });
     }
