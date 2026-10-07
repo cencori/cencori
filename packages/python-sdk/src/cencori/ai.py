@@ -57,6 +57,8 @@ class AIModule:
         tools: Optional[List[ToolDefinition]] = None,
         tool_choice: Optional[ToolChoice] = None,
         prompt: Optional[Dict[str, Any]] = None,
+        timeout_ms: Optional[int] = None,
+        max_cost_usd: Optional[float] = None,
     ) -> ChatResponse:
         """
         Send a chat completion request (non-streaming).
@@ -70,6 +72,8 @@ class AIModule:
             tools: Tool definitions for function calling
             tool_choice: How the model chooses to call tools
             prompt: Prompt Registry reference
+            timeout_ms: Per-request provider timeout in milliseconds
+            max_cost_usd: Per-request cost budget in USD (402 budget_exceeded on overrun)
 
         Returns:
             ChatResponse with content, usage, and cost
@@ -92,6 +96,10 @@ class AIModule:
             payload["toolChoice"] = tool_choice.__dict__ if hasattr(tool_choice, '__dict__') else tool_choice
         if prompt is not None:
             payload["prompt"] = prompt
+        if timeout_ms is not None:
+            payload["timeout_ms"] = timeout_ms
+        if max_cost_usd is not None:
+            payload["max_cost_usd"] = max_cost_usd
 
         data = self._client._request("POST", "/api/ai/chat", json=payload)
 
@@ -128,6 +136,8 @@ class AIModule:
         tools: Optional[List[ToolDefinition]] = None,
         tool_choice: Optional[ToolChoice] = None,
         prompt: Optional[Dict[str, Any]] = None,
+        timeout_ms: Optional[int] = None,
+        max_cost_usd: Optional[float] = None,
     ) -> Iterator[StreamChunk]:
         """
         Send a chat completion request with streaming.
@@ -150,6 +160,10 @@ class AIModule:
             payload["toolChoice"] = tool_choice.__dict__ if hasattr(tool_choice, '__dict__') else tool_choice
         if prompt is not None:
             payload["prompt"] = prompt
+        if timeout_ms is not None:
+            payload["timeout_ms"] = timeout_ms
+        if max_cost_usd is not None:
+            payload["max_cost_usd"] = max_cost_usd
 
         url = f"{self._client._base_url}/api/ai/chat"
         headers = {
@@ -574,6 +588,8 @@ class AIModule:
         tools: Optional[List[ToolDefinition]] = None,
         tool_choice: Optional[ToolChoice] = None,
         prompt: Optional[Dict[str, Any]] = None,
+        timeout_ms: Optional[int] = None,
+        max_cost_usd: Optional[float] = None,
     ) -> ChatResponse:
         """Send a chat completion request asynchronously."""
         payload: Dict[str, Any] = {
@@ -594,6 +610,10 @@ class AIModule:
             payload["toolChoice"] = tool_choice.__dict__ if hasattr(tool_choice, '__dict__') else tool_choice
         if prompt is not None:
             payload["prompt"] = prompt
+        if timeout_ms is not None:
+            payload["timeout_ms"] = timeout_ms
+        if max_cost_usd is not None:
+            payload["max_cost_usd"] = max_cost_usd
 
         data = await self._client._async_request("POST", "/api/ai/chat", json=payload)
 

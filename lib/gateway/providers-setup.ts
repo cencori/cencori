@@ -1,4 +1,5 @@
 import type { createAdminClient } from '@/lib/supabaseAdmin';
+import type { ProviderTransportOptions } from '@/lib/providers/base';
 import {
     GeminiProvider,
     OpenAIProvider,
@@ -97,11 +98,11 @@ export function getManagedProviderNames(): Set<string> {
     return providers;
 }
 
-export function registerDefaultProviders(router: ProviderRouter): void {
+export function registerDefaultProviders(router: ProviderRouter, transport?: ProviderTransportOptions): void {
     const defaultGoogleApiKey = getGoogleApiKey();
     if (!router.hasProvider('google') && defaultGoogleApiKey) {
         try {
-            router.registerProvider('google', new GeminiProvider(defaultGoogleApiKey));
+            router.registerProvider('google', new GeminiProvider(defaultGoogleApiKey, transport));
         } catch (error) {
             console.warn('[Gateway] Gemini provider not available:', error);
         }
@@ -109,7 +110,7 @@ export function registerDefaultProviders(router: ProviderRouter): void {
 
     if (!router.hasProvider('openai') && process.env.OPENAI_API_KEY) {
         try {
-            router.registerProvider('openai', new OpenAIProvider());
+            router.registerProvider('openai', new OpenAIProvider(undefined, transport));
         } catch (error) {
             console.warn('[Gateway] OpenAI provider not available:', error);
         }
@@ -117,7 +118,7 @@ export function registerDefaultProviders(router: ProviderRouter): void {
 
     if (!router.hasProvider('anthropic') && process.env.ANTHROPIC_API_KEY) {
         try {
-            router.registerProvider('anthropic', new AnthropicProvider());
+            router.registerProvider('anthropic', new AnthropicProvider(undefined, transport ? { transport } : undefined));
         } catch (error) {
             console.warn('[Gateway] Anthropic provider not available:', error);
         }
@@ -125,7 +126,7 @@ export function registerDefaultProviders(router: ProviderRouter): void {
 
     if (!router.hasProvider('cohere') && process.env.COHERE_API_KEY) {
         try {
-            router.registerProvider('cohere', new CohereProvider(process.env.COHERE_API_KEY));
+            router.registerProvider('cohere', new CohereProvider(process.env.COHERE_API_KEY, transport));
         } catch (error) {
             console.warn('[Gateway] Cohere provider not available:', error);
         }
@@ -135,7 +136,7 @@ export function registerDefaultProviders(router: ProviderRouter): void {
         const apiKey = firstConfiguredEnv(envVars);
         if (!router.hasProvider(provider) && apiKey) {
             try {
-                router.registerProvider(provider, new OpenAICompatibleProvider(provider, apiKey));
+                router.registerProvider(provider, new OpenAICompatibleProvider(provider, apiKey, undefined, undefined, transport));
             } catch (error) {
                 console.warn(`[Gateway] ${provider} provider not available:`, error);
             }
@@ -148,7 +149,8 @@ export async function initializeBYOKProviders(
     supabase: SupabaseAdmin,
     projectId: string,
     organizationId: string,
-    targetProvider: string
+    targetProvider: string,
+    transport?: ProviderTransportOptions
 ): Promise<{ success: boolean; usesByok: boolean; defaultModel?: string }> {
     try {
         const cached = await getCachedProviderConfig(projectId, targetProvider);
@@ -168,7 +170,7 @@ export async function initializeBYOKProviders(
 
         if (providerKey && providerKey.is_active) {
             const apiKey = decryptApiKey(providerKey.encrypted_key, organizationId);
-            if (registerByokKey(router, targetProvider, apiKey)) {
+            if (registerByokKey(router, targetProvider, apiKey, transport)) {
                 return { success: true, usesByok: true, defaultModel: providerKey.default_model || undefined };
             }
         }
@@ -291,6 +293,13 @@ export async function resolveGatewayProvider(params: {
      * a task-appropriate BYOK model.
      */
     autoRouterInput?: AutoRouterInput | null;
+    /**
+     * First-class transport for every provider registered during resolution
+     * (managed and BYOK). Lets agent runtimes attach their own fetch,
+     * timeout, retry, and telemetry hooks instead of patching
+     * `globalThis.fetch`.
+     */
+    transport?: ProviderTransportOptions;
 }): Promise<ResolvedGatewayProvider> {
     // BYOK auto-router (`cencori-auto` / `cencori/auto`) is explicit and always
     // wins over the Tensor plan rewrite. Bare `auto` is ambiguous: Tensor
@@ -302,7 +311,7 @@ export async function resolveGatewayProvider(params: {
         rawNormalized === 'cencori-auto' || rawNormalized === 'cencori/auto';
     if (isExplicitCencoriAuto) {
         const router = new ProviderRouter();
-        registerDefaultProviders(router);
+        registerDefaultProviders(router, params.transport);
         return resolveAutoGatewayProvider({
             router,
             supabase: params.supabase,
@@ -313,6 +322,7 @@ export async function resolveGatewayProvider(params: {
             sponsoredModels: params.sponsoredModels,
             pinnedConnectionId: params.pinnedConnectionId ?? null,
             autoRouterInput: params.autoRouterInput ?? null,
+            transport: params.transport,
         });
     }
     const requestedModel = resolveTensorPlanModel(
@@ -320,7 +330,7 @@ export async function resolveGatewayProvider(params: {
         params.tensorModelPolicy,
     );
     const router = new ProviderRouter();
-    registerDefaultProviders(router);
+    registerDefaultProviders(router, params.transport);
 
     if (isAutoRouterModel(requestedModel)) {
         return resolveAutoGatewayProvider({
@@ -333,6 +343,7 @@ export async function resolveGatewayProvider(params: {
             sponsoredModels: params.sponsoredModels,
             pinnedConnectionId: params.pinnedConnectionId ?? null,
             autoRouterInput: params.autoRouterInput ?? null,
+            transport: params.transport,
         });
     }
 
@@ -382,12 +393,13 @@ export async function resolveGatewayProvider(params: {
             params.supabase,
             params.projectId,
             params.organizationId,
-            providerName
+            providerName,
+            params.transport
         );
         usesByok = byokResult.usesByok;
 
         if (!byokResult.success) {
-            registerDefaultProviders(router);
+            registerDefaultProviders(router, params.transport);
         }
 
         if (params.pinnedConnectionId) {
@@ -452,6 +464,7 @@ async function resolveAutoGatewayProvider(args: {
     sponsoredModels?: string[] | null;
     pinnedConnectionId?: string | null;
     autoRouterInput?: AutoRouterInput | null;
+    transport?: ProviderTransportOptions;
 }): Promise<ResolvedGatewayProvider> {
     if (args.pinnedConnectionId) {
         throw new InvalidRequestError(
@@ -517,6 +530,7 @@ async function resolveAutoGatewayProvider(args: {
                 args.projectId,
                 args.organizationId,
                 providerName,
+                args.transport,
             );
             if (!byokResult.success || !byokResult.usesByok) continue;
             const provider = args.router.getProvider(providerName);

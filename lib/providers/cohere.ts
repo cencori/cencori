@@ -11,10 +11,18 @@ import {
     UnifiedChatResponse,
     StreamChunk,
     ModelPricing,
+    ProviderFetch,
+    ProviderTransportOptions,
+    ResolvedProviderTransport,
+    attemptSignal,
+    enforceRequestBudget,
+    resolveProviderTransport,
+    runWithProviderRetry,
+    transportSignal,
 } from './base';
 import { getPricingFromDB } from './pricing';
 import { estimateTokenCount } from './utils';
-import { normalizeProviderError } from './errors';
+import { normalizeProviderError, ServiceUnavailableError } from './errors';
 import { safeProviderFetch } from '@/lib/security/outbound-url';
 
 interface CohereMessage {
@@ -51,8 +59,9 @@ export class CohereProvider extends AIProvider {
     readonly providerName = 'cohere';
     private apiKey: string;
     private baseURL = 'https://api.cohere.ai/v1';
+    private readonly transport?: ProviderTransportOptions;
 
-    constructor(apiKey: string) {
+    constructor(apiKey: string, transport?: ProviderTransportOptions) {
         super();
 
         if (!apiKey) {
@@ -60,6 +69,11 @@ export class CohereProvider extends AIProvider {
         }
 
         this.apiKey = apiKey;
+        this.transport = transport;
+    }
+
+    private fetchImpl(transport: ResolvedProviderTransport): ProviderFetch {
+        return transport.fetch ?? safeProviderFetch;
     }
 
     /**
@@ -99,12 +113,24 @@ export class CohereProvider extends AIProvider {
     }
 
     async chat(request: UnifiedChatRequest): Promise<UnifiedChatResponse> {
+        const transport = resolveProviderTransport(this.transport, request);
+        return runWithProviderRetry({
+            provider: this.providerName,
+            model: request.model,
+            transport,
+            callerSignal: request.signal,
+            operation: () => this.executeChat(request, transport),
+        });
+    }
+
+    private async executeChat(request: UnifiedChatRequest, transport: ResolvedProviderTransport): Promise<UnifiedChatResponse> {
         const startTime = Date.now();
+        const { signal, timedOut } = attemptSignal(request.signal, transport.timeoutMs);
 
         try {
             const { chatHistory, message, preamble } = this.toCohereChatHistory(request.messages);
 
-            const response = await safeProviderFetch(`${this.baseURL}/chat`, {
+            const response = await this.fetchImpl(transport)(`${this.baseURL}/chat`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${this.apiKey}`,
@@ -119,7 +145,7 @@ export class CohereProvider extends AIProvider {
                     temperature: request.temperature ?? 0.7,
                     max_tokens: request.maxTokens,
                 }),
-                signal: request.signal ? AbortSignal.any([request.signal, AbortSignal.timeout(55_000)]) : AbortSignal.timeout(55_000),
+                signal,
             });
 
             if (!response.ok) {
@@ -141,6 +167,18 @@ export class CohereProvider extends AIProvider {
             const providerCost = this.calculateCost(inputTokens, outputTokens, pricing);
             const cencoriCharge = providerCost;
 
+            enforceRequestBudget({
+                provider: this.providerName,
+                model: request.model,
+                costUsd: providerCost,
+                budgetUsd: request.maxCostUsd,
+                usage: {
+                    promptTokens: inputTokens,
+                    completionTokens: outputTokens,
+                    totalTokens: inputTokens + outputTokens,
+                },
+            });
+
             return {
                 content: data.text,
                 model: request.model,
@@ -159,15 +197,22 @@ export class CohereProvider extends AIProvider {
                 finishReason: data.finish_reason === 'COMPLETE' ? 'stop' : undefined,
             };
         } catch (error) {
+            if (timedOut()) {
+                throw new ServiceUnavailableError(this.providerName, error);
+            }
             throw normalizeProviderError(this.providerName, error);
         }
     }
 
     async *stream(request: UnifiedChatRequest): AsyncGenerator<StreamChunk> {
+        // Streams never retry: a partially-yielded stream cannot be replayed.
+        // (This path also previously dropped the caller's signal entirely —
+        // it now participates in the attempt deadline.)
+        const transport = resolveProviderTransport(this.transport, request);
         try {
             const { chatHistory, message, preamble } = this.toCohereChatHistory(request.messages);
 
-            const response = await safeProviderFetch(`${this.baseURL}/chat`, {
+            const response = await this.fetchImpl(transport)(`${this.baseURL}/chat`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${this.apiKey}`,
@@ -183,7 +228,7 @@ export class CohereProvider extends AIProvider {
                     max_tokens: request.maxTokens,
                     stream: true,
                 }),
-                signal: AbortSignal.timeout(55_000),
+                signal: transportSignal(request.signal, transport.timeoutMs),
             });
 
             if (!response.ok) {

@@ -541,6 +541,8 @@ export class AINamespace {
                 include: request.include,
                 stream: false,
                 user: request.user,
+                timeout_ms: request.timeout_ms,
+                max_cost_usd: request.max_cost_usd,
             }),
         });
 
@@ -592,6 +594,8 @@ export class AINamespace {
                 include: request.include,
                 stream: true,
                 user: request.user,
+                timeout_ms: request.timeout_ms,
+                max_cost_usd: request.max_cost_usd,
             }),
         });
 

@@ -57,7 +57,12 @@ describe('Maximo reasoning and stream cancellation', () => {
         });
         expect((await stream.next()).value).toMatchObject({ delta: 'first' });
         expect(create.mock.calls[0][0].reasoning_effort).toBe('low');
-        expect(create.mock.calls[0][1].signal).toBe(controller.signal);
+        // The adapter combines caller cancellation with its attempt timeout,
+        // so the SDK sees a scoped signal — which must still follow a caller
+        // abort (asserted below), not the identical object.
+        const passedSignal = create.mock.calls[0][1].signal as AbortSignal;
+        expect(passedSignal).toBeInstanceOf(AbortSignal);
+        expect(passedSignal.aborted).toBe(false);
         const pending = stream.next();
         await Promise.resolve();
         controller.abort(new Error('cancelled'));

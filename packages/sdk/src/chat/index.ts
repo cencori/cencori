@@ -64,6 +64,16 @@ export interface ChatCompletionCreateParams {
     tools?: unknown[];
     tool_choice?: unknown;
     prompt?: { name: string; variables?: Record<string, string> };
+    /**
+     * Per-request provider timeout in milliseconds (positive, capped
+     * server-side at 300000). Bounds one provider attempt.
+     */
+    timeout_ms?: number;
+    /**
+     * Per-request cost budget in USD (non-negative). Unary calls fail before
+     * returning; streams surface HTTP 402 `budget_exceeded` at final tally.
+     */
+    max_cost_usd?: number;
 }
 
 export interface ChatCompletionResponse {

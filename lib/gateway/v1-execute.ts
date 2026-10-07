@@ -117,6 +117,17 @@ export type V1ExecuteParams = {
      * output passes with zero risk signals; governance policies still enforce.
      */
     securityEnabled?: boolean;
+    /**
+     * Per-request provider timeout override (ms). Bounds one provider
+     * attempt; sanitized and capped gateway-side.
+     */
+    timeoutMs?: number;
+    /**
+     * Per-request cost budget (USD). Unary calls fail exact before
+     * returning; streams throw at final tally as a stop signal for the
+     * issuing loop. Unset = no budget.
+     */
+    maxCostUsd?: number;
 };
 
 function buildOpenAiCompletionJson(params: {
@@ -263,6 +274,8 @@ export async function runV1ProviderExecution(
             userId: params.endUserId || undefined,
             frequencyPenalty: params.frequencyPenalty,
             presencePenalty: params.presencePenalty,
+            timeoutMs: params.timeoutMs,
+            maxCostUsd: params.maxCostUsd,
             promptCacheKey: `cencori:${params.gatewayCtx.projectId}:${resolved.model}`,
         };
 
@@ -665,6 +678,9 @@ export async function runV1ProviderExecution(
                     } = await settleStreamUsage({
                         reported: reportedUsage,
                         pricing,
+                        provider: meta.actualProvider,
+                        model: meta.actualModel,
+                        budgetUsd: params.maxCostUsd,
                         estimate: async () => {
                             try {
                                 return {

@@ -39,6 +39,7 @@ import {
 } from '@/lib/gateway/chat-vision-router';
 import { loadAgentKeyContext } from '@/lib/gateway/agent-context';
 import { runV1ProviderExecution } from '@/lib/gateway/v1-execute';
+import { parseRequestControls } from '@/lib/gateway/request-controls';
 import { makeChatLogSuccess } from '@/lib/gateway/chat-post-success';
 import {
     parseCachedPayload,
@@ -170,6 +171,19 @@ export async function POST(req: NextRequest) {
                 : typeof body.presence_penalty === 'number'
                   ? body.presence_penalty
                   : undefined;
+        // First-class request controls (same names as the v1 API). Invalid
+        // values fail fast with a flat legacy 400, matching this route's
+        // error shape.
+        const controls = parseRequestControls(body);
+        if ('error' in controls) {
+            return wrap(
+                NextResponse.json(
+                    { error: 'Invalid request controls', message: controls.error },
+                    { status: 400 }
+                ),
+                ctx
+            );
+        }
 
         if (!rawMessages || !Array.isArray(rawMessages)) {
             return wrap(
@@ -758,6 +772,8 @@ export async function POST(req: NextRequest) {
             singleProviderAttempt: fastLane,
             securityEnabled: inputPipeline.securityEnabled,
             enforceMaxTokens: true,
+            timeoutMs: controls.timeoutMs,
+            maxCostUsd: controls.maxCostUsd,
             endUserId,
             endUserQuota,
             recordEndUserUsage: maybeRecordEndUserUsage,

@@ -12,10 +12,17 @@ import {
     StreamChunk,
     ModelPricing,
     ToolCall,
+    ProviderTransportOptions,
+    ResolvedProviderTransport,
+    attemptSignal,
+    enforceRequestBudget,
+    resolveProviderTransport,
+    runWithProviderRetry,
+    transportSignal,
 } from './base';
 import { getPricingFromDB } from './pricing';
 import { toAnthropicMessages } from './utils';
-import { normalizeProviderError } from './errors';
+import { normalizeProviderError, ServiceUnavailableError } from './errors';
 import { safeProviderFetch } from '@/lib/security/outbound-url';
 
 /**
@@ -78,8 +85,14 @@ export class AnthropicProvider extends AIProvider {
     readonly supportsTools = true;
     private client: Anthropic;
     private pricingOverride?: ModelPricing;
+    private readonly transport?: ProviderTransportOptions;
+    private readonly defaultTimeoutMs: number;
+    /** Whether the constructor client routes through the SSRF-guarded fetch. */
+    private readonly defaultFetch?: ProviderTransportOptions['fetch'];
+    private readonly apiKey: string;
+    private readonly baseURL?: string;
 
-    constructor(apiKey?: string, options?: { baseURL?: string; pricing?: ModelPricing }) {
+    constructor(apiKey?: string, options?: { baseURL?: string; pricing?: ModelPricing; transport?: ProviderTransportOptions }) {
         super();
 
         const key = apiKey || process.env.ANTHROPIC_API_KEY;
@@ -87,14 +100,41 @@ export class AnthropicProvider extends AIProvider {
             throw new Error('Anthropic API key is required - either pass it or set ANTHROPIC_API_KEY env var');
         }
 
+        this.apiKey = key;
+        this.baseURL = options?.baseURL;
+        this.transport = options?.transport;
+        const resolved = resolveProviderTransport(options?.transport);
+        this.defaultTimeoutMs = resolved.timeoutMs;
+        // Historical behaviour preserved: the guarded fetch applies only to
+        // custom base URLs (proxies); direct Anthropic calls use the SDK default.
+        this.defaultFetch = resolved.fetch ?? (options?.baseURL ? safeProviderFetch : undefined);
+
         this.client = new Anthropic({
             apiKey: key,
-            ...(options?.baseURL ? { baseURL: options.baseURL } : {}),
-            ...(options?.baseURL ? { fetch: safeProviderFetch } : {}),
-            timeout: 55_000,
+            ...(this.baseURL ? { baseURL: this.baseURL } : {}),
+            ...(this.defaultFetch ? { fetch: this.defaultFetch } : {}),
+            timeout: resolved.timeoutMs,
             maxRetries: 0,
         });
         this.pricingOverride = options?.pricing;
+    }
+
+    /**
+     * Per-call client view: the shared client unless this call overrides
+     * fetch or timeout.
+     */
+    private clientFor(transport: ResolvedProviderTransport): Anthropic {
+        const fetch = transport.fetch ?? this.defaultFetch;
+        if (fetch === this.defaultFetch && transport.timeoutMs === this.defaultTimeoutMs) {
+            return this.client;
+        }
+        return new Anthropic({
+            apiKey: this.apiKey,
+            ...(this.baseURL ? { baseURL: this.baseURL } : {}),
+            ...(fetch ? { fetch } : {}),
+            timeout: transport.timeoutMs,
+            maxRetries: 0,
+        });
     }
 
     /**
@@ -146,7 +186,19 @@ export class AnthropicProvider extends AIProvider {
     }
 
     async chat(request: UnifiedChatRequest): Promise<UnifiedChatResponse> {
+        const transport = resolveProviderTransport(this.transport, request);
+        return runWithProviderRetry({
+            provider: this.providerName,
+            model: request.model,
+            transport,
+            callerSignal: request.signal,
+            operation: () => this.executeChat(request, transport),
+        });
+    }
+
+    private async executeChat(request: UnifiedChatRequest, transport: ResolvedProviderTransport): Promise<UnifiedChatResponse> {
         const startTime = Date.now();
+        const { signal, timedOut } = attemptSignal(request.signal, transport.timeoutMs);
 
         try {
             // Anthropic handles system messages separately
@@ -154,7 +206,7 @@ export class AnthropicProvider extends AIProvider {
             const tools = this.toAnthropicTools(request);
             const toolChoice = this.toAnthropicToolChoice(request);
 
-            const response = await this.client.messages.create({
+            const response = await this.clientFor(transport).messages.create({
                 model: request.model,
                 max_tokens: request.maxTokens ?? 4096,
                 temperature: request.temperature,
@@ -162,7 +214,7 @@ export class AnthropicProvider extends AIProvider {
                 messages: messages as Anthropic.MessageParam[],
                 ...(tools ? { tools } : {}),
                 ...(toolChoice ? { tool_choice: toolChoice } : {}),
-            }, { signal: request.signal });
+            }, { signal, timeout: transport.timeoutMs, maxRetries: 0 });
 
             const pricing = await this.getPricing(request.model);
             // Anthropic reports cache reads and writes as fields of their own,
@@ -179,6 +231,18 @@ export class AnthropicProvider extends AIProvider {
                 cached
             );
             const cencoriCharge = providerCost;
+
+            enforceRequestBudget({
+                provider: this.providerName,
+                model: request.model,
+                costUsd: providerCost,
+                budgetUsd: request.maxCostUsd,
+                usage: {
+                    promptTokens: response.usage.input_tokens,
+                    completionTokens: response.usage.output_tokens,
+                    totalTokens: response.usage.input_tokens + response.usage.output_tokens,
+                },
+            });
 
             // A response can interleave several blocks — prose plus one
             // tool_use per requested call — so walk all of them rather than
@@ -221,17 +285,22 @@ export class AnthropicProvider extends AIProvider {
                 ...(toolCalls.length > 0 ? { toolCalls } : {}),
             };
         } catch (error) {
+            if (timedOut()) {
+                throw new ServiceUnavailableError(this.providerName, error);
+            }
             throw normalizeProviderError(this.providerName, error);
         }
     }
 
     async *stream(request: UnifiedChatRequest): AsyncGenerator<StreamChunk> {
+        // Streams never retry: a partially-yielded stream cannot be replayed.
+        const transport = resolveProviderTransport(this.transport, request);
         try {
             const { system, messages } = toAnthropicMessages(request.messages);
             const tools = this.toAnthropicTools(request);
             const toolChoice = this.toAnthropicToolChoice(request);
 
-            const stream = await this.client.messages.create({
+            const stream = await this.clientFor(transport).messages.create({
                 model: request.model,
                 max_tokens: request.maxTokens ?? 4096,
                 temperature: request.temperature,
@@ -240,6 +309,10 @@ export class AnthropicProvider extends AIProvider {
                 ...(tools ? { tools } : {}),
                 ...(toolChoice ? { tool_choice: toolChoice } : {}),
                 stream: true,
+            }, {
+                signal: transportSignal(request.signal, transport.timeoutMs),
+                timeout: transport.timeoutMs,
+                maxRetries: 0,
             });
 
             // Tool arguments arrive as partial JSON fragments spread across

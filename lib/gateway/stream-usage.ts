@@ -12,6 +12,7 @@
 
 import {
     calculateProviderTokenCost,
+    enforceRequestBudget,
     type CachedTokenUsage,
     type ModelPricing,
     type TokenUsage,
@@ -44,8 +45,17 @@ export async function settleStreamUsage(params: {
     /** Called only when the provider reported nothing. */
     estimate: () => Promise<{ promptTokens: number; completionTokens: number }>;
     pricing: ModelPricing;
+    /**
+     * Optional per-request budget. Enforced once the final usage is tallied —
+     * the spend already happened (the stream was delivered), so a breach
+     * throws BudgetExceededError as a machine-readable stop signal for the
+     * issuing loop rather than a silent overrun. No-op when unset.
+     */
+    provider?: string;
+    model?: string;
+    budgetUsd?: number | null;
 }): Promise<SettledStreamUsage> {
-    const { reported, estimate, pricing } = params;
+    const { reported, estimate, pricing, provider, model, budgetUsd } = params;
 
     // Billable prompt tokens exclude anything served from or written to cache;
     // those are priced separately and would otherwise be charged twice.
@@ -66,17 +76,32 @@ export async function settleStreamUsage(params: {
 
     const cachedTokens = (cached.cacheReadTokens ?? 0) + (cached.cacheWriteTokens ?? 0);
     const promptTokens = billablePromptTokens + cachedTokens;
+    const providerCostUsd = calculateProviderTokenCost(
+        billablePromptTokens,
+        completionTokens,
+        pricing,
+        cached,
+    );
+
+    if (provider !== undefined && model !== undefined) {
+        enforceRequestBudget({
+            provider,
+            model,
+            costUsd: providerCostUsd,
+            budgetUsd,
+            usage: {
+                promptTokens: billablePromptTokens,
+                completionTokens,
+                totalTokens: promptTokens + completionTokens,
+            },
+        });
+    }
 
     return {
         promptTokens,
         completionTokens,
         totalTokens: promptTokens + completionTokens,
-        providerCostUsd: calculateProviderTokenCost(
-            billablePromptTokens,
-            completionTokens,
-            pricing,
-            cached,
-        ),
+        providerCostUsd,
         fromProvider: reported !== undefined,
         ...(cached.cacheReadTokens === undefined ? {} : { cacheReadTokens: cached.cacheReadTokens }),
         ...(cached.cacheWriteTokens === undefined

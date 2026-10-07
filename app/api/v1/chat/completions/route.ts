@@ -32,6 +32,7 @@ import type { ResolvedPrompt } from "@/lib/prompts/types";
 import { runGatewayInputPipeline } from "@/lib/gateway/input-guard";
 import { toOpenAiErrorBody } from "@/lib/gateway/guard-types";
 import { runV1ProviderExecution } from "@/lib/gateway/v1-execute";
+import { parseRequestControls } from "@/lib/gateway/request-controls";
 import { makeChatLogSuccess } from "@/lib/gateway/chat-post-success";
 import {
     hasImageInMessages,
@@ -104,6 +105,10 @@ type ChatRequestBody = {
     /** Fast-lane passthrough: skip gateway guards/cache/retries (own safety layers). */
     passthrough?: boolean;
     fast_lane?: boolean;
+    /** Per-request provider timeout override (ms). Validated downstream. */
+    timeout_ms?: unknown;
+    /** Per-request cost budget (USD). Validated downstream. */
+    max_cost_usd?: unknown;
 };
 
 const normalizeGatewayModelId = (modelId: string): string => {
@@ -382,6 +387,10 @@ export async function POST(req: NextRequest) {
 
         // ── Parse Request Body ──
         const body = await bodyPromise;
+        const controls = parseRequestControls(body);
+        if ('error' in controls) {
+            return respondError(400, controls.error, 'invalid_request_controls');
+        }
         routingProfile = resolveGatewayRoutingProfile(
             body.routing_profile,
             req.headers.get('x-cencori-routing-profile')
@@ -1050,6 +1059,8 @@ export async function POST(req: NextRequest) {
             skipOutputGuard: fastLane,
             singleProviderAttempt: fastLane,
             securityEnabled: inputPipeline.securityEnabled,
+            timeoutMs: controls.timeoutMs,
+            maxCostUsd: controls.maxCostUsd,
         });
 
         if (!execResult.ok) {

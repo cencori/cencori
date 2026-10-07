@@ -11,9 +11,17 @@ import {
     UnifiedChatResponse,
     StreamChunk,
     ModelPricing,
+    ProviderFetch,
+    ProviderTransportOptions,
+    ResolvedProviderTransport,
+    attemptSignal,
+    enforceRequestBudget,
+    resolveProviderTransport,
+    runWithProviderRetry,
+    transportSignal,
 } from './base';
 import { toOpenAIMessages, toAnthropicMessages, estimateTokenCount } from './utils';
-import { normalizeProviderError } from './errors';
+import { normalizeProviderError, ServiceUnavailableError } from './errors';
 import { safeOutboundFetch } from '@/lib/security/outbound-url';
 
 export interface CustomProviderConfig {
@@ -23,6 +31,7 @@ export interface CustomProviderConfig {
     organizationId?: string; // For tracking
     providerId?: string; // Database ID
     pricing?: ModelPricing;
+    transport?: ProviderTransportOptions;
 }
 
 export class CustomProvider extends AIProvider {
@@ -35,20 +44,32 @@ export class CustomProvider extends AIProvider {
     }
 
     async chat(request: UnifiedChatRequest): Promise<UnifiedChatResponse> {
+        const transport = resolveProviderTransport(this.config.transport, request);
+        return runWithProviderRetry({
+            provider: this.providerName,
+            model: request.model,
+            transport,
+            callerSignal: request.signal,
+            operation: () => this.executeChat(request, transport),
+        });
+    }
+
+    private async executeChat(request: UnifiedChatRequest, transport: ResolvedProviderTransport): Promise<UnifiedChatResponse> {
         const startTime = Date.now();
+        const { signal, timedOut } = attemptSignal(request.signal, transport.timeoutMs);
 
         try {
             const body = this.formatRequest(request);
 
-            const response = await safeOutboundFetch(`${this.config.baseUrl}/chat/completions`, {
+            const response = await this.fetchImpl(transport)(`${this.config.baseUrl}/chat/completions`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     ...(this.config.apiKey ? { 'Authorization': `Bearer ${this.config.apiKey}` } : {}),
                 },
                 body: JSON.stringify(body),
-                signal: request.signal,
-            }, { maxRedirects: 0 });
+                signal,
+            });
 
             if (!response.ok) {
                 const errorText = await response.text();
@@ -57,24 +78,49 @@ export class CustomProvider extends AIProvider {
 
             const data = await response.json();
 
-            return this.parseResponse(data, request.model, startTime);
+            const result = this.parseResponse(data, request.model, startTime);
+            enforceRequestBudget({
+                provider: this.providerName,
+                model: request.model,
+                costUsd: result.cost.providerCostUsd,
+                budgetUsd: request.maxCostUsd,
+                usage: result.usage,
+            });
+            return result;
         } catch (error) {
+            if (timedOut()) {
+                throw new ServiceUnavailableError(this.providerName, error);
+            }
             throw normalizeProviderError(this.providerName, error);
         }
     }
 
+    /**
+     * Transport fetch with the SSRF-guarded default this adapter always used.
+     * NOTE: unlike the other adapters this one previously had NO timeout —
+     * direct calls were unbounded (the gateway's 60s outer bound was the only
+     * guard). The default 55s attempt timeout now applies uniformly.
+     */
+    private fetchImpl(transport: ResolvedProviderTransport): ProviderFetch {
+        if (transport.fetch) return transport.fetch;
+        return (input, init) => safeOutboundFetch(input as string, init ?? {}, { maxRedirects: 0 });
+    }
+
     async *stream(request: UnifiedChatRequest): AsyncGenerator<StreamChunk> {
+        // Streams never retry: a partially-yielded stream cannot be replayed.
+        const transport = resolveProviderTransport(this.config.transport, request);
         try {
             const body = this.formatRequest(request, true);
 
-            const response = await safeOutboundFetch(`${this.config.baseUrl}/chat/completions`, {
+            const response = await this.fetchImpl(transport)(`${this.config.baseUrl}/chat/completions`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     ...(this.config.apiKey ? { 'Authorization': `Bearer ${this.config.apiKey}` } : {}),
                 },
                 body: JSON.stringify(body),
-            }, { maxRedirects: 0 });
+                signal: transportSignal(request.signal, transport.timeoutMs),
+            });
 
             if (!response.ok) {
                 throw new Error(`Custom provider error: ${response.statusText}`);

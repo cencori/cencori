@@ -125,6 +125,8 @@ When using the `api.cencori.com` subdomain, set the base URL to `https://api.cen
 | `metadata` | object | No | Key-value pairs for request tagging |
 | `parallel_tool_calls` | boolean | No | Allow parallel tool calls |
 | `truncation` | string | No | `"auto"` or `"disabled"` |
+| `timeout_ms` | number | No | Per-request provider timeout in ms (1–300000, capped). Bounds one provider attempt |
+| `max_cost_usd` | number | No | Per-request cost budget in USD. Non-streaming calls fail before returning; streams surface it at final tally as HTTP 402 `budget_exceeded` |
 
 ### Input Items
 

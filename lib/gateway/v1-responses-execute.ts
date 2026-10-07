@@ -19,6 +19,7 @@ import {
     type UnifiedChatRequest,
 } from '@/lib/providers/base';
 import { settleStreamUsage } from '@/lib/gateway/stream-usage';
+import { parseRequestControls } from '@/lib/gateway/request-controls';
 import { executeGatewayChat, isCreditExhaustedError, streamGatewayChat } from '@/lib/gateway/chat-executor';
 import { resolveGatewayProvider } from '@/lib/gateway/providers-setup';
 import { mapProviderErrorToHttpResponse } from '@/lib/gateway-reliability';
@@ -90,6 +91,10 @@ export type ResponsesRequest = {
     truncation?: 'auto' | 'disabled';
     stream?: boolean;
     user?: string;
+    /** Per-request provider timeout override (ms). */
+    timeout_ms?: unknown;
+    /** Per-request cost budget (USD). */
+    max_cost_usd?: unknown;
 };
 
 export type ResponsesUsage = {
@@ -431,6 +436,22 @@ export async function runV1ResponsesExecution(
     const responseId = generateId('resp');
 
     try {
+        const controls = parseRequestControls(body);
+        if ('error' in controls) {
+            return {
+                ok: false,
+                status: 400,
+                body: {
+                    error: {
+                        message: controls.error,
+                        type: 'invalid_request_error',
+                        code: 'invalid_request_controls',
+                    },
+                    status: 'failed',
+                },
+            };
+        }
+
         const resolved = await resolveGatewayProvider({
             supabase: params.supabase,
             projectId: gatewayCtx.projectId,
@@ -645,6 +666,8 @@ export async function runV1ResponsesExecution(
             truncation: body.truncation,
             parallelToolCalls: body.parallel_tool_calls,
             userId: params.endUserId || undefined,
+            timeoutMs: controls.timeoutMs,
+            maxCostUsd: controls.maxCostUsd,
         };
 
         // Check if code_interpreter is enabled
@@ -1206,6 +1229,9 @@ export async function runV1ResponsesExecution(
                             } = await settleStreamUsage({
                                 reported: reportedUsage,
                                 pricing,
+                                provider: chunk.actualProvider,
+                                model: chunk.actualModel,
+                                budgetUsd: controls.maxCostUsd,
                                 estimate: async () => {
                                     const promptText = messages.map(m => m.content).join(' ');
                                     try {

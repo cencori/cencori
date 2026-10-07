@@ -312,6 +312,8 @@ class ResponsesRequest:
     include: Optional[List[str]] = None
     stream: bool = False
     user: Optional[str] = None
+    timeout_ms: Optional[int] = None
+    max_cost_usd: Optional[float] = None
 
 
 @dataclass
