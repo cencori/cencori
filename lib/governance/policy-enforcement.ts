@@ -40,6 +40,37 @@ async function getActivePoliciesCached(supabase: SupabaseAdmin, orgId: string): 
     return policies;
 }
 
+/**
+ * Whether any active policy could block or rewrite this project's output.
+ *
+ * Streaming holds back a tail and re-runs the output guard every few
+ * characters so nothing a policy rejects reaches the client. Policies are the
+ * only thing that can stop or redact output, so an org without one needs
+ * neither. Conservative: a rule without a direction, a default-deny policy, or
+ * a failed load all count as "yes".
+ */
+export async function orgHasOutputPolicies(
+    supabase: SupabaseAdmin,
+    orgId: string | null | undefined,
+    projectId?: string | null,
+): Promise<boolean> {
+    if (!orgId) return false;
+    let policies: Policy[];
+    try {
+        policies = await getActivePoliciesCached(supabase, orgId);
+    } catch {
+        return true;
+    }
+    return policies.some((policy) => {
+        const projects = policy.match?.projects;
+        if (projects && projectId && !projects.includes('*') && !projects.includes(projectId)) {
+            return false;
+        }
+        return policy.defaults?.onNoMatch === 'block'
+            || (policy.rules ?? []).some((rule) => rule.direction !== 'input');
+    });
+}
+
 export interface PolicyRedaction {
     pattern: string;
     strategy: 'mask' | 'tokenize';

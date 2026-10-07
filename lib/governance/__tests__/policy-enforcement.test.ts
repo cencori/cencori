@@ -4,7 +4,7 @@ vi.mock('@/lib/rate-limit', () => ({
     checkCustomRateLimit: vi.fn().mockResolvedValue({ allowed: true, remaining: 100, reset: 0 }),
 }));
 
-import { enforcePolicies, invalidatePolicyCache, applyPolicyRedactions } from '../policy-enforcement';
+import { enforcePolicies, invalidatePolicyCache, applyPolicyRedactions, orgHasOutputPolicies } from '../policy-enforcement';
 import { checkCustomRateLimit } from '@/lib/rate-limit';
 
 /** Mock supabase: active-policy read via from().select().eq().eq(); ledger via rpc(). */
@@ -134,5 +134,53 @@ describe('enforcePolicies — route & rate_limit', () => {
         const res = await enforcePolicies(mockSupabase([policy]), { orgId: 'o8', direction: 'input', model: 'gpt' });
         expect(res.block).toBeUndefined();
         expect(res.decision).toBe('rate_limit');
+    });
+});
+
+/** Decides whether streaming must hold back a tail for the output guard. */
+describe('orgHasOutputPolicies', () => {
+    const outputRule = (overrides: Record<string, unknown> = {}) => ({
+        name: 'out', version: 1, spec: {
+            rules: [{ name: 'mask', direction: 'output', when: { all: [{ field: 'content', matches: 'x' }] }, action: 'redact' }],
+            ...overrides,
+        },
+    });
+
+    it('is false with no org, without loading anything', async () => {
+        const supabase = mockSupabase([outputRule()]);
+        expect(await orgHasOutputPolicies(supabase, null)).toBe(false);
+        expect((supabase as unknown as { from: ReturnType<typeof vi.fn> }).from).not.toHaveBeenCalled();
+    });
+
+    it('is false when the org has no active policies', async () => {
+        expect(await orgHasOutputPolicies(mockSupabase([]), 'o1', 'p1')).toBe(false);
+    });
+
+    it('is false when every rule is input-only', async () => {
+        expect(await orgHasOutputPolicies(mockSupabase([blockJailbreak]), 'o1', 'p1')).toBe(false);
+    });
+
+    it('is true for an output rule', async () => {
+        expect(await orgHasOutputPolicies(mockSupabase([outputRule()]), 'o1', 'p1')).toBe(true);
+    });
+
+    it('treats a rule with no direction as applying to output', async () => {
+        const both = outputRule({ rules: [{ name: 'any', when: { all: [{ field: 'content', matches: 'x' }] }, action: 'block' }] });
+        expect(await orgHasOutputPolicies(mockSupabase([both]), 'o1', 'p1')).toBe(true);
+    });
+
+    it('treats default-deny as able to act on output', async () => {
+        const deny = { ...blockJailbreak, spec: { ...blockJailbreak.spec, defaults: { onNoMatch: 'block' } } };
+        expect(await orgHasOutputPolicies(mockSupabase([deny]), 'o1', 'p1')).toBe(true);
+    });
+
+    it('ignores a policy scoped to other projects', async () => {
+        const scoped = outputRule({ match: { projects: ['p2'] } });
+        expect(await orgHasOutputPolicies(mockSupabase([scoped]), 'o1', 'p1')).toBe(false);
+    });
+
+    it('keeps the guard on when policies cannot be loaded', async () => {
+        const failing = { from: () => { throw new Error('db down'); } } as never;
+        expect(await orgHasOutputPolicies(failing, 'o1', 'p1')).toBe(true);
     });
 });
