@@ -13,11 +13,11 @@ import {
 } from '@/lib/config-cache';
 
 /**
- * Settings-row state. Lexical scanning (jailbreak patterns, content filter,
- * regex PII) is secure-by-default: a project that never configured security
- * is protected, at ~0ms cost. An explicit `security_enabled: false` row opts
- * out and is respected. Model-backed checks (custom `ai_detect` rules) stay
- * strictly opt-in per rule — those cost seconds per request.
+ * Settings-row state. Scanning is explicit opt-in: nothing runs unless the
+ * project turned it on on the dashboard (`security_settings.security_enabled`).
+ * No row or an unset flag means fully disabled. Lexical defaults produced
+ * false positives on ordinary agent traffic (coding-agent system prompts read
+ * as instruction overrides), so protection is a deliberate per-project choice.
  */
 export type CachedSecuritySettings = {
     enabled: boolean;
@@ -48,32 +48,12 @@ const DISABLED_SECURITY_SETTINGS: CachedSecuritySettings = {
 };
 
 /**
- * Secure default for never-configured projects: the lexical scanners on,
- * model-backed checks off. Same thresholds as an explicit enablement with
- * all lexical filters ticked — the dashboard shows the same state.
- */
-const LEXICAL_DEFAULT_SECURITY_SETTINGS: CachedSecuritySettings = {
-    enabled: true,
-    inputThreshold: 0.5,
-    outputThreshold: 0.6,
-    jailbreakThreshold: 0.7,
-    filterJailbreaks: true,
-    filterPII: true,
-    filterPromptInjection: true,
-};
-
-/**
  * Pure row → cache-shape mapper. Shared by the DB reader below and the
  * gateway request warmer so a packed bundle seeds exactly what a DB read
  * would have cached.
  */
 export function toCachedSecuritySettings(row: SecuritySettingsRow): CachedSecuritySettings {
-    // Never configured (no row): lexical secure default. Explicit opt-out
-    // (security_enabled false): fully disabled, respected as-is.
-    if (!row) {
-        return { ...LEXICAL_DEFAULT_SECURITY_SETTINGS };
-    }
-    if (row.security_enabled !== true) {
+    if (!row || row.security_enabled !== true) {
         return { ...DISABLED_SECURITY_SETTINGS };
     }
     const safetyThreshold = row.safety_threshold ?? 0.7;
@@ -92,11 +72,10 @@ export function toCachedSecuritySettings(row: SecuritySettingsRow): CachedSecuri
 /**
  * Get project security configuration from database.
  *
- * Secure by default: a project with no settings row gets the lexical
- * scanners on (jailbreak patterns, content filter, regex PII — ~0ms). An
- * explicit `security_enabled: false` row opts out and is respected.
- * Model-backed checks (custom `ai_detect` rules) are never implied by this
- * switch; they stay opt-in per rule.
+ * Explicit opt-in only: scanning runs iff the project enabled it on the
+ * dashboard (`security_settings.security_enabled`). No row or an unset flag
+ * means every scanner is off, on every tier. The cached value carries the
+ * switch, so tier plays no role in the decision.
  */
 export async function getProjectSecurityConfig(
     supabase: ReturnType<typeof createAdminClient>,
@@ -126,18 +105,13 @@ export async function getProjectSecurityConfig(
             .eq('project_id', projectId)
             .single();
 
-        // Null row (never configured) maps to the lexical secure default.
-        // An explicit opt-out row (security_enabled false) maps to fully
-        // disabled inside toCachedSecuritySettings; warmer-seeded bundles go
-        // through the same mapper.
+        // Null row (never configured) maps to fully disabled, as does any
+        // warmer-seeded bundle without the explicit switch.
         const resolved = toCachedSecuritySettings(settings);
         void setCachedSecurityConfig(projectId, resolved);
         return applyExplicit(resolved);
     } catch (error) {
         console.warn('[Security] Failed to fetch security settings:', error);
-        // Fail closed on lexical (~0ms, low false-positive): transient DB
-        // errors must not open a hole for never-configured projects.
-        // Model-backed ai_detect rules stay off — those are opt-in per rule.
-        return applyExplicit({ ...LEXICAL_DEFAULT_SECURITY_SETTINGS });
+        return applyExplicit({ ...DISABLED_SECURITY_SETTINGS });
     }
 }

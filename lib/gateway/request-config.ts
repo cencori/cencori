@@ -77,8 +77,7 @@ export function seedGatewayProjectBundle(projectId: string, bundle: GatewayProje
         GATEWAY_CACHE_TTLS.NETWORK_CONFIG,
     );
 
-    // Security settings (resolved via toCachedSecuritySettings: null row =
-    // lexical secure default, explicit security_enabled false = disabled).
+    // Security settings (explicit opt-in; null row or unset switch = disabled).
     seedLocalCacheEntry(
         gatewayCacheKeys.security(projectId),
         toCachedSecuritySettings(asRecord(bundle.security) as {
