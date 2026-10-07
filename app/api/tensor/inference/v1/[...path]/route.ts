@@ -22,6 +22,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authenticateTensorDataRequest } from "@/lib/tensor-data";
 import { noStoreHeaders } from "@/lib/tensor-auth";
+import { getCachedTensorAccess, setCachedTensorAccess } from "@/lib/config-cache";
 import {
     buildServerTiming,
     PROXY_AUTH_MS_HEADER,
@@ -88,17 +89,24 @@ async function forward(req: NextRequest, path: string[]): Promise<Response> {
 
   // The lease RPC is the single biggest pre-dispatch cost on this path
   // (0.8–1.7s observed). It stays serial — spend must be verified before the
-  // upstream call exists — but its duration is now measured, forwarded to
-  // the gateway log as attribution metadata, and reported back to the
-  // client as a Server-Timing span, so the next investigation subtracts
-  // instead of guessing.
+  // upstream call exists — but it only re-confirms the reservation the turn
+  // already holds, and an agent turn makes many calls under one reservation.
+  // An allowed answer is cached briefly per user (cleared when the turn
+  // finishes); denials always go to the database. Its duration is measured,
+  // forwarded to the gateway log, and reported as a Server-Timing span.
   let leaseMs: number | null = null;
+  let leaseCached = false;
   if (route.generates) {
     const leaseStartedAt = Date.now();
-    const { data: access, error: accessError } = await session.admin.rpc(
-      "basecode_gateway_access",
-      { p_user_id: session.user.id },
-    );
+    let access: unknown = await getCachedTensorAccess(session.user.id);
+    let accessError: unknown = null;
+    leaseCached = access !== null;
+    if (!leaseCached) {
+      ({ data: access, error: accessError } = await session.admin.rpc(
+        "basecode_gateway_access",
+        { p_user_id: session.user.id },
+      ));
+    }
     leaseMs = Date.now() - leaseStartedAt;
     if (accessError) {
       console.error("[TensorInference] entitlement lookup failed", accessError);
@@ -121,6 +129,7 @@ async function forward(req: NextRequest, path: string[]): Promise<Response> {
         entitlement?.reason === "concurrency_limit" ? 409 : 429,
       );
     }
+    if (!leaseCached) void setCachedTensorAccess(session.user.id, entitlement);
 
     // Every turn is attributed to the person who ran it. The gateway reads `user` as the end user,
     // so one product key still tells the project's owner which of their users spent what.
@@ -152,7 +161,7 @@ async function forward(req: NextRequest, path: string[]): Promise<Response> {
   // otherwise most likely to reintroduce.
   const serverTiming = buildServerTiming([
     { name: 'tensor_auth', durMs: authMs },
-    { name: 'tensor_lease', durMs: leaseMs },
+    { name: leaseCached ? 'tensor_lease_cached' : 'tensor_lease', durMs: leaseMs },
   ]);
   return new NextResponse(upstream.body, {
     status: upstream.status,

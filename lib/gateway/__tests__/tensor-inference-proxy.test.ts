@@ -20,6 +20,14 @@ vi.mock('@/lib/tensor-auth', () => ({
     noStoreHeaders: () => ({ 'Cache-Control': 'no-store' }),
 }));
 
+const mockGetCachedAccess = vi.fn();
+const mockSetCachedAccess = vi.fn();
+
+vi.mock('@/lib/config-cache', () => ({
+    getCachedTensorAccess: (...args: unknown[]) => mockGetCachedAccess(...args),
+    setCachedTensorAccess: (...args: unknown[]) => mockSetCachedAccess(...args),
+}));
+
 const PRODUCT_KEY = 'csk_the_products_own_key';
 process.env.BASECODE_GATEWAY_API_KEY = PRODUCT_KEY;
 
@@ -51,6 +59,7 @@ function signedIn(allowed: boolean, reason?: string) {
 
 beforeEach(() => {
     vi.clearAllMocks();
+    mockGetCachedAccess.mockResolvedValue(null);
     vi.stubGlobal(
         'fetch',
         vi.fn(async () => new Response('{"ok":true}', {
@@ -204,5 +213,52 @@ describe('what the product key may be spent on', () => {
         expect((global.fetch as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]).toBe(
             'https://api.cencori.com/v1/chat/completions'
         );
+    });
+});
+
+/**
+ * An agent turn makes many model calls under one reservation, and each one used to pay the
+ * entitlement RPC again (0.8–1.7s). An allowed answer is cached; a refusal never is.
+ */
+describe('re-checking a turn already reserved', () => {
+    it('skips the database when the turn was just confirmed', async () => {
+        signedIn(true);
+        mockGetCachedAccess.mockResolvedValue({ allowed: true });
+
+        const response = await POST(request(), at('responses'));
+
+        expect(response.status).toBe(200);
+        expect(mockRpc).not.toHaveBeenCalled();
+        expect(response.headers.get('Server-Timing')).toContain('tensor_lease_cached');
+    });
+
+    it('remembers an allowed turn for the next call', async () => {
+        signedIn(true);
+
+        await POST(request(), at('responses'));
+
+        expect(mockRpc).toHaveBeenCalledTimes(1);
+        expect(mockSetCachedAccess).toHaveBeenCalledWith('user-tensor-1', { allowed: true });
+    });
+
+    it('never remembers a refusal', async () => {
+        signedIn(false, 'insufficient_credits');
+
+        expect((await POST(request(), at('responses'))).status).toBe(429);
+        expect(mockSetCachedAccess).not.toHaveBeenCalled();
+    });
+
+    it('does not touch the cache for calls that spend nothing', async () => {
+        signedIn(true);
+
+        await GET(
+            new Request('https://cencori.com/api/tensor/inference/v1/models', {
+                method: 'GET',
+                headers: { Authorization: 'Bearer session-token' },
+            }) as never,
+            at('models'),
+        );
+
+        expect(mockGetCachedAccess).not.toHaveBeenCalled();
     });
 });
