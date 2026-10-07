@@ -28,8 +28,23 @@ vi.mock('@/lib/config-cache', () => ({
     setCachedTensorAccess: (...args: unknown[]) => mockSetCachedAccess(...args),
 }));
 
+const mockGatewayResponses = vi.fn();
+const mockGatewayChat = vi.fn();
+const mockGatewayModels = vi.fn();
+
+vi.mock('@/app/api/v1/responses/route', () => ({
+    POST: (...args: unknown[]) => mockGatewayResponses(...args),
+}));
+vi.mock('@/app/api/v1/chat/completions/route', () => ({
+    POST: (...args: unknown[]) => mockGatewayChat(...args),
+}));
+vi.mock('@/app/api/v1/models/route', () => ({
+    GET: (...args: unknown[]) => mockGatewayModels(...args),
+}));
+
 const PRODUCT_KEY = 'csk_the_products_own_key';
 process.env.BASECODE_GATEWAY_API_KEY = PRODUCT_KEY;
+const REMOTE_GATEWAY = 'https://api.cencori.com/v1';
 
 const { GET, POST } = await import('@/app/api/tensor/inference/v1/[...path]/route');
 
@@ -59,6 +74,8 @@ function signedIn(allowed: boolean, reason?: string) {
 
 beforeEach(() => {
     vi.clearAllMocks();
+    // Most tests drive the HTTP transport, which a configured gateway URL selects.
+    process.env.BASECODE_GATEWAY_URL = REMOTE_GATEWAY;
     mockGetCachedAccess.mockResolvedValue(null);
     vi.stubGlobal(
         'fetch',
@@ -260,5 +277,102 @@ describe('re-checking a turn already reserved', () => {
         );
 
         expect(mockGetCachedAccess).not.toHaveBeenCalled();
+    });
+});
+
+/**
+ * In production the gateway is this same deployment. Going out to api.cencori.com only to land back
+ * here cost a TLS hop, edge routing and a second function invocation per call, so the handler is
+ * called directly instead.
+ */
+describe('calling the gateway in-process', () => {
+    beforeEach(() => {
+        delete process.env.BASECODE_GATEWAY_URL;
+        const ok = () => new Response('{"ok":true}', {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+        });
+        mockGatewayResponses.mockImplementation(async () => ok());
+        mockGatewayChat.mockImplementation(async () => ok());
+        mockGatewayModels.mockImplementation(async () => ok());
+    });
+
+    function lastGatewayRequest(mock: ReturnType<typeof vi.fn>) {
+        return mock.mock.calls[0]?.[0] as Request;
+    }
+
+    it('hands the turn to the gateway handler without a network call', async () => {
+        signedIn(true);
+
+        const response = await POST(request(), at('responses'));
+
+        expect(response.status).toBe(200);
+        expect(global.fetch).not.toHaveBeenCalled();
+        expect(mockGatewayResponses).toHaveBeenCalledTimes(1);
+        expect(new URL(lastGatewayRequest(mockGatewayResponses).url).pathname).toBe('/api/v1/responses');
+    });
+
+    it('routes each path to its own handler', async () => {
+        signedIn(true);
+
+        await POST(request(), at('chat', 'completions'));
+
+        expect(mockGatewayChat).toHaveBeenCalledTimes(1);
+        expect(mockGatewayResponses).not.toHaveBeenCalled();
+        expect(new URL(lastGatewayRequest(mockGatewayChat).url).pathname).toBe('/api/v1/chat/completions');
+    });
+
+    it('authenticates with the product key and attributes the user', async () => {
+        signedIn(true);
+
+        const response = await POST(request(), at('responses'));
+        const forwarded = lastGatewayRequest(mockGatewayResponses);
+
+        expect(forwarded.headers.get('authorization')).toBe(`Bearer ${PRODUCT_KEY}`);
+        expect(await forwarded.json()).toMatchObject({ model: 'gpt-4o', user: 'user-tensor-1' });
+        expect(await response.text()).not.toContain(PRODUCT_KEY);
+    });
+
+    it("passes the caller's address through, not this function's", async () => {
+        signedIn(true);
+        const withIp = new Request('https://cencori.com/api/tensor/inference/v1/responses', {
+            method: 'POST',
+            headers: {
+                Authorization: 'Bearer session-token',
+                'Content-Type': 'application/json',
+                'x-forwarded-for': '203.0.113.7',
+                'x-vercel-ip-country': 'NG',
+            },
+            body: JSON.stringify({ model: 'gpt-4o', input: 'hi' }),
+        });
+
+        await POST(new (await import('next/server')).NextRequest(withIp), at('responses'));
+        const forwarded = lastGatewayRequest(mockGatewayResponses);
+
+        expect(forwarded.headers.get('x-forwarded-for')).toBe('203.0.113.7');
+        expect(forwarded.headers.get('x-vercel-ip-country')).toBe('NG');
+    });
+
+    it('still refuses a turn the plan does not allow, before the gateway', async () => {
+        signedIn(false, 'weekly_budget_limit');
+
+        expect((await POST(request(), at('responses'))).status).toBe(429);
+        expect(mockGatewayResponses).not.toHaveBeenCalled();
+    });
+
+    it('lists models in-process too', async () => {
+        signedIn(true);
+
+        const response = await GET(
+            new Request('https://cencori.com/api/tensor/inference/v1/models', {
+                method: 'GET',
+                headers: { Authorization: 'Bearer session-token' },
+            }) as never,
+            at('models'),
+        );
+
+        expect(response.status).toBe(200);
+        expect(mockGatewayModels).toHaveBeenCalledTimes(1);
+        expect(global.fetch).not.toHaveBeenCalled();
     });
 });

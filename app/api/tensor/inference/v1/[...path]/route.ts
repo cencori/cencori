@@ -29,8 +29,17 @@ import {
     PROXY_LEASE_MS_HEADER,
 } from "@/lib/gateway/performance";
 
-const GATEWAY_BASE =
-  process.env.BASECODE_GATEWAY_URL?.trim().replace(/\/+$/, "") || "https://api.cencori.com/v1";
+/**
+ * Where the gateway is. Unset (production), it is this same deployment, so the gateway's handler
+ * is called in-process: going out to api.cencori.com only to land back on this app cost a second
+ * TLS hop, edge routing and a second function invocation (with its own cold start) per call. Set
+ * it to reach a different gateway over HTTP, e.g. local development against staging.
+ */
+function remoteGatewayBase(): string | null {
+  return process.env.BASECODE_GATEWAY_URL?.trim().replace(/\/+$/, "") || null;
+}
+
+type GatewayHandler = (req: NextRequest) => Promise<Response>;
 
 /**
  * What Tensor may reach, and what it costs.
@@ -41,10 +50,25 @@ const GATEWAY_BASE =
  * user at their limit unable to see which models exist, which reads as the app being broken rather
  * than as a limit being reached.
  */
-const ROUTES: Record<string, { generates: boolean; methods: string[] }> = {
-  "chat/completions": { generates: true, methods: ["POST"] },
-  models: { generates: false, methods: ["GET"] },
-  responses: { generates: true, methods: ["POST"] },
+const ROUTES: Record<
+  string,
+  { generates: boolean; methods: string[]; handler: () => Promise<GatewayHandler> }
+> = {
+  "chat/completions": {
+    generates: true,
+    methods: ["POST"],
+    handler: async () => (await import("@/app/api/v1/chat/completions/route")).POST,
+  },
+  models: {
+    generates: false,
+    methods: ["GET"],
+    handler: async () => (await import("@/app/api/v1/models/route")).GET,
+  },
+  responses: {
+    generates: true,
+    methods: ["POST"],
+    handler: async () => (await import("@/app/api/v1/responses/route")).POST,
+  },
 };
 
 /** The product's own Cencori key. Server-only: it is never sent to a client. */
@@ -143,17 +167,36 @@ async function forward(req: NextRequest, path: string[]): Promise<Response> {
     }
   }
 
-  const upstream = await fetch(`${GATEWAY_BASE}/${path.join("/")}`, {
-    method: req.method,
-    headers: {
-      Authorization: `Bearer ${PRODUCT_KEY}`,
-      "Content-Type": "application/json",
-      "X-Cencori-User-IP": req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "",
-      [PROXY_AUTH_MS_HEADER]: String(authMs),
-      ...(leaseMs !== null ? { [PROXY_LEASE_MS_HEADER]: String(leaseMs) } : {}),
-    },
-    ...(body === undefined ? {} : { body }),
-  });
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${PRODUCT_KEY}`,
+    "Content-Type": "application/json",
+    "X-Cencori-User-IP": req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "",
+    [PROXY_AUTH_MS_HEADER]: String(authMs),
+    ...(leaseMs !== null ? { [PROXY_LEASE_MS_HEADER]: String(leaseMs) } : {}),
+  };
+  const remote = remoteGatewayBase();
+  let upstream: Response;
+  if (remote) {
+    upstream = await fetch(`${remote}/${path.join("/")}`, {
+      method: req.method,
+      headers,
+      ...(body === undefined ? {} : { body }),
+    });
+  } else {
+    // In-process: the gateway sees the caller's own address and geo headers (over HTTP it saw this
+    // function's egress), and the caller's disconnect reaches the provider call through `signal`.
+    for (const name of ["x-forwarded-for", "x-real-ip", "x-vercel-ip-country", "x-vercel-ip-country-region", "x-vercel-ip-city"]) {
+      const value = req.headers.get(name);
+      if (value) headers[name] = value;
+    }
+    const gatewayRequest = new NextRequest(`${new URL(req.url).origin}/api/v1/${path.join("/")}`, {
+      method: req.method,
+      headers,
+      signal: req.signal,
+      ...(body === undefined ? {} : { body }),
+    });
+    upstream = await (await route.handler())(gatewayRequest);
+  }
 
   // The body is handed back as it arrives rather than read to completion: these are streaming
   // endpoints, and buffering here would put the whole answer's generation time back in front of
