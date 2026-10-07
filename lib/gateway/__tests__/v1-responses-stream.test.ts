@@ -660,3 +660,81 @@ describe('/v1/responses replaying an agent\'s own history', () => {
         ]);
     });
 });
+
+describe('/v1/responses streaming a thinking trace', () => {
+    /** Every event's name, in the order the client receives them. */
+    function eventNames(body: string): string[] {
+        return [...body.matchAll(/event: ([\w.]+)\n/g)].map((match) => match[1] as string);
+    }
+
+    function eventData(body: string, name: string): Array<Record<string, unknown>> {
+        const pattern = new RegExp(`event: ${name.replace(/\./g, '\\.')}\\ndata: (\\{[^\\n]*\\})`, 'g');
+        return [...body.matchAll(pattern)].map((match) => JSON.parse(match[1] as string));
+    }
+
+    it('streams the trace as it is produced, closed before the reply, and not repeated at the end', async () => {
+        mockStreamGatewayChat.mockImplementation(() => (async function* () {
+            yield chunk({ reasoning: 'Look at ' });
+            yield chunk({ reasoning: 'the repo.' });
+            yield chunk({ delta: "I'll look at the repo." });
+            yield chunk({ delta: '', finishReason: 'stop' });
+        })());
+        const result = await runV1ResponsesExecution(baseParams());
+        if (!result.ok) throw new Error('expected ok');
+        const body = await new Response(result.response.body).text();
+        const names = eventNames(body);
+
+        // Opened, streamed in pieces, closed, and only then the reply.
+        const added = names.indexOf('response.output_item.added');
+        const firstDelta = names.indexOf('response.reasoning_text.delta');
+        const closed = names.indexOf('response.output_item.done');
+        const firstText = names.indexOf('response.output_text.delta');
+        expect(added).toBeGreaterThanOrEqual(0);
+        expect(firstDelta).toBeGreaterThan(added);
+        expect(closed).toBeGreaterThan(firstDelta);
+        if (firstText >= 0) expect(firstText).toBeGreaterThan(closed);
+
+        const deltas = eventData(body, 'response.reasoning_text.delta');
+        expect(deltas.map((delta) => delta.delta).join('')).toBe('Look at the repo.');
+        // What the runtime needs on each delta: which item, and which content part.
+        expect(deltas.every((delta) => delta.content_index === 0 && typeof delta.item_id === 'string')).toBe(true);
+
+        const [opened] = eventData(body, 'response.output_item.added') as Array<{ item: { id: string; type: string } }>;
+        const [done] = eventData(body, 'response.output_item.done') as Array<{
+            item: { id: string; content: unknown; summary: unknown };
+        }>;
+        expect(opened?.item.type).toBe('reasoning');
+        expect(done?.item.id).toBe(opened?.item.id);
+        expect(done?.item.content).toEqual([{ type: 'reasoning_text', text: 'Look at the repo.' }]);
+
+        // The final response does not carry the trace a second time.
+        const [final] = eventData(body, 'response.done') as Array<{ response: { output: Array<{ type: string }> } }>;
+        expect(final?.response.output.some((item) => item.type === 'reasoning')).toBe(false);
+    });
+
+    it('sends the trace while the model is still going, not when it finishes', async () => {
+        let release: (() => void) | null = null;
+        const gate = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+        mockStreamGatewayChat.mockImplementation(() => (async function* () {
+            yield chunk({ reasoning: 'Thinking about it.' });
+            await gate;
+            yield chunk({ delta: 'Done.', finishReason: 'stop' });
+        })());
+        const result = await runV1ResponsesExecution(baseParams());
+        if (!result.ok) throw new Error('expected ok');
+        const reader = result.response.body!.getReader();
+        let seen = '';
+        while (!seen.includes('response.reasoning_text.delta')) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            seen += new TextDecoder().decode(value);
+        }
+        // The provider has not finished, and the thinking is already on its way.
+        expect(seen).toContain('Thinking about it.');
+        expect(seen).not.toContain('response.done');
+        release?.();
+        await reader.cancel();
+    });
+});
