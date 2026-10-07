@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authenticateTensorBillingRequest } from "@/lib/tensor-billing";
-import { isUuid, readThreadUsageEntries } from "@/lib/tensor-data";
+import { gatewayEntitlementFrom } from "@/lib/tensor-entitlement";
+import { authenticateTensorDataRequest, isUuid, readThreadUsageEntries } from "@/lib/tensor-data";
 import { noStoreHeaders } from "@/lib/tensor-auth";
-import { invalidateTensorAccess } from "@/lib/config-cache";
+import { invalidateTensorAccess, setCachedTensorAccess } from "@/lib/config-cache";
 
 type TurnBillingBody = {
   action?: unknown;
@@ -14,7 +15,12 @@ type TurnBillingBody = {
 };
 
 export async function POST(request: NextRequest) {
-  const session = await authenticateTensorBillingRequest(request);
+  // The app calls this before every turn with its bearer token, so it takes the cached check the
+  // inference proxy uses; a browser session (cookie) still goes the full way.
+  const authorization = request.headers.get("authorization");
+  const session = authorization?.startsWith("Bearer ")
+    ? await authenticateTensorDataRequest(authorization)
+    : await authenticateTensorBillingRequest(request);
   if (!session) {
     return NextResponse.json(
       { error: "Your Cencori session is invalid." },
@@ -99,6 +105,13 @@ export async function POST(request: NextRequest) {
       );
     }
     const result = data as { allowed?: boolean; reason?: string } | null;
+    // The turn's first model call re-checks entitlement before it dispatches, and the cache it
+    // reads was cleared when the previous turn finished — so every turn paid that lookup
+    // (0.8–1.7s) right after this one had just answered it. Seeded here instead, awaited so the
+    // entry exists before the app is told to start. Only an answer with every field the lookup
+    // returns is cached: the plan's model policy rides on it, and a partial entry would skip it.
+    const entitlement = gatewayEntitlementFrom(result);
+    if (entitlement) await setCachedTensorAccess(session.user.id, entitlement);
     return NextResponse.json(result ?? { allowed: false }, {
       headers: noStoreHeaders(),
       status: result?.allowed ? 200 : result?.reason === "concurrency_limit" ? 409 : 429,
