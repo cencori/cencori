@@ -40,6 +40,11 @@ const PROVIDER_LOGOS: Record<string, React.ReactNode> = {
     qwen: <Qwen.Color size={20} />,
     deepseek: <DeepSeek.Color size={20} />,
     zai: <ZAI size={20} />,
+    cerebras: <Key size={16} className="text-muted-foreground" />,
+    maximo: <Image src="/providers/maximo.svg" alt="Maximo AI" width={20} height={20} className="rounded-sm" />,
+    helix: <Image src="/providers/helix.svg" alt="Helix" width={20} height={20} className="rounded-sm" />,
+    bai: <DeepSeek.Color size={20} />,
+    centaur: <Image src="/providers/centaur.svg" alt="Centaur" width={20} height={20} className="rounded-sm" />,
     // Voice providers (no brand icons in the icon set) — neutral voice glyph
     deepgram: <AudioLines size={18} />,
     cartesia: <AudioLines size={18} />,
@@ -49,7 +54,11 @@ const PROVIDER_LOGOS: Record<string, React.ReactNode> = {
 };
 
 function getProviderLogo(providerId: string, size: 'sm' | 'md' = 'md') {
-    const logo = PROVIDER_LOGOS[providerId];
+    const logo = PROVIDER_LOGOS[providerId] ?? (
+        <span className="text-xs font-semibold uppercase text-muted-foreground">
+            {providerId.slice(0, 1)}
+        </span>
+    );
     const baseClass = size === 'sm'
         ? "w-5 h-5 flex items-center justify-center rounded-md bg-muted/50"
         : "w-8 h-8 flex items-center justify-center rounded-lg bg-muted/50";

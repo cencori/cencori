@@ -256,6 +256,13 @@ export async function POST(
 
         if (error) {
             console.error('[API] Error saving provider key:', error);
+            const msg = String((error as { message?: unknown }).message ?? '');
+            if (msg.includes('provider_keys_provider_check') || msg.includes('violates check constraint')) {
+                return NextResponse.json(
+                    { error: `Provider '${provider}' is not supported for BYOK keys. If this is a listed provider, the database vendor allow-list needs updating (see supabase/migrations/20261007_000000_expand_provider_keys_vendors.sql).` },
+                    { status: 400 }
+                );
+            }
             return NextResponse.json({ error: error.message }, { status: 500 });
         }
 

@@ -36,11 +36,15 @@ export interface EmbeddedConnectionRow {
 
 /**
  * Vendors whose keys may live in `provider_keys` (its CHECK constraint).
- * `openrouter` is dashboard-only legacy with no embedded counterpart.
+ * Kept in sync with SUPPORTED_PROVIDERS in lib/providers/config.ts plus the
+ * two legacy CHECK values (`openrouter`, `huggingface`). `openrouter` is
+ * dashboard-only legacy with no embedded counterpart.
  */
 const MIRRORABLE_PROVIDERS = new Set([
     'openai', 'anthropic', 'google', 'mistral', 'groq', 'cohere',
     'together', 'perplexity', 'xai', 'meta', 'huggingface', 'qwen', 'deepseek',
+    'zai', 'cerebras', 'maximo', 'helix', 'bai', 'centaur',
+    'deepgram', 'cartesia', 'spitch', 'assemblyai', 'elevenlabs',
 ]);
 
 export function canMirrorProvider(provider: string): boolean {

@@ -152,12 +152,15 @@ describe('mirror: connections -> keys', () => {
     });
 
     it('skips vendors outside the keys-table constraint', async () => {
-        expect(canMirrorProvider('maximo')).toBe(false);
+        expect(canMirrorProvider('maximo')).toBe(true);
+        expect(canMirrorProvider('cerebras')).toBe(true);
+        expect(canMirrorProvider('deepgram')).toBe(true);
         expect(canMirrorProvider('openai')).toBe(true);
+        expect(canMirrorProvider('not-a-vendor')).toBe(false);
         const { log, client } = fakeDb({
             connectionsList: [{ encrypted_key_ref: 'K', created_at: '2026-09-25T23:00:47Z' }],
         });
-        await mirrorConnectionsToKeys(client as never, { projectId: 'p', organizationId: 'org-1', provider: 'maximo' });
+        await mirrorConnectionsToKeys(client as never, { projectId: 'p', organizationId: 'org-1', provider: 'not-a-vendor' });
         expect(log.filter((c) => c.table === 'provider_keys')).toHaveLength(0);
     });
 });
