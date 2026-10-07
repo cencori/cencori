@@ -531,3 +531,46 @@ export async function invalidateNetworkConfig(projectId: string): Promise<void> 
     }
     await invalidatePackedGatewayConfig(projectId);
 }
+
+/**
+ * Tensor turn entitlement (`basecode_gateway_access`) per user.
+ *
+ * The RPC only re-confirms a reservation the turn already took, but every
+ * model call in an agent turn paid it again (0.8–1.7s observed). Only an
+ * allowed answer is cached, and only in Redis: finishing or releasing a turn
+ * deletes the entry, and an instance-local copy could not be reached by that
+ * delete. Denials are never cached, so a top-up or a new reservation takes
+ * effect on the next call. Budget and wallet checks may lag by up to the TTL.
+ */
+const TENSOR_ACCESS_TTL_SECONDS = 15;
+
+function tensorAccessKey(userId: string) {
+    return `${CONFIG_PREFIX}tensor-access:${userId}`;
+}
+
+export async function getCachedTensorAccess<T = unknown>(userId: string): Promise<T | null> {
+    if (!redisConfigured) return null;
+    try {
+        return (await redis.get<T>(tensorAccessKey(userId))) ?? null;
+    } catch {
+        return null;
+    }
+}
+
+export async function setCachedTensorAccess(userId: string, data: unknown): Promise<void> {
+    if (!redisConfigured) return;
+    try {
+        await redis.set(tensorAccessKey(userId), data, { ex: TENSOR_ACCESS_TTL_SECONDS });
+    } catch {
+        // A miss only costs the RPC.
+    }
+}
+
+export async function invalidateTensorAccess(userId: string): Promise<void> {
+    if (!redisConfigured) return;
+    try {
+        await redis.del(tensorAccessKey(userId));
+    } catch {
+        // The TTL bounds staleness.
+    }
+}

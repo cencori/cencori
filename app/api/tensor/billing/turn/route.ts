@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { authenticateTensorBillingRequest } from "@/lib/tensor-billing";
 import { isUuid, readThreadUsageEntries } from "@/lib/tensor-data";
 import { noStoreHeaders } from "@/lib/tensor-auth";
+import { invalidateTensorAccess } from "@/lib/config-cache";
 
 type TurnBillingBody = {
   action?: unknown;
@@ -46,6 +47,8 @@ export async function POST(request: NextRequest) {
    * closing keys that no longer exist anywhere.
    */
   if (body.action === "release-stale") {
+    // The inference proxy caches an allowed check per user; a closed lease must not outlive it.
+    await invalidateTensorAccess(session.user.id);
     const { data: account } = await session.admin
       .from("basecode_billing_accounts")
       .select("id")
@@ -110,6 +113,7 @@ export async function POST(request: NextRequest) {
       p_client_turn_key: body.clientTurnKey,
       p_runtime_turn_id: runtimeTurnId,
     });
+    await invalidateTensorAccess(session.user.id);
     if (error) {
       console.error("[Tensor Billing] Turn finalization failed", error);
       return NextResponse.json(
