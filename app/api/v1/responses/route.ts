@@ -34,6 +34,7 @@ import {
     buildServerTiming,
     GatewayPerformanceTracker,
     parseProxyEdgeTimings,
+    proxyHandoffMs,
 } from "@/lib/gateway/performance";
 import type { SubscriptionTier } from "@/lib/entitlements";
 import { resolveAgentContext } from "@/lib/gateway/agent-context";
@@ -105,6 +106,7 @@ export async function POST(req: NextRequest) {
     const performance = new GatewayPerformanceTracker(startedAt);
     const callerIdentity = extractGatewayCallerIdentity(req.headers);
     const proxyTimings = parseProxyEdgeTimings(req.headers);
+    const proxyHandoff = proxyHandoffMs(req.headers, startedAt);
     let gatewayCtx: GatewayContext | null = null;
 
     const respond = (response: NextResponse, errorCode?: string, errorMessage?: string) => {
@@ -127,15 +129,12 @@ export async function POST(req: NextRequest) {
             clientApp: callerIdentity.clientApp,
             errorCode: errorCode || null,
             errorMessage: errorMessage || null,
-            ...(proxyTimings.authMs !== null || proxyTimings.leaseMs !== null
-                ? {
-                    metadata: {
-                        ...(proxyTimings.authMs !== null ? { tensor_proxy_auth_ms: proxyTimings.authMs } : {}),
-                        ...(proxyTimings.leaseMs !== null ? { tensor_proxy_lease_ms: proxyTimings.leaseMs } : {}),
-                        gateway_preflight_steps: performance.preflightSteps(),
-                    },
-                }
-                : {}),
+            metadata: {
+                ...(proxyTimings.authMs !== null ? { tensor_proxy_auth_ms: proxyTimings.authMs } : {}),
+                ...(proxyTimings.leaseMs !== null ? { tensor_proxy_lease_ms: proxyTimings.leaseMs } : {}),
+                ...(proxyHandoff !== null ? { tensor_proxy_handoff_ms: proxyHandoff } : {}),
+                gateway_preflight_steps: performance.preflightSteps(),
+            },
         });
         const serverTiming = buildServerTiming([
             { name: 'tensor_auth', durMs: proxyTimings.authMs },

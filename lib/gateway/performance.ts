@@ -22,6 +22,11 @@ export type ProxyEdgeTimings = {
 
 export const PROXY_AUTH_MS_HEADER = 'x-tensor-proxy-auth-ms';
 export const PROXY_LEASE_MS_HEADER = 'x-tensor-proxy-lease-ms';
+/**
+ * When the proxy's handler began, so the gateway can log the handoff between the two: loading the
+ * gateway route in a cold instance happens there, outside both the proxy's and the gateway's spans.
+ */
+export const PROXY_STARTED_AT_HEADER = 'x-tensor-proxy-started-at';
 
 function readEdgeMs(value: string | null): number | null {
     if (value === null) return null;
@@ -36,6 +41,14 @@ export function parseProxyEdgeTimings(headers: Headers): ProxyEdgeTimings {
         authMs: readEdgeMs(headers.get(PROXY_AUTH_MS_HEADER)),
         leaseMs: readEdgeMs(headers.get(PROXY_LEASE_MS_HEADER)),
     };
+}
+
+/** Milliseconds from the proxy's handler starting to this point, or null when not proxied. */
+export function proxyHandoffMs(headers: Headers, now: number = Date.now()): number | null {
+    const startedAt = Number(headers.get(PROXY_STARTED_AT_HEADER));
+    if (!Number.isFinite(startedAt) || startedAt <= 0) return null;
+    const handoff = now - startedAt;
+    return handoff >= 0 && handoff < 600_000 ? Math.round(handoff) : null;
 }
 
 /** Build a `Server-Timing` value from named durations, skipping unknowns. */

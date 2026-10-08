@@ -27,6 +27,7 @@ import {
     buildServerTiming,
     PROXY_AUTH_MS_HEADER,
     PROXY_LEASE_MS_HEADER,
+    PROXY_STARTED_AT_HEADER,
 } from "@/lib/gateway/performance";
 
 /**
@@ -88,6 +89,7 @@ async function forward(req: NextRequest, path: string[]): Promise<Response> {
   }
 
   const authStartedAt = Date.now();
+  const handlerStartedAt = authStartedAt;
   const session = await authenticateTensorDataRequest(req.headers.get("authorization"));
   const authMs = Date.now() - authStartedAt;
   if (!session) {
@@ -172,6 +174,7 @@ async function forward(req: NextRequest, path: string[]): Promise<Response> {
     "Content-Type": "application/json",
     "X-Cencori-User-IP": req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "",
     [PROXY_AUTH_MS_HEADER]: String(authMs),
+    [PROXY_STARTED_AT_HEADER]: String(handlerStartedAt),
     ...(leaseMs !== null ? { [PROXY_LEASE_MS_HEADER]: String(leaseMs) } : {}),
   };
   const remote = remoteGatewayBase();
