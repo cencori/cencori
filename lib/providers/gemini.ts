@@ -22,8 +22,66 @@ import {
 } from './base';
 import { getPricingFromDB } from './pricing';
 import { toGeminiMessages } from './utils';
-import { normalizeProviderError, ServiceUnavailableError } from './errors';
+import type { UnifiedMessage } from './base';
+import { InvalidRequestError, normalizeProviderError, ServiceUnavailableError } from './errors';
 import { getGoogleApiKey } from './google-env';
+import { readResponseBuffer, safeProviderFetch } from '@/lib/security/outbound-url';
+
+/**
+ * Google's inline image cap (mirrors VISION_PROVIDER_LIMITS.google in
+ * lib/vision/analyze.ts). Remote images are downloaded into memory, so the
+ * cap bounds both the fetch and the inline payload.
+ */
+const GOOGLE_MAX_IMAGE_BYTES = 20 * 1024 * 1024;
+const GOOGLE_IMAGE_FORMATS = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif'];
+
+/**
+ * Rewrite `https:` image URLs to `data:` URLs so the (sync) message
+ * converter can inline them. `data:` URLs pass through untouched; anything
+ * else throws InvalidRequestError. Downloads run through the SSRF-guarded
+ * fetch with the provider's byte cap and a 15s deadline, mirroring the
+ * vision layer's normalization.
+ *
+ * Exported for tests; the adapter calls it at the top of both chat paths.
+ */
+export async function resolveMessageImages(messages: UnifiedMessage[]): Promise<UnifiedMessage[]> {
+    return Promise.all(messages.map(async (msg) => {
+        if (!msg.images?.length) return msg;
+        const images = await Promise.all(msg.images.map(async (image) => {
+            if (image.url.startsWith('data:')) return image;
+            if (!/^https?:\/\//i.test(image.url)) {
+                throw new InvalidRequestError('google', 'Image URL must be a data: URL or an http(s):// URL.');
+            }
+            let response: Response;
+            try {
+                response = await safeProviderFetch(
+                    image.url,
+                    {
+                        headers: { 'User-Agent': 'Cencori-Gateway/1.0 (+https://cencori.com)' },
+                        signal: AbortSignal.timeout(15_000),
+                    },
+                    GOOGLE_MAX_IMAGE_BYTES,
+                );
+            } catch (error) {
+                throw new InvalidRequestError('google', `Could not fetch image URL: ${error instanceof Error ? error.message : 'fetch failed'}.`);
+            }
+            if (!response.ok) {
+                throw new InvalidRequestError('google', `Could not fetch image URL: HTTP ${response.status}.`);
+            }
+            const mimeType = (response.headers.get('content-type')?.split(';')[0] ?? 'image/jpeg').toLowerCase().trim();
+            if (!GOOGLE_IMAGE_FORMATS.includes(mimeType)) {
+                throw new InvalidRequestError(
+                    'google',
+                    `Image format "${mimeType}" is not supported by google. ` +
+                    `Supported formats: ${GOOGLE_IMAGE_FORMATS.map(m => m.replace('image/', '').toUpperCase()).join(', ')}.`,
+                );
+            }
+            const buffer = await readResponseBuffer(response, GOOGLE_MAX_IMAGE_BYTES);
+            return { ...image, url: `data:${mimeType};base64,${buffer.toString('base64')}` };
+        }));
+        return { ...msg, images };
+    }));
+}
 
 export class GeminiProvider extends AIProvider {
     readonly providerName = 'google';
@@ -65,7 +123,7 @@ export class GeminiProvider extends AIProvider {
             const model = this.client.getGenerativeModel({ model: request.model });
 
             // Convert unified format to Gemini format
-            const { history, prompt } = toGeminiMessages(request.messages);
+            const { history, prompt } = toGeminiMessages(await resolveMessageImages(request.messages));
 
             const chat = model.startChat({
                 history,
@@ -153,7 +211,7 @@ export class GeminiProvider extends AIProvider {
         try {
             const model = this.client.getGenerativeModel({ model: request.model });
 
-            const { history, prompt } = toGeminiMessages(request.messages);
+            const { history, prompt } = toGeminiMessages(await resolveMessageImages(request.messages));
 
             const chat = model.startChat({
                 history,
