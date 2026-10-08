@@ -127,8 +127,16 @@ export function ConsoleHomeOverview({
             <h2 className="mb-3 text-sm font-medium tracking-[-0.02em]">
                 Setup
             </h2>
-            <article className="flex min-h-44 flex-col rounded-md bg-muted/60 p-5">
-                <div className="mt-auto flex items-end justify-between gap-4 pt-3">
+            <article className="relative flex min-h-44 flex-col overflow-hidden rounded-md bg-muted/60 p-5">
+                <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-0"
+                    style={{
+                        background:
+                            "radial-gradient(circle 340px at 88% 50%, rgba(139, 92, 246, 0.55) 0%, rgba(139, 92, 246, 0.18) 38%, transparent 68%), radial-gradient(circle 220px at 95% 28%, rgba(59, 130, 246, 0.45) 0%, transparent 70%), radial-gradient(circle 220px at 96% 74%, rgba(249, 115, 22, 0.42) 0%, transparent 70%), radial-gradient(circle 170px at 89% 55%, rgba(250, 204, 21, 0.32) 0%, transparent 70%), radial-gradient(circle 170px at 101% 52%, rgba(239, 68, 68, 0.32) 0%, transparent 70%)",
+                    }}
+                />
+                <div className="relative z-10 mt-auto flex items-end justify-between gap-4 pt-3">
                     <div className="min-w-0">
                         <p className="text-2xl font-medium tracking-tight">
                             Integrate Cencori API
