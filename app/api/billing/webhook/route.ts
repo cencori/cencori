@@ -17,6 +17,7 @@ import {
 } from '@/lib/bachsClient';
 import {
   applyVerifiedTensorPayment,
+  applyVerifiedTensorPrepaidPayment,
   majorAmountToMinor,
 } from '@/lib/tensor-billing';
 import { applyPaidCreditTopup } from '@/lib/billing/paid-credit-topups';
@@ -179,7 +180,8 @@ async function handleCollectionSucceeded(
       break;
     }
 
-    case 'basecode_subscription': {
+    case 'basecode_subscription':
+    case 'basecode_prepaid': {
       if (!data.charge_id) {
         throw new Error('Bachs Tensor collection is missing a charge ID');
       }
@@ -189,7 +191,7 @@ async function handleCollectionSucceeded(
       }
 
       // The signed webhook starts the workflow; the independently retrieved
-      // charge is the only object allowed to grant the entitlement.
+      // charge is the only object allowed to grant value.
       const charge = await getCharge(data.charge_id);
       const amountMinor = majorAmountToMinor(charge.amount);
       if (
@@ -201,18 +203,32 @@ async function handleCollectionSucceeded(
         throw new Error('Bachs Tensor charge did not verify');
       }
 
-      await applyVerifiedTensorPayment(supabase, {
-        provider: 'bachs',
-        providerTransactionId: charge.charge_id,
-        reference: charge.reference,
-        amountMinor,
-        currency: 'USD',
-        paymentMethod: charge.payment_method,
-        paidAt: charge.created_at,
-        providerCustomerId: charge.customer.id,
-        providerPayload: charge as unknown as Record<string, unknown>,
-        planCode,
-      });
+      if (productType === 'basecode_prepaid') {
+        await applyVerifiedTensorPrepaidPayment(supabase, {
+          provider: 'bachs',
+          providerTransactionId: charge.charge_id,
+          reference: charge.reference,
+          amountMinor,
+          currency: 'USD',
+          paymentMethod: charge.payment_method,
+          paidAt: charge.created_at,
+          providerCustomerId: charge.customer.id,
+          providerPayload: charge as unknown as Record<string, unknown>,
+        });
+      } else {
+        await applyVerifiedTensorPayment(supabase, {
+          provider: 'bachs',
+          providerTransactionId: charge.charge_id,
+          reference: charge.reference,
+          amountMinor,
+          currency: 'USD',
+          paymentMethod: charge.payment_method,
+          paidAt: charge.created_at,
+          providerCustomerId: charge.customer.id,
+          providerPayload: charge as unknown as Record<string, unknown>,
+          planCode,
+        });
+      }
       break;
     }
 

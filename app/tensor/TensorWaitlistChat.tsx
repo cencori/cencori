@@ -124,7 +124,7 @@ export function TensorWaitlistChat({ onClose }: { onClose: () => void }) {
         body: JSON.stringify({ messages: history, collected: data, currentField: field }),
       });
       const json = (await res.json()) as AgentResponse;
-      if (!res.ok || !json.reply) throw new Error("agent failed");
+      if (!json.reply) throw new Error("agent failed");
       setCollected(json.collected);
       setCurrentField(json.currentField);
       setMessages((prev) => [...prev, { role: "assistant", content: json.reply }]);

@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import {
   applyVerifiedTensorPayment,
+  applyVerifiedTensorPrepaidPayment,
   getTensorPlan,
   getTensorPlanByPaystackPlanCode,
   type TensorPaidPlanCode,
@@ -236,17 +237,36 @@ async function handleChargeSuccess(admin: Admin, eventId: string, reference: str
     .maybeSingle();
 
   if (checkout) {
-    await applyVerifiedTensorPayment(admin, {
-      provider: "paystack",
-      providerTransactionId: String(transaction.id),
-      reference: transaction.reference,
-      amountMinor: transaction.amount,
-      currency: "NGN",
-      paymentMethod: transaction.channel,
-      paidAt: transaction.paid_at,
-      providerCustomerId: transaction.customer?.customer_code ?? null,
-      providerPayload: transaction as unknown as Record<string, unknown>,
-    });
+    const { data: kind } = await admin
+      .from("basecode_checkout_sessions")
+      .select("purchase_kind")
+      .eq("reference", transaction.reference)
+      .maybeSingle();
+    if ((kind as { purchase_kind?: string } | null)?.purchase_kind === "prepaid") {
+      await applyVerifiedTensorPrepaidPayment(admin, {
+        provider: "paystack",
+        providerTransactionId: String(transaction.id),
+        reference: transaction.reference,
+        amountMinor: transaction.amount,
+        currency: "NGN",
+        paymentMethod: transaction.channel,
+        paidAt: transaction.paid_at,
+        providerCustomerId: transaction.customer?.customer_code ?? null,
+        providerPayload: transaction as unknown as Record<string, unknown>,
+      });
+    } else {
+      await applyVerifiedTensorPayment(admin, {
+        provider: "paystack",
+        providerTransactionId: String(transaction.id),
+        reference: transaction.reference,
+        amountMinor: transaction.amount,
+        currency: "NGN",
+        paymentMethod: transaction.channel,
+        paidAt: transaction.paid_at,
+        providerCustomerId: transaction.customer?.customer_code ?? null,
+        providerPayload: transaction as unknown as Record<string, unknown>,
+      });
+    }
   } else {
     // A provider-generated reference: a subscription renewal, not a checkout.
     await applyRenewal(admin, {

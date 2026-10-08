@@ -54,11 +54,13 @@ insert into public.basecode_plans (
   model_policy,
   max_concurrent_turns
 ) values
-  ('free', 'Free', 0, 0, 10, null, 'auto', 1),
+  ('free', 'Free', 0, 0, 15, null, 'auto', 1),
   -- Paid limits are provider-cost budgets. They are deliberately server-side
   -- and may be tuned without shipping a desktop release.
-  ('builder', 'Builder', 500000, 500, null, 250000, 'open_weight', 1),
-  ('pro', 'Pro', 1500000, 1500, null, 1000000, 'frontier', 1),
+  -- Builder $0.50/wk (~12 glm-5.3-flash / ~38 v4-pro medium turns), Pro $2.00/wk
+  -- (~21 sol / ~10 opus medium turns). Retuned 2026-10-04 for profitability.
+  ('builder', 'Builder', 500000, 500, null, 500000, 'open_weight', 1),
+  ('pro', 'Pro', 1500000, 1500, null, 2000000, 'frontier', 1),
   ('enterprise', 'Enterprise', null, null, null, null, 'custom', 100)
 on conflict (code) do update set
   name = excluded.name,

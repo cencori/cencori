@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 
 type BillingSnapshot = {
   plan: { code: string; name: string };
+  prepaid?: { balanceMicrousd: number; totalCreditedMicrousd: number };
 };
 
 const POLL_INTERVAL_MS = 3000;
@@ -30,6 +31,9 @@ export function BillingReturnNotice() {
     let polls = 0;
     let stopped = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
+    let baselinePlan: string | null = null;
+    let baselineBalance = 0;
+    let baselined = false;
 
     const poll = async () => {
       polls += 1;
@@ -37,10 +41,22 @@ export function BillingReturnNotice() {
         const response = await fetch("/api/tensor/billing", { cache: "no-store" });
         if (response.ok) {
           const snapshot = (await response.json()) as BillingSnapshot;
-          if (snapshot.plan.code === "builder" || snapshot.plan.code === "pro") {
+          if (!baselined) {
+            baselinePlan = snapshot.plan.code;
+            baselineBalance = snapshot.prepaid?.balanceMicrousd ?? 0;
+            baselined = true;
+          }
+          // Prepaid success is either a picker unlock (builder/pro pack) or a
+          // credit increase (starter pack keeps the free plan). Legacy
+          // subscriptions surface as the plan change.
+          const unlocked =
+            (snapshot.plan.code === "builder" || snapshot.plan.code === "pro") &&
+            snapshot.plan.code !== baselinePlan;
+          const credited = (snapshot.prepaid?.balanceMicrousd ?? 0) > baselineBalance;
+          if (unlocked || credited) {
             if (!stopped) {
               setState("active");
-              // Reload on the clean URL so the plans below refetch and show "Current plan".
+              // Reload on the clean URL so the packs below refetch and show the new balance.
               timer = setTimeout(() => window.location.replace("/tensor#plans"), 2500);
             }
             return;
@@ -68,10 +84,10 @@ export function BillingReturnNotice() {
   if (cancelled && !returned) {
     return (
       <p className="mx-auto max-w-6xl px-5 text-center text-xs text-white/60 md:px-8" role="status">
-        Checkout was cancelled — no charge was made. You can pick a plan whenever you
+        Checkout was cancelled — no charge was made. You can pick a pack whenever you
         are ready.{" "}
         <a className="underline underline-offset-4 hover:text-white" href="/tensor#plans">
-          Back to plans
+          Back to packs
         </a>
       </p>
     );
@@ -82,7 +98,7 @@ export function BillingReturnNotice() {
   if (state === "active") {
     return (
       <p className="mx-auto max-w-6xl px-5 text-center text-xs text-white md:px-8" role="status">
-        Payment confirmed — your plan is now active. Refreshing…
+        Payment confirmed — your credit is now active. Refreshing…
       </p>
     );
   }
@@ -90,11 +106,11 @@ export function BillingReturnNotice() {
   if (state === "slow") {
     return (
       <p className="mx-auto max-w-6xl px-5 text-center text-xs text-white/60 md:px-8" role="status">
-        Payment is still confirming — your plan will update automatically once the
+        Payment is still confirming — your credit will update automatically once the
         provider settles it. If you were charged and nothing changes, write to
         hello@cencori.com.{" "}
         <a className="underline underline-offset-4 hover:text-white" href="/tensor#plans">
-          Back to plans
+          Back to packs
         </a>
       </p>
     );
