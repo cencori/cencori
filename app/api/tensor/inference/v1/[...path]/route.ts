@@ -20,9 +20,11 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { waitUntil } from "@vercel/functions";
 import { authenticateTensorDataRequest } from "@/lib/tensor-data";
 import { noStoreHeaders } from "@/lib/tensor-auth";
 import { getCachedTensorAccess, setCachedTensorAccess } from "@/lib/config-cache";
+import { warmTensorGateway } from "@/lib/gateway/tensor-warm";
 import {
     buildServerTiming,
     PROXY_AUTH_MS_HEADER,
@@ -83,6 +85,7 @@ function json(body: unknown, status: number) {
 }
 
 async function forward(req: NextRequest, path: string[]): Promise<Response> {
+  if (path.join("/") === "warm" && req.method === "POST") return warm(req);
   const route = ROUTES[path.join("/")];
   if (!route || !route.methods.includes(req.method)) {
     return json({ error: "Not found", code: "unknown_route" }, 404);
@@ -229,4 +232,25 @@ export async function GET(req: NextRequest, context: RouteContext): Promise<Resp
 
 export async function POST(req: NextRequest, context: RouteContext): Promise<Response> {
   return forward(req, (await context.params).path);
+}
+
+/**
+ * Readies the gateway while the user is still typing (see `warmTensorGateway`). Signed-in users
+ * only; it calls no model and spends nothing, so it needs no lease. Answered at once, with the
+ * lookups finishing after the response so the app never waits on them.
+ */
+async function warm(req: NextRequest): Promise<Response> {
+  const session = await authenticateTensorDataRequest(req.headers.get("authorization"));
+  if (!session) {
+    return json({ error: "Sign in to Tensor to continue.", code: "unauthenticated" }, 401);
+  }
+  let model: string | null = null;
+  try {
+    const body = (await req.json()) as { model?: unknown };
+    model = typeof body.model === "string" && body.model.length <= 160 ? body.model : null;
+  } catch {
+    // No body is fine: the project config still warms.
+  }
+  waitUntil(warmTensorGateway(session.user.id, model));
+  return new Response(null, { status: 204, headers: noStoreHeaders() });
 }

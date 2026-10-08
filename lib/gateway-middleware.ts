@@ -15,7 +15,7 @@ import { checkSpendCap } from '@/lib/budgets';
 import { deductCredits } from '@/lib/credits';
 import { extractCencoriApiKeyFromHeaders } from '@/lib/api-keys';
 import { logGatewayEvent } from '@/lib/gateway-reliability';
-import { getCachedApiKeyConfig, setCachedApiKeyConfig } from '@/lib/config-cache';
+import { getCachedApiKeyConfig, getCachedTensorAccess, setCachedApiKeyConfig } from '@/lib/config-cache';
 import { processUsageQueue } from '@/lib/queue';
 import { recordGatewayGovernanceDecision } from '@/lib/governance/record-decision';
 import { isFullySponsoredApiKey } from '@/lib/gateway/model-access';
@@ -189,6 +189,59 @@ async function enforceProjectIngressPolicy(params: {
  * Validate a gateway request: auth, rate limit, spend cap, domain, geo.
  * Call this at the top of every AI endpoint POST handler.
  */
+/**
+ * The API key's row with its project and organization, from cache when it is there.
+ *
+ * Shared by request validation and the Tensor warm-up, which runs it while a prompt is being typed
+ * so the send does not meet a cold cache: the 60s lifetime is what bounds a revoked key, so it is
+ * kept short and warmed instead of lengthened.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function loadApiKeyConfig(supabase: ReturnType<typeof createAdminClient>, keyHash: string): Promise<{ data: any; error: unknown }> {
+    const cachedKey = await getCachedApiKeyConfig(keyHash);
+    if (cachedKey?.data) return { data: cachedKey.data, error: null };
+
+    const result = await supabase
+        .from('api_keys')
+        .select(`
+            id,
+            name,
+            created_by,
+            client_app,
+            project_id,
+            environment,
+            key_type,
+            agent_id,
+            allowed_domains,
+            allowed_models,
+            sponsored_models,
+            projects!inner(
+                id,
+                name,
+                organization_id,
+                default_model,
+                default_provider,
+                end_user_billing_enabled,
+                organizations!inner(
+                    id,
+                    subscription_tier,
+                    monthly_requests_used,
+                    credits_balance,
+                    billing_frozen
+                )
+            )
+        `)
+        .eq('key_hash', keyHash)
+        .is('revoked_at', null)
+        .single();
+
+    // Cache the result for next time
+    if (result.data) {
+        void setCachedApiKeyConfig(keyHash, result.data);
+    }
+    return { data: result.data, error: result.error };
+}
+
 export async function validateGatewayRequest(req: NextRequest): Promise<GatewayValidationResult> {
     const startTime = Date.now();
     const requestId = crypto.randomUUID();
@@ -458,54 +511,9 @@ return {
     // ── Look up key (with Redis cache) ──
     const keyHash = crypto.createHash('sha256').update(apiKey).digest('hex');
 
-    // Try cache first for performance
-    const cachedKey = await getCachedApiKeyConfig(keyHash);
-    let keyData = cachedKey?.data;
-    let keyError = null;
-
-    if (!keyData) {
-        const result = await supabase
-            .from('api_keys')
-            .select(`
-                id,
-                name,
-                created_by,
-                client_app,
-                project_id,
-                environment,
-                key_type,
-                agent_id,
-                allowed_domains,
-                allowed_models,
-                sponsored_models,
-                projects!inner(
-                    id,
-                    name,
-                    organization_id,
-                    default_model,
-                    default_provider,
-                    end_user_billing_enabled,
-                    organizations!inner(
-                        id,
-                        subscription_tier,
-                        monthly_requests_used,
-                        credits_balance,
-                        billing_frozen
-                    )
-                )
-            `)
-            .eq('key_hash', keyHash)
-            .is('revoked_at', null)
-            .single();
-        
-        keyData = result.data;
-        keyError = result.error;
-
-        // Cache the result for next time
-        if (keyData) {
-            void setCachedApiKeyConfig(keyHash, keyData);
-        }
-    }
+    const loaded = await loadApiKeyConfig(supabase, keyHash);
+    const keyData = loaded.data;
+    const keyError = loaded.error;
 
     if (keyError || !keyData) {
         // A key that matched nothing may still be one this gateway issued and later revoked —
@@ -657,8 +665,16 @@ return {
     const creditsBalancePromise = shouldEnforceCredits
         ? import('@/lib/credits').then(({ getCreditsBalance }) => getCreditsBalance(organizationId))
         : Promise.resolve(Number(organization.credits_balance ?? 0));
+    // The Tensor proxy and the turn reservation keep a short-lived allowed answer for this user;
+    // it is the same RPC's answer, so a hit saves the round trip and a miss asks as before.
+    const readTensorAccess = async (userId: string): Promise<{ data: unknown; error: unknown }> => {
+        const cached = await getCachedTensorAccess(userId);
+        if (cached) return { data: cached, error: null };
+        const { data, error } = await supabase.rpc('basecode_gateway_access', { p_user_id: userId });
+        return { data, error };
+    };
     const tensorAccessPromise = tensorUserId
-        ? supabase.rpc('basecode_gateway_access', { p_user_id: tensorUserId })
+        ? readTensorAccess(tensorUserId)
         : Promise.resolve({ data: null, error: null });
     // Tiered quotas: control-plane reads (polls) draw from a roomy bucket so
     // they cannot starve the write budget, and cancellation is always
