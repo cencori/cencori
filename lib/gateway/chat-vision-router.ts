@@ -103,12 +103,33 @@ const VISION_CAPABLE_PATTERNS = [
     /^gpt-4o/i,
     /^gpt-4-turbo/i,
     /^gpt-4-vision/i,
+    // GPT-4.1 / GPT-5 / GPT-6 families all take image input. Without these an
+    // image request naming one fell to the `gpt` family fallback and was
+    // downgraded to gpt-4o-mini.
+    /^gpt-4\.1/i,
+    /^gpt-5/i,
+    /^gpt-6/i,
+    // o-series reasoning models take image input (previously downgraded via
+    // the o1/o3 family fallback below).
+    /^o[134]/i,
     /^claude-3-5-sonnet/i,
     /^claude-3-opus/i,
     /^claude-sonnet-4/i,
     /^claude-sonnet-5/i,
+    // Opus, Fable and Mythos lines are all multimodal. Haiku is covered per
+    // model: 5.5 takes images, while 4.5 keeps its deliberate Sonnet upgrade
+    // in VISION_UPGRADES below — so no blanket haiku pattern.
+    /^claude-opus/i,
+    /^claude-fable/i,
+    /^claude-mythos/i,
+    /^claude-haiku-5-5/i,
     /^gemini-2\.5/i,
     /^gemini-3/i,
+    // Mistral Large 3/4 are multimodal and ride the OpenAI wire format, which
+    // forwards images untouched. Narrower lines (Small, Ministral, Codestral,
+    // Devstral) stay on passthrough: their image support is unconfirmed, and
+    // the unknown-provider branch below already leaves them alone.
+    /^mistral-large/i,
     /^maximo-atlas-1\.[12]/i,
     // OpenRouter free vision models. Without these an image request naming one
     // would be "upgraded" to gpt-4o-mini — moving a working free request onto

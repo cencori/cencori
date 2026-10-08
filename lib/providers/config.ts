@@ -212,7 +212,7 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
             // original rate ($1.36/$4.18) recorded in the pricing migration.
             // Weights drop end of Oct 2026. 1M context per Mistral's page
             // (some gateways report 524k — re-check at GA).
-            { id: 'mistral-large-4-0', name: 'Mistral Large 4', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: '1T-param open-weight flagship, coding/agentic/multimodal, preview sale $0.68/$2.09 per 1M', capabilities: { tools: true, structuredOutput: true }, addedAt: '2026-10-06' },
+            { id: 'mistral-large-4-0', name: 'Mistral Large 4', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: '1T-param open-weight flagship, coding/agentic/multimodal, preview sale $0.68/$2.09 per 1M', capabilities: { tools: true, structuredOutput: true, fileInput: true }, addedAt: '2026-10-06' },
             // Mistral Large 3 (Dec 2025 - MoE)
             { id: 'mistral-large-latest', name: 'Mistral Large 3', type: ['chat'], contextWindow: 128000, description: '675B params, best open-weight multimodal', capabilities: { tools: true, structuredOutput: true }, addedAt: '2025-12-01' },
             { id: 'mistral-medium-latest', name: 'Mistral Medium 3.1', type: ['chat'], contextWindow: 128000, description: 'Frontier-class multimodal', capabilities: { tools: true, structuredOutput: true }, addedAt: '2025-12-01' },

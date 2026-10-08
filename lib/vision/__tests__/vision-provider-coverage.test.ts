@@ -78,4 +78,37 @@ describe('vision capability coverage', () => {
         // unknown-provider branch. It survived by accident; now it's explicit.
         expect(upgradeModelForVision('maximo-atlas-1.2')).toEqual({ model: 'maximo-atlas-1.2', upgraded: false });
     });
+
+    it('keeps image requests on vision-capable chat models', () => {
+        // Every id here takes image input upstream. Before their patterns were
+        // added, GPT-5/6 and o-series requests were downgraded to gpt-4o-mini
+        // and newer Claudes fell to the family fallback (claude-3-5-sonnet).
+        for (const id of [
+            'claude-opus-5-5',
+            'claude-sonnet-5-5',
+            'claude-haiku-5-5',
+            'claude-fable-5-1',
+            'claude-mythos-5-1',
+            'gpt-5.5',
+            'gpt-6-sol',
+            'gpt-6.1-sol',
+            'gpt-4.1',
+            'o3',
+            'o4-mini',
+            'mistral-large-4-0',
+            'mistral-large-latest',
+        ]) {
+            expect(upgradeModelForVision(id)).toEqual({ model: id, upgraded: false });
+        }
+    });
+
+    it('still upgrades models without confirmed image support', () => {
+        // Haiku 4.5 keeps its deliberate Sonnet upgrade — the haiku pattern
+        // above is scoped to 5.5 precisely so this keeps working.
+        expect(upgradeModelForVision('claude-haiku-4-5')).toEqual({
+            model: 'claude-sonnet-4-6',
+            upgraded: true,
+            from: 'claude-haiku-4-5',
+        });
+    });
 });

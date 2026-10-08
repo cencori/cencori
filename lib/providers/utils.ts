@@ -5,6 +5,74 @@
  */
 
 import { UnifiedMessage, ToolCall } from './base';
+import { InvalidRequestError } from './errors';
+
+/**
+ * Image formats and per-image byte caps per provider. This mirrors
+ * `VISION_PROVIDER_LIMITS` in lib/vision/analyze.ts — duplicated rather than
+ * imported so providers never depend on the vision layer (analyze.ts imports
+ * the OpenAI-compatible registry from here, so importing it back would cycle).
+ */
+const ANTHROPIC_IMAGE_FORMATS = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+const GOOGLE_IMAGE_FORMATS = [...ANTHROPIC_IMAGE_FORMATS, 'image/heic', 'image/heif'];
+const ANTHROPIC_MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const GOOGLE_MAX_IMAGE_BYTES = 20 * 1024 * 1024;
+
+function normalizeImageMime(mimeType: string): string {
+    const lower = mimeType.toLowerCase().trim();
+    // Anthropic and Google both expect the canonical `image/jpeg`.
+    return lower === 'image/jpg' ? 'image/jpeg' : lower;
+}
+
+function imageByteLength(base64: string): number {
+    // 4 base64 chars encode 3 bytes; trailing '=' padding trims the last group.
+    const padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0;
+    return Math.floor((base64.length * 3) / 4) - padding;
+}
+
+function formatBytes(bytes: number): string {
+    if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(0)}MB`;
+    return `${(bytes / 1024).toFixed(0)}KB`;
+}
+
+/**
+ * Split a `data:<mime>;base64,...` URL into its parts, validating mime and
+ * size for the target provider. Anything malformed, foreign, or oversized
+ * throws InvalidRequestError (a 400, never retried) rather than being
+ * silently dropped — a dropped image would answer without seeing it.
+ */
+export function parseImageDataUrl(
+    url: string,
+    provider: string,
+    allowedFormats: readonly string[] = ANTHROPIC_IMAGE_FORMATS,
+    maxBytes: number = ANTHROPIC_MAX_IMAGE_BYTES,
+): { mimeType: string; data: string } {
+    const match = /^data:([^;,]*)(;base64)?,([\s\S]*)$/.exec(url);
+    if (!match || match[2] !== ';base64') {
+        throw new InvalidRequestError(provider, 'Image data URL must be base64-encoded (data:<mime>;base64,...).');
+    }
+    // Lenient on a missing mime (default JPEG, like the vision layer) but
+    // strict on a wrong one — sending it anyway only buys an upstream 400.
+    const mimeType = normalizeImageMime(match[1] || 'image/jpeg');
+    if (!allowedFormats.includes(mimeType)) {
+        throw new InvalidRequestError(
+            provider,
+            `Image format "${match[1] || 'unknown'}" is not supported by ${provider}. ` +
+            `Supported formats: ${allowedFormats.map(m => m.replace('image/', '').toUpperCase()).join(', ')}.`,
+        );
+    }
+    const data = match[3];
+    if (!data) {
+        throw new InvalidRequestError(provider, 'Image data URL carries no data.');
+    }
+    if (imageByteLength(data) > maxBytes) {
+        throw new InvalidRequestError(
+            provider,
+            `Image is ${formatBytes(imageByteLength(data))} but ${provider} allows a maximum of ${formatBytes(maxBytes)} per image.`,
+        );
+    }
+    return { mimeType, data };
+}
 
 /**
  * OpenAI message format
@@ -34,16 +102,40 @@ export interface OpenAIMessage {
  *
  * Anthropic carries tool calls and their results as content blocks rather than
  * as separate message fields, so `content` widens to a block list whenever a
- * turn involves tools. Plain text turns stay plain strings.
+ * turn involves tools — and, since images ride as image blocks, whenever a
+ * turn carries images. Plain text turns stay plain strings.
  */
+export type AnthropicImageSource =
+    | { type: 'base64'; media_type: string; data: string }
+    | { type: 'url'; url: string };
+
 export type AnthropicContentBlock =
     | { type: 'text'; text: string }
+    | { type: 'image'; source: AnthropicImageSource }
     | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> }
     | { type: 'tool_result'; tool_use_id: string; content: string };
 
 export interface AnthropicMessage {
     role: 'user' | 'assistant';
     content: string | AnthropicContentBlock[];
+}
+
+/**
+ * Convert one unified image to an Anthropic image block.
+ *
+ * `data:` URLs become base64 blocks (validated); `https:` URLs become URL
+ * blocks, which Anthropic fetches itself. Anything else (http, ftp, garbage)
+ * throws rather than being sent to a certain upstream rejection.
+ */
+export function toAnthropicImageBlock(url: string, provider = 'anthropic'): AnthropicContentBlock {
+    if (url.startsWith('data:')) {
+        const { mimeType, data } = parseImageDataUrl(url, provider);
+        return { type: 'image', source: { type: 'base64', media_type: mimeType, data } };
+    }
+    if (/^https:\/\//i.test(url)) {
+        return { type: 'image', source: { type: 'url', url } };
+    }
+    throw new InvalidRequestError(provider, 'Image URL must be a data: URL or an https:// URL.');
 }
 
 /**
@@ -65,10 +157,43 @@ function parseToolArguments(args: string): Record<string, unknown> {
 
 /**
  * Gemini message format
+ *
+ * `parts` widens beyond text only for turns that carry images; text-only turns
+ * keep the single-text-part shape the adapter has always sent.
  */
+export type GeminiPart =
+    | { text: string }
+    | { inlineData: { mimeType: string; data: string } };
+
 export interface GeminiMessage {
     role: 'user' | 'model';
-    parts: { text: string }[];
+    parts: GeminiPart[];
+}
+
+/**
+ * Build the parts list for one turn: prose first, then one inline-data part
+ * per image. Only `data:` URLs are accepted here — Gemini cannot fetch remote
+ * URLs, so callers must resolve `https:` images to bytes first (see the
+ * Gemini adapter); an unresolved URL throws rather than being dropped.
+ */
+function toGeminiParts(msg: Pick<UnifiedMessage, 'content' | 'images'>): GeminiPart[] {
+    const images = msg.images ?? [];
+    // Text-only turns keep the exact single-text-part shape the adapter has
+    // always sent — including the empty-string edge, which the SDK accepts.
+    if (images.length === 0) return [{ text: msg.content }];
+    const parts: GeminiPart[] = [];
+    if (msg.content) parts.push({ text: msg.content });
+    for (const image of images) {
+        if (!image.url.startsWith('data:')) {
+            throw new InvalidRequestError(
+                'google',
+                'Gemini chat images must be data: URLs. Resolve https:// image URLs to bytes before conversion.',
+            );
+        }
+        const { mimeType, data } = parseImageDataUrl(image.url, 'google', GOOGLE_IMAGE_FORMATS, GOOGLE_MAX_IMAGE_BYTES);
+        parts.push({ inlineData: { mimeType, data } });
+    }
+    return parts;
 }
 
 /**
@@ -128,8 +253,15 @@ function toOpenAIContent(msg: UnifiedMessage): string | OpenAIContentPart[] {
  * block on the assistant turn, and each tool result becomes a `tool_result`
  * block on a *user* turn. Parallel results must share one user turn, so
  * consecutive tool messages are merged rather than emitted one turn each.
+ *
+ * Images ride as image blocks on the turn that carries them (`data:` URLs as
+ * base64, `https:` as URL blocks Anthropic fetches itself). Turns without
+ * images keep the exact shapes they always had.
  */
-export function toAnthropicMessages(messages: UnifiedMessage[]): {
+export function toAnthropicMessages(
+    messages: UnifiedMessage[],
+    { provider = 'anthropic' }: { provider?: string } = {},
+): {
     system?: string;
     messages: AnthropicMessage[];
 } {
@@ -164,6 +296,9 @@ export function toAnthropicMessages(messages: UnifiedMessage[]): {
             if (msg.content) {
                 blocks.push({ type: 'text', text: msg.content });
             }
+            for (const image of msg.images ?? []) {
+                blocks.push(toAnthropicImageBlock(image.url, provider));
+            }
             for (const call of msg.tool_calls) {
                 blocks.push({
                     type: 'tool_use',
@@ -176,9 +311,24 @@ export function toAnthropicMessages(messages: UnifiedMessage[]): {
             continue;
         }
 
+        const imageBlocks = (msg.images ?? []).map(image => toAnthropicImageBlock(image.url, provider));
+        if (imageBlocks.length === 0) {
+            converted.push({
+                role: msg.role === 'assistant' ? 'assistant' : 'user',
+                content: msg.content,
+            });
+            continue;
+        }
+        // Prose first, then images — and never an empty text block, which
+        // Anthropic rejects. An images-only turn is blocks of images alone.
+        const blocks: AnthropicContentBlock[] = [];
+        if (msg.content) {
+            blocks.push({ type: 'text', text: msg.content });
+        }
+        blocks.push(...imageBlocks);
         converted.push({
             role: msg.role === 'assistant' ? 'assistant' : 'user',
-            content: msg.content,
+            content: blocks,
         });
     }
 
@@ -191,24 +341,32 @@ export function toAnthropicMessages(messages: UnifiedMessage[]): {
 }
 
 /**
- * Convert unified messages to Gemini format
+ * Convert unified messages to Gemini format.
+ *
+ * Gemini uses chat history + current prompt format; all messages except the
+ * last one go into history. Text-only turns keep the single-text-part shape
+ * the adapter has always sent; turns with images widen to text plus one
+ * inline-data part per image.
  */
 export function toGeminiMessages(messages: UnifiedMessage[]): {
     history: GeminiMessage[];
-    prompt: string;
+    prompt: string | GeminiPart[];
 } {
-    // Gemini uses chat history + current prompt format
-    // All messages except the last one go into history
     const history = messages.slice(0, -1).map(msg => ({
         role: msg.role === 'assistant' ? 'model' as const : 'user' as const,
-        parts: [{ text: msg.content }],
+        parts: toGeminiParts(msg),
     }));
 
     const lastMessage = messages[messages.length - 1];
+    const lastParts = toGeminiParts(lastMessage);
 
     return {
         history,
-        prompt: lastMessage.content,
+        // A lone text part collapses back to the plain string every caller
+        // has always passed; anything richer goes over as parts.
+        prompt: lastParts.length === 1 && 'text' in lastParts[0]
+            ? lastParts[0].text
+            : lastParts,
     };
 }
 

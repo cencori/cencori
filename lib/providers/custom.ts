@@ -205,7 +205,7 @@ export class CustomProvider extends AIProvider {
                 user: request.userId,
             };
         } else if (this.config.format === 'anthropic') {
-            const { system, messages } = toAnthropicMessages(request.messages);
+            const { system, messages } = toAnthropicMessages(request.messages, { provider: this.providerName });
             return {
                 model: request.model,
                 max_tokens: request.maxTokens ?? 4096,
