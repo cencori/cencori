@@ -71,13 +71,20 @@ function toInputSchema(parameters: Record<string, any> | undefined): Anthropic.T
  * guaranteed rejection — with tools present and a caller who wanted one used,
  * `auto` almost always calls it, whereas the 400 returns nothing at all.
  *
+ * Claude Sonnet 5.5 (2026-09-28) does the same: `tool_choice` `any`/`tool`
+ * returns 400 `tool_choice: type "tool" and "any" are not supported for this
+ * model` (see "Forced tool use is not supported" in its what's-new page), so
+ * it rides the same downgrade. Haiku 5.5 is unaffected — its change table
+ * lists no forced-tool-use removal — hence no blanket 5.5 rule.
+ *
  * Every other Claude model still honours the forced forms, so this is keyed to
  * the affected ids rather than applied across the provider. `none` is
  * unaffected on all models, and `disable_parallel_tool_use` still rides along
  * with `auto`.
  */
 function rejectsForcedToolChoice(model: string): boolean {
-    return /^claude-(fable|mythos)-5-1\b/.test(model);
+    return /^claude-(fable|mythos)-5-1\b/.test(model)
+        || model === 'claude-sonnet-5-5';
 }
 
 export class AnthropicProvider extends AIProvider {
