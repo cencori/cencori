@@ -79,6 +79,10 @@ export function getModelDisplayPrice(
     // GPT-6 family (September 2026)
     if (id.startsWith('gpt-6-astra')) return price(10, 50);
     if (id.startsWith('gpt-6-sol')) return price(2, 10);
+    // GPT-6.1 Sol keeps the $2/$10 base (cheaper cache reads, same display).
+    // Dotted id never matches the gpt-6-sol prefix above ('gpt-6.' vs 'gpt-6-')
+    // and would otherwise fall through to the $0.50/$1.50 generic catch-all.
+    if (id.startsWith('gpt-6.1-sol')) return price(2, 10);
     if (id.startsWith('gpt-6-luna')) return price(0.2, 0.5);
     if (id.startsWith('gpt-5.5-pro')) return price(30, 180);
     // GPT-5 flagship
@@ -109,6 +113,12 @@ export function getModelDisplayPrice(
 
     // Claude
     if (id === 'claude-sonnet-5') return price(2, 10);
+    // Sonnet 5.5 keeps Sonnet 5's $2/$10 base rate (cache reads halved to
+    // $0.10/MTok Oct 2026). Must precede the generic sonnet catch-all ($3/$15).
+    if (id === 'claude-sonnet-5-5') return price(2, 10);
+    // Haiku 5.5 short-prompt rate ($0.10/$0.50 at or under 100k tokens; 5x
+    // above). Must precede the generic haiku catch-all ($0.25/$1.25).
+    if (id === 'claude-haiku-5-5') return price(0.1, 0.5);
     if (id === 'claude-opus-4.8') return price(5, 25);
     if (id === 'claude-opus-5') return price(5, 25);
     if (id === 'claude-opus-5-5') return price(4, 20);
@@ -161,6 +171,9 @@ export function getModelDisplayPrice(
         id.includes('devstral') ||
         id.includes('magistral')
     ) {
+        // Large 4 preview sale rate ($0.68/$2.09 per 1M; original $1.36/$4.18).
+        // Must precede the generic large catch-all ($2/$6, Large 3 era).
+        if (id.includes('large-4')) return price(0.68, 2.09);
         if (id.includes('large')) return price(2, 6);
         if (id.includes('medium')) return price(1, 3);
         if (id.includes('small') || id.includes('8b')) return price(0.2, 0.6);

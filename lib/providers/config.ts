@@ -82,6 +82,13 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
             // ids resolve upstream, verified 2026-09-23 by error-code probe)
             { id: 'gpt-6-astra', name: 'GPT-6 Astra', type: ['chat', 'reasoning', 'code'], contextWindow: 1050000, description: 'New generation flagship, computer use/coding/cyber/science, $10/$50 per 1M', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2026-09-10' },
             { id: 'gpt-6-sol', name: 'GPT-6 Sol', type: ['chat', 'reasoning', 'code'], contextWindow: 1050000, description: 'GPT-6 flagship tier, $2/$10 per 1M', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2026-09-10' },
+            // GPT-6.1 Sol (DevDay, Sept 29 2026) — mid-tier refresh of Sol:
+            // near-Astra coding/computer-use at 1/5 Astra prices, same $2/$10
+            // base as 6 Sol but cache reads halved to $0.10/MTok (0.05x, not
+            // the usual 0.1x). Long-context surcharge past 272k input tokens
+            // (2x in/cache, 1.5x out) lives in the pricing row's long_context_*
+            // columns. Dotted id is canonical — no router alias needed.
+            { id: 'gpt-6.1-sol', name: 'GPT-6.1 Sol', type: ['chat', 'reasoning', 'code'], contextWindow: 1050000, description: 'Sol refresh, near-Astra coding at 1/5 cost, $2/$10 per 1M, cheaper caching', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2026-09-29' },
             { id: 'gpt-6-luna', name: 'GPT-6 Luna', type: ['chat', 'reasoning', 'code'], contextWindow: 1050000, description: 'Cheapest frontier tier, $0.10/$0.50 per 1M', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2026-09-10' },
             // GPT-5.6 Series (July 2026; repriced Aug 21 2026)
             { id: 'gpt-5.6-sol', name: 'GPT-5.6 Sol', type: ['chat', 'reasoning', 'code'], contextWindow: 1050000, description: 'Flagship, SOTA coding/cyber/science, max/ultra reasoning, $4/$20 per 1M', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2026-07-09' },
@@ -134,6 +141,19 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
             // Claude Opus 5.5 (September 2026) — Anthropic's recommended default
             // for most workloads. $4/$20 per 1M, 1M context, adaptive thinking.
             { id: 'claude-opus-5-5', name: 'Claude Opus 5.5', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'Default for most workloads, long-horizon agentic coding, $4/$20 per 1M', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2026-09-20' },
+            // Claude Sonnet 5.5 (September 2026) — faster, lower-cost complement
+            // to Opus 5.5 for well-scoped everyday work. $2/$10 per 1M, cache
+            // reads halved to $0.10/MTok on 2026-10-07. 1M context, adaptive
+            // thinking. Rejects forced tool_choice (`any`/`tool` 400), like
+            // Fable/Mythos 5.1 — see rejectsForcedToolChoice in anthropic.ts.
+            { id: 'claude-sonnet-5-5', name: 'Claude Sonnet 5.5', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'Best speed/intelligence balance, 30%+ faster output than Sonnet 5, $2/$10 per 1M', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2026-09-28' },
+            // Claude Haiku 5.5 (October 2026) — fastest, cheapest Claude, built
+            // for subagents and high-volume cost-sensitive work. Tiered pricing
+            // by prompt length: $0.10/$0.50 per 1M at or under 100k prompt
+            // tokens, $0.50/$2.50 above (see long_context_* pricing columns).
+            // 1M context (up from 200k on Haiku 4.5), adaptive thinking with
+            // adjustable effort — a first for Haiku.
+            { id: 'claude-haiku-5-5', name: 'Claude Haiku 5.5', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'Fastest, cheapest Claude for classification, routing & subagents, from $0.10/$0.50 per 1M', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2026-10-07' },
             // Claude 5 Series (June-July 2026)
             { id: 'claude-fable-5', name: 'Claude Fable 5', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'Most capable model, for the most demanding reasoning & long-horizon agentic work', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2026-06-09' },
             { id: 'claude-opus-5', name: 'Claude Opus 5', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'New flagship for complex agentic coding & enterprise work, succeeds Opus 4.8', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2026-07-24' },
@@ -182,6 +202,17 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         docsUrl: 'https://docs.mistral.ai',
         keyPrefix: '',
         models: [
+            // Mistral Large 4 "Le Chonk" (Oct 2026, public preview v26.10) —
+            // 1T-param granular MoE (52B active + 1.6B vision encoder), natively
+            // multimodal, SOTA open-weight on cyber/finance/manufacturing and
+            // visual grounding. Versioned id: native examples and the model
+            // page (`/models/mistral-large-4-0`) use `mistral-large-4-0`; the
+            // bare `mistral-large-4` form is aliased in router.ts. Preview sale
+            // pricing ($0.68/$2.09 per 1M, no published end date) with the
+            // original rate ($1.36/$4.18) recorded in the pricing migration.
+            // Weights drop end of Oct 2026. 1M context per Mistral's page
+            // (some gateways report 524k — re-check at GA).
+            { id: 'mistral-large-4-0', name: 'Mistral Large 4', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: '1T-param open-weight flagship, coding/agentic/multimodal, preview sale $0.68/$2.09 per 1M', capabilities: { tools: true, structuredOutput: true }, addedAt: '2026-10-06' },
             // Mistral Large 3 (Dec 2025 - MoE)
             { id: 'mistral-large-latest', name: 'Mistral Large 3', type: ['chat'], contextWindow: 128000, description: '675B params, best open-weight multimodal', capabilities: { tools: true, structuredOutput: true }, addedAt: '2025-12-01' },
             { id: 'mistral-medium-latest', name: 'Mistral Medium 3.1', type: ['chat'], contextWindow: 128000, description: 'Frontier-class multimodal', capabilities: { tools: true, structuredOutput: true }, addedAt: '2025-12-01' },

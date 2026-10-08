@@ -21,6 +21,15 @@ const MODEL_ALIASES: Record<string, string> = {
     'claude-opus-4.6': 'claude-opus-4-6',
     'claude-opus-4.7': 'claude-opus-4-7',
     'claude-opus-4.8': 'claude-opus-4-8',
+    // 5.5 generation dotted forms, same reason as the 4.x rows above.
+    'claude-sonnet-5.5': 'claude-sonnet-5-5',
+    'claude-haiku-5.5': 'claude-haiku-5-5',
+    'claude-opus-5.5': 'claude-opus-5-5',
+    // Mistral Large 4: the versioned `mistral-large-4-0` id is what Mistral's
+    // docs and native examples use; accept the bare major-version form too
+    // (it is what gateways like Vercel advertise) and send the versioned id
+    // upstream. Pricing is keyed on the versioned id.
+    'mistral-large-4': 'mistral-large-4-0',
     // Centaur is the public codename; the upstream endpoint only answers to
     // its internal id. Normalization happens before billing and the upstream
     // call, so pricing keys must use the internal id (see free-models.ts).
