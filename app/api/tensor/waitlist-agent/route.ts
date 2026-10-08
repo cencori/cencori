@@ -65,9 +65,43 @@ done = true only when nextField is null.`;
 
 const DEEPSEEK_MODEL = "deepseek-v4-pro";
 const DEEPSEEK_TIMEOUT_MS = 35_000;
+const GATE_WINDOW_SECONDS = 60;
+const GATE_MAX_TURNS_PER_WINDOW = 30;
+
+type GateVerdict = { allowed: true } | { allowed: false };
 
 /**
- * Primary brain for the waitlist agent: DeepSeek V4 Pro (OpenAI-compatible).
+ * Abuse guard for a public endpoint that spends gateway credits.
+ * Tiny Upstash sliding window per IP, fails OPEN when Redis is unconfigured
+ * so a missing cache never blocks a legit signup.
+ */
+async function gateAbuse(req: Request): Promise<GateVerdict> {
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token) return { allowed: true };
+  try {
+    const forwarded = req.headers.get("x-forwarded-for");
+    const ip = forwarded?.split(",")[0]?.trim() || "unknown";
+    const key = `tensor-waitlist-agent:${ip}`;
+    const res = await fetch(`${url}/incr/${encodeURIComponent(key)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return { allowed: true };
+    const data = (await res.json()) as { result?: number };
+    const count = typeof data.result === "number" ? data.result : 0;
+    if (count === 1) {
+      await fetch(`${url}/expire/${encodeURIComponent(key)}/${GATE_WINDOW_SECONDS}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    }
+    return count <= GATE_MAX_TURNS_PER_WINDOW ? { allowed: true } : { allowed: false };
+  } catch {
+    return { allowed: true };
+  }
+}
+
+/**
+ * Primary brain for the waitlist agent: DeepSeek V4 Pro, called directly.
  * Returns the raw text on success, null when unconfigured or failed —
  * the caller falls through to the shared provider chain, then rules.
  */
@@ -150,6 +184,21 @@ export async function POST(req: Request) {
     body.currentField && TENSOR_WAITLIST_FIELD_ORDER.includes(body.currentField) ? body.currentField : nextMissingField(collected);
 
   const lastUser = [...messages].reverse().find((m) => m.role === "user")?.content?.trim() || "";
+
+  // Abuse guard first: public endpoint, metered backend.
+  const gate = await gateAbuse(req);
+  if (!gate.allowed) {
+    return NextResponse.json(
+      {
+        reply: "Whoa, slow down a touch — give it a minute and try that again.",
+        collected,
+        currentField,
+        done: false,
+        provider: "rate-limited",
+      },
+      { status: 429 },
+    );
+  }
 
   // Fast path: no user message yet (chat opened) — ask first missing field without LLM.
   if (!lastUser) {

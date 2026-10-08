@@ -52,8 +52,44 @@ export type TensorPlanRow = {
   enabled: boolean;
 };
 
+export type TensorPackCode = "starter" | "builder" | "pro";
+
+export type TensorPrepaidPackRow = {
+  code: TensorPackCode;
+  name: string;
+  price_ngn_minor: number;
+  price_usd_minor: number;
+  credit_microusd: number;
+  grants_plan: TensorPlanCode;
+  enabled: boolean;
+};
+
 function isPaidPlan(value: unknown): value is TensorPaidPlanCode {
   return value === "builder" || value === "pro";
+}
+
+function isPackCode(value: unknown): value is TensorPackCode {
+  return value === "starter" || value === "builder" || value === "pro";
+}
+
+export function parseTensorPackCheckoutInput(value: unknown): {
+  paymentMethod: TensorPaymentMethod;
+  pack: TensorPackCode;
+  provider: TensorPaymentProvider;
+} | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const body = value as Record<string, unknown>;
+  // Prepaid packs are one-off by nature: no recurring flag. Card, OPay and
+  // bank transfer all work because nothing is reused.
+  if (!isPackCode(body.pack)) return null;
+  const provider = body.provider === "bachs" ? "bachs" : body.provider === "paystack" ? "paystack" : null;
+  if (!provider) return null;
+  const paymentMethod =
+    body.paymentMethod === "opay" || body.paymentMethod === "banktransfer"
+      ? body.paymentMethod
+      : "auto";
+  if (provider === "bachs" && paymentMethod !== "auto") return null;
+  return { paymentMethod, pack: body.pack, provider };
 }
 
 export function parseTensorCheckoutInput(value: unknown): {
@@ -198,10 +234,26 @@ export async function getTensorPlan(
   return data as TensorPlanRow;
 }
 
+export async function getTensorPack(admin: Admin, code: TensorPackCode): Promise<TensorPrepaidPackRow> {
+  const { data, error } = await admin
+    .from("basecode_prepaid_packs")
+    .select("code, name, price_ngn_minor, price_usd_minor, credit_microusd, grants_plan, enabled")
+    .eq("code", code)
+    .eq("enabled", true)
+    .maybeSingle();
+  if (error || !data) throw new Error("The selected Tensor pack is unavailable.");
+  return data as TensorPrepaidPackRow;
+}
+
 export async function getTensorBillingSnapshot(admin: Admin, userId: string) {
   const account = await getOrCreateTensorBillingAccount(admin, userId);
   const planCode = effectiveTensorPlan(account);
   const plan = await getTensorPlan(admin, planCode);
+  const { data: wallet } = await admin
+    .from("basecode_billing_accounts")
+    .select("prepaid_balance_microusd, prepaid_total_credited_microusd")
+    .eq("id", account.id)
+    .maybeSingle();
   const now = new Date().toISOString();
   const { data: period, error } = await admin
     .from("basecode_usage_periods")
@@ -255,6 +307,73 @@ export async function getTensorBillingSnapshot(admin: Admin, userId: string) {
       resetsAt: period?.ends_at ?? null,
       ...(tokens ? { tokens } : {}),
     },
+    prepaid: {
+      balanceMicrousd: Number(
+        (wallet as { prepaid_balance_microusd?: unknown } | null)?.prepaid_balance_microusd ?? 0,
+      ),
+      totalCreditedMicrousd: Number(
+        (wallet as { prepaid_total_credited_microusd?: unknown } | null)?.prepaid_total_credited_microusd ?? 0,
+      ),
+    },
+  };
+}
+
+export async function applyVerifiedTensorPrepaidPayment(
+  admin: Admin,
+  payment: Omit<VerifiedTensorPayment, "planCode"> & { packCode?: TensorPackCode },
+) {
+  const { data: checkout, error: checkoutError } = await admin
+    .from("basecode_checkout_sessions")
+    .select("id, account_id, pack_code, purchase_kind, provider, reference, expected_amount_minor, currency, status")
+    .eq("reference", payment.reference)
+    .maybeSingle();
+  if (checkoutError || !checkout) throw new Error("Tensor checkout not found.");
+  if (checkout.provider !== payment.provider) throw new Error("Payment provider mismatch.");
+  if (checkout.purchase_kind !== "prepaid") throw new Error("Tensor checkout is not prepaid.");
+  if (payment.packCode && checkout.pack_code !== payment.packCode) {
+    throw new Error("Payment pack mismatch.");
+  }
+  if (checkout.currency !== payment.currency) throw new Error("Payment currency mismatch.");
+  if (payment.amountMinor < Number(checkout.expected_amount_minor)) {
+    throw new Error("Payment amount is below the checkout total.");
+  }
+  if (checkout.status !== "pending" && checkout.status !== "paid") {
+    throw new Error("Tensor checkout is not payable.");
+  }
+
+  const { data, error } = await admin.rpc("basecode_apply_prepaid_payment", {
+    p_checkout_session_id: checkout.id,
+    p_provider_transaction_id: payment.providerTransactionId,
+    p_amount_minor: payment.amountMinor,
+    p_currency: payment.currency,
+    p_payment_method: payment.paymentMethod ?? null,
+    p_paid_at: payment.paidAt ?? new Date().toISOString(),
+    p_provider_payload: payment.providerPayload,
+  });
+  if (error) throw new Error(`Could not apply the Tensor payment: ${error.message}`);
+
+  if (payment.providerCustomerId) {
+    const { error: customerError } = await admin.from("basecode_billing_customers").upsert(
+      {
+        account_id: checkout.account_id,
+        provider: payment.provider,
+        provider_customer_id: payment.providerCustomerId,
+      },
+      { onConflict: "account_id,provider" },
+    );
+    if (customerError) {
+      console.error("[Tensor Billing] Could not save provider customer", customerError);
+    }
+  }
+
+  return data as {
+    applied: boolean;
+    duplicate?: boolean;
+    account_id: string;
+    pack?: TensorPackCode;
+    plan?: TensorPlanCode;
+    credited_microusd?: number;
+    balance_microusd?: number;
   };
 }
 

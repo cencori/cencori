@@ -14,24 +14,28 @@ describe('Tensor plan model policy', () => {
     );
   });
 
-  it('defaults Free Auto requests to GLM 5.3 Flash', () => {
-    expect(resolveTensorPlanModel('auto', 'auto')).toBe('glm-5.3-flash');
+  it('defaults Free Auto requests to DeepSeek V4 Flash', () => {
+    expect(resolveTensorPlanModel('auto', 'auto')).toBe('deepseek-v4-flash');
   });
 
   /**
-   * Auto is the default on the Free plan, not the only option. Every request used to be replaced by
-   * the auto model whatever it named, so a picker offering a choice would have been lying — the
-   * pick was discarded and every turn ran on the same model.
+   * Free/auto is request-counted, so it stays pinned to the cheap weak models.
+   * Atlas + flash pass through; expensive open-weight falls back to auto.
    */
-  it('serves a Free user the open-weight model they asked for', () => {
-    for (const model of ['maximo-atlas-1.2', 'glm-5.3-flash']) {
+  it('serves a Free user the cheap auto model they asked for', () => {
+    for (const model of ['maximo-atlas-1.3', 'maximo-atlas-1.2', 'deepseek-v4-flash']) {
       expect(resolveTensorPlanModel(model, 'auto')).toBe(model);
     }
   });
 
+  it('falls back to auto for expensive open-weight on Free', () => {
+    expect(resolveTensorPlanModel('glm-5.3-flash', 'auto')).toBe('deepseek-v4-flash');
+    expect(resolveTensorPlanModel('deepseek-v4-pro', 'auto')).toBe('deepseek-v4-flash');
+  });
+
   /** A frontier model is not on this plan, and is answered rather than refused, as it always was. */
   it('still substitutes rather than refusing a frontier model on Free', () => {
-    expect(resolveTensorPlanModel('claude-opus-5', 'auto')).toBe('glm-5.3-flash');
+    expect(resolveTensorPlanModel('claude-opus-5', 'auto')).toBe('deepseek-v4-flash');
   });
 
   it('allows open-weight Builder models and rejects frontier models', () => {

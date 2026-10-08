@@ -3,80 +3,68 @@
 import { useEffect, useState } from "react";
 
 type PlanCode = "free" | "builder" | "pro" | "enterprise";
-type PaidPlan = Extract<PlanCode, "builder" | "pro">;
+type PackCode = "starter" | "builder" | "pro";
 type CheckoutMethod = "opay" | "banktransfer" | "international";
 
 type BillingSnapshot = {
   plan: { code: PlanCode; name: string };
   usage: { percentageUsed: number; resetsAt: string | null };
+  prepaid?: { balanceMicrousd: number; totalCreditedMicrousd: number };
 };
 
-const plans: Array<{
-  code: PlanCode;
+const packs: Array<{
+  code: PackCode;
   eyebrow: string;
   price: string;
-  cadence: string;
+  usd: string;
   description: string;
   features: string[];
 }> = [
   {
-    code: "free",
-    eyebrow: "Start",
-    price: "₦0",
-    cadence: "forever",
-    description: "A sharp first taste of Tensor, routed automatically.",
-    features: ["10 agent requests each week", "Auto model routing", "One task at a time"],
+    code: "starter",
+    eyebrow: "Top up",
+    price: "₦2,000",
+    usd: "$2",
+    description: "Turns on the auto model. No picker change.",
+    features: ["Pay once, burn as you go", "Hard stop at zero — never a bill", "Top up again whenever you run out"],
   },
   {
     code: "builder",
     eyebrow: "Build",
     price: "₦5,000",
-    cadence: "every 30 days",
-    description: "More room to work with capable open-weight models.",
-    features: ["Selectable open-weight models", "Weekly usage allowance", "Priority over Free"],
+    usd: "$5",
+    description: "Unlocks the open-weight picker + extra turns.",
+    features: ["Unlocks selectable open-weight models", "Plenty of room for daily building", "Pay once, burn as you go"],
   },
   {
     code: "pro",
     eyebrow: "Ship",
     price: "₦15,000",
-    cadence: "every 30 days",
-    description: "Frontier intelligence for the work that justifies it.",
-    features: ["GPT 5.6 Sol and Opus-class access", "Cost-weighted weekly allowance", "All Builder models"],
-  },
-  {
-    code: "enterprise",
-    eyebrow: "Scale",
-    price: "Custom",
-    cadence: "for teams",
-    description: "Controls, capacity, and support shaped around your company.",
-    features: ["Custom model policy", "Custom limits and concurrency", "Direct support"],
+    usd: "$15",
+    description: "Unlocks frontier models + the most turns.",
+    features: ["Unlocks GPT / Opus-class models", "Built for serious shipping weeks", "Pay once, burn as you go"],
   },
 ];
 
-function checkoutPayload(plan: PaidPlan, method: CheckoutMethod, recurring: boolean) {
+// Launch gate: Pro stays hidden until a frontier key is funded and its
+// pricing row is active. Add "pro" back the moment that lands — one-line flip.
+const ENABLED_PACKS: PackCode[] = ["starter", "builder"];
+
+function checkoutPayload(pack: PackCode, method: CheckoutMethod) {
   if (method === "international") {
-    return { paymentMethod: "auto", plan, provider: "bachs" };
+    return { paymentMethod: "auto", pack, provider: "bachs" };
   }
-  if (recurring) {
-    // Auto-renew pays by card: only card authorizations can be reused for
-    // subscriptions. OPay and bank transfer stay one-off.
-    return { paymentMethod: "auto", plan, provider: "paystack", recurring: true };
-  }
-  return { paymentMethod: method, plan, provider: "paystack" };
+  return { paymentMethod: method, pack, provider: "paystack" };
 }
 
-type AutoRenewState = {
-  autoRenews: boolean;
-  provider: string;
-  currentPeriodEnd: string | null;
-} | null;
+function formatCredit(microusd: number): string {
+  return `$${(microusd / 1_000_000).toFixed(2)}`;
+}
 
 export function TensorPlans() {
   const [currentPlan, setCurrentPlan] = useState<PlanCode | null>(null);
-  const [selectedPlan, setSelectedPlan] = useState<PaidPlan | null>(null);
-  const [recurring, setRecurring] = useState(false);
-  const [autoRenew, setAutoRenew] = useState<AutoRenewState>(null);
-  const [cancelling, setCancelling] = useState(false);
+  const [balanceMicrousd, setBalanceMicrousd] = useState<number | null>(null);
+  const [selectedPack, setSelectedPack] = useState<PackCode | null>(null);
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -90,17 +78,7 @@ export function TensorPlans() {
       .then((snapshot) => {
         if (active && snapshot) {
           setCurrentPlan(snapshot.plan.code);
-          if (snapshot.plan.code === "builder" || snapshot.plan.code === "pro") {
-            void fetch("/api/tensor/billing/subscription", { cache: "no-store" })
-              .then(async (response) => {
-                if (!response.ok) return null;
-                return (await response.json()) as { subscription: AutoRenewState };
-              })
-              .then((result) => {
-                if (active && result) setAutoRenew(result.subscription);
-              })
-              .catch(() => undefined);
-          }
+          if (snapshot.prepaid) setBalanceMicrousd(snapshot.prepaid.balanceMicrousd);
         }
       })
       .catch(() => undefined);
@@ -109,34 +87,15 @@ export function TensorPlans() {
     };
   }, []);
 
-  async function cancelAutoRenew() {
-    setCancelling(true);
-    setError(null);
-    try {
-      const response = await fetch("/api/tensor/billing/subscription/cancel", {
-        method: "POST",
-      });
-      const result = (await response.json()) as { cancelled?: boolean; error?: string };
-      if (!response.ok || !result.cancelled) {
-        throw new Error(result.error || "Auto-renew could not be turned off.");
-      }
-      setAutoRenew((previous) => (previous ? { ...previous, autoRenews: false } : previous));
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Auto-renew could not be turned off.");
-    } finally {
-      setCancelling(false);
-    }
-  }
-
-  async function beginCheckout(plan: PaidPlan, method: CheckoutMethod) {
-    const key = `${plan}:${method}:${recurring ? "recurring" : "once"}`;
+  async function beginCheckout(pack: PackCode, method: CheckoutMethod) {
+    const key = `${pack}:${method}`;
     setLoading(key);
     setError(null);
     try {
       const response = await fetch("/api/tensor/billing/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(checkoutPayload(plan, method, recurring)),
+        body: JSON.stringify(checkoutPayload(pack, method)),
       });
       if (response.status === 401) {
         window.location.assign(`/login?redirect=${encodeURIComponent("/tensor#plans")}`);
@@ -155,55 +114,52 @@ export function TensorPlans() {
 
   return (
     <section className="mx-auto max-w-6xl px-5 pb-24 pt-16 md:px-8 md:pb-32 md:pt-24" id="plans">
-      <div className="mb-10 grid gap-5 border-t border-white/20 pt-6 md:grid-cols-[1fr_1fr] md:items-end">
-        <div>
-          <p className="font-mono text-[10px] font-medium uppercase tracking-[0.2em] text-white/55">
-            Plans / priced for Nigeria
+      <div className="mb-10">
+        <h2 className="max-w-xl text-3xl font-semibold tracking-[-0.05em] text-white sm:text-4xl">
+          Get started with Tensor
+        </h2>
+        {balanceMicrousd !== null ? (
+          <p className="mt-4 inline-flex items-center gap-2 rounded-full border border-white/15 px-3 py-1 text-xs text-white/75">
+            Credit balance: <strong className="text-white">{formatCredit(balanceMicrousd)}</strong>
+            {currentPlan && currentPlan !== "free" ? (
+              <span className="text-white/45">· {currentPlan} picker unlocked</span>
+            ) : null}
           </p>
-          <h2 className="mt-3 max-w-xl text-3xl font-semibold tracking-[-0.05em] text-white sm:text-4xl">
-            Start small. Pay when the work gets serious.
-          </h2>
-        </div>
-        <p className="max-w-lg text-sm leading-6 text-white/60 md:justify-self-end">
-          Every plan resets weekly. Paid usage is weighted by model cost, so frontier models use the
-          allowance faster. Your app shows one clear percentage—not a wall of token arithmetic.
-        </p>
+        ) : null}
       </div>
 
-      <div className="grid overflow-hidden rounded-xl border border-white/15 bg-black/25 backdrop-blur-md sm:grid-cols-2 lg:grid-cols-4">
-        {plans.map((plan) => {
-          const isCurrent = currentPlan === plan.code;
-          const isPaid = plan.code === "builder" || plan.code === "pro";
-          const isSelected = isPaid && selectedPlan === plan.code;
+      <div className={`grid overflow-hidden rounded-xl border border-white/15 bg-black/25 backdrop-blur-md sm:grid-cols-2 ${packs.filter((p) => ENABLED_PACKS.includes(p.code)).length > 2 ? "lg:grid-cols-3" : "lg:grid-cols-2"}`}>
+        {packs.filter((pack) => ENABLED_PACKS.includes(pack.code)).map((pack) => {
+          const isSelected = selectedPack === pack.code;
           return (
             <article
               className={`flex min-h-[28rem] flex-col border-white/10 p-5 sm:[&:nth-child(odd)]:border-r lg:border-r lg:last:border-r-0 ${
-                plan.code === "pro" ? "bg-white/[0.07]" : "bg-white/[0.025]"
+                pack.code === "pro" ? "bg-white/[0.07]" : "bg-white/[0.025]"
               }`}
-              key={plan.code}
+              key={pack.code}
             >
               <div className="flex items-start justify-between gap-3">
                 <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/45">
-                  {plan.eyebrow}
+                  {pack.eyebrow}
                 </p>
-                {plan.code === "pro" ? (
+                {pack.code === "pro" ? (
                   <span className="rounded-full border border-white/20 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-white/70">
                     Frontier
                   </span>
                 ) : null}
               </div>
               <h3 className="mt-8 text-xl font-medium tracking-[-0.035em] text-white">
-                {plan.code[0].toUpperCase() + plan.code.slice(1)}
+                {pack.code[0].toUpperCase() + pack.code.slice(1)}
               </h3>
               <div className="mt-3 flex items-baseline gap-2">
                 <strong className="text-3xl font-semibold tracking-[-0.055em] text-white">
-                  {plan.price}
+                  {pack.price}
                 </strong>
-                <span className="text-[11px] text-white/40">{plan.cadence}</span>
+                <span className="text-[11px] text-white/40">one-off</span>
               </div>
-              <p className="mt-5 min-h-12 text-sm leading-5 text-white/55">{plan.description}</p>
+              <p className="mt-5 min-h-12 text-sm leading-5 text-white/55">{pack.description}</p>
               <ul className="mt-6 grid gap-3 border-t border-white/10 pt-5 text-xs text-white/70">
-                {plan.features.map((feature) => (
+                {pack.features.map((feature) => (
                   <li className="flex gap-2" key={feature}>
                     <span aria-hidden="true" className="text-white/35">—</span>
                     {feature}
@@ -212,109 +168,41 @@ export function TensorPlans() {
               </ul>
 
               <div className="mt-auto pt-8">
-                {isCurrent ? (
-                  <div className="grid gap-2">
-                    <div className="flex h-9 items-center justify-center rounded-md border border-white/15 text-xs text-white/50">
-                      Current plan
-                    </div>
-                    {autoRenew && autoRenew.provider === "paystack" ? (
-                      autoRenew.autoRenews ? (
-                        <button
-                          className="h-8 text-[11px] text-white/45 transition-colors hover:text-white/75 disabled:opacity-50"
-                          disabled={cancelling}
-                          onClick={() => void cancelAutoRenew()}
-                          type="button"
-                        >
-                          {cancelling ? "Turning off…" : "Auto-renew on · turn off"}
-                        </button>
-                      ) : (
-                        <p className="text-center text-[11px] text-white/40">
-                          Auto-renew off — turn it on at your next renewal.
-                        </p>
-                      )
-                    ) : null}
-                  </div>
-                ) : isPaid ? (
-                  isSelected ? (
-                    <div className="grid gap-2" aria-label={`Pay for ${plan.code}`}>
-                      <label className="flex cursor-pointer items-center gap-2 text-[11px] text-white/60">
-                        <input
-                          checked={recurring}
-                          className="h-3.5 w-3.5 accent-white"
-                          disabled={loading !== null}
-                          onChange={(event) => setRecurring(event.target.checked)}
-                          type="checkbox"
-                        />
-                        Auto-renew every 30 days
-                      </label>
-                      {recurring ? (
-                        <>
-                          <button
-                            className="h-9 rounded-md bg-white text-xs font-medium text-black transition-colors hover:bg-white/85 disabled:opacity-50"
-                            disabled={loading !== null}
-                            onClick={() => void beginCheckout(plan.code as PaidPlan, "opay")}
-                            type="button"
-                          >
-                            {loading?.startsWith(`${plan.code}:`) ? "Opening…" : "Pay with card · auto-renews"}
-                          </button>
-                          <p className="-mt-1 text-[11px] leading-4 text-white/40">
-                            Auto-renew needs a card — OPay and bank transfer are one-off.
-                          </p>
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            className="h-9 rounded-md bg-white text-xs font-medium text-black transition-colors hover:bg-white/85 disabled:opacity-50"
-                            disabled={loading !== null}
-                            onClick={() => void beginCheckout(plan.code as PaidPlan, "opay")}
-                            type="button"
-                          >
-                            {loading === `${plan.code}:opay:once` ? "Opening…" : "Pay with OPay"}
-                          </button>
-                          <button
-                            className="h-9 rounded-md border border-white/20 text-xs font-medium text-white transition-colors hover:bg-white/10 disabled:opacity-50"
-                            disabled={loading !== null}
-                            onClick={() => void beginCheckout(plan.code as PaidPlan, "banktransfer")}
-                            type="button"
-                          >
-                            {loading === `${plan.code}:banktransfer:once` ? "Opening…" : "Bank transfer"}
-                          </button>
-                          <button
-                            className="h-8 text-[11px] text-white/45 transition-colors hover:text-white/75 disabled:opacity-50"
-                            disabled={loading !== null}
-                            onClick={() => void beginCheckout(plan.code as PaidPlan, "international")}
-                            type="button"
-                          >
-                            {loading === `${plan.code}:international:once`
-                              ? "Opening…"
-                              : `International card · $${plan.code === "builder" ? "5" : "15"}`}
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  ) : (
+                {isSelected ? (
+                  <div className="grid gap-2" aria-label={`Buy ${pack.code}`}>
                     <button
-                      className="h-9 w-full rounded-md bg-white text-xs font-medium text-black transition-colors hover:bg-white/85"
-                      onClick={() => setSelectedPlan(plan.code as PaidPlan)}
+                      className="h-9 rounded-md bg-white text-xs font-medium text-black transition-colors hover:bg-white/85 disabled:opacity-50"
+                      disabled={loading !== null}
+                      onClick={() => void beginCheckout(pack.code, "opay")}
                       type="button"
                     >
-                      Choose {plan.code === "builder" ? "Builder" : "Pro"}
+                      {loading === `${pack.code}:opay` ? "Opening…" : "Pay with OPay"}
                     </button>
-                  )
-                ) : plan.code === "enterprise" ? (
-                  <a
-                    className="flex h-9 items-center justify-center rounded-md border border-white/20 text-xs font-medium text-white transition-colors hover:bg-white/10"
-                    href="mailto:hello@cencori.com?subject=Tensor%20Enterprise"
-                  >
-                    Talk to us
-                  </a>
+                    <button
+                      className="h-9 rounded-md border border-white/20 text-xs font-medium text-white transition-colors hover:bg-white/10 disabled:opacity-50"
+                      disabled={loading !== null}
+                      onClick={() => void beginCheckout(pack.code, "banktransfer")}
+                      type="button"
+                    >
+                      {loading === `${pack.code}:banktransfer` ? "Opening…" : "Bank transfer"}
+                    </button>
+                    <button
+                      className="h-8 text-[11px] text-white/45 transition-colors hover:text-white/75 disabled:opacity-50"
+                      disabled={loading !== null}
+                      onClick={() => void beginCheckout(pack.code, "international")}
+                      type="button"
+                    >
+                      {loading === `${pack.code}:international` ? "Opening…" : `International card · ${pack.usd}`}
+                    </button>
+                  </div>
                 ) : (
-                  <a
-                    className="flex h-9 items-center justify-center rounded-md border border-white/20 text-xs font-medium text-white transition-colors hover:bg-white/10"
-                    href="#download"
+                  <button
+                    className="h-9 w-full rounded-md bg-white text-xs font-medium text-black transition-colors hover:bg-white/85"
+                    onClick={() => setSelectedPack(pack.code)}
+                    type="button"
                   >
-                    Download Tensor
-                  </a>
+                    Buy {pack.code[0].toUpperCase() + pack.code.slice(1)}
+                  </button>
                 )}
               </div>
             </article>
@@ -329,8 +217,8 @@ export function TensorPlans() {
       ) : null}
       <p className="mt-5 text-center text-[11px] leading-5 text-white/40">
         OPay and Nigerian bank transfers are processed by Paystack. International card checkout
-        is processed by Bachs. Card payments can auto-renew every 30 days; OPay and bank
-        transfer are one-off. Usage allowances reset weekly.
+        is processed by Bachs. Every payment is one-off — no auto-renew. Credit burns at real
+        provider cost and stops at zero. Weekly velocity caps still pace heavy burn.
       </p>
     </section>
   );
