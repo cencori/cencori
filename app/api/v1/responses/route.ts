@@ -132,6 +132,7 @@ export async function POST(req: NextRequest) {
                     metadata: {
                         ...(proxyTimings.authMs !== null ? { tensor_proxy_auth_ms: proxyTimings.authMs } : {}),
                         ...(proxyTimings.leaseMs !== null ? { tensor_proxy_lease_ms: proxyTimings.leaseMs } : {}),
+                        gateway_preflight_steps: performance.preflightSteps(),
                     },
                 }
                 : {}),
@@ -178,6 +179,7 @@ export async function POST(req: NextRequest) {
             }
             gatewayCtx = validation.context;
             authenticatedProjectId = gatewayCtx.projectId;
+            performance.step('validate');
         } else if (authHeader) {
             const userClient = createClient(supabaseUrl, supabaseAnonKey, {
                 global: { headers: { Authorization: authHeader } },
@@ -202,6 +204,7 @@ export async function POST(req: NextRequest) {
             startedAt,
         });
 
+        performance.step('agent');
         let agentId: string | null = null;
         let shadowMode = false;
         let agentConfig: { model?: string | null; system_prompt?: string | null; tools?: string[] | null } | null = null;
@@ -228,6 +231,7 @@ export async function POST(req: NextRequest) {
         if (!body || typeof body !== 'object') {
             return respondError(400, 'Request body must be a JSON object.', 'invalid_request');
         }
+        performance.step('body');
         if (body.model !== undefined && typeof body.model !== 'string') {
             return respondError(400, 'Model must be a string.', 'invalid_model');
         }
@@ -338,7 +342,9 @@ export async function POST(req: NextRequest) {
         const inputMessages: UnifiedMessage[] = translatedInput.messages;
 
         // Data-plane split: warm per-project config in one fetch (see chat route).
+        performance.step('translate');
         await warmGatewayProjectConfig(adminClient, gatewayCtx.projectId);
+        performance.step('project_config');
 
         const inputPipeline = await runGatewayInputPipeline({
             supabase: adminClient,

@@ -59,9 +59,26 @@ export class GatewayPerformanceTracker {
     private clientFirstByteAt: number | null = null;
     private completedAt: number | null = null;
     private completionTokens: number | null = null;
+    private readonly steps: Array<[string, number]> = [];
+    private lastStepAt: number;
 
     constructor(requestStartedAt: number = Date.now()) {
         this.requestStartedAt = requestStartedAt;
+        this.lastStepAt = requestStartedAt;
+    }
+
+    /**
+     * Ends one named stretch of preflight. The total alone said a request spent 1.6–2.7s before the
+     * provider was called and nothing about where; these say which step it was.
+     */
+    step(name: string, at: number = Date.now()): void {
+        this.steps.push([name, Math.max(0, at - this.lastStepAt)]);
+        this.lastStepAt = at;
+    }
+
+    /** Each preflight step's duration, in the order they ran. */
+    preflightSteps(): Record<string, number> {
+        return Object.fromEntries(this.steps);
     }
 
     markPreflightComplete(at: number = Date.now()): void {

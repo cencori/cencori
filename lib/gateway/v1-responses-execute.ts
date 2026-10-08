@@ -460,6 +460,7 @@ export async function runV1ResponsesExecution(
             };
         }
 
+        params.performance?.step('input_pipeline');
         const resolved = await resolveGatewayProvider({
             supabase: params.supabase,
             projectId: gatewayCtx.projectId,
@@ -477,6 +478,7 @@ export async function runV1ResponsesExecution(
 
         // Separate function tools from built-in tools
         const { functionTools, builtInTools } = extractTools(body.tools);
+        params.performance?.step('provider');
         params.performance?.markPreflightComplete();
 
         // Make files supplied on this request searchable during this request,
