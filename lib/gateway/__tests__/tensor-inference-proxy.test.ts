@@ -28,6 +28,14 @@ vi.mock('@/lib/config-cache', () => ({
     setCachedTensorAccess: (...args: unknown[]) => mockSetCachedAccess(...args),
 }));
 
+const mockWarm = vi.fn();
+vi.mock('@/lib/gateway/tensor-warm', () => ({
+    warmTensorGateway: (...args: unknown[]) => mockWarm(...args),
+}));
+vi.mock('@vercel/functions', () => ({
+    waitUntil: (promise: Promise<unknown>) => void promise,
+}));
+
 const mockGatewayResponses = vi.fn();
 const mockGatewayChat = vi.fn();
 const mockGatewayModels = vi.fn();
@@ -374,5 +382,42 @@ describe('calling the gateway in-process', () => {
         expect(response.status).toBe(200);
         expect(mockGatewayModels).toHaveBeenCalledTimes(1);
         expect(global.fetch).not.toHaveBeenCalled();
+    });
+});
+
+describe('readying the gateway while a prompt is typed', () => {
+    beforeEach(() => {
+        mockWarm.mockReset().mockResolvedValue(undefined);
+        mockGatewayResponses.mockReset();
+    });
+
+    it('warms for the signed-in user and the model they picked, and calls no model', async () => {
+        mockAuthenticate.mockResolvedValue({ admin: {}, user: { id: 'user-1' } });
+        const response = await POST(
+            new Request('https://cencori.com/api/tensor/inference/v1/warm', {
+                method: 'POST',
+                headers: { Authorization: 'Bearer session-token', 'Content-Type': 'application/json' },
+                body: JSON.stringify({ model: 'deepseek-v4-pro' }),
+            }) as never,
+            at('warm'),
+        );
+
+        expect(response.status).toBe(204);
+        expect(mockWarm).toHaveBeenCalledWith('user-1', 'deepseek-v4-pro');
+        expect(mockGatewayResponses).not.toHaveBeenCalled();
+    });
+
+    it('refuses anyone who is not signed in', async () => {
+        mockAuthenticate.mockResolvedValue(null);
+        const response = await POST(
+            new Request('https://cencori.com/api/tensor/inference/v1/warm', {
+                method: 'POST',
+                headers: { Authorization: 'Bearer forged' },
+            }) as never,
+            at('warm'),
+        );
+
+        expect(response.status).toBe(401);
+        expect(mockWarm).not.toHaveBeenCalled();
     });
 });
