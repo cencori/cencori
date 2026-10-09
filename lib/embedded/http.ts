@@ -6,7 +6,7 @@ export function embeddedError(
     status: number,
     code: string,
     message: string,
-    opts: { requestId?: string; param?: string; type?: string } = {},
+    opts: { requestId?: string; param?: string; type?: string; details?: Record<string, unknown> } = {},
 ) {
     return NextResponse.json(
         {
@@ -16,6 +16,7 @@ export function embeddedError(
                 message,
                 request_id: opts.requestId ?? `req_${crypto.randomUUID().slice(0, 8)}`,
                 ...(opts.param ? { param: opts.param } : {}),
+                ...(opts.details ? { details: opts.details } : {}),
             },
         },
         { status },
