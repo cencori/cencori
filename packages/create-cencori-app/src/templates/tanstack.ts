@@ -636,10 +636,15 @@ async function sendChatStream(
         Connection: 'keep-alive',
     });
 
+    // General rule: only send temperature when explicitly configured.
+    // Never hardcode a per-model blocklist here — the gateway strips
+    // unsupported sampling params per model family.
     for await (const chunk of cencori.ai.chatStream({
         model,
         messages: request.messages || [],
-        temperature: cencoriConfig.temperature,
+        ...(cencoriConfig.temperature !== undefined
+            ? { temperature: cencoriConfig.temperature }
+            : {}),
         maxTokens: cencoriConfig.maxTokens,
     })) {
         if (chunk.delta) {
@@ -1001,9 +1006,10 @@ export function Chat() {
  * Docs: https://cencori.com/docs
  */
 export const cencoriConfig = {
-    defaultModel: 'dots-studio/dots-3-note-preview:free',
+    defaultModel: 'maximo-atlas-1.3',
 
     models: [
+        { id: 'maximo-atlas-1.3', name: 'Maximo Atlas 1.3', provider: 'maximo' },
         { id: 'dots-studio/dots-3-note-preview:free', name: 'Dots 3 Note Preview', provider: 'cencori' },
         { id: 'gpt-5.6-sol', name: 'GPT-5.6 Sol', provider: 'openai' },
         { id: 'claude-opus-5', name: 'Claude Opus 5', provider: 'anthropic' },
@@ -1012,7 +1018,11 @@ export const cencoriConfig = {
         { id: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash', provider: 'deepseek' },
     ],
 
-    temperature: 0.7,
+    // Optional sampling temperature. Leave undefined for maximum
+    // compatibility — providers fall back to their own defaults and some
+    // models (e.g. the Claude 5 family) reject temperature outright.
+    // Set to 0-2 only for models you know support sampling.
+    temperature: undefined as number | undefined,
     maxTokens: 4096,
 };
 `;
@@ -1053,7 +1063,7 @@ const cencori = getCencori();
 
 // Chat
 const response = await cencori.ai.chat({
-    model: 'dots-studio/dots-3-note-preview:free',
+    model: 'maximo-atlas-1.3',
     messages: [{ role: 'user', content: 'Hello!' }],
 });
 
@@ -1066,8 +1076,8 @@ Update the default model in \`cencori.config.ts\`; the local API server reads th
 
 \`\`\`typescript
 export const cencoriConfig = {
-    defaultModel: 'dots-studio/dots-3-note-preview:free',
-    temperature: 0.7,
+    defaultModel: 'maximo-atlas-1.3',
+    temperature: undefined as number | undefined,
     maxTokens: 4096,
 };
 \`\`\`

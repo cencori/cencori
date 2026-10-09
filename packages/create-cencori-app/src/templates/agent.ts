@@ -40,7 +40,7 @@ output/
 CENCORI_API_KEY=${options.apiKey || ''}
 CENCORI_AGENT_ID=
 CENCORI_BASE_URL=https://api.cencori.com/v1
-CENCORI_MODEL=dots-studio/dots-3-note-preview:free
+CENCORI_MODEL=maximo-atlas-1.3
 
 # Demo controls
 AGENT_NAME=Cencori Research Agent
@@ -53,7 +53,7 @@ AGENT_MAX_SPEND_USD=0.10
 CENCORI_API_KEY=csk_...
 CENCORI_AGENT_ID=
 CENCORI_BASE_URL=https://api.cencori.com/v1
-CENCORI_MODEL=dots-studio/dots-3-note-preview:free
+CENCORI_MODEL=maximo-atlas-1.3
 
 # Demo controls
 AGENT_NAME=Cencori Research Agent
@@ -249,7 +249,7 @@ const result = await runCencoriAgent({
   apiKey: readEnv("CENCORI_API_KEY"),
   baseUrl: readEnv("CENCORI_BASE_URL", "https://api.cencori.com/v1"),
   agentId,
-  model: readEnv("CENCORI_MODEL", "dots-studio/dots-3-note-preview:free"),
+  model: readEnv("CENCORI_MODEL", "maximo-atlas-1.3"),
   task,
   externalRunId,
 });
@@ -259,7 +259,7 @@ const completedAt = new Date().toISOString();
 const receipt = createRunReceipt({
   agentId,
   agentName: readEnv("AGENT_NAME", agentId ? "Cencori Research Agent" : "Cencori project agent"),
-  model: readEnv("CENCORI_MODEL", "dots-studio/dots-3-note-preview:free"),
+  model: readEnv("CENCORI_MODEL", "maximo-atlas-1.3"),
   externalRunId,
   task,
   status: "completed",
@@ -329,7 +329,7 @@ Set \`CENCORI_AGENT_ID\` to an agent UUID to enable agent-scoped features (built
 curl -X POST https://api.cencori.com/v1/agents \\
   -H "Authorization: Bearer \${CENCORI_API_KEY}" \\
   -H "Content-Type: application/json" \\
-  -d '{"name": "my-agent", "config": {"model": "dots-studio/dots-3-note-preview:free", "system_prompt": "You are a helpful assistant."}}'
+  -d '{"name": "my-agent", "config": {"model": "maximo-atlas-1.3", "system_prompt": "You are a helpful assistant."}}'
 \`\`\`
 
 ## Expected Output

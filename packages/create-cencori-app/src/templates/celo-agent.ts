@@ -42,7 +42,7 @@ output/
 CENCORI_API_KEY=${options.apiKey || ''}
 CENCORI_AGENT_ID=
 CENCORI_BASE_URL=https://api.cencori.com/v1
-CENCORI_MODEL=dots-studio/dots-3-note-preview:free
+CENCORI_MODEL=maximo-atlas-1.3
 
 # Celo Sepolia
 CELO_RPC_URL=https://forno.celo-sepolia.celo-testnet.org
@@ -63,7 +63,7 @@ DEMO_MAX_SPEND_USD=0.10
 CENCORI_API_KEY=csk_...
 CENCORI_AGENT_ID=
 CENCORI_BASE_URL=https://api.cencori.com/v1
-CENCORI_MODEL=dots-studio/dots-3-note-preview:free
+CENCORI_MODEL=maximo-atlas-1.3
 
 # Celo Sepolia
 CELO_RPC_URL=https://forno.celo-sepolia.celo-testnet.org
@@ -352,7 +352,7 @@ const result = await runCencoriAgent({
   apiKey: readEnv("CENCORI_API_KEY"),
   baseUrl: readEnv("CENCORI_BASE_URL", "https://api.cencori.com/v1"),
   agentId,
-  model: readEnv("CENCORI_MODEL", "dots-studio/dots-3-note-preview:free"),
+  model: readEnv("CENCORI_MODEL", "maximo-atlas-1.3"),
   task,
   externalRunId,
 });
@@ -362,7 +362,7 @@ const completedAt = new Date().toISOString();
 const receipt = createReceipt({
   agentId,
   agentName: agentId ? "Cencori x Celo Research Agent" : "Cencori project agent",
-  model: readEnv("CENCORI_MODEL", "dots-studio/dots-3-note-preview:free"),
+  model: readEnv("CENCORI_MODEL", "maximo-atlas-1.3"),
   externalRunId,
   task,
   status: "completed",
