@@ -15,7 +15,7 @@ export interface ScanFinding {
 export const SKILL_MAX_FILES = 50;
 export const SKILL_MAX_TOTAL_BYTES = 2 * 1024 * 1024;
 export const SKILL_MAX_FILE_BYTES = 200 * 1024;
-export const SKILL_ALLOWED_EXTENSIONS = ['.md', '.markdown', '.txt'];
+export const SKILL_ALLOWED_EXTENSIONS = ['.md', '.markdown', '.mdx', '.txt'];
 
 const SECRET_PATTERNS: Array<{ code: string; re: RegExp }> = [
     { code: 'secret_aws_key', re: /AKIA[0-9A-Z]{16}/ },
@@ -58,8 +58,9 @@ export function normalizeSkillFiles(raw: Array<{ path?: string; content?: unknow
             continue;
         }
         const content = typeof entry.content === 'string' ? entry.content : '';
-        if (Buffer.byteLength(content, 'utf8') > SKILL_MAX_FILE_BYTES) {
-            findings.push({ severity: 'blocker', code: 'file_too_large', message: `File exceeds ${SKILL_MAX_FILE_BYTES} bytes: ${path}`, path });
+        const actualBytes = Buffer.byteLength(content, 'utf8');
+        if (actualBytes > SKILL_MAX_FILE_BYTES) {
+            findings.push({ severity: 'blocker', code: 'file_too_large', message: `File exceeds ${SKILL_MAX_FILE_BYTES} bytes (found ${actualBytes}): ${path}`, path });
             continue;
         }
         files.push({ path, content });
@@ -72,10 +73,10 @@ export function scanSkillFiles(files: SkillFile[]): ScanFinding[] {
     const findings: ScanFinding[] = [];
     const totalBytes = files.reduce((n, f) => n + Buffer.byteLength(f.content, 'utf8'), 0);
     if (files.length > SKILL_MAX_FILES) {
-        findings.push({ severity: 'blocker', code: 'too_many_files', message: `Skill exceeds ${SKILL_MAX_FILES} files` });
+        findings.push({ severity: 'blocker', code: 'too_many_files', message: `Skill exceeds ${SKILL_MAX_FILES} files (found ${files.length}); split into smaller skills or import a subdirectory` });
     }
     if (totalBytes > SKILL_MAX_TOTAL_BYTES) {
-        findings.push({ severity: 'blocker', code: 'skill_too_large', message: `Skill exceeds ${SKILL_MAX_TOTAL_BYTES} bytes` });
+        findings.push({ severity: 'blocker', code: 'skill_too_large', message: `Skill exceeds ${SKILL_MAX_TOTAL_BYTES} bytes (found ${totalBytes}); remove files or import a subdirectory` });
     }
     for (const file of files) {
         // Binary detection: null bytes or mostly non-text.

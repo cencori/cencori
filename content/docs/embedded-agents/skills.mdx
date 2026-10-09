@@ -24,6 +24,10 @@ author/paste → draft version → validate → staged import → review → pub
 
 `POST /v1/skill-imports` accepts exactly one source — `repository` (public GitHub, fetched as an archive), `url` (raw file or zip), `text`/`files` (paste), or multipart `file` (zip/md/txt). The import is normalized (Markdown/text kept, traversal and executables rejected), scanned, and staged as `ready_for_review`. Nothing becomes a production capability automatically.
 
+Repository imports accept `ref` (branch/tag/SHA, default `HEAD`) and `subdir` to scope large repos — `/tree/<ref>/<subdir>` deep links are parsed too. Archives are pre-filtered to Markdown/text (`.md/.markdown/.mdx/.txt`) with `node_modules`, `.git`, and other vendor clutter skipped and reported as a `repo_filtered` warning instead of failing the import.
+
+Plain web pages passed as `url` have readable text extracted (reported as an `html_extracted` warning); binary content-types are rejected with `415`. Alpha caps stay at 50 files, 200 KB per file, 2 MB total — oversize failures now return `413` with actual-vs-limit numbers, the offending path, and `request_id` under `error.details` (the `code` stays `invalid_request_error`).
+
 The scanner flags secrets (AWS keys, private keys, tokens), prompt-injection patterns, binaries, archive bombs, and oversized packages as blockers; external links are warnings. `POST .../publish` with `name` creates the skill and emits an immutable published version pinned to the scanned checksum.
 
 ## Turn-time loading

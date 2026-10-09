@@ -3398,10 +3398,24 @@
         "properties": {
           "url": {
             "type": "string",
-            "format": "uri"
+            "format": "uri",
+            "description": "Raw Markdown/text file or zip URL. HTML pages have readable text extracted (reported as an html_extracted warning); binary content-types are rejected with 415."
           },
           "repository": {
-            "type": "string"
+            "type": "string",
+            "description": "Public github.com URL (owner/repo, /tree/<ref>/<subdir> and /blob/ deep links accepted) or owner/repo shorthand. Fetched as a codeload zip and pre-filtered to Markdown/text."
+          },
+          "ref": {
+            "type": "string",
+            "description": "Branch, tag, or commit SHA for repository imports. Defaults to HEAD."
+          },
+          "subdir": {
+            "type": "string",
+            "description": "Repo-relative directory scoping a repository import (also derived from /tree/ deep links). Caps apply to the scoped files."
+          },
+          "filename": {
+            "type": "string",
+            "description": "Stored path for text pastes."
           },
           "text": {
             "type": "string"
@@ -7613,7 +7627,7 @@
             "$ref": "#/components/responses/Error"
           }
         },
-        "description": "Requires a secret project key (`secret_key_required` otherwise).",
+        "description": "Requires a secret project key (`secret_key_required` otherwise). Alpha caps: 50 Markdown/text files (.md/.markdown/.mdx/.txt), 200KB per file, 2MB total. Oversize failures return 413 with actual-vs-limit details under error.details (code stays invalid_request_error).",
         "operationId": "postSkillImports",
         "tags": [
           "Skills"
