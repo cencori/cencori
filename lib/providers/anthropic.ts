@@ -87,6 +87,19 @@ function rejectsForcedToolChoice(model: string): boolean {
         || model === 'claude-sonnet-5-5';
 }
 
+/**
+ * Claude 5 family (`claude-opus-5`, `claude-sonnet-5`, `claude-haiku-5-5`,
+ * `claude-fable-5-1`, etc.) rejects `temperature` with 400
+ * "`temperature` is deprecated for this model" — verified live 2026-10-09
+ * across opus-5-5/sonnet-5-5/haiku-5-5/opus-5/sonnet-5/fable-5-1, while
+ * Claude 4.5 accepts it. Strip it (send undefined) so callers that pass
+ * a default 0.7 don't get an empty stream / provider_invalid_request.
+ * Keyed to the 5 family so older models keep their sampling control.
+ */
+function supportsTemperature(model: string): boolean {
+    return !/^claude-(?:opus|sonnet|haiku|fable|mythos)-5(?:[.-]|$)/.test(model);
+}
+
 export class AnthropicProvider extends AIProvider {
     readonly providerName = 'anthropic';
     readonly supportsTools = true;
@@ -216,7 +229,9 @@ export class AnthropicProvider extends AIProvider {
             const response = await this.clientFor(transport).messages.create({
                 model: request.model,
                 max_tokens: request.maxTokens ?? 4096,
-                temperature: request.temperature,
+                // Claude 5 family rejects temperature — omit it (undefined)
+                // rather than forwarding a default that guarantees a 400.
+                temperature: supportsTemperature(request.model) ? request.temperature : undefined,
                 system,
                 messages: messages as Anthropic.MessageParam[],
                 ...(tools ? { tools } : {}),
@@ -310,7 +325,7 @@ export class AnthropicProvider extends AIProvider {
             const stream = await this.clientFor(transport).messages.create({
                 model: request.model,
                 max_tokens: request.maxTokens ?? 4096,
-                temperature: request.temperature,
+                temperature: supportsTemperature(request.model) ? request.temperature : undefined,
                 system,
                 messages: messages as Anthropic.MessageParam[],
                 ...(tools ? { tools } : {}),

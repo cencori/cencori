@@ -68,9 +68,77 @@ interface CencoriResponse {
 }
 
 interface CencoriStreamChunk {
-    delta: string;
+    delta?: string;
     finish_reason?: string;
     tool_calls?: CencoriToolCall[];
+    toolCalls?: CencoriToolCall[];
+    usage?: unknown;
+    error?: string | Record<string, unknown>;
+    message?: string;
+}
+
+/**
+ * Extract a human-readable error from any Cencori SSE chunk shape.
+ * Gateway streams errors as `{"error":"..."}` (Cencori wire) but
+ * defensive handling covers object forms (`{"error":{"message":...}}`)
+ * and bare `{"message":"..."}` payloads so no model fails silently
+ * with an empty stream.
+ */
+function extractStreamError(chunk: Record<string, unknown>): string | undefined {
+    const error = chunk.error;
+    if (typeof error === 'string' && error) return error;
+    if (error && typeof error === 'object') {
+        const record = error as Record<string, unknown>;
+        if (typeof record.message === 'string' && record.message) {
+            return record.message;
+        }
+        try {
+            return JSON.stringify(error);
+        } catch {
+            return 'Provider stream error';
+        }
+    }
+    // Bare message without any content fields (usage-only chunks like
+    // {"usage":{...}} must NOT be treated as errors).
+    if (
+        typeof chunk.message === 'string' &&
+        chunk.message &&
+        chunk.delta === undefined &&
+        chunk.finish_reason === undefined &&
+        chunk.tool_calls === undefined &&
+        chunk.toolCalls === undefined &&
+        chunk.usage === undefined
+    ) {
+        return chunk.message;
+    }
+    return undefined;
+}
+
+/**
+ * Extract a message from a non-OK JSON error body in any shape:
+ * flat `{error,message}`, nested `{error:{message,code}}`, or bare.
+ */
+function extractHttpError(body: unknown, fallback: string): string {
+    if (!body || typeof body !== 'object') return fallback;
+    const record = body as Record<string, unknown>;
+    if (typeof record.message === 'string' && record.message) return record.message;
+    const error = record.error;
+    if (typeof error === 'string' && error) {
+        // Prefer a detailed message when the code is generic.
+        return typeof record.message === 'string' && record.message
+            ? record.message
+            : error;
+    }
+    if (error && typeof error === 'object') {
+        const nested = error as Record<string, unknown>;
+        if (typeof nested.message === 'string' && nested.message) return nested.message;
+        try {
+            return JSON.stringify(error);
+        } catch {
+            return fallback;
+        }
+    }
+    return fallback;
 }
 
 export class CencoriChatLanguageModel implements LanguageModelV3 {
@@ -242,8 +310,10 @@ export class CencoriChatLanguageModel implements LanguageModelV3 {
         });
 
         if (!response.ok) {
-            const error = await response.json().catch(() => ({ error: 'Unknown error' })) as { error?: string };
-            throw new Error(`Cencori API error: ${error.error || response.statusText}`);
+            const body = await response.json().catch(() => ({ error: 'Unknown error' }));
+            throw new Error(
+                `Cencori API error: ${extractHttpError(body, response.statusText)}`
+            );
         }
 
         const data = await response.json() as CencoriResponse;
@@ -306,8 +376,10 @@ export class CencoriChatLanguageModel implements LanguageModelV3 {
         });
 
         if (!response.ok) {
-            const error = await response.json().catch(() => ({ error: 'Unknown error' })) as { error?: string };
-            throw new Error(`Cencori API error: ${error.error || response.statusText}`);
+            const body = await response.json().catch(() => ({ error: 'Unknown error' }));
+            throw new Error(
+                `Cencori API error: ${extractHttpError(body, response.statusText)}`
+            );
         }
 
         const reader = response.body?.getReader();
@@ -372,6 +444,20 @@ export class CencoriChatLanguageModel implements LanguageModelV3 {
                         try {
                             const chunk = JSON.parse(data) as CencoriStreamChunk;
 
+                            // Surface provider errors instead of silently ending
+                            // with an empty stream. Covers every wire shape:
+                            // {"error":"..."}, {"error":{"message":...}}, and
+                            // bare {"message":"..."} payloads.
+                            const streamError = extractStreamError(
+                                chunk as unknown as Record<string, unknown>
+                            );
+                            if (streamError) {
+                                controller.error(
+                                    new Error(`Cencori API error: ${streamError}`)
+                                );
+                                return;
+                            }
+
                             // Handle text delta
                             if (chunk.delta) {
                                 // Start text if not started
@@ -391,9 +477,15 @@ export class CencoriChatLanguageModel implements LanguageModelV3 {
                                 });
                             }
 
-                            // Handle tool calls
-                            if (chunk.tool_calls && chunk.tool_calls.length > 0) {
-                                for (const tc of chunk.tool_calls) {
+                            // Handle tool calls (both snake_case and camelCase wire shapes)
+                            const toolCalls =
+                                (chunk.tool_calls && chunk.tool_calls.length > 0
+                                    ? chunk.tool_calls
+                                    : chunk.toolCalls && chunk.toolCalls.length > 0
+                                      ? chunk.toolCalls
+                                      : undefined);
+                            if (toolCalls) {
+                                for (const tc of toolCalls) {
                                     // Emit complete tool-call event
                                     controller.enqueue({
                                         type: 'tool-call',
@@ -406,6 +498,17 @@ export class CencoriChatLanguageModel implements LanguageModelV3 {
                             }
 
                             if (chunk.finish_reason) {
+                                // A provider-level failure surfaced as a terminal
+                                // reason must error the stream, not masquerade
+                                // as an empty successful stop.
+                                if (chunk.finish_reason === 'error') {
+                                    controller.error(
+                                        new Error(
+                                            `Cencori API error: ${extractStreamError(chunk as unknown as Record<string, unknown>) ?? 'stream failed with error'}`
+                                        )
+                                    );
+                                    return;
+                                }
                                 if (started) {
                                     controller.enqueue({
                                         type: 'text-end',
