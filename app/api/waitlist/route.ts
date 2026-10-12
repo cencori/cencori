@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
+import { gateEmail, gateReply } from "@/lib/tensor-email-gate";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -15,7 +16,7 @@ export async function POST(req: Request) {
     const {
       email,
       productName,
-      // Tensor conversational waitlist (all optional except email for backwards compat)
+      // Tensor waitlist is email-only (extra fields accepted for backwards compat)
       name,
       workEmail,
       company,
@@ -40,6 +41,15 @@ export async function POST(req: Request) {
     const normalizedEmail = String(resolvedEmail).trim().toLowerCase();
     const tools = asStringArray(currentTools);
     const prios = asStringArray(priorities);
+
+    // Tensor is email-only: refuse throwaway / unreachable inboxes up front.
+    // Other products keep the plain regex check for backwards compat.
+    if ((productName || "tensor") === "tensor") {
+      const gate = await gateEmail(normalizedEmail);
+      if (gate !== "ok") {
+        return NextResponse.json({ error: gateReply(gate) }, { status: 400 });
+      }
+    }
 
     // Primary record: Supabase is the source of truth. One row per email —
     // resubmits refresh the answers in place instead of duplicating.

@@ -10,7 +10,7 @@ export function TensorPageShell() {
   const [chatVisible, setChatVisible] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
 
-  // Deep-link: /tensor#waitlist opens straight into the agent.
+  // Deep-link: /tensor#waitlist opens straight into the signup form.
   useEffect(() => {
     if (typeof window !== "undefined" && window.location.hash === "#waitlist") {
       setMode("chat");
