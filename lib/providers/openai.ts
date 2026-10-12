@@ -46,6 +46,17 @@ export function openAIReasoningEffort(request: Pick<UnifiedChatRequest, 'model' 
     return reasoningModel ? request.reasoningEffort as OpenAI.ReasoningEffort : undefined;
 }
 
+/**
+ * OpenAI caches a repeated prompt prefix on its own, but drops it after a few
+ * idle minutes unless asked to keep it. `24h` keeps it for a day at no extra
+ * charge, so a conversation picked up after lunch is still a cache read.
+ * Verified accepted on every family listed (2026-10-12); a model outside them
+ * is sent nothing rather than a parameter it might reject.
+ */
+export function openAICacheRetention(model: string): { prompt_cache_retention: '24h' } | Record<string, never> {
+    return /^(gpt-5|gpt-4\.1|gpt-4o|o3|o4)/.test(model) ? { prompt_cache_retention: '24h' } : {};
+}
+
 export class OpenAIProvider extends AIProvider {
     readonly providerName = 'openai';
     readonly supportsTools = true;
@@ -128,6 +139,7 @@ export class OpenAIProvider extends AIProvider {
                 frequency_penalty: request.frequencyPenalty,
                 presence_penalty: request.presencePenalty,
                 prompt_cache_key: request.promptCacheKey,
+                ...(request.promptCacheKey ? openAICacheRetention(request.model) : {}),
             }, { signal, timeout: transport.timeoutMs, maxRetries: 0 });
 
             const usage = completion.usage!;
@@ -242,6 +254,7 @@ export class OpenAIProvider extends AIProvider {
                 frequency_penalty: request.frequencyPenalty,
                 presence_penalty: request.presencePenalty,
                 prompt_cache_key: request.promptCacheKey,
+                ...(request.promptCacheKey ? openAICacheRetention(request.model) : {}),
                 // Without this OpenAI reports no usage on a stream at all, and
                 // the gateway has to fall back to estimating tokens from text.
                 stream_options: { include_usage: true },

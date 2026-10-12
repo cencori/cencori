@@ -132,3 +132,40 @@ describe('splitOpenAICachedTokens', () => {
         expect(overcharged).toBeCloseTo(0.125);
     });
 });
+
+describe('long-lived cache writes', () => {
+    const pricing: ModelPricing = {
+        inputPer1KTokens: 0.005,
+        outputPer1KTokens: 0.025,
+        cencoriMarkupPercentage: 0,
+        cachedInputPer1KTokens: 0.0005,
+        cacheWriteMultiplier: 1.25,
+        cacheWriteLongMultiplier: 2,
+    };
+
+    it('bills one-hour writes at their own rate and the rest at the short rate', () => {
+        // 1,000 written, 600 of them with the long lifetime.
+        const cost = calculateProviderTokenCost(0, 0, pricing, {
+            cacheWriteTokens: 1_000,
+            cacheWriteLongTokens: 600,
+        });
+        expect(cost).toBeCloseTo(0.4 * 0.005 * 1.25 + 0.6 * 0.005 * 2);
+    });
+
+    it('never bills more long writes than there were writes', () => {
+        const cost = calculateProviderTokenCost(0, 0, pricing, {
+            cacheWriteTokens: 1_000,
+            cacheWriteLongTokens: 5_000,
+        });
+        expect(cost).toBeCloseTo(0.005 * 2);
+    });
+
+    it('falls back to the short rate where a provider prices no long lifetime', () => {
+        const cost = calculateProviderTokenCost(0, 0, { ...pricing, cacheWriteLongMultiplier: undefined }, {
+            cacheWriteTokens: 1_000,
+            cacheWriteLongTokens: 1_000,
+        });
+        expect(cost).toBeCloseTo(0.005 * 1.25);
+    });
+});
+

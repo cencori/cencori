@@ -132,6 +132,33 @@ export function openAICompatibleHeaders(providerName: string): Record<string, st
 }
 
 /**
+ * Providers verified to accept `prompt_cache_key` and to report usage on a
+ * stream when asked. This adapter fronts a dozen vendors and an unrecognised
+ * parameter can fail a whole request, so each is added only once it has been
+ * seen to work.
+ *
+ * Maximo (verified 2026-10-12): caches a repeated prefix and reports
+ * `prompt_tokens_details.cached_tokens`, but on a stream only when
+ * `stream_options.include_usage` is set. Without it the gateway fell back to
+ * estimating tokens from text, so every Maximo request looked uncached, its
+ * output was undercounted, and cached input was billed at the full rate.
+ */
+const PROMPT_CACHE_PROVIDERS = new Set(['maximo']);
+
+/** The request fields that turn caching on, and make it visible, for a provider. */
+export function openAICompatibleCacheParams(
+    providerName: string,
+    request: Pick<UnifiedChatRequest, 'promptCacheKey'>,
+    { stream }: { stream: boolean },
+): Record<string, unknown> {
+    if (!PROMPT_CACHE_PROVIDERS.has(providerName)) return {};
+    return {
+        ...(request.promptCacheKey ? { prompt_cache_key: request.promptCacheKey } : {}),
+        ...(stream ? { stream_options: { include_usage: true } } : {}),
+    };
+}
+
+/**
  * Providers whose thinking models take their trace back as `reasoning_content`
  * on assistant turns: DeepSeek requires it after a tool call (400 without),
  * and Kimi (Moonshot) and GLM (Z.ai) expect it across tool calls. Everyone
@@ -285,6 +312,7 @@ export class OpenAICompatibleProvider extends AIProvider {
                 max_tokens: request.maxTokens,
                 ...(openAICompatibleReasoningEffort(this.providerName, request) ? { reasoning_effort: openAICompatibleReasoningEffort(this.providerName, request) } : {}),
                 stream: false,
+                ...openAICompatibleCacheParams(this.providerName, request, { stream: false }),
                 user: request.userId,
                 tools: this.toOpenAITools(request),
                 tool_choice: request.toolChoice as any,
@@ -427,6 +455,7 @@ export class OpenAICompatibleProvider extends AIProvider {
                 max_tokens: request.maxTokens,
                 ...(openAICompatibleReasoningEffort(this.providerName, request) ? { reasoning_effort: openAICompatibleReasoningEffort(this.providerName, request) } : {}),
                 stream: true,
+                ...openAICompatibleCacheParams(this.providerName, request, { stream: true }),
                 user: request.userId,
                 tools: this.toOpenAITools(request),
                 tool_choice: request.toolChoice as any,

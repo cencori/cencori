@@ -4,6 +4,7 @@
  * handles built-in tools, and formats responses.
  */
 
+import { createHash } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { recoverXmlToolCalls, releasableLength } from '@/lib/gateway/tool-call-xml';
 import {
@@ -92,6 +93,8 @@ export type ResponsesRequest = {
     truncation?: 'auto' | 'disabled';
     stream?: boolean;
     user?: string;
+    /** The client's own key for its conversation, used to route to a warm provider cache. */
+    prompt_cache_key?: string;
     /** Per-request provider timeout override (ms). */
     timeout_ms?: unknown;
     /** Per-request cost budget (USD). */
@@ -435,6 +438,22 @@ function buildResponsesStreamChunk(params: {
 
 // ── Main Execution ──
 
+/**
+ * The key a provider routes cache lookups by. A client that names its
+ * conversation gets a cache of its own: an agent sends the same growing
+ * prefix on every step, and a key shared by a whole project spreads those
+ * requests across machines that have never seen it. The project is folded in
+ * so one tenant's key can never address another's cache; without a client key
+ * the project and model are the best stable thing there is.
+ */
+export function promptCacheKey(clientKey: unknown, projectId: string, model: string): string {
+    if (typeof clientKey !== 'string' || !clientKey) return `cencori:${projectId}:${model}`;
+    // Hashed, not joined: providers cap the key at 64 characters, and a
+    // project id with a conversation id on the end is longer than that.
+    const digest = createHash('sha256').update(`${projectId}\n${clientKey}`).digest('hex');
+    return `cencori:${digest.slice(0, 48)}`;
+}
+
 export async function runV1ResponsesExecution(
     params: V1ResponseExecuteParams
 ): Promise<V1ResponseExecuteResult> {
@@ -678,6 +697,7 @@ export async function runV1ResponsesExecution(
             userId: params.endUserId || undefined,
             timeoutMs: controls.timeoutMs,
             maxCostUsd: controls.maxCostUsd,
+            promptCacheKey: promptCacheKey(body.prompt_cache_key, gatewayCtx.projectId, resolved.model),
         };
 
         // Check if code_interpreter is enabled

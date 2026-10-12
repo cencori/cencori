@@ -66,11 +66,21 @@ export async function getUsageUnitPricingFromDB(
  * Premium a provider charges on the input rate for writing a prompt cache
  * entry, keyed by provider. This is a property of the provider's billing model
  * rather than of any one model, so it lives here instead of in model_pricing.
- * Anthropic: 1.25x for the 5-minute TTL (2x for the 1-hour TTL, which nothing
- * here requests). Providers absent from this map bill writes as plain input.
+ * Anthropic: 1.25x for the 5-minute TTL. Providers absent from this map bill
+ * writes as plain input.
  */
 const CACHE_WRITE_MULTIPLIERS: Record<string, number> = {
     anthropic: 1.25,
+};
+
+/**
+ * The same premium for writes made with a provider's long cache lifetime.
+ * Anthropic: 2x for the 1-hour TTL. The Anthropic adapter asks for the
+ * five-minute lifetime today, so this prices a write only if that changes or a
+ * caller marks its own.
+ */
+const CACHE_WRITE_LONG_MULTIPLIERS: Record<string, number> = {
+    anthropic: 2,
 };
 
 type ScheduledPricing = { input: number; output: number; cachedInput: number | undefined };
@@ -202,6 +212,7 @@ export async function getPricingFromDB(
         longContextOutputPer1KTokens,
         longContextCachedInputPer1KTokens: optionalRate(data.long_context_cached_input_price_per_1k_tokens),
         cacheWriteMultiplier: CACHE_WRITE_MULTIPLIERS[provider],
+        cacheWriteLongMultiplier: CACHE_WRITE_LONG_MULTIPLIERS[provider],
         // Once the changeover has happened the successor rate has no end date,
         // so don't keep reporting a deadline that has already passed.
         pricingExpiresAt: !scheduled && typeof data.pricing_expires_at === 'string'
@@ -293,6 +304,7 @@ export async function getProviderPricing(provider: string): Promise<Record<strin
                 ? undefined
                 : parseFloat(row.long_context_cached_input_price_per_1k_tokens),
             cacheWriteMultiplier: CACHE_WRITE_MULTIPLIERS[provider],
+            cacheWriteLongMultiplier: CACHE_WRITE_LONG_MULTIPLIERS[provider],
             pricingExpiresAt: scheduled ? undefined : (row.pricing_expires_at || undefined),
         };
     }

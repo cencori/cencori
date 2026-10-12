@@ -142,6 +142,8 @@ export interface TokenUsage {
      */
     cacheReadTokens?: number;
     cacheWriteTokens?: number;
+    /** The part of `cacheWriteTokens` written with the provider's long cache lifetime. */
+    cacheWriteLongTokens?: number;
 }
 
 /**
@@ -203,11 +205,17 @@ export interface ModelPricing {
     cachedInputPer1KTokens?: number;
     /**
      * Multiplier on the input rate for tokens written to a provider-side cache.
-     * Anthropic charges 1.25x the base input rate for a 5-minute cache write
-     * (2x for the 1-hour TTL, which nothing here requests). Providers that do
-     * not charge a write premium leave this unset and bill writes as input.
+     * Anthropic charges 1.25x the base input rate for a 5-minute cache write.
+     * Providers that do not charge a write premium leave this unset and bill
+     * writes as input.
      */
     cacheWriteMultiplier?: number;
+    /**
+     * The same for writes made with the provider's long cache lifetime, where
+     * it prices them apart: Anthropic charges 2x for its 1-hour TTL. Unset
+     * falls back to `cacheWriteMultiplier`.
+     */
+    cacheWriteLongMultiplier?: number;
     /** Prompt-token count above which the long-context rates apply. */
     longContextThresholdTokens?: number;
     longContextInputPer1KTokens?: number;
@@ -231,6 +239,11 @@ export interface CachedTokenUsage {
     cacheReadTokens?: number;
     /** Prompt tokens written to cache, billed at a premium over the input rate. */
     cacheWriteTokens?: number;
+    /**
+     * How many of `cacheWriteTokens` were written with the long lifetime, which
+     * costs more. A subset of that figure, never an addition to it.
+     */
+    cacheWriteLongTokens?: number;
 }
 
 /**
@@ -280,6 +293,9 @@ export function calculateProviderTokenCost(
     const safeCompletionTokens = safe(completionTokens);
     const cacheReadTokens = safe(cached?.cacheReadTokens);
     const cacheWriteTokens = safe(cached?.cacheWriteTokens);
+    // A subset of the writes; a provider reporting more long writes than
+    // writes is wrong, and is not allowed to bill tokens that do not exist.
+    const cacheWriteLongTokens = Math.min(safe(cached?.cacheWriteLongTokens), cacheWriteTokens);
 
     // Providers tier on the size of the whole request, so the threshold has to
     // see cached tokens too — they occupy the context window like any other.
@@ -303,10 +319,13 @@ export function calculateProviderTokenCost(
         ? pricing.longContextCachedInputPer1KTokens ?? pricing.cachedInputPer1KTokens
         : pricing.cachedInputPer1KTokens) ?? inputRate;
     const cacheWriteRate = inputRate * (pricing.cacheWriteMultiplier ?? 1);
+    const cacheWriteLongRate = inputRate
+        * (pricing.cacheWriteLongMultiplier ?? pricing.cacheWriteMultiplier ?? 1);
 
     return (safePromptTokens / 1000) * inputRate
         + (cacheReadTokens / 1000) * cacheReadRate
-        + (cacheWriteTokens / 1000) * cacheWriteRate
+        + ((cacheWriteTokens - cacheWriteLongTokens) / 1000) * cacheWriteRate
+        + (cacheWriteLongTokens / 1000) * cacheWriteLongRate
         + (safeCompletionTokens / 1000) * outputRate;
 }
 

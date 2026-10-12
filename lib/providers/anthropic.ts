@@ -21,7 +21,7 @@ import {
     transportSignal,
 } from './base';
 import { getPricingFromDB } from './pricing';
-import { toAnthropicMessages } from './utils';
+import { toAnthropicMessages, type AnthropicMessage } from './utils';
 import { normalizeProviderError, ServiceUnavailableError } from './errors';
 import { safeProviderFetch } from '@/lib/security/outbound-url';
 
@@ -98,6 +98,102 @@ function rejectsForcedToolChoice(model: string): boolean {
  */
 function supportsTemperature(model: string): boolean {
     return !/^claude-(?:opus|sonnet|haiku|fable|mythos)-5(?:[.-]|$)/.test(model);
+}
+
+/**
+ * One cache mark, with Anthropic's default five-minute lifetime. Every read
+ * renews it, so it holds for as long as an agent keeps working; a conversation
+ * left idle for longer is written again on its next request. The one-hour
+ * lifetime (`ttl: '1h'`) would survive that pause but costs 2x the input rate
+ * to write against 1.25x here.
+ */
+const CACHE_BREAKPOINT = { cache_control: { type: 'ephemeral' as const } };
+
+type MessageBlocks = Exclude<AnthropicMessage['content'], string>;
+
+/** A message with its last block marked, or null where there is nothing markable. */
+function markedAtEnd(message: AnthropicMessage): AnthropicMessage | null {
+    if (typeof message.content === 'string') {
+        // An empty text block is rejected outright, marked or not.
+        return message.content
+            ? { ...message, content: [{ type: 'text', text: message.content, ...CACHE_BREAKPOINT }] as MessageBlocks }
+            : null;
+    }
+    const last = message.content[message.content.length - 1];
+    if (!last || (last.type === 'text' && !last.text)) return null;
+    return {
+        ...message,
+        content: [...message.content.slice(0, -1), { ...last, ...CACHE_BREAKPOINT }] as MessageBlocks,
+    };
+}
+
+/**
+ * Asks Anthropic to cache the part of a request that the next request will
+ * repeat. Anthropic caches nothing unless a block is marked, so without this
+ * an agent re-sends — and waits on, and pays full price for — its whole system
+ * prompt, every tool schema and the entire conversation on each step of a
+ * tool loop. Read from cache, those tokens come back faster and at a tenth of
+ * the input price.
+ *
+ * The cached prefix runs tools → system → messages, and all four marks
+ * Anthropic allows are used:
+ *
+ *  - the last tool and the system prompt, which do not change within a
+ *    conversation;
+ *  - the last block of the last message, which moves forward each turn so the
+ *    next request finds everything before it already stored;
+ *  - the end of the user message before that, which is where the previous
+ *    request left its mark. Anthropic only looks back twenty blocks from a
+ *    mark for an earlier entry, and one step of parallel tool calls can add
+ *    more than that; marking the old position again makes the read certain.
+ *
+ * A prefix under the model's minimum length is simply not cached; the marks
+ * cost nothing then.
+ */
+export function withPromptCaching(input: {
+    system?: string;
+    messages: AnthropicMessage[];
+    tools?: Anthropic.Tool[];
+}): {
+    system?: Anthropic.TextBlockParam[];
+    messages: Anthropic.MessageParam[];
+    tools?: Anthropic.Tool[];
+} {
+    const tools = input.tools?.length
+        ? input.tools.map((tool, index, all) =>
+            index === all.length - 1 ? { ...tool, ...CACHE_BREAKPOINT } : tool)
+        : input.tools;
+
+    const system = input.system
+        ? [{ type: 'text' as const, text: input.system, ...CACHE_BREAKPOINT }]
+        : undefined;
+
+    const lastIndex = input.messages.length - 1;
+    // Where the previous request ended: the nearest earlier user message.
+    let previousIndex = -1;
+    for (let index = lastIndex - 1; index >= 0; index -= 1) {
+        if (input.messages[index].role === 'user') {
+            previousIndex = index;
+            break;
+        }
+    }
+    const messages = input.messages.map((message, index) =>
+        index === lastIndex || index === previousIndex
+            ? markedAtEnd(message) ?? message
+            : message);
+
+    return { system, messages: messages as Anthropic.MessageParam[], tools };
+}
+
+/**
+ * How many of a response's cache-write tokens went in with the one-hour
+ * lifetime. Anthropic prices those apart from five-minute writes, so they are
+ * reported apart; older API versions that only give the total report none.
+ */
+function longCacheWrites(usage: unknown): number {
+    const breakdown = (usage as { cache_creation?: { ephemeral_1h_input_tokens?: number } | null })
+        ?.cache_creation;
+    return Math.max(0, Number(breakdown?.ephemeral_1h_input_tokens) || 0);
 }
 
 export class AnthropicProvider extends AIProvider {
@@ -222,8 +318,10 @@ export class AnthropicProvider extends AIProvider {
 
         try {
             // Anthropic handles system messages separately
-            const { system, messages } = toAnthropicMessages(request.messages);
-            const tools = this.toAnthropicTools(request);
+            const { system, messages, tools } = withPromptCaching({
+                ...toAnthropicMessages(request.messages),
+                tools: this.toAnthropicTools(request),
+            });
             const toolChoice = this.toAnthropicToolChoice(request);
 
             const response = await this.clientFor(transport).messages.create({
@@ -233,7 +331,7 @@ export class AnthropicProvider extends AIProvider {
                 // rather than forwarding a default that guarantees a 400.
                 temperature: supportsTemperature(request.model) ? request.temperature : undefined,
                 system,
-                messages: messages as Anthropic.MessageParam[],
+                messages,
                 ...(tools ? { tools } : {}),
                 ...(toolChoice ? { tool_choice: toolChoice } : {}),
             }, { signal, timeout: transport.timeoutMs, maxRetries: 0 });
@@ -245,6 +343,7 @@ export class AnthropicProvider extends AIProvider {
             const cached = {
                 cacheReadTokens: response.usage.cache_read_input_tokens ?? 0,
                 cacheWriteTokens: response.usage.cache_creation_input_tokens ?? 0,
+                cacheWriteLongTokens: longCacheWrites(response.usage),
             };
             const providerCost = this.calculateCost(
                 response.usage.input_tokens,
@@ -296,6 +395,7 @@ export class AnthropicProvider extends AIProvider {
                     totalTokens: response.usage.input_tokens + response.usage.output_tokens,
                     ...(cached.cacheReadTokens ? { cacheReadTokens: cached.cacheReadTokens } : {}),
                     ...(cached.cacheWriteTokens ? { cacheWriteTokens: cached.cacheWriteTokens } : {}),
+                    ...(cached.cacheWriteLongTokens ? { cacheWriteLongTokens: cached.cacheWriteLongTokens } : {}),
                 },
                 cost: {
                     providerCostUsd: providerCost,
@@ -318,8 +418,10 @@ export class AnthropicProvider extends AIProvider {
         // Streams never retry: a partially-yielded stream cannot be replayed.
         const transport = resolveProviderTransport(this.transport, request);
         try {
-            const { system, messages } = toAnthropicMessages(request.messages);
-            const tools = this.toAnthropicTools(request);
+            const { system, messages, tools } = withPromptCaching({
+                ...toAnthropicMessages(request.messages),
+                tools: this.toAnthropicTools(request),
+            });
             const toolChoice = this.toAnthropicToolChoice(request);
 
             const stream = await this.clientFor(transport).messages.create({
@@ -327,7 +429,7 @@ export class AnthropicProvider extends AIProvider {
                 max_tokens: request.maxTokens ?? 4096,
                 temperature: supportsTemperature(request.model) ? request.temperature : undefined,
                 system,
-                messages: messages as Anthropic.MessageParam[],
+                messages,
                 ...(tools ? { tools } : {}),
                 ...(toolChoice ? { tool_choice: toolChoice } : {}),
                 stream: true,
@@ -348,6 +450,7 @@ export class AnthropicProvider extends AIProvider {
             let promptTokens = 0;
             let cacheReadTokens = 0;
             let cacheWriteTokens = 0;
+            let cacheWriteLongTokens = 0;
             let completionTokens = 0;
 
             for await (const event of stream) {
@@ -356,6 +459,7 @@ export class AnthropicProvider extends AIProvider {
                     promptTokens = usage.input_tokens ?? 0;
                     cacheReadTokens = usage.cache_read_input_tokens ?? 0;
                     cacheWriteTokens = usage.cache_creation_input_tokens ?? 0;
+                    cacheWriteLongTokens = longCacheWrites(usage);
                     completionTokens = usage.output_tokens ?? 0;
                 }
                 if (event.type === 'content_block_start' && event.content_block.type === 'tool_use') {
@@ -402,6 +506,7 @@ export class AnthropicProvider extends AIProvider {
                                 + completionTokens,
                             ...(cacheReadTokens ? { cacheReadTokens } : {}),
                             ...(cacheWriteTokens ? { cacheWriteTokens } : {}),
+                            ...(cacheWriteLongTokens ? { cacheWriteLongTokens } : {}),
                         },
                     };
                 }
