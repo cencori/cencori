@@ -1,3 +1,9 @@
 # Local-only artifacts that break remote builds (symlinks) or bloat uploads.
 .venv-pdf
 .venv
+# Local build cache + scratch dirs — rebuilt/needed remotely, never upload.
+.next
+tmp
+coverage
+playwright-report
+output
