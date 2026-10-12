@@ -38,6 +38,8 @@ export interface SettledStreamUsage {
     cacheReadTokens?: number;
     /** Prompt tokens written to cache on this request, when the provider said so. */
     cacheWriteTokens?: number;
+    /** How many of those were written with the provider's long cache lifetime. */
+    cacheWriteLongTokens?: number;
 }
 
 export async function settleStreamUsage(params: {
@@ -68,6 +70,7 @@ export async function settleStreamUsage(params: {
         completionTokens = Math.max(0, reported.completionTokens);
         cached.cacheReadTokens = reported.cacheReadTokens;
         cached.cacheWriteTokens = reported.cacheWriteTokens;
+        cached.cacheWriteLongTokens = reported.cacheWriteLongTokens;
     } else {
         const estimated = await estimate();
         billablePromptTokens = Math.max(0, estimated.promptTokens);
@@ -107,6 +110,9 @@ export async function settleStreamUsage(params: {
         ...(cached.cacheWriteTokens === undefined
             ? {}
             : { cacheWriteTokens: cached.cacheWriteTokens }),
+        ...(cached.cacheWriteLongTokens === undefined
+            ? {}
+            : { cacheWriteLongTokens: cached.cacheWriteLongTokens }),
     };
 }
 

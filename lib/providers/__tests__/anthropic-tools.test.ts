@@ -18,7 +18,7 @@ vi.mock('../pricing', () => ({
     }),
 }));
 
-const { AnthropicProvider } = await import('../anthropic');
+const { AnthropicProvider, withPromptCaching } = await import('../anthropic');
 
 function blocks(content: string | AnthropicContentBlock[]): AnthropicContentBlock[] {
     if (typeof content === 'string') throw new Error('expected content blocks');
@@ -188,6 +188,8 @@ describe('AnthropicProvider tool calling', () => {
             name: 'get_weather',
             description: 'Get weather',
             input_schema: { type: 'object', properties: { city: { type: 'string' } } },
+            // The last tool closes the cached prefix.
+            cache_control: { type: 'ephemeral' },
         }]);
         expect(sent.tool_choice).toEqual({ type: 'auto' });
 
@@ -514,5 +516,87 @@ describe('AnthropicProvider input_schema normalisation', () => {
 
     it('falls back for a missing schema', async () => {
         expect(await schemaFor(undefined)).toEqual({ type: 'object', properties: {} });
+    });
+});
+
+describe('prompt caching', () => {
+    const mark = { cache_control: { type: 'ephemeral' } };
+    const tool = (name: string) => ({ name, description: name, input_schema: { type: 'object' as const, properties: {} } });
+
+    it('marks the last tool, the system prompt, and both ends of the newest step', () => {
+        const cached = withPromptCaching({
+            system: 'You are an agent.',
+            tools: [tool('read'), tool('write')],
+            messages: [
+                { role: 'user', content: 'fix the bug' },
+                { role: 'assistant', content: [{ type: 'tool_use', id: 'c1', name: 'read', input: {} }] },
+                { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'c1', content: 'file text' }] },
+            ],
+        });
+
+        expect(cached.tools).toEqual([tool('read'), { ...tool('write'), ...mark }]);
+        expect(cached.system).toEqual([{ type: 'text', text: 'You are an agent.', ...mark }]);
+        // Where the previous request ended, so its entry is found however much was added since.
+        expect(cached.messages[0]).toEqual({
+            role: 'user',
+            content: [{ type: 'text', text: 'fix the bug', ...mark }],
+        });
+        expect(cached.messages[1]).toEqual({
+            role: 'assistant',
+            content: [{ type: 'tool_use', id: 'c1', name: 'read', input: {} }],
+        });
+        // Where this request ends, for the next one to find.
+        expect(cached.messages[2].content).toEqual([
+            { type: 'tool_result', tool_use_id: 'c1', content: 'file text', ...mark },
+        ]);
+    });
+
+    it('never uses more than the four marks Anthropic allows', () => {
+        const messages = Array.from({ length: 40 }, (_, index) => (index % 2
+            ? { role: 'assistant' as const, content: `answer ${index}` }
+            : { role: 'user' as const, content: `question ${index}` }));
+        const cached = withPromptCaching({ system: 's', tools: [tool('a'), tool('b')], messages: [...messages, { role: 'user', content: 'last' }] });
+        const marks = JSON.stringify(cached).split('"cache_control"').length - 1;
+        expect(marks).toBe(4);
+    });
+
+    it('turns a plain last message into a marked block, and leaves the caller\'s request alone', () => {
+        const messages = [{ role: 'user' as const, content: 'hello' }];
+        const cached = withPromptCaching({ messages });
+        expect(cached.messages).toEqual([
+            { role: 'user', content: [{ type: 'text', text: 'hello', ...mark }] },
+        ]);
+        expect(messages).toEqual([{ role: 'user', content: 'hello' }]);
+        expect(cached.system).toBeUndefined();
+        expect(cached.tools).toBeUndefined();
+    });
+
+    it('never marks an empty block, which Anthropic rejects', () => {
+        expect(withPromptCaching({ messages: [{ role: 'user', content: '' }] }).messages).toEqual([
+            { role: 'user', content: '' },
+        ]);
+    });
+
+    it('sends the marks on a real request, and reports any one-hour writes apart', async () => {
+        createMock.mockResolvedValueOnce({
+            content: [{ type: 'text', text: 'ok' }],
+            model: 'claude-opus-5-5',
+            stop_reason: 'end_turn',
+            usage: {
+                input_tokens: 10,
+                output_tokens: 2,
+                cache_read_input_tokens: 900,
+                cache_creation_input_tokens: 300,
+                cache_creation: { ephemeral_5m_input_tokens: 0, ephemeral_1h_input_tokens: 300 },
+            },
+        });
+        const reply = await new AnthropicProvider('test-key').chat({
+            model: 'claude-opus-5-5',
+            messages: [{ role: 'system', content: 'Be brief.' }, { role: 'user', content: 'hi' }],
+        });
+        const sent = createMock.mock.calls.at(-1)?.[0];
+        expect(sent.system).toEqual([{ type: 'text', text: 'Be brief.', ...mark }]);
+        expect(sent.messages.at(-1).content.at(-1).cache_control).toEqual(mark.cache_control);
+        expect(reply.usage).toMatchObject({ cacheReadTokens: 900, cacheWriteTokens: 300, cacheWriteLongTokens: 300 });
     });
 });
