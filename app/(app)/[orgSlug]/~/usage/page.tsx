@@ -41,13 +41,20 @@ interface UsageStats {
     }>;
 }
 
-type UsageRequest = {
-    created_at: string;
-    prompt_tokens?: number | null;
-    completion_tokens?: number | null;
+// One UTC hour from org_usage_stats; re-bucketed into the viewer's local hours/days.
+type UsageHour = {
+    hour: string;
+    count: number;
+    input_tokens: number;
+    output_tokens: number;
 };
 
-function buildRequestActivity(requests: UsageRequest[], timeRange: string) {
+type UsageRollup = Omit<UsageStats, 'success_rate' | 'daily_requests'> & {
+    successful_requests: number;
+    hourly: UsageHour[];
+};
+
+function buildRequestActivity(hours: UsageHour[], timeRange: string) {
     const isHourly = timeRange === '24h';
     const bucketCount = isHourly ? 24 : timeRange === '30d' ? 30 : 7;
     const stepMs = isHourly ? 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
@@ -62,8 +69,8 @@ function buildRequestActivity(requests: UsageRequest[], timeRange: string) {
     const startMs = end.getTime() - ((bucketCount - 1) * stepMs);
     const buckets = new Map<number, { count: number; inputTokens: number; outputTokens: number }>();
 
-    for (const request of requests) {
-        const bucket = new Date(request.created_at);
+    for (const hour of hours) {
+        const bucket = new Date(hour.hour);
         if (Number.isNaN(bucket.getTime())) continue;
 
         if (isHourly) {
@@ -75,11 +82,11 @@ function buildRequestActivity(requests: UsageRequest[], timeRange: string) {
         const bucketTime = bucket.getTime();
         if (bucketTime < startMs || bucketTime > end.getTime()) continue;
         const current = buckets.get(bucketTime) || { count: 0, inputTokens: 0, outputTokens: 0 };
-        const inputTokens = Number(request.prompt_tokens || 0);
-        const outputTokens = Number(request.completion_tokens || 0);
+        const inputTokens = Number(hour.input_tokens || 0);
+        const outputTokens = Number(hour.output_tokens || 0);
 
         buckets.set(bucketTime, {
-            count: current.count + 1,
+            count: current.count + Number(hour.count || 0),
             inputTokens: current.inputTokens + (Number.isFinite(inputTokens) ? inputTokens : 0),
             outputTokens: current.outputTokens + (Number.isFinite(outputTokens) ? outputTokens : 0),
         });
@@ -225,96 +232,38 @@ function useOrganization(orgSlug: string) {
     });
 }
 
-// Hook to fetch usage stats across all org projects
-function useUsageStats(orgId: string | undefined, timeRange: string) {
+// Hook to fetch usage stats across all org projects. Aggregated server-side:
+// ai_requests rows carry full request payloads, so pulling them here timed out.
+function useUsageStats(orgSlug: string, timeRange: string) {
     return useQuery({
-        queryKey: ["usageStats", orgId, timeRange],
+        queryKey: ["usageStats", orgSlug, timeRange],
         queryFn: async () => {
-            if (!orgId) throw new Error("No org ID");
+            const response = await fetch(`/api/organizations/${orgSlug}/usage?range=${timeRange}`);
+            if (!response.ok) {
+                const body = await response.json().catch(() => ({}));
+                throw new Error(body.error || 'Failed to load usage');
+            }
 
-            // Get all projects for this org
-            const { data: projects } = await supabase
-                .from('projects')
-                .select('id')
-                .eq('organization_id', orgId);
-
-            const projectIds = projects?.map((p: { id: string }) => p.id) || [];
-            if (projectIds.length === 0) {
+            const { rollup } = await response.json() as { rollup: UsageRollup | null };
+            if (!rollup || rollup.total_requests === 0) {
                 return emptyUsageStats(timeRange);
             }
-
-            // Calculate time filter
-            const now = new Date();
-            let startTime: Date;
-            switch (timeRange) {
-                case '24h':
-                    startTime = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-                    break;
-                case '7d':
-                    startTime = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-                    break;
-                case '30d':
-                    startTime = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-                    break;
-                default:
-                    startTime = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-            }
-
-            // Fetch all requests across all projects
-            const { data: requests } = await supabase
-                .from('ai_requests')
-                .select('*')
-                .in('project_id', projectIds)
-                .gte('created_at', startTime.toISOString());
-
-            if (!requests || requests.length === 0) {
-                return emptyUsageStats(timeRange);
-            }
-
-            // Calculate stats
-            const totalRequests = requests.length;
-            const successfulRequests = requests.filter((r: { status: string }) => r.status === 'success').length;
-            const totalTokens = requests.reduce((sum: number, r: { total_tokens?: number }) => sum + (r.total_tokens || 0), 0);
-            const inputTokens = requests.reduce((sum: number, r: { prompt_tokens?: number }) => sum + (r.prompt_tokens || 0), 0);
-            const outputTokens = requests.reduce((sum: number, r: { completion_tokens?: number }) => sum + (r.completion_tokens || 0), 0);
-            const totalCost = requests.reduce((sum: number, r: { cost_usd?: number }) => sum + (r.cost_usd || 0), 0);
-            const latencies = requests.map((r: { latency_ms?: number }) => r.latency_ms).filter((l: number | null | undefined): l is number => l != null);
-            const avgLatency = latencies.length > 0
-                ? latencies.reduce((sum: number, l: number) => sum + l, 0) / latencies.length
-                : 0;
-
-            // Model usage breakdown
-            const modelUsage: Record<string, number> = {};
-            requests.forEach((r: { model?: string }) => {
-                if (r.model) {
-                    modelUsage[r.model] = (modelUsage[r.model] || 0) + 1;
-                }
-            });
-
-            // Provider usage breakdown
-            const providerUsage: Record<string, number> = {};
-            requests.forEach((r: { provider?: string }) => {
-                const provider = r.provider || 'unknown';
-                providerUsage[provider] = (providerUsage[provider] || 0) + 1;
-            });
-
-            const dailyRequests = buildRequestActivity(requests as UsageRequest[], timeRange);
 
             return {
-                total_requests: totalRequests,
-                total_tokens: totalTokens,
-                input_tokens: inputTokens,
-                output_tokens: outputTokens,
-                total_cost: totalCost,
-                avg_latency: Math.round(avgLatency),
-                success_rate: totalRequests > 0 ? (successfulRequests / totalRequests) * 100 : 0,
-                model_usage: modelUsage,
-                provider_usage: providerUsage,
-                daily_requests: dailyRequests,
+                total_requests: Number(rollup.total_requests),
+                total_tokens: Number(rollup.total_tokens),
+                input_tokens: Number(rollup.input_tokens),
+                output_tokens: Number(rollup.output_tokens),
+                total_cost: Number(rollup.total_cost),
+                avg_latency: Number(rollup.avg_latency),
+                success_rate: (Number(rollup.successful_requests) / Number(rollup.total_requests)) * 100,
+                model_usage: rollup.model_usage,
+                provider_usage: rollup.provider_usage,
+                daily_requests: buildRequestActivity(rollup.hourly, timeRange),
             } as UsageStats;
         },
-        enabled: !!orgId,
         staleTime: 60 * 1000,
+        placeholderData: (previous) => previous,
     });
 }
 
@@ -376,7 +325,7 @@ export default function UsagePage({ params }: PageProps) {
     };
 
     const { data: org, isLoading: orgLoading } = useOrganization(orgSlug);
-    const { data: stats, isLoading: statsLoading } = useUsageStats(org?.id, timeRange);
+    const { data: stats, isLoading: statsLoading, error: statsError } = useUsageStats(orgSlug, timeRange);
 
     const isLoading = orgLoading || statsLoading;
 
@@ -500,6 +449,12 @@ export default function UsagePage({ params }: PageProps) {
                     </div>
                 </div>
             </header>
+
+            {statsError && (
+                <div className="mt-6 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-xs text-destructive">
+                    Couldn&apos;t load usage for this window: {statsError.message}. The figures below are not your real usage.
+                </div>
+            )}
 
             {isLoading ? (
                 <>

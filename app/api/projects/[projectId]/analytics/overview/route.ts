@@ -82,14 +82,15 @@ export async function GET(
         let requests: Array<{
             status: string | null; cost_usd: number | null; total_tokens: number | null;
             latency_ms: number | null; model: string; provider: string | null;
-            country?: string | null; geolocation?: { country?: string | null } | null;
+            country_code?: string | null;
         }>;
         try {
             // Paginate past the 1000-row ceiling so every aggregate below covers ALL requests.
             requests = await fetchAllRows((from, to) =>
                 supabaseAdmin
                     .from('ai_requests')
-                    .select('*')
+                    // Never `*`: request_payload is tens of KB per row.
+                    .select('status, cost_usd, total_tokens, latency_ms, model, provider, country_code')
                     .eq('project_id', projectId)
                     .in('api_key_id', apiKeyIds)
                     .gte('created_at', startTime.toISOString())
@@ -175,7 +176,7 @@ export async function GET(
 
         const requestsByCountry: Record<string, number> = {};
         requests?.forEach(r => {
-            const country = r.country || r.geolocation?.country || 'Unknown';
+            const country = r.country_code || 'Unknown';
             if (country && country !== 'Unknown') {
                 requestsByCountry[country] = (requestsByCountry[country] || 0) + 1;
             }

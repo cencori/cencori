@@ -71,7 +71,8 @@ export async function GET(
 
         let query = supabaseAdmin
             .from('ai_requests')
-            .select('*', { count: 'exact' })
+            // Only the first message for the preview; the full request_payload is tens of KB per row.
+            .select('id, created_at, status, model, provider, environment, api_key_id, prompt_tokens, completion_tokens, total_tokens, cost_usd, latency_ms, safety_score, error_message, filtered_reasons, first_message:request_payload->messages->0', { count: 'exact' })
             .eq('project_id', projectId);
 
         if (apiKeyId && apiKeyId !== 'all') {
@@ -120,9 +121,8 @@ export async function GET(
         const formattedRequests = requests?.map(req => {
             let requestPreview = '';
             try {
-                const messages = req.request_payload?.messages;
-                if (messages && messages.length > 0) {
-                    const firstMessage = messages[0];
+                const firstMessage = req.first_message as { content?: string; text?: string } | null;
+                if (firstMessage) {
                     requestPreview = (firstMessage.content || firstMessage.text || '').substring(0, 100);
                 }
             } catch (e) {
