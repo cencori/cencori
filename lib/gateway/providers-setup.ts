@@ -225,12 +225,10 @@ const TENSOR_OPEN_WEIGHT_MODEL_MARKERS = [
 ];
 
 /**
- * Sold on Pro only. A Maximo task averages more than a whole Starter or Builder task is allowed
- * to cost, so on those plans it would be cut off part-way more often than it finished.
+ * The two models Trial and Starter run on. Tensor picks between them for each turn (the app's Auto
+ * names the one it wants), and every plan above Starter may use them too.
  */
-const TENSOR_PRO_ONLY_MODEL_MARKERS = ['maximo-atlas'];
-
-const TENSOR_AUTO_ALLOWED_MODEL_MARKERS = ['deepseek-v4-flash'];
+const TENSOR_STARTER_MODEL_MARKERS = ['deepseek-v4-flash', 'maximo-atlas'];
 
 export function resolveTensorPlanModel(
     requestedModel: string,
@@ -248,10 +246,9 @@ export function resolveTensorPlanModel(
     const isOpenWeight = TENSOR_OPEN_WEIGHT_MODEL_MARKERS.some((marker) =>
         normalized.includes(marker),
     );
-    const isAutoAllowed = TENSOR_AUTO_ALLOWED_MODEL_MARKERS.some((marker) =>
+    const isStarterModel = TENSOR_STARTER_MODEL_MARKERS.some((marker) =>
         normalized.includes(marker),
     );
-    const isProOnly = TENSOR_PRO_ONLY_MODEL_MARKERS.some((marker) => normalized.includes(marker));
 
     if (policy === 'auto') {
         const pinnedAutoModel = process.env.TENSOR_AUTO_MODEL?.trim();
@@ -260,11 +257,10 @@ export function resolveTensorPlanModel(
         // A model named in the environment answers everything, the cheap one asked for by name
         // included: it is set when the cheap model's upstream cannot answer.
         if (pinnedAutoModel) return pinnedAutoModel;
-        // Trial and Starter are counted in tasks, each with a small cost ceiling, so they stay
-        // pinned to the one cheap model. Anything else — including expensive open-weight like
-        // glm-5.3-flash — falls back to the server auto model rather than being cut off at the
-        // ceiling part-way through.
-        if (isAutoAllowed) return requestedModel;
+        // Trial and Starter have two models, DeepSeek V4 Flash and Maximo, and either is served
+        // when it is the one named. Anything else — Builder's open-weight models included — is
+        // answered by the auto model.
+        if (isStarterModel) return requestedModel;
         // A model that is not on this plan is not an error here: the auto model answers instead,
         // which is what this policy did for every request before. Refusing would break callers
         // that have always been quietly substituted.
@@ -275,9 +271,8 @@ export function resolveTensorPlanModel(
     // Builder Auto turn onto a model that cannot answer. The env var still overrides this.
     const builderAutoModel = process.env.TENSOR_BUILDER_AUTO_MODEL?.trim() || 'glm-5.3-flash';
     if (askedForAuto) return builderAutoModel;
-    // Maximo is what the desktop app selects by default, and builds released before it moved to
-    // Pro still offer it on Builder. Answering with Builder's own model keeps those working.
-    if (isProOnly) return builderAutoModel;
+    // Builder adds the open-weight models to Starter's two; the frontier models are Pro's.
+    if (isStarterModel) return requestedModel;
     if (!isOpenWeight) {
         throw new ModelAccessDeniedError('tensor-builder', requestedModel);
     }

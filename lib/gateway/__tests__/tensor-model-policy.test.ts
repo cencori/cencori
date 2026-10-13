@@ -35,15 +35,10 @@ describe('Tensor plan model policy', () => {
     expect(resolveTensorPlanModel('auto', 'auto')).toBe('deepseek-v4-flash');
   });
 
-  /** Trial and Starter are counted in tasks with a small ceiling each, so one cheap model serves them. */
-  it('serves the cheap model when it is asked for by name', () => {
-    expect(resolveTensorPlanModel('deepseek-v4-flash', 'auto')).toBe('deepseek-v4-flash');
-  });
-
-  /** A Maximo task averages more than a Starter task may cost, so it would rarely finish there. */
-  it('answers a Maximo request on Trial and Starter with the auto model', () => {
-    for (const model of ['maximo-atlas-1.3', 'maximo-atlas-1.2']) {
-      expect(resolveTensorPlanModel(model, 'auto')).toBe('deepseek-v4-flash');
+  /** Trial and Starter run on two models, and Tensor's Auto names the one it wants for a turn. */
+  it('serves either Starter model when it is asked for by name', () => {
+    for (const model of ['deepseek-v4-flash', 'maximo-atlas-1.3', 'maximo-atlas-1.2']) {
+      expect(resolveTensorPlanModel(model, 'auto')).toBe(model);
     }
   });
 
@@ -64,11 +59,11 @@ describe('Tensor plan model policy', () => {
     expect(() => resolveTensorPlanModel('gpt-5.6-sol', 'open_weight')).toThrow();
   });
 
-  /** The desktop app selects Maximo by default, so Builder answers it rather than refusing. */
-  it('answers a Maximo request on Builder with Builder\'s own model', () => {
-    expect(resolveTensorPlanModel('maximo-atlas-1.3', 'open_weight')).toBe('glm-5.3-flash');
-    process.env.TENSOR_BUILDER_AUTO_MODEL = 'qwen-4-coder';
-    expect(resolveTensorPlanModel('maximo-atlas-1.3', 'open_weight')).toBe('qwen-4-coder');
+  /** Builder is Starter's two models plus the open-weight ones. */
+  it('serves Starter\'s models and the open-weight models on Builder', () => {
+    for (const model of ['maximo-atlas-1.3', 'deepseek-v4-flash', 'deepseek-v4-pro', 'glm-5.3-flash']) {
+      expect(resolveTensorPlanModel(model, 'open_weight')).toBe(model);
+    }
   });
 
   it('serves Maximo on Pro', () => {
