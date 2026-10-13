@@ -11,10 +11,10 @@ Send an image (URL, base64, or file upload) and get back rich analysis — descr
 
 | Path | Purpose |
 |------|---------|
-| `POST /api/ai/vision` | General analyze — provide your own prompt |
-| `POST /api/ai/vision/describe` | Describe the image in rich detail |
-| `POST /api/ai/vision/ocr` | Extract all visible text |
-| `POST /api/ai/vision/classify` | Structured JSON: tags, categories, objects |
+| `POST /v1/vision` | General analyze — provide your own prompt |
+| `POST /v1/vision/describe` | Describe the image in rich detail |
+| `POST /v1/vision/ocr` | Extract all visible text |
+| `POST /v1/vision/classify` | Structured JSON: tags, categories, objects |
 
 ## Basic Request
 
@@ -109,7 +109,7 @@ const { text } = await cencori.vision.ocr({
 Multipart uploads also support multi-image: send multiple `file` fields (or a single `files[]` field with several files):
 
 ```bash
-curl -X POST https://cencori.com/api/ai/vision \
+curl -X POST https://api.cencori.com/v1/vision \
   -H "CENCORI_API_KEY: csk_..." \
   -F "file=@before.jpg" \
   -F "file=@after.jpg" \
@@ -125,7 +125,7 @@ Per-image validation runs before the provider call, so oversize/wrong-format err
 Set `stream: true` to receive a Server-Sent Events stream of text deltas. The final `data:` line before `[DONE]` contains the usage + cost summary.
 
 ```typescript
-const res = await fetch('https://cencori.com/api/ai/vision', {
+const res = await fetch('https://api.cencori.com/v1/vision', {
   method: 'POST',
   headers: {
     'CENCORI_API_KEY': 'csk_...',
@@ -177,7 +177,7 @@ Universal safe set: **JPEG, PNG, WEBP, GIF**. Requests that violate the provider
 The endpoints also accept `multipart/form-data` for direct file upload:
 
 ```bash
-curl -X POST https://cencori.com/api/ai/vision \
+curl -X POST https://api.cencori.com/v1/vision \
   -H "CENCORI_API_KEY: csk_..." \
   -F "file=@photo.jpg" \
   -F "prompt=What's in this image?" \
@@ -192,7 +192,7 @@ The `cencori/react` subpath ships a `<VisionUploader />` component you can embed
 import { VisionUploader } from 'cencori/react';
 
 <VisionUploader
-  endpoint="https://cencori.com/api/ai/vision"
+  endpoint="https://api.cencori.com/v1/vision"
   apiKey={process.env.NEXT_PUBLIC_CENCORI_KEY}
   task="describe"
   onResult={(result) => console.log(result)}
@@ -202,7 +202,7 @@ import { VisionUploader } from 'cencori/react';
 ## HTTP API
 
 ```bash
-curl -X POST https://cencori.com/api/ai/vision \
+curl -X POST https://api.cencori.com/v1/vision \
   -H "CENCORI_API_KEY: csk_..." \
   -H "Content-Type: application/json" \
   -d '{
@@ -314,9 +314,9 @@ Async variants: `cencori.vision.async_analyze(&params).await`. Full example: [`e
 
 ## Also: automatic vision routing in chat
 
-You don't have to use `/api/ai/vision` directly to get vision. If you send image content through the regular `/api/ai/chat` endpoint, Cencori auto-detects the image, transparently routes through Vision, and even upgrades the model if the one you picked doesn't support vision (`claude-3-5-haiku` → `claude-3-5-sonnet-latest`, `gpt-3.5-turbo` → `gpt-4o-mini`, etc.). See [Vision Auto-Routing in Chat](/docs/api/chat#vision-auto-routing).
+You don't have to use `/v1/vision` directly to get vision. If you send image content through the regular `/api/ai/chat` endpoint, Cencori auto-detects the image, transparently routes through Vision, and even upgrades the model if the one you picked doesn't support vision (`claude-3-5-haiku` → `claude-3-5-sonnet-latest`, `gpt-3.5-turbo` → `gpt-4o-mini`, etc.). See [Vision Auto-Routing in Chat](/docs/api/chat#vision-auto-routing).
 
-Use `/api/ai/vision` directly when:
+Use `/v1/vision` directly when:
 - You want OCR / describe / classify presets
 - You want structured JSON classification
 - You want the multipart file upload path

@@ -63,9 +63,9 @@ const response = await cencori.ai.chat({
 | Endpoint | Task | Selection |
 |----------|------|-----------|
 | Chat (`/api/ai/chat`, `/api/ai/completions`, `/v1/chat/completions`, `/v1/responses`, sessions, agents) | `vision` / `code` / `reasoning` / `fast` | Classified from the request: image content → vision; code signals or tool calls → code; long/analytical prompts → reasoning; otherwise fast (cheap) |
-| Embeddings (`/api/ai/embeddings`) | `embed` | Endpoint-implied; cheapest priced BYOK embedding model first (`text-embedding-3-small` → `text-embedding-3-large` → Google → Cohere) |
-| Images (`/api/ai/images/generate`) | `image` | Endpoint-implied; quality-ordered (`gpt-image-1` → `dall-e-3` → `dall-e-2` → Google). Requests with `n > 1` only match `dall-e-2`; Google-incompatible options (non-1024 size, style, URL output) match OpenAI only |
-| Speech (`/api/ai/audio/speech`) | `speech` | Endpoint-implied; latency-ordered (`tts-1` → `tts-1-hd` → Deepgram → Cartesia → Spitch → ElevenLabs). A voice that doesn't belong to the resolved model falls back to that model's default voice |
+| Embeddings (`/v1/embeddings`) | `embed` | Endpoint-implied; cheapest priced BYOK embedding model first (`text-embedding-3-small` → `text-embedding-3-large` → Google → Cohere) |
+| Images (`/v1/images/generations`) | `image` | Endpoint-implied; quality-ordered (`gpt-image-1` → `dall-e-3` → `dall-e-2` → Google). Requests with `n > 1` only match `dall-e-2`; Google-incompatible options (non-1024 size, style, URL output) match OpenAI only |
+| Speech (`/v1/audio/speech`) | `speech` | Endpoint-implied; latency-ordered (`tts-1` → `tts-1-hd` → Deepgram → Cartesia → Spitch → ElevenLabs). A voice that doesn't belong to the resolved model falls back to that model's default voice |
 
 Candidates are intersected with the project's active BYOK providers and each must have a priced row for the task — unpriced or unkeyed entries are skipped. For chat, a per-provider dashboard **Default Model** acts as a last-resort candidate. Key-level model allowlists still apply: a restricted key can't reach outside its grant via the router.
 

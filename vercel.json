@@ -189,6 +189,38 @@
             "destination": "/api/v1/telemetry/web"
         },
         {
+            "source": "/v1/embeddings",
+            "destination": "/api/ai/embeddings"
+        },
+        {
+            "source": "/v1/moderations",
+            "destination": "/api/ai/moderation"
+        },
+        {
+            "source": "/v1/images/generations",
+            "destination": "/api/ai/images/generate"
+        },
+        {
+            "source": "/v1/images/:path*",
+            "destination": "/api/ai/images/:path*"
+        },
+        {
+            "source": "/v1/audio/:path*",
+            "destination": "/api/ai/audio/:path*"
+        },
+        {
+            "source": "/v1/vision",
+            "destination": "/api/ai/vision"
+        },
+        {
+            "source": "/v1/vision/:path*",
+            "destination": "/api/ai/vision/:path*"
+        },
+        {
+            "source": "/v1/documents/:path*",
+            "destination": "/api/ai/documents/:path*"
+        },
+        {
             "source": "/:path*",
             "has": [
                 {
