@@ -6,6 +6,7 @@
  * request ID, CORS, domain validation, and geo/IP.
  */
 
+import { readProxiedTensorTurn } from '@/lib/tensor-entitlement';
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import crypto from 'crypto';
@@ -618,11 +619,16 @@ return {
     const fullySponsoredKey = isFullySponsoredApiKey(allowedModels, sponsoredModels);
     // Desktop keys minted before the Basecode → Tensor rename carry client_app='basecode';
     // accept both so existing installs keep working.
-    const tensorUserId =
+    const keyTensorUserId =
         (keyData.client_app === 'tensor' || keyData.client_app === 'basecode') &&
         typeof keyData.created_by === 'string'
             ? keyData.created_by
             : null;
+    // Tensor now reaches the gateway through its own proxy, under one product key. The proxy has
+    // authenticated the user and checked their plan, and says who the call is for; that is what
+    // lets the cost below be recorded against their task.
+    const proxiedTensor = keyTensorUserId ? null : readProxiedTensorTurn(req.headers, apiKey);
+    const tensorUserId = keyTensorUserId ?? proxiedTensor?.userId ?? null;
 
     const shouldEnforceCredits = tier !== 'enterprise' && !fullySponsoredKey
         && (tier !== 'free' || isMeteredGatewayRequest(req.method, req.nextUrl.pathname));
@@ -673,9 +679,16 @@ return {
         const { data, error } = await supabase.rpc('basecode_gateway_access', { p_user_id: userId });
         return { data, error };
     };
-    const tensorAccessPromise = tensorUserId
-        ? readTensorAccess(tensorUserId)
-        : Promise.resolve({ data: null, error: null });
+    // A proxied call was checked a moment ago by the proxy, against the same function; asking
+    // again would only add the round trip back.
+    const tensorAccessPromise: Promise<{ data: unknown; error: unknown }> = proxiedTensor
+        ? Promise.resolve({
+            data: { allowed: true, model_policy: proxiedTensor.modelPolicy },
+            error: null,
+        })
+        : tensorUserId
+            ? readTensorAccess(tensorUserId)
+            : Promise.resolve({ data: null, error: null });
     // Tiered quotas: control-plane reads (polls) draw from a roomy bucket so
     // they cannot starve the write budget, and cancellation is always
     // admitted — the corrective action for overload must never be blocked by
@@ -1156,6 +1169,15 @@ export function describeTensorRefusal(reason: string | undefined): {
                     + 'is out of date.',
                 status: 409,
             };
+        case 'task_cost_limit':
+            return {
+                code: 'basecode_task_limit',
+                error: 'Tensor task reached its size limit',
+                message:
+                    'This task has used all the model time one task gets on this plan. Start a new '
+                    + 'task to continue, or move to a larger plan for longer tasks.',
+                status: 429,
+            };
         case 'account_missing':
             return {
                 code: 'basecode_account_missing',
@@ -1171,12 +1193,12 @@ export function describeTensorRefusal(reason: string | undefined): {
                 status: 403,
             };
         default:
-            // `weekly_budget_limit`, and anything a later migration adds: a real usage ceiling,
-            // which is the only one an upgrade or a reset actually resolves.
+            // `task_limit`, `trial_limit`, `pass_budget_limit`, and anything a later migration
+            // adds: the allowance itself is used up, which a new pass resolves.
             return {
                 code: 'basecode_usage_limited',
                 error: 'Tensor usage limit reached',
-                message: 'Your Tensor usage resets automatically. Upgrade or wait for the reset to continue.',
+                message: 'This Tensor plan has been used up. Get a new pass to continue.',
                 status: 429,
             };
     }

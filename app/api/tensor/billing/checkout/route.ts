@@ -3,13 +3,10 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   authenticateTensorBillingRequest,
   tensorCheckoutReference,
-  getPaystackPlanCode,
   paystackChannels,
   getTensorPlan,
-  getTensorPack,
   getOrCreateTensorBillingAccount,
   parseTensorCheckoutInput,
-  parseTensorPackCheckoutInput,
   resolveTensorCheckoutOrigin,
 } from "@/lib/tensor-billing";
 import { createCheckoutSession, getTensorProductId } from "@/lib/bachsClient";
@@ -30,16 +27,10 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const rawBody = await request.json().catch(() => null);
-  // Prepaid packs are the default path (cash first, no subscription promise).
-  // Legacy plan subscriptions still parse for backwards-compatible webhooks,
-  // but the client only sends packs.
-  const packInput = parseTensorPackCheckoutInput(rawBody);
-  const planInput = packInput ? null : parseTensorCheckoutInput(rawBody);
-  const input = packInput ?? planInput;
+  const input = parseTensorCheckoutInput(await request.json().catch(() => null));
   if (!input) {
     return NextResponse.json(
-      { error: "Choose a Starter, Builder or Pro pack and a supported payment method." },
+      { error: "Choose Starter, Builder or Pro and a supported payment method." },
       { headers: noStoreHeaders(), status: 400 },
     );
   }
@@ -53,33 +44,17 @@ export async function POST(request: NextRequest) {
     const account = await getOrCreateTensorBillingAccount(session.admin, session.user.id);
     accountId = account.id;
     const currency = input.provider === "paystack" ? "NGN" : "USD";
-    let expectedAmountMinor: number | null = null;
-    let planCode: string;
-    let packCode: string | null = null;
-    let purchaseKind: "subscription" | "prepaid" = "prepaid";
-    if (packInput) {
-      const pack = await getTensorPack(session.admin, packInput.pack);
-      expectedAmountMinor =
-        input.provider === "paystack" ? pack.price_ngn_minor : pack.price_usd_minor;
-      planCode = pack.grants_plan;
-      packCode = pack.code;
-    } else {
-      const plan = await getTensorPlan(session.admin, (input as { plan: "builder" | "pro" }).plan);
-      expectedAmountMinor =
-        input.provider === "paystack" ? plan.price_ngn_minor : plan.price_usd_minor;
-      planCode = plan.code;
-      purchaseKind = "subscription";
-    }
+    const plan = await getTensorPlan(session.admin, input.plan);
+    const expectedAmountMinor =
+      input.provider === "paystack" ? plan.price_ngn_minor : plan.price_usd_minor;
     if (!expectedAmountMinor || expectedAmountMinor <= 0) {
-      throw new Error("The selected pack does not have a configured price.");
+      throw new Error("The selected plan does not have a configured price.");
     }
 
     const { error: insertError } = await session.admin.from("basecode_checkout_sessions").insert({
       id: checkoutId,
       account_id: account.id,
-      plan_code: planCode,
-      pack_code: packCode,
-      purchase_kind: purchaseKind,
+      plan_code: plan.code,
       provider: input.provider,
       reference,
       expected_amount_minor: expectedAmountMinor,
@@ -92,45 +67,32 @@ export async function POST(request: NextRequest) {
     let providerCheckoutId: string | null = null;
     let checkoutUrl: string;
 
+    // The provider is told what is being bought only for its own records: the checkout row above
+    // is what a verified payment is matched to, and what decides the pass it grants.
+    const metadata = {
+      purchase_type: "basecode_subscription",
+      checkout_id: checkoutId,
+      account_id: account.id,
+      user_id: session.user.id,
+      plan_code: plan.code,
+    };
     if (input.provider === "paystack") {
-      // Prepaid packs are always one-off: OPay, transfer and card all work
-      // because nothing is reused. Legacy subscriptions keep the recurring path.
-      const recurring = !packInput && (input as { recurring?: boolean }).recurring === true;
       const result = await initializePaystackTransaction({
         email: session.user.email,
-        // Paystack takes the NGN minor unit (kobo) directly — the same units the
-        // packs/plans tables store, so no major/minor conversion happens here.
+        // Paystack takes the NGN minor unit (kobo) directly — the same units the plans table
+        // stores, so no major/minor conversion happens here.
         amountMinor: expectedAmountMinor,
         reference,
         callbackUrl: `${baseUrl}/tensor?billing_return=${encodeURIComponent(checkoutId)}`,
         currency: "NGN",
-        channels: recurring ? ["card"] : paystackChannels(input.paymentMethod),
-        ...(recurring && !packInput
-          ? { plan: getPaystackPlanCode((input as { plan: "builder" | "pro" }).plan) }
-          : {}),
-        metadata: {
-          purchase_type: packInput ? "basecode_prepaid" : "basecode_subscription",
-          checkout_id: checkoutId,
-          account_id: account.id,
-          user_id: session.user.id,
-          plan_code: planCode,
-          ...(packCode ? { pack_code: packCode } : {}),
-          ...(recurring ? { recurring: "true" } : {}),
-        },
+        channels: paystackChannels(input.paymentMethod),
+        metadata,
       });
       providerCheckoutId = result.data.access_code;
       checkoutUrl = result.data.authorization_url;
     } else {
-      // Bachs prepaid uses the same plan products for now; the webhook credits
-      // the wallet instead of granting a subscription period when the checkout
-      // is marked prepaid. Pack-specific Bachs products can replace these IDs.
-      const bachsPlan = packInput
-        ? packInput.pack === "starter"
-          ? ("builder" as const)
-          : packInput.pack
-        : (input as { plan: "builder" | "pro" }).plan;
       const result = await createCheckoutSession({
-        product_cart: [{ product_id: getTensorProductId(bachsPlan), quantity: 1 }],
+        product_cart: [{ product_id: getTensorProductId(input.plan), quantity: 1 }],
         customer: {
           email: session.user.email,
           name:
@@ -141,14 +103,7 @@ export async function POST(request: NextRequest) {
         cancel_url: `${baseUrl}/tensor?billing_cancelled=1`,
         reference,
         expires_in_minutes: 30,
-        metadata: {
-          purchase_type: packInput ? "basecode_prepaid" : "basecode_subscription",
-          checkout_id: checkoutId,
-          account_id: account.id,
-          user_id: session.user.id,
-          plan_code: planCode,
-          ...(packCode ? { pack_code: packCode } : {}),
-        },
+        metadata,
       });
       providerCheckoutId = result.checkout_id;
       checkoutUrl = result.checkout_url;

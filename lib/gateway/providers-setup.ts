@@ -222,14 +222,15 @@ const TENSOR_OPEN_WEIGHT_MODEL_MARKERS = [
     'devstral',
     'nemotron',
     'gpt-oss',
-    'maximo-atlas',
 ];
 
-const TENSOR_AUTO_ALLOWED_MODEL_MARKERS = [
-    'deepseek-v4-flash',
-    'maximo-atlas-1.3',
-    'maximo-atlas-1.2',
-];
+/**
+ * Sold on Pro only. A Maximo task averages more than a whole Starter or Builder task is allowed
+ * to cost, so on those plans it would be cut off part-way more often than it finished.
+ */
+const TENSOR_PRO_ONLY_MODEL_MARKERS = ['maximo-atlas'];
+
+const TENSOR_AUTO_ALLOWED_MODEL_MARKERS = ['deepseek-v4-flash'];
 
 export function resolveTensorPlanModel(
     requestedModel: string,
@@ -245,27 +246,29 @@ export function resolveTensorPlanModel(
     const isAutoAllowed = TENSOR_AUTO_ALLOWED_MODEL_MARKERS.some((marker) =>
         normalized.includes(marker),
     );
+    const isProOnly = TENSOR_PRO_ONLY_MODEL_MARKERS.some((marker) => normalized.includes(marker));
 
     if (policy === 'auto') {
         const autoModel = process.env.TENSOR_AUTO_MODEL?.trim() || 'deepseek-v4-flash';
         if (askedForAuto) return autoModel;
-        // Free/auto is request-counted, not cost-weighted, so it must stay pinned to
-        // the cheap weak models (flash + atlas). Anything else — including expensive
-        // open-weight like glm-5.3-flash — falls back to the server auto model
-        // rather than blowing the free cost envelope.
+        // Trial and Starter are counted in tasks, each with a small cost ceiling, so they stay
+        // pinned to the one cheap model. Anything else — including expensive open-weight like
+        // glm-5.3-flash — falls back to the server auto model rather than being cut off at the
+        // ceiling part-way through.
         if (isAutoAllowed) return requestedModel;
-        if (isOpenWeight) return autoModel;
-        // A frontier model is not an error here, it is simply not on this plan, and the auto model
-        // answers instead — which is what this policy did for every request before. Refusing would
-        // break callers that have always been quietly substituted.
+        // A model that is not on this plan is not an error here: the auto model answers instead,
+        // which is what this policy did for every request before. Refusing would break callers
+        // that have always been quietly substituted.
         return autoModel;
     }
 
-    if (askedForAuto) {
-        // GLM rather than DeepSeek: the DeepSeek quota is spent, so the old default resolved every
-        // Builder Auto turn onto a model that cannot answer. The env var still overrides this.
-        return process.env.TENSOR_BUILDER_AUTO_MODEL?.trim() || 'glm-5.3-flash';
-    }
+    // GLM rather than DeepSeek: the DeepSeek quota is spent, so the old default resolved every
+    // Builder Auto turn onto a model that cannot answer. The env var still overrides this.
+    const builderAutoModel = process.env.TENSOR_BUILDER_AUTO_MODEL?.trim() || 'glm-5.3-flash';
+    if (askedForAuto) return builderAutoModel;
+    // Maximo is what the desktop app selects by default, and builds released before it moved to
+    // Pro still offer it on Builder. Answering with Builder's own model keeps those working.
+    if (isProOnly) return builderAutoModel;
     if (!isOpenWeight) {
         throw new ModelAccessDeniedError('tensor-builder', requestedModel);
     }

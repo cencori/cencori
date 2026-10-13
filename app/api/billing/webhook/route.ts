@@ -17,7 +17,6 @@ import {
 } from '@/lib/bachsClient';
 import {
   applyVerifiedTensorPayment,
-  applyVerifiedTensorPrepaidPayment,
   majorAmountToMinor,
 } from '@/lib/tensor-billing';
 import { applyPaidCreditTopup } from '@/lib/billing/paid-credit-topups';
@@ -203,32 +202,18 @@ async function handleCollectionSucceeded(
         throw new Error('Bachs Tensor charge did not verify');
       }
 
-      if (productType === 'basecode_prepaid') {
-        await applyVerifiedTensorPrepaidPayment(supabase, {
-          provider: 'bachs',
-          providerTransactionId: charge.charge_id,
-          reference: charge.reference,
-          amountMinor,
-          currency: 'USD',
-          paymentMethod: charge.payment_method,
-          paidAt: charge.created_at,
-          providerCustomerId: charge.customer.id,
-          providerPayload: charge as unknown as Record<string, unknown>,
-        });
-      } else {
-        await applyVerifiedTensorPayment(supabase, {
-          provider: 'bachs',
-          providerTransactionId: charge.charge_id,
-          reference: charge.reference,
-          amountMinor,
-          currency: 'USD',
-          paymentMethod: charge.payment_method,
-          paidAt: charge.created_at,
-          providerCustomerId: charge.customer.id,
-          providerPayload: charge as unknown as Record<string, unknown>,
-          planCode,
-        });
-      }
+      // The checkout row decides which pass this buys; the product only has to agree with it.
+      await applyVerifiedTensorPayment(supabase, {
+        provider: 'bachs',
+        providerTransactionId: charge.charge_id,
+        reference: charge.reference,
+        amountMinor,
+        currency: 'USD',
+        paymentMethod: charge.payment_method,
+        paidAt: charge.created_at,
+        providerPayload: charge as unknown as Record<string, unknown>,
+        planCode,
+      });
       break;
     }
 

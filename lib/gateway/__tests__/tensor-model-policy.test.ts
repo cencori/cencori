@@ -18,13 +18,15 @@ describe('Tensor plan model policy', () => {
     expect(resolveTensorPlanModel('auto', 'auto')).toBe('deepseek-v4-flash');
   });
 
-  /**
-   * Free/auto is request-counted, so it stays pinned to the cheap weak models.
-   * Atlas + flash pass through; expensive open-weight falls back to auto.
-   */
-  it('serves a Free user the cheap auto model they asked for', () => {
-    for (const model of ['maximo-atlas-1.3', 'maximo-atlas-1.2', 'deepseek-v4-flash']) {
-      expect(resolveTensorPlanModel(model, 'auto')).toBe(model);
+  /** Trial and Starter are counted in tasks with a small ceiling each, so one cheap model serves them. */
+  it('serves the cheap model when it is asked for by name', () => {
+    expect(resolveTensorPlanModel('deepseek-v4-flash', 'auto')).toBe('deepseek-v4-flash');
+  });
+
+  /** A Maximo task averages more than a Starter task may cost, so it would rarely finish there. */
+  it('answers a Maximo request on Trial and Starter with the auto model', () => {
+    for (const model of ['maximo-atlas-1.3', 'maximo-atlas-1.2']) {
+      expect(resolveTensorPlanModel(model, 'auto')).toBe('deepseek-v4-flash');
     }
   });
 
@@ -43,6 +45,17 @@ describe('Tensor plan model policy', () => {
       'deepseek-v4-flash',
     );
     expect(() => resolveTensorPlanModel('gpt-5.6-sol', 'open_weight')).toThrow();
+  });
+
+  /** The desktop app selects Maximo by default, so Builder answers it rather than refusing. */
+  it('answers a Maximo request on Builder with Builder\'s own model', () => {
+    expect(resolveTensorPlanModel('maximo-atlas-1.3', 'open_weight')).toBe('glm-5.3-flash');
+    process.env.TENSOR_BUILDER_AUTO_MODEL = 'qwen-4-coder';
+    expect(resolveTensorPlanModel('maximo-atlas-1.3', 'open_weight')).toBe('qwen-4-coder');
+  });
+
+  it('serves Maximo on Pro', () => {
+    expect(resolveTensorPlanModel('maximo-atlas-1.3', 'frontier')).toBe('maximo-atlas-1.3');
   });
 
   it('does not narrow Pro frontier access', () => {

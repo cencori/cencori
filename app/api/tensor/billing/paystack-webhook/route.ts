@@ -1,18 +1,7 @@
 import { createHash } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
-import {
-  applyVerifiedTensorPayment,
-  applyVerifiedTensorPrepaidPayment,
-  getTensorPlan,
-  getTensorPlanByPaystackPlanCode,
-  type TensorPaidPlanCode,
-} from "@/lib/tensor-billing";
-import {
-  listPaystackSubscriptions,
-  verifyPaystackTransaction,
-  verifyPaystackWebhook,
-  type PaystackSubscription,
-} from "@/lib/paystackClient";
+import { applyVerifiedTensorPayment } from "@/lib/tensor-billing";
+import { verifyPaystackTransaction, verifyPaystackWebhook } from "@/lib/paystackClient";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 
 export const runtime = "nodejs";
@@ -21,17 +10,9 @@ type PaystackChargeData = {
   reference?: string;
 };
 
-type PaystackSubscriptionData = {
-  subscription_code?: string;
-  email_token?: string;
-  status?: string;
-  plan?: { plan_code?: string };
-  customer?: { id?: number; customer_code?: string; email?: string };
-};
-
 type PaystackWebhook = {
   event?: string;
-  data?: PaystackChargeData & PaystackSubscriptionData;
+  data?: PaystackChargeData;
 };
 
 type Admin = ReturnType<typeof createAdminClient>;
@@ -91,132 +72,12 @@ async function claimEvent(eventId: string, eventType: string, payloadSha256: str
   return { claimed: true as const };
 }
 
-/** Resolves a billing account from a Paystack customer code saved at first payment. */
-async function findAccountByCustomerCode(
-  admin: Admin,
-  customerCode: string,
-): Promise<string | null> {
-  const { data } = await admin
-    .from("basecode_billing_customers")
-    .select("account_id")
-    .eq("provider", "paystack")
-    .eq("provider_customer_id", customerCode)
-    .maybeSingle();
-  return (data?.account_id as string | undefined) ?? null;
-}
-
-async function attachSubscription(
-  admin: Admin,
-  accountId: string,
-  plan: TensorPaidPlanCode,
-  subscriptionCode: string,
-  emailToken: string | null,
-): Promise<void> {
-  const { data: existing } = await admin
-    .from("basecode_subscriptions")
-    .select("id")
-    .eq("account_id", accountId)
-    .eq("plan_code", plan)
-    .in("status", ["active", "past_due", "paused"])
-    .order("current_period_end", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (existing) {
-    const { error } = await admin
-      .from("basecode_subscriptions")
-      .update({
-        provider_subscription_id: subscriptionCode,
-        ...(emailToken ? { provider_subscription_token: emailToken } : {}),
-        auto_renews: true,
-        cancel_at_period_end: false,
-      })
-      .eq("id", existing.id);
-    if (error) throw new Error("Could not link the subscription.");
-    return;
-  }
-  // The subscription webhook beat the first-payment webhook: record the row now and
-  // let the payment attach its period when it lands.
-  const planRow = await getTensorPlan(admin, plan);
-  const startsAt = new Date();
-  const endsAt = new Date(startsAt.getTime() + planRow.billing_period_days * 86_400_000);
-  const { error } = await admin.from("basecode_subscriptions").insert({
-    account_id: accountId,
-    plan_code: plan,
-    provider: "paystack",
-    provider_subscription_id: subscriptionCode,
-    ...(emailToken ? { provider_subscription_token: emailToken } : {}),
-    status: "active",
-    current_period_start: startsAt.toISOString(),
-    current_period_end: endsAt.toISOString(),
-    auto_renews: true,
-  });
-  if (error) throw new Error("Could not record the subscription.");
-}
-
 /**
- * Extends access for a provider-generated renewal charge, which carries no checkout
- * reference of its own. The subscription is resolved through the customer's active
- * Paystack subscriptions rather than trusted from the payload alone.
+ * A charge buys a pass, and only a charge Tensor opened a checkout for.
+ *
+ * Passes are one payment each and nothing renews, so a successful charge with no checkout behind
+ * it is not Tensor's to act on: it is acknowledged and left alone rather than guessed at.
  */
-async function applyRenewal(
-  admin: Admin,
-  transaction: {
-    id: number;
-    amount: number;
-    currency: string;
-    channel?: string;
-    paid_at?: string;
-    customer?: { id?: number; customer_code?: string };
-    [key: string]: unknown;
-  },
-): Promise<void> {
-  const customerCode = transaction.customer?.customer_code;
-  const customerId = transaction.customer?.id;
-  if (!customerCode || !customerId) throw new Error("Renewal charge has no customer.");
-  const accountId = await findAccountByCustomerCode(admin, customerCode);
-  if (!accountId) throw new Error("Renewal charge matches no billing account.");
-
-  const subscriptions = await listPaystackSubscriptions(customerId);
-  const match = subscriptions.find(
-    (sub) =>
-      sub.plan?.plan_code && getTensorPlanByPaystackPlanCode(sub.plan.plan_code) !== null,
-  );
-  if (!match?.plan?.plan_code) throw new Error("Renewal matches no Tensor plan.");
-  const plan = getTensorPlanByPaystackPlanCode(match.plan.plan_code);
-  if (!plan) throw new Error("Renewal matches no Tensor plan.");
-  const planRow = await getTensorPlan(admin, plan);
-  if (transaction.amount < (planRow.price_ngn_minor ?? 0)) {
-    throw new Error("Renewal amount is below the plan price.");
-  }
-
-  const { data, error } = await admin.rpc("basecode_apply_subscription_renewal", {
-    p_account_id: accountId,
-    p_plan_code: plan,
-    p_provider: "paystack",
-    p_provider_subscription_id: match.subscription_code,
-    p_provider_transaction_id: String(transaction.id),
-    p_amount_minor: transaction.amount,
-    p_currency: transaction.currency,
-    p_payment_method: transaction.channel ?? null,
-    p_paid_at: transaction.paid_at ?? new Date().toISOString(),
-    p_provider_payload: transaction as unknown as Record<string, unknown>,
-  });
-  if (error) throw new Error(`Could not apply the renewal: ${error.message}`);
-  if (data && typeof data === "object" && (data as { duplicate?: boolean }).duplicate) return;
-
-  // Backfill the disable token so opt-out keeps working even when the
-  // subscription.create webhook arrived before the customer row existed.
-  if (match.email_token) {
-    await admin
-      .from("basecode_subscriptions")
-      .update({ provider_subscription_token: match.email_token })
-      .eq("account_id", accountId)
-      .eq("plan_code", plan)
-      .eq("provider", "paystack")
-      .eq("provider_subscription_id", match.subscription_code);
-  }
-}
-
 async function handleChargeSuccess(admin: Admin, eventId: string, reference: string) {
   const transaction = await verifyPaystackTransaction(reference);
   if (
@@ -235,86 +96,21 @@ async function handleChargeSuccess(admin: Admin, eventId: string, reference: str
     .select("id")
     .eq("reference", transaction.reference)
     .maybeSingle();
-
-  if (checkout) {
-    const { data: kind } = await admin
-      .from("basecode_checkout_sessions")
-      .select("purchase_kind")
-      .eq("reference", transaction.reference)
-      .maybeSingle();
-    if ((kind as { purchase_kind?: string } | null)?.purchase_kind === "prepaid") {
-      await applyVerifiedTensorPrepaidPayment(admin, {
-        provider: "paystack",
-        providerTransactionId: String(transaction.id),
-        reference: transaction.reference,
-        amountMinor: transaction.amount,
-        currency: "NGN",
-        paymentMethod: transaction.channel,
-        paidAt: transaction.paid_at,
-        providerCustomerId: transaction.customer?.customer_code ?? null,
-        providerPayload: transaction as unknown as Record<string, unknown>,
-      });
-    } else {
-      await applyVerifiedTensorPayment(admin, {
-        provider: "paystack",
-        providerTransactionId: String(transaction.id),
-        reference: transaction.reference,
-        amountMinor: transaction.amount,
-        currency: "NGN",
-        paymentMethod: transaction.channel,
-        paidAt: transaction.paid_at,
-        providerCustomerId: transaction.customer?.customer_code ?? null,
-        providerPayload: transaction as unknown as Record<string, unknown>,
-      });
-    }
-  } else {
-    // A provider-generated reference: a subscription renewal, not a checkout.
-    await applyRenewal(admin, {
-      ...transaction,
-      channel: transaction.channel,
-      paid_at: transaction.paid_at,
-      customer: transaction.customer,
-    });
-  }
-  await markEvent(eventId, "processed");
-}
-
-async function handleSubscriptionCreated(admin: Admin, eventId: string, data: PaystackSubscriptionData) {
-  const plan = data.plan?.plan_code ? getTensorPlanByPaystackPlanCode(data.plan.plan_code) : null;
-  const customerCode = data.customer?.customer_code;
-  if (!plan || !data.subscription_code || !customerCode) {
-    await markEvent(eventId, "ignored", "Subscription event is not a Tensor subscription.");
+  if (!checkout) {
+    await markEvent(eventId, "ignored", "Charge matches no Tensor checkout.");
     return;
   }
-  const accountId = await findAccountByCustomerCode(admin, customerCode);
-  if (!accountId) {
-    // The first-payment webhook likely has not processed yet — fail so Paystack
-    // redelivers after the customer row exists.
-    throw new Error("Subscription matches no billing account yet.");
-  }
-  await attachSubscription(admin, accountId, plan, data.subscription_code, data.email_token ?? null);
-  await markEvent(eventId, "processed");
-}
 
-async function handleSubscriptionEnded(admin: Admin, eventId: string, data: PaystackSubscriptionData) {
-  if (!data.subscription_code) {
-    await markEvent(eventId, "ignored");
-    return;
-  }
-  const { data: row } = await admin
-    .from("basecode_subscriptions")
-    .select("id")
-    .eq("provider", "paystack")
-    .eq("provider_subscription_id", data.subscription_code)
-    .maybeSingle();
-  if (!row) {
-    await markEvent(eventId, "ignored", "Subscription matches no Tensor account.");
-    return;
-  }
-  await admin
-    .from("basecode_subscriptions")
-    .update({ auto_renews: false, cancel_at_period_end: true })
-    .eq("id", row.id);
+  await applyVerifiedTensorPayment(admin, {
+    provider: "paystack",
+    providerTransactionId: String(transaction.id),
+    reference: transaction.reference,
+    amountMinor: transaction.amount,
+    currency: "NGN",
+    paymentMethod: transaction.channel,
+    paidAt: transaction.paid_at,
+    providerPayload: transaction as unknown as Record<string, unknown>,
+  });
   await markEvent(eventId, "processed");
 }
 
@@ -341,8 +137,7 @@ export async function POST(request: NextRequest) {
   const eventType = event.event || "unknown";
   // The claim id scopes to event + provider id so Paystack retries dedupe without one
   // event type swallowing another for the same payment.
-  const providerId =
-    event.data?.reference || event.data?.subscription_code || null;
+  const providerId = event.data?.reference || null;
   const eventId =
     providerId && providerId.length <= 200 ? `${eventType}:${providerId}` : null;
   if (!eventId) {
@@ -361,13 +156,6 @@ export async function POST(request: NextRequest) {
   try {
     if (eventType === "charge.success" && event.data?.reference) {
       await handleChargeSuccess(admin, eventId, event.data.reference);
-    } else if (eventType === "subscription.create" && event.data) {
-      await handleSubscriptionCreated(admin, eventId, event.data);
-    } else if (
-      (eventType === "subscription.not_renew" || eventType === "subscription.disable") &&
-      event.data
-    ) {
-      await handleSubscriptionEnded(admin, eventId, event.data);
     } else {
       await markEvent(eventId, "ignored");
     }
@@ -379,5 +167,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Processing failed" }, { status: 500 });
   }
 }
-
-export type { PaystackSubscription };
