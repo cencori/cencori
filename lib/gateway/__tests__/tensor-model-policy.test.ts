@@ -5,6 +5,17 @@ describe('Tensor plan model policy', () => {
   afterEach(() => {
     delete process.env.TENSOR_AUTO_MODEL;
     delete process.env.TENSOR_BUILDER_AUTO_MODEL;
+    delete process.env.TENSOR_ONLY_MODEL;
+  });
+
+  /** While the open-weight upstream is down, one model that works answers every plan below Pro. */
+  it('answers Trial, Starter and Builder with the one model when one is set', () => {
+    process.env.TENSOR_ONLY_MODEL = 'maximo-atlas-1.3';
+    for (const model of ['auto', 'glm-5.3-flash', 'deepseek-v4-flash', 'gpt-5.6-sol']) {
+      expect(resolveTensorPlanModel(model, 'auto')).toBe('maximo-atlas-1.3');
+      expect(resolveTensorPlanModel(model, 'open_weight')).toBe('maximo-atlas-1.3');
+    }
+    expect(resolveTensorPlanModel('claude-opus-5', 'frontier')).toBe('claude-opus-5');
   });
 
   it('routes Free requests through the server-controlled Auto model', () => {
@@ -12,6 +23,12 @@ describe('Tensor plan model policy', () => {
     expect(resolveTensorPlanModel('gpt-5.6-sol', 'auto')).toBe(
       'nvidia/nemotron-3-nano-30b-a3b:free',
     );
+  });
+
+  it('answers even the cheap model by name with the pinned one', () => {
+    process.env.TENSOR_AUTO_MODEL = 'maximo-atlas-1.3';
+    expect(resolveTensorPlanModel('deepseek-v4-flash', 'auto')).toBe('maximo-atlas-1.3');
+    expect(resolveTensorPlanModel('glm-5.3-flash', 'auto')).toBe('maximo-atlas-1.3');
   });
 
   it('defaults Free Auto requests to DeepSeek V4 Flash', () => {

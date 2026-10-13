@@ -238,6 +238,11 @@ export function resolveTensorPlanModel(
 ): string {
     if (!policy || policy === 'frontier' || policy === 'custom') return requestedModel;
 
+    // One model for every Trial, Starter and Builder request, whatever was asked for. Set while
+    // the upstream behind the open-weight models cannot answer, and removed when it can again.
+    const onlyModel = process.env.TENSOR_ONLY_MODEL?.trim();
+    if (onlyModel) return onlyModel;
+
     const normalized = requestedModel.trim().toLowerCase();
     const askedForAuto = !normalized || normalized === 'auto' || normalized === 'tensor-auto';
     const isOpenWeight = TENSOR_OPEN_WEIGHT_MODEL_MARKERS.some((marker) =>
@@ -249,8 +254,12 @@ export function resolveTensorPlanModel(
     const isProOnly = TENSOR_PRO_ONLY_MODEL_MARKERS.some((marker) => normalized.includes(marker));
 
     if (policy === 'auto') {
-        const autoModel = process.env.TENSOR_AUTO_MODEL?.trim() || 'deepseek-v4-flash';
+        const pinnedAutoModel = process.env.TENSOR_AUTO_MODEL?.trim();
+        const autoModel = pinnedAutoModel || 'deepseek-v4-flash';
         if (askedForAuto) return autoModel;
+        // A model named in the environment answers everything, the cheap one asked for by name
+        // included: it is set when the cheap model's upstream cannot answer.
+        if (pinnedAutoModel) return pinnedAutoModel;
         // Trial and Starter are counted in tasks, each with a small cost ceiling, so they stay
         // pinned to the one cheap model. Anything else — including expensive open-weight like
         // glm-5.3-flash — falls back to the server auto model rather than being cut off at the
