@@ -504,7 +504,9 @@ export async function POST(req: NextRequest) {
                 );
             },
             incrementUsage: (chargeUsd) => {
-                void incrementUsage(activeGatewayCtx, chargeUsd);
+                // waitUntil, not bare void: the wallet debit + Tensor usage
+                // record must survive serverless freeze after streaming ends.
+                waitUntil(incrementUsage(activeGatewayCtx, chargeUsd));
             },
             agentId,
             shadowMode,

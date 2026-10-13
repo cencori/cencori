@@ -791,7 +791,9 @@ export async function POST(req: NextRequest) {
                 customRules: inputPipeline.customRules,
             }),
             incrementUsage: (chargeUsd) => {
-                void incrementUsage(ctx, chargeUsd);
+                // waitUntil, not bare void: the wallet debit must survive
+                // serverless freeze after the response flushes.
+                waitUntil(incrementUsage(ctx, chargeUsd));
             },
         });
 

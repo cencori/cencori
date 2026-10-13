@@ -682,7 +682,9 @@ export async function POST(
                 );
             },
             incrementUsage: (chargeUsd) => {
-                void incrementUsage(activeGatewayCtx, chargeUsd);
+                // waitUntil, not bare void: the wallet debit must survive
+                // serverless freeze after the turn stream ends.
+                waitUntil(incrementUsage(activeGatewayCtx, chargeUsd));
             },
             recordEndUserUsage: maybeRecordEndUserUsage,
         });
