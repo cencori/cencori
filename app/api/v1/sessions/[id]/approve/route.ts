@@ -12,6 +12,7 @@ import {
 import { extractCencoriApiKeyFromHeaders } from "@/lib/api-keys";
 import { resumeSessionTurn, type SupabaseAdmin } from "@/lib/gateway/session-engine";
 import { recordSessionApprovalResolved } from "@/lib/governance/record-session";
+import { waitUntil } from "@vercel/functions";
 import type { SubscriptionTier } from "@/lib/entitlements";
 import { runGatewayInputPipeline } from "@/lib/gateway/input-guard";
 import type { UnifiedMessage } from "@/lib/providers/base";
@@ -313,7 +314,9 @@ export async function POST(
                     });
                 },
                 incrementUsage: (chargeUsd) => {
-                    void incrementUsage(gatewayCtx!, chargeUsd);
+                    // waitUntil, not bare void: the wallet debit must survive
+                    // serverless freeze after the resumed stream ends.
+                    waitUntil(incrementUsage(gatewayCtx!, chargeUsd));
                 },
             });
 
