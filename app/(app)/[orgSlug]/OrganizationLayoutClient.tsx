@@ -31,7 +31,7 @@ import Analytics01Icon from "@hugeicons/core-free-icons/Analytics01Icon";
 import Activity03Icon from "@hugeicons/core-free-icons/Activity03Icon";
 import DiscoverSquareIcon from "@hugeicons/core-free-icons/DiscoverSquareIcon";
 import AiLockIcon from "@hugeicons/core-free-icons/AiLockIcon";
-import AiBrain02Icon from "@hugeicons/core-free-icons/AiBrain02Icon";
+import BrainIcon from "@hugeicons/core-free-icons/BrainIcon";
 import ThreeDRotateIcon from "@hugeicons/core-free-icons/ThreeDRotateIcon";
 import CreditCardAcceptIcon from "@hugeicons/core-free-icons/CreditCardAcceptIcon";
 import Settings02Icon from "@hugeicons/core-free-icons/Settings02Icon";
@@ -400,8 +400,9 @@ export default function OrganizationLayoutClient({
     //   1. overviewItem                  — selected project's Overview
     //   2. Observability toggle           — expands to observabilitySubItems
     //   3. projectItems                  — Logs
+    //   ── separator ──
     //   4. AI Gateway toggle             — expands to projectSubItems
-    //   5. projectSecondaryItems         — Security, Memory, Deployments, Monetization
+    //   5. projectSecondaryItems         — Security, Memory, Deployments, Monetization, Agents
     //   6. orgItems                      — Billing, Usage, Teams, Audit Log
     //   7. bottomItems                   — Settings (fixed final position in every scope)
 
@@ -450,7 +451,7 @@ export default function OrganizationLayoutClient({
         // Memory belongs to the selected project, so keep it available while an
         // organization-level page is open instead of reshaping the sidebar.
         ...(scopeProjectSlug
-            ? [{ href: consoleMode ? "/memory" : `${orgBase}/${scopeProjectSlug}/memory`, icon: <HugeiconsIcon icon={AiBrain02Icon} className="!h-5 !w-5" />, label: "Memory" }]
+            ? [{ href: consoleMode ? "/memory" : `${orgBase}/${scopeProjectSlug}/memory`, icon: <HugeiconsIcon icon={BrainIcon} className="!h-5 !w-5" />, label: "Memory" }]
             : []),
         // Deployments stays attached to the selected project for the same stable
         // project → organization → project navigation model.
@@ -817,6 +818,7 @@ export default function OrganizationLayoutClient({
                                                 </SidebarMenuButton>
                                             </SidebarMenuItem>
                                         ))}
+                                        <SidebarSeparator className="my-2 mx-0 w-full" />
                                         {/* 4. AI Gateway toggle */}
                                         <SidebarMenuItem>
                                             <SidebarMenuButton
@@ -840,7 +842,7 @@ export default function OrganizationLayoutClient({
                                                 </Link>
                                             </SidebarMenuButton>
                                         </SidebarMenuItem>
-                                        {/* 5. Security, Deployments, Monetization */}
+                                        {/* 5. Security, Memory, Deployments, Monetization, Agents */}
                                         {projectSecondaryItems.map((item) => (
                                             <SidebarMenuItem key={item.href}>
                                                 <SidebarMenuButton asChild tooltip={item.label} isActive={isActive(item.href)} size="sm">
