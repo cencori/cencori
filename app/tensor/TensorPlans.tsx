@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 
 type PackCode = "starter" | "builder" | "pro";
-type CheckoutMethod = "opay" | "banktransfer" | "international";
 
 type BillingSnapshot = {
   plan: { name: string; tier?: "trial" | PackCode | "enterprise"; renewsAt: string | null };
@@ -48,13 +47,6 @@ const packs: Array<{
 // pricing row is active. Add "pro" back the moment that lands — one-line flip.
 const ENABLED_PACKS: PackCode[] = ["starter", "builder"];
 
-function checkoutPayload(plan: PackCode, method: CheckoutMethod) {
-  if (method === "international") {
-    return { paymentMethod: "auto", plan, provider: "bachs" };
-  }
-  return { paymentMethod: method, plan, provider: "paystack" };
-}
-
 /** Where the signed-in account stands, said in one line. */
 function describeStanding(snapshot: BillingSnapshot): string | null {
   const { tasksLimit, tasksUsed } = snapshot.usage;
@@ -72,8 +64,7 @@ function describeStanding(snapshot: BillingSnapshot): string | null {
 
 export function TensorPlans() {
   const [standing, setStanding] = useState<string | null>(null);
-  const [selectedPack, setSelectedPack] = useState<PackCode | null>(null);
-  const [loading, setLoading] = useState<string | null>(null);
+  const [loading, setLoading] = useState<PackCode | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -92,15 +83,14 @@ export function TensorPlans() {
     };
   }, []);
 
-  async function beginCheckout(pack: PackCode, method: CheckoutMethod) {
-    const key = `${pack}:${method}`;
-    setLoading(key);
+  async function beginCheckout(plan: PackCode) {
+    setLoading(plan);
     setError(null);
     try {
       const response = await fetch("/api/tensor/billing/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(checkoutPayload(pack, method)),
+        body: JSON.stringify({ plan }),
       });
       if (response.status === 401) {
         window.location.assign(`/login?redirect=${encodeURIComponent("/tensor#plans")}`);
@@ -132,7 +122,6 @@ export function TensorPlans() {
 
       <div className={`grid overflow-hidden rounded-xl border border-white/15 bg-black/25 backdrop-blur-md sm:grid-cols-2 ${packs.filter((p) => ENABLED_PACKS.includes(p.code)).length > 2 ? "lg:grid-cols-3" : "lg:grid-cols-2"}`}>
         {packs.filter((pack) => ENABLED_PACKS.includes(pack.code)).map((pack) => {
-          const isSelected = selectedPack === pack.code;
           return (
             <article
               className={`flex min-h-[28rem] flex-col border-white/10 p-5 sm:[&:nth-child(odd)]:border-r lg:border-r lg:last:border-r-0 ${
@@ -157,7 +146,7 @@ export function TensorPlans() {
                 <strong className="text-3xl font-semibold tracking-[-0.055em] text-white">
                   {pack.price}
                 </strong>
-                <span className="text-[11px] text-white/40">for 30 days</span>
+                <span className="text-[11px] text-white/40">or {pack.usd} · for 30 days</span>
               </div>
               <p className="mt-5 min-h-12 text-sm leading-5 text-white/55">{pack.description}</p>
               <ul className="mt-6 grid gap-3 border-t border-white/10 pt-5 text-xs text-white/70">
@@ -170,42 +159,16 @@ export function TensorPlans() {
               </ul>
 
               <div className="mt-auto pt-8">
-                {isSelected ? (
-                  <div className="grid gap-2" aria-label={`Buy ${pack.code}`}>
-                    <button
-                      className="h-9 rounded-md bg-white text-xs font-medium text-black transition-colors hover:bg-white/85 disabled:opacity-50"
-                      disabled={loading !== null}
-                      onClick={() => void beginCheckout(pack.code, "opay")}
-                      type="button"
-                    >
-                      {loading === `${pack.code}:opay` ? "Opening…" : "Pay with OPay"}
-                    </button>
-                    <button
-                      className="h-9 rounded-md border border-white/20 text-xs font-medium text-white transition-colors hover:bg-white/10 disabled:opacity-50"
-                      disabled={loading !== null}
-                      onClick={() => void beginCheckout(pack.code, "banktransfer")}
-                      type="button"
-                    >
-                      {loading === `${pack.code}:banktransfer` ? "Opening…" : "Bank transfer"}
-                    </button>
-                    <button
-                      className="h-8 text-[11px] text-white/45 transition-colors hover:text-white/75 disabled:opacity-50"
-                      disabled={loading !== null}
-                      onClick={() => void beginCheckout(pack.code, "international")}
-                      type="button"
-                    >
-                      {loading === `${pack.code}:international` ? "Opening…" : `International card · ${pack.usd}`}
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    className="h-9 w-full rounded-md bg-white text-xs font-medium text-black transition-colors hover:bg-white/85"
-                    onClick={() => setSelectedPack(pack.code)}
-                    type="button"
-                  >
-                    Buy {pack.code[0].toUpperCase() + pack.code.slice(1)}
-                  </button>
-                )}
+                <button
+                  className="h-9 w-full rounded-md bg-white text-xs font-medium text-black transition-colors hover:bg-white/85 disabled:opacity-50"
+                  disabled={loading !== null}
+                  onClick={() => void beginCheckout(pack.code)}
+                  type="button"
+                >
+                  {loading === pack.code
+                    ? "Opening…"
+                    : `Buy ${pack.code[0].toUpperCase() + pack.code.slice(1)}`}
+                </button>
               </div>
             </article>
           );
@@ -218,9 +181,9 @@ export function TensorPlans() {
         </p>
       ) : null}
       <p className="mt-5 text-center text-[11px] leading-5 text-white/40">
-        OPay and Nigerian bank transfers are processed by Paystack. International card checkout
-        is processed by Bachs. Every payment is one-off and buys 30 days — nothing renews by
-        itself. A task is one request to Tensor, however many steps it takes to finish.
+        Payments are processed by Bachs, in naira or dollars. Every payment is one-off and buys 30
+        days — nothing renews by itself. A task is one request to Tensor, however many steps it
+        takes to finish.
       </p>
     </section>
   );

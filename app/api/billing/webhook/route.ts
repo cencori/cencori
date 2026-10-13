@@ -196,7 +196,7 @@ async function handleCollectionSucceeded(
       if (
         !['succeeded', 'successful', 'paid'].includes(charge.status) ||
         !charge.reference ||
-        charge.currency !== 'USD' ||
+        (charge.currency !== 'USD' && charge.currency !== 'NGN') ||
         !amountMinor
       ) {
         throw new Error('Bachs Tensor charge did not verify');
@@ -208,7 +208,8 @@ async function handleCollectionSucceeded(
         providerTransactionId: charge.charge_id,
         reference: charge.reference,
         amountMinor,
-        currency: 'USD',
+        // Naira or dollars, whichever the customer chose on Bachs's checkout.
+        currency: charge.currency === 'NGN' ? 'NGN' : 'USD',
         paymentMethod: charge.payment_method,
         paidAt: charge.created_at,
         providerPayload: charge as unknown as Record<string, unknown>,

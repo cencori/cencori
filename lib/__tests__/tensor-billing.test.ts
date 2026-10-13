@@ -3,7 +3,7 @@ import {
   tensorCheckoutReference,
   effectiveTensorPlan,
   legacyTensorPlanCode,
-  paystackChannels,
+  tensorPlanPriceMinor,
   majorAmountToMinor,
   parseTensorCheckoutInput,
   resolveTensorCheckoutOrigin,
@@ -11,38 +11,31 @@ import {
 
 describe("Tensor billing contracts", () => {
   it("sells Starter, Builder and Pro, and nothing else", () => {
-    expect(
-      parseTensorCheckoutInput({
-        plan: "builder",
-        provider: "paystack",
-        paymentMethod: "opay",
-      }),
-    ).toEqual({ plan: "builder", provider: "paystack", paymentMethod: "opay" });
-    expect(parseTensorCheckoutInput({ plan: "starter", provider: "bachs" })).toEqual({
-      plan: "starter",
-      provider: "bachs",
-      paymentMethod: "auto",
-    });
+    expect(parseTensorCheckoutInput({ plan: "builder" })).toEqual({ plan: "builder" });
+    expect(parseTensorCheckoutInput({ plan: "starter" })).toEqual({ plan: "starter" });
     // There is no free plan to check out, and the trial is not for sale.
-    expect(parseTensorCheckoutInput({ plan: "free", provider: "paystack" })).toBeNull();
-    expect(parseTensorCheckoutInput({ plan: "enterprise", provider: "paystack" })).toBeNull();
-    expect(
-      parseTensorCheckoutInput({ plan: "pro", provider: "bachs", paymentMethod: "opay" }),
-    ).toBeNull();
+    expect(parseTensorCheckoutInput({ plan: "free" })).toBeNull();
+    expect(parseTensorCheckoutInput({ plan: "enterprise" })).toBeNull();
+    expect(parseTensorCheckoutInput(null)).toBeNull();
   });
 
-  it("still reads a plans page that calls the pass a pack", () => {
-    expect(parseTensorCheckoutInput({ pack: "starter", provider: "paystack" })).toEqual({
-      plan: "starter",
-      provider: "paystack",
-      paymentMethod: "auto",
+  /** A plans page left open from before still names a provider, a method, and a "pack". */
+  it("reads an older plans page, and sends it to Bachs like everything else", () => {
+    expect(
+      parseTensorCheckoutInput({ pack: "starter", provider: "paystack", paymentMethod: "opay" }),
+    ).toEqual({ plan: "starter" });
+    expect(parseTensorCheckoutInput({ plan: "pro", provider: "paystack", recurring: true })).toEqual({
+      plan: "pro",
     });
   });
 
-  it("never sets a purchase up to renew", () => {
-    expect(
-      parseTensorCheckoutInput({ plan: "pro", provider: "paystack", recurring: true }),
-    ).toEqual({ plan: "pro", provider: "paystack", paymentMethod: "auto" });
+  it("prices a plan in the currency the payment arrived in", () => {
+    const starter = { price_ngn_minor: 200_000, price_usd_minor: 200 };
+    expect(tensorPlanPriceMinor(starter, "NGN")).toBe(200_000);
+    expect(tensorPlanPriceMinor(starter, "USD")).toBe(200);
+    // No price in a currency is not a price of nothing: such a payment cannot buy the plan.
+    expect(tensorPlanPriceMinor({ price_ngn_minor: null, price_usd_minor: 200 }, "NGN")).toBeNull();
+    expect(tensorPlanPriceMinor({ price_ngn_minor: 0, price_usd_minor: 0 }, "USD")).toBeNull();
   });
 
   it("reports Starter to released desktop builds under the code they accept", () => {
@@ -50,12 +43,6 @@ describe("Tensor billing contracts", () => {
     expect(legacyTensorPlanCode("free")).toBe("free");
     expect(legacyTensorPlanCode("builder")).toBe("builder");
     expect(legacyTensorPlanCode("pro")).toBe("pro");
-  });
-
-  it("uses the Nigerian checkout channels requested for Paystack", () => {
-    expect(paystackChannels("opay")).toEqual(["bank"]);
-    expect(paystackChannels("banktransfer")).toEqual(["bank_transfer"]);
-    expect(paystackChannels("auto")).toBeUndefined();
   });
 
   it("converts provider major-unit amounts without floating point drift", () => {

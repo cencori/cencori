@@ -10,8 +10,8 @@ import { createServerClient } from "@/lib/supabaseServer";
 export type TensorPlanCode = "free" | "starter" | "builder" | "pro" | "enterprise";
 /** The passes that are for sale. */
 export type TensorPaidPlanCode = "starter" | "builder" | "pro";
-export type TensorPaymentProvider = "paystack" | "bachs";
-export type TensorPaymentMethod = "auto" | "opay" | "banktransfer";
+/** Every Tensor payment is taken by Bachs, in whichever currency the customer chooses there. */
+export type TensorPaymentProvider = "bachs";
 
 const TENSOR_PRODUCTION_ORIGIN = "https://cencori.com";
 
@@ -67,29 +67,18 @@ function isPaidPlan(value: unknown): value is TensorPaidPlanCode {
 }
 
 /**
- * A pass, and how it will be paid for.
+ * The pass being bought.
  *
- * Every purchase is one payment for one 30-day pass. Nothing renews by itself, so card, OPay and
- * bank transfer are all equal here: no authorisation is ever reused. `pack` is what the plans page
- * called the same thing before passes, and a page still open in a browser sends it.
+ * Every purchase is one payment for one 30-day pass, taken by Bachs. How it is paid — card, bank
+ * transfer, naira or dollars — is chosen on Bachs's own checkout, so nothing about it is asked
+ * for here; a plans page still open from before sends a provider and a method, and they are
+ * ignored. `pack` is what that page called the same thing before passes.
  */
-export function parseTensorCheckoutInput(value: unknown): {
-  paymentMethod: TensorPaymentMethod;
-  plan: TensorPaidPlanCode;
-  provider: TensorPaymentProvider;
-} | null {
+export function parseTensorCheckoutInput(value: unknown): { plan: TensorPaidPlanCode } | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const body = value as Record<string, unknown>;
   const plan = body.plan ?? body.pack;
-  if (!isPaidPlan(plan)) return null;
-  const provider = body.provider === "bachs" ? "bachs" : body.provider === "paystack" ? "paystack" : null;
-  if (!provider) return null;
-  const paymentMethod =
-    body.paymentMethod === "opay" || body.paymentMethod === "banktransfer"
-      ? body.paymentMethod
-      : "auto";
-  if (provider === "bachs" && paymentMethod !== "auto") return null;
-  return { paymentMethod, plan, provider };
+  return isPaidPlan(plan) ? { plan } : null;
 }
 
 export function majorAmountToMinor(value: unknown): number | null {
@@ -300,21 +289,8 @@ function readAccountTokens(value: unknown) {
   return tokens;
 }
 
-/**
- * Paystack channels for the requested Nigerian method. `undefined` means the full
- * Paystack channel list. OPay rides on the `bank` (Pay with Bank) channel: the customer
- * picks OPay on the Paystack checkout and authorizes in the OPay app or web app.
- * (Requires the Bank channel enabled in the Paystack dashboard preferences.)
- */
-export function paystackChannels(method: TensorPaymentMethod): string[] | undefined {
-  if (method === "opay") return ["bank"];
-  if (method === "banktransfer") return ["bank_transfer"];
-  return undefined;
-}
-
 export function tensorCheckoutReference(id: string): string {
-  // Dash-separated: Paystack references allow only `-`, `.`, `=` and alphanumerics,
-  // and Bachs accepts the same shape, so one format serves both providers.
+  // Dash-separated and alphanumeric, which is a shape every payment provider accepts.
   return `tensor-${id.replaceAll("-", "")}`;
 }
 
@@ -330,6 +306,15 @@ export type VerifiedTensorPayment = {
   planCode?: TensorPaidPlanCode;
 };
 
+/** What a plan costs in the currency a payment arrived in. */
+export function tensorPlanPriceMinor(
+  plan: Pick<TensorPlanRow, "price_ngn_minor" | "price_usd_minor">,
+  currency: "NGN" | "USD",
+): number | null {
+  const price = currency === "NGN" ? plan.price_ngn_minor : plan.price_usd_minor;
+  return typeof price === "number" && price > 0 ? price : null;
+}
+
 export async function applyVerifiedTensorPayment(
   admin: Admin,
   payment: VerifiedTensorPayment,
@@ -344,12 +329,29 @@ export async function applyVerifiedTensorPayment(
   if (payment.planCode && checkout.plan_code !== payment.planCode) {
     throw new Error("Payment plan mismatch.");
   }
-  if (checkout.currency !== payment.currency) throw new Error("Payment currency mismatch.");
-  if (payment.amountMinor < Number(checkout.expected_amount_minor)) {
-    throw new Error("Payment amount is below the checkout total.");
-  }
   if (checkout.status !== "pending" && checkout.status !== "paid") {
     throw new Error("Tensor checkout is not payable.");
+  }
+
+  // The customer picks naira or dollars on Bachs's checkout, after this one was opened, so the
+  // payment is measured against the plan's own price in the currency it actually arrived in. The
+  // checkout is then made to say what was really charged, which is what the database verifies.
+  const plan = await getTensorPlan(admin, checkout.plan_code as TensorPlanCode);
+  const price = tensorPlanPriceMinor(plan, payment.currency);
+  if (!price) throw new Error("The plan has no price in the payment's currency.");
+  if (payment.amountMinor < price) {
+    throw new Error("Payment amount is below the plan price.");
+  }
+  if (
+    checkout.status === "pending" &&
+    (checkout.currency !== payment.currency || Number(checkout.expected_amount_minor) !== price)
+  ) {
+    const { error: repriceError } = await admin
+      .from("basecode_checkout_sessions")
+      .update({ currency: payment.currency, expected_amount_minor: price })
+      .eq("id", checkout.id)
+      .eq("status", "pending");
+    if (repriceError) throw new Error("Could not record the payment's currency.");
   }
 
   const { data, error } = await admin.rpc("basecode_apply_verified_payment", {

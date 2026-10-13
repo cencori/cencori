@@ -3,14 +3,12 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   authenticateTensorBillingRequest,
   tensorCheckoutReference,
-  paystackChannels,
   getTensorPlan,
   getOrCreateTensorBillingAccount,
   parseTensorCheckoutInput,
   resolveTensorCheckoutOrigin,
 } from "@/lib/tensor-billing";
 import { createCheckoutSession, getTensorProductId } from "@/lib/bachsClient";
-import { initializePaystackTransaction } from "@/lib/paystackClient";
 import { noStoreHeaders } from "@/lib/tensor-auth";
 import { resolvePublicOrigin } from "@/lib/public-origin";
 
@@ -30,7 +28,7 @@ export async function POST(request: NextRequest) {
   const input = parseTensorCheckoutInput(await request.json().catch(() => null));
   if (!input) {
     return NextResponse.json(
-      { error: "Choose Starter, Builder or Pro and a supported payment method." },
+      { error: "Choose Starter, Builder or Pro." },
       { headers: noStoreHeaders(), status: 400 },
     );
   }
@@ -43,10 +41,11 @@ export async function POST(request: NextRequest) {
   try {
     const account = await getOrCreateTensorBillingAccount(session.admin, session.user.id);
     accountId = account.id;
-    const currency = input.provider === "paystack" ? "NGN" : "USD";
     const plan = await getTensorPlan(session.admin, input.plan);
-    const expectedAmountMinor =
-      input.provider === "paystack" ? plan.price_ngn_minor : plan.price_usd_minor;
+    // Opened in dollars. Bachs lets the customer pay in naira instead, and the payment is checked
+    // against the plan's price in whichever of the two it arrives in.
+    const currency = "USD";
+    const expectedAmountMinor = plan.price_usd_minor;
     if (!expectedAmountMinor || expectedAmountMinor <= 0) {
       throw new Error("The selected plan does not have a configured price.");
     }
@@ -55,7 +54,7 @@ export async function POST(request: NextRequest) {
       id: checkoutId,
       account_id: account.id,
       plan_code: plan.code,
-      provider: input.provider,
+      provider: "bachs",
       reference,
       expected_amount_minor: expectedAmountMinor,
       currency,
@@ -64,50 +63,30 @@ export async function POST(request: NextRequest) {
     if (insertError) throw new Error("Could not create the checkout record.");
 
     const baseUrl = appBaseUrl(request);
-    let providerCheckoutId: string | null = null;
-    let checkoutUrl: string;
-
-    // The provider is told what is being bought only for its own records: the checkout row above
-    // is what a verified payment is matched to, and what decides the pass it grants.
-    const metadata = {
-      purchase_type: "basecode_subscription",
-      checkout_id: checkoutId,
-      account_id: account.id,
-      user_id: session.user.id,
-      plan_code: plan.code,
-    };
-    if (input.provider === "paystack") {
-      const result = await initializePaystackTransaction({
+    // Bachs is told what is being bought only for its own records: the checkout row above is
+    // what a verified payment is matched to, and what decides the pass it grants.
+    const result = await createCheckoutSession({
+      product_cart: [{ product_id: getTensorProductId(input.plan), quantity: 1 }],
+      customer: {
         email: session.user.email,
-        // Paystack takes the NGN minor unit (kobo) directly — the same units the plans table
-        // stores, so no major/minor conversion happens here.
-        amountMinor: expectedAmountMinor,
-        reference,
-        callbackUrl: `${baseUrl}/tensor?billing_return=${encodeURIComponent(checkoutId)}`,
-        currency: "NGN",
-        channels: paystackChannels(input.paymentMethod),
-        metadata,
-      });
-      providerCheckoutId = result.data.access_code;
-      checkoutUrl = result.data.authorization_url;
-    } else {
-      const result = await createCheckoutSession({
-        product_cart: [{ product_id: getTensorProductId(input.plan), quantity: 1 }],
-        customer: {
-          email: session.user.email,
-          name:
-            (session.user.user_metadata?.full_name as string | undefined) ||
-            session.user.email.split("@")[0],
-        },
-        success_url: `${baseUrl}/tensor?billing_return=${encodeURIComponent(checkoutId)}`,
-        cancel_url: `${baseUrl}/tensor?billing_cancelled=1`,
-        reference,
-        expires_in_minutes: 30,
-        metadata,
-      });
-      providerCheckoutId = result.checkout_id;
-      checkoutUrl = result.checkout_url;
-    }
+        name:
+          (session.user.user_metadata?.full_name as string | undefined) ||
+          session.user.email.split("@")[0],
+      },
+      success_url: `${baseUrl}/tensor?billing_return=${encodeURIComponent(checkoutId)}`,
+      cancel_url: `${baseUrl}/tensor?billing_cancelled=1`,
+      reference,
+      expires_in_minutes: 30,
+      metadata: {
+        purchase_type: "basecode_subscription",
+        checkout_id: checkoutId,
+        account_id: account.id,
+        user_id: session.user.id,
+        plan_code: plan.code,
+      },
+    });
+    const providerCheckoutId = result.checkout_id;
+    const checkoutUrl = result.checkout_url;
 
     const { error: updateError } = await session.admin
       .from("basecode_checkout_sessions")
