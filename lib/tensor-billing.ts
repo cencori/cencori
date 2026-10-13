@@ -3,8 +3,13 @@ import type { NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { createServerClient } from "@/lib/supabaseServer";
 
-export type TensorPlanCode = "free" | "builder" | "pro" | "enterprise";
-export type TensorPaidPlanCode = Exclude<TensorPlanCode, "free" | "enterprise">;
+/**
+ * What an account is on. `free` is the trial: there is no free plan, but every account starts
+ * there with a handful of tasks, and released desktop builds know the code by that name.
+ */
+export type TensorPlanCode = "free" | "starter" | "builder" | "pro" | "enterprise";
+/** The passes that are for sale. */
+export type TensorPaidPlanCode = "starter" | "builder" | "pro";
 export type TensorPaymentProvider = "paystack" | "bachs";
 export type TensorPaymentMethod = "auto" | "opay" | "banktransfer";
 
@@ -37,6 +42,7 @@ export type TensorBillingAccount = {
   status: "active" | "past_due" | "cancelled" | "suspended";
   entitlement_starts_at: string | null;
   entitlement_ends_at: string | null;
+  created_at: string;
 };
 
 export type TensorPlanRow = {
@@ -45,62 +51,37 @@ export type TensorPlanRow = {
   price_ngn_minor: number | null;
   price_usd_minor: number | null;
   billing_period_days: number;
-  weekly_request_limit: number | null;
-  weekly_budget_microusd: number | null;
+  /** Tasks in a pass; for the trial, tasks ever. Null is unlimited. */
+  task_limit: number | null;
+  /** Provider cost one task may reach. */
+  task_cost_cap_microusd: number | null;
+  /** Provider cost the whole pass may reach, kept below what the pass nets. */
+  pass_budget_microusd: number | null;
   model_policy: "auto" | "open_weight" | "frontier" | "custom";
   max_concurrent_turns: number;
   enabled: boolean;
 };
 
-export type TensorPackCode = "starter" | "builder" | "pro";
-
-export type TensorPrepaidPackRow = {
-  code: TensorPackCode;
-  name: string;
-  price_ngn_minor: number;
-  price_usd_minor: number;
-  credit_microusd: number;
-  grants_plan: TensorPlanCode;
-  enabled: boolean;
-};
-
 function isPaidPlan(value: unknown): value is TensorPaidPlanCode {
-  return value === "builder" || value === "pro";
-}
-
-function isPackCode(value: unknown): value is TensorPackCode {
   return value === "starter" || value === "builder" || value === "pro";
 }
 
-export function parseTensorPackCheckoutInput(value: unknown): {
-  paymentMethod: TensorPaymentMethod;
-  pack: TensorPackCode;
-  provider: TensorPaymentProvider;
-} | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const body = value as Record<string, unknown>;
-  // Prepaid packs are one-off by nature: no recurring flag. Card, OPay and
-  // bank transfer all work because nothing is reused.
-  if (!isPackCode(body.pack)) return null;
-  const provider = body.provider === "bachs" ? "bachs" : body.provider === "paystack" ? "paystack" : null;
-  if (!provider) return null;
-  const paymentMethod =
-    body.paymentMethod === "opay" || body.paymentMethod === "banktransfer"
-      ? body.paymentMethod
-      : "auto";
-  if (provider === "bachs" && paymentMethod !== "auto") return null;
-  return { paymentMethod, pack: body.pack, provider };
-}
-
+/**
+ * A pass, and how it will be paid for.
+ *
+ * Every purchase is one payment for one 30-day pass. Nothing renews by itself, so card, OPay and
+ * bank transfer are all equal here: no authorisation is ever reused. `pack` is what the plans page
+ * called the same thing before passes, and a page still open in a browser sends it.
+ */
 export function parseTensorCheckoutInput(value: unknown): {
   paymentMethod: TensorPaymentMethod;
   plan: TensorPaidPlanCode;
   provider: TensorPaymentProvider;
-  recurring: boolean;
 } | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const body = value as Record<string, unknown>;
-  if (!isPaidPlan(body.plan)) return null;
+  const plan = body.plan ?? body.pack;
+  if (!isPaidPlan(plan)) return null;
   const provider = body.provider === "bachs" ? "bachs" : body.provider === "paystack" ? "paystack" : null;
   if (!provider) return null;
   const paymentMethod =
@@ -108,35 +89,7 @@ export function parseTensorCheckoutInput(value: unknown): {
       ? body.paymentMethod
       : "auto";
   if (provider === "bachs" && paymentMethod !== "auto") return null;
-  // Auto-renew is a Paystack-plans feature. Bachs monthly products already bill
-  // recurringly through Bachs itself, so the flag is meaningless there — and OPay /
-  // bank-transfer authorizations cannot be reused, so recurring always pays by card.
-  const recurring = body.recurring === true;
-  if (recurring && provider !== "paystack") return null;
-  return { paymentMethod, plan: body.plan, provider, recurring };
-}
-
-/**
- * Paystack plan for an auto-renewing Tensor purchase. Amounts on these plans must
- * match the plans table (Builder ₦5,000 / Pro ₦15,000) — Paystack charges the plan
- * amount, ignoring the initialize amount, when a plan is passed.
- *
- * Test and live Paystack accounts have separate plans, so these hold the test codes
- * locally and the live codes in production — same names, different values.
- */
-export function getPaystackPlanCode(plan: TensorPaidPlanCode): string {
-  const code =
-    plan === "builder"
-      ? process.env.PAYSTACK_PLAN_BASECODE_BUILDER
-      : process.env.PAYSTACK_PLAN_BASECODE_PRO;
-  if (!code) throw new Error(`No Paystack plan configured for ${plan}`);
-  return code;
-}
-
-export function getTensorPlanByPaystackPlanCode(planCode: string): TensorPaidPlanCode | null {
-  if (planCode && planCode === process.env.PAYSTACK_PLAN_BASECODE_BUILDER) return "builder";
-  if (planCode && planCode === process.env.PAYSTACK_PLAN_BASECODE_PRO) return "pro";
-  return null;
+  return { paymentMethod, plan, provider };
 }
 
 export function majorAmountToMinor(value: unknown): number | null {
@@ -150,6 +103,7 @@ export function effectiveTensorPlan(
   account: Pick<TensorBillingAccount, "plan_code" | "status" | "entitlement_ends_at">,
   now = new Date(),
 ): TensorPlanCode {
+  // A pass that has ended, or an account that never bought one, is on the trial.
   if (account.plan_code === "free") return "free";
   const endsAt = account.entitlement_ends_at ? new Date(account.entitlement_ends_at) : null;
   return account.status === "active" && endsAt && endsAt.getTime() > now.getTime()
@@ -199,7 +153,7 @@ export async function getOrCreateTensorBillingAccount(
 ): Promise<TensorBillingAccount> {
   const { data: existing, error: readError } = await admin
     .from("basecode_billing_accounts")
-    .select("id, user_id, organization_id, plan_code, status, entitlement_starts_at, entitlement_ends_at")
+    .select("id, user_id, organization_id, plan_code, status, entitlement_starts_at, entitlement_ends_at, created_at")
     .eq("user_id", userId)
     .maybeSingle();
   if (readError) throw new Error("Could not load the Tensor billing account.");
@@ -212,7 +166,7 @@ export async function getOrCreateTensorBillingAccount(
       { user_id: userId, organization_id: organizationId, plan_code: "free", status: "active" },
       { onConflict: "user_id" },
     )
-    .select("id, user_id, organization_id, plan_code, status, entitlement_starts_at, entitlement_ends_at")
+    .select("id, user_id, organization_id, plan_code, status, entitlement_starts_at, entitlement_ends_at, created_at")
     .single();
   if (error || !data) throw new Error("Could not create the Tensor billing account.");
   return data as TensorBillingAccount;
@@ -225,7 +179,7 @@ export async function getTensorPlan(
   const { data, error } = await admin
     .from("basecode_plans")
     .select(
-      "code, name, price_ngn_minor, price_usd_minor, billing_period_days, weekly_request_limit, weekly_budget_microusd, model_policy, max_concurrent_turns, enabled",
+      "code, name, price_ngn_minor, price_usd_minor, billing_period_days, task_limit, task_cost_cap_microusd, pass_budget_microusd, model_policy, max_concurrent_turns, enabled",
     )
     .eq("code", code)
     .eq("enabled", true)
@@ -234,47 +188,55 @@ export async function getTensorPlan(
   return data as TensorPlanRow;
 }
 
-export async function getTensorPack(admin: Admin, code: TensorPackCode): Promise<TensorPrepaidPackRow> {
-  const { data, error } = await admin
-    .from("basecode_prepaid_packs")
-    .select("code, name, price_ngn_minor, price_usd_minor, credit_microusd, grants_plan, enabled")
-    .eq("code", code)
-    .eq("enabled", true)
-    .maybeSingle();
-  if (error || !data) throw new Error("The selected Tensor pack is unavailable.");
-  return data as TensorPrepaidPackRow;
+/**
+ * The plan code as desktop builds released before passes understand it.
+ *
+ * They accept free, builder, pro and enterprise and reject the whole snapshot for anything else,
+ * which would blank the usage screen for everyone on Starter. Starter has the trial's models, so
+ * it reads to them as `free` with the name "Starter"; newer builds read `tier` instead.
+ */
+export function legacyTensorPlanCode(code: TensorPlanCode): Exclude<TensorPlanCode, "starter"> {
+  return code === "starter" ? "free" : code;
+}
+
+/** How much of an allowance is gone, as a whole percentage. */
+function percentageOf(used: number, limit: number | null): number {
+  if (!limit || limit <= 0) return 0;
+  return Math.max(0, Math.min(100, Math.round((used / limit) * 100)));
 }
 
 export async function getTensorBillingSnapshot(admin: Admin, userId: string) {
   const account = await getOrCreateTensorBillingAccount(admin, userId);
   const planCode = effectiveTensorPlan(account);
   const plan = await getTensorPlan(admin, planCode);
-  const { data: wallet } = await admin
-    .from("basecode_billing_accounts")
-    .select("prepaid_balance_microusd, prepaid_total_credited_microusd")
-    .eq("id", account.id)
-    .maybeSingle();
-  const now = new Date().toISOString();
+  const onTrial = planCode === "free";
+
+  // An allowance belongs to a pass, so its period starts exactly when the pass did; the trial's
+  // opens with the account. Matching the start rather than "whichever period covers today" is what
+  // keeps a period from the weekly model that came before from being read as the current one.
+  const periodStart = onTrial ? account.created_at : (account.entitlement_starts_at ?? account.created_at);
   const { data: period, error } = await admin
     .from("basecode_usage_periods")
-    .select("starts_at, ends_at, request_limit, requests_used, budget_microusd, cost_used_microusd, cost_reserved_microusd")
+    .select("ends_at, requests_used, cost_used_microusd")
     .eq("account_id", account.id)
     .eq("plan_code", planCode)
-    .lte("starts_at", now)
-    .gt("ends_at", now)
-    .order("starts_at", { ascending: false })
-    .limit(1)
+    .eq("starts_at", periodStart)
     .maybeSingle();
   if (error) throw new Error("Could not load Tensor usage.");
 
-  const requestLimit = Number(period?.request_limit ?? plan.weekly_request_limit ?? 0);
-  const requestsUsed = Number(period?.requests_used ?? 0);
-  const budget = Number(period?.budget_microusd ?? plan.weekly_budget_microusd ?? 0);
-  const cost = Number(period?.cost_used_microusd ?? 0) + Number(period?.cost_reserved_microusd ?? 0);
-  const rawPercentage = requestLimit > 0 ? (requestsUsed / requestLimit) * 100 : budget > 0 ? (cost / budget) * 100 : 0;
+  const tasksUsed = Number(period?.requests_used ?? 0);
+  const tasksLimit = plan.task_limit;
+  // The pass also has a cost ceiling. It is not shown as a figure, but a pass that has reached it
+  // is used up, and the percentage has to say so or the app would offer tasks it cannot start.
+  const percentageUsed = Math.max(
+    percentageOf(tasksUsed, tasksLimit),
+    percentageOf(Number(period?.cost_used_microusd ?? 0), plan.pass_budget_microusd),
+  );
+  // A trial never turns over: there is nothing to wait for, only a pass to buy.
+  const resetsAt = onTrial ? null : account.entitlement_ends_at;
 
   // Token spend across every device on this account. Deliberately separate from the meter above:
-  // the plan is billed on requests and provider cost, never on tokens. Left off entirely when the
+  // the plan is counted in tasks and provider cost, never in tokens. Left off entirely when the
   // account has no rows yet, because absent has to read as unknown rather than as zero.
   const { data: tokenTotals, error: tokenError } = await admin.rpc("basecode_account_token_usage", {
     p_user_id: userId,
@@ -286,10 +248,12 @@ export async function getTensorBillingSnapshot(admin: Admin, userId: string) {
 
   return {
     plan: {
-      code: plan.code,
+      code: legacyTensorPlanCode(plan.code),
+      tier: onTrial ? ("trial" as const) : plan.code,
       name: plan.name,
       modelPolicy: plan.model_policy,
-      renewsAt: planCode === "free" ? null : account.entitlement_ends_at,
+      // When the pass ends. Nothing renews by itself; the name is the one released builds read.
+      renewsAt: resetsAt,
       // Both currencies, because nothing here knows which one a given account pays in -- checkout
       // decides that from the payment provider, not from the account. The client picks; a plan
       // priced in neither (enterprise) reports null rather than zero, which would read as free.
@@ -303,77 +267,12 @@ export async function getTensorBillingSnapshot(admin: Admin, userId: string) {
             },
     },
     usage: {
-      percentageUsed: Math.max(0, Math.min(100, Math.round(rawPercentage))),
-      resetsAt: period?.ends_at ?? null,
+      percentageUsed,
+      resetsAt,
+      tasksUsed,
+      tasksLimit,
       ...(tokens ? { tokens } : {}),
     },
-    prepaid: {
-      balanceMicrousd: Number(
-        (wallet as { prepaid_balance_microusd?: unknown } | null)?.prepaid_balance_microusd ?? 0,
-      ),
-      totalCreditedMicrousd: Number(
-        (wallet as { prepaid_total_credited_microusd?: unknown } | null)?.prepaid_total_credited_microusd ?? 0,
-      ),
-    },
-  };
-}
-
-export async function applyVerifiedTensorPrepaidPayment(
-  admin: Admin,
-  payment: Omit<VerifiedTensorPayment, "planCode"> & { packCode?: TensorPackCode },
-) {
-  const { data: checkout, error: checkoutError } = await admin
-    .from("basecode_checkout_sessions")
-    .select("id, account_id, pack_code, purchase_kind, provider, reference, expected_amount_minor, currency, status")
-    .eq("reference", payment.reference)
-    .maybeSingle();
-  if (checkoutError || !checkout) throw new Error("Tensor checkout not found.");
-  if (checkout.provider !== payment.provider) throw new Error("Payment provider mismatch.");
-  if (checkout.purchase_kind !== "prepaid") throw new Error("Tensor checkout is not prepaid.");
-  if (payment.packCode && checkout.pack_code !== payment.packCode) {
-    throw new Error("Payment pack mismatch.");
-  }
-  if (checkout.currency !== payment.currency) throw new Error("Payment currency mismatch.");
-  if (payment.amountMinor < Number(checkout.expected_amount_minor)) {
-    throw new Error("Payment amount is below the checkout total.");
-  }
-  if (checkout.status !== "pending" && checkout.status !== "paid") {
-    throw new Error("Tensor checkout is not payable.");
-  }
-
-  const { data, error } = await admin.rpc("basecode_apply_prepaid_payment", {
-    p_checkout_session_id: checkout.id,
-    p_provider_transaction_id: payment.providerTransactionId,
-    p_amount_minor: payment.amountMinor,
-    p_currency: payment.currency,
-    p_payment_method: payment.paymentMethod ?? null,
-    p_paid_at: payment.paidAt ?? new Date().toISOString(),
-    p_provider_payload: payment.providerPayload,
-  });
-  if (error) throw new Error(`Could not apply the Tensor payment: ${error.message}`);
-
-  if (payment.providerCustomerId) {
-    const { error: customerError } = await admin.from("basecode_billing_customers").upsert(
-      {
-        account_id: checkout.account_id,
-        provider: payment.provider,
-        provider_customer_id: payment.providerCustomerId,
-      },
-      { onConflict: "account_id,provider" },
-    );
-    if (customerError) {
-      console.error("[Tensor Billing] Could not save provider customer", customerError);
-    }
-  }
-
-  return data as {
-    applied: boolean;
-    duplicate?: boolean;
-    account_id: string;
-    pack?: TensorPackCode;
-    plan?: TensorPlanCode;
-    credited_microusd?: number;
-    balance_microusd?: number;
   };
 }
 
@@ -427,7 +326,6 @@ export type VerifiedTensorPayment = {
   currency: "NGN" | "USD";
   paymentMethod?: string | null;
   paidAt?: string | null;
-  providerCustomerId?: string | null;
   providerPayload: Record<string, unknown>;
   planCode?: TensorPaidPlanCode;
 };
@@ -464,20 +362,6 @@ export async function applyVerifiedTensorPayment(
     p_provider_payload: payment.providerPayload,
   });
   if (error) throw new Error(`Could not apply the Tensor payment: ${error.message}`);
-
-  if (payment.providerCustomerId) {
-    const { error: customerError } = await admin.from("basecode_billing_customers").upsert(
-      {
-        account_id: checkout.account_id,
-        provider: payment.provider,
-        provider_customer_id: payment.providerCustomerId,
-      },
-      { onConflict: "account_id,provider" },
-    );
-    if (customerError) {
-      console.error("[Tensor Billing] Could not save provider customer", customerError);
-    }
-  }
 
   return data as {
     applied: boolean;

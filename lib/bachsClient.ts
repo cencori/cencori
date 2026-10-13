@@ -286,6 +286,7 @@ export const BACHS_CONFIG = {
     creditsStarter: process.env.BACHS_PRODUCT_CREDITS_STARTER || '',
     creditsGrowth: process.env.BACHS_PRODUCT_CREDITS_GROWTH || '',
     creditsScale: process.env.BACHS_PRODUCT_CREDITS_SCALE || '',
+    tensorStarterMonthly: process.env.BACHS_PRODUCT_BASECODE_STARTER_MONTHLY || '',
     tensorBuilderMonthly: process.env.BACHS_PRODUCT_BASECODE_BUILDER_MONTHLY || '',
     tensorProMonthly: process.env.BACHS_PRODUCT_BASECODE_PRO_MONTHLY || '',
   } as const,
@@ -371,18 +372,22 @@ export function getProductId(
   return id;
 }
 
-export function getTensorProductId(tier: 'builder' | 'pro'): string {
+export function getTensorProductId(tier: 'starter' | 'builder' | 'pro'): string {
   const id =
-    tier === 'builder'
-      ? BACHS_CONFIG.products.tensorBuilderMonthly
-      : BACHS_CONFIG.products.tensorProMonthly;
+    tier === 'starter'
+      ? BACHS_CONFIG.products.tensorStarterMonthly
+      : tier === 'builder'
+        ? BACHS_CONFIG.products.tensorBuilderMonthly
+        : BACHS_CONFIG.products.tensorProMonthly;
   if (!id) throw new Error(`No Bachs Tensor product configured for ${tier}`);
   return id;
 }
 
 export function getTensorPlanByProductId(
   productId: string
-): 'builder' | 'pro' | null {
+): 'starter' | 'builder' | 'pro' | null {
+  if (!productId) return null;
+  if (productId === BACHS_CONFIG.products.tensorStarterMonthly) return 'starter';
   if (productId === BACHS_CONFIG.products.tensorBuilderMonthly) return 'builder';
   if (productId === BACHS_CONFIG.products.tensorProMonthly) return 'pro';
   return null;
@@ -437,6 +442,7 @@ export function getProductTypeFromId(
     return 'credits_topup';
   }
   if (
+    (p.tensorStarterMonthly !== '' && productId === p.tensorStarterMonthly) ||
     productId === p.tensorBuilderMonthly ||
     productId === p.tensorProMonthly
   ) {

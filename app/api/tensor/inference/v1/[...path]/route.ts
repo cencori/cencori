@@ -25,6 +25,7 @@ import { authenticateTensorDataRequest } from "@/lib/tensor-data";
 import { noStoreHeaders } from "@/lib/tensor-auth";
 import { getCachedTensorAccess, setCachedTensorAccess } from "@/lib/config-cache";
 import { warmTensorGateway } from "@/lib/gateway/tensor-warm";
+import { TENSOR_MODEL_POLICY_HEADER, TENSOR_USER_HEADER } from "@/lib/tensor-entitlement";
 import {
     buildServerTiming,
     PROXY_AUTH_MS_HEADER,
@@ -125,6 +126,7 @@ async function forward(req: NextRequest, path: string[]): Promise<Response> {
   // forwarded to the gateway log, and reported as a Server-Timing span.
   let leaseMs: number | null = null;
   let leaseCached = false;
+  let tensorTurn: { modelPolicy: string; userId: string } | null = null;
   if (route.generates) {
     const leaseStartedAt = Date.now();
     let access: unknown = await getCachedTensorAccess(session.user.id);
@@ -147,17 +149,28 @@ async function forward(req: NextRequest, path: string[]): Promise<Response> {
         503,
       );
     }
-    const entitlement = access as { allowed?: boolean; reason?: string; reset_at?: string } | null;
+    const entitlement = access as {
+      allowed?: boolean;
+      model_policy?: string;
+      reason?: string;
+      reset_at?: string;
+    } | null;
     if (!entitlement?.allowed) {
       return json(
         {
-          error: "Tensor usage limit reached",
+          // A task that has reached its own ceiling is a different thing to tell someone than a
+          // plan that is used up: the first is over, the second needs a new pass.
+          error:
+            entitlement?.reason === "task_cost_limit"
+              ? "This task has reached the size limit for your plan. Start a new task to continue."
+              : "Tensor usage limit reached",
           code: entitlement?.reason ?? "usage_limited",
           reset_at: entitlement?.reset_at ?? null,
         },
         entitlement?.reason === "concurrency_limit" ? 409 : 429,
       );
     }
+    tensorTurn = { modelPolicy: entitlement.model_policy ?? "", userId: session.user.id };
     if (!leaseCached) void setCachedTensorAccess(session.user.id, entitlement);
 
     // Every turn is attributed to the person who ran it. The gateway reads `user` as the end user,
@@ -179,6 +192,15 @@ async function forward(req: NextRequest, path: string[]): Promise<Response> {
     [PROXY_AUTH_MS_HEADER]: String(authMs),
     [PROXY_STARTED_AT_HEADER]: String(handlerStartedAt),
     ...(leaseMs !== null ? { [PROXY_LEASE_MS_HEADER]: String(leaseMs) } : {}),
+    // Whose task this is. One product key carries every user's calls, so without this the gateway
+    // cannot record what the call cost against the task that made it. Built here from the verified
+    // session and never copied from the incoming request.
+    ...(tensorTurn
+      ? {
+          [TENSOR_USER_HEADER]: tensorTurn.userId,
+          [TENSOR_MODEL_POLICY_HEADER]: tensorTurn.modelPolicy,
+        }
+      : {}),
   };
   const remote = remoteGatewayBase();
   let upstream: Response;

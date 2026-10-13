@@ -2,14 +2,12 @@
 
 import { useEffect, useState } from "react";
 
-type PlanCode = "free" | "builder" | "pro" | "enterprise";
 type PackCode = "starter" | "builder" | "pro";
 type CheckoutMethod = "opay" | "banktransfer" | "international";
 
 type BillingSnapshot = {
-  plan: { code: PlanCode; name: string };
-  usage: { percentageUsed: number; resetsAt: string | null };
-  prepaid?: { balanceMicrousd: number; totalCreditedMicrousd: number };
+  plan: { name: string; tier?: "trial" | PackCode | "enterprise"; renewsAt: string | null };
+  usage: { tasksUsed?: number; tasksLimit?: number | null };
 };
 
 const packs: Array<{
@@ -22,27 +20,27 @@ const packs: Array<{
 }> = [
   {
     code: "starter",
-    eyebrow: "Top up",
+    eyebrow: "Start",
     price: "₦2,000",
     usd: "$2",
-    description: "Turns on the auto model. No picker change.",
-    features: ["Pay once, burn as you go", "Hard stop at zero — never a bill", "Top up again whenever you run out"],
+    description: "35 tasks over 30 days, on Tensor's Auto model.",
+    features: ["35 tasks", "Auto picks the model for you", "Pay once — nothing renews by itself"],
   },
   {
     code: "builder",
     eyebrow: "Build",
     price: "₦5,000",
     usd: "$5",
-    description: "Unlocks the open-weight picker + extra turns.",
-    features: ["Unlocks selectable open-weight models", "Plenty of room for daily building", "Pay once, burn as you go"],
+    description: "100 tasks over 30 days, with the open-weight models to choose from.",
+    features: ["100 tasks", "Choose your own open-weight model", "Longer tasks than Starter"],
   },
   {
     code: "pro",
     eyebrow: "Ship",
     price: "₦15,000",
     usd: "$15",
-    description: "Unlocks frontier models + the most turns.",
-    features: ["Unlocks GPT / Opus-class models", "Built for serious shipping weeks", "Pay once, burn as you go"],
+    description: "60 tasks over 30 days on frontier models, each with far more room.",
+    features: ["60 tasks", "GPT, Opus-class and Maximo models", "The longest tasks Tensor runs"],
   },
 ];
 
@@ -50,20 +48,30 @@ const packs: Array<{
 // pricing row is active. Add "pro" back the moment that lands — one-line flip.
 const ENABLED_PACKS: PackCode[] = ["starter", "builder"];
 
-function checkoutPayload(pack: PackCode, method: CheckoutMethod) {
+function checkoutPayload(plan: PackCode, method: CheckoutMethod) {
   if (method === "international") {
-    return { paymentMethod: "auto", pack, provider: "bachs" };
+    return { paymentMethod: "auto", plan, provider: "bachs" };
   }
-  return { paymentMethod: method, pack, provider: "paystack" };
+  return { paymentMethod: method, plan, provider: "paystack" };
 }
 
-function formatCredit(microusd: number): string {
-  return `$${(microusd / 1_000_000).toFixed(2)}`;
+/** Where the signed-in account stands, said in one line. */
+function describeStanding(snapshot: BillingSnapshot): string | null {
+  const { tasksLimit, tasksUsed } = snapshot.usage;
+  if (typeof tasksUsed !== "number" || typeof tasksLimit !== "number") return null;
+  const left = Math.max(0, tasksLimit - tasksUsed);
+  const tasks = `${left} of ${tasksLimit} tasks left`;
+  if (snapshot.plan.tier === "trial") return `Trial · ${tasks}`;
+  const ends = snapshot.plan.renewsAt ? new Date(snapshot.plan.renewsAt) : null;
+  const until =
+    ends && !Number.isNaN(ends.getTime())
+      ? ` · until ${new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" }).format(ends)}`
+      : "";
+  return `${snapshot.plan.name} · ${tasks}${until}`;
 }
 
 export function TensorPlans() {
-  const [currentPlan, setCurrentPlan] = useState<PlanCode | null>(null);
-  const [balanceMicrousd, setBalanceMicrousd] = useState<number | null>(null);
+  const [standing, setStanding] = useState<string | null>(null);
   const [selectedPack, setSelectedPack] = useState<PackCode | null>(null);
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -76,10 +84,7 @@ export function TensorPlans() {
         return (await response.json()) as BillingSnapshot;
       })
       .then((snapshot) => {
-        if (active && snapshot) {
-          setCurrentPlan(snapshot.plan.code);
-          if (snapshot.prepaid) setBalanceMicrousd(snapshot.prepaid.balanceMicrousd);
-        }
+        if (active && snapshot) setStanding(describeStanding(snapshot));
       })
       .catch(() => undefined);
     return () => {
@@ -118,12 +123,9 @@ export function TensorPlans() {
         <h2 className="max-w-xl text-3xl font-semibold tracking-[-0.05em] text-white sm:text-4xl">
           Get started with Tensor
         </h2>
-        {balanceMicrousd !== null ? (
+        {standing ? (
           <p className="mt-4 inline-flex items-center gap-2 rounded-full border border-white/15 px-3 py-1 text-xs text-white/75">
-            Credit balance: <strong className="text-white">{formatCredit(balanceMicrousd)}</strong>
-            {currentPlan && currentPlan !== "free" ? (
-              <span className="text-white/45">· {currentPlan} picker unlocked</span>
-            ) : null}
+            {standing}
           </p>
         ) : null}
       </div>
@@ -155,7 +157,7 @@ export function TensorPlans() {
                 <strong className="text-3xl font-semibold tracking-[-0.055em] text-white">
                   {pack.price}
                 </strong>
-                <span className="text-[11px] text-white/40">one-off</span>
+                <span className="text-[11px] text-white/40">for 30 days</span>
               </div>
               <p className="mt-5 min-h-12 text-sm leading-5 text-white/55">{pack.description}</p>
               <ul className="mt-6 grid gap-3 border-t border-white/10 pt-5 text-xs text-white/70">
@@ -217,8 +219,8 @@ export function TensorPlans() {
       ) : null}
       <p className="mt-5 text-center text-[11px] leading-5 text-white/40">
         OPay and Nigerian bank transfers are processed by Paystack. International card checkout
-        is processed by Bachs. Every payment is one-off — no auto-renew. Credit burns at real
-        provider cost and stops at zero. Weekly velocity caps still pace heavy burn.
+        is processed by Bachs. Every payment is one-off and buys 30 days — nothing renews by
+        itself. A task is one request to Tensor, however many steps it takes to finish.
       </p>
     </section>
   );

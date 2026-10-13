@@ -1,9 +1,8 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   tensorCheckoutReference,
   effectiveTensorPlan,
-  getTensorPlanByPaystackPlanCode,
-  getPaystackPlanCode,
+  legacyTensorPlanCode,
   paystackChannels,
   majorAmountToMinor,
   parseTensorCheckoutInput,
@@ -11,53 +10,46 @@ import {
 } from "@/lib/tensor-billing";
 
 describe("Tensor billing contracts", () => {
-  it("accepts only paid Tensor plan checkouts", () => {
+  it("sells Starter, Builder and Pro, and nothing else", () => {
     expect(
       parseTensorCheckoutInput({
         plan: "builder",
         provider: "paystack",
         paymentMethod: "opay",
       }),
-    ).toEqual({ plan: "builder", provider: "paystack", paymentMethod: "opay", recurring: false });
+    ).toEqual({ plan: "builder", provider: "paystack", paymentMethod: "opay" });
+    expect(parseTensorCheckoutInput({ plan: "starter", provider: "bachs" })).toEqual({
+      plan: "starter",
+      provider: "bachs",
+      paymentMethod: "auto",
+    });
+    // There is no free plan to check out, and the trial is not for sale.
     expect(parseTensorCheckoutInput({ plan: "free", provider: "paystack" })).toBeNull();
+    expect(parseTensorCheckoutInput({ plan: "enterprise", provider: "paystack" })).toBeNull();
     expect(
       parseTensorCheckoutInput({ plan: "pro", provider: "bachs", paymentMethod: "opay" }),
     ).toBeNull();
   });
 
-  it("only allows auto-renew on Paystack", () => {
+  it("still reads a plans page that calls the pass a pack", () => {
+    expect(parseTensorCheckoutInput({ pack: "starter", provider: "paystack" })).toEqual({
+      plan: "starter",
+      provider: "paystack",
+      paymentMethod: "auto",
+    });
+  });
+
+  it("never sets a purchase up to renew", () => {
     expect(
       parseTensorCheckoutInput({ plan: "pro", provider: "paystack", recurring: true }),
-    ).toEqual({ plan: "pro", provider: "paystack", paymentMethod: "auto", recurring: true });
-    expect(
-      parseTensorCheckoutInput({ plan: "pro", provider: "bachs", recurring: true }),
-    ).toBeNull();
-    expect(
-      parseTensorCheckoutInput({ plan: "pro", provider: "paystack", recurring: "yes" }),
-    ).toEqual({ plan: "pro", provider: "paystack", paymentMethod: "auto", recurring: false });
+    ).toEqual({ plan: "pro", provider: "paystack", paymentMethod: "auto" });
   });
 
-  it("maps Paystack plan codes to Tensor plans", () => {
-    vi.stubEnv("PAYSTACK_PLAN_BASECODE_BUILDER", "PLN_builder_test");
-    vi.stubEnv("PAYSTACK_PLAN_BASECODE_PRO", "PLN_pro_test");
-    try {
-      expect(getPaystackPlanCode("builder")).toBe("PLN_builder_test");
-      expect(getPaystackPlanCode("pro")).toBe("PLN_pro_test");
-      expect(getTensorPlanByPaystackPlanCode("PLN_builder_test")).toBe("builder");
-      expect(getTensorPlanByPaystackPlanCode("PLN_pro_test")).toBe("pro");
-      expect(getTensorPlanByPaystackPlanCode("PLN_unknown")).toBeNull();
-    } finally {
-      vi.unstubAllEnvs();
-    }
-  });
-
-  it("throws when a Paystack plan is unconfigured", () => {
-    vi.stubEnv("PAYSTACK_PLAN_BASECODE_BUILDER", "");
-    try {
-      expect(() => getPaystackPlanCode("builder")).toThrow("No Paystack plan");
-    } finally {
-      vi.unstubAllEnvs();
-    }
+  it("reports Starter to released desktop builds under the code they accept", () => {
+    expect(legacyTensorPlanCode("starter")).toBe("free");
+    expect(legacyTensorPlanCode("free")).toBe("free");
+    expect(legacyTensorPlanCode("builder")).toBe("builder");
+    expect(legacyTensorPlanCode("pro")).toBe("pro");
   });
 
   it("uses the Nigerian checkout channels requested for Paystack", () => {
@@ -73,7 +65,7 @@ describe("Tensor billing contracts", () => {
     expect(majorAmountToMinor("not-money")).toBeNull();
   });
 
-  it("falls back to free when a paid entitlement is inactive or expired", () => {
+  it("falls back to the trial when a pass is inactive or has ended", () => {
     const future = new Date("2026-09-30T00:00:00Z").toISOString();
     const past = new Date("2026-08-01T00:00:00Z").toISOString();
     const now = new Date("2026-08-31T00:00:00Z");
@@ -95,6 +87,12 @@ describe("Tensor billing contracts", () => {
         now,
       ),
     ).toBe("free");
+    expect(
+      effectiveTensorPlan(
+        { plan_code: "starter", status: "active", entitlement_ends_at: future },
+        now,
+      ),
+    ).toBe("starter");
   });
 
   it("creates provider-safe checkout references", () => {
