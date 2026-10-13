@@ -12,7 +12,7 @@ We'll use `cencori.documents.extract()` (free for text-based PDFs) and `cencori.
 ## What you're building
 
 - Upload a PDF once, ask many questions
-- Each question hits `/api/ai/documents/query`
+- Each question hits `/v1/documents/query`
 - Answers cite the relevant excerpt when possible
 - The system prompt guarantees "Not found in the document" instead of hallucinated legal opinions
 
@@ -88,7 +88,7 @@ export async function getContract(id: string) {
 
 ## Step 2 — Ask questions
 
-Each question is a small `POST /api/ai/documents/query` call. The strict system prompt guarantees no invented text.
+Each question is a small `POST /v1/documents/query` call. The strict system prompt guarantees no invented text.
 
 ```typescript
 // app/api/contract/[id]/ask/route.ts
@@ -240,7 +240,7 @@ Ship this to your app and you have a working contract Q&A tool. All the AI-magic
 
 **Validate the schema.** For structured extraction (dates, dollar amounts, party names), use `cencori.ai.generateObject()` with a Zod schema instead of freeform query — you'll get typed data back and Cencori will fail loudly if the model returns invalid JSON.
 
-**Handle the scanned-PDF error.** If `extract` returns `error: 'scanned_pdf_not_yet_supported'`, show the user a helpful message: "This PDF looks like a scan — try uploading each page as an image." Or rasterize on the client with pdf.js and send the pages to `/api/ai/vision` with the multi-image field.
+**Handle the scanned-PDF error.** If `extract` returns `error: 'scanned_pdf_not_yet_supported'`, show the user a helpful message: "This PDF looks like a scan — try uploading each page as an image." Or rasterize on the client with pdf.js and send the pages to `/v1/vision` with the multi-image field.
 
 **Redact before you ship.** Contracts contain PII. If you're logging the extracted text anywhere your team can see, enable scanning in **Project > Security** for input blocking, and add a governance policy if you also need output enforcement — `cencori.ai.chat` does not mask PII automatically.
 

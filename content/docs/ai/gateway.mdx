@@ -12,11 +12,11 @@ The AI Gateway is Cencori's runtime control point. Your application sends AI tra
 | Endpoint | Description | Providers |
 |----------|-------------|-----------|
 | `/api/ai/chat` | Chat completions | OpenAI, Anthropic, Google, xAI, Mistral, DeepSeek, Meta |
-| `/api/ai/embeddings` | Vector embeddings | OpenAI, Google, Cohere |
-| `/api/ai/images/generate` | Image generation | OpenAI, Google |
-| `/api/ai/audio/transcriptions` | Speech-to-text | OpenAI |
-| `/api/ai/audio/speech` | Text-to-speech | OpenAI |
-| `/api/ai/moderation` | Content moderation | OpenAI |
+| `/v1/embeddings` | Vector embeddings | OpenAI, Google, Cohere |
+| `/v1/images/generations` | Image generation | OpenAI, Google |
+| `/v1/audio/transcriptions` | Speech-to-text | OpenAI |
+| `/v1/audio/speech` | Text-to-speech | OpenAI |
+| `/v1/moderations` | Content moderation | OpenAI |
 | `https://api.cencori.com/v1/chat/completions` | OpenAI-compatible chat endpoint | OpenAI-compatible clients |
 
 Use `https://api.cencori.com/v1` as the base URL for OpenAI-compatible SDKs. Most SDKs append `/chat/completions` automatically.

@@ -11,9 +11,9 @@ Point at a PDF or image and get back clean text, a summary, or an answer to your
 
 | Path | Purpose |
 |------|---------|
-| `POST /api/ai/documents/extract` | Return the full text of the document |
-| `POST /api/ai/documents/summarize` | Extract then generate a concise summary |
-| `POST /api/ai/documents/query` | Extract then answer a specific question |
+| `POST /v1/documents/extract` | Return the full text of the document |
+| `POST /v1/documents/summarize` | Extract then generate a concise summary |
+| `POST /v1/documents/query` | Extract then answer a specific question |
 
 ## Basic Request
 
@@ -138,15 +138,15 @@ Scanned PDFs (image-only, no embedded text) return a `400`:
 ```
 
 Rasterize the pages to PNGs client-side and either:
-- POST each page image to `/api/ai/documents/extract` and concatenate the text, or
-- POST all pages together to `/api/ai/vision` with the `images: [...]` multi-image field for a single unified analysis.
+- POST each page image to `/v1/documents/extract` and concatenate the text, or
+- POST all pages together to `/v1/vision` with the `images: [...]` multi-image field for a single unified analysis.
 
 ## Multipart file upload
 
 Both endpoints accept `multipart/form-data`:
 
 ```bash
-curl -X POST https://cencori.com/api/ai/documents/query \
+curl -X POST https://api.cencori.com/v1/documents/query \
   -H "CENCORI_API_KEY: csk_..." \
   -F "file=@contract.pdf" \
   -F "question=What is the total contract value?"

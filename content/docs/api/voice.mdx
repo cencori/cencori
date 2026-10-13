@@ -11,11 +11,11 @@ Turn text into speech and speech into text through a single billable, logged, PI
 
 | Path | Purpose |
 |------|---------|
-| `POST /api/ai/audio/speech` | Text-to-speech (TTS) |
-| `POST /api/ai/audio/transcriptions` | Speech-to-text (STT) |
-| `GET /api/ai/audio/speech` | TTS models + formats + limits |
-| `GET /api/ai/audio/transcriptions` | STT models + supported formats + limits |
-| `GET /api/ai/audio/voices` | Full TTS voice registry (runtime voice discovery) |
+| `POST /v1/audio/speech` | Text-to-speech (TTS) |
+| `POST /v1/audio/transcriptions` | Speech-to-text (STT) |
+| `GET /v1/audio/speech` | TTS models + formats + limits |
+| `GET /v1/audio/transcriptions` | STT models + supported formats + limits |
+| `GET /v1/audio/voices` | Full TTS voice registry (runtime voice discovery) |
 
 The **provider is inferred from `model`** — you never pass a provider name. Both endpoints default to OpenAI for backward compatibility.
 
@@ -59,11 +59,11 @@ await fs.writeFile('hello.mp3', Buffer.from(audio));
 | `spitch-tts` | Spitch | `sade`, `funmi`, `segun`, `femi`, `amara`, `amina`, `aliyu`, `hasan`, `ngozi`, `obinna`, `henry`, `kani` | `sade` |
 | `eleven_turbo_v2_5`, `eleven_flash_v2_5`, `eleven_multilingual_v2` | ElevenLabs | (voice is an id) | `21m00Tcm4TlvDq8ikWAM` |
 
-The authoritative, always-current list comes from `GET /api/ai/audio/voices`, which returns each model with its `voices`, `default_voice`, `formats`, and `max_input_chars`. Omit `voice` to get the default.
+The authoritative, always-current list comes from `GET /v1/audio/voices`, which returns each model with its `voices`, `default_voice`, `formats`, and `max_input_chars`. Omit `voice` to get the default.
 
 ### Response
 
-`POST /api/ai/audio/speech` returns **raw audio bytes**, not JSON:
+`POST /v1/audio/speech` returns **raw audio bytes**, not JSON:
 
 - `Content-Type`: `audio/mpeg` (mp3), `audio/opus`, `audio/aac`, `audio/flac`, `audio/wav`, or `audio/pcm` per `response_format`
 - `X-Provider`: which provider served the request
@@ -78,7 +78,7 @@ Save the body directly to a file or play it — no decoding needed.
 Set `"stream": true` to receive the audio as a chunked `Transfer-Encoding: chunked` response instead of one buffered blob. The client can begin decoding/playing bytes as they arrive, and the server never holds the full file in memory.
 
 ```bash
-curl -X POST https://cencori.com/api/ai/audio/speech \
+curl -X POST https://api.cencori.com/v1/audio/speech \
   -H "CENCORI_API_KEY: csk_..." \
   -H "Content-Type: application/json" \
   -d '{ "input": "A long reply…", "stream": true }' \
@@ -227,7 +227,7 @@ import { VoiceRecorder, SpeakButton } from 'cencori/react';
 ### Speech (TTS)
 
 ```bash
-curl -X POST https://cencori.com/api/ai/audio/speech \
+curl -X POST https://api.cencori.com/v1/audio/speech \
   -H "CENCORI_API_KEY: csk_..." \
   -H "Content-Type: application/json" \
   -d '{
@@ -242,7 +242,7 @@ The response carries an `X-Provider` header telling you which provider served th
 ### Transcription (STT)
 
 ```bash
-curl -X POST https://cencori.com/api/ai/audio/transcriptions \
+curl -X POST https://api.cencori.com/v1/audio/transcriptions \
   -H "CENCORI_API_KEY: csk_..." \
   -F file=@audio.mp3 \
   -F model=nova-3 \
@@ -252,17 +252,17 @@ curl -X POST https://cencori.com/api/ai/audio/transcriptions \
 
 ## Auto-router (`auto` / `cencori-auto`)
 
-Pass `model: 'auto'` to `POST /api/ai/audio/speech` to resolve a latency-ordered BYOK voice model for the project (`tts-1` → `tts-1-hd` → Deepgram → Cartesia → Spitch → ElevenLabs), verified against unit pricing and the requested format. A `voice` that doesn't belong to the resolved model falls back to that model's default voice. BYOK-only: no usable key returns `402 byok_required`, and it never falls back to managed keys. Details: [BYOK auto-router](/docs/platform/byok#auto-router).
+Pass `model: 'auto'` to `POST /v1/audio/speech` to resolve a latency-ordered BYOK voice model for the project (`tts-1` → `tts-1-hd` → Deepgram → Cartesia → Spitch → ElevenLabs), verified against unit pricing and the requested format. A `voice` that doesn't belong to the resolved model falls back to that model's default voice. BYOK-only: no usable key returns `402 byok_required`, and it never falls back to managed keys. Details: [BYOK auto-router](/docs/platform/byok#auto-router).
 
 ### Voice discovery
 
 ```bash
 # All TTS models with voices, defaults, and limits
-curl https://cencori.com/api/ai/audio/voices
+curl https://api.cencori.com/v1/audio/voices
 # Same registry plus formats / supports_streaming
-curl https://cencori.com/api/ai/audio/speech
+curl https://api.cencori.com/v1/audio/speech
 # STT models, accepted containers, response formats, max file size
-curl https://cencori.com/api/ai/audio/transcriptions
+curl https://api.cencori.com/v1/audio/transcriptions
 ```
 
 These GET endpoints are unauthenticated and safe to call at startup.

@@ -11,7 +11,7 @@ The Responses API is an OpenAI-compatible endpoint that unifies chat completions
 
 | Endpoint | Path | Best For |
 |----------|------|----------|
-| **Cencori Responses API** | `https://cencori.com/api/v1/responses` | Agentic workflows with built-in tools |
+| **Cencori Responses API** | `https://api.cencori.com/v1/responses` | Agentic workflows with built-in tools |
 | **OpenAI-Compatible** | `https://api.cencori.com/v1/responses` | Existing OpenAI Responses API clients |
 
 ## When to Use Responses vs Chat
@@ -89,7 +89,7 @@ console.log(response.output[0].content?.[0]?.text);
 ## HTTP Endpoint
 
 ```bash
-curl https://cencori.com/api/v1/responses \
+curl https://api.cencori.com/v1/responses \
   -H "Authorization: Bearer csk_..." \
   -H "Content-Type: application/json" \
   -d '{
@@ -402,7 +402,7 @@ for await (const event of stream) {
 ### HTTP Streaming
 
 ```bash
-curl -N https://cencori.com/api/v1/responses \
+curl -N https://api.cencori.com/v1/responses \
   -H "Authorization: Bearer csk_..." \
   -H "Content-Type: application/json" \
   -d '{

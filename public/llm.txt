@@ -611,11 +611,11 @@ Base origin:
 
 Common endpoints:
 - `POST /api/ai/chat`
-- `POST /api/ai/embeddings`
-- `POST /api/ai/images/generate`
-- `POST /api/ai/vision/describe` · `POST /api/ai/vision/ocr` · `POST /api/ai/vision/classify`
-- `POST /api/ai/documents/extract` · `POST /api/ai/documents/summarize` · `POST /api/ai/documents/query`
-- `POST /api/ai/audio/speech` (text-to-speech) · `POST /api/ai/audio/transcriptions` (speech-to-text)
+- `POST /v1/embeddings`
+- `POST /v1/images/generations`
+- `POST /v1/vision/describe` · `POST /v1/vision/ocr` · `POST /v1/vision/classify`
+- `POST /v1/documents/extract` · `POST /v1/documents/summarize` · `POST /v1/documents/query`
+- `POST /v1/audio/speech` (text-to-speech) · `POST /v1/audio/transcriptions` (speech-to-text)
 - `POST /api/v1/telemetry/web`
 
 All endpoints below use the same `CENCORI_API_KEY: csk_...` header and `https://cencori.com` origin.
@@ -860,18 +860,18 @@ Optional fields: `prompt`, `model`, `max_tokens`, `temperature`, `response_forma
 
 ```bash
 # Describe → { "description", "model", "provider", "usage", "cost" }
-curl https://cencori.com/api/ai/vision/describe \
+curl https://api.cencori.com/v1/vision/describe \
   -H "CENCORI_API_KEY: csk_..." -H "Content-Type: application/json" \
   -d '{ "image_url": "https://example.com/photo.jpg" }'
 
 # OCR → { "text", "model", "provider", "usage", "cost" }
-curl https://cencori.com/api/ai/vision/ocr \
+curl https://api.cencori.com/v1/vision/ocr \
   -H "CENCORI_API_KEY: csk_..." -H "Content-Type: application/json" \
   -d '{ "image_url": "https://example.com/receipt.png" }'
 
 # Classify → { "classification", "raw", "model", "provider", "usage", "cost" }
 # (`classification` is parsed JSON; `raw` is the model's original string.)
-curl https://cencori.com/api/ai/vision/classify \
+curl https://api.cencori.com/v1/vision/classify \
   -H "CENCORI_API_KEY: csk_..." -H "Content-Type: application/json" \
   -d '{ "image_url": "https://example.com/product.jpg" }'
 ```
@@ -888,15 +888,15 @@ Scanned PDFs with no embedded text are not yet supported — rasterize to per-pa
 
 ```bash
 # Extract → { "text", "method", "kind", "pageCount", "model", "provider", "usage", "cost" }
-curl https://cencori.com/api/ai/documents/extract \
+curl https://api.cencori.com/v1/documents/extract \
   -H "CENCORI_API_KEY: csk_..." -F "file=@contract.pdf"
 
 # Summarize → summary of the extracted document (optional `prompt`, `model`)
-curl https://cencori.com/api/ai/documents/summarize \
+curl https://api.cencori.com/v1/documents/summarize \
   -H "CENCORI_API_KEY: csk_..." -F "file=@contract.pdf"
 
 # Query → answer a question about the document (`question` is required)
-curl https://cencori.com/api/ai/documents/query \
+curl https://api.cencori.com/v1/documents/query \
   -H "CENCORI_API_KEY: csk_..." \
   -F "file=@contract.pdf" -F "question=What is the termination notice period?"
 ```
@@ -905,21 +905,21 @@ curl https://cencori.com/api/ai/documents/query \
 
 Text-to-speech and speech-to-text. Provider is inferred from `model`.
 
-`POST /api/ai/audio/speech` (TTS) — JSON body `{ "input": "...", "model": "tts-1", "voice": "...", "response_format": "mp3", "provider": "openai" }`.
+`POST /v1/audio/speech` (TTS) — JSON body `{ "input": "...", "model": "tts-1", "voice": "...", "response_format": "mp3", "provider": "openai" }`.
 Only `input` is required. Returns **binary audio** with the matching `Content-Type` (e.g. `audio/mpeg`), not JSON.
 
 ```bash
-curl https://cencori.com/api/ai/audio/speech \
+curl https://api.cencori.com/v1/audio/speech \
   -H "CENCORI_API_KEY: csk_..." -H "Content-Type: application/json" \
   -d '{ "input": "Hello from Cencori.", "model": "tts-1", "voice": "alloy" }' \
   --output speech.mp3
 ```
 
-`POST /api/ai/audio/transcriptions` (STT) — `multipart/form-data`. Fields: `file` (required), `model` (default `whisper-1`), `language`, `prompt`, `response_format` (`json` | `text` | `srt` | `verbose_json` | `vtt`), `temperature`, `diarize`, `provider`.
+`POST /v1/audio/transcriptions` (STT) — `multipart/form-data`. Fields: `file` (required), `model` (default `whisper-1`), `language`, `prompt`, `response_format` (`json` | `text` | `srt` | `verbose_json` | `vtt`), `temperature`, `diarize`, `provider`.
 Default response: `{ "text": "..." }`. `verbose_json` adds `language`, `duration`, `segments`, `words`, `provider`, `model`.
 
 ```bash
-curl https://cencori.com/api/ai/audio/transcriptions \
+curl https://api.cencori.com/v1/audio/transcriptions \
   -H "CENCORI_API_KEY: csk_..." \
   -F "file=@meeting.mp3" -F "model=whisper-1"
 ```
@@ -1085,12 +1085,12 @@ Cencori credits, works at a zero credit balance. No usable key returns
   else fast. `cencori-auto` forces the BYOK router when a Tensor plan mapping
   would own bare `auto`. Do not combine with a pinned `connection_id` (400).
   Chat allowlists still apply; responses are never cached for `auto`.
-- Embeddings (`POST /api/ai/embeddings`): cheapest priced BYOK model first
+- Embeddings (`POST /v1/embeddings`): cheapest priced BYOK model first
   (`text-embedding-3-small` → `text-embedding-3-large` → Google → Cohere).
-- Images (`POST /api/ai/images/generate`): quality-ordered
+- Images (`POST /v1/images/generations`): quality-ordered
   (`gpt-image-1` → `dall-e-3` → `dall-e-2` → Google). `n > 1` only matches
   `dall-e-2`.
-- Speech (`POST /api/ai/audio/speech`): latency-ordered (`tts-1` →
+- Speech (`POST /v1/audio/speech`): latency-ordered (`tts-1` →
   `tts-1-hd` → Deepgram → Cartesia → Spitch → ElevenLabs). A voice that does
   not belong to the resolved model falls back to that model's default voice.
 
@@ -1178,7 +1178,7 @@ Auth:
 - `cpk_*` (publishable): cannot call embedded management APIs.
 - Never ship `csk_*` to a browser or mobile client.
 
-Canonical endpoints (`https://cencori.com/v1/*`; [full OpenAPI reference](https://cencori.com/openapi/embedded-agents.json)):
+Canonical endpoints (`https://api.cencori.com/v1/*`; [full OpenAPI reference](https://cencori.com/openapi/embedded-agents.json)):
 - Models: `GET /v1/models` (only discovery surface; `?available=true` for invokable-only).
 - Providers: `POST/GET /v1/provider-connections`, `/validate`, `/:id/test`, `/model-syncs` preview then `/apply`.
 - Tenants: `POST/GET /v1/tenants` (upsert by `external_id`), `GET/PATCH/DELETE /v1/tenants/:id`, `/export`, `/users` CRUD.
