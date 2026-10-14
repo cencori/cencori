@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -8,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/lib/supabaseClient";
 import { formatCurrency } from "@/lib/currency";
+import { DitherCanvas, type DitherVariant } from "./DitherCanvas";
 
 interface ConsoleHomeOverviewProps {
     orgId: string;
@@ -96,6 +98,42 @@ function useApiKeyCount(projectId: string) {
         refetchOnMount: "always",
     });
 }
+
+type ExploreApi = {
+    // Card artwork in /public. Without one (and no dither) the 16:9 slot
+    // stays empty so the layout never shifts.
+    image?: string;
+    // CSS brightness for the image (1 = as shot); lower for a darker card.
+    brightness?: number;
+    // Render the slot through the ordered-dither effect: the image if set,
+    // otherwise this generated variant.
+    dither?: DitherVariant;
+    title: string;
+    description: string;
+    docsHref: string;
+};
+
+const EXPLORE_APIS: ExploreApi[] = [
+    {
+        dither: "clouds",
+        title: "Agents API",
+        description: "Run multi-turn agents with streamed events and human approval on tool calls.",
+        docsHref: "/docs/api/sessions",
+    },
+    {
+        image: "/console/explore-memory.jpg",
+        brightness: 0.45,
+        title: "Memory API",
+        description: "Give any chat long-term memory with one field, or write and search it directly.",
+        docsHref: "/docs/api/memory",
+    },
+    {
+        image: "/console/explore-multimodal.jpg",
+        title: "Multimodal API",
+        description: "Generate images, speak and transcribe, and read images through one API key.",
+        docsHref: "/docs/api/images",
+    },
+];
 
 export function ConsoleHomeOverview({
     orgId,
@@ -223,6 +261,44 @@ export function ConsoleHomeOverview({
                         </Button>
                     </div>
                 </article>
+            </div>
+
+            <h2 className="mb-3 mt-8 text-sm font-medium tracking-[-0.02em]">
+                Explore our API
+            </h2>
+            <div className="grid gap-4 md:grid-cols-3">
+                {EXPLORE_APIS.map((api) => (
+                    <article key={api.title} className="flex flex-col overflow-hidden rounded-md bg-muted/60">
+                        <div className="relative aspect-[16/9] w-full bg-foreground/[0.04]">
+                            {api.dither ? (
+                                <DitherCanvas src={api.image} variant={api.dither} className="absolute inset-0 h-full w-full" />
+                            ) : api.image && (
+                                <Image
+                                    src={api.image}
+                                    alt=""
+                                    fill
+                                    sizes="(min-width: 768px) 33vw, 100vw"
+                                    className="object-cover"
+                                    style={api.brightness ? { filter: `brightness(${api.brightness})` } : undefined}
+                                />
+                            )}
+                            <div className="absolute inset-0 flex items-center justify-center">
+                                <span className="text-sm font-medium tracking-tight text-white [text-shadow:0_1px_8px_rgba(0,0,0,0.6)]">
+                                    {api.title}
+                                </span>
+                            </div>
+                        </div>
+                        <div className="flex flex-1 flex-col p-5">
+                            <p className="text-lg font-medium tracking-tight">{api.title}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">{api.description}</p>
+                            <div className="mt-auto flex items-center gap-2 pt-5">
+                                <Button asChild size="sm" className="h-7 text-xs">
+                                    <Link href={api.docsHref}>Get Docs</Link>
+                                </Button>
+                            </div>
+                        </div>
+                    </article>
+                ))}
             </div>
 
             {projectId && (
