@@ -174,7 +174,7 @@ export function CostGraphIntegration({ orgSlug }: { orgSlug: string }) {
             <CardShell
                 logo={costGraphLogo}
                 title="CostGraph"
-                description="Send this organization's AI spend to CostGraph, by model, project and customer."
+                description="Cost infrastructure for enterprise teams."
             >
                 <p className="border-t border-border/30 px-5 py-4 text-xs text-muted-foreground">
                     {error instanceof Error ? error.message : "Could not load the CostGraph integration."}
@@ -262,7 +262,7 @@ function CostGraphCard({
         <CardShell
             logo={costGraphLogo}
             title="CostGraph"
-            description="Send this organization's AI spend to CostGraph as FOCUS 1.2, by model, project and customer, so it sits beside the rest of your cloud bill. Sent nightly; closed months are re-sent so late usage corrects itself."
+            description="Cost infrastructure for enterprise teams."
             action={connection ? (
                 <div className="flex gap-2 self-start">
                     <Button
