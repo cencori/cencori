@@ -1,11 +1,13 @@
 import z from "zod";
 import rehypePrettyCode from "rehype-pretty-code";
 import { transformers } from "./lib/docs/highlight-code";
+import { remarkGithubAlerts } from "./lib/docs/remark-github-alerts";
 import { pageSchema } from "fumadocs-core/source/schema";
 import { defineConfig, defineDocs } from "fumadocs-mdx/config";
 
 export default defineConfig({
   mdxOptions: {
+    remarkPlugins: (plugins) => [...plugins, remarkGithubAlerts],
     rehypePlugins: (plugins) => {
       plugins.shift();
       plugins.push([
