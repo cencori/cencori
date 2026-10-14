@@ -230,3 +230,88 @@ The Arcie connection stays configured; the nightly `finops-push` cron continues 
 - Our marketplace sync and placement quotes are low volume (one diffed sync a day, quotes on demand), so negligible cost.
 - **Overlap to agree on:** CostGraph billing exports (to Stripe, Metronome, Orb, …) and Cencori end-user billing and rate plans both turn usage into customer invoices. Proposed line: Cencori meters and bills AI usage at request time; CostGraph allocates and reports total cloud spend. Neither invoices the other's line items.
 - **Co-marketing:** "Cencori in CostGraph" integration page and docs (ours are written: `/docs/integrations/costgraph`).
+
+## 11. Listing spec: how Cencori appears in CostGraph
+
+**The rule.** CostGraph files every integration under a category string, and today Cencori would land next to LiteLLM, Helicone and OpenRouter as "AI gateway". That's wrong for us. Our canonical narrative (`docs/company/VOLUME_5_GTM.md`) is:
+
+> **Cencori is a deep technology company building the infrastructure AI runs on.**
+
+The Gateway is the live control-plane *foundation*, not the identity (GTM-02 §3). The listing has to pass GTM-08 Q1: *does this make Cencori sound like a deep technology company rather than a Gateway vendor?* It also has to obey the status rules: everything the card says must be live today (GTM-07). Models is **in development** and managed compute is **Next**, so neither appears as a capability.
+
+### 11.1 The card (Integrations page)
+
+Mapped to the fields of CostGraph's provider catalogue (`GET /api/v1/integrations/focus/providers`):
+
+| Field | Value | Why |
+| --- | --- | --- |
+| `slug` | `cencori` | Already the provider our push connections bind to |
+| `name` | **Cencori** | Company name only. Not "Cencori AI Gateway", "Cencori Gateway" or "Cencori AI" |
+| `category` (first words on the card) | **AI infrastructure** | Their AI cards read "AI / LLM" or "AI gateway / observability". Ours says what the company is |
+| Card body | **AI infrastructure. Cencori sends your model spend daily — by project and by customer.** | Their pattern is `<category>. <how data arrives>.`; everything here is live and verified |
+| Tab | **AI and Machine Learning** | Not "Compute": managed compute is publicly "Next" |
+| Logo | Cencori mark: four interlocking circles. `public/logos/icon-black.svg` (light UI) and `icon-white.svg` (dark UI), square SVG | — |
+| Button | **Connect** (opens the preset push form, §11.2) | Same verb as every other card |
+| Setup guide | https://cencori.com/docs/integrations/costgraph | Live |
+| `grain` | day × project × model × customer, at what Cencori billed | Matches our FOCUS records |
+
+**Provider page header** (`/cost/providers/cencori`, where CostGraph shows a description):
+
+> Cencori is a deep technology company building the infrastructure AI runs on. This connection carries what your products spend through Cencori — model calls across text, embeddings, images, audio and vision — priced at what Cencori billed, by project and by customer.
+
+### 11.2 Connect flow
+
+Today a customer has to find the generic "FOCUS push" card under "Anything Else", leave Provider on "Detect from my first push", and guess what "billing account" means. The Cencori card should open the same push form, preset:
+
+| Form field | Preset |
+| --- | --- |
+| Connection name | `Cencori` |
+| Provider | **Cencori**, locked (not "Detect from my first push") |
+| Billing account | Relabelled **Cencori organization ID**, helper text *"In Cencori: Organization settings → Advanced → Usage export → Billing account id"*, validated as a UUID |
+| After create | Show the `fpc_` id **and** offer "Create a `focus:write` key for this tenant", so both values are on one screen to paste into Cencori |
+
+**Next step (ask):** an API to create a push connection and its key, authorised with "Sign in with CostGraph" (`focus:write`). Then Cencori's console can offer a one-click **Connect CostGraph** and nobody copies ids between two dashboards.
+
+### 11.3 Labels inside CostGraph come from our data
+
+The card is one surface. Everything else CostGraph shows about us (service breakdowns, provider page, Graph AI answers) comes from the FOCUS columns we send. Today:
+
+| Column | Sent today | Shown in CostGraph as | Proposed |
+| --- | --- | --- | --- |
+| `Provider` / `ProviderName` | `Cencori` | provider `cencori` | keep |
+| `ServiceName` | **`Cencori AI Gateway`** (every row) | "Cencori AI Gateway", the top service label | **descriptive service lines by endpoint family** (below) |
+| `ServiceCategory` / `ServiceSubcategory` | `AI and Machine Learning` / `Generative AI` | category | keep |
+| `Publisher` | upstream model maker | publisher | keep |
+| `SkuId` | `provider/model` | tokens-by-model | keep |
+
+Proposed `ServiceName` values. They describe the work and don't invent product brands (GTM-02 §4: no casual commercial names):
+
+| Endpoint family | `ServiceName` |
+| --- | --- |
+| chat, responses, sessions | Cencori Text Generation |
+| embeddings, memory search | Cencori Embeddings |
+| images | Cencori Image Generation |
+| audio (speech, transcription) | Cencori Audio |
+| vision | Cencori Vision |
+| documents | Cencori Documents |
+| moderation | Cencori Moderation |
+| web | Cencori Web Search |
+
+Changing it restates cleanly: the push replaces whole windows, so re-sending October relabels it in place.
+
+### 11.4 Words to keep off the listing
+
+- "AI gateway", "LLM gateway", "LLM proxy", "model router". Gateway is how traffic arrives, not what Cencori is.
+- "OpenRouter / LiteLLM alternative", or any comparison to another listing (GTM-05).
+- "One API for every model". Approved as Gateway copy only, never the company story (GTM-02 §8).
+- "AI platform", "all-in-one", "complete stack" (restricted language).
+- Cencori Models, Compute, Arcie's managed API, or any capability not live.
+
+### 11.5 Approved lines for co-marketing
+
+- Company: **Cencori is a deep technology company building the infrastructure AI runs on.**
+- Integration: **Cencori spend in CostGraph, by model, project and customer.**
+- Proof (internal until we publish the source): reconciled to the cent against Cencori's own records, Sept–Oct 2026 (§8).
+- CTA on our side: **Build with Gateway** for the product, **Talk to Cencori** for the partnership (GTM-06).
+
+A visual mockup of the card and the preset form is in `docs/partners/costgraph-listing-mockup.html`.
