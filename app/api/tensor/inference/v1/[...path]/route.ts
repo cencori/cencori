@@ -226,6 +226,37 @@ async function forward(req: NextRequest, path: string[]): Promise<Response> {
     upstream = await (await route.handler())(gatewayRequest);
   }
 
+  // Errors reach Tensor users verbatim, so only Tensor's own refusals (plan
+  // limits, concurrency — codes `basecode_*`, written for users) pass through.
+  // Anything else is an internal gateway matter (billing, keys, provider
+  // config, outages): log it and give the user a plain, retryable message.
+  if (!upstream.ok) {
+    const raw = await upstream.text().catch(() => "");
+    let code = "";
+    try {
+      const parsed = JSON.parse(raw) as { code?: unknown; error?: { code?: unknown } };
+      code = String(parsed.code ?? parsed.error?.code ?? "");
+    } catch {
+      // Not JSON: treat as internal.
+    }
+    if (code.startsWith("basecode_") || code.startsWith("tensor_")) {
+      return new NextResponse(raw, {
+        status: upstream.status,
+        headers: { "Cache-Control": "no-store", "Content-Type": upstream.headers.get("content-type") ?? "application/json" },
+      });
+    }
+    console.error(`[Tensor proxy] Gateway ${upstream.status} for user ${session.user.id}: ${raw.slice(0, 500)}`);
+    return NextResponse.json(
+      {
+        error: {
+          message: "Tensor couldn't reach the model just now. Please try again in a moment.",
+          code: "tensor_upstream_unavailable",
+        },
+      },
+      { status: 503, headers: { "Cache-Control": "no-store" } },
+    );
+  }
+
   // The body is handed back as it arrives rather than read to completion: these are streaming
   // endpoints, and buffering here would put the whole answer's generation time back in front of
   // the first token — the exact problem the streaming work removed, and the cost this extra hop is
