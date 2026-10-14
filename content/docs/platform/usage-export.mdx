@@ -1,0 +1,141 @@
+---
+title: "Usage Export (FOCUS)"
+description: "Export Cencori usage and spend as FOCUS 1.2 records for FinOps tools, data warehouses, and chargeback."
+section: "Platform"
+order: 7
+---
+
+`GET /v1/usage/focus` returns your Cencori usage as [FOCUS 1.2](https://focus.finops.org) records, the FinOps Foundation's open format for billing data. Any tool that reads FOCUS, such as [CostGraph](/docs/integrations/costgraph), a warehouse job or your own chargeback script, can put AI spend through Cencori next to the rest of your cloud bill without a Cencori-specific connector.
+
+Each record covers one **UTC day × project × environment × model provider × model × endpoint family × sub-account**.
+
+## Authentication
+
+Use one of:
+
+| Credential | Scope | Can call models? |
+| :--- | :--- | :--- |
+| **Usage export key** (`cuk_…`) | Every project in the organization | No. Read usage only |
+| **Project secret key** (`csk_…`) | That project only | Yes |
+
+Create usage export keys in **Organization settings → Advanced → Usage export**. Owners and admins can create and revoke them. The key is shown once. Give FinOps tools an export key rather than a project key: an export key cannot spend money if it leaks.
+
+```bash
+curl https://cencori.com/v1/usage/focus \
+  -H "Authorization: Bearer $CENCORI_USAGE_EXPORT_KEY"
+```
+
+## Query parameters
+
+| Parameter | Default | Meaning |
+| :--- | :--- | :--- |
+| `start` | Yesterday 00:00 UTC | Window start, inclusive. RFC 3339 or `YYYY-MM-DD` (UTC midnight). |
+| `end` | Today 00:00 UTC | Window end, exclusive. At most 92 days after `start`. |
+| `sub_account` | `project` | What fills `SubAccountId`: `project`, `end_user` (the end-user id you send on requests), `tenant` (embedded-agent tenants) or `none`. |
+| `project_id` | All projects | Export-key callers can narrow to one project. Project keys always see only their own project. |
+| `format` | `json` | `json` or `csv`. |
+| `limit` | `5000` | Records per page, 1–5000. |
+| `cursor` | | From `next_cursor` (JSON) or the `X-Next-Cursor` header (CSV) of the previous page. |
+
+The default window is yesterday because a day is settled once it has closed. Request logs are written as requests finish, so the current day keeps growing.
+
+## Response
+
+```json
+{
+  "object": "list",
+  "focus_version": "1.2",
+  "charge_period_start": "2026-10-13T00:00:00.000Z",
+  "charge_period_end": "2026-10-14T00:00:00.000Z",
+  "sub_account": "end_user",
+  "data": [
+    {
+      "BillingAccountId": "8f1c…",
+      "BillingAccountName": "Acme",
+      "BillingCurrency": "USD",
+      "BillingPeriodStart": "2026-10-01T00:00:00.000Z",
+      "BillingPeriodEnd": "2026-11-01T00:00:00.000Z",
+      "ChargePeriodStart": "2026-10-13T00:00:00.000Z",
+      "ChargePeriodEnd": "2026-10-14T00:00:00.000Z",
+      "ChargeCategory": "Usage",
+      "ChargeDescription": "anthropic/claude-sonnet-5 chat (1204 requests)",
+      "Provider": "Cencori",
+      "Publisher": "anthropic",
+      "ServiceName": "Cencori AI Gateway",
+      "ServiceCategory": "AI and Machine Learning",
+      "ServiceSubcategory": "Generative AI",
+      "SubAccountId": "cust_4711",
+      "SubAccountType": "End User",
+      "ResourceId": "b7e2…",
+      "ResourceName": "Support bot",
+      "ResourceType": "Project",
+      "SkuId": "anthropic/claude-sonnet-5",
+      "SkuMeter": "chat/tokens",
+      "ConsumedQuantity": "18420931",
+      "ConsumedUnit": "Tokens",
+      "BilledCost": "41.2203150000",
+      "EffectiveCost": "41.2203150000",
+      "ListCost": "41.2203150000",
+      "ContractedCost": "41.2203150000",
+      "Tags": { "cencori:project": "b7e2…", "cencori:environment": "production", "cencori:endpoint": "chat" },
+      "x_RequestCount": "1204",
+      "x_InputTokens": "2210441",
+      "x_CacheReadTokens": "14988120",
+      "x_CacheWriteTokens": "412004",
+      "x_OutputTokens": "810366",
+      "x_UnsplitRequests": "0",
+      "x_UpstreamProviderCost": "41.220315"
+    }
+  ],
+  "has_more": false,
+  "next_cursor": null
+}
+```
+
+Costs and quantities are **decimal strings**, so no precision is lost in JSON.
+
+## What the costs mean
+
+- **`BilledCost`, `EffectiveCost`, `ListCost` and `ContractedCost`** are what Cencori charged for the usage. Cencori adds no markup to provider rates, so the four are equal.
+- **BYOK usage reports a cost of zero.** Your own provider account bills it, not Cencori. If your FinOps tool also reads that provider's bill directly, reporting it here would count it twice. What the provider charged is still visible in `x_UpstreamProviderCost`.
+- **Requests that cost nothing and used no tokens are left out.** These are refusals, rate limits and errors before a provider was called. They are still in your request logs.
+
+## Token buckets
+
+Providers price prompt tokens differently depending on whether they were read from a prompt cache, written to one, or neither. Each record carries all of them:
+
+| Column | Tokens |
+| :--- | :--- |
+| `x_InputTokens` | Prompt tokens billed at the full input rate |
+| `x_CacheReadTokens` | Prompt tokens served from the provider's cache |
+| `x_CacheWriteTokens` | Prompt tokens written to the provider's cache |
+| `x_OutputTokens` | Generated tokens |
+
+`ConsumedQuantity` is the total of all tokens. For endpoints that don't bill by token, such as image generation, it is the request count and `ConsumedUnit` is `Requests`.
+
+`x_UnsplitRequests` counts requests whose input and cache split is unknown: requests logged before buckets were recorded (October 2026), or ones where a provider reported cache activity without the uncached count. When it is not zero, the bucket columns undercount, but the cost columns are still exact.
+
+## Paging
+
+Follow `next_cursor` until `has_more` is `false`. Pages are ordered deterministically by day, project, environment, provider, model, endpoint and sub-account, so a cursor stays valid for the same query.
+
+```bash
+cursor=""
+while :; do
+  page=$(curl -s "https://cencori.com/v1/usage/focus?start=2026-09-01&end=2026-10-01&cursor=$cursor" \
+    -H "Authorization: Bearer $CENCORI_USAGE_EXPORT_KEY")
+  echo "$page" | jq -c '.data[]' >> september.focus.jsonl
+  cursor=$(echo "$page" | jq -r '.next_cursor // empty')
+  [ -z "$cursor" ] && break
+done
+```
+
+## Errors
+
+| Status | Code | Meaning |
+| :--- | :--- | :--- |
+| `400` | `invalid_request_error` | Bad window, `sub_account`, `format`, `limit` or `cursor`. `param` names the field. |
+| `401` | `invalid_api_key` | The export key is unknown or revoked. |
+| `403` | `secret_key_required` | A publishable key was used. |
+| `403` | `project_forbidden` | A project key asked for another project. |
+| `404` | `project_not_found` | `project_id` is not in this organization. |

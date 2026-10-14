@@ -1,0 +1,87 @@
+---
+title: "CostGraph"
+description: "See AI spend through Cencori beside the rest of your cloud bill in CostGraph."
+section: "Integrations"
+order: 4
+---
+
+[CostGraph](https://costgraph.ai) is a FinOps platform that puts cloud, Kubernetes, GPU and AI spend in one place. It covers allocation, budgets, anomaly alerts and recommendations. Connect it to Cencori and every request through the gateway lands in CostGraph as [FOCUS 1.2](/docs/platform/usage-export) records, attributed to your projects or to your own customers.
+
+There are two ways to connect. Use **push** unless your security team prefers pulling.
+
+| | Push (recommended) | Pull |
+| :--- | :--- | :--- |
+| Who moves the data | Cencori sends each settled day to CostGraph | CostGraph or an exporter you run reads `GET /v1/usage/focus` |
+| Credential you hand over | A CostGraph key, stored encrypted in Cencori | A read-only Cencori usage export key |
+| Setup | Cencori console | Your CostGraph exporter or script |
+
+## Push: Cencori sends usage to CostGraph
+
+### 1. Create the push connection in CostGraph
+
+1. In CostGraph, open **Settings → Integrations** and choose **FOCUS push**.
+2. Pick the CostGraph tenant the spend belongs to, and name the connection, for example `Cencori`.
+3. Copy the **connection id**. It starts with `fpc_`.
+
+### 2. Create a CostGraph API key
+
+In CostGraph, open **Settings → API keys** and create a key with the **`focus:write`** scope. It needs nothing else.
+
+### 3. Connect it in Cencori
+
+1. Open **Organization settings → Advanced → Usage export**.
+2. Under **CostGraph**, choose **Connect**.
+3. Paste the connection id and the API key.
+4. Choose what fills the sub-account column:
+   - **Project**: each Cencori project is a sub-account.
+   - **End user**: the end-user id you pass on requests. Use this if you resell AI and want spend per customer.
+   - **Tenant**: embedded-agent tenants.
+   - **None**.
+5. Choose **Connect**, then **Send now** to send the month so far straight away.
+
+After that, Cencori sends each UTC day once it closes. From the 3rd of each month it also re-sends the whole previous month, so any request logged late corrects itself. Every send replaces the window it covers, so repeating one never double-counts.
+
+The card shows the last day sent and, if a push failed, CostGraph's error message.
+
+## Pull: CostGraph reads from Cencori
+
+1. In Cencori, open **Organization settings → Advanced → Usage export** and **create a usage export key**. It reads usage for every project in the organization and cannot call models.
+2. Point your CostGraph exporter, or any scheduled job, at the [usage export API](/docs/platform/usage-export):
+
+```bash
+curl "https://cencori.com/v1/usage/focus?start=2026-10-13&end=2026-10-14&sub_account=end_user" \
+  -H "Authorization: Bearer $CENCORI_USAGE_EXPORT_KEY" \
+  | jq '{connection_id: env.COSTGRAPH_CONNECTION_ID, complete: true, focus_version: .focus_version,
+         charge_period_start: .charge_period_start, charge_period_end: .charge_period_end, rows: .data}' \
+  | curl -X POST https://api.costgraph.ai/api/v1/tenant/billing/focus \
+      -H "X-API-Key: $COSTGRAPH_API_KEY" -H "Content-Type: application/json" -d @-
+```
+
+CostGraph's ingest endpoint takes the key in an `X-API-Key` header. It answers `Authorization: Bearer` with `401 API key required`, even though some of its docs show Bearer.
+
+For windows larger than one page, follow `next_cursor`. Send the first page with `complete: true`, and send later pages with the same `batch_id` and their `row_offset`, as [CostGraph's push docs](https://docs.costgraph.ai/costgraph/integrations/focus-push) describe.
+
+## What lands in CostGraph
+
+- **Provider**: `Cencori`. **Publisher**: the model's maker (`anthropic`, `openai`, …). **Service**: `Cencori AI Gateway`.
+- **SkuId**: `provider/model`. Group by it to see spend per model.
+- **ResourceId**: the Cencori project, so project-level breakdowns work even when the sub-account is an end user.
+- **Costs**: what Cencori billed. BYOK usage is billed by your own provider account, so it reports zero here and doesn't double-count with that provider's bill in CostGraph.
+- **Token buckets**: input, cache read, cache write and output tokens as `x_` columns. See [Token buckets](/docs/platform/usage-export#token-buckets).
+
+## Cencori's rates in CostGraph's catalogue
+
+Cencori publishes its model rates to CostGraph's pricing marketplace under the host `cencori`. Each model gets one rate per token bucket (input, output, cache read, cache write), kept in sync daily. Anything CostGraph prices from AI-gateway telemetry for traffic through Cencori resolves to Cencori's actual rates, not to another host's list price.
+
+Models are published as `provider/model`, the same string as `SkuId` in the FOCUS records, for example `anthropic/claude-sonnet-5` or `groq/openai/gpt-oss-120b`. The same model served through two providers has two rates. If your gateway telemetry reports bare model names, map them with the connection's `model_map`. Audio models priced per minute or per character are not in the catalogue, because CostGraph's model prices are per token.
+
+## Troubleshooting
+
+| What you see | Why | Fix |
+| :--- | :--- | :--- |
+| `CostGraph 401` on the card | The key was revoked or mistyped | Paste a current key in **Edit** |
+| `CostGraph 403` on the card | The key lacks `focus:write` | Create a key with that scope and paste it in **Edit** |
+| `CostGraph 404 Could not find resource` | The connection id belongs to another CostGraph tenant, or was deleted | Copy the `fpc_` id again |
+| `CostGraph 409` | The connection is pull-mode, or another ingest was running | Pull-mode: create a FOCUS **push** connection. Otherwise the next run retries |
+| Nothing sent for a day | That day had no billable usage | Nothing to fix |
+| `x_UnsplitRequests` > 0 | Usage from before buckets were recorded | Costs are exact; only the bucket split is missing |

@@ -26,6 +26,7 @@ import { toast } from '@/components/ui/toast';
 import { deleteOrganization, updateOrgName, updateOrgSlug } from './actions';
 import { SsoSettings } from './SsoSettings';
 import { AuditInfrastructureSettings } from './AuditInfrastructureSettings';
+import { UsageExportSettings } from './UsageExportSettings';
 import type { SubscriptionTier } from '@/lib/entitlements';
 import { useOrganizationProject } from '@/lib/contexts/OrganizationProjectContext';
 
@@ -166,6 +167,13 @@ export default function OrgSettingsPage({ params }: PageProps) {
                         description="Enterprise controls for evidence retention, machine access, and external security operations."
                     >
                         <AuditInfrastructureSettings orgSlug={orgSlug} tier={effectiveTier} />
+                    </SettingsSection>
+
+                    <SettingsSection
+                        title="Usage export"
+                        description="FOCUS 1.2 usage for FinOps tools: read-only export keys, and a nightly push to CostGraph."
+                    >
+                        <UsageExportSettings orgSlug={orgSlug} />
                     </SettingsSection>
 
                     <SettingsSection

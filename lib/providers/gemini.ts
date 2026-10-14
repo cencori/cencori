@@ -188,6 +188,7 @@ export class GeminiProvider extends AIProvider {
                     promptTokens,
                     completionTokens,
                     totalTokens: promptTokens + completionTokens,
+                    uncachedPromptTokens: billablePromptTokens,
                     ...(cacheReadTokens ? { cacheReadTokens } : {}),
                 },
                 cost: {

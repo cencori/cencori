@@ -40,6 +40,8 @@ export interface SettledStreamUsage {
     cacheWriteTokens?: number;
     /** How many of those were written with the provider's long cache lifetime. */
     cacheWriteLongTokens?: number;
+    /** Prompt tokens billed at the full input rate — `promptTokens` minus cache reads and writes. */
+    uncachedPromptTokens: number;
 }
 
 export async function settleStreamUsage(params: {
@@ -106,6 +108,7 @@ export async function settleStreamUsage(params: {
         totalTokens: promptTokens + completionTokens,
         providerCostUsd,
         fromProvider: reported !== undefined,
+        uncachedPromptTokens: billablePromptTokens,
         ...(cached.cacheReadTokens === undefined ? {} : { cacheReadTokens: cached.cacheReadTokens }),
         ...(cached.cacheWriteTokens === undefined
             ? {}

@@ -85,6 +85,19 @@ export interface LogRequestParams {
     promptTokens?: number;
     completionTokens?: number;
     totalTokens?: number;
+    /**
+     * Prompt tokens served from, or written to, the provider's cache. Undefined when the provider
+     * reported nothing, which is stored as NULL — not zero, because "no cache activity" and "the
+     * provider does not say" are different facts.
+     */
+    cacheReadTokens?: number;
+    cacheWriteTokens?: number;
+    /**
+     * Prompt tokens billed at the full input rate. Required to split a request into token buckets
+     * whenever cache counts are given, since `promptTokens` folds cached tokens in for some
+     * providers and leaves them out for others.
+     */
+    uncachedPromptTokens?: number;
     costUsd?: number;
     providerCostUsd?: number;
     cencoriChargeUsd?: number;
@@ -1008,6 +1021,47 @@ export function handleCorsPreFlight(): NextResponse {
 // Logging
 // ──────────────────────────────────────────────
 
+const TOKEN_BUCKET_COLUMNS = ['cache_read_tokens', 'cache_write_tokens', 'uncached_prompt_tokens'] as const;
+
+/**
+ * The per-bucket token counts usage exports price from.
+ *
+ * A request that reports no cache activity spent its whole prompt at the input rate, so its
+ * uncached count is simply `promptTokens`. A request that does report cache activity has to say
+ * how much was uncached, because `promptTokens` cannot be split after the fact (see
+ * `TokenUsage.uncachedPromptTokens`); when it does not, the column stays NULL — unknown — rather
+ * than a guess that would price cached tokens at the input rate.
+ */
+export function tokenBucketColumns(params: Pick<LogRequestParams,
+    'promptTokens' | 'cacheReadTokens' | 'cacheWriteTokens' | 'uncachedPromptTokens'>): Record<string, number | null> {
+    const count = (value: number | undefined): number | null =>
+        value === undefined || !Number.isFinite(value) ? null : Math.max(0, Math.round(value));
+    const cacheReadTokens = count(params.cacheReadTokens);
+    const cacheWriteTokens = count(params.cacheWriteTokens);
+    const reportsCache = cacheReadTokens !== null || cacheWriteTokens !== null;
+    const uncachedPromptTokens = count(params.uncachedPromptTokens)
+        ?? (reportsCache ? null : Math.max(0, params.promptTokens || 0));
+
+    return {
+        cache_read_tokens: cacheReadTokens,
+        cache_write_tokens: cacheWriteTokens,
+        uncached_prompt_tokens: uncachedPromptTokens,
+    };
+}
+
+function isMissingBucketColumnError(error: { message?: string; code?: string }): boolean {
+    const message = error.message ?? '';
+    return TOKEN_BUCKET_COLUMNS.some((column) => message.includes(column))
+        && (error.code === 'PGRST204' || /column/i.test(message));
+}
+
+let bucketColumnsWarned = false;
+function warnBucketColumnsMissingOnce(message: string): void {
+    if (bucketColumnsWarned) return;
+    bucketColumnsWarned = true;
+    console.warn(`[Gateway] ai_requests token-bucket columns are missing; logging without them until the migration is applied: ${message}`);
+}
+
 /**
  * Log a request to the ai_requests table with full cost tracking.
  * Returns the inserted row id (used by post-success hooks),
@@ -1024,7 +1078,7 @@ export async function logGatewayRequest(context: GatewayContext, params: LogRequ
 
     try {
         const embeddedDims = params.embedded ?? context.embedded ?? {};
-        const { data, error } = await context.supabase.from('ai_requests').insert({
+        const row: Record<string, unknown> = {
             project_id: context.projectId,
             api_key_id: context.apiKeyId,
             environment: context.environment === 'test' ? 'test' : 'production',
@@ -1058,7 +1112,20 @@ export async function logGatewayRequest(context: GatewayContext, params: LogRequ
             request_id: context.requestId,
             fallback_provider: params.fallbackProvider,
             fallback_model: params.fallbackModel,
-        }).select('id').single();
+        };
+        const bucketColumns = tokenBucketColumns(params);
+
+        let { data, error } = await context.supabase.from('ai_requests')
+            .insert({ ...row, ...bucketColumns }).select('id').single();
+
+        // The bucket columns arrive by migration (20261014_120000_costgraph_finops), and
+        // migrations here are applied by hand. Until that has run, PostgREST rejects the whole row
+        // over an unknown column — so drop the buckets and keep the billing row rather than lose it.
+        if (error && isMissingBucketColumnError(error)) {
+            warnBucketColumnsMissingOnce(error.message);
+            ({ data, error } = await context.supabase.from('ai_requests')
+                .insert(row).select('id').single());
+        }
 
         // Reported, not swallowed. Only `data` used to be read here, so a rejected insert returned
         // null and said nothing — the catch below never fires for a PostgREST error, it only

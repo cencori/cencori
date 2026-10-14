@@ -92,6 +92,27 @@ describe('reporting cached tokens to the client', () => {
         expect(settled.cacheReadTokens).toBe(10_000);
     });
 
+    /**
+     * Usage exports price each token bucket on its own, so the uncached count has to leave
+     * settlement too — the cache-inclusive `promptTokens` cannot be split back apart later.
+     */
+    it('carries the uncached prompt count out alongside the cache buckets', async () => {
+        const settled = await settleStreamUsage({
+            reported: {
+                promptTokens: 1_000,
+                completionTokens: 5,
+                totalTokens: 11_505,
+                cacheReadTokens: 10_000,
+                cacheWriteTokens: 500,
+            },
+            estimate: vi.fn(),
+            pricing,
+        });
+
+        expect(settled.uncachedPromptTokens).toBe(1_000);
+        expect(settled.promptTokens).toBe(11_500);
+    });
+
     /** Absent and zero mean different things and must stay distinguishable. */
     it('reports nothing when the provider reported nothing', async () => {
         const settled = await settleStreamUsage({
