@@ -185,13 +185,15 @@ function CostGraphCard({
     // Option C only: Connect runs "Sign in with CostGraph". Until CostGraph offers focus:write over
     // OAuth (COSTGRAPH_OAUTH_ENABLED), the button is there but disabled.
     const connectAction = (
-        <div className="flex flex-col items-start gap-1.5">
-            <Button size="sm" className="h-7 px-3 text-xs" disabled={!settings.oauthAvailable} onClick={startOAuth}>
-                Connect
-            </Button>
-            {!settings.oauthAvailable && <p className="text-[11px] text-muted-foreground">Available soon</p>}
-        </div>
+        <Button size="sm" className="h-7 px-3 text-xs" disabled={!settings.oauthAvailable} onClick={startOAuth}>
+            Connect
+        </Button>
     );
+    const availableSoon = !connection && !settings.oauthAvailable ? (
+        <span className="shrink-0 self-start rounded-full border border-border/40 bg-background/25 px-2 py-0.5 text-[9px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+            Available soon
+        </span>
+    ) : undefined;
 
     return (
         <CardShell
@@ -199,6 +201,7 @@ function CostGraphCard({
             logo={costGraphLogo}
             title="CostGraph"
             description="Cost infrastructure for enterprise teams."
+            action={availableSoon}
             bottomActionDivided={Boolean(connection)}
             bottomAction={connection ? (
                 <>
