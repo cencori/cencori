@@ -22,7 +22,7 @@ import {
     type ExportKeySummary,
 } from '@/lib/finops/export-keys';
 import { isSubAccountMode, type SubAccountMode } from '@/lib/finops/focus';
-import { runConnectionPush, type FinopsConnectionRow } from '@/lib/finops/costgraph-push';
+import { runConnectionPush, sendFirstPush, type FinopsConnectionRow } from '@/lib/finops/costgraph-push';
 import {
     COSTGRAPH_OAUTH_PENDING_COOKIE,
     CostGraphCapabilityMissing,
@@ -36,6 +36,7 @@ import { decryptTokens, finishCostGraphConnect, type PendingConnect } from '@/li
 import { CostGraphError } from '@/lib/finops/costgraph';
 import { resolveConsoleBaseUrl } from '@/lib/auth-redirect';
 import { cookies } from 'next/headers';
+import { after } from 'next/server';
 
 interface ActionResult<T = null> {
     ok: boolean;
@@ -438,8 +439,9 @@ export async function completeCostGraphConnect(orgSlug: string, tenantId: string
     if (!tenant) return { ok: false, error: 'Choose one of your CostGraph tenants.' };
 
     const admin = createAdminClient();
+    let rowId: string;
     try {
-        await finishCostGraphConnect({
+        ({ rowId } = await finishCostGraphConnect({
             supabase: admin,
             organizationId: auth.orgId,
             userId: auth.userId,
@@ -447,7 +449,7 @@ export async function completeCostGraphConnect(orgSlug: string, tenantId: string
             subject: pending.subject,
             tenant,
             clientId: oauthClientId(resolveConsoleBaseUrl()),
-        });
+        }));
     } catch (error) {
         await clearPendingConnect();
         console.error('[Org Settings] completeCostGraphConnect failed:', error);
@@ -461,6 +463,7 @@ export async function completeCostGraphConnect(orgSlug: string, tenantId: string
         };
     }
     await clearPendingConnect();
+    after(() => sendFirstPush(rowId));
     const { data } = await admin
         .from('organization_finops_connections')
         .select(CONNECTION_COLUMNS)

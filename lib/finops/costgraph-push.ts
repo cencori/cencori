@@ -237,6 +237,18 @@ async function platformClientFor(supabase: SupabaseClient, connection: FinopsCon
     return createCostGraphPlatformClient(decryptApiKey(connection.api_key_encrypted, connection.organization_id));
 }
 
+/** Run one connection's push right after it is connected. Never throws: the nightly run retries. */
+export async function sendFirstPush(rowId: string): Promise<void> {
+    try {
+        const { createAdminClient } = await import('@/lib/supabaseAdmin');
+        const supabase = createAdminClient();
+        const { data } = await supabase.from('organization_finops_connections').select('*').eq('id', rowId).single();
+        if (data) await runConnectionPush(supabase, data as FinopsConnectionRow);
+    } catch (error) {
+        console.error('[FinOps] first push failed:', error);
+    }
+}
+
 /** Every enabled connection, least recently run first, within a time budget. */
 export async function runAllFinopsPushes(
     supabase: SupabaseClient,

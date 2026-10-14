@@ -47,7 +47,7 @@ export async function finishCostGraphConnect(params: {
     tenant: CostGraphTenant;
     clientId: string;
     fetchImpl?: typeof fetch;
-}): Promise<{ connectionId: string }> {
+}): Promise<{ connectionId: string; rowId: string }> {
     const { supabase, organizationId, tokens, tenant } = params;
     try {
         // The organization id is the BillingAccountId on every FOCUS record we send.
@@ -100,7 +100,7 @@ export async function finishCostGraphConnect(params: {
             description: `Connected CostGraph with Sign in with CostGraph (tenant ${tenant.name})`,
             metadata: { connection_id: connectionId, tenant_id: tenant.id, auth_method: 'oauth' },
         });
-        return { connectionId };
+        return { connectionId, rowId: data.id as string };
     } catch (error) {
         // Don't leave a live grant behind for a connection we didn't make.
         await revokeToken({ token: tokens.refreshToken, clientId: params.clientId, fetchImpl: params.fetchImpl });
