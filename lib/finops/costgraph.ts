@@ -142,8 +142,14 @@ export interface FocusPushRequest {
     charge_period_start: string;
     charge_period_end: string;
     rows: Array<Record<string, unknown>>;
-    /** true replaces everything already ingested for the connection inside the window. */
+    /** true replaces everything already ingested for the connection inside the window (as documented). */
     complete?: boolean;
+    /**
+     * The flag the live API actually reads for that replace (verified 2026-10-14): with only
+     * `complete`, the response echoes `overwrite: false` and earlier rows survive. Sent together
+     * with `complete` so the push replaces the window whichever name CostGraph settles on.
+     */
+    overwrite?: boolean;
     /** Required when appending; the same on every page of one export run. */
     batch_id?: string;
     /** Index of this page's first row within the whole export run. */

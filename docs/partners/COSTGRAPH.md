@@ -208,6 +208,12 @@ Per-model figures match too (e.g. `anthropic/claude-opus-5-5` $24.4166, `maximo/
 
 The Arcie connection stays configured; the nightly `finops-push` cron continues it from 2026-10-14 once `ENABLE_VERCEL_CRON` is set.
 
+**Window replace doesn't replace (found 2026-10-14).** After renaming `ServiceName` we re-sent September with `complete: true` and then `complete + overwrite: true` (the sibling usage endpoint's flag; CostGraph echoed `overwrite: true`). The old rows were **not** removed. September showed $1.94 under "Cencori AI Gateway" *and* $1.94 under "Cencori Text Generation", and stayed that way over several minutes. What actually happens is an upsert by row identity, and `ServiceName` is part of that identity. Re-sending identical rows is idempotent, which is why the earlier test passed, but any row whose identity changes leaves its old version behind. Deleting the connection does purge its data: the deleted Bola test connection's $1.78 disappeared from the tenant. Consequences for us:
+
+- Nightly pushes and month restatements are safe while row identity is stable.
+- **Changing anything in a record's identity** (`ServiceName`, `SkuId`, sub-account mode, `ResourceId`) double-counts the history until the connection is deleted and re-pushed, or CostGraph fixes replace. Treat FOCUS identity columns as frozen.
+- A record that disappears from a later restatement (e.g. usage reclassified) is not removed either.
+
 **Still to verify:**
 
 1. **`Base`/`BaseCompute` rows with a custom region** (`cencori-iad`) price through `/v1/pricing/compute` once Compute rates are published.
@@ -224,6 +230,7 @@ The Arcie connection stays configured; the nightly `finops-push` cron continues 
 7. **Docs vs reality.** The Pricing API intro lists 9 providers; the OpenAPI provider enum has about 50, including GPU clouds. Worth reconciling, since it undersells them.
 8. **Marketplace write validation:** `model_id` fails as "not valid JSON" (400), and `source`/`source_url`/`effective_from` return 500 instead of a 422 naming the field. Provider isn't part of a model price's key, so one org can't price the same model from two upstreams under one name. Recording provider in the key, or documenting it, would avoid silent overwrites.
 9. **Bugs found while integrating:** `/v1/recommendations/compute` returns 500 when the anchor is a `Base` shape; `same_continent` returns machines from other continents (au-mel, Sweden for a us-east-1 anchor); "only cheaper than the anchor" is undocumented and surprising for placement queries. An option to return every provider's cheapest regardless of anchor price would help.
+10. **Make window replace work as documented.** `complete: true` (and `overwrite: true`) should delete what the connection previously ingested inside the window, not upsert by row identity. Otherwise any change to a record's identity double-counts with no API to undo it. At minimum, offer an endpoint to clear a connection's window.
 
 ## 10. Commercial notes (for the partnership conversation)
 
