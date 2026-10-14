@@ -1,6 +1,6 @@
 # Cencori × CostGraph — integration spec
 
-**Status:** built on Cencori's side (2026-10-14). Verified against live CostGraph with Cencori's key the same day. **Cencori's model rates are live in CostGraph's marketplace:** 87 models × 4 buckets = 348 rows under `host: cencori`. Several doc/behaviour mismatches were found and fixed in our client ([§8](#8-verification-with-costgraph)). No FOCUS rows have been sent yet; that needs a customer `fpc_` connection.
+**Status:** built and verified end to end against live CostGraph (2026-10-14). **Model rates are live in CostGraph's marketplace:** 87 models × 4 buckets = 348 rows under `host: cencori`. **FOCUS push works:** a test tenant shows Cencori spend by provider, model, project and customer, and re-sends are idempotent. Several doc/behaviour mismatches were found and fixed on our side ([§8](#8-verification-with-costgraph)).
 **Owner:** Bola · **Counterpart:** CostGraph founder
 
 ## 1. Summary
@@ -178,15 +178,28 @@ curl -H "Authorization: Bearer $CRON_SECRET" "https://cencori.com/api/cron/costg
 | `source`, `source_url`, `effective_from` on write | ❌ 500 for an existing key; server sets `source: marketplace`, `source_url: marketplace://cencori` |
 | Batch of 200 entries | ✅ |
 
-**FOCUS push setup (2026-10-14):** test tenant `cencori-focus-test` created in the CostGraph app. Tenants can't be created with an API key (`401 Valid Bearer token required`), and push connections have no create endpoint, so both are dashboard-only. FOCUS push is in the sidebar's **Integrations → "Anything Else"** category, not under Settings as the docs say, and not in the AI category.
+**FOCUS push setup (2026-10-14):** test tenant `cencori-focus-test` created in the CostGraph app. Tenants can't be created with an API key (`401 Valid Bearer token required`), and push connections have no create endpoint, so both are dashboard-only. FOCUS push is in the sidebar's **Integrations → "Anything Else"** category, not under Settings as the docs say. The create form asks for a **billing account**, which must equal our `BillingAccountId` (the Cencori organization id); the console's CostGraph card now shows it with a copy button. API keys belong to one tenant: our `default`-tenant key got 404 on the test connection, and a key created in `cencori-focus-test` worked.
 
-**Still to verify** (needs their team or a customer connection):
+**FOCUS push, end to end (2026-10-14).** A labelled test batch was sent through the real pipeline (`pushWindow` → `toFocusRecord` → client) into connection `fpc_7vo9U4J0XqLYbKoH`: 5 records for 2026-10-13, end-user sub-accounts, paged 2/2/1 under one `batch_id`.
 
-1. **The first FOCUS push binds the connection to `Provider: "Cencori"`.** We need a real `fpc_` connection in a test tenant.
-2. **FOCUS 1.2 column names.** We send both `ProviderName` and `ServiceProviderName`, and both `InvoiceIssuer` and `InvoiceIssuerName`. Confirm none is rejected.
-3. **`x_` extension columns** survive ingestion and are queryable (Cost Overview, MCP).
-4. **`Base`/`BaseCompute` rows with a custom region** (`cencori-iad`) price through `/v1/pricing/compute` once published.
-5. **Rate limits** on `/v1` and on FOCUS ingest. The client retries 429 and 5xx with `Retry-After`.
+| Check | Result |
+| --- | --- |
+| Provider binding on first push | ✅ Connection bound to `cencori` (lower-cased), `ingest_mode: push`, `status: active` |
+| FOCUS 1.2 columns incl. `ProviderName`/`ServiceProviderName`/`InvoiceIssuer(Name)` and `x_*` | ✅ Accepted, no rejections |
+| Paging (`complete` on page 1, `batch_id` + `row_offset`) | ✅ 2 + 2 + 1 rows ingested |
+| Totals | ✅ $1.78 = sum of records; by service `Cencori AI Gateway` |
+| Sub-accounts | ✅ `test-customer-a` $1.3275, `test-customer-b` $0.375, unattributed $0.0775 |
+| Resource | ✅ Project id with its name, type `Project` |
+| Provider page (`/tenant/cost/providers/cencori`) | ✅ `tokens` section; `tokensByModel` keyed by our `SkuId` (`anthropic/claude-sonnet-5` 551k tokens $1.5825, …); image generation as a `request` unit ($0.04/request) |
+| Re-sending the same day | ✅ Still $1.78: `complete: true` replaces the window |
+| `x_` token buckets in the read APIs | Stored but not surfaced in cost/provider responses (expected; they're extensions) |
+
+The test rows remain in `cencori-focus-test`, labelled `TEST Nicole` / `Bola (TEST)`. Real Cencori usage couldn't be used: free models were retired 2026-09-23, and Bola-owned orgs have no credits or traffic.
+
+**Still to verify:**
+
+1. **`Base`/`BaseCompute` rows with a custom region** (`cencori-iad`) price through `/v1/pricing/compute` once Compute rates are published.
+2. **Rate limits** on `/v1` and on FOCUS ingest. The client retries 429 and 5xx with `Retry-After`.
 
 ## 9. Asks for CostGraph
 
