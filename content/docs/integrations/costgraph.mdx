@@ -19,13 +19,18 @@ There are two ways to connect. Use **push** unless your security team prefers pu
 
 ### 1. Create the push connection in CostGraph
 
-1. In CostGraph, open **Settings → Integrations** and choose **FOCUS push**.
-2. Pick the CostGraph tenant the spend belongs to, and name the connection, for example `Cencori`.
-3. Copy the **connection id**. It starts with `fpc_`.
+1. In Cencori, open **Organization settings → Advanced → Usage export** and copy the **Billing account id** shown on the CostGraph card. It is your Cencori organization id.
+2. In CostGraph, open **Integrations** in the sidebar, choose the **Anything Else** category, and click **Set up** on **FOCUS push**.
+3. Name the connection, for example `Cencori`, and pick the CostGraph tenant the spend belongs to.
+4. Leave **Provider** on **Detect from my first push**. Cencori's first push sets it to `cencori`.
+5. Paste the billing account id from step 1, then **Create connection**.
+6. Copy the **connection id**. It starts with `fpc_`.
+
+Each push connection is bound to one billing account. Connect each Cencori organization to its own connection.
 
 ### 2. Create a CostGraph API key
 
-In CostGraph, open **Settings → API keys** and create a key with the **`focus:write`** scope. It needs nothing else.
+In CostGraph, with the same tenant selected, open **Settings → API keys** and create a key with the **`focus:write`** scope. A key belongs to one tenant, so it must be created in the tenant that holds the connection.
 
 ### 3. Connect it in Cencori
 
@@ -81,7 +86,7 @@ Models are published as `provider/model`, the same string as `SkuId` in the FOCU
 | :--- | :--- | :--- |
 | `CostGraph 401` on the card | The key was revoked or mistyped | Paste a current key in **Edit** |
 | `CostGraph 403` on the card | The key lacks `focus:write` | Create a key with that scope and paste it in **Edit** |
-| `CostGraph 404 Could not find resource` | The connection id belongs to another CostGraph tenant, or was deleted | Copy the `fpc_` id again |
+| `CostGraph 404 Could not find resource` | The key belongs to a different CostGraph tenant than the connection, or the connection was deleted | Create the key in the connection's tenant, or copy the `fpc_` id again |
 | `CostGraph 409` | The connection is pull-mode, or another ingest was running | Pull-mode: create a FOCUS **push** connection. Otherwise the next run retries |
 | Nothing sent for a day | That day had no billable usage | Nothing to fix |
 | `x_UnsplitRequests` > 0 | Usage from before buckets were recorded | Costs are exact; only the bucket split is missing |

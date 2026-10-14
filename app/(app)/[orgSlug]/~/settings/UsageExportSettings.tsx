@@ -49,7 +49,7 @@ const SUB_ACCOUNT_OPTIONS = [
     { value: "none", label: "None", hint: "Leave the sub-account column empty." },
 ] as const;
 
-export function UsageExportSettings({ orgSlug }: { orgSlug: string }) {
+export function UsageExportSettings({ orgSlug, orgId }: { orgSlug: string; orgId: string }) {
     const queryKey = ["usageExportSettings", orgSlug];
     const { data, isLoading, error } = useQuery<UsageExportSettingsData>({
         queryKey,
@@ -73,7 +73,7 @@ export function UsageExportSettings({ orgSlug }: { orgSlug: string }) {
     return (
         <div className="space-y-4">
             <ExportKeysCard orgSlug={orgSlug} keys={data.keys} queryKey={queryKey} />
-            <CostGraphCard orgSlug={orgSlug} connection={data.costgraph} queryKey={queryKey} />
+            <CostGraphCard orgSlug={orgSlug} orgId={orgId} connection={data.costgraph} queryKey={queryKey} />
         </div>
     );
 }
@@ -268,10 +268,12 @@ function ExportKeysCard({
 
 function CostGraphCard({
     orgSlug,
+    orgId,
     connection,
     queryKey,
 }: {
     orgSlug: string;
+    orgId: string;
     connection: CostGraphConnectionView | null;
     queryKey: string[];
 }) {
@@ -368,11 +370,12 @@ function CostGraphCard({
             }
             footer={
                 <>
-                    In CostGraph, open Settings → Integrations → FOCUS push to create the connection (fpc_…), and Settings → API keys for a key with the focus:write scope. Usage is reported at what Cencori billed; BYOK usage reports zero, because your provider bills it directly.
+                    In CostGraph, open Integrations → Anything Else → FOCUS push. Leave Provider on “Detect from my first push” and use the billing account id above, then copy the connection id (fpc_…). Create a focus:write key under Settings → API keys in the same tenant. Usage is reported at what Cencori billed; BYOK usage reports zero, because your provider bills it directly.
                 </>
             }
         >
             <div className="divide-y divide-border/30 border-t border-border/30">
+                <CopyRow label="Billing account id (for CostGraph)" value={orgId} />
                 <Row label="Status" value={status} />
                 {connection && (
                     <>
@@ -470,6 +473,29 @@ function CostGraphCard({
                 </DialogContent>
             </Dialog>
         </CardShell>
+    );
+}
+
+/** CostGraph binds a push connection to the BillingAccountId our records carry: the org id. */
+function CopyRow({ label, value }: { label: string; value: string }) {
+    const [copied, setCopied] = useState(false);
+    return (
+        <div className="flex min-h-12 items-center justify-between gap-6 px-5 py-3">
+            <p className="text-xs text-muted-foreground">{label}</p>
+            <button
+                type="button"
+                className="flex min-w-0 items-center gap-1.5 text-right font-mono text-[13px] font-medium hover:text-foreground"
+                onClick={async () => {
+                    await navigator.clipboard.writeText(value);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 1500);
+                }}
+                aria-label={`Copy ${label}`}
+            >
+                <span className="truncate">{value}</span>
+                {copied ? <Check className="size-3 shrink-0" /> : <Copy className="size-3 shrink-0 text-muted-foreground" />}
+            </button>
+        </div>
     );
 }
 
