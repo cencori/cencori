@@ -16,6 +16,12 @@ import { useEffect, useState, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Copy, FileSpreadsheet, Lock, Send } from "lucide-react";
+
+/** CostGraph's mark, from their brand assets (public/integrations/costgraph.svg). */
+const costGraphLogo = (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src="/integrations/costgraph.svg" alt="" width={18} height={18} className="size-[18px]" />
+);
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -74,13 +80,16 @@ const CALLBACK_MESSAGES: Record<string, string> = {
 
 export function CardShell({
     icon: Icon,
+    logo,
     title,
     description,
     action,
     children,
     footer,
 }: {
-    icon: typeof FileSpreadsheet;
+    icon?: typeof FileSpreadsheet;
+    /** An image (e.g. a partner's mark) shown in place of the icon. */
+    logo?: ReactNode;
     title: string;
     description: string;
     action?: ReactNode;
@@ -92,7 +101,7 @@ export function CardShell({
             <div className="flex flex-col gap-4 px-5 py-5 sm:flex-row sm:items-start sm:justify-between">
                 <div className="flex items-start gap-3">
                     <div className="flex size-9 shrink-0 items-center justify-center rounded-[10px] border border-border/35 bg-background/30">
-                        <Icon className="size-4 text-foreground" />
+                        {logo ?? (Icon ? <Icon className="size-4 text-foreground" /> : null)}
                     </div>
                     <div>
                         <h2 className="text-sm font-medium">{title}</h2>
@@ -163,7 +172,7 @@ export function CostGraphIntegration({ orgSlug }: { orgSlug: string }) {
     if (error || !data) {
         return (
             <CardShell
-                icon={FileSpreadsheet}
+                logo={costGraphLogo}
                 title="CostGraph"
                 description="Send this organization's AI spend to CostGraph, by model, project and customer."
             >
@@ -238,18 +247,6 @@ function CostGraphCard({
         },
     });
 
-    const status = !connection
-        ? "Not connected"
-        : !connection.enabled
-            ? "Paused"
-            : !connection.connectionId
-                ? "Waiting for CostGraph"
-                : connection.lastRunStatus === "error"
-                    ? "Last push failed"
-                    : connection.lastRunAt
-                        ? "Active"
-                        : "Waiting for first push";
-
     const connectAction = settings.oauthAvailable ? (
         <div className="flex flex-col items-start gap-1.5 self-start sm:items-end">
             <Button size="sm" className="h-7 px-3 text-xs" onClick={startOAuth}>Connect CostGraph</Button>
@@ -263,7 +260,7 @@ function CostGraphCard({
 
     return (
         <CardShell
-            icon={FileSpreadsheet}
+            logo={costGraphLogo}
             title="CostGraph"
             description="Send this organization's AI spend to CostGraph as FOCUS 1.2, by model, project and customer, so it sits beside the rest of your cloud bill. Sent nightly; closed months are re-sent so late usage corrects itself."
             action={connection ? (
@@ -281,30 +278,24 @@ function CostGraphCard({
                     <Button size="sm" className="h-7 px-3 text-xs" onClick={() => setSettingsOpen(true)}>Manage</Button>
                 </div>
             ) : settings.pendingTenants ? null : connectAction}
-            footer="Applies to every project in this organization. Usage is reported at what Cencori billed; BYOK usage reports zero, because your own provider account bills it."
         >
             {settings.pendingTenants && !connection ? (
                 <TenantPicker orgSlug={orgSlug} tenants={settings.pendingTenants} onDone={refresh} />
-            ) : (
+            ) : connection && (
                 <div className="divide-y divide-border/30 border-t border-border/30">
-                    <Row label="Status" value={status} />
-                    {connection && (
-                        <>
-                            <Row
-                                label="Connected with"
-                                value={connection.authMethod === "oauth"
-                                    ? `CostGraph sign-in${connection.tenantName ? ` · ${connection.tenantName}` : ""}`
-                                    : `API key ${connection.apiKeyHint ?? ""}`}
-                            />
-                            <Row label="Connection" value={connection.connectionId ?? "Not created yet"} mono />
-                            <Row label="Sub-account" value={SUB_ACCOUNT_OPTIONS.find((o) => o.value === connection.subAccount)?.label ?? connection.subAccount} />
-                            <Row label="Sent through" value={connection.lastPushedDay ?? "Nothing sent yet"} mono />
-                            {connection.lastRunStatus === "error" && connection.lastRunError && (
-                                <div className="px-5 py-3">
-                                    <p className="break-words font-mono text-[11px] leading-5 text-destructive">{connection.lastRunError}</p>
-                                </div>
-                            )}
-                        </>
+                    <Row
+                        label="Connected with"
+                        value={connection.authMethod === "oauth"
+                            ? `CostGraph sign-in${connection.tenantName ? ` · ${connection.tenantName}` : ""}`
+                            : `API key ${connection.apiKeyHint ?? ""}`}
+                    />
+                    <Row label="Connection" value={connection.connectionId ?? "Not created yet"} mono />
+                    <Row label="Sub-account" value={SUB_ACCOUNT_OPTIONS.find((o) => o.value === connection.subAccount)?.label ?? connection.subAccount} />
+                    <Row label="Sent through" value={connection.lastPushedDay ?? "Nothing sent yet"} mono />
+                    {connection.lastRunStatus === "error" && connection.lastRunError && (
+                        <div className="px-5 py-3">
+                            <p className="break-words font-mono text-[11px] leading-5 text-destructive">{connection.lastRunError}</p>
+                        </div>
                     )}
                 </div>
             )}
