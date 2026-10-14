@@ -371,3 +371,11 @@ Nothing is written to `organization_finops_connections` until CostGraph has crea
 3. **Staged:** set `COSTGRAPH_OAUTH_ORGS=<org slug>[,…]` in Vercel. Connect works for those organizations only, and our client document is served so the real HTTPS flow runs. Test on Arcie (`xcfgg0o74s8n8hrg5kfy`).
 4. **Everyone:** set `COSTGRAPH_OAUTH_ENABLED=true` (**done 2026-10-14**; `COSTGRAPH_OAUTH_ORGS` is now redundant). Optional: `COSTGRAPH_OAUTH_SCOPES` (default `openid profile focus:write integrations:read`), `COSTGRAPH_OAUTH_STATE_SECRET` (default `ENCRYPTION_SECRET`), `COSTGRAPH_PUSH_CONNECTION_CREATE_PATH` (default `/api/v1/integrations/connections`).
 5. Local development needs a client registered in CostGraph (Settings → OAuth clients, granted `focus:write`), set as `COSTGRAPH_OAUTH_CLIENT_ID`, with redirect URI `http://console.localhost:3000/api/integrations/costgraph/oauth/callback`. Metadata documents must be served over HTTPS.
+
+### First live connection (2026-10-14)
+
+Arcie connected through Connect CostGraph: the sign-in completed, the tenant `Cencori` was chosen, and CostGraph created `fpc_RD_h6hBqSFLbiYoA` for the Arcie billing account. **But CostGraph granted the token only `mcp`**, though we asked for `openid profile focus:write integrations:read`, so every push returns `403 Insufficient permissions: this credential needs the focus:write scope`. The `mcp` token was still allowed to create the connection.
+
+Most likely CostGraph treats clients defined by a metadata document as MCP clients and narrows their scopes. **Ask:** grant the scopes a metadata-document client requests and the user approves, including `focus:write` and `integrations:read`, or document how a public multi-tenant client gets them. A client registered under Settings → OAuth clients is no substitute: such a client belongs to one tenant, so only that tenant's users could connect.
+
+Our side now refuses a grant without `focus:write` (the user is told, and the grant is revoked) and sends the month so far as soon as a connection is made. Arcie needs to **Reconnect** once CostGraph fixes the scopes.
