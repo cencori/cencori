@@ -74,6 +74,7 @@ const CALLBACK_MESSAGES: Record<string, string> = {
     unsupported: "CostGraph doesn't support connecting from Cencori yet.",
     unavailable: "Connecting CostGraph from Cencori isn't available yet.",
     invalid_scope: "CostGraph didn't allow the permissions Cencori asked for.",
+    costgraph_role: "Connecting needs an owner, admin or billing admin role in that CostGraph organization.",
 };
 
 /* ---------- Card pieces ---------- */

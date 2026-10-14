@@ -33,6 +33,7 @@ import {
     revokeToken,
 } from '@/lib/finops/costgraph-oauth';
 import { decryptTokens, finishCostGraphConnect, type PendingConnect } from '@/lib/finops/costgraph-connect';
+import { CostGraphError } from '@/lib/finops/costgraph';
 import { resolveConsoleBaseUrl } from '@/lib/auth-redirect';
 import { cookies } from 'next/headers';
 
@@ -213,7 +214,7 @@ export async function getUsageExportSettings(orgSlug: string): Promise<ActionRes
                 organizationId: auth.orgId,
                 keys,
                 costgraph: connection.data ? toConnectionView(connection.data) : null,
-                oauthAvailable: costgraphOAuthEnabled(),
+                oauthAvailable: costgraphOAuthEnabled(orgSlug),
                 pendingTenants: pending ? pending.tenants : null,
             },
         };
@@ -429,8 +430,10 @@ export async function completeCostGraphConnect(orgSlug: string, tenantId: string
         return {
             ok: false,
             error: error instanceof CostGraphCapabilityMissing
-                ? 'CostGraph does not support connecting this way yet. Use an API key instead.'
-                : 'Could not finish connecting CostGraph.',
+                ? 'CostGraph does not support connecting from Cencori yet.'
+                : error instanceof CostGraphError && error.status === 403
+                    ? 'Connecting needs an owner, admin or billing admin role in that CostGraph organization.'
+                    : 'Could not finish connecting CostGraph.',
         };
     }
     await clearPendingConnect();

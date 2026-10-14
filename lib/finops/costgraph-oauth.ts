@@ -13,13 +13,15 @@
  * `client_id_metadata_document_supported`): the client_id is the URL of a JSON document we serve,
  * so there is nothing to register with CostGraph.
  *
- * Gated by COSTGRAPH_OAUTH_ENABLED. As of 2026-10-14 CostGraph lacks three pieces, verified live:
- *   - a `focus:write` OAuth scope (scopes_supported: openid, profile, email, usage:read,
- *     billing:read, pricing:read, pricing:write, mcp);
- *   - Bearer tokens on POST /api/v1/tenant/billing/focus (it answers 401 "API key required");
- *   - an endpoint that creates a push connection (dashboard only). Its path is configured with
- *     COSTGRAPH_PUSH_CONNECTION_CREATE_PATH once CostGraph ships it.
- * Docs: https://docs.costgraph.ai/costgraph/developers/sign-in-with-costgraph
+ * CostGraph shipped what this needs on 2026-10-14 (verified live): a `focus:write` OAuth scope,
+ * Bearer tokens on POST /api/v1/tenant/billing/focus, and POST /api/v1/integrations/connections to
+ * create a push connection.
+ *
+ * Switched on by COSTGRAPH_OAUTH_ENABLED=true for everyone, or by COSTGRAPH_OAUTH_ORGS (comma-
+ * separated organization slugs) for a staged rollout — the client document is then served, so the
+ * real HTTPS flow can be tested on chosen organizations before everyone sees Connect.
+ * Docs: https://docs.costgraph.ai/costgraph/developers/sign-in-with-costgraph,
+ *       https://docs.costgraph.ai/costgraph/integrations/focus-push#api
  */
 
 import crypto from 'crypto';
@@ -50,12 +52,27 @@ const CLIENT_DOCUMENT_PATH = '/api/integrations/costgraph/oauth/client.json';
 
 type FetchLike = typeof fetch;
 
-export function costgraphOAuthEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-    return env.COSTGRAPH_OAUTH_ENABLED === 'true';
+function rolloutOrgs(env: NodeJS.ProcessEnv): string[] {
+    return (env.COSTGRAPH_OAUTH_ORGS ?? '').split(',').map((slug) => slug.trim()).filter(Boolean);
 }
 
+/** Whether "Connect CostGraph" is on for an organization (all of them, or the rollout list). */
+export function costgraphOAuthEnabled(orgSlug?: string | null, env: NodeJS.ProcessEnv = process.env): boolean {
+    if (env.COSTGRAPH_OAUTH_ENABLED === 'true') return true;
+    return Boolean(orgSlug) && rolloutOrgs(env).includes(orgSlug as string);
+}
+
+/** Whether our OAuth client exists at all: on for everyone, or for at least one organization. */
+export function costgraphOAuthServed(env: NodeJS.ProcessEnv = process.env): boolean {
+    return env.COSTGRAPH_OAUTH_ENABLED === 'true' || rolloutOrgs(env).length > 0;
+}
+
+/**
+ * `focus:write` to create the push connection and send usage; `integrations:read` to find the
+ * connection CostGraph already has for this billing account when creating one answers 409.
+ */
 export function costgraphOAuthScopes(env: NodeJS.ProcessEnv = process.env): string[] {
-    const raw = env.COSTGRAPH_OAUTH_SCOPES || 'openid profile focus:write';
+    const raw = env.COSTGRAPH_OAUTH_SCOPES || 'openid profile focus:write integrations:read';
     return [...new Set(raw.split(/[\s,]+/).filter(Boolean))];
 }
 
@@ -407,11 +424,15 @@ export class CostGraphCapabilityMissing extends Error {
     }
 }
 
+const DEFAULT_CREATE_CONNECTION_PATH = '/api/v1/integrations/connections';
+
 /**
- * Create the FOCUS push connection for an organization's billing account in the chosen tenant.
+ * Create the FOCUS push connection for an organization's billing account in the chosen tenant
+ * (POST /api/v1/integrations/connections; the user must be an owner, admin or billing admin there).
  *
- * The endpoint does not exist yet; COSTGRAPH_PUSH_CONNECTION_CREATE_PATH turns this on once
- * CostGraph ships it. The request mirrors the dashboard form (name, provider, billing account).
+ * CostGraph allows one connection per provider and billing account and answers a second one with
+ * 409 — which is what a reconnect looks like. Then the existing connection is found and reused,
+ * so reconnecting never strands the history already sent to it.
  */
 export async function createPushConnection(params: {
     accessToken: string;
@@ -420,16 +441,17 @@ export async function createPushConnection(params: {
     displayName?: string;
     fetchImpl?: FetchLike;
     env?: NodeJS.ProcessEnv;
-}): Promise<{ connectionId: string }> {
-    const path = (params.env ?? process.env).COSTGRAPH_PUSH_CONNECTION_CREATE_PATH;
-    if (!path) throw new CostGraphCapabilityMissing('an API to create FOCUS push connections');
-    const res = await (params.fetchImpl ?? fetch)(`${COSTGRAPH_API_URL}${path}`, {
+}): Promise<{ connectionId: string; reused: boolean }> {
+    const fetchImpl = params.fetchImpl ?? fetch;
+    const path = (params.env ?? process.env).COSTGRAPH_PUSH_CONNECTION_CREATE_PATH || DEFAULT_CREATE_CONNECTION_PATH;
+    const headers = {
+        Authorization: `Bearer ${params.accessToken}`,
+        'Content-Type': 'application/json',
+        'X-CostGraph-Tenant-ID': params.tenantId,
+    };
+    const res = await fetchImpl(`${COSTGRAPH_API_URL}${path}`, {
         method: 'POST',
-        headers: {
-            Authorization: `Bearer ${params.accessToken}`,
-            'Content-Type': 'application/json',
-            'X-CostGraph-Tenant-ID': params.tenantId,
-        },
+        headers,
         body: JSON.stringify({
             tenant_id: params.tenantId,
             display_name: params.displayName ?? 'Cencori',
@@ -438,10 +460,38 @@ export async function createPushConnection(params: {
         }),
     });
     const json = await res.json().catch(() => ({})) as { data?: { connection_id?: unknown }; connection_id?: unknown; message?: string };
+
+    if (res.status === 409) {
+        const existing = await findPushConnection({ ...params, fetchImpl });
+        if (existing) return { connectionId: existing, reused: true };
+        throw new CostGraphError(409, { detail: json.message ?? 'a connection already exists for this billing account' }, 'connection exists');
+    }
     if (!res.ok) throw new CostGraphError(res.status, { detail: json.message }, 'could not create the push connection');
     const connectionId = json.data?.connection_id ?? json.connection_id;
     if (typeof connectionId !== 'string' || !connectionId.startsWith('fpc_')) {
         throw new CostGraphError(res.status, { detail: 'response did not include an fpc_ connection id' }, 'unexpected response');
     }
-    return { connectionId };
+    return { connectionId, reused: false };
+}
+
+/** The tenant's existing push connection for this billing account, if any (GET /api/v1/integrations). */
+async function findPushConnection(params: {
+    accessToken: string;
+    tenantId: string;
+    billingAccountId: string;
+    fetchImpl: FetchLike;
+}): Promise<string | null> {
+    const res = await params.fetchImpl(`${COSTGRAPH_API_URL}/api/v1/integrations`, {
+        headers: { Authorization: `Bearer ${params.accessToken}`, 'X-CostGraph-Tenant-ID': params.tenantId, Accept: 'application/json' },
+    });
+    if (!res.ok) return null;
+    const json = await res.json().catch(() => ({})) as {
+        data?: Array<{ connection_id?: unknown; provider_account_id?: unknown; ingest_mode?: unknown; provider?: unknown }>;
+    };
+    const match = (json.data ?? []).find((c) =>
+        c.provider_account_id === params.billingAccountId
+        && c.ingest_mode === 'push'
+        && (!c.provider || c.provider === 'cencori')
+        && typeof c.connection_id === 'string');
+    return match ? (match.connection_id as string) : null;
 }

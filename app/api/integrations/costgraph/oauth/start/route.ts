@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
     const orgSlug = url.searchParams.get('org') ?? '';
     const returnTo = safeReturnTo(url.searchParams.get('returnTo'), '/home');
 
-    if (!costgraphOAuthEnabled()) return back(origin, returnTo, { costgraph: 'error', reason: 'unavailable' });
+    if (!costgraphOAuthEnabled(orgSlug)) return back(origin, returnTo, { costgraph: 'error', reason: 'unavailable' });
 
     const access = await requireOrgOwnerOrAdmin(orgSlug);
     if (!access.ok) return back(origin, returnTo, { costgraph: 'error', reason: access.status === 401 ? 'signed_out' : 'forbidden' });

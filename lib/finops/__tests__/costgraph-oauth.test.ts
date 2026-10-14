@@ -5,8 +5,10 @@ import crypto from 'crypto';
 import { describe, expect, it, vi } from 'vitest';
 import { encryptApiKey } from '@/lib/encryption';
 import {
-    CostGraphCapabilityMissing,
     CostGraphOAuthError,
+    costgraphOAuthEnabled,
+    costgraphOAuthScopes,
+    costgraphOAuthServed,
     buildAuthorizeUrl,
     clientMetadataDocument,
     createPkce,
@@ -202,22 +204,53 @@ describe('getValidAccessToken', () => {
 });
 
 describe('createPushConnection', () => {
-    it('says plainly that CostGraph has no endpoint for it yet', async () => {
-        await expect(createPushConnection({ accessToken: 'a', tenantId: 't', billingAccountId: 'org', env: {} as NodeJS.ProcessEnv }))
-            .rejects.toBeInstanceOf(CostGraphCapabilityMissing);
-    });
-
-    it('creates a connection bound to provider cencori and the organization once configured', async () => {
+    it('creates a connection bound to provider cencori and the organization', async () => {
         const fetchImpl = vi.fn(async () => tokenResponse({ data: { connection_id: 'fpc_new' } }, 201));
         const result = await createPushConnection({
-            accessToken: 'tok', tenantId: 'ten', billingAccountId: 'org_1', fetchImpl: fetchImpl as never,
-            env: { COSTGRAPH_PUSH_CONNECTION_CREATE_PATH: '/api/v1/integrations/focus/push' } as NodeJS.ProcessEnv,
+            accessToken: 'tok', tenantId: 'ten', billingAccountId: 'org_1', fetchImpl: fetchImpl as never, env: {} as NodeJS.ProcessEnv,
         });
-        expect(result.connectionId).toBe('fpc_new');
+        expect(result).toEqual({ connectionId: 'fpc_new', reused: false });
         const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
-        expect(url).toBe('https://api.costgraph.ai/api/v1/integrations/focus/push');
+        expect(url).toBe('https://api.costgraph.ai/api/v1/integrations/connections');
         expect((init.headers as Record<string, string>).Authorization).toBe('Bearer tok');
         expect(JSON.parse(String(init.body))).toMatchObject({ provider: 'cencori', provider_account_id: 'org_1', tenant_id: 'ten' });
+    });
+
+    /** A reconnect: CostGraph allows one connection per provider and billing account. */
+    it('reuses the existing connection when CostGraph answers 409', async () => {
+        const fetchImpl = vi.fn()
+            .mockResolvedValueOnce(tokenResponse({ message: 'connection exists' }, 409))
+            .mockResolvedValueOnce(tokenResponse({ data: [
+                { connection_id: 'fpc_other', provider_account_id: 'org_2', ingest_mode: 'push', provider: 'cencori' },
+                { connection_id: 'fpc_pull', provider_account_id: 'org_1', ingest_mode: 'pull', provider: 'cencori' },
+                { connection_id: 'fpc_mine', provider_account_id: 'org_1', ingest_mode: 'push', provider: 'cencori' },
+            ] }));
+        const result = await createPushConnection({ accessToken: 'tok', tenantId: 'ten', billingAccountId: 'org_1', fetchImpl: fetchImpl as never, env: {} as NodeJS.ProcessEnv });
+        expect(result).toEqual({ connectionId: 'fpc_mine', reused: true });
+        const [url, init] = fetchImpl.mock.calls[1] as unknown as [string, RequestInit];
+        expect(url).toBe('https://api.costgraph.ai/api/v1/integrations');
+        expect((init.headers as Record<string, string>)['X-CostGraph-Tenant-ID']).toBe('ten');
+    });
+
+    it('surfaces a 403 when the user may not create connections in CostGraph', async () => {
+        const fetchImpl = vi.fn(async () => tokenResponse({ message: 'forbidden' }, 403));
+        const error = await createPushConnection({ accessToken: 't', tenantId: 'x', billingAccountId: 'o', fetchImpl: fetchImpl as never, env: {} as NodeJS.ProcessEnv }).catch((e: unknown) => e);
+        expect((error as { status?: number }).status).toBe(403);
+    });
+});
+
+describe('rollout switch', () => {
+    it('turns Connect on for everyone, or only for listed organizations', () => {
+        expect(costgraphOAuthEnabled('arcie', { COSTGRAPH_OAUTH_ENABLED: 'true' } as NodeJS.ProcessEnv)).toBe(true);
+        expect(costgraphOAuthEnabled('arcie', { COSTGRAPH_OAUTH_ORGS: 'arcie, other' } as NodeJS.ProcessEnv)).toBe(true);
+        expect(costgraphOAuthEnabled('someone', { COSTGRAPH_OAUTH_ORGS: 'arcie' } as NodeJS.ProcessEnv)).toBe(false);
+        expect(costgraphOAuthEnabled(null, { COSTGRAPH_OAUTH_ORGS: 'arcie' } as NodeJS.ProcessEnv)).toBe(false);
+        expect(costgraphOAuthServed({ COSTGRAPH_OAUTH_ORGS: 'arcie' } as NodeJS.ProcessEnv)).toBe(true);
+        expect(costgraphOAuthServed({} as NodeJS.ProcessEnv)).toBe(false);
+    });
+
+    it('asks for focus:write and integrations:read by default', () => {
+        expect(costgraphOAuthScopes({} as NodeJS.ProcessEnv)).toEqual(['openid', 'profile', 'focus:write', 'integrations:read']);
     });
 });
 
