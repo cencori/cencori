@@ -264,8 +264,8 @@
 }
 
 .dark .dashboard-theme {
-    --border: #2b2b2b;
-    --sidebar-border: #181818;
+    --border: #3a3a3a;
+    --sidebar-border: #242424;
 }
 
 /* ── Docs route theme  scoped to .docs-theme only ── */
