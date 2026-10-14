@@ -190,7 +190,7 @@ function CostGraphCard({
         </Button>
     );
     const availableSoon = !connection && !settings.oauthAvailable ? (
-        <span className="ml-auto shrink-0 rounded-full border border-border/40 bg-background/25 px-2 py-0.5 text-[9px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+        <span className="ml-auto shrink-0 rounded-md border border-border/40 bg-background/25 px-2 py-0.5 text-[9px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
             Available soon
         </span>
     ) : undefined;
