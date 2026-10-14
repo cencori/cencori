@@ -206,6 +206,7 @@ export class OpenAIProvider extends AIProvider {
                     promptTokens: usage.prompt_tokens,
                     completionTokens: usage.completion_tokens,
                     totalTokens: usage.total_tokens,
+                    uncachedPromptTokens: billablePromptTokens,
                     ...(cached.cacheReadTokens ? { cacheReadTokens: cached.cacheReadTokens } : {}),
                 },
                 cost: {

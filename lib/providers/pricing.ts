@@ -255,6 +255,49 @@ export async function updatePricing(
 }
 
 /**
+ * A model_pricing row as the rate the gateway bills, or null when the row is not billable now: an
+ * elapsed expiry with no stored successor rate fails closed here exactly as it does at request time.
+ */
+// Supabase rows are untyped here; every field is parsed and validated below.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function rowToModelPricing(row: Record<string, any>, provider: string): ModelPricing | null {
+    const expiresAt = typeof row.pricing_expires_at === 'string'
+        ? Date.parse(row.pricing_expires_at)
+        : null;
+    const scheduled = resolveScheduledPricing(row, expiresAt);
+    if (!scheduled
+        && expiresAt !== null
+        && (!Number.isFinite(expiresAt) || expiresAt <= Date.now())) {
+        return null;
+    }
+    return {
+        inputPer1KTokens: scheduled?.input ?? parseFloat(row.input_price_per_1k_tokens),
+        outputPer1KTokens: scheduled?.output ?? parseFloat(row.output_price_per_1k_tokens),
+        cencoriMarkupPercentage: 0,
+        cachedInputPer1KTokens: scheduled
+            ? scheduled.cachedInput
+            : row.cached_input_price_per_1k_tokens == null
+                ? undefined
+                : parseFloat(row.cached_input_price_per_1k_tokens),
+        longContextThresholdTokens: row.long_context_threshold_tokens == null
+            ? undefined
+            : Number(row.long_context_threshold_tokens),
+        longContextInputPer1KTokens: row.long_context_input_price_per_1k_tokens == null
+            ? undefined
+            : parseFloat(row.long_context_input_price_per_1k_tokens),
+        longContextOutputPer1KTokens: row.long_context_output_price_per_1k_tokens == null
+            ? undefined
+            : parseFloat(row.long_context_output_price_per_1k_tokens),
+        longContextCachedInputPer1KTokens: row.long_context_cached_input_price_per_1k_tokens == null
+            ? undefined
+            : parseFloat(row.long_context_cached_input_price_per_1k_tokens),
+        cacheWriteMultiplier: CACHE_WRITE_MULTIPLIERS[provider],
+        cacheWriteLongMultiplier: CACHE_WRITE_LONG_MULTIPLIERS[provider],
+        pricingExpiresAt: scheduled ? undefined : (row.pricing_expires_at || undefined),
+    };
+}
+
+/**
  * Get all pricing for a provider
  */
 export async function getProviderPricing(provider: string): Promise<Record<string, ModelPricing>> {
@@ -273,41 +316,39 @@ export async function getProviderPricing(provider: string): Promise<Record<strin
     const pricing: Record<string, ModelPricing> = {};
 
     for (const row of data) {
-        const expiresAt = typeof row.pricing_expires_at === 'string'
-            ? Date.parse(row.pricing_expires_at)
-            : null;
-        const scheduled = resolveScheduledPricing(row, expiresAt);
-        if (!scheduled
-            && expiresAt !== null
-            && (!Number.isFinite(expiresAt) || expiresAt <= Date.now())) {
-            continue;
-        }
-        pricing[row.model_name] = {
-            inputPer1KTokens: scheduled?.input ?? parseFloat(row.input_price_per_1k_tokens),
-            outputPer1KTokens: scheduled?.output ?? parseFloat(row.output_price_per_1k_tokens),
-            cencoriMarkupPercentage: 0,
-            cachedInputPer1KTokens: scheduled
-                ? scheduled.cachedInput
-                : row.cached_input_price_per_1k_tokens == null
-                    ? undefined
-                    : parseFloat(row.cached_input_price_per_1k_tokens),
-            longContextThresholdTokens: row.long_context_threshold_tokens == null
-                ? undefined
-                : Number(row.long_context_threshold_tokens),
-            longContextInputPer1KTokens: row.long_context_input_price_per_1k_tokens == null
-                ? undefined
-                : parseFloat(row.long_context_input_price_per_1k_tokens),
-            longContextOutputPer1KTokens: row.long_context_output_price_per_1k_tokens == null
-                ? undefined
-                : parseFloat(row.long_context_output_price_per_1k_tokens),
-            longContextCachedInputPer1KTokens: row.long_context_cached_input_price_per_1k_tokens == null
-                ? undefined
-                : parseFloat(row.long_context_cached_input_price_per_1k_tokens),
-            cacheWriteMultiplier: CACHE_WRITE_MULTIPLIERS[provider],
-            cacheWriteLongMultiplier: CACHE_WRITE_LONG_MULTIPLIERS[provider],
-            pricingExpiresAt: scheduled ? undefined : (row.pricing_expires_at || undefined),
-        };
+        const mapped = rowToModelPricing(row, provider);
+        if (mapped) pricing[row.model_name] = mapped;
     }
 
     return pricing;
+}
+
+/**
+ * Every active, currently billable token rate across providers — what the gateway would charge
+ * right now. Unlike the per-request lookups this throws on a read failure: callers publishing the
+ * catalogue must not mistake an outage for an empty price list.
+ */
+export async function getAllActivePricing(): Promise<Array<{ provider: string; model: string; pricing: ModelPricing }>> {
+    const supabase = createAdminClient();
+    const { data, error } = await supabase
+        .from('model_pricing')
+        .select('*')
+        .eq('is_active', true)
+        .order('provider')
+        .order('model_name');
+    if (error) throw new Error(`Could not read model_pricing: ${error.message}`);
+
+    const out: Array<{ provider: string; model: string; pricing: ModelPricing }> = [];
+    for (const row of data ?? []) {
+        // Audio models bill per minute or per character and carry zero token rates as
+        // placeholders. They have no token rate, so leaving them out is the honest answer —
+        // publishing those zeros would advertise the models as free.
+        const unitPriced = row.price_per_minute != null || row.price_per_1k_chars != null;
+        if (unitPriced && Number(row.input_price_per_1k_tokens) === 0 && Number(row.output_price_per_1k_tokens) === 0) continue;
+        const provider = String(row.provider);
+        const mapped = rowToModelPricing(row, provider);
+        if (!mapped || !Number.isFinite(mapped.inputPer1KTokens) || !Number.isFinite(mapped.outputPer1KTokens)) continue;
+        out.push({ provider, model: String(row.model_name), pricing: mapped });
+    }
+    return out;
 }

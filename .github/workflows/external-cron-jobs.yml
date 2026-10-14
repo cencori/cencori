@@ -6,6 +6,9 @@ on:
     - cron: '7,37 * * * *'
     - cron: '23 * * * *'
     - cron: '47 * * * *'
+    # Daily, after the UTC day has settled.
+    - cron: '17 4 * * *'
+    - cron: '41 5 * * *'
   workflow_dispatch:
     inputs:
       target:
@@ -18,6 +21,8 @@ on:
           - anomaly-alerts
           - cache-cleanup
           - expire-sessions
+          - finops-push
+          - costgraph-marketplace
 
 permissions:
   contents: read
@@ -167,6 +172,106 @@ jobs:
             echo "### Expire Sessions"
             echo
             echo "- URL: \`$BASE_URL/api/cron/expire-sessions\`"
+            echo "- Triggered at: \`$(date -u +"%Y-%m-%dT%H:%M:%SZ")\`"
+            echo
+            echo '```json'
+            cat "$RESPONSE_FILE"
+            echo
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  finops-push:
+    name: Push usage to FinOps connections
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: >
+      (github.event_name == 'workflow_dispatch' &&
+      (github.event.inputs.target == 'all' || github.event.inputs.target == 'finops-push')) ||
+      (github.event_name == 'schedule' && github.event.schedule == '17 4 * * *')
+    env:
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      CENCORI_CRON_BASE_URL: ${{ vars.CENCORI_CRON_BASE_URL }}
+    steps:
+      - name: Validate configuration
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "Missing required GitHub secret: CRON_SECRET" >&2
+            exit 1
+          fi
+
+      - name: Invoke finops push cron
+        run: |
+          BASE_URL="${CENCORI_CRON_BASE_URL:-https://cencori.com}"
+          BASE_URL="${BASE_URL%/}"
+          RESPONSE_FILE="$(mktemp)"
+
+          curl --fail-with-body --silent --show-error \
+            --max-time 300 \
+            --retry 2 \
+            --retry-delay 10 \
+            --request POST \
+            --header "Authorization: Bearer $CRON_SECRET" \
+            --header "Content-Type: application/json" \
+            "$BASE_URL/api/cron/finops-push" \
+            --output "$RESPONSE_FILE"
+
+          echo "Triggered $BASE_URL/api/cron/finops-push"
+          cat "$RESPONSE_FILE"
+
+          {
+            echo "### FinOps Push"
+            echo
+            echo "- URL: \`$BASE_URL/api/cron/finops-push\`"
+            echo "- Triggered at: \`$(date -u +"%Y-%m-%dT%H:%M:%SZ")\`"
+            echo
+            echo '```json'
+            cat "$RESPONSE_FILE"
+            echo
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  costgraph-marketplace:
+    name: Sync rates to CostGraph marketplace
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: >
+      (github.event_name == 'workflow_dispatch' &&
+      (github.event.inputs.target == 'all' || github.event.inputs.target == 'costgraph-marketplace')) ||
+      (github.event_name == 'schedule' && github.event.schedule == '41 5 * * *')
+    env:
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      CENCORI_CRON_BASE_URL: ${{ vars.CENCORI_CRON_BASE_URL }}
+    steps:
+      - name: Validate configuration
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "Missing required GitHub secret: CRON_SECRET" >&2
+            exit 1
+          fi
+
+      - name: Invoke costgraph marketplace sync cron
+        run: |
+          BASE_URL="${CENCORI_CRON_BASE_URL:-https://cencori.com}"
+          BASE_URL="${BASE_URL%/}"
+          RESPONSE_FILE="$(mktemp)"
+
+          curl --fail-with-body --silent --show-error \
+            --max-time 300 \
+            --retry 2 \
+            --retry-delay 10 \
+            --request POST \
+            --header "Authorization: Bearer $CRON_SECRET" \
+            --header "Content-Type: application/json" \
+            "$BASE_URL/api/cron/costgraph-marketplace" \
+            --output "$RESPONSE_FILE"
+
+          echo "Triggered $BASE_URL/api/cron/costgraph-marketplace"
+          cat "$RESPONSE_FILE"
+
+          {
+            echo "### CostGraph Marketplace Sync"
+            echo
+            echo "- URL: \`$BASE_URL/api/cron/costgraph-marketplace\`"
             echo "- Triggered at: \`$(date -u +"%Y-%m-%dT%H:%M:%SZ")\`"
             echo
             echo '```json'

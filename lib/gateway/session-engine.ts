@@ -64,6 +64,8 @@ export type TurnExecuteParams = {
     logSuccess: (meta: {
         provider: string; model: string; status: 'success' | 'success_fallback' | 'error';
         promptTokens: number; completionTokens: number; totalTokens: number;
+        /** Token buckets — see LogRequestParams. */
+        cacheReadTokens?: number; cacheWriteTokens?: number; uncachedPromptTokens?: number;
         providerCostUsd: number; cencoriChargeUsd: number; markupPercentage: number;
         errorMessage?: string;
         /** Assistant text, so the logged turn is inspectable in the console. */
@@ -175,7 +177,7 @@ function makeStream(params: {
     tokenMap?: Map<string, string>;
     endUserId?: string | null;
     tier: SubscriptionTier;
-    logSuccess: (m: { provider: string; model: string; status: 'success' | 'success_fallback' | 'error'; promptTokens: number; completionTokens: number; totalTokens: number; providerCostUsd: number; cencoriChargeUsd: number; markupPercentage: number; errorMessage?: string; responseText?: string }) => void;
+    logSuccess: (m: { provider: string; model: string; status: 'success' | 'success_fallback' | 'error'; promptTokens: number; completionTokens: number; totalTokens: number; cacheReadTokens?: number; cacheWriteTokens?: number; uncachedPromptTokens?: number; providerCostUsd: number; cencoriChargeUsd: number; markupPercentage: number; errorMessage?: string; responseText?: string }) => void;
     incrementUsage: (c: number) => void;
     recordEndUserUsage?: (u: { promptTokens: number; completionTokens: number; totalTokens: number; providerCostUsd: number; cencoriChargeUsd: number; markupPercentage: number }) => void;
     onCompletion?: (fullText: string) => void;
@@ -352,6 +354,9 @@ function makeStream(params: {
                                 promptTokens: pt,
                                 completionTokens: ct,
                                 totalTokens: tt,
+                                cacheReadTokens: settled.cacheReadTokens,
+                                cacheWriteTokens: settled.cacheWriteTokens,
+                                uncachedPromptTokens: settled.uncachedPromptTokens,
                                 providerCostUsd: pc,
                                 cencoriChargeUsd: cc,
                                 markupPercentage,
@@ -410,7 +415,7 @@ function makeStream(params: {
                                     actionIds: callValues.map(tc => tc.id),
                                     model: resolved.model,
                                 });
-                                logSuccess({ provider: pn, model: chunk.actualModel, status: chunk.usedFallback ? 'success_fallback' : 'success', promptTokens: pt, completionTokens: ct, totalTokens: tt, providerCostUsd: pc, cencoriChargeUsd: cc, markupPercentage, responseText: fullText });
+                                logSuccess({ provider: pn, model: chunk.actualModel, status: chunk.usedFallback ? 'success_fallback' : 'success', promptTokens: pt, completionTokens: ct, totalTokens: tt, cacheReadTokens: settled.cacheReadTokens, cacheWriteTokens: settled.cacheWriteTokens, uncachedPromptTokens: settled.uncachedPromptTokens, providerCostUsd: pc, cencoriChargeUsd: cc, markupPercentage, responseText: fullText });
                                 incrementUsage(cc);
                                 if (recordEndUserUsage) recordEndUserUsage({ promptTokens: pt, completionTokens: ct, totalTokens: tt, providerCostUsd: pc, cencoriChargeUsd: cc, markupPercentage });
                                 controller.close();
@@ -434,7 +439,7 @@ function makeStream(params: {
                             cc,
                         );
 
-                        logSuccess({ provider: pn, model: chunk.actualModel, status: chunk.usedFallback ? 'success_fallback' : 'success', promptTokens: pt, completionTokens: ct, totalTokens: tt, providerCostUsd: pc, cencoriChargeUsd: cc, markupPercentage, responseText: fullText });
+                        logSuccess({ provider: pn, model: chunk.actualModel, status: chunk.usedFallback ? 'success_fallback' : 'success', promptTokens: pt, completionTokens: ct, totalTokens: tt, cacheReadTokens: settled.cacheReadTokens, cacheWriteTokens: settled.cacheWriteTokens, uncachedPromptTokens: settled.uncachedPromptTokens, providerCostUsd: pc, cencoriChargeUsd: cc, markupPercentage, responseText: fullText });
                         incrementUsage(cc);
                         if (recordEndUserUsage) recordEndUserUsage({ promptTokens: pt, completionTokens: ct, totalTokens: tt, providerCostUsd: pc, cencoriChargeUsd: cc, markupPercentage });
 
@@ -914,7 +919,7 @@ export async function resumeSessionTurn(params: ResumeTurnParams): Promise<TurnE
                                     usage: { input_tokens: pt, output_tokens: ct, total_tokens: tt },
                                 }, cc);
                                 const pn = resolved.customProviderTag || chunk.actualProvider;
-                                logSuccess({ provider: pn, model: chunk.actualModel, status: 'error', promptTokens: pt, completionTokens: ct, totalTokens: tt, providerCostUsd: pc, cencoriChargeUsd: cc, markupPercentage, errorMessage: outputCheck.message });
+                                logSuccess({ provider: pn, model: chunk.actualModel, status: 'error', promptTokens: pt, completionTokens: ct, totalTokens: tt, cacheReadTokens: settled.cacheReadTokens, cacheWriteTokens: settled.cacheWriteTokens, uncachedPromptTokens: settled.uncachedPromptTokens, providerCostUsd: pc, cencoriChargeUsd: cc, markupPercentage, errorMessage: outputCheck.message });
                                 incrementUsage(cc);
                                 if (recordEndUserUsage) recordEndUserUsage({ promptTokens: pt, completionTokens: ct, totalTokens: tt, providerCostUsd: pc, cencoriChargeUsd: cc, markupPercentage });
                                 controller.close();
@@ -934,7 +939,7 @@ export async function resumeSessionTurn(params: ResumeTurnParams): Promise<TurnE
                             );
 
                             const pn = resolved.customProviderTag || chunk.actualProvider;
-                            logSuccess({ provider: pn, model: chunk.actualModel, status: chunk.usedFallback ? 'success_fallback' : 'success', promptTokens: pt, completionTokens: ct, totalTokens: tt, providerCostUsd: pc, cencoriChargeUsd: cc, markupPercentage, responseText: fullText });
+                            logSuccess({ provider: pn, model: chunk.actualModel, status: chunk.usedFallback ? 'success_fallback' : 'success', promptTokens: pt, completionTokens: ct, totalTokens: tt, cacheReadTokens: settled.cacheReadTokens, cacheWriteTokens: settled.cacheWriteTokens, uncachedPromptTokens: settled.uncachedPromptTokens, providerCostUsd: pc, cencoriChargeUsd: cc, markupPercentage, responseText: fullText });
                             incrementUsage(cc);
                             if (recordEndUserUsage) recordEndUserUsage({ promptTokens: pt, completionTokens: ct, totalTokens: tt, providerCostUsd: pc, cencoriChargeUsd: cc, markupPercentage });
 

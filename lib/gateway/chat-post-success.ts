@@ -137,6 +137,9 @@ export type ChatLogSuccessMeta = {
     promptTokens: number;
     completionTokens: number;
     totalTokens: number;
+    cacheReadTokens?: number;
+    cacheWriteTokens?: number;
+    uncachedPromptTokens?: number;
     providerCostUsd: number;
     cencoriChargeUsd: number;
     markupPercentage: number;
@@ -181,6 +184,9 @@ export function makeChatLogSuccess(params: {
                     promptTokens: meta.promptTokens,
                     completionTokens: meta.completionTokens,
                     totalTokens: meta.totalTokens,
+                    cacheReadTokens: meta.cacheReadTokens,
+                    cacheWriteTokens: meta.cacheWriteTokens,
+                    uncachedPromptTokens: meta.uncachedPromptTokens,
                     costUsd: meta.cencoriChargeUsd,
                     providerCostUsd: meta.providerCostUsd,
                     cencoriChargeUsd: meta.cencoriChargeUsd,

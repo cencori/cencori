@@ -393,6 +393,7 @@ export class AnthropicProvider extends AIProvider {
                     promptTokens: response.usage.input_tokens,
                     completionTokens: response.usage.output_tokens,
                     totalTokens: response.usage.input_tokens + response.usage.output_tokens,
+                    uncachedPromptTokens: response.usage.input_tokens,
                     ...(cached.cacheReadTokens ? { cacheReadTokens: cached.cacheReadTokens } : {}),
                     ...(cached.cacheWriteTokens ? { cacheWriteTokens: cached.cacheWriteTokens } : {}),
                     ...(cached.cacheWriteLongTokens ? { cacheWriteLongTokens: cached.cacheWriteLongTokens } : {}),

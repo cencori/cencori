@@ -144,6 +144,15 @@ export interface TokenUsage {
     cacheWriteTokens?: number;
     /** The part of `cacheWriteTokens` written with the provider's long cache lifetime. */
     cacheWriteLongTokens?: number;
+    /**
+     * Prompt tokens billed at the full input rate: neither read from nor written to a cache.
+     *
+     * Needed because `promptTokens` does not mean the same thing across adapters — OpenAI and
+     * Gemini report the whole prompt there, Anthropic reports it with cached tokens left out — so
+     * the uncached count cannot be derived from it afterwards. Adapters that report cache activity
+     * set this; it is what usage exports price the `input` bucket from.
+     */
+    uncachedPromptTokens?: number;
 }
 
 /**

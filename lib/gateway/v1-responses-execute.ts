@@ -182,6 +182,10 @@ type V1ResponseExecuteParams = {
         promptTokens: number;
         completionTokens: number;
         totalTokens: number;
+        /** Token buckets — see LogRequestParams. */
+        cacheReadTokens?: number;
+        cacheWriteTokens?: number;
+        uncachedPromptTokens?: number;
         providerCostUsd: number;
         cencoriChargeUsd: number;
         markupPercentage: number;
@@ -769,6 +773,9 @@ export async function runV1ResponsesExecution(
                     promptTokens: result.usage.promptTokens,
                     completionTokens: result.usage.completionTokens,
                     totalTokens: result.usage.totalTokens,
+                    cacheReadTokens: result.usage.cacheReadTokens,
+                    cacheWriteTokens: result.usage.cacheWriteTokens,
+                    uncachedPromptTokens: result.usage.uncachedPromptTokens,
                     providerCostUsd: result.cost.providerCostUsd,
                     cencoriChargeUsd: result.cost.cencoriChargeUsd,
                     markupPercentage: result.cost.markupPercentage,
@@ -868,6 +875,9 @@ export async function runV1ResponsesExecution(
                 promptTokens: result.usage.promptTokens,
                 completionTokens: result.usage.completionTokens,
                 totalTokens: result.usage.totalTokens,
+                cacheReadTokens: result.usage.cacheReadTokens,
+                cacheWriteTokens: result.usage.cacheWriteTokens,
+                uncachedPromptTokens: result.usage.uncachedPromptTokens,
                 providerCostUsd: result.cost.providerCostUsd,
                 cencoriChargeUsd: result.cost.cencoriChargeUsd,
                 markupPercentage: result.cost.markupPercentage,
@@ -1324,6 +1334,8 @@ export async function runV1ResponsesExecution(
                                 totalTokens,
                                 providerCostUsd,
                                 cacheReadTokens,
+                                cacheWriteTokens,
+                                uncachedPromptTokens,
                             } = await settleStreamUsage({
                                 reported: reportedUsage,
                                 pricing,
@@ -1360,6 +1372,9 @@ export async function runV1ResponsesExecution(
                                     promptTokens,
                                     completionTokens,
                                     totalTokens,
+                                    cacheReadTokens,
+                                    cacheWriteTokens,
+                                    uncachedPromptTokens,
                                     providerCostUsd,
                                     cencoriChargeUsd,
                                     markupPercentage,
@@ -1479,6 +1494,9 @@ export async function runV1ResponsesExecution(
                                 promptTokens,
                                 completionTokens,
                                 totalTokens,
+                                cacheReadTokens,
+                                cacheWriteTokens,
+                                uncachedPromptTokens,
                                 providerCostUsd,
                                 cencoriChargeUsd,
                                 markupPercentage,
