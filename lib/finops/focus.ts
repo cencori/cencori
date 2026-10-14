@@ -60,7 +60,27 @@ export type FocusRecord = Record<string, string | number | Record<string, string
 
 /** The Provider / ServiceProvider every record carries; a push connection is bound to it. */
 export const FOCUS_PROVIDER_NAME = 'Cencori';
-const SERVICE_NAME = 'Cencori AI Gateway';
+
+/**
+ * `ServiceName` by endpoint family. FinOps tools show it as the service a cost belongs to, so it
+ * says what the work was rather than how the traffic arrived. It was "Cencori AI Gateway" on
+ * every row, which filed all Cencori spend under a gateway (docs/partners/COSTGRAPH.md §11.3).
+ * These describe the work; they are not product brands.
+ */
+const SERVICE_NAMES: Record<string, string> = {
+    chat: 'Cencori Text Generation',
+    embeddings: 'Cencori Embeddings',
+    images: 'Cencori Image Generation',
+    audio: 'Cencori Audio',
+    vision: 'Cencori Vision',
+    documents: 'Cencori Documents',
+    moderation: 'Cencori Moderation',
+    web: 'Cencori Web Search',
+};
+
+export function serviceNameFor(endpointFamily: string): string {
+    return SERVICE_NAMES[endpointFamily] ?? SERVICE_NAMES.chat;
+}
 
 const SUB_ACCOUNT_TYPES: Record<Exclude<SubAccountMode, 'none'>, string> = {
     project: 'Project',
@@ -149,7 +169,7 @@ export function toFocusRecord(row: UsageRollupRow, ctx: FocusContext): FocusReco
         // The model's maker, which is who actually produced what was consumed.
         Publisher: row.provider,
         PublisherName: row.provider,
-        ServiceName: SERVICE_NAME,
+        ServiceName: serviceNameFor(family),
         ServiceCategory: 'AI and Machine Learning',
         ServiceSubcategory: 'Generative AI',
         ResourceId: row.project_id,

@@ -65,7 +65,8 @@ We chose not to integrate through CostGraph's **telemetry** path (`costgraph_gen
 | `ChargeCategory` / `ChargeFrequency` | `Usage` / `Usage-Based` |
 | `Provider`, `ProviderName`, `ServiceProviderName`, `InvoiceIssuer(Name)` | `Cencori`. Constant, because CostGraph binds a push connection to one provider. |
 | `Publisher(Name)` | Upstream model provider (`anthropic`, `openai`, …) |
-| `ServiceName` / `ServiceCategory` / `ServiceSubcategory` | `Cencori AI Gateway` / `AI and Machine Learning` / `Generative AI` |
+| `ServiceName` | By endpoint family: `Cencori Text Generation`, `Cencori Embeddings`, `Cencori Image Generation`, `Cencori Audio`, `Cencori Vision`, `Cencori Documents`, `Cencori Moderation`, `Cencori Web Search` (was `Cencori AI Gateway` until 2026-10-14, §11.3) |
+| `ServiceCategory` / `ServiceSubcategory` | `AI and Machine Learning` / `Generative AI` |
 | `SubAccountId` / `Type` / `Name` | Per connection setting: project (with name), end user, tenant, or none. Only set when there is a value, because CostGraph rejects Name/Type without an Id. |
 | `ResourceId` / `Name` / `Type` | Cencori project id / name / `Project` |
 | `SkuId` / `SkuMeter` | `provider/model` / `<endpoint family>/tokens` or `/requests` |
@@ -279,12 +280,12 @@ The card is one surface. Everything else CostGraph shows about us (service break
 | Column | Sent today | Shown in CostGraph as | Proposed |
 | --- | --- | --- | --- |
 | `Provider` / `ProviderName` | `Cencori` | provider `cencori` | keep |
-| `ServiceName` | **`Cencori AI Gateway`** (every row) | "Cencori AI Gateway", the top service label | **descriptive service lines by endpoint family** (below) |
+| `ServiceName` | ~~`Cencori AI Gateway`~~ on every row until 2026-10-14 | the top service label | **Changed 2026-10-14** to service lines by endpoint family (below); September and October restated in CostGraph |
 | `ServiceCategory` / `ServiceSubcategory` | `AI and Machine Learning` / `Generative AI` | category | keep |
 | `Publisher` | upstream model maker | publisher | keep |
 | `SkuId` | `provider/model` | tokens-by-model | keep |
 
-Proposed `ServiceName` values. They describe the work and don't invent product brands (GTM-02 §4: no casual commercial names):
+`ServiceName` values (live). They describe the work and don't invent product brands (GTM-02 §4: no casual commercial names):
 
 | Endpoint family | `ServiceName` |
 | --- | --- |
