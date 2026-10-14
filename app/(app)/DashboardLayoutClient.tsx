@@ -327,7 +327,8 @@ function LayoutContent({ user, avatar, name, children, initialAgentOpen, initial
   const parsedCreditsBalance = Number(orgCreditsData?.credits_balance ?? 0);
   const creditsBalance = Number.isFinite(parsedCreditsBalance) ? parsedCreditsBalance : 0;
   const isLowCredits = creditsBalance > 0 && creditsBalance < 5;
-  const isOutOfCredits = creditsBalance <= 0;
+  // Matches the gateway: under a cent (or in debt) can't serve requests.
+  const isOutOfCredits = creditsBalance < 0.01;
   const creditsPillClassName = [
     "hidden lg:inline-flex h-6 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-medium transition-colors",
     isOutOfCredits

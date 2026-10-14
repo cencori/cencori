@@ -44,6 +44,8 @@ vi.mock('@/lib/budgets', () => ({
 vi.mock('@/lib/credits', () => ({
     deductCredits: vi.fn(),
     getCreditsBalance: (...args: unknown[]) => mockGetCreditsBalance(...args),
+    // Same rule as the real module: under a cent is out of credits.
+    isCreditBalanceExhausted: (balance: number) => !(balance >= 0.01),
 }));
 
 vi.mock('@/lib/providers/custom-provider-routing', () => ({

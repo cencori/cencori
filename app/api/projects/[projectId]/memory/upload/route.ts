@@ -12,6 +12,7 @@ import { getPricingFromDB } from '@/lib/providers/pricing';
 import { calculateProviderTokenCost } from '@/lib/providers/base';
 import { runGatewayInputPipeline } from '@/lib/gateway/input-guard';
 import type { SubscriptionTier } from '@/lib/entitlements';
+import { isCreditBalanceExhausted } from '@/lib/credits';
 
 interface RouteParams {
     params: Promise<{ projectId: string }>;
@@ -136,7 +137,7 @@ export async function POST(request: NextRequest, context: RouteParams) {
             .eq('is_active', true)
             .maybeSingle();
 
-        if (shouldEnforceCredits && creditsBalance <= 0 && !providerKey?.encrypted_key) {
+        if (shouldEnforceCredits && isCreditBalanceExhausted(creditsBalance) && !providerKey?.encrypted_key) {
             return NextResponse.json(
                 {
                     error: "Credit balance exhausted",
