@@ -1905,9 +1905,11 @@ export default function ProjectSettingsPage({ params }: PageProps) {
               <button
                 type="button"
                 onClick={() => setShowSuggestModal(true)}
-                className="self-start rounded-lg text-left transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="h-full rounded-lg text-left transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
+                {/* Stretches to the row, whose height the CostGraph card sets. */}
                 <CardShell
+                  className="h-full"
                   layout="compact"
                   icon={Plus}
                   title="More integrations"

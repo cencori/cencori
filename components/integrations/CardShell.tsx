@@ -17,6 +17,7 @@ export function CardShell({
     bottomAction,
     bottomActionDivided = false,
     layout = "row",
+    className = "",
     children,
     footer,
 }: {
@@ -38,6 +39,8 @@ export function CardShell({
      * does not stretch to the height of its neighbours in a grid row.
      */
     layout?: "row" | "tile" | "compact";
+    /** Extra classes on the card itself, e.g. h-full to match a neighbour's height. */
+    className?: string;
     children?: ReactNode;
     footer?: ReactNode;
 }) {
@@ -66,7 +69,7 @@ export function CardShell({
     }
 
     return (
-        <div className={`overflow-hidden rounded-lg border border-border/35 bg-muted/30 ${layout === "compact" ? "self-start" : ""}`}>
+        <div className={`overflow-hidden rounded-lg border border-border/35 bg-muted/30 ${layout === "compact" ? "self-start" : ""} ${className}`}>
             <div className="flex flex-col gap-4 px-5 py-5 sm:flex-row sm:items-start sm:justify-between">
                 <div className="flex items-start gap-3">
                     {mark}
