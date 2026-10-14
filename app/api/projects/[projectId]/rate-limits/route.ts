@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
+import { fetchAllRows } from '@/lib/supabase-paginate';
 
 // Throughput ceilings only. The monthly request ceiling these tiers used to
 // carry is gone — nothing enforced it after the gateway stopped checking, and
@@ -67,13 +68,20 @@ export async function GET(
 
         const startOfDay = new Date();
         startOfDay.setHours(0, 0, 0, 0);
-        const { data: tokenData } = await supabaseAdmin
-            .from('ai_requests')
-            .select('total_tokens')
-            .eq('project_id', projectId)
-            .gte('created_at', startOfDay.toISOString());
+        // Paginated: a single select stops at 1,000 rows, under-counting
+        // today's tokens on busy projects.
+        const tokenData = await fetchAllRows<{ total_tokens: number | null }>((from, to) =>
+            supabaseAdmin
+                .from('ai_requests')
+                .select('total_tokens')
+                .eq('project_id', projectId)
+                .gte('created_at', startOfDay.toISOString())
+                .order('created_at', { ascending: true })
+                .order('id', { ascending: true })
+                .range(from, to),
+        );
 
-        const tokensToday = tokenData?.reduce((sum, r) => sum + (r.total_tokens || 0), 0) || 0;
+        const tokensToday = tokenData.reduce((sum, r) => sum + (r.total_tokens || 0), 0);
 
         const fiveSecondsAgo = new Date(Date.now() - 5000).toISOString();
         const { count: concurrentEstimate } = await supabaseAdmin

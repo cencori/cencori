@@ -4,6 +4,7 @@ import { validateGatewayRequest, addGatewayHeaders, handleCorsPreFlight } from '
 import { embeddedError, dePrefixId } from '@/lib/embedded/http';
 import { groupUsage, parseWindow } from '@/lib/embedded/usage';
 import crypto from 'crypto';
+import { fetchAllRows } from '@/lib/supabase-paginate';
 
 export async function OPTIONS() {
     return handleCorsPreFlight();
@@ -38,16 +39,27 @@ export async function GET(req: NextRequest) {
     // One over the cap so truncation is explicit instead of silent: totals
     // over a truncated scan are partial, not complete.
     const ROW_CAP = 10000;
-    let query = supabase
-        .from('ai_requests')
-        .select('tenant_id, agent_id, installation_id, model, provider, prompt_tokens, completion_tokens, total_tokens, cost_usd, provider_cost_usd, cencori_charge_usd, metadata, created_at')
-        .eq('project_id', validation.context.projectId)
-        .gte('created_at', window.since)
-        .lte('created_at', window.until)
-        .order('created_at', { ascending: false })
-        .limit(ROW_CAP + 1);
-    query = applyScopeFilters(query as never, url.searchParams) as never;
-    const { data, error } = await query;
+    // Paginated: one select stops at PostgREST's 1,000-row cap whatever
+    // .limit() says, so totals were computed over the newest 1,000 rows while
+    // `truncated` stayed false. id breaks created_at ties between pages.
+    let data: Array<Record<string, unknown>> | null = null;
+    let error: { message: string } | null = null;
+    try {
+        data = await fetchAllRows<Record<string, unknown>>((from, to) => {
+            const query = supabase
+                .from('ai_requests')
+                .select('tenant_id, agent_id, installation_id, model, provider, prompt_tokens, completion_tokens, total_tokens, cost_usd, provider_cost_usd, cencori_charge_usd, metadata, created_at')
+                .eq('project_id', validation.context.projectId)
+                .gte('created_at', window.since)
+                .lte('created_at', window.until)
+                .order('created_at', { ascending: false })
+                .order('id', { ascending: false })
+                .range(from, to);
+            return applyScopeFilters(query as never, url.searchParams) as never;
+        }, { maxRows: ROW_CAP + 1 });
+    } catch (scanError) {
+        error = { message: scanError instanceof Error ? scanError.message : 'Usage query failed' };
+    }
     if (error) return addGatewayHeaders(embeddedError(500, 'invalid_request_error', error.message, { requestId }), { requestId });
     const truncated = (data ?? []).length > ROW_CAP;
     const rows = ((data ?? []).slice(0, ROW_CAP) as Array<Record<string, unknown>>).map((r) => ({

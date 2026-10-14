@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireProjectAccess } from '@/lib/require-project-access';
 import { createAdminClient } from '@/lib/supabaseAdmin';
+import { fetchAllRows } from '@/lib/supabase-paginate';
 
 export async function POST(
     req: NextRequest,
@@ -15,29 +16,12 @@ export async function POST(
         const body = await req.json();
         const { format = 'csv', filters } = body;
 
-        let query = supabaseAdmin
-            .from('ai_requests')
-            .select('*')
-            .eq('project_id', projectId);
-
-        if (filters?.status && filters.status !== 'all') {
-            query = query.eq('status', filters.status);
-        }
-
-        if (filters?.model && filters.model !== 'all') {
-            query = query.eq('model', filters.model);
-        }
-
+        let startTime: Date | null = null;
         if (filters?.time_range && filters.time_range !== 'all') {
             const now = new Date();
-            let startTime: Date;
-
             switch (filters.time_range) {
                 case '1h':
                     startTime = new Date(now.getTime() - 60 * 60 * 1000);
-                    break;
-                case '24h':
-                    startTime = new Date(now.getTime() - 24 * 60 * 60 * 1000);
                     break;
                 case '7d':
                     startTime = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -45,20 +29,44 @@ export async function POST(
                 case '30d':
                     startTime = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
                     break;
+                case '24h':
                 default:
                     startTime = new Date(now.getTime() - 24 * 60 * 60 * 1000);
             }
-
-            query = query.gte('created_at', startTime.toISOString());
         }
 
-        query = query
-            .order('created_at', { ascending: false })
-            .limit(10000);
-
-        const { data: requests, error } = await query;
-
-        if (error) {
+        // Only the exported columns, paginated (a single select stops at 1,000
+        // rows whatever .limit() says). CSV never includes payloads, so it
+        // reads narrow rows up to 10,000. JSON includes request/response
+        // payloads (tens of KB each), so it reads them in small pages and
+        // stops at 1,000 rows to stay within query and response limits.
+        const withPayloads = format === 'json';
+        const baseColumns = 'id, created_at, status, model, prompt_tokens, completion_tokens, total_tokens, cost_usd, latency_ms, safety_score, error_message, filtered_reasons';
+        type ExportedLog = {
+            id: string; created_at: string; status: string | null; model: string | null;
+            prompt_tokens: number | null; completion_tokens: number | null; total_tokens: number | null;
+            cost_usd: number | null; latency_ms: number | null; safety_score: number | null;
+            error_message: string | null; filtered_reasons: string[] | null;
+            request_payload?: unknown; response_payload?: unknown;
+        };
+        let requests: ExportedLog[];
+        try {
+            requests = await fetchAllRows<ExportedLog>((from, to) => {
+                let query = supabaseAdmin
+                    .from('ai_requests')
+                    .select(withPayloads ? `${baseColumns}, request_payload, response_payload` : baseColumns)
+                    .eq('project_id', projectId);
+                if (filters?.status && filters.status !== 'all') query = query.eq('status', filters.status);
+                if (filters?.model && filters.model !== 'all') query = query.eq('model', filters.model);
+                if (startTime) query = query.gte('created_at', startTime.toISOString());
+                // The column list is chosen at runtime, which the client's type
+                // parser can't follow; the row shape is ExportedLog either way.
+                return query
+                    .order('created_at', { ascending: false })
+                    .order('id', { ascending: false })
+                    .range(from, to) as unknown as PromiseLike<{ data: ExportedLog[] | null; error: { message: string } | null }>;
+            }, withPayloads ? { pageSize: 100, maxRows: 1_000 } : { maxRows: 10_000 });
+        } catch (error) {
             console.error('[Export API] Error fetching requests:', error);
             return NextResponse.json(
                 { error: 'Failed to export request logs' },
@@ -66,7 +74,7 @@ export async function POST(
             );
         }
 
-        if (!requests || requests.length === 0) {
+        if (requests.length === 0) {
             return NextResponse.json(
                 { error: 'No requests found for the given filters' },
                 { status: 404 }

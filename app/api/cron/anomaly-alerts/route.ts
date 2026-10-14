@@ -4,6 +4,7 @@ import { triggerAnomalyWebhook } from '@/lib/webhooks/trigger';
 import { createWebhookEvent, signPayload } from '@/lib/webhooks/deliver';
 import { safeOutboundFetch } from '@/lib/security/outbound-url';
 import { cronDisabled } from '@/lib/cron';
+import { fetchAllRows } from '@/lib/supabase-paginate';
 
 function mean(arr: number[]): number {
     if (arr.length === 0) return 0;
@@ -43,15 +44,22 @@ async function detectAnomalies(
 
     if (apiKeyIds.length === 0) return [];
 
-    const { data: requests } = await supabase
-        .from('ai_requests')
-        .select('created_at, cost_usd, latency_ms, status')
-        .eq('project_id', projectId)
-        .in('api_key_id', apiKeyIds)
-        .gte('created_at', baselineStart.toISOString())
-        .order('created_at', { ascending: true });
+    // Paginated: a single select stops at 1,000 rows and, oldest-first, that
+    // cut the detection window (the newest rows) on busy projects, so
+    // anomalies there were never detected.
+    const requests = await fetchAllRows<{ created_at: string; cost_usd: number | null; latency_ms: number | null; status: string | null }>((from, to) =>
+        supabase
+            .from('ai_requests')
+            .select('created_at, cost_usd, latency_ms, status')
+            .eq('project_id', projectId)
+            .in('api_key_id', apiKeyIds)
+            .gte('created_at', baselineStart.toISOString())
+            .order('created_at', { ascending: true })
+            .order('id', { ascending: true })
+            .range(from, to),
+    );
 
-    if (!requests || requests.length === 0) return [];
+    if (requests.length === 0) return [];
 
     const detectionRequests = requests.filter(r => new Date(r.created_at) >= detectionStart);
     const baselineRequests = requests.filter(r => new Date(r.created_at) < detectionStart);

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireProjectAccess } from '@/lib/require-project-access';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { requireTierFeatureForProject } from '@/lib/require-tier-feature';
+import { fetchAllRows } from '@/lib/supabase-paginate';
 
 export async function GET(
     req: NextRequest,
@@ -37,12 +38,18 @@ export async function GET(
 
     // Get daily spend for last 30 days
     const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString();
-    const { data: requests } = await supabase
-        .from('ai_requests')
-        .select('cencori_charge_usd, created_at')
-        .eq('project_id', projectId)
-        .gte('created_at', thirtyDaysAgo)
-        .order('created_at', { ascending: true });
+    // Paginated: a single select stops at 1,000 rows and, oldest-first, that
+    // dropped the most recent days' spend.
+    const requests = await fetchAllRows<{ cencori_charge_usd: number | null; created_at: string }>((from, to) =>
+        supabase
+            .from('ai_requests')
+            .select('cencori_charge_usd, created_at')
+            .eq('project_id', projectId)
+            .gte('created_at', thirtyDaysAgo)
+            .order('created_at', { ascending: true })
+            .order('id', { ascending: true })
+            .range(from, to),
+    );
 
     // Bucket by day
     const dailySpend = new Map<string, number>();
@@ -78,11 +85,16 @@ export async function GET(
 
     // Monthly spend by month (last 6 months)
     const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
-    const { data: monthlyRequests } = await supabase
-        .from('ai_requests')
-        .select('cencori_charge_usd, created_at')
-        .eq('project_id', projectId)
-        .gte('created_at', sixMonthsAgo.toISOString());
+    const monthlyRequests = await fetchAllRows<{ cencori_charge_usd: number | null; created_at: string }>((from, to) =>
+        supabase
+            .from('ai_requests')
+            .select('cencori_charge_usd, created_at')
+            .eq('project_id', projectId)
+            .gte('created_at', sixMonthsAgo.toISOString())
+            .order('created_at', { ascending: true })
+            .order('id', { ascending: true })
+            .range(from, to),
+    );
 
     const monthlySpend = new Map<string, number>();
     for (const req of monthlyRequests || []) {

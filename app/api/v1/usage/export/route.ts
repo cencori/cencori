@@ -4,6 +4,7 @@ import { validateGatewayRequest, addGatewayHeaders, handleCorsPreFlight } from '
 import { embeddedError, dePrefixId } from '@/lib/embedded/http';
 import { groupUsage, parseWindow, toCsv, USAGE_EXPORT_ROW_LIMIT } from '@/lib/embedded/usage';
 import crypto from 'crypto';
+import { fetchAllRows } from '@/lib/supabase-paginate';
 
 export async function OPTIONS() {
     return handleCorsPreFlight();
@@ -24,19 +25,30 @@ export async function GET(req: NextRequest) {
     }
 
     const supabase = createAdminClient();
-    let query = supabase
-        .from('ai_requests')
-        .select('tenant_id, agent_id, installation_id, model, provider, prompt_tokens, completion_tokens, total_tokens, cost_usd, provider_cost_usd, cencori_charge_usd, created_at')
-        .eq('project_id', validation.context.projectId)
-        .gte('created_at', window.since)
-        .lte('created_at', window.until)
-        .order('created_at', { ascending: false })
-        .limit(USAGE_EXPORT_ROW_LIMIT);
+    // Paginated: one select stops at PostgREST's 1,000-row cap whatever
+    // .limit() says, so exports were cut to the newest 1,000 rows.
     const tenant = url.searchParams.get('tenant_id');
     const agent = url.searchParams.get('agent_id');
-    if (tenant) query = query.eq('tenant_id', dePrefixId(tenant));
-    if (agent) query = query.eq('agent_id', dePrefixId(agent));
-    const { data, error } = await query;
+    let data: Array<Record<string, unknown>> | null = null;
+    let error: { message: string } | null = null;
+    try {
+        data = await fetchAllRows<Record<string, unknown>>((from, to) => {
+            let query = supabase
+                .from('ai_requests')
+                .select('tenant_id, agent_id, installation_id, model, provider, prompt_tokens, completion_tokens, total_tokens, cost_usd, provider_cost_usd, cencori_charge_usd, created_at')
+                .eq('project_id', validation.context.projectId)
+                .gte('created_at', window.since)
+                .lte('created_at', window.until);
+            if (tenant) query = query.eq('tenant_id', dePrefixId(tenant));
+            if (agent) query = query.eq('agent_id', dePrefixId(agent));
+            return query
+                .order('created_at', { ascending: false })
+                .order('id', { ascending: false })
+                .range(from, to);
+        }, { maxRows: USAGE_EXPORT_ROW_LIMIT });
+    } catch (scanError) {
+        error = { message: scanError instanceof Error ? scanError.message : 'Usage export failed' };
+    }
     if (error) return addGatewayHeaders(embeddedError(500, 'invalid_request_error', error.message, { requestId }), { requestId });
     const rows = ((data ?? []) as Array<Record<string, unknown>>).map((r) => ({
         tenant_id: (r.tenant_id as string | null) ?? null,
