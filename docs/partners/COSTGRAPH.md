@@ -178,7 +178,7 @@ curl -H "Authorization: Bearer $CRON_SECRET" "https://cencori.com/api/cron/costg
 | `source`, `source_url`, `effective_from` on write | ❌ 500 for an existing key; server sets `source: marketplace`, `source_url: marketplace://cencori` |
 | Batch of 200 entries | ✅ |
 
-**FOCUS push setup (2026-10-14):** test tenant `cencori-focus-test` created in the CostGraph app. Tenants can't be created with an API key (`401 Valid Bearer token required`), and push connections have no create endpoint. **FOCUS push is not offered in the app's Integrations page** for the tenant: not in any category, and not found by search. The docs place Integrations under Settings, but it's in the sidebar. Waiting on CostGraph to enable FOCUS push or add a Cencori card (ask 2).
+**FOCUS push setup (2026-10-14):** test tenant `cencori-focus-test` created in the CostGraph app. Tenants can't be created with an API key (`401 Valid Bearer token required`), and push connections have no create endpoint, so both are dashboard-only. FOCUS push is in the sidebar's **Integrations → "Anything Else"** category, not under Settings as the docs say, and not in the AI category.
 
 **Still to verify** (needs their team or a customer connection):
 
@@ -191,7 +191,7 @@ curl -H "Authorization: Bearer $CRON_SECRET" "https://cencori.com/api/cron/costg
 ## 9. Asks for CostGraph
 
 1. **Expose the model catalogue on the Pricing API.** Their "hosted reference rate" catalogue exists inside the platform but `/v1/marketplace/models` only lists our own rows. A public read lets us cross-check our `model_pricing` against an independent source, since catalogue drift has bitten us before.
-2. **List Cencori as a first-class integration** (Integrations → Cencori), pre-wired to push or pull, next to LiteLLM, Helicone and OpenRouter. **Blocking:** the generic FOCUS push connection their docs describe isn't offered in the app, so today a customer can't receive Cencori's push at all.
+2. **List Cencori as a first-class integration** (Integrations → Cencori), pre-wired to push or pull, next to LiteLLM, Helicone and OpenRouter. Today a customer has to find the generic "FOCUS push" card under "Anything Else", and the docs point to Settings.
 3. **Price non-token units.** Their telemetry already captures images, audio seconds and characters but only prices tokens. Our voice, image and vision traffic needs that.
 4. **Long-context tiers** in the model price schema (a threshold plus a second rate), or a documented convention.
 5. **Fix the FOCUS push docs:** they show `Authorization: Bearer`, but the API only accepts `X-API-Key`. Anyone following them gets 401. Also unify the error shape (platform `{message,status}` vs Pricing API RFC 9457) and move the Pricing API off `baselinehq.cloud`.
