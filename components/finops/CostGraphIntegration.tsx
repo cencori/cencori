@@ -445,7 +445,7 @@ function Connected({
                         title="Disconnect"
                         description="Stop sending usage to CostGraph. What CostGraph has already received stays there."
                     >
-                        <Button size="sm" className="h-7 px-3 text-xs" onClick={() => setConfirmDisconnect(true)}>
+                        <Button size="sm" className="h-7 bg-white px-3 text-xs text-red-600 hover:bg-white/90 hover:text-red-600" onClick={() => setConfirmDisconnect(true)}>
                             Disconnect
                         </Button>
                     </ActionRow>
