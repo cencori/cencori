@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import Image, { type StaticImageData } from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -10,6 +10,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/lib/supabaseClient";
 import { formatCurrency } from "@/lib/currency";
 import { DitherCanvas, type DitherVariant } from "./DitherCanvas";
+import memoryArt from "@/public/console/explore-memory.webp";
+import multimodalArt from "@/public/console/explore-multimodal.webp";
 
 interface ConsoleHomeOverviewProps {
     orgId: string;
@@ -100,9 +102,10 @@ function useApiKeyCount(projectId: string) {
 }
 
 type ExploreApi = {
-    // Card artwork in /public. Without one (and no dither) the 16:9 slot
-    // stays empty so the layout never shifts.
-    image?: string;
+    // Card artwork, statically imported so Next.js inlines a blurred
+    // preview that shows instantly while the full image loads. Without one
+    // (and no dither) the 16:9 slot stays empty so the layout never shifts.
+    image?: StaticImageData;
     // CSS brightness for the image (1 = as shot); lower for a darker card.
     brightness?: number;
     // Render the slot through the ordered-dither effect: the image if set,
@@ -121,14 +124,14 @@ const EXPLORE_APIS: ExploreApi[] = [
         docsHref: "/docs/api/sessions",
     },
     {
-        image: "/console/explore-memory.jpg",
+        image: memoryArt,
         brightness: 0.45,
         title: "Memory API",
         description: "Give any chat long-term memory with one field, or write and search it directly.",
         docsHref: "/docs/api/memory",
     },
     {
-        image: "/console/explore-multimodal.jpg",
+        image: multimodalArt,
         title: "Multimodal API",
         description: "Generate images, speak and transcribe, and read images through one API key.",
         docsHref: "/docs/api/images",
@@ -271,13 +274,16 @@ export function ConsoleHomeOverview({
                     <article key={api.title} className="flex flex-col overflow-hidden rounded-md bg-muted/60">
                         <div className="relative aspect-[16/9] w-full bg-foreground/[0.04]">
                             {api.dither ? (
-                                <DitherCanvas src={api.image} variant={api.dither} className="absolute inset-0 h-full w-full" />
+                                <DitherCanvas src={api.image?.src} variant={api.dither} className="absolute inset-0 h-full w-full" />
                             ) : api.image && (
                                 <Image
                                     src={api.image}
                                     alt=""
                                     fill
-                                    sizes="(min-width: 768px) 33vw, 100vw"
+                                    // The cards top out near 440px (a third of the 1360px page).
+                                    sizes="(min-width: 1360px) 440px, (min-width: 768px) 33vw, 100vw"
+                                    placeholder="blur"
+                                    priority
                                     className="object-cover"
                                     style={api.brightness ? { filter: `brightness(${api.brightness})` } : undefined}
                                 />
