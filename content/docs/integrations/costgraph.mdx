@@ -54,7 +54,7 @@ The card shows the last day sent and, if a push failed, CostGraph's error messag
 2. Point your CostGraph exporter, or any scheduled job, at the [usage export API](/docs/platform/usage-export):
 
 ```bash
-curl "https://cencori.com/v1/usage/focus?start=2026-10-13&end=2026-10-14&sub_account=end_user" \
+curl "https://api.cencori.com/v1/usage/focus?start=2026-10-13&end=2026-10-14&sub_account=end_user" \
   -H "Authorization: Bearer $CENCORI_USAGE_EXPORT_KEY" \
   | jq '{connection_id: env.COSTGRAPH_CONNECTION_ID, complete: true, focus_version: .focus_version,
          charge_period_start: .charge_period_start, charge_period_end: .charge_period_end, rows: .data}' \
