@@ -8,10 +8,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveConsoleBaseUrl } from '@/lib/auth-redirect';
 import { resolvePublicOrigin } from '@/lib/public-origin';
-import { clientMetadataDocument, costgraphOAuthEnabled } from '@/lib/finops/costgraph-oauth';
+import { clientMetadataDocument, costgraphOAuthServed } from '@/lib/finops/costgraph-oauth';
 
 export async function GET(req: NextRequest) {
-    if (!costgraphOAuthEnabled()) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    if (!costgraphOAuthServed()) return NextResponse.json({ error: 'Not found' }, { status: 404 });
     const origin = resolveConsoleBaseUrl(resolvePublicOrigin(req));
     return NextResponse.json(clientMetadataDocument(origin), {
         headers: { 'Cache-Control': 'public, max-age=3600' },

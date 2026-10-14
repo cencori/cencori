@@ -27,6 +27,7 @@ import {
     sealSigned,
 } from '@/lib/finops/costgraph-oauth';
 import { encryptTokens, finishCostGraphConnect, type PendingConnect } from '@/lib/finops/costgraph-connect';
+import { CostGraphError } from '@/lib/finops/costgraph';
 
 const COOKIE_PATH = '/api/integrations/costgraph/oauth';
 
@@ -106,7 +107,9 @@ export async function GET(req: NextRequest) {
         console.error('[CostGraph OAuth] callback failed:', error);
         const reason = error instanceof CostGraphCapabilityMissing ? 'unsupported'
             : error instanceof CostGraphOAuthError ? error.code
-                : 'failed';
+                // Creating a connection needs an owner, admin or billing admin in CostGraph.
+                : error instanceof CostGraphError && error.status === 403 ? 'costgraph_role'
+                    : 'failed';
         return finish(returnTo, { costgraph: 'error', reason });
     }
 }

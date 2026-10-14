@@ -332,19 +332,22 @@ A visual mockup of the card and the preset form is in `docs/partners/costgraph-l
 
 **Decision (2026-10-14):** customers connect CostGraph from Cencori's console with one click: **Connect CostGraph** → sign in to CostGraph → pick a tenant → done. No ids or keys are copied between dashboards. The CostGraph card lives on every project's **Settings → Integrations** tab and manages the organization's connection (owners and admins).
 
-### What CostGraph must ship (asked 2026-10-14)
+### What CostGraph shipped (2026-10-14, same day we asked)
 
-Verified live against `/.well-known/openid-configuration` and the push endpoint:
+Verified live:
 
-| Needed | CostGraph today |
+| Needed | Status |
 | --- | --- |
-| `focus:write` OAuth scope | ❌ `scopes_supported`: openid, profile, email, usage:read, billing:read, pricing:read, pricing:write, mcp |
-| `POST /api/v1/tenant/billing/focus` accepting `Authorization: Bearer <access token>` | ❌ 401 "API key required" |
-| An endpoint that creates a FOCUS push connection (name, provider `cencori`, billing account) and returns the `fpc_` id | ❌ dashboard only |
-| Client ID Metadata Documents (no client registration) | ✅ `client_id_metadata_document_supported: true` |
-| Authorization code + PKCE S256, rotating 30-day refresh tokens | ✅ |
+| `focus:write` OAuth scope | ✅ in `scopes_supported` (with `integrations:read`, `focus:read`, …) |
+| `POST /api/v1/tenant/billing/focus` with `Authorization: Bearer` | ✅ ("An OAuth access token with the `focus:write` scope") |
+| Create a push connection | ✅ `POST /api/v1/integrations/connections` with `provider_account_id`, `provider`, `display_name`, `tenant_id`; returns `connection_id`. Caller must be an owner, admin or billing admin in CostGraph. **409** if one exists for the provider and billing account |
+| Window replace | ✅ documented as `overwrite: true` (deletes the connection's rows in the window). We send `overwrite` and `complete` |
 
-### What Cencori has built (behind `COSTGRAPH_OAUTH_ENABLED`)
+Docs: https://docs.costgraph.ai/costgraph/integrations/focus-push#api · scopes: https://docs.costgraph.ai/api-reference/costgraph/introduction#authentication
+
+Our side, adjusted the same day: the create path defaults to `/api/v1/integrations/connections`; a 409 (any reconnect) finds the existing push connection for the billing account via `GET /api/v1/integrations` and reuses it, so we ask for `integrations:read` too; a CostGraph 403 tells the user they need an owner, admin or billing admin role there.
+
+### What Cencori has built
 
 | Piece | Where |
 | --- | --- |
@@ -363,8 +366,8 @@ Nothing is written to `organization_finops_connections` until CostGraph has crea
 
 ### Turning it on
 
-1. CostGraph ships the three pieces above.
-2. Apply `20261014_180000_costgraph_oauth.sql`.
-3. Set in Vercel: `COSTGRAPH_OAUTH_ENABLED=true` and `COSTGRAPH_PUSH_CONNECTION_CREATE_PATH=<their endpoint path>`. Optional: `COSTGRAPH_OAUTH_SCOPES` (default `openid profile focus:write`) and `COSTGRAPH_OAUTH_STATE_SECRET` (default: `ENCRYPTION_SECRET`).
-4. Local development: a metadata document must be served over HTTPS, so register a dev client in CostGraph and set `COSTGRAPH_OAUTH_CLIENT_ID`, with redirect URI `http://console.localhost:3000/api/integrations/costgraph/oauth/callback`.
-5. Check `createPushConnection`'s request body against their endpoint. It sends `tenant_id`, `display_name`, `provider: "cencori"`, `provider_account_id`, mirroring the dashboard form, and reads `data.connection_id`.
+1. ~~CostGraph ships the three pieces~~ (done 2026-10-14).
+2. ~~Apply `20261014_180000_costgraph_oauth.sql`~~ (done 2026-10-14).
+3. **Staged:** set `COSTGRAPH_OAUTH_ORGS=<org slug>[,…]` in Vercel. Connect works for those organizations only, and our client document is served so the real HTTPS flow runs. Test on Arcie (`xcfgg0o74s8n8hrg5kfy`).
+4. **Everyone:** set `COSTGRAPH_OAUTH_ENABLED=true`. Optional: `COSTGRAPH_OAUTH_SCOPES` (default `openid profile focus:write integrations:read`), `COSTGRAPH_OAUTH_STATE_SECRET` (default `ENCRYPTION_SECRET`), `COSTGRAPH_PUSH_CONNECTION_CREATE_PATH` (default `/api/v1/integrations/connections`).
+5. Local development needs a client registered in CostGraph (Settings → OAuth clients, granted `focus:write`), set as `COSTGRAPH_OAUTH_CLIENT_ID`, with redirect URI `http://console.localhost:3000/api/integrations/costgraph/oauth/callback`. Metadata documents must be served over HTTPS.
