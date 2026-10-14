@@ -1902,17 +1902,18 @@ export default function ProjectSettingsPage({ params }: PageProps) {
               <CostGraphIntegration orgSlug={orgSlug} />
 
               {/* Placeholder for future integrations */}
-              <CardShell
-                layout="compact"
-                icon={Plus}
-                title="More integrations"
-                description="Suggest a tool for the ecosystem"
-                bottomAction={
-                  <Button size="sm" className="h-7 px-3 text-xs" onClick={() => setShowSuggestModal(true)}>
-                    Suggest
-                  </Button>
-                }
-              />
+              <button
+                type="button"
+                onClick={() => setShowSuggestModal(true)}
+                className="self-start rounded-lg text-left transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <CardShell
+                  layout="compact"
+                  icon={Plus}
+                  title="More integrations"
+                  description="Suggest a tool for the ecosystem"
+                />
+              </button>
             </div>
           </section>
         </TabsContent>
