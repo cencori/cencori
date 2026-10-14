@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cencori listing mockup</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --surface: #ffffff; --border: #e6e8ec; --text: #14161a; --muted: #6b7280;
+    --faint: #9aa1ab; --accent: #1f6bff; --accent-text: #ffffff; --chip: #ffffff; --chip-active: #eef3ff;
+    --bad: #b42318; --bad-bg: #fef3f2; --good: #067647; --good-bg: #ecfdf3; --mark: #000000; --field: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f1115; --surface: #171a20; --border: #2a2f38; --text: #eef0f3; --muted: #a0a7b2;
+      --faint: #6e7681; --accent: #4c8dff; --chip: #171a20; --chip-active: #1d2a44;
+      --bad: #fda29b; --bad-bg: #2d1514; --good: #75e0a7; --good-bg: #102a1e; --mark: #ffffff; --field: #12151a;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1115; --surface: #171a20; --border: #2a2f38; --text: #eef0f3; --muted: #a0a7b2;
+    --faint: #6e7681; --accent: #4c8dff; --chip: #171a20; --chip-active: #1d2a44;
+    --bad: #fda29b; --bad-bg: #2d1514; --good: #75e0a7; --good-bg: #102a1e; --mark: #ffffff; --field: #12151a;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif; }
+  main { max-width: 1080px; margin: 0 auto; padding: 40px 16px 64px; }
+  .eyebrow { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin: 0 0 6px; }
+  h1 { font-size: 22px; margin: 0 0 6px; letter-spacing: -.01em; }
+  .lede { color: var(--muted); max-width: 720px; margin: 0 0 32px; }
+  h2 { font-size: 15px; margin: 40px 0 6px; }
+  .note { color: var(--muted); font-size: 13px; margin: 0 0 16px; max-width: 720px; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
+  .chip { border: 1px solid var(--border); background: var(--chip); border-radius: 999px; padding: 4px 12px; font-size: 12.5px; color: var(--muted); }
+  .chip.active { border-color: var(--accent); background: var(--chip-active); color: var(--text); }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px;
+          display: flex; flex-direction: column; min-height: 132px; }
+  .card.ours { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent); }
+  .card.dim { opacity: .55; }
+  .title { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 15px; }
+  .logo { width: 18px; height: 18px; flex: none; border-radius: 4px; background: var(--border); }
+  .desc { color: var(--muted); font-size: 13px; margin: 6px 0 0; }
+  .foot { margin-top: auto; padding-top: 14px; display: flex; align-items: center; justify-content: space-between; }
+  .guide { color: var(--faint); font-size: 12.5px; }
+  .btn { background: var(--accent); color: var(--accent-text); border: 0; border-radius: 8px; padding: 7px 14px; font: inherit; font-weight: 600; font-size: 13.5px; }
+
+  .compare { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+  .verdict { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 999px; margin-bottom: 8px; }
+  .verdict.bad { color: var(--bad); background: var(--bad-bg); }
+  .verdict.good { color: var(--good); background: var(--good-bg); }
+
+  .form { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px;
+          display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+  .form h3 { margin: 0 0 6px; font-size: 16px; }
+  .form .side { color: var(--muted); font-size: 13px; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  .input { border: 1px solid var(--border); background: var(--field); border-radius: 8px; padding: 9px 12px; font-size: 13.5px;
+           display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 40px; }
+  .input.locked { color: var(--muted); }
+  .help { color: var(--muted); font-size: 12px; margin-top: 5px; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+  .lock { font-size: 11px; color: var(--faint); }
+
+  table { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; font-size: 13px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; }
+  tr:last-child td { border-bottom: 0; }
+  s { color: var(--bad); }
+  .table-wrap { overflow-x: auto; }
+</style>
+</head>
+<body>
+<main>
+  <p class="eyebrow">Proposal · mockup, not CostGraph's product</p>
+  <h1>How Cencori appears in CostGraph</h1>
+  <p class="lede">The integration card, the connect form, and the labels CostGraph shows from our data. Cencori is a deep technology company building the infrastructure AI runs on. The listing should say that, not file us under AI gateways.</p>
+
+  <h2>1 · The card</h2>
+  <p class="note">Integrations → AI and Machine Learning. Same layout as every other card; only the words change.</p>
+
+  <div class="compare">
+    <div>
+      <span class="verdict bad">Not this</span>
+      <div class="card">
+        <div class="title"><span class="logo" aria-hidden="true"></span>Cencori AI Gateway</div>
+        <p class="desc">AI gateway / observability. We pull it daily, or you push it yourself.</p>
+        <div class="foot"><span class="guide">Setup guide ›</span><button class="btn" type="button">Connect</button></div>
+      </div>
+    </div>
+    <div>
+      <span class="verdict good">Proposed</span>
+      <div class="card ours">
+        <div class="title">
+          <svg class="logo" style="background:none" viewBox="0 0 21924 21924" aria-label="Cencori">
+            <defs><clipPath id="c"><rect width="21924" height="21924" rx="594"/></clipPath></defs>
+            <g clip-path="url(#c)" fill="var(--mark)">
+              <circle cx="7744" r="7744"/><circle cy="14180" r="7744"/><circle cx="21924" cy="7744" r="7744"/><circle cx="14180" cy="21924" r="7744"/>
+            </g>
+          </svg>
+          Cencori
+        </div>
+        <p class="desc">AI infrastructure. Cencori sends your model spend daily — by project and by customer.</p>
+        <div class="foot"><span class="guide">Setup guide ›</span><button class="btn" type="button">Connect</button></div>
+      </div>
+    </div>
+  </div>
+
+  <h2>2 · In context</h2>
+  <p class="note">Beside the existing AI cards, without joining the gateway group.</p>
+  <div class="chips">
+    <span class="chip">All</span><span class="chip">Compute</span><span class="chip active">AI and Machine Learning</span>
+    <span class="chip">Databases</span><span class="chip">Analytics</span><span class="chip">Developer Tools</span><span class="chip">Anything Else</span>
+  </div>
+  <div class="grid">
+    <div class="card dim"><div class="title"><span class="logo"></span>Anthropic</div><p class="desc">AI / LLM. We pull it daily, or you push it yourself.</p><div class="foot"><span class="guide">Setup guide ›</span><button class="btn" type="button">Connect</button></div></div>
+    <div class="card ours">
+      <div class="title">
+        <svg class="logo" style="background:none" viewBox="0 0 21924 21924" aria-label="Cencori">
+          <defs><clipPath id="c2"><rect width="21924" height="21924" rx="594"/></clipPath></defs>
+          <g clip-path="url(#c2)" fill="var(--mark)">
+            <circle cx="7744" r="7744"/><circle cy="14180" r="7744"/><circle cx="21924" cy="7744" r="7744"/><circle cx="14180" cy="21924" r="7744"/>
+          </g>
+        </svg>
+        Cencori
+      </div>
+      <p class="desc">AI infrastructure. Cencori sends your model spend daily — by project and by customer.</p>
+      <div class="foot"><span class="guide">Setup guide ›</span><button class="btn" type="button">Connect</button></div>
+    </div>
+    <div class="card dim"><div class="title"><span class="logo"></span>OpenAI</div><p class="desc">AI / LLM. We pull it daily, or you push it yourself.</p><div class="foot"><span class="guide">Setup guide ›</span><button class="btn" type="button">Connect</button></div></div>
+  </div>
+
+  <h2>3 · Connect opens a preset push form</h2>
+  <p class="note">The generic FOCUS push form under "Anything Else", filled in for Cencori. Nobody has to guess what "billing account" means.</p>
+  <div class="form">
+    <div>
+      <h3>Connect Cencori</h3>
+      <p class="side">Cencori sends each settled day of usage as FOCUS 1.2: what Cencori billed, by model, project and customer. Re-sends replace the day, so totals never double.</p>
+      <p class="side">You'll paste two things into Cencori → Organization settings → Advanced → Usage export: the connection id and a <span class="mono">focus:write</span> key. Both appear on the next screen.</p>
+    </div>
+    <div>
+      <div class="field"><label>Connection name</label><div class="input">Cencori</div></div>
+      <div class="field"><label>Tenant</label><div class="input">your-tenant <span class="lock">▾</span></div></div>
+      <div class="field"><label>Provider</label><div class="input locked">Cencori <span class="lock">Locked</span></div></div>
+      <div class="field">
+        <label>Cencori organization ID</label>
+        <div class="input mono" style="color:var(--faint)">xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx</div>
+        <p class="help">In Cencori: Organization settings → Advanced → Usage export → Billing account id.</p>
+      </div>
+      <div style="text-align:right"><button class="btn" type="button">Create connection</button></div>
+    </div>
+  </div>
+
+  <h2>4 · Labels CostGraph shows from our data</h2>
+  <p class="note">Service breakdowns, the provider page and Graph AI answers read our FOCUS columns. Today every row says "Cencori AI Gateway".</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Where</th><th>Today</th><th>Proposed</th></tr></thead>
+      <tbody>
+        <tr><td>Card name</td><td><s>Cencori AI Gateway</s></td><td>Cencori</td></tr>
+        <tr><td>Card category</td><td><s>AI gateway / observability</s></td><td>AI infrastructure</td></tr>
+        <tr><td>Service (text, chat, sessions)</td><td><s>Cencori AI Gateway</s></td><td>Cencori Text Generation</td></tr>
+        <tr><td>Service (embeddings, memory search)</td><td><s>Cencori AI Gateway</s></td><td>Cencori Embeddings</td></tr>
+        <tr><td>Service (images · audio · vision · documents)</td><td><s>Cencori AI Gateway</s></td><td>Cencori Image Generation · Audio · Vision · Documents</td></tr>
+        <tr><td>Provider page header</td><td>—</td><td>Cencori is a deep technology company building the infrastructure AI runs on. This connection carries what your products spend through Cencori — model calls across text, embeddings, images, audio and vision — priced at what Cencori billed, by project and by customer.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</main>
+</body>
+</html>
