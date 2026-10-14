@@ -61,7 +61,7 @@ The default window is yesterday because a day is settled once it has closed. Req
       "ChargeDescription": "anthropic/claude-sonnet-5 chat (1204 requests)",
       "Provider": "Cencori",
       "Publisher": "anthropic",
-      "ServiceName": "Cencori AI Gateway",
+      "ServiceName": "Cencori Text Generation",
       "ServiceCategory": "AI and Machine Learning",
       "ServiceSubcategory": "Generative AI",
       "SubAccountId": "cust_4711",
@@ -99,6 +99,21 @@ Costs and quantities are **decimal strings**, so no precision is lost in JSON.
 - **`BilledCost`, `EffectiveCost`, `ListCost` and `ContractedCost`** are what Cencori charged for the usage. Cencori adds no markup to provider rates, so the four are equal.
 - **BYOK usage reports a cost of zero.** Your own provider account bills it, not Cencori. If your FinOps tool also reads that provider's bill directly, reporting it here would count it twice. What the provider charged is still visible in `x_UpstreamProviderCost`.
 - **Requests that cost nothing and used no tokens are left out.** These are refusals, rate limits and errors before a provider was called. They are still in your request logs.
+
+## Services
+
+`ServiceName` says what kind of work the cost was for:
+
+| Endpoint | `ServiceName` |
+| :--- | :--- |
+| Chat completions, responses, sessions | Cencori Text Generation |
+| Embeddings, memory search | Cencori Embeddings |
+| Image generation | Cencori Image Generation |
+| Speech and transcription | Cencori Audio |
+| Vision | Cencori Vision |
+| Documents | Cencori Documents |
+| Moderation | Cencori Moderation |
+| Web search | Cencori Web Search |
 
 ## Token buckets
 

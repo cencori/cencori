@@ -68,7 +68,7 @@ For windows larger than one page, follow `next_cursor`. Send the first page with
 
 ## What lands in CostGraph
 
-- **Provider**: `Cencori`. **Publisher**: the model's maker (`anthropic`, `openai`, …). **Service**: `Cencori AI Gateway`.
+- **Provider**: `Cencori`. **Publisher**: the model's maker (`anthropic`, `openai`, …). **Service**: what the work was: `Cencori Text Generation`, `Cencori Embeddings`, `Cencori Image Generation`, `Cencori Audio`, `Cencori Vision`, and so on.
 - **SkuId**: `provider/model`. Group by it to see spend per model.
 - **ResourceId**: the Cencori project, so project-level breakdowns work even when the sub-account is an end user.
 - **Costs**: what Cencori billed. BYOK usage is billed by your own provider account, so it reports zero here and doesn't double-count with that provider's bill in CostGraph.

@@ -69,6 +69,17 @@ describe('toFocusRecord', () => {
         expect(record.Publisher).toBe('anthropic');
     });
 
+    /** FinOps tools show ServiceName as the service; it names the work, never "gateway". */
+    it('names the service after the work done, not how the traffic arrived', () => {
+        expect(toFocusRecord(row(), ctx).ServiceName).toBe('Cencori Text Generation');
+        expect(toFocusRecord(row({ endpoint_family: 'embeddings' }), ctx).ServiceName).toBe('Cencori Embeddings');
+        expect(toFocusRecord(row({ endpoint_family: 'images' }), ctx).ServiceName).toBe('Cencori Image Generation');
+        expect(toFocusRecord(row({ endpoint_family: 'something-new' }), ctx).ServiceName).toBe('Cencori Text Generation');
+        for (const family of ['chat', 'embeddings', 'images', 'audio', 'vision', 'documents', 'moderation', 'web']) {
+            expect(String(toFocusRecord(row({ endpoint_family: family }), ctx).ServiceName)).not.toMatch(/gateway/i);
+        }
+    });
+
     it('carries every token bucket as an extension column', () => {
         const record = toFocusRecord(row(), ctx);
         expect(record).toMatchObject({
