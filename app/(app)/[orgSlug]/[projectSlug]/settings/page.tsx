@@ -1892,12 +1892,8 @@ export default function ProjectSettingsPage({ params }: PageProps) {
             description="Connect external services to this project's workflows."
           />
 
-          <section>
-            <div className="space-y-0.5">
-              <h2 className="text-sm font-medium">External Integrations</h2>
-              <p className="text-[10px] text-muted-foreground">Connect Cencori to third-party tools for evaluation, monitoring, and deployments.</p>
-            </div>
-
+          {/* A div, not a section: sections here are label | content grids, and these cards span the width. */}
+          <div className="border-t border-border/35 py-7">
             <div className="grid gap-4 md:grid-cols-2">
               <CostGraphIntegration orgSlug={orgSlug} />
 
@@ -1917,7 +1913,7 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                 />
               </button>
             </div>
-          </section>
+          </div>
         </TabsContent>
 
         {/* API TAB */}
