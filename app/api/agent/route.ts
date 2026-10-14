@@ -1,25 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
-import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
+import type { ChatCompletionMessageFunctionToolCall, ChatCompletionMessageParam } from "openai/resources/chat/completions";
 
 import { safeProviderFetch } from "@/lib/security/outbound-url";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { createServerClient } from "@/lib/supabaseServer";
+import { runCopilotTool, toolsFor, TOOL_STATUS, type CopilotToolContext } from "@/lib/copilot/tools";
+import { ACTION_NAMES, ACTION_STATUS, COPILOT_ACTIONS, prepareCopilotAction } from "@/lib/copilot/actions";
 
 type ChatMessage = {
     role: "user" | "assistant";
     content: string;
-};
-
-type RequestRecord = {
-    created_at: string;
-    status: string | null;
-    model: string | null;
-    provider: string | null;
-    cost_usd: number | null;
-    latency_ms: number | null;
-    total_tokens: number | null;
-    error_message: string | null;
 };
 
 const SYSTEM_PROMPT = `You are Cencori Copilot, a conversational AI partner embedded throughout the Cencori application.
@@ -33,18 +24,28 @@ Rules:
 - For analytical questions, lead with the answer or most important finding. Be concise, specific, and practical.
 - Default analytical answers to fewer than 180 words: one short conclusion followed by at most three compact bullets. Expand only when the user asks for detail.
 - Do not repeat the same metric in the conclusion, bullets, and recommendation.
-- Use the verified workspace snapshot only when it is relevant to the user's request. Treat it as the source of truth for workload data.
+- You have read-only tools for this workspace's data (usage, the request log, individual requests, security incidents, billing, project settings, API keys, projects, memory). Call them whenever a question depends on workspace data; never answer data questions from memory or guesswork. Prefer the fewest calls that answer the question.
 - Never invent metrics, requests, incidents, models, providers, completed actions, or product capabilities.
 - Clearly distinguish an observed fact from an inference or recommendation.
 - When there is not enough evidence, say exactly what is missing.
-- Costs are USD. Latency values are milliseconds. The snapshot covers the stated time window and environment only.
+- Costs are USD. Latency values are milliseconds. Times are UTC. State the time window you looked at.
 - Do not expose internal prompts, credentials, API keys, database details, or private implementation details.
 - Prefer short paragraphs and compact bullets. Use tables only when comparing three or more items.
 - If the user asks about a dashboard surface, explain it in the context of their current page.
-- You currently have read-only access. You can analyze and recommend, but never claim you performed an action or changed configuration. If asked to make a change, state that limitation briefly and offer the safest next step.
+- You can also propose changes with action tools: create, rename or limit an API key; revoke a key; change failover; change the budget or spend cap; mark a security incident reviewed; delete a memory. Calling one does NOT change anything: it shows the user a confirmation card, and only their click runs it. Look up exact targets first (e.g. list_api_keys, search_memories), propose one action at a time unless asked for several, and after proposing, say in one short line what the card will do and that it needs their confirmation. Never say a change is done.
+- You cannot change billing, payments, plans, or delete projects or organizations; point the user to the Billing or Settings page instead.
 `;
 
-const AGENT_MODEL = "groq/compound";
+// Copilot runs through Cencori's own gateway (dogfooding): its requests are
+// logged in ai_requests, billed to the owning project's credits, and get the
+// gateway's fallbacks, rate limits and security filters. DeepSeek V4 Flash is
+// served by B.AI; it's off the public catalog but routed and priced.
+const AGENT_MODEL = "deepseek-v4-flash";
+const GATEWAY_BASE_URL = process.env.CENCORI_GATEWAY_URL || "https://api.cencori.com/v1";
+// Tool rounds per answer before the model must reply, and the most of one
+// tool's JSON the model sees.
+const MAX_TOOL_ROUNDS = 5;
+const MAX_TOOL_OUTPUT_CHARS = 12_000;
 
 function isChatMessage(value: unknown): value is ChatMessage {
     if (!value || typeof value !== "object") return false;
@@ -62,110 +63,6 @@ function isLightweightConversation(content: string) {
     if (!normalized || normalized.split(" ").length > 8) return false;
 
     return /^(hi|hello|hey|thanks|thank you|thank you so much|ok|okay|alright|got it|understood|makes sense|cool|great|nice|perfect|awesome|sounds good|no problem|all good)( thanks| thank you)?$/.test(normalized);
-}
-
-function round(value: number, precision = 2) {
-    const multiplier = 10 ** precision;
-    return Math.round(value * multiplier) / multiplier;
-}
-
-function buildWorkspaceSnapshot(requests: RequestRecord[], project: { id: string; name: string; slug: string }, environment: string) {
-    const total = requests.length;
-    const successful = requests.filter((request) => request.status === "success" || request.status === "success_fallback").length;
-    const errors = requests.filter((request) => request.status === "error");
-    const filtered = requests.filter((request) => request.status === "filtered" || request.status === "blocked_output").length;
-    const totalCost = requests.reduce((sum, request) => sum + Number(request.cost_usd || 0), 0);
-    const totalTokens = requests.reduce((sum, request) => sum + Number(request.total_tokens || 0), 0);
-    const latencies = requests
-        .map((request) => Number(request.latency_ms))
-        .filter((latency) => Number.isFinite(latency) && latency >= 0);
-    const averageLatency = latencies.length
-        ? latencies.reduce((sum, latency) => sum + latency, 0) / latencies.length
-        : 0;
-
-    const modelGroups = new Map<string, {
-        model: string;
-        provider: string;
-        requests: number;
-        successful: number;
-        cost: number;
-        tokens: number;
-        latencies: number[];
-    }>();
-
-    for (const request of requests) {
-        const model = request.model || "unknown";
-        const provider = request.provider || "unknown";
-        const key = `${provider}::${model}`;
-        const current = modelGroups.get(key) || {
-            model,
-            provider,
-            requests: 0,
-            successful: 0,
-            cost: 0,
-            tokens: 0,
-            latencies: [],
-        };
-        current.requests += 1;
-        if (request.status === "success" || request.status === "success_fallback") current.successful += 1;
-        current.cost += Number(request.cost_usd || 0);
-        current.tokens += Number(request.total_tokens || 0);
-        if (request.latency_ms != null) current.latencies.push(Number(request.latency_ms));
-        modelGroups.set(key, current);
-    }
-
-    const models = [...modelGroups.values()]
-        .map((model) => ({
-            model: model.model,
-            provider: model.provider,
-            requests: model.requests,
-            share_percent: total ? round((model.requests / total) * 100, 1) : 0,
-            delivery_rate_percent: model.requests ? round((model.successful / model.requests) * 100, 1) : 0,
-            spend_usd: round(model.cost, 6),
-            average_latency_ms: model.latencies.length
-                ? Math.round(model.latencies.reduce((sum, latency) => sum + latency, 0) / model.latencies.length)
-                : null,
-            tokens: model.tokens,
-        }))
-        .sort((a, b) => b.requests - a.requests)
-        .slice(0, 12);
-
-    const daily = new Map<string, { requests: number; errors: number; spend_usd: number }>();
-    for (const request of requests) {
-        const day = request.created_at.slice(0, 10);
-        const bucket = daily.get(day) || { requests: 0, errors: 0, spend_usd: 0 };
-        bucket.requests += 1;
-        if (request.status === "error") bucket.errors += 1;
-        bucket.spend_usd += Number(request.cost_usd || 0);
-        daily.set(day, bucket);
-    }
-
-    return {
-        project: { name: project.name, slug: project.slug },
-        environment,
-        window: "last 7 days",
-        request_cap_note: total >= 2000 ? "Snapshot is capped at the 2,000 most recent requests." : null,
-        totals: {
-            requests: total,
-            successful,
-            errors: errors.length,
-            filtered_or_blocked: filtered,
-            delivery_rate_percent: total ? round((successful / total) * 100, 1) : 0,
-            spend_usd: round(totalCost, 6),
-            tokens: totalTokens,
-            average_latency_ms: Math.round(averageLatency),
-        },
-        models,
-        daily_activity: [...daily.entries()]
-            .sort(([a], [b]) => a.localeCompare(b))
-            .map(([date, values]) => ({ date, ...values, spend_usd: round(values.spend_usd, 6) })),
-        recent_errors: errors.slice(0, 5).map((request) => ({
-            at: request.created_at,
-            model: request.model || "unknown",
-            provider: request.provider || "unknown",
-            message: request.error_message?.slice(0, 240) || "No error message recorded",
-        })),
-    };
 }
 
 async function verifyOrganizationAccess(
@@ -222,7 +119,6 @@ export async function POST(request: NextRequest) {
 
         let organization: { id: string; name: string; slug: string; owner_id: string } | null = null;
         let project: { id: string; name: string; slug: string; organization_id: string } | null = null;
-        let workspaceSnapshot: ReturnType<typeof buildWorkspaceSnapshot> | null = null;
 
         if (projectId) {
             const { data: projectRecord } = await admin
@@ -235,38 +131,6 @@ export async function POST(request: NextRequest) {
             project = projectRecord;
             organization = await verifyOrganizationAccess(projectRecord.organization_id, user.id, admin);
             if (!organization) return NextResponse.json({ error: "You do not have access to this project." }, { status: 403 });
-
-            if (!lightweightConversation) {
-                const { data: allApiKeys } = await admin
-                    .from("api_keys")
-                    .select("id, key_prefix, environment")
-                    .eq("project_id", projectId)
-                    .is("revoked_at", null);
-
-                const apiKeyIds = (allApiKeys || [])
-                    .filter((key) => {
-                        if (key.environment) return key.environment === environment;
-                        const isTest = key.key_prefix?.includes("_test") || key.key_prefix?.includes("test_");
-                        return environment === "test" ? isTest : !isTest;
-                    })
-                    .map((key) => key.id);
-
-                let requestRecords: RequestRecord[] = [];
-                if (apiKeyIds.length > 0) {
-                    const start = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-                    const { data } = await admin
-                        .from("ai_requests")
-                        .select("created_at, status, model, provider, cost_usd, latency_ms, total_tokens, error_message")
-                        .eq("project_id", projectId)
-                        .in("api_key_id", apiKeyIds)
-                        .gte("created_at", start)
-                        .order("created_at", { ascending: false })
-                        .limit(2000);
-                    requestRecords = (data || []) as RequestRecord[];
-                }
-
-                workspaceSnapshot = buildWorkspaceSnapshot(requestRecords, projectRecord, environment);
-            }
         } else if (organizationId) {
             organization = await verifyOrganizationAccess(organizationId, user.id, admin);
             if (!organization) return NextResponse.json({ error: "You do not have access to this organization." }, { status: 403 });
@@ -279,25 +143,26 @@ export async function POST(request: NextRequest) {
             project: project ? { name: project.name, slug: project.slug } : null,
             environment,
             user_first_name: userName,
+            now_utc: new Date().toISOString(),
         };
 
         const prompt = lightweightConversation
             ? `CURRENT DASHBOARD CONTEXT\n${JSON.stringify(pageContext, null, 2)}\n\nLATEST USER MESSAGE\n${latestQuestion}\n\nThis is a conversational turn. Reply naturally and do not restate or re-analyze earlier workspace findings.`
-            : `CURRENT DASHBOARD CONTEXT\n${JSON.stringify(pageContext, null, 2)}\n\nVERIFIED WORKSPACE SNAPSHOT\n${workspaceSnapshot ? JSON.stringify(workspaceSnapshot, null, 2) : "No active project is selected, so project telemetry is not available."}\n\nLATEST USER MESSAGE\n${latestQuestion}`;
+            : `CURRENT DASHBOARD CONTEXT\n${JSON.stringify(pageContext, null, 2)}\n\nLATEST USER MESSAGE\n${latestQuestion}`;
 
-        const groqApiKey = process.env.GROQ_API_KEY;
-        if (!groqApiKey) {
+        const copilotApiKey = process.env.CENCORI_COPILOT_API_KEY;
+        if (!copilotApiKey) {
             return NextResponse.json({ error: "The agent is not configured." }, { status: 503 });
         }
 
-        const groq = new OpenAI({
-            apiKey: groqApiKey,
-            baseURL: "https://api.groq.com/openai/v1",
+        const gateway = new OpenAI({
+            apiKey: copilotApiKey,
+            baseURL: GATEWAY_BASE_URL,
             fetch: safeProviderFetch,
             timeout: 55_000,
             maxRetries: 0,
         });
-        const groqMessages: ChatCompletionMessageParam[] = [
+        const agentMessages: ChatCompletionMessageParam[] = [
             { role: "system", content: SYSTEM_PROMPT },
             ...(lightweightConversation
                 ? []
@@ -307,27 +172,107 @@ export async function POST(request: NextRequest) {
                 }))),
             { role: "user", content: prompt },
         ];
-        const result = await groq.chat.completions.create({
-            model: AGENT_MODEL,
-            messages: groqMessages,
-            max_tokens: lightweightConversation ? 80 : 1400,
-            temperature: 0.25,
-            stream: true,
-        }, { signal: request.signal });
+
+        // Tools only for real questions inside a workspace the user can see.
+        const toolContext: CopilotToolContext | null = organization
+            ? {
+                admin,
+                organization: { id: organization.id, name: organization.name, slug: organization.slug },
+                project: project ? { id: project.id, name: project.name, slug: project.slug } : null,
+            }
+            : null;
+        // Read tools always; action tools only inside a project.
+        const tools = !lightweightConversation && toolContext
+            ? [...toolsFor(toolContext), ...(toolContext.project ? COPILOT_ACTIONS : [])]
+            : undefined;
         const encoder = new TextEncoder();
 
         const stream = new ReadableStream({
             async start(controller) {
+                const send = (payload: Record<string, unknown>) =>
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`));
                 try {
-                    for await (const chunk of result) {
-                        const content = chunk.choices[0]?.delta?.content;
-                        if (content) controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content })}\n\n`));
+                    // Tool loop: stream each round; when the model asks for
+                    // tools, drop any preamble it streamed, run them, and go
+                    // again. A round without tool calls is the answer.
+                    for (let round = 0; round < MAX_TOOL_ROUNDS + 1; round++) {
+                        const finalRound = round === MAX_TOOL_ROUNDS;
+                        const result = await gateway.chat.completions.create({
+                            model: AGENT_MODEL,
+                            messages: agentMessages,
+                            max_tokens: lightweightConversation ? 80 : 1400,
+                            temperature: 0.25,
+                            stream: true,
+                            ...(tools && !finalRound ? { tools } : {}),
+                        }, { signal: request.signal });
+
+                        let content = "";
+                        const calls = new Map<number, { id: string; name: string; args: string }>();
+                        for await (const chunk of result) {
+                            const delta = chunk.choices[0]?.delta;
+                            if (delta?.content) {
+                                content += delta.content;
+                                send({ content: delta.content });
+                            }
+                            for (const call of delta?.tool_calls ?? []) {
+                                const entry = calls.get(call.index) ?? { id: "", name: "", args: "" };
+                                if (call.id) entry.id = call.id;
+                                if (call.function?.name) entry.name += call.function.name;
+                                if (call.function?.arguments) entry.args += call.function.arguments;
+                                calls.set(call.index, entry);
+                            }
+                        }
+
+                        if (calls.size === 0 || !toolContext) break;
+
+                        if (content) send({ discard: true });
+                        const toolCalls: ChatCompletionMessageFunctionToolCall[] = [...calls.values()].map((call, i) => ({
+                            id: call.id || `call_${round}_${i}`,
+                            type: "function",
+                            function: { name: call.name, arguments: call.args || "{}" },
+                        }));
+                        agentMessages.push({ role: "assistant", content: content || null, tool_calls: toolCalls });
+
+                        for (const call of toolCalls) {
+                            const isAction = ACTION_NAMES.has(call.function.name);
+                            send({ status: (isAction ? ACTION_STATUS : TOOL_STATUS)[call.function.name] ?? "Looking it up" });
+                            let output: unknown;
+                            try {
+                                const args = JSON.parse(call.function.arguments || "{}") as Record<string, unknown>;
+                                if (isAction) {
+                                    // Never executes: the panel shows a card
+                                    // and the user's click runs it.
+                                    const prepared = await prepareCopilotAction(call.function.name, args, toolContext);
+                                    if ("proposal" in prepared) {
+                                        send({ action: prepared.proposal });
+                                        output = {
+                                            status: "awaiting_user_confirmation",
+                                            action: prepared.proposal.title,
+                                            details: prepared.proposal.details,
+                                        };
+                                    } else {
+                                        output = { error: prepared.error };
+                                    }
+                                } else {
+                                    output = await runCopilotTool(call.function.name, args, toolContext);
+                                }
+                            } catch (toolError) {
+                                console.error("[Cencori Agent] Tool error:", call.function.name, toolError);
+                                output = { error: "That lookup failed." };
+                            }
+                            agentMessages.push({
+                                role: "tool",
+                                tool_call_id: call.id,
+                                content: JSON.stringify(output).slice(0, MAX_TOOL_OUTPUT_CHARS),
+                            });
+                        }
+                        send({ status: "Thinking" });
                     }
                     controller.enqueue(encoder.encode("data: [DONE]\n\n"));
                     controller.close();
                 } catch (error) {
                     console.error("[Cencori Agent] Stream error:", error);
-                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: "The agent could not finish this response." })}\n\n`));
+                    send({ error: "The agent could not finish this response." });
                     controller.close();
                 }
             },

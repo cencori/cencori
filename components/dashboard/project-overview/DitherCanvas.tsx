@@ -14,6 +14,9 @@ interface DitherCanvasProps {
     cellSize?: number;
     // Tones between black and white (2 = pure 1-bit, 3 adds a mid grey).
     levels?: number;
+    // Custom palette, darkest first (index 0 is the background). Overrides
+    // `levels`, e.g. ["#000000", "#2b1150", "#5a2d91"] for a purple dither.
+    colors?: string[];
     className?: string;
 }
 
@@ -163,7 +166,9 @@ function paint(
     }
 }
 
-export function DitherCanvas({ src, variant = "clouds", cellSize = 3, levels = 3, className }: DitherCanvasProps) {
+export function DitherCanvas({ src, variant = "clouds", cellSize = 3, levels = 3, colors, className }: DitherCanvasProps) {
+    // Joined so an inline array literal doesn't restart the effect each render.
+    const palette = colors?.join(",");
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     useEffect(() => {
@@ -171,7 +176,7 @@ export function DitherCanvas({ src, variant = "clouds", cellSize = 3, levels = 3
         const ctx = canvas?.getContext("2d");
         if (!canvas || !ctx) return;
 
-        const tones = TONES[levels] ?? TONES[3];
+        const tones = palette ? palette.split(",") : TONES[levels] ?? TONES[3];
         const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
         let image: HTMLImageElement | null = null;
         let cols = 0;
@@ -232,7 +237,7 @@ export function DitherCanvas({ src, variant = "clouds", cellSize = 3, levels = 3
             cancelAnimationFrame(frame);
             observer.disconnect();
         };
-    }, [src, variant, cellSize, levels]);
+    }, [src, variant, cellSize, levels, palette]);
 
     return (
         <canvas
