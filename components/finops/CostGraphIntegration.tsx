@@ -190,7 +190,7 @@ function CostGraphCard({
         </Button>
     );
     const availableSoon = !connection && !settings.oauthAvailable ? (
-        <span className="shrink-0 self-start rounded-full border border-border/40 bg-background/25 px-2 py-0.5 text-[9px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+        <span className="ml-auto shrink-0 rounded-full border border-border/40 bg-background/25 px-2 py-0.5 text-[9px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
             Available soon
         </span>
     ) : undefined;
@@ -201,7 +201,6 @@ function CostGraphCard({
             logo={costGraphLogo}
             title="CostGraph"
             description="Cost infrastructure for enterprise teams."
-            action={availableSoon}
             bottomActionDivided={Boolean(connection)}
             bottomAction={connection ? (
                 <>
@@ -217,7 +216,7 @@ function CostGraphCard({
                     </Button>
                     <Button size="sm" className="h-7 px-3 text-xs" onClick={() => setSettingsOpen(true)}>Manage</Button>
                 </>
-            ) : settings.pendingTenants ? null : connectAction}
+            ) : settings.pendingTenants ? null : <>{connectAction}{availableSoon}</>}
         >
             {settings.pendingTenants && !connection ? (
                 <TenantPicker orgSlug={orgSlug} tenants={settings.pendingTenants} onDone={refresh} />
