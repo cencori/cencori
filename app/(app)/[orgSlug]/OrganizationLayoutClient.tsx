@@ -402,7 +402,7 @@ export default function OrganizationLayoutClient({
     //   3. projectItems                  — Logs
     //   ── separator ──
     //   4. AI Gateway toggle             — expands to projectSubItems
-    //   5. projectSecondaryItems         — Security, Memory, Deployments, Monetization, Agents
+    //   5. projectSecondaryItems         — Security, Memory, Agents, Monetization, Deployments
     //   6. orgItems                      — Billing, Usage, Teams, Audit Log
     //   7. bottomItems                   — Settings (fixed final position in every scope)
 
@@ -453,13 +453,13 @@ export default function OrganizationLayoutClient({
         ...(scopeProjectSlug
             ? [{ href: consoleMode ? "/memory" : `${orgBase}/${scopeProjectSlug}/memory`, icon: <HugeiconsIcon icon={BrainIcon} className="!h-5 !w-5" />, label: "Memory" }]
             : []),
+        { href: scopeProjectSlug ? scopedProjectHref("agents") : orgProductHref("agents"), icon: <HugeiconsIcon icon={ThreeDRotateIcon} className="!h-5 !w-5" />, label: "Agents" },
+        { href: scopeProjectSlug ? scopedProjectHref("monetization") : orgProductHref("monetization"), icon: <HugeiconsIcon icon={CreditCardAcceptIcon} className="!h-5 !w-5" />, label: "Monetization" },
         // Deployments stays attached to the selected project for the same stable
         // project → organization → project navigation model.
         ...(process.env.NODE_ENV !== "production"
             ? [{ href: scopeProjectSlug ? scopedProjectHref("deployments") : orgProductHref("deployments"), icon: <HugeiconsIcon icon={ThreeDMoveIcon} className="!h-5 !w-5" />, label: "Deployments" }]
             : []),
-        { href: scopeProjectSlug ? scopedProjectHref("monetization") : orgProductHref("monetization"), icon: <HugeiconsIcon icon={CreditCardAcceptIcon} className="!h-5 !w-5" />, label: "Monetization" },
-        { href: scopeProjectSlug ? scopedProjectHref("agents") : orgProductHref("agents"), icon: <HugeiconsIcon icon={ThreeDRotateIcon} className="!h-5 !w-5" />, label: "Agents" },
     ];
 
     const orgItems = [
@@ -842,7 +842,7 @@ export default function OrganizationLayoutClient({
                                                 </Link>
                                             </SidebarMenuButton>
                                         </SidebarMenuItem>
-                                        {/* 5. Security, Memory, Deployments, Monetization, Agents */}
+                                        {/* 5. Security, Memory, Agents, Monetization, Deployments */}
                                         {projectSecondaryItems.map((item) => (
                                             <SidebarMenuItem key={item.href}>
                                                 <SidebarMenuButton asChild tooltip={item.label} isActive={isActive(item.href)} size="sm">
