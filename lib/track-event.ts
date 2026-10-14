@@ -10,6 +10,7 @@ export type PlatformEventType =
     // API Keys
     | 'api_key.generated'
     | 'api_key.revoked'
+    | 'api_key.updated'
     | 'api_key.deleted'
     // Scan Web
     | 'scan.project_imported'
