@@ -8,6 +8,7 @@
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { triggerCostThresholdWebhook } from '@/lib/webhooks/trigger';
 import { Redis } from '@upstash/redis';
+import { fetchAllRows } from '@/lib/supabase-paginate';
 
 let redis: Redis | null | undefined;
 
@@ -81,19 +82,30 @@ export async function getCurrentMonthSpend(projectId: string): Promise<number> {
     const supabase = createAdminClient();
     const { start, end } = getCurrentMonthRange();
 
-    const { data, error } = await supabase
-        .from('ai_requests')
-        .select('cencori_charge_usd')
-        .eq('project_id', projectId)
-        .gte('created_at', start.toISOString())
-        .lt('created_at', end.toISOString());
-
-    if (error) {
+    // Paginated: a single select stops at 1,000 rows, and this total seeds the
+    // month's Redis counter, so a capped read under-counted spend (and
+    // under-enforced spend caps and alerts) for the rest of the month. Only
+    // runs on a cache miss.
+    let data: Array<{ cencori_charge_usd: number | null }>;
+    try {
+        data = await fetchAllRows<{ cencori_charge_usd: number | null }>((from, to) =>
+            supabase
+                .from('ai_requests')
+                .select('cencori_charge_usd')
+                .eq('project_id', projectId)
+                .gte('created_at', start.toISOString())
+                .lt('created_at', end.toISOString())
+                .order('created_at', { ascending: true })
+                .order('id', { ascending: true })
+                .range(from, to),
+            { maxRows: 500_000 },
+        );
+    } catch (error) {
         console.error('[Budget] Error fetching spend:', error);
         return 0;
     }
 
-    const total = data?.reduce((sum, req) => sum + (req.cencori_charge_usd || 0), 0) || 0;
+    const total = data.reduce((sum, req) => sum + (req.cencori_charge_usd || 0), 0);
 
     // Seed Redis so subsequent requests are fast
     if (client) {

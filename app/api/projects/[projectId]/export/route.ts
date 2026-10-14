@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { createServerClient } from '@/lib/supabaseServer';
+import { fetchAllRows } from '@/lib/supabase-paginate';
 
 interface RouteParams {
     params: Promise<{ projectId: string }>;
@@ -73,21 +74,22 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
                 return environment === 'production' ? !isTestKey : isTestKey;
             }).map(k => k.id) || [];
 
-            let query = supabaseAdmin
-                .from('ai_requests')
-                .select('id, created_at, status, model, prompt_tokens, completion_tokens, total_tokens, cost_usd, latency_ms, safety_score, error_message')
-                .eq('project_id', projectId)
-                .in('api_key_id', apiKeyIds)
-                .order('created_at', { ascending: false })
-                .limit(10000);
+            // Paginated up to 10,000: a single select stops at 1,000 rows.
+            const logs = await fetchAllRows<Record<string, unknown>>((rangeFrom, rangeTo) => {
+                let query = supabaseAdmin
+                    .from('ai_requests')
+                    .select('id, created_at, status, model, prompt_tokens, completion_tokens, total_tokens, cost_usd, latency_ms, safety_score, error_message')
+                    .eq('project_id', projectId)
+                    .in('api_key_id', apiKeyIds);
+                if (from) query = query.gte('created_at', from);
+                if (to) query = query.lte('created_at', to);
+                return query
+                    .order('created_at', { ascending: false })
+                    .order('id', { ascending: false })
+                    .range(rangeFrom, rangeTo);
+            }, { maxRows: 10_000 });
 
-            if (from) query = query.gte('created_at', from);
-            if (to) query = query.lte('created_at', to);
-
-            const { data: logs, error } = await query;
-            if (error) throw error;
-
-            data = logs || [];
+            data = logs;
             columns = ['id', 'created_at', 'status', 'model', 'prompt_tokens', 'completion_tokens', 'total_tokens', 'cost_usd', 'latency_ms', 'safety_score', 'error_message'];
             filename = `logs-${projectId}-${new Date().toISOString().split('T')[0]}`;
 
@@ -114,18 +116,22 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
             filename = `security-incidents-${projectId}-${new Date().toISOString().split('T')[0]}`;
 
         } else if (type === 'analytics') {
-            let query = supabaseAdmin
-                .from('ai_requests')
-                .select('created_at, status, model, prompt_tokens, completion_tokens, cost_usd, latency_ms')
-                .eq('project_id', projectId)
-                .order('created_at', { ascending: false })
-                .limit(50000);
-
-            if (from) query = query.gte('created_at', from);
-            if (to) query = query.lte('created_at', to);
-
-            const { data: requests, error } = await query;
-            if (error) throw error;
+            // Paginated up to 50,000: a single select stops at 1,000 rows.
+            const requests = await fetchAllRows<{
+                created_at: string; status: string | null; model: string | null; prompt_tokens: number | null;
+                completion_tokens: number | null; cost_usd: number | null; latency_ms: number | null;
+            }>((rangeFrom, rangeTo) => {
+                let query = supabaseAdmin
+                    .from('ai_requests')
+                    .select('created_at, status, model, prompt_tokens, completion_tokens, cost_usd, latency_ms')
+                    .eq('project_id', projectId);
+                if (from) query = query.gte('created_at', from);
+                if (to) query = query.lte('created_at', to);
+                return query
+                    .order('created_at', { ascending: false })
+                    .order('id', { ascending: false })
+                    .range(rangeFrom, rangeTo);
+            }, { maxRows: 50_000 });
 
             const dailyStats: Record<string, {
                 date: string;

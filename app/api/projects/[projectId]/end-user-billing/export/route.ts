@@ -2,6 +2,25 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { createServerClient } from "@/lib/supabaseServer";
 import { writeAuditLog } from "@/lib/audit-log";
+import { fetchAllRows } from "@/lib/supabase-paginate";
+
+const EXPORT_MAX_ROWS = 50_000;
+
+type ExportRow = {
+    id: string;
+    end_user_id: string | null;
+    model: string | null;
+    provider: string | null;
+    prompt_tokens: number | null;
+    completion_tokens: number | null;
+    total_tokens: number | null;
+    provider_cost_usd: string | number | null;
+    cencori_charge_usd: string | number | null;
+    markup_percentage: string | number | null;
+    status: string | null;
+    latency_ms: number | null;
+    created_at: string;
+};
 
 function parsePeriodToDate(period: string): Date | null {
     const now = Date.now();
@@ -85,28 +104,29 @@ export async function GET(
     const startDate = parsePeriodToDate(period);
 
     try {
-        let query = admin
-            .from("ai_requests")
-            .select(
-                "id, end_user_id, model, provider, prompt_tokens, completion_tokens, total_tokens, provider_cost_usd, cencori_charge_usd, markup_percentage, status, latency_ms, created_at"
-            )
-            .eq("project_id", projectId)
-            .not("end_user_id", "is", null)
-            .neq("end_user_id", "")
-            .order("created_at", { ascending: false })
-            .limit(50000);
-
-        if (startDate) {
-            query = query.gte("created_at", startDate.toISOString());
-        }
-
-        if (endUserId) {
-            query = query.eq("end_user_id", endUserId);
-        }
-
-        const { data: rows, error } = await query;
-
-        if (error) {
+        // Paginated: a single select stops at PostgREST's 1,000-row cap no
+        // matter what .limit() says, so exports were silently cut to the
+        // newest 1,000 requests. Walks pages up to EXPORT_MAX_ROWS; id breaks
+        // created_at ties so pages can't skip or repeat a row.
+        let rows: ExportRow[];
+        try {
+            rows = await fetchAllRows<ExportRow>((from, to) => {
+                let query = admin
+                    .from("ai_requests")
+                    .select(
+                        "id, end_user_id, model, provider, prompt_tokens, completion_tokens, total_tokens, provider_cost_usd, cencori_charge_usd, markup_percentage, status, latency_ms, created_at"
+                    )
+                    .eq("project_id", projectId)
+                    .not("end_user_id", "is", null)
+                    .neq("end_user_id", "");
+                if (startDate) query = query.gte("created_at", startDate.toISOString());
+                if (endUserId) query = query.eq("end_user_id", endUserId);
+                return query
+                    .order("created_at", { ascending: false })
+                    .order("id", { ascending: false })
+                    .range(from, to);
+            }, { maxRows: EXPORT_MAX_ROWS });
+        } catch (error) {
             console.error("[EndUserBilling] Export query error:", error);
             return NextResponse.json(
                 { error: "Failed to fetch usage data" },
@@ -114,8 +134,8 @@ export async function GET(
             );
         }
 
-        const entries = rows || [];
-        const isTruncated = entries.length === 50000;
+        const entries = rows;
+        const isTruncated = entries.length === EXPORT_MAX_ROWS;
         const dateStr = new Date().toISOString().split("T")[0];
 
         // Fire audit log for export
@@ -205,9 +225,9 @@ export async function GET(
                 prompt_tokens: row.prompt_tokens || 0,
                 completion_tokens: row.completion_tokens || 0,
                 total_tokens: row.total_tokens || 0,
-                provider_cost_usd: parseFloat(row.provider_cost_usd) || 0,
-                customer_charge_usd: parseFloat(row.cencori_charge_usd) || 0,
-                markup_percentage: parseFloat(row.markup_percentage) || 0,
+                provider_cost_usd: Number(row.provider_cost_usd) || 0,
+                customer_charge_usd: Number(row.cencori_charge_usd) || 0,
+                markup_percentage: Number(row.markup_percentage) || 0,
                 status: row.status,
                 latency_ms: row.latency_ms,
                 created_at: row.created_at,

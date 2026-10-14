@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { createServerClient } from "@/lib/supabaseServer";
+import { fetchAllRows } from "@/lib/supabase-paginate";
 
 function parsePeriodToDate(period: string): Date {
     const now = Date.now();
@@ -80,36 +81,33 @@ export async function GET(
             .order("created_at", { ascending: true })
             .limit(50000);
 
-        // 2. Active end users (with requests in period)
-        let activeEndUsers = 0;
-        const { data: distinctUsers } = await admin
-            .from("ai_requests")
-            .select("end_user_id")
-            .eq("project_id", projectId)
-            .not("end_user_id", "is", null)
-            .neq("end_user_id", "")
-            .gte("created_at", startISO);
+        // 2-3. Every metered request in the period. Paginated: a plain select
+        // stops at PostgREST's 1,000-row cap, and with oldest-first ordering
+        // that silently dropped the most recent days. Narrow columns only;
+        // id breaks created_at ties so pages can't skip or repeat a row.
+        const requests = await fetchAllRows<{
+            total_tokens: number | null;
+            provider_cost_usd: string | number | null;
+            cencori_charge_usd: string | number | null;
+            end_user_id: string;
+            created_at: string;
+        }>((from, to) =>
+            admin
+                .from("ai_requests")
+                .select("total_tokens, provider_cost_usd, cencori_charge_usd, end_user_id, created_at")
+                .eq("project_id", projectId)
+                .not("end_user_id", "is", null)
+                .neq("end_user_id", "")
+                .gte("created_at", startISO)
+                .order("created_at", { ascending: true })
+                .order("id", { ascending: true })
+                .range(from, to),
+        );
 
-        if (distinctUsers) {
-            const uniqueIds = new Set(
-                distinctUsers.map((r) => r.end_user_id)
-            );
-            activeEndUsers = uniqueIds.size;
-        }
+        // Active end users: distinct customers with requests in the period.
+        const activeEndUsers = new Set(requests.map((r) => r.end_user_id)).size;
 
-        // 3. Aggregated totals for the period
-        const { data: requests } = await admin
-            .from("ai_requests")
-            .select(
-                "total_tokens, provider_cost_usd, cencori_charge_usd, end_user_id, created_at"
-            )
-            .eq("project_id", projectId)
-            .not("end_user_id", "is", null)
-            .neq("end_user_id", "")
-            .gte("created_at", startISO)
-            .order("created_at", { ascending: true });
-
-        const allRequests = requests || [];
+        const allRequests = requests;
         const totalRequests = allRequests.length;
         let totalTokens = 0;
         let providerCostUsd = 0;
@@ -163,8 +161,8 @@ export async function GET(
 
         for (const r of allRequests) {
             const tokens = r.total_tokens || 0;
-            const cost = parseFloat(r.provider_cost_usd) || 0;
-            const revenue = parseFloat(r.cencori_charge_usd) || 0;
+            const cost = Number(r.provider_cost_usd) || 0;
+            const revenue = Number(r.cencori_charge_usd) || 0;
             const userId = r.end_user_id;
             const dateKey = new Date(r.created_at).toISOString().split("T")[0];
 

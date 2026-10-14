@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { createServerClient } from '@/lib/supabaseServer';
+import { fetchAllRows } from '@/lib/supabase-paginate';
 
 interface RouteParams {
     params: Promise<{ orgSlug: string }>;
@@ -90,17 +91,23 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
         }
 
         // Fetch all requests across org projects
-        let query = supabaseAdmin
-            .from('ai_requests')
-            .select('project_id, created_at, status, model, provider, prompt_tokens, completion_tokens, total_tokens, cost_usd, latency_ms')
-            .in('project_id', projectIds)
-            .order('created_at', { ascending: false })
-            .limit(50000);
-
-        if (from) query = query.gte('created_at', from);
-
-        const { data: requests, error } = await query;
-        if (error) throw error;
+        // Paginated up to 50,000: a single select stops at 1,000 rows whatever
+        // .limit() says, so exports silently covered only the newest 1,000.
+        const requests = await fetchAllRows<{
+            project_id: string; created_at: string; status: string | null; model: string | null; provider: string | null;
+            prompt_tokens: number | null; completion_tokens: number | null; total_tokens: number | null;
+            cost_usd: number | null; latency_ms: number | null;
+        }>((rangeFrom, rangeTo) => {
+            let query = supabaseAdmin
+                .from('ai_requests')
+                .select('project_id, created_at, status, model, provider, prompt_tokens, completion_tokens, total_tokens, cost_usd, latency_ms')
+                .in('project_id', projectIds);
+            if (from) query = query.gte('created_at', from);
+            return query
+                .order('created_at', { ascending: false })
+                .order('id', { ascending: false })
+                .range(rangeFrom, rangeTo);
+        }, { maxRows: 50_000 });
 
         // Aggregate by date + project + model + provider
         const aggregation: Record<string, {
