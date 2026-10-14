@@ -369,5 +369,5 @@ Nothing is written to `organization_finops_connections` until CostGraph has crea
 1. ~~CostGraph ships the three pieces~~ (done 2026-10-14).
 2. ~~Apply `20261014_180000_costgraph_oauth.sql`~~ (done 2026-10-14).
 3. **Staged:** set `COSTGRAPH_OAUTH_ORGS=<org slug>[,…]` in Vercel. Connect works for those organizations only, and our client document is served so the real HTTPS flow runs. Test on Arcie (`xcfgg0o74s8n8hrg5kfy`).
-4. **Everyone:** set `COSTGRAPH_OAUTH_ENABLED=true`. Optional: `COSTGRAPH_OAUTH_SCOPES` (default `openid profile focus:write integrations:read`), `COSTGRAPH_OAUTH_STATE_SECRET` (default `ENCRYPTION_SECRET`), `COSTGRAPH_PUSH_CONNECTION_CREATE_PATH` (default `/api/v1/integrations/connections`).
+4. **Everyone:** set `COSTGRAPH_OAUTH_ENABLED=true` (**done 2026-10-14**; `COSTGRAPH_OAUTH_ORGS` is now redundant). Optional: `COSTGRAPH_OAUTH_SCOPES` (default `openid profile focus:write integrations:read`), `COSTGRAPH_OAUTH_STATE_SECRET` (default `ENCRYPTION_SECRET`), `COSTGRAPH_PUSH_CONNECTION_CREATE_PATH` (default `/api/v1/integrations/connections`).
 5. Local development needs a client registered in CostGraph (Settings → OAuth clients, granted `focus:write`), set as `COSTGRAPH_OAUTH_CLIENT_ID`, with redirect URI `http://console.localhost:3000/api/integrations/costgraph/oauth/callback`. Metadata documents must be served over HTTPS.

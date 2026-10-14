@@ -11,15 +11,21 @@ There are two ways to connect:
 
 | | Connect from Cencori | Pull |
 | :--- | :--- | :--- |
-| Status | **Available soon** | **Live** |
+| Status | **Live** | **Live** |
 | How | Click **Connect** on the CostGraph card, sign in to CostGraph, pick a tenant | CostGraph's exporter, or a job you run, reads `GET /v1/usage/focus` |
 | Credential | A CostGraph sign-in, held by Cencori | A read-only Cencori usage export key |
 
 ## Connect from Cencori
 
-The CostGraph card is on every project's **Settings → Integrations** tab. The connection belongs to the organization and applies to every project; owners and admins manage it.
+The CostGraph card is on every project's **Settings → Integrations** tab, under **FinOps**. The connection belongs to the organization and applies to every project; Cencori owners and admins manage it.
 
-**Connect** signs you in to CostGraph, asks which CostGraph tenant to send usage to, and sets up the connection. Nothing to copy between dashboards. It becomes available once CostGraph enables connecting from Cencori; until then the button is disabled. To send usage to CostGraph today, use [Pull](#pull-costgraph-reads-from-cencori).
+1. Click **Connect** on the CostGraph card.
+2. Sign in to CostGraph and approve Cencori's access (`focus:write` to send usage, `integrations:read` to find an existing connection).
+3. If your CostGraph account has more than one tenant, choose the one this organization's usage goes to.
+
+Cencori creates the push connection in CostGraph for your organization and sends the month so far. You need an owner, admin or billing admin role in the CostGraph organization. If one already exists for this Cencori organization, Cencori reuses it.
+
+After that, **View connection** on the card opens the CostGraph page in Cencori: connection details, when usage was last sent, **Send now**, the nightly switch, **Reconnect** and **Disconnect**.
 
 Once connected, Cencori sends each UTC day after it closes. From the 3rd of each month it also re-sends the whole previous month, so a request logged late corrects itself. Re-sending the same usage updates it in place, so a repeat never double-counts. Each Cencori project appears as a sub-account; this is fixed once usage has been sent, because CostGraph keeps every record it receives.
 
@@ -59,7 +65,7 @@ Models are published as `provider/model`, the same string as `SkuId` in the FOCU
 
 | What you see | Why | Fix |
 | :--- | :--- | :--- |
-| **Connect** is disabled | Connecting from Cencori isn't available yet | Use [Pull](#pull-costgraph-reads-from-cencori) for now |
+| "Connecting needs an owner, admin or billing admin role" | Your CostGraph role can't create connections | Ask a CostGraph owner or admin to connect, or to raise your role |
 | A CostGraph error on the card | The CostGraph sign-in was revoked, or the connection was removed in CostGraph | Open **Manage → Reconnect** |
 | Nothing sent for a day | That day had no billable usage | Nothing to fix |
 | `x_UnsplitRequests` > 0 | Usage from before buckets were recorded | Costs are exact; only the bucket split is missing |
