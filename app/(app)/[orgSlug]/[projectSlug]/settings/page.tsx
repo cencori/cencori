@@ -1903,14 +1903,14 @@ export default function ProjectSettingsPage({ params }: PageProps) {
               {/* Placeholder for future integrations */}
               <button
                 onClick={() => setShowSuggestModal(true)}
-                className="rounded-lg border border-dashed border-border/35 bg-muted/20 p-5 flex flex-col items-center justify-center text-center space-y-2 min-h-[240px] hover:bg-muted/40 hover:border-border/45 transition-all cursor-pointer group"
+                className="group flex items-start gap-3 self-start rounded-lg border border-dashed border-border/35 bg-muted/20 px-5 py-5 text-left transition-all hover:border-border/45 hover:bg-muted/40 cursor-pointer"
               >
-                <div className="w-10 h-10 rounded-lg bg-secondary/50 flex items-center justify-center group-hover:bg-secondary transition-colors">
-                  <Plus className="w-5 h-5 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors" />
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-secondary/50 transition-colors group-hover:bg-secondary">
+                  <Plus className="size-4 text-muted-foreground/40 transition-colors group-hover:text-muted-foreground" />
                 </div>
                 <div>
-                  <p className="text-[11px] font-medium text-muted-foreground group-hover:text-foreground transition-colors">More integrations</p>
-                  <p className="text-[9px] text-muted-foreground/60">Suggest a tool for the ecosystem</p>
+                  <p className="text-sm font-medium text-muted-foreground transition-colors group-hover:text-foreground">More integrations</p>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground/60">Suggest a tool for the ecosystem</p>
                 </div>
               </button>
             </div>
