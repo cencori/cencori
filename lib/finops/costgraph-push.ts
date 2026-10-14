@@ -19,6 +19,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { decryptApiKey } from '@/lib/encryption';
 import { FOCUS_VERSION, isSubAccountMode, type SubAccountMode } from './focus';
 import { createCostGraphPlatformClient, type CostGraphPlatformClient } from './costgraph';
+import { getValidAccessToken, oauthClientId } from './costgraph-oauth';
+import { resolveConsoleBaseUrl } from '@/lib/auth-redirect';
 import {
     FOCUS_PAGE_SIZE,
     loadOrganizationIdentity,
@@ -36,8 +38,11 @@ export interface FinopsConnectionRow {
     id: string;
     organization_id: string;
     provider: 'costgraph';
-    connection_id: string;
-    api_key_encrypted: string;
+    /** Null for an OAuth connection CostGraph has not created a push connection for yet. */
+    connection_id: string | null;
+    /** Absent until migration 20261014_180000_costgraph_oauth; treated as 'api_key'. */
+    auth_method?: 'api_key' | 'oauth';
+    api_key_encrypted: string | null;
     sub_account: string;
     enabled: boolean;
     last_pushed_day: string | null;
@@ -179,14 +184,17 @@ export async function runConnectionPush(
             .eq('id', connection.id);
 
     try {
-        const client = options.client
-            ?? createCostGraphPlatformClient(decryptApiKey(connection.api_key_encrypted, connection.organization_id));
+        const connectionId = connection.connection_id;
+        if (!connectionId) {
+            throw new Error('Waiting for CostGraph to create the push connection for this organization');
+        }
+        const client = options.client ?? await platformClientFor(supabase, connection);
         const subAccount: SubAccountMode = isSubAccountMode(connection.sub_account) ? connection.sub_account : 'project';
         const [organization, projectIds] = await Promise.all([
             loadOrganizationIdentity(supabase, connection.organization_id),
             resolveScopeProjectIds(supabase, { organizationId: connection.organization_id }),
         ]);
-        const common = { supabase, client, organization, projectIds, connectionId: connection.connection_id, subAccount };
+        const common = { supabase, client, organization, projectIds, connectionId, subAccount };
 
         for (const day of daysToPush(connection.last_pushed_day, now)) {
             const window = await pushWindow({ ...common, start: day, end: addDays(day, 1) });
@@ -217,6 +225,18 @@ export async function runConnectionPush(
     return result;
 }
 
+/** The credential a connection pushes with: its OAuth token (refreshed as needed) or its API key. */
+async function platformClientFor(supabase: SupabaseClient, connection: FinopsConnectionRow): Promise<CostGraphPlatformClient> {
+    if (connection.auth_method === 'oauth') {
+        const accessToken = await getValidAccessToken(supabase, connection.id, {
+            clientId: oauthClientId(resolveConsoleBaseUrl()),
+        });
+        return createCostGraphPlatformClient({ accessToken });
+    }
+    if (!connection.api_key_encrypted) throw new Error('This CostGraph connection has no API key stored');
+    return createCostGraphPlatformClient(decryptApiKey(connection.api_key_encrypted, connection.organization_id));
+}
+
 /** Every enabled connection, least recently run first, within a time budget. */
 export async function runAllFinopsPushes(
     supabase: SupabaseClient,
@@ -226,7 +246,9 @@ export async function runAllFinopsPushes(
     const budgetMs = options.budgetMs ?? 240_000;
     const { data, error } = await supabase
         .from('organization_finops_connections')
-        .select('id, organization_id, provider, connection_id, api_key_encrypted, sub_account, enabled, last_pushed_day, last_closed_month')
+        // '*' rather than a column list: auth_method arrives by a later migration, and naming it
+        // here would fail every push until that migration is applied.
+        .select('*')
         .eq('enabled', true)
         .order('last_run_at', { ascending: true, nullsFirst: true })
         .limit(options.limit ?? 100);

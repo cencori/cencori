@@ -140,7 +140,7 @@
     <div>
       <h3>Connect Cencori</h3>
       <p class="side">Cencori sends each settled day of usage as FOCUS 1.2: what Cencori billed, by model, project and customer. Re-sends replace the day, so totals never double.</p>
-      <p class="side">You'll paste two things into Cencori → Organization settings → Advanced → Usage export: the connection id and a <span class="mono">focus:write</span> key. Both appear on the next screen.</p>
+      <p class="side">You'll paste two things into Cencori's CostGraph card (any project → Settings → Integrations): the connection id and a <span class="mono">focus:write</span> key. Both appear on the next screen. Once CostGraph offers <span class="mono">focus:write</span> over OAuth, this becomes one click from Cencori instead (spec §12).</p>
     </div>
     <div>
       <div class="field"><label>Connection name</label><div class="input">Cencori</div></div>
@@ -149,7 +149,7 @@
       <div class="field">
         <label>Cencori organization ID</label>
         <div class="input mono" style="color:var(--faint)">xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx</div>
-        <p class="help">In Cencori: Organization settings → Advanced → Usage export → Billing account id.</p>
+        <p class="help">In Cencori: any project → Settings → Integrations → CostGraph → Billing account id.</p>
       </div>
       <div style="text-align:right"><button class="btn" type="button">Create connection</button></div>
     </div>

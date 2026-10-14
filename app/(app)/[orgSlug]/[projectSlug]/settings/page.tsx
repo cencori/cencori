@@ -50,6 +50,7 @@ import { SUPPORTED_PROVIDERS, getModelsForProvider } from "@/lib/providers/confi
 import { cn } from "@/lib/utils";
 import { normalizeWebhookResponse } from "@/lib/webhook-response";
 import { onSettingsTab } from "@/lib/navigation-intent";
+import { CostGraphIntegration } from "@/components/finops/CostGraphIntegration";
 
 interface ProjectData {
   id: string;
@@ -1897,7 +1898,7 @@ export default function ProjectSettingsPage({ params }: PageProps) {
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
-
+              <CostGraphIntegration orgSlug={orgSlug} />
 
               {/* Placeholder for future integrations */}
               <button

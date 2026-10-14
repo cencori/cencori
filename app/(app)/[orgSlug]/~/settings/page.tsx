@@ -171,9 +171,9 @@ export default function OrgSettingsPage({ params }: PageProps) {
 
                     <SettingsSection
                         title="Usage export"
-                        description="FOCUS 1.2 usage for FinOps tools: read-only export keys, and a nightly push to CostGraph."
+                        description="Read-only keys that let FinOps tools pull this organization's usage as FOCUS 1.2."
                     >
-                        <UsageExportSettings orgSlug={orgSlug} orgId={org.id} />
+                        <UsageExportSettings orgSlug={orgSlug} />
                     </SettingsSection>
 
                     <SettingsSection

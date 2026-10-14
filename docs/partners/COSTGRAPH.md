@@ -279,7 +279,7 @@ Today a customer has to find the generic "FOCUS push" card under "Anything Else"
 | --- | --- |
 | Connection name | `Cencori` |
 | Provider | **Cencori**, locked (not "Detect from my first push") |
-| Billing account | Relabelled **Cencori organization ID**, helper text *"In Cencori: Organization settings → Advanced → Usage export → Billing account id"*, validated as a UUID |
+| Billing account | Relabelled **Cencori organization ID**, helper text *"In Cencori: any project → Settings → Integrations → CostGraph → Billing account id"*, validated as a UUID |
 | After create | Show the `fpc_` id **and** offer "Create a `focus:write` key for this tenant", so both values are on one screen to paste into Cencori |
 
 **Next step (ask):** an API to create a push connection and its key, authorised with "Sign in with CostGraph" (`focus:write`). Then Cencori's console can offer a one-click **Connect CostGraph** and nobody copies ids between two dashboards.
@@ -327,3 +327,44 @@ Changing it restates cleanly: the push replaces whole windows, so re-sending Oct
 - CTA on our side: **Build with Gateway** for the product, **Talk to Cencori** for the partnership (GTM-06).
 
 A visual mockup of the card and the preset form is in `docs/partners/costgraph-listing-mockup.html`.
+
+## 12. Connect CostGraph from Cencori (OAuth, option C)
+
+**Decision (2026-10-14):** customers connect CostGraph from Cencori's console with one click: **Connect CostGraph** → sign in to CostGraph → pick a tenant → done. No ids or keys are copied between dashboards. The CostGraph card lives on every project's **Settings → Integrations** tab and manages the organization's connection (owners and admins).
+
+### What CostGraph must ship (asked 2026-10-14)
+
+Verified live against `/.well-known/openid-configuration` and the push endpoint:
+
+| Needed | CostGraph today |
+| --- | --- |
+| `focus:write` OAuth scope | ❌ `scopes_supported`: openid, profile, email, usage:read, billing:read, pricing:read, pricing:write, mcp |
+| `POST /api/v1/tenant/billing/focus` accepting `Authorization: Bearer <access token>` | ❌ 401 "API key required" |
+| An endpoint that creates a FOCUS push connection (name, provider `cencori`, billing account) and returns the `fpc_` id | ❌ dashboard only |
+| Client ID Metadata Documents (no client registration) | ✅ `client_id_metadata_document_supported: true` |
+| Authorization code + PKCE S256, rotating 30-day refresh tokens | ✅ |
+
+### What Cencori has built (behind `COSTGRAPH_OAUTH_ENABLED`)
+
+| Piece | Where |
+| --- | --- |
+| OAuth client document; its URL is our client_id | `GET /api/integrations/costgraph/oauth/client.json` |
+| Start: owner/admin check, PKCE verifier + state in a signed httpOnly cookie, redirect to CostGraph | `GET /api/integrations/costgraph/oauth/start?org=&returnTo=` |
+| Callback: verify state + same user + still admin, exchange the code, list tenants (`GET /api/v1/me`), create the push connection, store tokens encrypted | `GET /api/integrations/costgraph/oauth/callback` |
+| Several tenants: tokens held encrypted in a signed 10-minute cookie until the user picks one; nothing written before that | `completeCostGraphConnect` / `cancelCostGraphConnect` server actions |
+| Token refresh under a lease (`oauth_refresh_lease_until`), so a rotated refresh token is never presented twice (CostGraph signs the user out if it is) | `getValidAccessToken` in `lib/finops/costgraph-oauth.ts` |
+| Push with the OAuth token | `createCostGraphPlatformClient({ accessToken })`, chosen by `auth_method` |
+| Disconnect revokes the grant | `deleteCostGraphConnection` |
+| Paste-a-key fallback, unchanged | "Use an API key instead" on the card |
+| Sub-account locked once anything has been sent (UI and server), because CostGraph never deletes ingested records | card + `saveCostGraphConnection` |
+| Schema | `supabase/migrations/20261014_180000_costgraph_oauth.sql` (manual apply; code works without it) |
+
+Nothing is written to `organization_finops_connections` until CostGraph has created the push connection, so a failed or abandoned sign-in never replaces a working API-key connection. If creation fails, the grant is revoked.
+
+### Turning it on
+
+1. CostGraph ships the three pieces above.
+2. Apply `20261014_180000_costgraph_oauth.sql`.
+3. Set in Vercel: `COSTGRAPH_OAUTH_ENABLED=true` and `COSTGRAPH_PUSH_CONNECTION_CREATE_PATH=<their endpoint path>`. Optional: `COSTGRAPH_OAUTH_SCOPES` (default `openid profile focus:write`) and `COSTGRAPH_OAUTH_STATE_SECRET` (default: `ENCRYPTION_SECRET`).
+4. Local development: a metadata document must be served over HTTPS, so register a dev client in CostGraph and set `COSTGRAPH_OAUTH_CLIENT_ID`, with redirect URI `http://console.localhost:3000/api/integrations/costgraph/oauth/callback`.
+5. Check `createPushConnection`'s request body against their endpoint. It sends `tenant_id`, `display_name`, `provider: "cencori"`, `provider_account_id`, mirroring the dashboard form, and reads `data.connection_id`.
