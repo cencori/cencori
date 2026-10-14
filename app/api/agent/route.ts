@@ -45,6 +45,15 @@ const GATEWAY_BASE_URL = process.env.CENCORI_GATEWAY_URL || "https://api.cencori
 // Tool rounds per answer before the model must reply, and the most of one
 // tool's JSON the model sees.
 const MAX_TOOL_ROUNDS = 5;
+
+// Copilot is free, capped per organization per UTC day by plan (0 = no cap).
+const COPILOT_DAILY_LIMITS: Record<string, number> = {
+    free: 10,
+    pro: 50,
+    team: 100,
+    enterprise: 0,
+};
+const PLAN_NAMES: Record<string, string> = { free: "Free", pro: "Pro", team: "Team", enterprise: "Enterprise" };
 const MAX_TOOL_OUTPUT_CHARS = 12_000;
 
 function isChatMessage(value: unknown): value is ChatMessage {
@@ -72,7 +81,7 @@ async function verifyOrganizationAccess(
 ) {
     const { data: organization } = await admin
         .from("organizations")
-        .select("id, name, slug, owner_id")
+        .select("id, name, slug, owner_id, subscription_tier")
         .eq("id", organizationId)
         .maybeSingle();
 
@@ -117,7 +126,7 @@ export async function POST(request: NextRequest) {
         const lightweightConversation = isLightweightConversation(latestQuestion);
         const admin = createAdminClient();
 
-        let organization: { id: string; name: string; slug: string; owner_id: string } | null = null;
+        let organization: { id: string; name: string; slug: string; owner_id: string; subscription_tier: string | null } | null = null;
         let project: { id: string; name: string; slug: string; organization_id: string } | null = null;
 
         if (projectId) {
@@ -134,6 +143,27 @@ export async function POST(request: NextRequest) {
         } else if (organizationId) {
             organization = await verifyOrganizationAccess(organizationId, user.id, admin);
             if (!organization) return NextResponse.json({ error: "You do not have access to this organization." }, { status: 403 });
+        }
+
+        // Fair-use cap. Small talk doesn't count. Fails open: if the counter is
+        // unavailable, Copilot keeps answering rather than blocking everyone.
+        if (!lightweightConversation) {
+            const tier = organization?.subscription_tier && organization.subscription_tier in COPILOT_DAILY_LIMITS
+                ? organization.subscription_tier
+                : "free";
+            const limit = COPILOT_DAILY_LIMITS[tier];
+            const { data: usage, error: usageError } = await admin.rpc("copilot_consume", {
+                p_subject: organization ? `org:${organization.id}` : `user:${user.id}`,
+                p_limit: limit,
+            });
+            if (usageError) {
+                console.error("[Cencori Agent] Usage cap unavailable:", usageError.message);
+            } else if (usage && (usage as { allowed?: boolean }).allowed === false) {
+                return NextResponse.json({
+                    error: `You've used today's ${limit} Copilot questions on the ${PLAN_NAMES[tier]} plan. It resets at midnight UTC, or upgrade for more.`,
+                    code: "copilot_daily_limit",
+                }, { status: 429 });
+            }
         }
 
         const pageContext = {

@@ -389,7 +389,10 @@ export function CencoriAgentSidebar({
 
             if (!response.ok) {
                 const payload = await response.json().catch(() => null);
-                throw new Error(payload?.error || "The agent could not answer right now.");
+                const failure = new Error(payload?.error || "The agent could not answer right now.");
+                // The daily cap is a plain message, not a failure.
+                if (payload?.code === "copilot_daily_limit") failure.name = "CopilotLimit";
+                throw failure;
             }
 
             const reader = response.body?.getReader();
@@ -456,7 +459,9 @@ export function CencoriAgentSidebar({
                     {
                         id: crypto.randomUUID(),
                         role: "assistant",
-                        content: `I couldn't complete that analysis. ${(error as Error).message}`,
+                        content: (error as Error).name === "CopilotLimit"
+                            ? (error as Error).message
+                            : `I couldn't complete that analysis. ${(error as Error).message}`,
                     },
                 ]);
             }
