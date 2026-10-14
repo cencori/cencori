@@ -18,7 +18,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowUpRight, ChevronLeft, Lock, Send } from "lucide-react";
+import { ArrowUpRight, ChevronLeft, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -406,12 +406,10 @@ function Connected({
                 <div className="mt-4">
                     <Button
                         size="sm"
-                        variant="outline"
                         className="h-7 px-3 text-xs"
                         disabled={pushNow.isPending || !connection.enabled || !connection.connectionId}
                         onClick={() => pushNow.mutate()}
                     >
-                        <Send className="mr-1.5 size-3" />
                         {pushNow.isPending ? "Sending…" : "Send now"}
                     </Button>
                 </div>
