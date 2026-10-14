@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTheme } from "next-themes";
 import { ArrowUp, ChevronDown, Plus, Square, X } from "lucide-react";
 
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
@@ -149,6 +150,7 @@ export function CencoriAgentSidebar({
 }: CencoriAgentSidebarProps) {
     const pathname = usePathname();
     const searchParams = useSearchParams();
+    const { resolvedTheme } = useTheme();
     const surface = getSurfaceLabel(pathname, searchParams.get("section"));
     const [messages, setMessages] = useState<AgentMessage[]>([]);
     const [input, setInput] = useState("");
@@ -610,13 +612,14 @@ export function CencoriAgentSidebar({
             </div>
 
             {/* Dithered clouds behind the composer, fading out upward so they
-                never sit behind the conversation. Dark theme only (the effect
-                is black/white), and only mounted while open so it doesn't
-                animate off-screen. */}
+                never sit behind the conversation. The palette follows the
+                theme: purple dots on black in dark mode, soft lavender on white
+                in light mode, each matching the panel background. Only mounted
+                while open so it doesn't animate off-screen. */}
             {open && (
                 <DitherCanvas
-                    colors={["#000000", "#2b1150", "#5a2d91"]}
-                    className="pointer-events-none absolute inset-x-0 bottom-0 hidden h-[250px] w-full [mask-image:linear-gradient(to_top,black_45%,transparent)] dark:block"
+                    colors={resolvedTheme === "light" ? ["#ffffff", "#ddd0f3", "#b393e3"] : ["#000000", "#2b1150", "#5a2d91"]}
+                    className="pointer-events-none absolute inset-x-0 bottom-0 h-[250px] w-full [mask-image:linear-gradient(to_top,black_45%,transparent)]"
                 />
             )}
 
@@ -702,7 +705,7 @@ export function CencoriAgentSidebar({
                 )}
             </div>
 
-            <div className="relative bg-background px-4 pb-4 pt-3 dark:bg-transparent">
+            <div className="relative px-4 pb-4 pt-3">
                 {/* Same shade as the dashboard cards (bg-muted/60 over the page
                     background); the solid layer underneath keeps the dither
                     from tinting it. */}
