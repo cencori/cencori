@@ -453,16 +453,22 @@ function Connected({
             </Section>
 
             <AlertDialog open={confirmDisconnect} onOpenChange={setConfirmDisconnect}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Disconnect CostGraph?</AlertDialogTitle>
-                        <AlertDialogDescription>
+                <AlertDialogContent className="gap-5 rounded-lg border-0 bg-muted p-6 shadow-none sm:max-w-[400px]">
+                    <AlertDialogHeader className="space-y-0 text-left">
+                        <CostGraphLogo size={28} />
+                        <AlertDialogTitle className="mt-4 text-sm font-medium">Disconnect CostGraph?</AlertDialogTitle>
+                        <AlertDialogDescription className="mt-1 text-xs leading-5">
                             Cencori stops sending usage to CostGraph for every project in this organization. Usage CostGraph already received stays there.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => disconnect.mutate()}>Disconnect</AlertDialogAction>
+                    <AlertDialogFooter className="flex-row justify-end gap-2 space-x-0 sm:space-x-0">
+                        <AlertDialogCancel className="mt-0 h-7 px-3 text-xs">Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            className="h-7 bg-white px-3 text-xs text-red-600 hover:bg-white/90 hover:text-red-600"
+                            onClick={() => disconnect.mutate()}
+                        >
+                            Disconnect
+                        </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
