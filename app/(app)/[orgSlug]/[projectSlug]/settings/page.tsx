@@ -1894,7 +1894,7 @@ export default function ProjectSettingsPage({ params }: PageProps) {
 
           {/* A div, not a section: sections here are label | content grids, and these cards span the width. */}
           <div className="border-t border-border/35 py-7">
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <CostGraphIntegration orgSlug={orgSlug} />
 
               {/* Placeholder for future integrations */}
