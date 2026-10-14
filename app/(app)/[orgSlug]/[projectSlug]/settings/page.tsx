@@ -52,6 +52,7 @@ import { normalizeWebhookResponse } from "@/lib/webhook-response";
 import { onSettingsTab } from "@/lib/navigation-intent";
 import { CostGraphIntegration } from "@/components/finops/CostGraphIntegration";
 import { CardShell } from "@/components/integrations/CardShell";
+import { IntegrationGroup } from "@/components/integrations/IntegrationGroup";
 
 interface ProjectData {
   id: string;
@@ -1892,9 +1893,10 @@ export default function ProjectSettingsPage({ params }: PageProps) {
             description="Connect external services to this project's workflows."
           />
 
-          {/* A div, not a section: sections here are label | content grids, and these cards span the width. */}
-          <div className="border-t border-border/35 py-7">
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {/* A div, not a section: sections here are label | content grids, and these groups span the width. */}
+          <div className="space-y-8 border-t border-border/35 py-7">
+            {/* "More integrations" trails the last group, so it shares a row (and height) with real cards. */}
+            <IntegrationGroup label="FinOps">
               <CostGraphIntegration orgSlug={orgSlug} />
 
               {/* Placeholder for future integrations */}
@@ -1912,7 +1914,7 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                   description="Suggest a tool for the ecosystem"
                 />
               </button>
-            </div>
+            </IntegrationGroup>
           </div>
         </TabsContent>
 
