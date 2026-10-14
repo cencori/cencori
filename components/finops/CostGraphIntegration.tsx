@@ -1,27 +1,24 @@
 "use client";
 
 /**
- * CostGraph integration card: send this organization's AI spend to CostGraph as FOCUS 1.2.
+ * CostGraph: send this organization's AI spend to CostGraph as FOCUS 1.2.
  *
- * Lives on a project's Settings → Integrations, but the connection belongs to the organization —
- * CostGraph keys usage on the billing account, which is the organization id — so it applies to
- * every project and only owners and admins can change it.
+ * Two surfaces, the same for every integration:
+ *   - CostGraphIntegration: the card on Settings → Integrations. Logo, name, one line, and one
+ *     action — Connect, or View connection once connected.
+ *   - CostGraphIntegrationPage: the integration's own page (/settings/integrations/costgraph) with
+ *     the connection's details and everything you can do to it.
  *
- * Two ways to connect:
- *   - Connect CostGraph: "Sign in with CostGraph" (OAuth). Shown when COSTGRAPH_OAUTH_ENABLED.
- *   - Paste a key: a focus:write key and the fpc_ push connection id from CostGraph's dashboard.
+ * The connection belongs to the organization — CostGraph keys usage on the billing account, which
+ * is the organization id — so it applies to every project, and owners and admins manage it.
+ * Connecting is "Sign in with CostGraph" (OAuth); see lib/finops/costgraph-oauth.ts.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Lock, Send } from "lucide-react";
-
-/** CostGraph's mark, from their brand assets (public/integrations/costgraph.svg). */
-const costGraphLogo = (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img src="/integrations/costgraph.svg" alt="" width={18} height={18} className="size-[18px]" />
-);
+import { ArrowUpRight, ChevronLeft, Lock, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -34,13 +31,15 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@/components/ui/dialog";
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { toast } from "@/components/ui/toast";
 import { CardShell } from "@/components/integrations/CardShell";
 import {
@@ -49,16 +48,25 @@ import {
     deleteCostGraphConnection,
     getUsageExportSettings,
     pushCostGraphNow,
-    saveCostGraphConnection,
+    setCostGraphEnabled,
     type CostGraphConnectionView,
     type UsageExportSettings,
 } from "@/app/(app)/[orgSlug]/~/settings/actions";
+
+export const COSTGRAPH = {
+    slug: "costgraph",
+    name: "CostGraph",
+    description: "Cost infrastructure for enterprise teams.",
+    category: "FinOps",
+    website: "https://costgraph.ai",
+    docs: "https://cencori.com/docs/integrations/costgraph",
+} as const;
 
 export const SUB_ACCOUNT_OPTIONS = [
     { value: "project", label: "Project", hint: "Each Cencori project is a sub-account." },
     { value: "end_user", label: "End user", hint: "The end user id you send with requests — your customers." },
     { value: "tenant", label: "Tenant", hint: "Embedded-agent tenants." },
-    { value: "none", label: "None", hint: "Leave the sub-account column empty." },
+    { value: "none", label: "None", hint: "The sub-account column is left empty." },
 ] as const;
 
 export function usageExportQueryKey(orgSlug: string) {
@@ -77,23 +85,29 @@ const CALLBACK_MESSAGES: Record<string, string> = {
     costgraph_role: "Connecting needs an owner, admin or billing admin role in that CostGraph organization.",
 };
 
-/* ---------- Card pieces ---------- */
-
-function Row({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
-    return (
-        <div className="flex min-h-12 items-center justify-between gap-6 px-5 py-3">
-            <p className="text-xs text-muted-foreground">{label}</p>
-            <p className={`truncate text-right text-[13px] font-medium ${mono ? "font-mono" : ""}`}>{value}</p>
-        </div>
-    );
+/** CostGraph's mark, from their brand assets (public/integrations/costgraph.svg). */
+function CostGraphLogo({ size = 18 }: { size?: number }) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src="/integrations/costgraph.svg" alt="" width={size} height={size} style={{ width: size, height: size }} />;
 }
 
-/* ---------- The card ---------- */
+/**
+ * Settings URLs for the integration, on whichever host we are: the console's flat routes
+ * (/settings/…) or the org/project ones (/{org}/{project}/settings/…).
+ */
+function useIntegrationPaths(orgSlug: string) {
+    const pathname = usePathname() ?? "";
+    const segments = pathname.split("/").filter(Boolean);
+    const base = segments[0] === orgSlug && segments[1] ? `/${segments[0]}/${segments[1]}/settings` : "/settings";
+    return {
+        list: `${base}?tab=integrations`,
+        page: `${base}/integrations/${COSTGRAPH.slug}`,
+    };
+}
 
-export function CostGraphIntegration({ orgSlug }: { orgSlug: string }) {
-    const queryKey = usageExportQueryKey(orgSlug);
-    const { data, isLoading, error } = useQuery<UsageExportSettings>({
-        queryKey,
+function useConnection(orgSlug: string) {
+    return useQuery<UsageExportSettings>({
+        queryKey: usageExportQueryKey(orgSlug),
         queryFn: async () => {
             const result = await getUsageExportSettings(orgSlug);
             if (!result.ok || !result.data) throw new Error(result.error || "Could not load the CostGraph integration");
@@ -101,26 +115,57 @@ export function CostGraphIntegration({ orgSlug }: { orgSlug: string }) {
         },
         staleTime: 30 * 1000,
     });
+}
 
-    useCallbackNotice(queryKey);
+/** Send the user through "Sign in with CostGraph", coming back to `returnTo`. */
+function startConnect(orgSlug: string, returnTo: string) {
+    window.location.href = `/api/integrations/costgraph/oauth/start?org=${encodeURIComponent(orgSlug)}&returnTo=${encodeURIComponent(returnTo)}`;
+}
 
-    if (isLoading) return <Skeleton className="h-60 w-full rounded-lg" />;
-    if (error || !data) {
-        return (
-            <CardShell
-                layout="compact"
-                logo={costGraphLogo}
-                title="CostGraph"
-                description="Cost infrastructure for enterprise teams."
-            >
-                <p className="border-t border-border/30 px-5 py-4 text-xs text-muted-foreground">
-                    {error instanceof Error ? error.message : "Could not load the CostGraph integration."}
-                </p>
-            </CardShell>
+/* ---------- The card on Settings → Integrations ---------- */
+
+export function CostGraphIntegration({ orgSlug }: { orgSlug: string }) {
+    const { data, isLoading } = useConnection(orgSlug);
+    const paths = useIntegrationPaths(orgSlug);
+    useCallbackNotice(usageExportQueryKey(orgSlug));
+
+    if (isLoading) return <Skeleton className="h-36 w-full rounded-lg" />;
+
+    const connected = Boolean(data?.costgraph);
+    const pending = Boolean(data?.pendingTenants && !connected);
+    const available = Boolean(data?.oauthAvailable);
+
+    let action: ReactNode;
+    if (connected || pending) {
+        action = (
+            <Button asChild size="sm" className="h-7 px-3 text-xs">
+                <Link href={paths.page}>{pending ? "Finish connecting" : "View connection"}</Link>
+            </Button>
+        );
+    } else {
+        action = (
+            <>
+                <Button size="sm" className="h-7 px-3 text-xs" disabled={!available} onClick={() => startConnect(orgSlug, paths.page)}>
+                    Connect
+                </Button>
+                {!available && (
+                    <span className="ml-auto shrink-0 rounded-md border border-border/40 bg-background/25 px-2 py-0.5 text-[9px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                        Available soon
+                    </span>
+                )}
+            </>
         );
     }
 
-    return <CostGraphCard orgSlug={orgSlug} settings={data} queryKey={queryKey} />;
+    return (
+        <CardShell
+            layout="compact"
+            logo={<CostGraphLogo />}
+            title={COSTGRAPH.name}
+            description={COSTGRAPH.description}
+            bottomAction={action}
+        />
+    );
 }
 
 /** Turn the OAuth callback's `?costgraph=` result into a toast, then drop it from the URL. */
@@ -148,63 +193,239 @@ function useCallbackNotice(queryKey: string[]) {
     }, [result]);
 }
 
-function CostGraphCard({
-    orgSlug,
-    settings,
-    queryKey,
-}: {
-    orgSlug: string;
-    settings: UsageExportSettings;
-    queryKey: string[];
-}) {
-    const connection = settings.costgraph;
+/* ---------- The integration's own page ---------- */
+
+const sectionClass = "grid gap-4 border-t border-border/35 py-7 lg:grid-cols-[200px_minmax(0,1fr)] lg:items-start lg:gap-9";
+
+function Section({ title, description, children }: { title: string; description: string; children: ReactNode }) {
+    return (
+        <section className={sectionClass}>
+            <div className="space-y-0.5">
+                <h2 className="text-sm font-medium">{title}</h2>
+                <p className="text-[11px] leading-5 text-muted-foreground">{description}</p>
+            </div>
+            <div className="min-w-0">{children}</div>
+        </section>
+    );
+}
+
+function Detail({ label, children, mono = false }: { label: string; children: ReactNode; mono?: boolean }) {
+    return (
+        <div className="flex min-h-12 items-center justify-between gap-6 px-5 py-3">
+            <p className="text-xs text-muted-foreground">{label}</p>
+            <div className={`min-w-0 truncate text-right text-[13px] font-medium ${mono ? "font-mono" : ""}`}>{children}</div>
+        </div>
+    );
+}
+
+function formatWhen(iso: string | null): string {
+    if (!iso) return "Never";
+    return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+}
+
+function connectionStatus(connection: CostGraphConnectionView): { label: string; tone: "ok" | "warn" | "error" | "idle" } {
+    if (!connection.enabled) return { label: "Paused", tone: "idle" };
+    if (!connection.connectionId) return { label: "Waiting for CostGraph", tone: "warn" };
+    if (connection.lastRunStatus === "error") return { label: "Last send failed", tone: "error" };
+    if (connection.lastRunAt) return { label: "Active", tone: "ok" };
+    return { label: "Waiting for first send", tone: "warn" };
+}
+
+const TONE_DOT: Record<string, string> = {
+    ok: "bg-emerald-500",
+    warn: "bg-amber-500",
+    error: "bg-red-500",
+    idle: "bg-muted-foreground/50",
+};
+
+export function CostGraphIntegrationPage({ orgSlug }: { orgSlug: string }) {
+    const queryKey = usageExportQueryKey(orgSlug);
     const queryClient = useQueryClient();
     const refresh = () => queryClient.invalidateQueries({ queryKey });
-    const [settingsOpen, setSettingsOpen] = useState(false);
+    const { data, isLoading, error } = useConnection(orgSlug);
+    const paths = useIntegrationPaths(orgSlug);
+    useCallbackNotice(queryKey);
 
-    const startOAuth = () => {
-        const returnTo = `${window.location.pathname}${window.location.search}`;
-        window.location.href = `/api/integrations/costgraph/oauth/start?org=${encodeURIComponent(orgSlug)}&returnTo=${encodeURIComponent(returnTo)}`;
-    };
+    const connection = data?.costgraph ?? null;
+    const status = connection ? connectionStatus(connection) : null;
+
+    return (
+        <main className="w-full max-w-[1180px] mx-auto px-6 lg:px-10 py-12">
+            <Link href={paths.list} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+                <ChevronLeft className="size-3.5" />
+                Integrations
+            </Link>
+
+            <header className="mt-6 flex flex-col gap-5 border-b border-border/35 pb-6 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex items-start gap-4">
+                    <CostGraphLogo size={40} />
+                    <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <h1 className="text-xl font-medium tracking-tight">{COSTGRAPH.name}</h1>
+                            <span className="rounded-md border border-border/40 bg-background/25 px-2 py-0.5 text-[9px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                                {COSTGRAPH.category}
+                            </span>
+                        </div>
+                        <p className="mt-1 text-xs leading-5 text-muted-foreground">{COSTGRAPH.description}</p>
+                        <div className="mt-2 flex gap-4 text-[11px] text-muted-foreground">
+                            <a href={COSTGRAPH.website} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 hover:text-foreground">
+                                costgraph.ai <ArrowUpRight className="size-3" />
+                            </a>
+                            <a href={COSTGRAPH.docs} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 hover:text-foreground">
+                                Setup guide <ArrowUpRight className="size-3" />
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {status && (
+                    <div className="flex items-center gap-2 self-start text-xs">
+                        <span className={`size-1.5 rounded-full ${TONE_DOT[status.tone]}`} />
+                        {status.label}
+                    </div>
+                )}
+            </header>
+
+            {isLoading ? (
+                <div className="space-y-4 pt-7">
+                    <Skeleton className="h-40 w-full rounded-lg" />
+                    <Skeleton className="h-24 w-full rounded-lg" />
+                </div>
+            ) : error || !data ? (
+                <p className="pt-7 text-xs text-muted-foreground">
+                    {error instanceof Error ? error.message : "Could not load the CostGraph integration."}
+                </p>
+            ) : data.pendingTenants && !connection ? (
+                <Section title="Choose a tenant" description="Your CostGraph account has more than one tenant. Pick the one this organization's usage goes to.">
+                    <TenantPicker orgSlug={orgSlug} tenants={data.pendingTenants} onDone={refresh} />
+                </Section>
+            ) : !connection ? (
+                <NotConnected orgSlug={orgSlug} available={data.oauthAvailable} returnTo={paths.page} />
+            ) : (
+                <Connected orgSlug={orgSlug} connection={connection} oauthAvailable={data.oauthAvailable} returnTo={paths.page} listPath={paths.list} onChanged={refresh} />
+            )}
+        </main>
+    );
+}
+
+function NotConnected({ orgSlug, available, returnTo }: { orgSlug: string; available: boolean; returnTo: string }) {
+    return (
+        <Section title="Connection" description="Applies to every project in this organization.">
+            <div className="rounded-lg border border-border/35 bg-muted/30 px-5 py-5">
+                <p className="max-w-xl text-xs leading-5 text-muted-foreground">
+                    Connect to send this organization&apos;s AI spend to CostGraph every night, by model, project and customer, priced at what Cencori billed. You&apos;ll sign in to CostGraph and choose the tenant it goes to.
+                </p>
+                <div className="mt-4 flex items-center gap-3">
+                    <Button size="sm" className="h-7 px-3 text-xs" disabled={!available} onClick={() => startConnect(orgSlug, returnTo)}>
+                        Connect
+                    </Button>
+                    {!available && <span className="text-[11px] text-muted-foreground">Available soon</span>}
+                </div>
+            </div>
+        </Section>
+    );
+}
+
+function Connected({
+    orgSlug,
+    connection,
+    oauthAvailable,
+    returnTo,
+    listPath,
+    onChanged,
+}: {
+    orgSlug: string;
+    connection: CostGraphConnectionView;
+    oauthAvailable: boolean;
+    returnTo: string;
+    listPath: string;
+    onChanged: () => void;
+}) {
+    const router = useRouter();
+    const [confirmDisconnect, setConfirmDisconnect] = useState(false);
+    const subAccount = SUB_ACCOUNT_OPTIONS.find((o) => o.value === connection.subAccount);
 
     const pushNow = useMutation({
         mutationFn: async () => {
             const result = await pushCostGraphNow(orgSlug);
-            if (!result.ok) throw new Error(result.error || "The push failed");
+            if (!result.ok) throw new Error(result.error || "The send failed");
             return result.data;
         },
         onSuccess: (view) => {
             toast.success(view && view.sentRows > 0 ? `Sent ${view.sentRows} FOCUS rows to CostGraph.` : "CostGraph is up to date.");
-            void refresh();
+            onChanged();
         },
         onError: (err: Error) => {
             toast.error(err.message);
-            void refresh();
+            onChanged();
         },
     });
 
-    // Option C only: Connect runs "Sign in with CostGraph". Until CostGraph offers focus:write over
-    // OAuth (COSTGRAPH_OAUTH_ENABLED), the button is there but disabled.
-    const connectAction = (
-        <Button size="sm" className="h-7 px-3 text-xs" disabled={!settings.oauthAvailable} onClick={startOAuth}>
-            Connect
-        </Button>
-    );
-    const availableSoon = !connection && !settings.oauthAvailable ? (
-        <span className="ml-auto shrink-0 rounded-md border border-border/40 bg-background/25 px-2 py-0.5 text-[9px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
-            Available soon
-        </span>
-    ) : undefined;
+    const toggle = useMutation({
+        mutationFn: async (enabled: boolean) => {
+            const result = await setCostGraphEnabled(orgSlug, enabled);
+            if (!result.ok) throw new Error(result.error || "Could not update");
+        },
+        onSuccess: onChanged,
+        onError: (err: Error) => toast.error(err.message),
+    });
+
+    const disconnect = useMutation({
+        mutationFn: async () => {
+            const result = await deleteCostGraphConnection(orgSlug);
+            if (!result.ok) throw new Error(result.error || "Could not disconnect");
+        },
+        onSuccess: () => {
+            toast.success("CostGraph disconnected.");
+            onChanged();
+            router.push(listPath);
+        },
+        onError: (err: Error) => toast.error(err.message),
+    });
 
     return (
-        <CardShell
-            layout="compact"
-            logo={costGraphLogo}
-            title="CostGraph"
-            description="Cost infrastructure for enterprise teams."
-            bottomActionDivided={Boolean(connection)}
-            bottomAction={connection ? (
-                <>
+        <>
+            <Section title="Connection" description="Applies to every project in this organization.">
+                <div className="overflow-hidden rounded-lg border border-border/35 bg-muted/30 divide-y divide-border/30">
+                    <Detail label="Connected with">
+                        {connection.authMethod === "oauth" ? "CostGraph sign-in" : `API key ${connection.apiKeyHint ?? ""}`}
+                    </Detail>
+                    {connection.tenantName && <Detail label="CostGraph tenant">{connection.tenantName}</Detail>}
+                    <Detail label="Connection" mono>{connection.connectionId ?? "Not created yet"}</Detail>
+                    <Detail label="Sub-account">
+                        <span className="inline-flex items-center gap-1.5">
+                            {subAccount?.label ?? connection.subAccount}
+                            {connection.lastPushedDay && <Lock className="size-3 text-muted-foreground" aria-label="Fixed" />}
+                        </span>
+                    </Detail>
+                </div>
+                {connection.lastPushedDay && (
+                    <p className="mt-2 text-[11px] leading-5 text-muted-foreground">
+                        The sub-account is fixed once usage has been sent: CostGraph keeps every record it receives, so changing it would count history twice.
+                    </p>
+                )}
+            </Section>
+
+            <Section title="Sending" description="Each UTC day is sent once it closes; from the 3rd, the previous month is re-sent so late usage corrects itself.">
+                <div className="overflow-hidden rounded-lg border border-border/35 bg-muted/30 divide-y divide-border/30">
+                    <Detail label="Sent through" mono>{connection.lastPushedDay ?? "Nothing sent yet"}</Detail>
+                    <Detail label="Last attempt">{formatWhen(connection.lastRunAt)}</Detail>
+                    <div className="flex min-h-12 items-center justify-between gap-6 px-5 py-3">
+                        <Label htmlFor="cg-enabled" className="text-xs font-normal text-muted-foreground">Send nightly</Label>
+                        <Switch
+                            id="cg-enabled"
+                            checked={connection.enabled}
+                            disabled={toggle.isPending}
+                            onCheckedChange={(enabled) => toggle.mutate(enabled)}
+                        />
+                    </div>
+                    {connection.lastRunStatus === "error" && connection.lastRunError && (
+                        <div className="px-5 py-3">
+                            <p className="text-[11px] text-muted-foreground">Last send failed</p>
+                            <p className="mt-1 break-words font-mono text-[11px] leading-5 text-destructive">{connection.lastRunError}</p>
+                        </div>
+                    )}
+                </div>
+                <div className="mt-4">
                     <Button
                         size="sm"
                         variant="outline"
@@ -215,43 +436,42 @@ function CostGraphCard({
                         <Send className="mr-1.5 size-3" />
                         {pushNow.isPending ? "Sending…" : "Send now"}
                     </Button>
-                    <Button size="sm" className="h-7 px-3 text-xs" onClick={() => setSettingsOpen(true)}>Manage</Button>
-                </>
-            ) : settings.pendingTenants ? null : <>{connectAction}{availableSoon}</>}
-        >
-            {settings.pendingTenants && !connection ? (
-                <TenantPicker orgSlug={orgSlug} tenants={settings.pendingTenants} onDone={refresh} />
-            ) : connection && (
-                <div className="divide-y divide-border/30 border-t border-border/30">
-                    <Row
-                        label="Connected with"
-                        value={connection.authMethod === "oauth"
-                            ? `CostGraph sign-in${connection.tenantName ? ` · ${connection.tenantName}` : ""}`
-                            : `API key ${connection.apiKeyHint ?? ""}`}
-                    />
-                    <Row label="Connection" value={connection.connectionId ?? "Not created yet"} mono />
-                    <Row label="Sub-account" value={SUB_ACCOUNT_OPTIONS.find((o) => o.value === connection.subAccount)?.label ?? connection.subAccount} />
-                    <Row label="Sent through" value={connection.lastPushedDay ?? "Nothing sent yet"} mono />
-                    {connection.lastRunStatus === "error" && connection.lastRunError && (
-                        <div className="px-5 py-3">
-                            <p className="break-words font-mono text-[11px] leading-5 text-destructive">{connection.lastRunError}</p>
-                        </div>
-                    )}
                 </div>
-            )}
+            </Section>
 
-            {connection && (
-                <ManageDialog
-                    open={settingsOpen}
-                    onOpenChange={setSettingsOpen}
-                    orgSlug={orgSlug}
-                    connection={connection}
-                    oauthAvailable={settings.oauthAvailable}
-                    onReconnect={startOAuth}
-                    onSaved={refresh}
-                />
-            )}
-        </CardShell>
+            <Section title="Manage" description="Reconnect to sign in to CostGraph again. Disconnecting stops the nightly send; what CostGraph already has stays there.">
+                <div className="flex flex-wrap gap-2">
+                    {oauthAvailable && (
+                        <Button size="sm" variant="outline" className="h-7 px-3 text-xs" onClick={() => startConnect(orgSlug, returnTo)}>
+                            {connection.authMethod === "oauth" ? "Reconnect" : "Switch to CostGraph sign-in"}
+                        </Button>
+                    )}
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 px-3 text-xs text-destructive hover:text-destructive"
+                        onClick={() => setConfirmDisconnect(true)}
+                    >
+                        Disconnect
+                    </Button>
+                </div>
+            </Section>
+
+            <AlertDialog open={confirmDisconnect} onOpenChange={setConfirmDisconnect}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Disconnect CostGraph?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Cencori stops sending usage to CostGraph for every project in this organization. Usage CostGraph already received stays there.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => disconnect.mutate()}>Disconnect</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </>
     );
 }
 
@@ -285,155 +505,23 @@ function TenantPicker({
     });
 
     return (
-        <div className="space-y-3 border-t border-border/30 px-5 py-4">
-            <Label className="text-xs">Send usage to which CostGraph tenant?</Label>
+        <div className="space-y-3 rounded-lg border border-border/35 bg-muted/30 px-5 py-5">
             <Select value={tenantId} onValueChange={setTenantId}>
-                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-8 max-w-sm text-xs"><SelectValue /></SelectTrigger>
                 <SelectContent>
                     {tenants.map((tenant) => (
                         <SelectItem key={tenant.id} value={tenant.id} className="text-xs">{tenant.name}</SelectItem>
                     ))}
                 </SelectContent>
             </Select>
-            <div className="flex justify-end gap-2">
-                <Button variant="ghost" size="sm" className="h-7 px-3 text-xs" disabled={cancel.isPending} onClick={() => cancel.mutate()}>Cancel</Button>
+            <div className="flex gap-2">
                 <Button size="sm" className="h-7 px-3 text-xs" disabled={!tenantId || complete.isPending} onClick={() => complete.mutate()}>
                     {complete.isPending ? "Connecting…" : "Connect"}
                 </Button>
+                <Button variant="ghost" size="sm" className="h-7 px-3 text-xs" disabled={cancel.isPending} onClick={() => cancel.mutate()}>
+                    Cancel
+                </Button>
             </div>
-        </div>
-    );
-}
-
-function ManageDialog({
-    open,
-    onOpenChange,
-    orgSlug,
-    connection,
-    oauthAvailable,
-    onReconnect,
-    onSaved,
-}: {
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
-    orgSlug: string;
-    connection: CostGraphConnectionView;
-    oauthAvailable: boolean;
-    onReconnect: () => void;
-    onSaved: () => void;
-}) {
-    const [enabled, setEnabled] = useState(connection.enabled);
-    useEffect(() => { if (open) setEnabled(connection.enabled); }, [open, connection.enabled]);
-
-    const save = useMutation({
-        mutationFn: async () => {
-            if (connection.authMethod !== "api_key" || !connection.connectionId) return;
-            const result = await saveCostGraphConnection(orgSlug, {
-                connectionId: connection.connectionId,
-                subAccount: connection.subAccount,
-                enabled,
-            });
-            if (!result.ok) throw new Error(result.error || "Could not save");
-        },
-        onSuccess: () => {
-            onOpenChange(false);
-            onSaved();
-        },
-        onError: (err: Error) => toast.error(err.message),
-    });
-
-    const disconnect = useMutation({
-        mutationFn: async () => {
-            const result = await deleteCostGraphConnection(orgSlug);
-            if (!result.ok) throw new Error(result.error || "Could not disconnect");
-        },
-        onSuccess: () => {
-            toast.success("CostGraph disconnected.");
-            onOpenChange(false);
-            onSaved();
-        },
-        onError: (err: Error) => toast.error(err.message),
-    });
-
-    return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                    <DialogTitle className="text-sm">CostGraph connection</DialogTitle>
-                    <DialogDescription className="text-xs leading-5">
-                        {connection.authMethod === "oauth"
-                            ? `Connected with CostGraph sign-in${connection.tenantName ? ` to ${connection.tenantName}` : ""}.`
-                            : `Connected with API key ${connection.apiKeyHint ?? ""}.`}
-                    </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-5">
-                    <SubAccountField value={connection.subAccount} onChange={() => undefined} locked />
-                    {connection.authMethod === "api_key" && (
-                        <div className="flex items-center justify-between">
-                            <Label htmlFor="cg-enabled" className="text-xs">Send nightly</Label>
-                            <Switch id="cg-enabled" checked={enabled} onCheckedChange={setEnabled} />
-                        </div>
-                    )}
-                    <div className="flex flex-wrap gap-2">
-                        {oauthAvailable && (
-                            <Button variant="outline" size="sm" className="h-7 px-3 text-xs" onClick={onReconnect}>
-                                {connection.authMethod === "oauth" ? "Reconnect" : "Switch to CostGraph sign-in"}
-                            </Button>
-                        )}
-                    </div>
-                </div>
-                <DialogFooter className="gap-2 sm:justify-between">
-                    <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-3 text-xs text-destructive hover:text-destructive"
-                        disabled={disconnect.isPending}
-                        onClick={() => disconnect.mutate()}
-                    >
-                        Disconnect
-                    </Button>
-                    {connection.authMethod === "api_key" && (
-                        <Button size="sm" className="h-7 px-3 text-xs" disabled={save.isPending} onClick={() => save.mutate()}>
-                            {save.isPending ? "Saving…" : "Save"}
-                        </Button>
-                    )}
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-/**
- * The sub-account is part of every record's identity in CostGraph, and CostGraph never deletes
- * what it has ingested — changing it after a push would count the history twice. So it is chosen
- * once, before anything is sent.
- */
-function SubAccountField({ value, onChange, locked }: { value: string; onChange: (value: string) => void; locked: boolean }) {
-    const option = SUB_ACCOUNT_OPTIONS.find((o) => o.value === value);
-    return (
-        <div className="space-y-2">
-            <Label className="text-xs">Sub-account</Label>
-            {locked ? (
-                <div className="flex h-8 items-center justify-between rounded-md border border-border/40 bg-muted/30 px-3 text-xs">
-                    <span>{option?.label ?? value}</span>
-                    <Lock className="size-3 text-muted-foreground" />
-                </div>
-            ) : (
-                <Select value={value} onValueChange={onChange}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                        {SUB_ACCOUNT_OPTIONS.map((o) => (
-                            <SelectItem key={o.value} value={o.value} className="text-xs">{o.label}</SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            )}
-            <p className="text-[11px] leading-5 text-muted-foreground">
-                {locked
-                    ? "Fixed once usage has been sent: CostGraph keeps every record it receives, so changing this would count your history twice."
-                    : option?.hint}
-            </p>
         </div>
     );
 }
