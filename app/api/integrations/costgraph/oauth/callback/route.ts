@@ -6,7 +6,7 @@
  * tenant (several). Every outcome redirects back to where the user started, with `costgraph=…`.
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { resolveConsoleBaseUrl } from '@/lib/auth-redirect';
 import { resolvePublicOrigin } from '@/lib/public-origin';
 import { requireOrgOwnerOrAdmin } from '@/lib/org-admin-access';
@@ -23,9 +23,11 @@ import {
     listTenants,
     oauthClientId,
     openOAuthState,
+    assertGrantedScopes,
     revokeToken,
     sealSigned,
 } from '@/lib/finops/costgraph-oauth';
+import { sendFirstPush } from '@/lib/finops/costgraph-push';
 import { encryptTokens, finishCostGraphConnect, type PendingConnect } from '@/lib/finops/costgraph-connect';
 import { CostGraphError } from '@/lib/finops/costgraph';
 
@@ -71,6 +73,12 @@ export async function GET(req: NextRequest) {
     const clientId = oauthClientId(origin);
     try {
         const tokens = await exchangeAuthorizationCode({ code, verifier: state.verifier, clientId, redirectUri: callbackUrl(origin) });
+        try {
+            assertGrantedScopes(tokens);
+        } catch (scopeError) {
+            await revokeToken({ token: tokens.refreshToken, clientId });
+            throw scopeError;
+        }
         const tenants = await listTenants(tokens.accessToken);
         const subject = idTokenSubject(tokens.idToken);
 
@@ -93,7 +101,7 @@ export async function GET(req: NextRequest) {
             return finish(returnTo, { costgraph: 'choose_tenant' }, sealSigned(pending));
         }
 
-        await finishCostGraphConnect({
+        const { rowId } = await finishCostGraphConnect({
             supabase: createAdminClient(),
             organizationId: state.organizationId,
             userId: state.userId,
@@ -102,6 +110,8 @@ export async function GET(req: NextRequest) {
             tenant: tenants[0],
             clientId,
         });
+        // Send the month so far now rather than at the next nightly run.
+        after(() => sendFirstPush(rowId));
         return finish(returnTo, { costgraph: 'connected' });
     } catch (error) {
         console.error('[CostGraph OAuth] callback failed:', error);

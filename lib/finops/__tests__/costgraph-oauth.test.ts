@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { encryptApiKey } from '@/lib/encryption';
 import {
     CostGraphOAuthError,
+    assertGrantedScopes,
     costgraphOAuthEnabled,
     costgraphOAuthScopes,
     costgraphOAuthServed,
@@ -200,6 +201,22 @@ describe('getValidAccessToken', () => {
         const fetchImpl = vi.fn(async () => tokenResponse({ error: 'invalid_grant' }, 400));
         await expect(getValidAccessToken(store.supabase, 'conn_1', { clientId: 'c', fetchImpl: fetchImpl as never })).rejects.toBeInstanceOf(CostGraphOAuthError);
         expect(store.row.oauth_refresh_lease_until).toBeNull();
+    });
+});
+
+describe('assertGrantedScopes', () => {
+    /**
+     * What CostGraph actually granted on 2026-10-14: we asked for openid profile focus:write
+     * integrations:read and got "mcp" — enough to create the connection, never enough to push.
+     */
+    it('refuses a token that cannot send usage', () => {
+        expect(() => assertGrantedScopes({ scope: 'mcp' })).toThrow(CostGraphOAuthError);
+        try { assertGrantedScopes({ scope: 'mcp' }); } catch (e) { expect((e as CostGraphOAuthError).code).toBe('insufficient_scope'); }
+    });
+
+    it('accepts a token with focus:write, and one whose response names no scope', () => {
+        expect(() => assertGrantedScopes({ scope: 'openid profile focus:write integrations:read' })).not.toThrow();
+        expect(() => assertGrantedScopes({ scope: null })).not.toThrow();
     });
 });
 

@@ -83,6 +83,7 @@ const CALLBACK_MESSAGES: Record<string, string> = {
     unavailable: "Connecting CostGraph from Cencori isn't available yet.",
     invalid_scope: "CostGraph didn't allow the permissions Cencori asked for.",
     costgraph_role: "Connecting needs an owner, admin or billing admin role in that CostGraph organization.",
+    insufficient_scope: "CostGraph didn't grant permission to send usage (focus:write), so nothing was connected.",
 };
 
 /** CostGraph's mark, from their brand assets (public/integrations/costgraph.svg). */

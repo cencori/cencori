@@ -285,6 +285,21 @@ export async function revokeToken(params: { token: string; clientId: string; fet
     }).catch(() => undefined);
 }
 
+/**
+ * Throw unless CostGraph granted what pushing needs. CostGraph can grant less than was asked for —
+ * on 2026-10-14 it granted only `mcp` to our metadata-document client while we asked for
+ * `openid profile focus:write integrations:read` — and a token without `focus:write` can create
+ * the connection but never send to it. A response that names no scope is taken at its word.
+ */
+export function assertGrantedScopes(tokens: Pick<TokenSet, 'scope'>, required: string[] = ['focus:write']): void {
+    if (tokens.scope === null) return;
+    const granted = new Set(tokens.scope.split(/\s+/).filter(Boolean));
+    const missing = required.filter((scope) => !granted.has(scope));
+    if (missing.length > 0) {
+        throw new CostGraphOAuthError(403, 'insufficient_scope', `granted "${tokens.scope}", missing ${missing.join(', ')}`);
+    }
+}
+
 /** The `sub` claim of an id_token, for knowing which CostGraph user connected. Not verified. */
 export function idTokenSubject(idToken: string | null): string | null {
     if (!idToken) return null;
