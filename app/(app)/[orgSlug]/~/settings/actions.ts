@@ -402,6 +402,30 @@ export async function deleteCostGraphConnection(orgSlug: string): Promise<Action
     return { ok: true };
 }
 
+/** Pause or resume the nightly push, whichever way the connection authenticates. */
+export async function setCostGraphEnabled(orgSlug: string, enabled: boolean): Promise<ActionResult<CostGraphConnectionView>> {
+    const auth = await requireOwnerOrAdmin(orgSlug);
+    if (!auth.ok) return { ok: false, error: auth.error };
+    const { data, error } = await createAdminClient()
+        .from('organization_finops_connections')
+        .update({ enabled, updated_at: new Date().toISOString() })
+        .eq('organization_id', auth.orgId)
+        .eq('provider', 'costgraph')
+        .select(CONNECTION_COLUMNS)
+        .single();
+    if (error || !data) return { ok: false, error: 'Could not update the CostGraph connection.' };
+    writeAuditLog({
+        organizationId: auth.orgId,
+        category: 'integration',
+        action: enabled ? 'activated' : 'deactivated',
+        resourceType: 'finops_connection',
+        resourceId: (data as Record<string, unknown>).id as string,
+        actorId: auth.userId,
+        description: `${enabled ? 'Resumed' : 'Paused'} the CostGraph usage push`,
+    });
+    return { ok: true, data: toConnectionView(data) };
+}
+
 /** Finish "Connect CostGraph" with the tenant the user picked. */
 export async function completeCostGraphConnect(orgSlug: string, tenantId: string): Promise<ActionResult<CostGraphConnectionView>> {
     const auth = await requireOwnerOrAdmin(orgSlug);

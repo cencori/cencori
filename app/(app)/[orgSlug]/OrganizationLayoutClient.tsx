@@ -210,8 +210,10 @@ export default function OrganizationLayoutClient({
     const docsUrl = getMainSiteUrl("/docs");
     const scopedArea = segments[2];
     const isProjectSettingsView = isInsideProject && (
-        consoleMode ? pathname === "/settings" : scopedArea === "settings"
+        consoleMode ? pathname === "/settings" || pathname.startsWith("/settings/") : scopedArea === "settings"
     );
+    // An integration's own page sits under Settings → Integrations.
+    const isIntegrationPage = isProjectSettingsView && pathname.includes("/settings/integrations/");
     const isOrganizationSettingsView = !isInsideProject && (
         consoleMode ? pathname === "/organization/settings" : scopedArea === "settings"
     );
@@ -298,7 +300,9 @@ export default function OrganizationLayoutClient({
     // the next real navigation.
     const [pendingSettingsTab, setPendingSettingsTab] = useState<string | null>(null);
     const projectSettingsTab = pendingSettingsTab
-        ?? (pendingSubnavEntry === "project-settings"
+        ?? (isIntegrationPage
+        ? "integrations"
+        : pendingSubnavEntry === "project-settings"
         ? "general"
         : ["general", "budget", "providers", "infrastructure", "networking", "integrations", "api", "webhooks"].includes(requestedProjectSettingsTab || "")
         ? requestedProjectSettingsTab
@@ -733,7 +737,11 @@ export default function OrganizationLayoutClient({
                                                             // The page syncs ?tab= itself so links
                                                             // stay shareable. Deep links from
                                                             // elsewhere remain normal navigations.
-                                                            if (!isProjectSettingsView) return;
+                                                            // An integration's own page has no tabs, so navigate.
+                                                            if (!isProjectSettingsView || isIntegrationPage) {
+                                                                setPendingSettingsTab(null);
+                                                                return;
+                                                            }
                                                             event.preventDefault();
                                                             setPendingSettingsTab(item.tab);
                                                             announceSettingsTab(item.tab);
