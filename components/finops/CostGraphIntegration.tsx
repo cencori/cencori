@@ -15,7 +15,7 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Copy, Lock, Send } from "lucide-react";
+import { Lock, Send } from "lucide-react";
 
 /** CostGraph's mark, from their brand assets (public/integrations/costgraph.svg). */
 const costGraphLogo = (
@@ -23,7 +23,6 @@ const costGraphLogo = (
     <img src="/integrations/costgraph.svg" alt="" width={18} height={18} className="size-[18px]" />
 );
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
@@ -72,8 +71,8 @@ const CALLBACK_MESSAGES: Record<string, string> = {
     signed_out: "Sign in to Cencori again, then connect CostGraph.",
     expired: "That CostGraph sign-in took too long. Connect again.",
     no_tenant: "Your CostGraph account has no tenant to send usage to.",
-    unsupported: "CostGraph doesn't support connecting this way yet. Use an API key instead.",
-    unavailable: "Connecting with CostGraph sign-in isn't available yet. Use an API key instead.",
+    unsupported: "CostGraph doesn't support connecting from Cencori yet.",
+    unavailable: "Connecting CostGraph from Cencori isn't available yet.",
     invalid_scope: "CostGraph didn't allow the permissions Cencori asked for.",
 };
 
@@ -84,29 +83,6 @@ function Row({ label, value, mono = false }: { label: string; value: string; mon
         <div className="flex min-h-12 items-center justify-between gap-6 px-5 py-3">
             <p className="text-xs text-muted-foreground">{label}</p>
             <p className={`truncate text-right text-[13px] font-medium ${mono ? "font-mono" : ""}`}>{value}</p>
-        </div>
-    );
-}
-
-/** CostGraph binds a push connection to the BillingAccountId our records carry: the org id. */
-function CopyRow({ label, value }: { label: string; value: string }) {
-    const [copied, setCopied] = useState(false);
-    return (
-        <div className="flex min-h-12 items-center justify-between gap-6 px-5 py-3">
-            <p className="text-xs text-muted-foreground">{label}</p>
-            <button
-                type="button"
-                className="flex min-w-0 items-center gap-1.5 text-right font-mono text-[13px] font-medium hover:text-foreground"
-                onClick={async () => {
-                    await navigator.clipboard.writeText(value);
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 1500);
-                }}
-                aria-label={`Copy ${label}`}
-            >
-                <span className="truncate">{value}</span>
-                {copied ? <Check className="size-3 shrink-0" /> : <Copy className="size-3 shrink-0 text-muted-foreground" />}
-            </button>
         </div>
     );
 }
@@ -183,7 +159,6 @@ function CostGraphCard({
     const connection = settings.costgraph;
     const queryClient = useQueryClient();
     const refresh = () => queryClient.invalidateQueries({ queryKey });
-    const [keyDialogOpen, setKeyDialogOpen] = useState(false);
     const [settingsOpen, setSettingsOpen] = useState(false);
 
     const startOAuth = () => {
@@ -207,15 +182,15 @@ function CostGraphCard({
         },
     });
 
-    const connectAction = settings.oauthAvailable ? (
-        <>
-            <Button size="sm" className="h-7 px-3 text-xs" onClick={startOAuth}>Connect CostGraph</Button>
-            <button type="button" className="text-[11px] text-muted-foreground hover:text-foreground" onClick={() => setKeyDialogOpen(true)}>
-                Use an API key instead
-            </button>
-        </>
-    ) : (
-        <Button size="sm" className="h-7 px-3 text-xs" onClick={() => setKeyDialogOpen(true)}>Connect</Button>
+    // Option C only: Connect runs "Sign in with CostGraph". Until CostGraph offers focus:write over
+    // OAuth (COSTGRAPH_OAUTH_ENABLED), the button is there but disabled.
+    const connectAction = (
+        <div className="flex flex-col items-start gap-1.5">
+            <Button size="sm" className="h-7 px-3 text-xs" disabled={!settings.oauthAvailable} onClick={startOAuth}>
+                Connect
+            </Button>
+            {!settings.oauthAvailable && <p className="text-[11px] text-muted-foreground">Available soon</p>}
+        </div>
     );
 
     return (
@@ -262,14 +237,6 @@ function CostGraphCard({
                 </div>
             )}
 
-            <ApiKeyDialog
-                open={keyDialogOpen}
-                onOpenChange={setKeyDialogOpen}
-                orgSlug={orgSlug}
-                organizationId={settings.organizationId}
-                connection={connection}
-                onSaved={refresh}
-            />
             {connection && (
                 <ManageDialog
                     open={settingsOpen}
@@ -277,7 +244,6 @@ function CostGraphCard({
                     orgSlug={orgSlug}
                     connection={connection}
                     oauthAvailable={settings.oauthAvailable}
-                    onSwitchToKey={() => { setSettingsOpen(false); setKeyDialogOpen(true); }}
                     onReconnect={startOAuth}
                     onSaved={refresh}
                 />
@@ -336,117 +302,12 @@ function TenantPicker({
     );
 }
 
-/** The paste-a-key flow: works today, with no OAuth on CostGraph's side. */
-function ApiKeyDialog({
-    open,
-    onOpenChange,
-    orgSlug,
-    organizationId,
-    connection,
-    onSaved,
-}: {
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
-    orgSlug: string;
-    organizationId: string;
-    connection: CostGraphConnectionView | null;
-    onSaved: () => void;
-}) {
-    const keyConnection = connection?.authMethod === "api_key" ? connection : null;
-    const [connectionId, setConnectionId] = useState("");
-    const [apiKey, setApiKey] = useState("");
-    const [subAccount, setSubAccount] = useState<string>("project");
-
-    useEffect(() => {
-        if (!open) return;
-        setConnectionId(keyConnection?.connectionId ?? "");
-        setApiKey("");
-        setSubAccount(connection?.subAccount ?? "project");
-    }, [open, keyConnection?.connectionId, connection?.subAccount]);
-
-    const subAccountLocked = Boolean(connection?.lastPushedDay) && connectionId === connection?.connectionId;
-
-    const save = useMutation({
-        mutationFn: async () => {
-            const result = await saveCostGraphConnection(orgSlug, {
-                connectionId,
-                apiKey,
-                subAccount,
-                enabled: connection?.enabled ?? true,
-            });
-            if (!result.ok) throw new Error(result.error || "Could not save");
-        },
-        onSuccess: () => {
-            toast.success(connection ? "CostGraph connection updated." : "CostGraph connected. The first push sends this month so far.");
-            onOpenChange(false);
-            onSaved();
-        },
-        onError: (err: Error) => toast.error(err.message),
-    });
-
-    return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                    <DialogTitle className="text-sm">Connect CostGraph with an API key</DialogTitle>
-                    <DialogDescription className="text-xs leading-5">
-                        In CostGraph, open Integrations → Anything Else → FOCUS push. Leave Provider on “Detect from my first push”, use the billing account id below, and copy the connection id. Then create a focus:write key under Settings → API keys in the same tenant.
-                    </DialogDescription>
-                </DialogHeader>
-                <div className="overflow-hidden rounded-md border border-border/35">
-                    <CopyRow label="Billing account id" value={organizationId} />
-                </div>
-                <form
-                    className="space-y-5"
-                    onSubmit={(event) => {
-                        event.preventDefault();
-                        save.mutate();
-                    }}
-                >
-                    <div className="space-y-2">
-                        <Label htmlFor="cg-connection" className="text-xs">Push connection id</Label>
-                        <Input
-                            id="cg-connection"
-                            value={connectionId}
-                            onChange={(event) => setConnectionId(event.target.value)}
-                            placeholder="fpc_…"
-                            autoComplete="off"
-                            className="h-8 font-mono text-xs"
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="cg-key" className="text-xs">
-                            API key {keyConnection && <span className="text-muted-foreground">(leave empty to keep {keyConnection.apiKeyHint})</span>}
-                        </Label>
-                        <Input
-                            id="cg-key"
-                            type="password"
-                            value={apiKey}
-                            onChange={(event) => setApiKey(event.target.value)}
-                            placeholder="focus:write key"
-                            autoComplete="off"
-                            className="h-8 font-mono text-xs"
-                        />
-                    </div>
-                    <SubAccountField value={subAccount} onChange={setSubAccount} locked={subAccountLocked} />
-                    <DialogFooter>
-                        <Button type="submit" size="sm" className="h-7 px-3 text-xs" disabled={save.isPending}>
-                            {save.isPending ? "Saving…" : "Save"}
-                        </Button>
-                    </DialogFooter>
-                </form>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
 function ManageDialog({
     open,
     onOpenChange,
     orgSlug,
     connection,
     oauthAvailable,
-    onSwitchToKey,
     onReconnect,
     onSaved,
 }: {
@@ -455,7 +316,6 @@ function ManageDialog({
     orgSlug: string;
     connection: CostGraphConnectionView;
     oauthAvailable: boolean;
-    onSwitchToKey: () => void;
     onReconnect: () => void;
     onSaved: () => void;
 }) {
@@ -517,9 +377,6 @@ function ManageDialog({
                                 {connection.authMethod === "oauth" ? "Reconnect" : "Switch to CostGraph sign-in"}
                             </Button>
                         )}
-                        <Button variant="outline" size="sm" className="h-7 px-3 text-xs" onClick={onSwitchToKey}>
-                            {connection.authMethod === "api_key" ? "Change key or connection" : "Use an API key instead"}
-                        </Button>
                     </div>
                 </div>
                 <DialogFooter className="gap-2 sm:justify-between">

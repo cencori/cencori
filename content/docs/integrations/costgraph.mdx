@@ -7,48 +7,21 @@ order: 4
 
 [CostGraph](https://costgraph.ai) is a FinOps platform that puts cloud, Kubernetes, GPU and AI spend in one place. It covers allocation, budgets, anomaly alerts and recommendations. Connect it to Cencori and every request through the gateway lands in CostGraph as [FOCUS 1.2](/docs/platform/usage-export) records, attributed to your projects or to your own customers.
 
-There are two ways to connect. Use **push** unless your security team prefers pulling.
+There are two ways to connect:
 
-| | Push (recommended) | Pull |
+| | Connect from Cencori | Pull |
 | :--- | :--- | :--- |
-| Who moves the data | Cencori sends each settled day to CostGraph | CostGraph or an exporter you run reads `GET /v1/usage/focus` |
-| Credential you hand over | A CostGraph key, stored encrypted in Cencori | A read-only Cencori usage export key |
-| Setup | Cencori console | Your CostGraph exporter or script |
+| Status | **Available soon** | **Live** |
+| How | Click **Connect** on the CostGraph card, sign in to CostGraph, pick a tenant | CostGraph's exporter, or a job you run, reads `GET /v1/usage/focus` |
+| Credential | A CostGraph sign-in, held by Cencori | A read-only Cencori usage export key |
 
-## Push: Cencori sends usage to CostGraph
+## Connect from Cencori
 
-### 1. Create the push connection in CostGraph
+The CostGraph card is on every project's **Settings → Integrations** tab. The connection belongs to the organization and applies to every project; owners and admins manage it.
 
-1. In Cencori, open any project's **Settings → Integrations**, choose **Connect** on the **CostGraph** card, and copy the **Billing account id** it shows. It is your Cencori organization id.
-2. In CostGraph, open **Integrations** in the sidebar, choose the **Anything Else** category, and click **Set up** on **FOCUS push**.
-3. Name the connection, for example `Cencori`, and pick the CostGraph tenant the spend belongs to.
-4. Leave **Provider** on **Detect from my first push**. Cencori's first push sets it to `cencori`.
-5. Paste the billing account id from step 1, then **Create connection**.
-6. Copy the **connection id**. It starts with `fpc_`.
+**Connect** signs you in to CostGraph, asks which CostGraph tenant to send usage to, and sets up the connection. Nothing to copy between dashboards. It becomes available once CostGraph enables connecting from Cencori; until then the button is disabled. To send usage to CostGraph today, use [Pull](#pull-costgraph-reads-from-cencori).
 
-Each push connection is bound to one billing account. Connect each Cencori organization to its own connection.
-
-### 2. Create a CostGraph API key
-
-In CostGraph, with the same tenant selected, open **Settings → API keys** and create a key with the **`focus:write`** scope. A key belongs to one tenant, so it must be created in the tenant that holds the connection.
-
-### 3. Connect it in Cencori
-
-The CostGraph connection belongs to the organization, so it applies to every project. Organization owners and admins can set it up from any project.
-
-1. Back on the **CostGraph** card (project **Settings → Integrations**), paste the connection id and the API key.
-2. Choose what fills the sub-account column:
-   - **Project**: each Cencori project is a sub-account.
-   - **End user**: the end-user id you pass on requests. Use this if you resell AI and want spend per customer.
-   - **Tenant**: embedded-agent tenants.
-   - **None**.
-
-   Choose carefully: once usage has been sent, the sub-account is fixed. CostGraph keeps every record it receives, so changing it later would count your history twice.
-3. Choose **Save**, then **Send now** to send the month so far straight away.
-
-After that, Cencori sends each UTC day once it closes. From the 3rd of each month it also re-sends the whole previous month, so any request logged late corrects itself. Re-sending the same usage updates it in place, so repeating a send never double-counts.
-
-The card shows the last day sent and, if a push failed, CostGraph's error message.
+Once connected, Cencori sends each UTC day after it closes. From the 3rd of each month it also re-sends the whole previous month, so a request logged late corrects itself. Re-sending the same usage updates it in place, so a repeat never double-counts. Each Cencori project appears as a sub-account; this is fixed once usage has been sent, because CostGraph keeps every record it receives.
 
 ## Pull: CostGraph reads from Cencori
 
@@ -86,9 +59,7 @@ Models are published as `provider/model`, the same string as `SkuId` in the FOCU
 
 | What you see | Why | Fix |
 | :--- | :--- | :--- |
-| `CostGraph 401` on the card | The key was revoked or mistyped | Paste a current key in **Edit** |
-| `CostGraph 403` on the card | The key lacks `focus:write` | Create a key with that scope and paste it in **Edit** |
-| `CostGraph 404 Could not find resource` | The key belongs to a different CostGraph tenant than the connection, or the connection was deleted | Create the key in the connection's tenant, or copy the `fpc_` id again |
-| `CostGraph 409` | The connection is pull-mode, or another ingest was running | Pull-mode: create a FOCUS **push** connection. Otherwise the next run retries |
+| **Connect** is disabled | Connecting from Cencori isn't available yet | Use [Pull](#pull-costgraph-reads-from-cencori) for now |
+| A CostGraph error on the card | The CostGraph sign-in was revoked, or the connection was removed in CostGraph | Open **Manage → Reconnect** |
 | Nothing sent for a day | That day had no billable usage | Nothing to fix |
 | `x_UnsplitRequests` > 0 | Usage from before buckets were recorded | Costs are exact; only the bucket split is missing |
