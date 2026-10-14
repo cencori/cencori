@@ -13,6 +13,7 @@ import { getPricingFromDB } from '@/lib/providers/pricing';
 import { runGatewayInputPipeline } from '@/lib/gateway/input-guard';
 import { runGatewayOutputGuard } from '@/lib/gateway/output-guard';
 import type { SubscriptionTier } from '@/lib/entitlements';
+import { isCreditBalanceExhausted } from '@/lib/credits';
 
 /**
  * Dashboard API: Semantic search in a namespace
@@ -86,7 +87,7 @@ export async function GET(request: NextRequest, context: RouteParams) {
             .eq('is_active', true)
             .maybeSingle();
 
-        if (shouldEnforceCredits && creditsBalance <= 0 && !providerKey?.encrypted_key) {
+        if (shouldEnforceCredits && isCreditBalanceExhausted(creditsBalance) && !providerKey?.encrypted_key) {
             return NextResponse.json(
                 {
                     error: "Credit balance exhausted",

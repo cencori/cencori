@@ -13,7 +13,7 @@ import crypto from 'crypto';
 import { geolocation, ipAddress, waitUntil } from '@vercel/functions';
 import { checkRateLimit, classifyRateLimitTier, MAX_READ_REQUESTS_PER_WINDOW, READ_BUCKET_SUFFIX, type RateLimitResult } from '@/lib/rate-limit';
 import { checkSpendCap } from '@/lib/budgets';
-import { deductCredits } from '@/lib/credits';
+import { deductCredits, isCreditBalanceExhausted } from '@/lib/credits';
 import { extractCencoriApiKeyFromHeaders } from '@/lib/api-keys';
 import { logGatewayEvent } from '@/lib/gateway-reliability';
 import { getCachedApiKeyConfig, getCachedTensorAccess, setCachedApiKeyConfig } from '@/lib/config-cache';
@@ -802,7 +802,7 @@ return {
         }
     }
 
-    const zeroBalanceByok = shouldEnforceCredits && creditsBalance <= 0
+    const zeroBalanceByok = shouldEnforceCredits && isCreditBalanceExhausted(creditsBalance)
         ? await isProvenByokRequest({
             req,
             supabase,
@@ -813,7 +813,7 @@ return {
         })
         : false;
 
-    if (shouldEnforceCredits && creditsBalance <= 0 && !zeroBalanceByok && isMeteredGatewayRequest(req.method, route)) {
+    if (shouldEnforceCredits && isCreditBalanceExhausted(creditsBalance) && !zeroBalanceByok && isMeteredGatewayRequest(req.method, route)) {
         // Zero balance blocks only calls that would spend managed-model money.
         // Control-plane reads (and other non-metered calls) neither consume
         // credits nor require them — blocking agent bootstrap over pennies

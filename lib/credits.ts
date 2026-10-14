@@ -40,6 +40,18 @@ export async function getCreditsBalance(organizationId: string): Promise<number>
 }
 
 /**
+ * Below this, an organization is out of credits and metered requests are
+ * refused. Not zero: a balance can strand at a fraction of a cent (every
+ * charge is larger than it), and a strictly-positive check let that serve
+ * requests for free indefinitely.
+ */
+export const MIN_SERVABLE_CREDIT_BALANCE_USD = 0.01;
+
+export function isCreditBalanceExhausted(balance: number): boolean {
+    return !(balance >= MIN_SERVABLE_CREDIT_BALANCE_USD);
+}
+
+/**
  * Check if organization has insufficient credits for a request
  */
 export async function hasInsufficientCredits(
@@ -124,6 +136,36 @@ export async function adjustCredits(
     );
 }
 
+/**
+ * Fallback for the old all-or-nothing deduction: charge whatever balance is
+ * left (read fresh, not from cache) so it reaches zero and the gateway blocks
+ * the next request. The unpaid remainder is logged.
+ */
+async function drainRemainingBalance(
+    organizationId: string,
+    attemptedAmount: number,
+    description: string,
+    referenceId?: string,
+): Promise<void> {
+    const supabase = createAdminClient();
+    const { data } = await supabase
+        .from('organizations')
+        .select('credits_balance')
+        .eq('id', organizationId)
+        .single();
+    const remaining = Number(data?.credits_balance) || 0;
+    if (!(remaining > 0)) return;
+    const { error } = await supabase.rpc('deduct_organization_credits', {
+        p_org_id: organizationId,
+        p_amount: remaining,
+        p_description: `${description} (balance exhausted; $${(attemptedAmount - remaining).toFixed(6)} unbilled)`,
+        p_reference_id: referenceId,
+        p_metadata: { partial: true, attempted_usd: attemptedAmount },
+    });
+    if (error) console.error('[Credits] Failed to drain remaining balance:', error);
+    console.warn(`[Credits] Org ${organizationId} exhausted: charged remaining $${remaining} of $${attemptedAmount}.`);
+}
+
 async function applyCreditDelta(
     organizationId: string,
     delta: number,
@@ -134,9 +176,43 @@ async function applyCreditDelta(
 ): Promise<boolean> {
     const supabase = createAdminClient();
 
-    // Use the atomic RPC for usage-based deductions to prevent race conditions
     if (transactionType === 'usage' && delta < 0) {
         const amount = Math.abs(delta);
+
+        // Usage is charged after the request was served, so it must always be
+        // recorded in full. charge_organization_credits takes the balance
+        // negative by any shortfall (debt that blocks the next request and is
+        // repaid by the next top-up) instead of refusing the charge.
+        const { data: chargeData, error: chargeError } = await supabase.rpc('charge_organization_credits', {
+            p_org_id: organizationId,
+            p_amount: amount,
+            p_description: description,
+            p_reference_id: referenceId ?? null,
+            p_metadata: metadata || {},
+        });
+
+        if (!chargeError) {
+            const charged = (Array.isArray(chargeData) ? chargeData[0] : chargeData) as {
+                success?: boolean; shortfall?: number; error_message?: string;
+            } | null;
+            await invalidateCreditsBalance(organizationId);
+            if (!charged?.success) {
+                console.warn(`[Credits] Charge failed for org ${organizationId}: ${charged?.error_message}`);
+                return false;
+            }
+            if (Number(charged.shortfall) > 0) {
+                console.warn(`[Credits] Org ${organizationId} went into debt by $${charged.shortfall}; next request will be blocked until top-up.`);
+            }
+            return true;
+        }
+
+        // PGRST202 / 42883: the new function isn't deployed yet. Fall back to
+        // the old all-or-nothing deduction below.
+        if (chargeError.code !== 'PGRST202' && chargeError.code !== '42883') {
+            console.error('[Credits] RPC Error charging credits:', chargeError);
+            return false;
+        }
+
         const { data, error } = await supabase.rpc('deduct_organization_credits', {
             p_org_id: organizationId,
             p_amount: amount,
@@ -153,10 +229,15 @@ async function applyCreditDelta(
         // The RPC returns a table/array in some Supabase client versions
         const resultData = Array.isArray(data) ? data[0] : data;
         const result = resultData as unknown as { success: boolean, new_balance: number, error_message: string };
-        
+
         if (!result.success) {
             console.warn(`[Credits] Deduction failed: ${result.error_message}`);
             if (result.error_message === 'Insufficient balance') {
+                // The old function refuses a charge bigger than the balance,
+                // leaving the balance untouched, so every later request would
+                // pass the balance check and go unbilled. Drain what's left to
+                // zero so the next request is blocked.
+                await drainRemainingBalance(organizationId, amount, description, referenceId);
                 await invalidateCreditsBalance(organizationId);
             }
             return false;
@@ -174,7 +255,9 @@ async function applyCreditDelta(
         const currentBalance = await getCreditsBalance(organizationId);
         const newBalance = currentBalance + delta;
 
-        if (newBalance < 0) {
+        // Only a deduction can be refused for going negative. A top-up must
+        // always land, even if it leaves the org still in debt from usage.
+        if (delta < 0 && newBalance < 0) {
             console.warn(`[Credits] Insufficient balance for org ${organizationId}`);
             return false;
         }
