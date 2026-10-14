@@ -21,7 +21,7 @@ Use one of:
 Create usage export keys in **Organization settings → Advanced → Usage export**. Owners and admins can create and revoke them. The key is shown once. Give FinOps tools an export key rather than a project key: an export key cannot spend money if it leaks.
 
 ```bash
-curl https://cencori.com/v1/usage/focus \
+curl https://api.cencori.com/v1/usage/focus \
   -H "Authorization: Bearer $CENCORI_USAGE_EXPORT_KEY"
 ```
 
@@ -122,7 +122,7 @@ Follow `next_cursor` until `has_more` is `false`. Pages are ordered deterministi
 ```bash
 cursor=""
 while :; do
-  page=$(curl -s "https://cencori.com/v1/usage/focus?start=2026-09-01&end=2026-10-01&cursor=$cursor" \
+  page=$(curl -s "https://api.cencori.com/v1/usage/focus?start=2026-09-01&end=2026-10-01&cursor=$cursor" \
     -H "Authorization: Bearer $CENCORI_USAGE_EXPORT_KEY")
   echo "$page" | jq -c '.data[]' >> september.focus.jsonl
   cursor=$(echo "$page" | jq -r '.next_cursor // empty')
