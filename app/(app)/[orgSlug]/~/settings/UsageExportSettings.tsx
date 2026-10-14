@@ -22,7 +22,8 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/toast";
-import { CardShell, usageExportQueryKey } from "@/components/finops/CostGraphIntegration";
+import { CardShell } from "@/components/integrations/CardShell";
+import { usageExportQueryKey } from "@/components/finops/CostGraphIntegration";
 import {
     createUsageExportKey,
     getUsageExportSettings,
