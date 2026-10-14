@@ -218,6 +218,18 @@ function Detail({ label, children, mono = false }: { label: string; children: Re
     );
 }
 
+function ActionRow({ title, description, children }: { title: string; description: string; children: ReactNode }) {
+    return (
+        <div className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+            <div className="min-w-0">
+                <p className="text-[13px] font-medium">{title}</p>
+                <p className="mt-0.5 text-[11px] leading-5 text-muted-foreground">{description}</p>
+            </div>
+            <div className="shrink-0">{children}</div>
+        </div>
+    );
+}
+
 function formatWhen(iso: string | null): string {
     if (!iso) return "Never";
     return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
@@ -415,21 +427,33 @@ function Connected({
                 </div>
             </Section>
 
-            <Section title="Manage" description="Reconnect to sign in to CostGraph again. Disconnecting stops the nightly send; what CostGraph already has stays there.">
-                <div className="flex flex-wrap gap-2">
+            <Section title="Manage" description="Changes here apply to every project in this organization.">
+                <div className="overflow-hidden rounded-lg border border-border/35 bg-muted/30 divide-y divide-border/30">
                     {oauthAvailable && (
-                        <Button size="sm" variant="outline" className="h-7 px-3 text-xs" onClick={() => startConnect(orgSlug, returnTo)}>
-                            {connection.authMethod === "oauth" ? "Reconnect" : "Switch to CostGraph sign-in"}
-                        </Button>
+                        <ActionRow
+                            title={connection.authMethod === "oauth" ? "Reconnect" : "Switch to CostGraph sign-in"}
+                            description={connection.authMethod === "oauth"
+                                ? "Sign in to CostGraph again, for example after access was revoked there."
+                                : "Replace the API key with your CostGraph sign-in. History already sent stays on the same connection."}
+                        >
+                            <Button size="sm" variant="outline" className="h-7 px-3 text-xs" onClick={() => startConnect(orgSlug, returnTo)}>
+                                {connection.authMethod === "oauth" ? "Reconnect" : "Switch"}
+                            </Button>
+                        </ActionRow>
                     )}
-                    <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7 px-3 text-xs text-destructive hover:text-destructive"
-                        onClick={() => setConfirmDisconnect(true)}
+                    <ActionRow
+                        title="Disconnect"
+                        description="Stop sending usage to CostGraph. What CostGraph has already received stays there."
                     >
-                        Disconnect
-                    </Button>
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 px-3 text-xs text-destructive hover:text-destructive"
+                            onClick={() => setConfirmDisconnect(true)}
+                        >
+                            Disconnect
+                        </Button>
+                    </ActionRow>
                 </div>
             </Section>
 
