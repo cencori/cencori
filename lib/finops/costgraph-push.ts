@@ -143,7 +143,8 @@ export async function pushWindow(params: {
             rows: page.records,
             batch_id: batchId,
             row_offset: offset,
-            ...(pages === 0 ? { complete: true } : {}),
+            // `overwrite` is what CostGraph honours; `complete` is what its docs name (see FocusPushRequest).
+            ...(pages === 0 ? { complete: true, overwrite: true } : {}),
         });
 
         pages += 1;
