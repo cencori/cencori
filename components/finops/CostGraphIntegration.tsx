@@ -436,7 +436,7 @@ function Connected({
                                 ? "Sign in to CostGraph again, for example after access was revoked there."
                                 : "Replace the API key with your CostGraph sign-in. History already sent stays on the same connection."}
                         >
-                            <Button size="sm" variant="outline" className="h-7 px-3 text-xs" onClick={() => startConnect(orgSlug, returnTo)}>
+                            <Button size="sm" className="h-7 px-3 text-xs" onClick={() => startConnect(orgSlug, returnTo)}>
                                 {connection.authMethod === "oauth" ? "Reconnect" : "Switch"}
                             </Button>
                         </ActionRow>
