@@ -51,6 +51,7 @@ import { cn } from "@/lib/utils";
 import { normalizeWebhookResponse } from "@/lib/webhook-response";
 import { onSettingsTab } from "@/lib/navigation-intent";
 import { CostGraphIntegration } from "@/components/finops/CostGraphIntegration";
+import { CardShell } from "@/components/integrations/CardShell";
 
 interface ProjectData {
   id: string;
@@ -1901,18 +1902,17 @@ export default function ProjectSettingsPage({ params }: PageProps) {
               <CostGraphIntegration orgSlug={orgSlug} />
 
               {/* Placeholder for future integrations */}
-              <button
-                onClick={() => setShowSuggestModal(true)}
-                className="group flex items-start gap-3 self-start rounded-lg border border-dashed border-border/35 bg-muted/20 px-5 py-5 text-left transition-all hover:border-border/45 hover:bg-muted/40 cursor-pointer"
-              >
-                <div className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-secondary/50 transition-colors group-hover:bg-secondary">
-                  <Plus className="size-4 text-muted-foreground/40 transition-colors group-hover:text-muted-foreground" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground transition-colors group-hover:text-foreground">More integrations</p>
-                  <p className="mt-1 text-xs leading-5 text-muted-foreground/60">Suggest a tool for the ecosystem</p>
-                </div>
-              </button>
+              <CardShell
+                layout="compact"
+                icon={Plus}
+                title="More integrations"
+                description="Suggest a tool for the ecosystem"
+                bottomAction={
+                  <Button size="sm" className="h-7 px-3 text-xs" onClick={() => setShowSuggestModal(true)}>
+                    Suggest
+                  </Button>
+                }
+              />
             </div>
           </section>
         </TabsContent>
