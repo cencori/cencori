@@ -84,6 +84,8 @@ export function CardShell({
     title,
     description,
     action,
+    bottomAction,
+    bottomActionDivided = false,
     children,
     footer,
 }: {
@@ -93,6 +95,10 @@ export function CardShell({
     title: string;
     description: string;
     action?: ReactNode;
+    /** Buttons along the bottom-left of the card. */
+    bottomAction?: ReactNode;
+    /** Rule above the bottom actions, for when rows sit between them and the header. */
+    bottomActionDivided?: boolean;
     children?: ReactNode;
     footer?: ReactNode;
 }) {
@@ -111,6 +117,11 @@ export function CardShell({
                 {action}
             </div>
             {children}
+            {bottomAction && (
+                <div className={`flex flex-wrap items-center gap-2 px-5 ${bottomActionDivided ? "border-t border-border/30 py-4" : "pb-5"}`}>
+                    {bottomAction}
+                </div>
+            )}
             {footer && (
                 <div className="border-t border-border/30 bg-background/20 px-5 py-3">
                     <p className="max-w-2xl text-[11px] leading-5 text-muted-foreground">{footer}</p>
@@ -248,14 +259,14 @@ function CostGraphCard({
     });
 
     const connectAction = settings.oauthAvailable ? (
-        <div className="flex flex-col items-start gap-1.5 self-start sm:items-end">
+        <>
             <Button size="sm" className="h-7 px-3 text-xs" onClick={startOAuth}>Connect CostGraph</Button>
             <button type="button" className="text-[11px] text-muted-foreground hover:text-foreground" onClick={() => setKeyDialogOpen(true)}>
                 Use an API key instead
             </button>
-        </div>
+        </>
     ) : (
-        <Button size="sm" className="h-7 self-start px-3 text-xs" onClick={() => setKeyDialogOpen(true)}>Connect</Button>
+        <Button size="sm" className="h-7 px-3 text-xs" onClick={() => setKeyDialogOpen(true)}>Connect</Button>
     );
 
     return (
@@ -263,8 +274,9 @@ function CostGraphCard({
             logo={costGraphLogo}
             title="CostGraph"
             description="Cost infrastructure for enterprise teams."
-            action={connection ? (
-                <div className="flex gap-2 self-start">
+            bottomActionDivided={Boolean(connection)}
+            bottomAction={connection ? (
+                <>
                     <Button
                         size="sm"
                         variant="outline"
@@ -276,7 +288,7 @@ function CostGraphCard({
                         {pushNow.isPending ? "Sending…" : "Send now"}
                     </Button>
                     <Button size="sm" className="h-7 px-3 text-xs" onClick={() => setSettingsOpen(true)}>Manage</Button>
-                </div>
+                </>
             ) : settings.pendingTenants ? null : connectAction}
         >
             {settings.pendingTenants && !connection ? (
