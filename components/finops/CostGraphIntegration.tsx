@@ -223,21 +223,6 @@ function formatWhen(iso: string | null): string {
     return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }
 
-function connectionStatus(connection: CostGraphConnectionView): { label: string; tone: "ok" | "warn" | "error" | "idle" } {
-    if (!connection.enabled) return { label: "Paused", tone: "idle" };
-    if (!connection.connectionId) return { label: "Waiting for CostGraph", tone: "warn" };
-    if (connection.lastRunStatus === "error") return { label: "Last send failed", tone: "error" };
-    if (connection.lastRunAt) return { label: "Active", tone: "ok" };
-    return { label: "Waiting for first send", tone: "warn" };
-}
-
-const TONE_DOT: Record<string, string> = {
-    ok: "bg-emerald-500",
-    warn: "bg-amber-500",
-    error: "bg-red-500",
-    idle: "bg-muted-foreground/50",
-};
-
 export function CostGraphIntegrationPage({ orgSlug }: { orgSlug: string }) {
     const queryKey = usageExportQueryKey(orgSlug);
     const queryClient = useQueryClient();
@@ -247,7 +232,6 @@ export function CostGraphIntegrationPage({ orgSlug }: { orgSlug: string }) {
     useCallbackNotice(queryKey);
 
     const connection = data?.costgraph ?? null;
-    const status = connection ? connectionStatus(connection) : null;
 
     return (
         <main className="w-full max-w-[1180px] mx-auto px-6 lg:px-10 py-12">
@@ -277,12 +261,6 @@ export function CostGraphIntegrationPage({ orgSlug }: { orgSlug: string }) {
                         </div>
                     </div>
                 </div>
-                {status && (
-                    <div className="flex items-center gap-2 self-start text-xs">
-                        <span className={`size-1.5 rounded-full ${TONE_DOT[status.tone]}`} />
-                        {status.label}
-                    </div>
-                )}
             </header>
 
             {isLoading ? (
