@@ -16,7 +16,7 @@ import {
 } from "@/lib/gateway-middleware";
 import { extractCencoriApiKeyFromHeaders } from "@/lib/api-keys";
 import { checkEndUserQuota, recordEndUserUsage, type QuotaCheckResult } from "@/lib/end-user-billing";
-import type { Tool, UnifiedChatRequest } from "@/lib/providers/base";
+import type { Tool, ToolCall, UnifiedChatRequest } from "@/lib/providers/base";
 import {
     computeExactCacheKey,
     getProjectCacheConfig,
@@ -82,6 +82,13 @@ type SupabaseAdminClient = ReturnType<typeof createAdminClient>;
 type ChatMessage = {
     role: "system" | "user" | "assistant" | "tool" | string;
     content: unknown;
+    // Tool-use turns (OpenAI wire format). Must survive to the provider: a
+    // `tool` result without its `tool_call_id`, or one whose preceding
+    // assistant turn lost `tool_calls`, is rejected upstream with a 400.
+    tool_call_id?: string;
+    tool_calls?: ToolCall[];
+    // DeepSeek thinking mode needs its own trace echoed back on later turns.
+    reasoning_content?: string;
 };
 type ChatRequestBody = {
     model?: string;
@@ -477,7 +484,15 @@ export async function POST(req: NextRequest) {
         const toUnifiedMessages = (items: ChatMessage[]): UnifiedMessage[] => {
             return items.map((m) => ({
                 role: (m.role === "system" || m.role === "assistant" || m.role === "tool") ? m.role : "user",
-                content: typeof m.content === "string" ? m.content : JSON.stringify(m.content ?? ""),
+                // An assistant turn that only calls tools has `content: null`.
+                content: typeof m.content === "string" ? m.content : m.content == null ? "" : JSON.stringify(m.content),
+                ...(m.role === "tool" && typeof m.tool_call_id === "string" ? { toolCallId: m.tool_call_id } : {}),
+                ...(m.role === "assistant" && Array.isArray(m.tool_calls) && m.tool_calls.length > 0
+                    ? { tool_calls: m.tool_calls }
+                    : {}),
+                ...(m.role === "assistant" && typeof m.reasoning_content === "string" && m.reasoning_content
+                    ? { reasoningContent: m.reasoning_content }
+                    : {}),
             }));
         };
 
@@ -708,6 +723,8 @@ export async function POST(req: NextRequest) {
         messages = guardedMessages.map((m) => ({
             role: m.role,
             content: m.content,
+            ...(m.toolCallId ? { tool_call_id: m.toolCallId } : {}),
+            ...(m.tool_calls?.length ? { tool_calls: m.tool_calls } : {}),
         }));
 
         // Vision uses the same quota, memory, input rules, output guard, and
@@ -828,9 +845,14 @@ export async function POST(req: NextRequest) {
                     const requestTemp = body.temperature ?? 0;
 
                     if (requestTemp <= cacheConfig.maxCacheableTemperature) {
+                        // Tool fields are part of the key: two conversations that
+                        // differ only in which tool ran (or its result id) must
+                        // not share a cached answer. Plain turns hash as before.
                         const normalizedMsgs = messages.map(m => ({
                             role: String(m.role),
                             content: typeof m.content === "string" ? m.content : JSON.stringify(m.content ?? ""),
+                            ...(m.tool_call_id ? { tool_call_id: m.tool_call_id } : {}),
+                            ...(m.tool_calls?.length ? { tool_calls: m.tool_calls } : {}),
                         }));
 
                         cacheKey = computeExactCacheKey({
