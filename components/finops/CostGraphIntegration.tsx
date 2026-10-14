@@ -104,8 +104,10 @@ export function CardShell({
      * "row": icon beside the title, actions in the header (settings sections).
      * "tile": logo on top, title and one-liner under it, actions pinned to the bottom — an
      * integration tile that fills its grid cell.
+     * "compact": icon beside the title, actions under it, and only as tall as its content — it
+     * does not stretch to the height of its neighbours in a grid row.
      */
-    layout?: "row" | "tile";
+    layout?: "row" | "tile" | "compact";
     children?: ReactNode;
     footer?: ReactNode;
 }) {
@@ -134,7 +136,7 @@ export function CardShell({
     }
 
     return (
-        <div className="overflow-hidden rounded-lg border border-border/35 bg-muted/30">
+        <div className={`overflow-hidden rounded-lg border border-border/35 bg-muted/30 ${layout === "compact" ? "self-start" : ""}`}>
             <div className="flex flex-col gap-4 px-5 py-5 sm:flex-row sm:items-start sm:justify-between">
                 <div className="flex items-start gap-3">
                     {mark}
@@ -212,7 +214,7 @@ export function CostGraphIntegration({ orgSlug }: { orgSlug: string }) {
     if (error || !data) {
         return (
             <CardShell
-                layout="tile"
+                layout="compact"
                 logo={costGraphLogo}
                 title="CostGraph"
                 description="Cost infrastructure for enterprise teams."
@@ -301,7 +303,7 @@ function CostGraphCard({
 
     return (
         <CardShell
-            layout="tile"
+            layout="compact"
             logo={costGraphLogo}
             title="CostGraph"
             description="Cost infrastructure for enterprise teams."
