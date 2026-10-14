@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
@@ -32,18 +33,15 @@ export async function generateMetadata({
   };
 }
 
-export default async function OrganizationLayout({
-  children,
-  params,
-}: {
-  children: React.ReactNode;
-  params: LayoutParams;
-}) {
-  // Org routes can't be protected by a middleware prefix — an org slug is any
-  // top-level segment — so the session check lives here, where the segment is
-  // unambiguous. Server-side, so an unauthenticated visitor never receives the
-  // page instead of receiving it and being bounced by a client effect.
-  const { orgSlug } = await params;
+// Org routes can't be protected by a middleware prefix — an org slug is any
+// top-level segment — so the session check lives here, where the segment is
+// unambiguous. It runs inside its own Suspense boundary so it never holds up
+// the shell: the sidebar and page render immediately while the check
+// resolves in parallel, and a missing session streams a redirect to /login.
+// Every page loads its data client-side behind RLS / authenticated APIs, so
+// nothing private renders before the redirect lands. (The proxy has already
+// run the same check for canonical console pages.)
+async function RequireSession({ orgSlug }: { orgSlug: string }) {
   const supabase = await createServerClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -51,10 +49,24 @@ export default async function OrganizationLayout({
     redirect(`/login?redirect=${encodeURIComponent(`/${orgSlug}`)}`);
   }
 
+  return null;
+}
+
+export default async function OrganizationLayout({
+  children,
+  params,
+}: {
+  children: React.ReactNode;
+  params: LayoutParams;
+}) {
+  const { orgSlug } = await params;
   const host = (await headers()).get("host") ?? "";
 
   return (
     <OrganizationLayoutClient consoleMode={isConsoleHostname(host)}>
+      <Suspense fallback={null}>
+        <RequireSession orgSlug={orgSlug} />
+      </Suspense>
       {children}
     </OrganizationLayoutClient>
   );
