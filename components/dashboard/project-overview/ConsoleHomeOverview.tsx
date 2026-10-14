@@ -10,18 +10,18 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/lib/supabaseClient";
 import { formatCurrency } from "@/lib/currency";
 import { DitherCanvas, type DitherVariant } from "./DitherCanvas";
+import { HomeUsageStats } from "./HomeUsageStats";
 import memoryArt from "@/public/console/explore-memory.webp";
 import multimodalArt from "@/public/console/explore-multimodal.webp";
 
 interface ConsoleHomeOverviewProps {
-    orgId: string;
-    orgName: string;
     orgSlug: string;
-    projectId: string;
-    projectName: string;
     projectSlug: string;
-    initialBalance: number | null;
-    initialFirstName: string | null;
+    // Optional so the page can render before any server lookups: the
+    // overview resolves the project id itself when it isn't handed one.
+    projectId?: string;
+    initialBalance?: number | null;
+    initialFirstName?: string | null;
     consoleMode?: boolean;
 }
 
@@ -60,14 +60,14 @@ function useFirstName(initialFirstName: string | null) {
     return data ?? initialFirstName;
 }
 
-function useCreditsBalance(orgId: string, initialBalance: number | null) {
+function useCreditsBalance(orgSlug: string, initialBalance: number | null) {
     return useQuery({
-        queryKey: ["consoleHomeCredits", orgId],
+        queryKey: ["consoleHomeCredits", orgSlug],
         queryFn: async () => {
             const { data, error } = await supabase
                 .from("organizations")
                 .select("credits_balance")
-                .eq("id", orgId)
+                .eq("slug", orgSlug)
                 .single();
             if (error || !data) throw new Error("Could not load credits balance");
             return Number(data.credits_balance ?? 0);
@@ -77,7 +77,26 @@ function useCreditsBalance(orgId: string, initialBalance: number | null) {
     });
 }
 
-function useApiKeyCount(projectId: string) {
+function useProjectId(orgSlug: string, projectSlug: string, known: string | undefined) {
+    const { data } = useQuery({
+        queryKey: ["consoleHomeProjectId", orgSlug, projectSlug],
+        queryFn: async (): Promise<string> => {
+            const { data, error } = await supabase
+                .from("projects")
+                .select("id, organizations!inner(slug)")
+                .eq("slug", projectSlug)
+                .eq("organizations.slug", orgSlug)
+                .single();
+            if (error || !data) throw new Error("Could not load project");
+            return data.id as string;
+        },
+        enabled: !known,
+        staleTime: 15 * 60 * 1000,
+    });
+    return known ?? data;
+}
+
+function useApiKeyCount(projectId: string | undefined) {
     // Dedicated cache key — the settings page stores the raw keys array under
     // queryKeys.apiKeys(projectId), which poisoned this count with an object.
     return useQuery({
@@ -94,6 +113,7 @@ function useApiKeyCount(projectId: string) {
             }
             return 0;
         },
+        enabled: Boolean(projectId),
         // Always refetch on mount so revokes/creates from other pages are
         // reflected the moment the user comes back here.
         staleTime: 0,
@@ -139,19 +159,22 @@ const EXPLORE_APIS: ExploreApi[] = [
 ];
 
 export function ConsoleHomeOverview({
-    orgId,
     orgSlug,
-    projectId,
-    initialBalance,
-    initialFirstName,
+    projectSlug,
+    projectId: knownProjectId,
+    initialBalance = null,
+    initialFirstName = null,
     consoleMode = true,
 }: ConsoleHomeOverviewProps) {
     const queryClient = useQueryClient();
     const [showGenerateKeyDialog, setShowGenerateKeyDialog] = useState(false);
 
     const firstName = useFirstName(initialFirstName);
-    const { data: balance, isLoading: balanceLoading } = useCreditsBalance(orgId, initialBalance);
-    const { data: keyCountData, isLoading: keysLoading } = useApiKeyCount(projectId);
+    const projectId = useProjectId(orgSlug, projectSlug, knownProjectId);
+    const { data: balance, isPending: balanceLoading } = useCreditsBalance(orgSlug, initialBalance);
+    // isPending, not isLoading: it stays true while the project id is still
+    // resolving and the count query hasn't started yet.
+    const { data: keyCountData, isPending: keysLoading } = useApiKeyCount(projectId);
     const keyCount = keyCountData ?? 0;
 
     const greeting = greetingForHour(new Date().getHours());
@@ -258,6 +281,7 @@ export function ConsoleHomeOverview({
                             type="button"
                             size="sm"
                             className="h-7 text-xs"
+                            disabled={!projectId}
                             onClick={() => setShowGenerateKeyDialog(true)}
                         >
                             Create API key
@@ -265,6 +289,8 @@ export function ConsoleHomeOverview({
                     </div>
                 </article>
             </div>
+
+            <HomeUsageStats orgSlug={orgSlug} />
 
             <h2 className="mb-3 mt-8 text-sm font-medium tracking-[-0.02em]">
                 Explore our API

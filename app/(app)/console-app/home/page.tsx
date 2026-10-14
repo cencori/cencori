@@ -61,11 +61,8 @@ export default async function ConsoleHomePage() {
       }}
     >
       <ConsoleHomeOverview
-        orgId={workspace.organization.id}
-        orgName={workspace.organization.name}
         orgSlug={workspace.organization.slug}
         projectId={workspace.project.id}
-        projectName={workspace.project.name}
         projectSlug={workspace.project.slug}
         initialBalance={initialBalance}
         initialFirstName={firstNameResult}
