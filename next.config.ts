@@ -51,6 +51,11 @@ const nextConfig: NextConfig = {
       // /llm.txt. Serve the same content at /llms.txt with a 200 (a rewrite, not
       // a redirect, so fetchers that don't follow 3xx still get the guide).
       { source: "/llms.txt", destination: "/llm.txt" },
+      // "View as Markdown" and agents fetch `<docs page>.md`. Rewrites run
+      // before dynamic routes, so these win over app/docs/[[...slug]].
+      { source: "/docs/:path+.md", destination: "/api/docs/markdown/:path+" },
+      { source: "/arcie/docs.md", destination: "/api/arcie/docs/markdown" },
+      { source: "/arcie/docs/:path+.md", destination: "/api/arcie/docs/markdown/:path+" },
     ];
   },
   async redirects() {
