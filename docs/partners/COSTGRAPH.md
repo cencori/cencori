@@ -194,7 +194,18 @@ curl -H "Authorization: Bearer $CRON_SECRET" "https://cencori.com/api/cron/costg
 | Re-sending the same day | ✅ Still $1.78: `complete: true` replaces the window |
 | `x_` token buckets in the read APIs | Stored but not surfaced in cost/provider responses (expected; they're extensions) |
 
-The test rows remain in `cencori-focus-test`, labelled `TEST Nicole` / `Bola (TEST)`. Real Cencori usage couldn't be used: free models were retired 2026-09-23, and Bola-owned orgs have no credits or traffic.
+The test rows remain in `cencori-focus-test` on connection `fpc_7vo9U4J0XqLYbKoH`, labelled `TEST Nicole` / `Bola (TEST)`.
+
+**Real usage reconciliation (2026-10-14).** The Arcie organization (owned by Bola's bola@cencori.com account) was connected exactly as the console does it: an `organization_finops_connections` row with the key encrypted under the production secret, to connection `fpc_WK-AP5vu_8Lrodrj` (billing account = Arcie org id). `runConnectionPush` sent 13 October days and then restated September: 84 records, all accepted.
+
+| Window | Cencori `ai_requests` (raw rows) | CostGraph | Difference |
+| --- | --- | --- | --- |
+| September 2026 | $1.941727 (840 requests) | $1.941727 | $0 |
+| October 1–13 | $35.163848 (1,334 requests) | $35.163848 | $0 |
+
+Per-model figures match too (e.g. `anthropic/claude-opus-5-5` $24.4166, `maximo/maximo-atlas-1.3` $8.9745). One finding on our side: `cerebras/gpt-oss-120b` rows carry cost but zero tokens, so they export as request-priced rows and don't appear in CostGraph's tokens-by-model view. Cerebras usage reporting is worth checking.
+
+The Arcie connection stays configured; the nightly `finops-push` cron continues it from 2026-10-14 once `ENABLE_VERCEL_CRON` is set.
 
 **Still to verify:**
 
