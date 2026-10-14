@@ -86,6 +86,7 @@ export function CardShell({
     action,
     bottomAction,
     bottomActionDivided = false,
+    layout = "row",
     children,
     footer,
 }: {
@@ -99,16 +100,44 @@ export function CardShell({
     bottomAction?: ReactNode;
     /** Rule above the bottom actions, for when rows sit between them and the header. */
     bottomActionDivided?: boolean;
+    /**
+     * "row": icon beside the title, actions in the header (settings sections).
+     * "tile": logo on top, title and one-liner under it, actions pinned to the bottom — an
+     * integration tile that fills its grid cell.
+     */
+    layout?: "row" | "tile";
     children?: ReactNode;
     footer?: ReactNode;
 }) {
+    const mark = (
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-[10px] border border-border/35 bg-background/30">
+            {logo ?? (Icon ? <Icon className="size-4 text-foreground" /> : null)}
+        </div>
+    );
+
+    if (layout === "tile") {
+        return (
+            <div className="flex h-full min-h-[240px] flex-col overflow-hidden rounded-lg border border-border/35 bg-muted/30">
+                <div className="px-5 pt-5">
+                    {mark}
+                    <h2 className="mt-5 text-sm font-medium">{title}</h2>
+                    <p className="mt-1 max-w-lg text-xs leading-5 text-muted-foreground">{description}</p>
+                </div>
+                <div className={children ? "mt-5" : undefined}>{children}</div>
+                {bottomAction && (
+                    <div className={`mt-auto flex flex-wrap items-center gap-2 px-5 ${bottomActionDivided ? "border-t border-border/30 py-4" : "pb-5 pt-5"}`}>
+                        {bottomAction}
+                    </div>
+                )}
+            </div>
+        );
+    }
+
     return (
         <div className="overflow-hidden rounded-lg border border-border/35 bg-muted/30">
             <div className="flex flex-col gap-4 px-5 py-5 sm:flex-row sm:items-start sm:justify-between">
                 <div className="flex items-start gap-3">
-                    <div className="flex size-9 shrink-0 items-center justify-center rounded-[10px] border border-border/35 bg-background/30">
-                        {logo ?? (Icon ? <Icon className="size-4 text-foreground" /> : null)}
-                    </div>
+                    {mark}
                     <div>
                         <h2 className="text-sm font-medium">{title}</h2>
                         <p className="mt-1 max-w-lg text-xs leading-5 text-muted-foreground">{description}</p>
@@ -183,6 +212,7 @@ export function CostGraphIntegration({ orgSlug }: { orgSlug: string }) {
     if (error || !data) {
         return (
             <CardShell
+                layout="tile"
                 logo={costGraphLogo}
                 title="CostGraph"
                 description="Cost infrastructure for enterprise teams."
@@ -271,6 +301,7 @@ function CostGraphCard({
 
     return (
         <CardShell
+            layout="tile"
             logo={costGraphLogo}
             title="CostGraph"
             description="Cost infrastructure for enterprise teams."
