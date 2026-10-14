@@ -643,7 +643,10 @@ return {
     const proxiedTensor = keyTensorUserId ? null : readProxiedTensorTurn(req.headers, apiKey);
     const tensorUserId = keyTensorUserId ?? proxiedTensor?.userId ?? null;
 
-    const shouldEnforceCredits = tier !== 'enterprise' && !fullySponsoredKey
+    // Tensor turns don't spend the product key's organization credits: each
+    // user is gated by their own Tensor entitlement (checked below) and pays
+    // through Tensor passes; the cost is recorded against their task.
+    const shouldEnforceCredits = tier !== 'enterprise' && !fullySponsoredKey && !tensorUserId
         && (tier !== 'free' || isMeteredGatewayRequest(req.method, req.nextUrl.pathname));
 
     if (billingFrozen && !fullySponsoredKey) {
@@ -1274,6 +1277,11 @@ export function describeTensorRefusal(reason: string | undefined): {
 async function chargeCreditsForRequest(context: GatewayContext, costUsd?: number): Promise<void> {
     // Enterprise is handled by contract; every other tier pays for managed usage.
     if (context.tier === 'enterprise') {
+        return;
+    }
+    // Tensor turns are paid for by the user's Tensor pass and recorded against
+    // their task (below), not drawn from the product key's organization.
+    if (context.tensorUserId) {
         return;
     }
 
