@@ -1,27 +1,18 @@
 "use client";
 
 /**
- * Usage export: organization export keys (read-only, every project) and the CostGraph push.
- *
- * Both send the same thing — Cencori usage as FOCUS 1.2 records (GET /v1/usage/focus) — one by
- * letting a FinOps tool pull it, the other by sending each settled day to CostGraph nightly.
+ * Usage export keys: read-only organization keys a FinOps tool uses to pull FOCUS 1.2 usage from
+ * GET /v1/usage/focus. The CostGraph push lives on a project's Settings → Integrations
+ * (components/finops/CostGraphIntegration.tsx).
  */
 
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Copy, FileSpreadsheet, KeyRound, Send } from "lucide-react";
+import { Check, Copy, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Switch } from "@/components/ui/switch";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
 import {
     Dialog,
     DialogContent,
@@ -31,26 +22,16 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/toast";
+import { CardShell, usageExportQueryKey } from "@/components/finops/CostGraphIntegration";
 import {
     createUsageExportKey,
-    deleteCostGraphConnection,
     getUsageExportSettings,
-    pushCostGraphNow,
     revokeUsageExportKey,
-    saveCostGraphConnection,
-    type CostGraphConnectionView,
     type UsageExportSettings as UsageExportSettingsData,
 } from "./actions";
 
-const SUB_ACCOUNT_OPTIONS = [
-    { value: "project", label: "Project", hint: "Each Cencori project is a sub-account." },
-    { value: "end_user", label: "End user", hint: "The end user id you send with requests — your customers." },
-    { value: "tenant", label: "Tenant", hint: "Embedded-agent tenants." },
-    { value: "none", label: "None", hint: "Leave the sub-account column empty." },
-] as const;
-
-export function UsageExportSettings({ orgSlug, orgId }: { orgSlug: string; orgId: string }) {
-    const queryKey = ["usageExportSettings", orgSlug];
+export function UsageExportSettings({ orgSlug }: { orgSlug: string }) {
+    const queryKey = usageExportQueryKey(orgSlug);
     const { data, isLoading, error } = useQuery<UsageExportSettingsData>({
         queryKey,
         queryFn: async () => {
@@ -73,46 +54,9 @@ export function UsageExportSettings({ orgSlug, orgId }: { orgSlug: string; orgId
     return (
         <div className="space-y-4">
             <ExportKeysCard orgSlug={orgSlug} keys={data.keys} queryKey={queryKey} />
-            <CostGraphCard orgSlug={orgSlug} orgId={orgId} connection={data.costgraph} queryKey={queryKey} />
-        </div>
-    );
-}
-
-function CardShell({
-    icon: Icon,
-    title,
-    description,
-    action,
-    children,
-    footer,
-}: {
-    icon: typeof KeyRound;
-    title: string;
-    description: string;
-    action?: ReactNode;
-    children?: ReactNode;
-    footer?: ReactNode;
-}) {
-    return (
-        <div className="overflow-hidden rounded-lg border border-border/35 bg-muted/30">
-            <div className="flex flex-col gap-4 px-5 py-5 sm:flex-row sm:items-start sm:justify-between">
-                <div className="flex items-start gap-3">
-                    <div className="flex size-9 shrink-0 items-center justify-center rounded-[10px] border border-border/35 bg-background/30">
-                        <Icon className="size-4 text-foreground" />
-                    </div>
-                    <div>
-                        <h2 className="text-sm font-medium">{title}</h2>
-                        <p className="mt-1 max-w-lg text-xs leading-5 text-muted-foreground">{description}</p>
-                    </div>
-                </div>
-                {action}
-            </div>
-            {children}
-            {footer && (
-                <div className="border-t border-border/30 bg-background/20 px-5 py-3">
-                    <p className="max-w-2xl text-[11px] leading-5 text-muted-foreground">{footer}</p>
-                </div>
-            )}
+            <p className="px-1 text-[11px] leading-5 text-muted-foreground">
+                CostGraph is connected from any project&apos;s Settings → Integrations. The connection applies to the whole organization.
+            </p>
         </div>
     );
 }
@@ -264,246 +208,3 @@ function ExportKeysCard({
     );
 }
 
-/* ---------- CostGraph push ---------- */
-
-function CostGraphCard({
-    orgSlug,
-    orgId,
-    connection,
-    queryKey,
-}: {
-    orgSlug: string;
-    orgId: string;
-    connection: CostGraphConnectionView | null;
-    queryKey: string[];
-}) {
-    const queryClient = useQueryClient();
-    const [open, setOpen] = useState(false);
-    const [connectionId, setConnectionId] = useState(connection?.connectionId ?? "");
-    const [apiKey, setApiKey] = useState("");
-    const [subAccount, setSubAccount] = useState<string>(connection?.subAccount ?? "project");
-    const [enabled, setEnabled] = useState(connection?.enabled ?? true);
-
-    const openDialog = () => {
-        setConnectionId(connection?.connectionId ?? "");
-        setApiKey("");
-        setSubAccount(connection?.subAccount ?? "project");
-        setEnabled(connection?.enabled ?? true);
-        setOpen(true);
-    };
-
-    const save = useMutation({
-        mutationFn: async () => {
-            const result = await saveCostGraphConnection(orgSlug, { connectionId, apiKey, subAccount, enabled });
-            if (!result.ok) throw new Error(result.error || "Could not save");
-        },
-        onSuccess: () => {
-            toast.success(connection ? "CostGraph connection updated." : "CostGraph connected. The first push sends this month so far.");
-            setOpen(false);
-            void queryClient.invalidateQueries({ queryKey });
-        },
-        onError: (err: Error) => toast.error(err.message),
-    });
-
-    const pushNow = useMutation({
-        mutationFn: async () => {
-            const result = await pushCostGraphNow(orgSlug);
-            if (!result.ok) throw new Error(result.error || "The push failed");
-            return result.data;
-        },
-        onSuccess: (view) => {
-            toast.success(view && view.sentRows > 0 ? `Sent ${view.sentRows} FOCUS rows to CostGraph.` : "CostGraph is up to date.");
-            void queryClient.invalidateQueries({ queryKey });
-        },
-        onError: (err: Error) => {
-            toast.error(err.message);
-            void queryClient.invalidateQueries({ queryKey });
-        },
-    });
-
-    const disconnect = useMutation({
-        mutationFn: async () => {
-            const result = await deleteCostGraphConnection(orgSlug);
-            if (!result.ok) throw new Error(result.error || "Could not disconnect");
-        },
-        onSuccess: () => {
-            toast.success("CostGraph disconnected.");
-            setOpen(false);
-            void queryClient.invalidateQueries({ queryKey });
-        },
-        onError: (err: Error) => toast.error(err.message),
-    });
-
-    const status = !connection
-        ? "Not connected"
-        : !connection.enabled
-            ? "Paused"
-            : connection.lastRunStatus === "error"
-                ? "Last push failed"
-                : connection.lastRunAt
-                    ? "Active"
-                    : "Waiting for first push";
-
-    return (
-        <CardShell
-            icon={FileSpreadsheet}
-            title="CostGraph"
-            description="Send each settled day of usage to CostGraph as FOCUS 1.2, so AI spend through Cencori sits beside the rest of your cloud bill. Runs nightly; closed months are re-sent so late usage corrects itself."
-            action={
-                <div className="flex gap-2 self-start">
-                    {connection && (
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 px-3 text-xs"
-                            disabled={pushNow.isPending || !connection.enabled}
-                            onClick={() => pushNow.mutate()}
-                        >
-                            <Send className="mr-1.5 size-3" />
-                            {pushNow.isPending ? "Sending…" : "Send now"}
-                        </Button>
-                    )}
-                    <Button size="sm" className="h-7 px-3 text-xs" onClick={openDialog}>
-                        {connection ? "Edit" : "Connect"}
-                    </Button>
-                </div>
-            }
-            footer={
-                <>
-                    In CostGraph, open Integrations → Anything Else → FOCUS push. Leave Provider on “Detect from my first push” and use the billing account id above, then copy the connection id (fpc_…). Create a focus:write key under Settings → API keys in the same tenant. Usage is reported at what Cencori billed; BYOK usage reports zero, because your provider bills it directly.
-                </>
-            }
-        >
-            <div className="divide-y divide-border/30 border-t border-border/30">
-                <CopyRow label="Billing account id (for CostGraph)" value={orgId} />
-                <Row label="Status" value={status} />
-                {connection && (
-                    <>
-                        <Row label="Connection" value={connection.connectionId} mono />
-                        <Row label="API key" value={connection.apiKeyHint} mono />
-                        <Row label="Sub-account" value={SUB_ACCOUNT_OPTIONS.find((o) => o.value === connection.subAccount)?.label ?? connection.subAccount} />
-                        <Row label="Sent through" value={connection.lastPushedDay ?? "Nothing sent yet"} mono />
-                        {connection.lastRunStatus === "error" && connection.lastRunError && (
-                            <div className="px-5 py-3">
-                                <p className="break-words font-mono text-[11px] leading-5 text-destructive">{connection.lastRunError}</p>
-                            </div>
-                        )}
-                    </>
-                )}
-            </div>
-
-            <Dialog open={open} onOpenChange={setOpen}>
-                <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                        <DialogTitle className="text-sm">{connection ? "Edit CostGraph connection" : "Connect CostGraph"}</DialogTitle>
-                        <DialogDescription className="text-xs leading-5">
-                            Cencori pushes FOCUS records to this connection with this key. The key is encrypted at rest and never shown again.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <form
-                        className="space-y-5"
-                        onSubmit={(event) => {
-                            event.preventDefault();
-                            save.mutate();
-                        }}
-                    >
-                        <div className="space-y-2">
-                            <Label htmlFor="cg-connection" className="text-xs">Push connection id</Label>
-                            <Input
-                                id="cg-connection"
-                                value={connectionId}
-                                onChange={(event) => setConnectionId(event.target.value)}
-                                placeholder="fpc_…"
-                                autoComplete="off"
-                                className="h-8 font-mono text-xs"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="cg-key" className="text-xs">API key {connection && <span className="text-muted-foreground">(leave empty to keep {connection.apiKeyHint})</span>}</Label>
-                            <Input
-                                id="cg-key"
-                                type="password"
-                                value={apiKey}
-                                onChange={(event) => setApiKey(event.target.value)}
-                                placeholder="focus:write key"
-                                autoComplete="off"
-                                className="h-8 font-mono text-xs"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="text-xs">Sub-account</Label>
-                            <Select value={subAccount} onValueChange={setSubAccount}>
-                                <SelectTrigger className="h-8 text-xs">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {SUB_ACCOUNT_OPTIONS.map((option) => (
-                                        <SelectItem key={option.value} value={option.value} className="text-xs">
-                                            {option.label}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            <p className="text-[11px] leading-5 text-muted-foreground">
-                                {SUB_ACCOUNT_OPTIONS.find((o) => o.value === subAccount)?.hint}
-                            </p>
-                        </div>
-                        <div className="flex items-center justify-between">
-                            <Label htmlFor="cg-enabled" className="text-xs">Push nightly</Label>
-                            <Switch id="cg-enabled" checked={enabled} onCheckedChange={setEnabled} />
-                        </div>
-                        <DialogFooter className="gap-2 sm:justify-between">
-                            {connection ? (
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-7 px-3 text-xs text-destructive hover:text-destructive"
-                                    disabled={disconnect.isPending}
-                                    onClick={() => disconnect.mutate()}
-                                >
-                                    Disconnect
-                                </Button>
-                            ) : <span />}
-                            <Button type="submit" size="sm" className="h-7 px-3 text-xs" disabled={save.isPending}>
-                                {save.isPending ? "Saving…" : connection ? "Save" : "Connect"}
-                            </Button>
-                        </DialogFooter>
-                    </form>
-                </DialogContent>
-            </Dialog>
-        </CardShell>
-    );
-}
-
-/** CostGraph binds a push connection to the BillingAccountId our records carry: the org id. */
-function CopyRow({ label, value }: { label: string; value: string }) {
-    const [copied, setCopied] = useState(false);
-    return (
-        <div className="flex min-h-12 items-center justify-between gap-6 px-5 py-3">
-            <p className="text-xs text-muted-foreground">{label}</p>
-            <button
-                type="button"
-                className="flex min-w-0 items-center gap-1.5 text-right font-mono text-[13px] font-medium hover:text-foreground"
-                onClick={async () => {
-                    await navigator.clipboard.writeText(value);
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 1500);
-                }}
-                aria-label={`Copy ${label}`}
-            >
-                <span className="truncate">{value}</span>
-                {copied ? <Check className="size-3 shrink-0" /> : <Copy className="size-3 shrink-0 text-muted-foreground" />}
-            </button>
-        </div>
-    );
-}
-
-function Row({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
-    return (
-        <div className="flex min-h-12 items-center justify-between gap-6 px-5 py-3">
-            <p className="text-xs text-muted-foreground">{label}</p>
-            <p className={`truncate text-right text-[13px] font-medium ${mono ? "font-mono" : ""}`}>{value}</p>
-        </div>
-    );
-}

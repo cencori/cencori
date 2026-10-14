@@ -164,8 +164,13 @@ export interface FocusPushResponse {
     [key: string]: unknown;
 }
 
-export function createCostGraphPlatformClient(apiKey: string, fetchImpl: FetchLike = fetch) {
-    const headers = { 'X-API-Key': apiKey };
+/** An API key (sent as X-API-Key) or an OAuth access token from "Sign in with CostGraph". */
+export type PlatformCredential = string | { accessToken: string };
+
+export function createCostGraphPlatformClient(credential: PlatformCredential, fetchImpl: FetchLike = fetch) {
+    const headers: Record<string, string> = typeof credential === 'string'
+        ? { 'X-API-Key': credential }
+        : { Authorization: `Bearer ${credential.accessToken}` };
     return {
         /** POST /api/v1/tenant/billing/focus — costed FOCUS records (key needs `focus:write`). */
         pushFocus(body: FocusPushRequest): Promise<FocusPushResponse> {

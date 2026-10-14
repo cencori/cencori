@@ -19,7 +19,7 @@ There are two ways to connect. Use **push** unless your security team prefers pu
 
 ### 1. Create the push connection in CostGraph
 
-1. In Cencori, open **Organization settings → Advanced → Usage export** and copy the **Billing account id** shown on the CostGraph card. It is your Cencori organization id.
+1. In Cencori, open any project's **Settings → Integrations**, choose **Connect** on the **CostGraph** card, and copy the **Billing account id** it shows. It is your Cencori organization id.
 2. In CostGraph, open **Integrations** in the sidebar, choose the **Anything Else** category, and click **Set up** on **FOCUS push**.
 3. Name the connection, for example `Cencori`, and pick the CostGraph tenant the spend belongs to.
 4. Leave **Provider** on **Detect from my first push**. Cencori's first push sets it to `cencori`.
@@ -34,17 +34,19 @@ In CostGraph, with the same tenant selected, open **Settings → API keys** and 
 
 ### 3. Connect it in Cencori
 
-1. Open **Organization settings → Advanced → Usage export**.
-2. Under **CostGraph**, choose **Connect**.
-3. Paste the connection id and the API key.
-4. Choose what fills the sub-account column:
+The CostGraph connection belongs to the organization, so it applies to every project. Organization owners and admins can set it up from any project.
+
+1. Back on the **CostGraph** card (project **Settings → Integrations**), paste the connection id and the API key.
+2. Choose what fills the sub-account column:
    - **Project**: each Cencori project is a sub-account.
    - **End user**: the end-user id you pass on requests. Use this if you resell AI and want spend per customer.
    - **Tenant**: embedded-agent tenants.
    - **None**.
-5. Choose **Connect**, then **Send now** to send the month so far straight away.
 
-After that, Cencori sends each UTC day once it closes. From the 3rd of each month it also re-sends the whole previous month, so any request logged late corrects itself. Every send replaces the window it covers, so repeating one never double-counts.
+   Choose carefully: once usage has been sent, the sub-account is fixed. CostGraph keeps every record it receives, so changing it later would count your history twice.
+3. Choose **Save**, then **Send now** to send the month so far straight away.
+
+After that, Cencori sends each UTC day once it closes. From the 3rd of each month it also re-sends the whole previous month, so any request logged late corrects itself. Re-sending the same usage updates it in place, so repeating a send never double-counts.
 
 The card shows the last day sent and, if a push failed, CostGraph's error message.
 
