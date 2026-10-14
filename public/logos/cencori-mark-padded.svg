@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-6166 -6166 34256 34256" width="256" height="256" fill="none">
+  <!-- The Cencori mark with transparent margin, for third parties that frame logos in a
+       rounded square or circle (e.g. OAuth consent screens): the mark spans 64% of the image,
+       inside the circle's inscribed square, so a crop only ever removes empty space. -->
+  <defs>
+    <clipPath id="cencori-mark"><rect width="21924" height="21924" rx="594"/></clipPath>
+  </defs>
+  <g clip-path="url(#cencori-mark)" fill="#000">
+    <circle cx="7744" r="7744"/>
+    <circle cy="14180" r="7744"/>
+    <circle cx="21924" cy="7744" r="7744"/>
+    <circle cx="14180" cy="21924" r="7744"/>
+  </g>
+</svg>

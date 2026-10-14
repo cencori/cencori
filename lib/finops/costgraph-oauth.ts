@@ -95,7 +95,8 @@ export function clientMetadataDocument(consoleOrigin: string) {
         client_name: 'Cencori',
         redirect_uris: [callbackUrl(consoleOrigin)],
         token_endpoint_auth_method: 'none',
-        logo_uri: 'https://cencori.com/logos/icon-black.svg',
+        // Padded: consent screens frame logos in rounded squares, which crop an edge-to-edge mark.
+        logo_uri: 'https://cencori.com/logos/cencori-mark-padded.svg',
         client_uri: 'https://cencori.com',
         tos_uri: 'https://cencori.com/terms-of-service',
         policy_uri: 'https://cencori.com/privacy-policy',
