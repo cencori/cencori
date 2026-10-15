@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
-import { resolveAuthRedirectTargets, getPostLoginDefault } from "@/lib/auth-redirect";
+import {
+    getConsoleAwareNavigationTarget,
+    resolveAuthRedirectTargets,
+    getPostLoginDefault,
+} from "@/lib/auth-redirect";
 
 /**
  * Password sign-in, server-side.
@@ -42,11 +46,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Re-validate the destination server-side (open-redirect defense), same as
-    // the OAuth callback does.
-    const { navigationTarget } = resolveAuthRedirectTargets(redirectParam, {
+    // the OAuth callback does. Bounce console-only paths to the console host
+    // so a main-host form submission still lands on console.cencori.com.
+    const { navigationTarget: rawTarget } = resolveAuthRedirectTargets(redirectParam, {
         currentOrigin: origin,
         defaultPath: getPostLoginDefault(origin),
     });
+    const navigationTarget = getConsoleAwareNavigationTarget(rawTarget, origin);
 
     const isProduction = hostname.endsWith("cencori.com");
 

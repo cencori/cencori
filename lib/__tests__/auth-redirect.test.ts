@@ -1,5 +1,14 @@
 import { describe, expect, test } from "vitest";
-import { resolveAuthRedirectTargets, getConsoleOrigin, getConsoleUrl, getPostLoginDefault, resolveConsoleBaseUrl } from "@/lib/auth-redirect";
+import {
+    resolveAuthRedirectTargets,
+    getConsoleOrigin,
+    getConsoleUrl,
+    getPostLoginDefault,
+    resolveConsoleBaseUrl,
+    getOAuthCallbackBase,
+    getOAuthDefaultNext,
+    getConsoleAwareNavigationTarget,
+} from "@/lib/auth-redirect";
 
 describe("getConsoleUrl", () => {
     test("builds absolute dashboard-intent links on the console host", () => {
@@ -81,5 +90,41 @@ describe("getPostLoginDefault", () => {
 
     test("falls back to dashboard elsewhere", () => {
         expect(getPostLoginDefault("https://scan.cencori.com/login")).toBe("/dashboard");
+    });
+});
+
+describe("getOAuthCallbackBase", () => {
+    test("runs the callback on the console host for main-app origins", () => {
+        expect(getOAuthCallbackBase("https://cencori.com")).toBe("https://console.cencori.com");
+        expect(getOAuthCallbackBase("https://console.cencori.com")).toBe("https://console.cencori.com");
+        expect(getOAuthCallbackBase("http://localhost:3000")).toBe("http://console.localhost:3000");
+    });
+
+    test("preserves product subdomains with no console counterpart", () => {
+        expect(getOAuthCallbackBase("https://scan.cencori.com")).toBe("https://scan.cencori.com");
+    });
+});
+
+describe("getOAuthDefaultNext", () => {
+    test("is always absolute on the console host so it survives a host switch", () => {
+        expect(getOAuthDefaultNext("https://console.cencori.com")).toBe("https://console.cencori.com/home");
+        expect(getOAuthDefaultNext("https://cencori.com")).toBe("https://console.cencori.com/home");
+    });
+});
+
+describe("getConsoleAwareNavigationTarget", () => {
+    test("bounces relative console paths on the main host to console", () => {
+        expect(getConsoleAwareNavigationTarget("/home", "https://cencori.com")).toBe(
+            "https://console.cencori.com/home",
+        );
+        expect(getConsoleAwareNavigationTarget("/agents", "https://cencori.com")).toBe(
+            "https://console.cencori.com/agents",
+        );
+    });
+
+    test("leaves console-host and marketing targets untouched", () => {
+        expect(getConsoleAwareNavigationTarget("/home", "https://console.cencori.com")).toBe("/home");
+        expect(getConsoleAwareNavigationTarget("/pricing", "https://cencori.com")).toBe("/pricing");
+        expect(getConsoleAwareNavigationTarget("/dashboard", "https://cencori.com")).toBe("/dashboard");
     });
 });

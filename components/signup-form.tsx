@@ -7,7 +7,13 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabaseClient";
-import { isAuthFormTarget, resolveAuthRedirectTargets, getPostLoginDefault } from "@/lib/auth-redirect";
+import {
+  isAuthFormTarget,
+  resolveAuthRedirectTargets,
+  getOAuthCallbackBase,
+  getOAuthDefaultNext,
+  getPostLoginDefault,
+} from "@/lib/auth-redirect";
 import {
   clearSignupWelcomeEmailPending,
   markSignupWelcomeEmailPending,
@@ -116,12 +122,14 @@ export function SignupForm({ className, ...props }: SignupFormProps) {
         return;
       }
 
+      const defaultNext = redirectParam ? getPostLoginDefault(window.location.origin) : getOAuthDefaultNext(window.location.origin);
       const { navigationTarget } = resolveAuthRedirectTargets(redirectParam, {
-        defaultPath: getPostLoginDefault(window.location.origin),
+        defaultPath: defaultNext,
       });
-      // Confirmation link goes through the server callback so the session is
-      // exchanged before the destination renders (prevents the login bounce).
-      const emailRedirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(navigationTarget)}`;
+      // Default sign-ups confirm via the console callback; explicit redirect
+      // flows keep the current host (see login-form handleOAuth).
+      const callbackBase = redirectParam ? window.location.origin : getOAuthCallbackBase(window.location.origin);
+      const emailRedirectTo = `${callbackBase}/auth/callback?next=${encodeURIComponent(navigationTarget)}`;
 
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email,
@@ -159,12 +167,14 @@ export function SignupForm({ className, ...props }: SignupFormProps) {
     setError(null);
     setLoading(true);
     try {
+      const defaultNext = redirectParam ? getPostLoginDefault(window.location.origin) : getOAuthDefaultNext(window.location.origin);
       const { navigationTarget } = resolveAuthRedirectTargets(redirectParam, {
-        defaultPath: getPostLoginDefault(window.location.origin),
+        defaultPath: defaultNext,
       });
-      // Route OAuth through the server callback so the session is exchanged and
-      // cookie-set before the destination renders (prevents the login bounce).
-      const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(navigationTarget)}`;
+      // Default sign-ins run on the console callback; explicit redirect flows
+      // keep the current host (see login-form handleOAuth).
+      const callbackBase = redirectParam ? window.location.origin : getOAuthCallbackBase(window.location.origin);
+      const redirectTo = `${callbackBase}/auth/callback?next=${encodeURIComponent(navigationTarget)}`;
 
       markSignupWelcomeEmailPending();
       const { error: oauthError } = await supabase.auth.signInWithOAuth({

@@ -7,7 +7,13 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabaseClient";
-import { isAuthFormTarget, resolveAuthRedirectTargets, getPostLoginDefault } from "@/lib/auth-redirect";
+import {
+  isAuthFormTarget,
+  resolveAuthRedirectTargets,
+  getOAuthCallbackBase,
+  getOAuthDefaultNext,
+  getPostLoginDefault,
+} from "@/lib/auth-redirect";
 import { clearSignupWelcomeEmailPending, markSignupWelcomeEmailPending } from "@/lib/auth-welcome";
 import Link from "next/link";
 import { Logo } from "@/components/logo";
@@ -190,12 +196,22 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
     setError(null);
     setLoading(true);
     try {
+      // Default to the absolute console home (not a relative `/home`) so the
+      // destination survives even if Supabase returns to the main host
+      // instead of the console callback. Explicit ?redirect= targets are
+      // honored as-is via resolveAuthRedirectTargets.
+      const defaultNext = redirectParam ? getPostLoginDefault(window.location.origin) : getOAuthDefaultNext(window.location.origin);
       const { navigationTarget } = resolveAuthRedirectTargets(redirectParam, {
-        defaultPath: getPostLoginDefault(window.location.origin),
+        defaultPath: defaultNext,
       });
-      // Route OAuth through the server callback so the session is exchanged and
-      // cookie-set before the destination renders (prevents the login bounce).
-      const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(navigationTarget)}`;
+      // Default sign-ins run the server callback on the console host so the
+      // session is exchanged and cookie-set where it will be used (prevents
+      // the login bounce and the cencori.com landing). Explicit redirect
+      // flows (tensor, invite, scan, …) keep the current host so their
+      // destination host is preserved — the callback still bounces
+      // console-only paths via getConsoleAwareNavigationTarget.
+      const callbackBase = redirectParam ? window.location.origin : getOAuthCallbackBase(window.location.origin);
+      const redirectTo = `${callbackBase}/auth/callback?next=${encodeURIComponent(navigationTarget)}`;
 
       markSignupWelcomeEmailPending();
       const { error: oauthError } = await supabase.auth.signInWithOAuth({

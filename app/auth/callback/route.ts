@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
-import { resolveAuthRedirectTargets, getPostLoginDefault } from "@/lib/auth-redirect";
+import {
+    getConsoleAwareNavigationTarget,
+    getConsoleOrigin,
+    resolveAuthRedirectTargets,
+    getPostLoginDefault,
+} from "@/lib/auth-redirect";
 
 // Mirrors @supabase/auth-js EmailOtpType (not re-exported by supabase-js).
 type EmailOtpType = "signup" | "invite" | "magiclink" | "recovery" | "email_change" | "email";
@@ -33,19 +38,29 @@ export async function GET(request: NextRequest) {
     const oauthError = searchParams.get("error_description") || searchParams.get("error");
 
     // Re-validate the post-login destination server-side (open-redirect defense).
-    const { navigationTarget } = resolveAuthRedirectTargets(searchParams.get("next"), {
+    // Then bounce console-only paths (e.g. relative `/home` when Supabase fell
+    // back to its Site URL on the main host) to the console counterpart so
+    // Google/GitHub sign-ins always land on console.cencori.com.
+    const { navigationTarget: rawTarget } = resolveAuthRedirectTargets(searchParams.get("next"), {
         currentOrigin: origin,
         defaultPath: getPostLoginDefault(origin),
     });
+    const navigationTarget = getConsoleAwareNavigationTarget(rawTarget, origin);
 
+    // Error / missing-code redirects stay on the console host when the
+    // callback itself ran on a main-app host — the bare main-host login
+    // would immediately bounce to console anyway, but without preserving the
+    // error query. Go direct so the message survives.
+    const consoleOrigin = getConsoleOrigin(origin);
+    const loginBase = consoleOrigin ?? origin;
     const loginWithError = (message: string) =>
-        NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(message)}`, origin));
+        NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(message)}`, loginBase));
 
     if (oauthError) {
         return loginWithError(oauthError);
     }
     if (!code && !(tokenHash && otpType)) {
-        return NextResponse.redirect(new URL("/login", origin));
+        return NextResponse.redirect(new URL("/login", loginBase));
     }
 
     const isProduction = hostname.endsWith("cencori.com");

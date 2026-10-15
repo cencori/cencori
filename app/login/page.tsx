@@ -35,7 +35,7 @@ function LoginPageContent() {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ redirect?: string }>;
+  searchParams: Promise<{ redirect?: string; error?: string }>;
 }) {
   const params = await searchParams;
   const supabase = await createServerClient();
@@ -49,11 +49,14 @@ export default async function LoginPage({
   }
   // Bare login on a main-app host starts on the console host instead, so the
   // whole flow (form, callback, cookies) lives where the session is used.
-  // Explicit ?redirect= targets are honored as-is.
+  // Explicit ?redirect= targets are honored as-is. Preserve ?error= from the
+  // OAuth callback so the message survives the hop.
   if (!params?.redirect) {
     const consoleOrigin = getConsoleOrigin(origin);
     if (consoleOrigin) {
-      redirect(`${consoleOrigin}/login`);
+      const target = new URL("/login", consoleOrigin);
+      if (params?.error) target.searchParams.set("error", params.error);
+      redirect(target.toString());
     }
   }
   return (
