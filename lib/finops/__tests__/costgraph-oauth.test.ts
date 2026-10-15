@@ -251,6 +251,18 @@ describe('createPushConnection', () => {
         expect((init.headers as Record<string, string>)['X-CostGraph-Tenant-ID']).toBe('ten');
     });
 
+    /** What Arcie hit: two connections for one billing account; the unbound one can't take a push. */
+    it('prefers the connection already bound to cencori over an unbound one listed first', async () => {
+        const fetchImpl = vi.fn()
+            .mockResolvedValueOnce(tokenResponse({ message: 'connection exists' }, 409))
+            .mockResolvedValueOnce(tokenResponse({ data: [
+                { connection_id: 'fpc_unbound', provider_account_id: 'org_1', ingest_mode: 'push', provider: '', created_at: '2026-10-14T15:53:16Z' },
+                { connection_id: 'fpc_bound', provider_account_id: 'org_1', ingest_mode: 'push', provider: 'cencori', created_at: '2026-10-14T21:55:44Z' },
+            ] }));
+        const result = await createPushConnection({ accessToken: 'tok', tenantId: 'ten', billingAccountId: 'org_1', fetchImpl: fetchImpl as never, env: {} as NodeJS.ProcessEnv });
+        expect(result.connectionId).toBe('fpc_bound');
+    });
+
     it('surfaces a 403 when the user may not create connections in CostGraph', async () => {
         const fetchImpl = vi.fn(async () => tokenResponse({ message: 'forbidden' }, 403));
         const error = await createPushConnection({ accessToken: 't', tenantId: 'x', billingAccountId: 'o', fetchImpl: fetchImpl as never, env: {} as NodeJS.ProcessEnv }).catch((e: unknown) => e);
