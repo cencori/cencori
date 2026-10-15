@@ -19,9 +19,11 @@ import {
     refreshTokens,
     safeReturnTo,
     sealOAuthState,
+    sealSigned,
     type OAuthStatePayload,
 } from '@/lib/finops/costgraph-oauth';
 import { createCostGraphPlatformClient } from '@/lib/finops/costgraph';
+import { MAX_PENDING_COOKIE_BYTES, encryptRefreshToken, type PendingConnect } from '@/lib/finops/costgraph-connect';
 
 const env = { COSTGRAPH_OAUTH_STATE_SECRET: 'test-secret' } as NodeJS.ProcessEnv;
 
@@ -281,5 +283,26 @@ describe('platform client credentials', () => {
         expect(headers[0].Authorization).toBe('Bearer tok');
         expect(headers[0]).not.toHaveProperty('X-API-Key');
         expect(headers[1]['X-API-Key']).toBe('bl_key');
+    });
+});
+
+describe('pending tenant-choice cookie', () => {
+    /**
+     * It held the whole token pair once — a signed JWT access token, encrypted as hex — and went
+     * past the browser's 4 KB cookie limit, so it was dropped without a word and the user was left
+     * on "Connect". It now carries only the refresh token.
+     */
+    it('fits in a cookie even with several tenants', () => {
+        const pending: PendingConnect = {
+            organizationId: '850ca097-744c-4f19-b370-df75d69dbf6f',
+            orgSlug: 'xcfgg0o74s8n8hrg5kfy',
+            userId: '6f1c2d3e-4b5a-6978-8a9b-0c1d2e3f4a5b',
+            refreshTokenEncrypted: encryptRefreshToken({ refreshToken: 'r'.repeat(256), accessToken: 'a'.repeat(1500), expiresAt: 0, scope: null, idToken: null }, '850ca097-744c-4f19-b370-df75d69dbf6f'),
+            subject: 'user-123',
+            tenants: Array.from({ length: 8 }, (_, i) => ({ id: crypto.randomUUID(), name: `Tenant number ${i}` })),
+            returnTo: '/settings/integrations/costgraph',
+            issuedAt: Date.now(),
+        };
+        expect(sealSigned(pending, env).length).toBeLessThan(MAX_PENDING_COOKIE_BYTES);
     });
 });

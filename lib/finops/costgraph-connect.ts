@@ -22,21 +22,28 @@ export interface PendingConnect {
     organizationId: string;
     orgSlug: string;
     userId: string;
-    /** TokenSet, JSON-encoded and encrypted with the organization's key. */
-    tokensEncrypted: string;
+    /**
+     * Only the refresh token, encrypted with the organization's key. The access token is a signed
+     * JWT; with it the cookie outgrew the browser's 4 KB limit and was silently dropped. A fresh
+     * access token is fetched when the tenant is chosen.
+     */
+    refreshTokenEncrypted: string;
     subject: string | null;
     tenants: CostGraphTenant[];
     returnTo: string;
     issuedAt: number;
 }
 
-export function encryptTokens(tokens: TokenSet, organizationId: string): string {
-    return encryptApiKey(JSON.stringify(tokens), organizationId);
+export function encryptRefreshToken(tokens: TokenSet, organizationId: string): string {
+    return encryptApiKey(tokens.refreshToken, organizationId);
 }
 
-export function decryptTokens(sealed: string, organizationId: string): TokenSet {
-    return JSON.parse(decryptApiKey(sealed, organizationId)) as TokenSet;
+export function decryptRefreshToken(sealed: string, organizationId: string): string {
+    return decryptApiKey(sealed, organizationId);
 }
+
+/** Browsers drop cookies over 4096 bytes without a word; stay well under. */
+export const MAX_PENDING_COOKIE_BYTES = 3800;
 
 export async function finishCostGraphConnect(params: {
     supabase: SupabaseClient;

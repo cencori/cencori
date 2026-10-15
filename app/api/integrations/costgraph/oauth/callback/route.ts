@@ -28,7 +28,7 @@ import {
     sealSigned,
 } from '@/lib/finops/costgraph-oauth';
 import { sendFirstPush } from '@/lib/finops/costgraph-push';
-import { encryptTokens, finishCostGraphConnect, type PendingConnect } from '@/lib/finops/costgraph-connect';
+import { MAX_PENDING_COOKIE_BYTES, encryptRefreshToken, finishCostGraphConnect, type PendingConnect } from '@/lib/finops/costgraph-connect';
 import { CostGraphError } from '@/lib/finops/costgraph';
 
 const COOKIE_PATH = '/api/integrations/costgraph/oauth';
@@ -92,13 +92,20 @@ export async function GET(req: NextRequest) {
                 organizationId: state.organizationId,
                 orgSlug: state.orgSlug,
                 userId: state.userId,
-                tokensEncrypted: encryptTokens(tokens, state.organizationId),
+                refreshTokenEncrypted: encryptRefreshToken(tokens, state.organizationId),
                 subject,
                 tenants,
                 returnTo,
                 issuedAt: Date.now(),
             };
-            return finish(returnTo, { costgraph: 'choose_tenant' }, sealSigned(pending));
+            const sealed = sealSigned(pending);
+            if (sealed.length > MAX_PENDING_COOKIE_BYTES) {
+                // The browser would drop it silently and the user would see nothing happen.
+                console.error(`[CostGraph OAuth] pending cookie too large (${sealed.length} bytes, ${tenants.length} tenants)`);
+                await revokeToken({ token: tokens.refreshToken, clientId });
+                return finish(returnTo, { costgraph: 'error', reason: 'failed' });
+            }
+            return finish(returnTo, { costgraph: 'choose_tenant' }, sealed);
         }
 
         const { rowId } = await finishCostGraphConnect({

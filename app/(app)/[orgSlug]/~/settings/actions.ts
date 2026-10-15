@@ -26,13 +26,16 @@ import { runConnectionPush, sendFirstPush, type FinopsConnectionRow } from '@/li
 import {
     COSTGRAPH_OAUTH_PENDING_COOKIE,
     CostGraphCapabilityMissing,
+    CostGraphOAuthError,
     PENDING_MAX_AGE_MS,
+    assertGrantedScopes,
     costgraphOAuthEnabled,
+    refreshTokens,
     oauthClientId,
     openSigned,
     revokeToken,
 } from '@/lib/finops/costgraph-oauth';
-import { decryptTokens, finishCostGraphConnect, type PendingConnect } from '@/lib/finops/costgraph-connect';
+import { decryptRefreshToken, finishCostGraphConnect, type PendingConnect } from '@/lib/finops/costgraph-connect';
 import { CostGraphError } from '@/lib/finops/costgraph';
 import { resolveConsoleBaseUrl } from '@/lib/auth-redirect';
 import { cookies } from 'next/headers';
@@ -445,7 +448,15 @@ export async function completeCostGraphConnect(orgSlug: string, tenantId: string
             supabase: admin,
             organizationId: auth.orgId,
             userId: auth.userId,
-            tokens: decryptTokens(pending.tokensEncrypted, auth.orgId),
+            // The pending cookie keeps only the refresh token; trade it for a fresh pair now.
+            tokens: await (async () => {
+                const tokens = await refreshTokens({
+                    refreshToken: decryptRefreshToken(pending.refreshTokenEncrypted, auth.orgId),
+                    clientId: oauthClientId(resolveConsoleBaseUrl()),
+                });
+                assertGrantedScopes(tokens);
+                return tokens;
+            })(),
             subject: pending.subject,
             tenant,
             clientId: oauthClientId(resolveConsoleBaseUrl()),
@@ -457,6 +468,10 @@ export async function completeCostGraphConnect(orgSlug: string, tenantId: string
             ok: false,
             error: error instanceof CostGraphCapabilityMissing
                 ? 'CostGraph does not support connecting from Cencori yet.'
+                : error instanceof CostGraphOAuthError && error.code === 'insufficient_scope'
+                    ? "CostGraph didn't grant permission to send usage (focus:write), so nothing was connected."
+                : error instanceof CostGraphOAuthError && error.requiresReconnect
+                    ? 'That CostGraph sign-in has expired. Connect again.'
                 : error instanceof CostGraphError && error.status === 403
                     ? 'Connecting needs an owner, admin or billing admin role in that CostGraph organization.'
                     : 'Could not finish connecting CostGraph.',
@@ -480,8 +495,10 @@ export async function cancelCostGraphConnect(orgSlug: string): Promise<ActionRes
     const pending = await readPendingConnect(auth.orgId);
     if (pending) {
         try {
-            const tokens = decryptTokens(pending.tokensEncrypted, auth.orgId);
-            await revokeToken({ token: tokens.refreshToken, clientId: oauthClientId(resolveConsoleBaseUrl()) });
+            await revokeToken({
+                token: decryptRefreshToken(pending.refreshTokenEncrypted, auth.orgId),
+                clientId: oauthClientId(resolveConsoleBaseUrl()),
+            });
         } catch {
             // The grant expires on its own; clearing the cookie is what matters here.
         }
