@@ -379,3 +379,11 @@ Arcie connected through Connect CostGraph: the sign-in completed, the tenant `Ce
 Most likely CostGraph treats clients defined by a metadata document as MCP clients and narrows their scopes. **Ask:** grant the scopes a metadata-document client requests and the user approves, including `focus:write` and `integrations:read`, or document how a public multi-tenant client gets them. A client registered under Settings → OAuth clients is no substitute: such a client belongs to one tenant, so only that tenant's users could connect.
 
 Our side now refuses a grant without `focus:write` (the user is told, and the grant is revoked) and sends the month so far as soon as a connection is made. Arcie needs to **Reconnect** once CostGraph fixes the scopes.
+
+### Working end to end (2026-10-14, evening)
+
+CostGraph fixed the scope grant: a Connect from Cencori now gets `focus:write integrations:read openid profile`. Arcie (official tenant `Cencori`) is connected through CostGraph sign-in to `fpc_RD_h6hBqSFLbiYoA` (bound to provider `cencori`). The first OAuth-token push sent 89 records (October 1–14 and September), and it **reconciles to the cent**: September $1.941727, October 1–14 $35.174515, both under the new service names.
+
+Two fixes on our side found along the way: the tenant-choice cookie outgrew the browser's 4 KB limit and was dropped (it now holds only the refresh token), and the 409 reuse picked an unbound connection first (it now prefers one bound to `cencori`, then the newest).
+
+**Cleanup for CostGraph:** `fpc_aHI0Rxdxnd8OXClP` in tenant `Cencori` is the old hand-made connection, unbound and stuck on "Failed to record connection provider". It holds no data and can be deleted.
