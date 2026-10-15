@@ -80,7 +80,7 @@
 <main>
   <p class="eyebrow">Proposal · mockup, not CostGraph's product</p>
   <h1>How Cencori appears in CostGraph</h1>
-  <p class="lede">The integration card, the connect form, and the labels CostGraph shows from our data. Cencori is a deep technology company building the infrastructure AI runs on. The listing should say that, not file us under AI gateways.</p>
+  <p class="lede">The integration card, how connecting works, and the labels CostGraph shows from our data. Cencori is a deep technology company building the infrastructure AI runs on. The listing should say that, not file us under AI gateways.</p>
 
   <h2>1 · The card</h2>
   <p class="note">Integrations → AI and Machine Learning. Same layout as every other card; only the words change.</p>
@@ -136,39 +136,38 @@
     <div class="card dim"><div class="title"><span class="logo"></span>OpenAI</div><p class="desc">AI / LLM. We pull it daily, or you push it yourself.</p><div class="foot"><span class="guide">Setup guide ›</span><button class="btn" type="button">Connect</button></div></div>
   </div>
 
-  <h2>3 · Connect opens a preset push form</h2>
-  <p class="note">The generic FOCUS push form under "Anything Else", filled in for Cencori. Nobody has to guess what "billing account" means.</p>
+  <h2>3 · Connect goes to Cencori</h2>
+  <p class="note">The card's Connect opens Cencori's CostGraph page. There the customer clicks Connect, signs in to CostGraph, picks a tenant, and Cencori creates the push connection and sends the month so far. Nothing to fill in on CostGraph's side.</p>
   <div class="form">
     <div>
-      <h3>Connect Cencori</h3>
-      <p class="side">Cencori sends each settled day of usage as FOCUS 1.2: what Cencori billed, by model, project and customer. Re-sends replace the day, so totals never double.</p>
-      <p class="side">You'll paste two things into Cencori's CostGraph card (any project → Settings → Integrations): the connection id and a <span class="mono">focus:write</span> key. Both appear on the next screen. Once CostGraph offers <span class="mono">focus:write</span> over OAuth, this becomes one click from Cencori instead (spec §12).</p>
+      <h3>Flow</h3>
+      <p class="side">1. CostGraph → Integrations → Cencori → <b>Connect</b><br>
+      2. Opens <span class="mono">console.cencori.com/settings/integrations/costgraph</span><br>
+      3. <b>Connect</b> → Sign in with CostGraph (<span class="mono">focus:write</span>, <span class="mono">integrations:read</span>)<br>
+      4. Choose the tenant (if more than one)<br>
+      5. Cencori creates the connection and sends usage; nightly after that</p>
     </div>
     <div>
-      <div class="field"><label>Connection name</label><div class="input">Cencori</div></div>
-      <div class="field"><label>Tenant</label><div class="input">your-tenant <span class="lock">▾</span></div></div>
-      <div class="field"><label>Provider</label><div class="input locked">Cencori <span class="lock">Locked</span></div></div>
-      <div class="field">
-        <label>Cencori organization ID</label>
-        <div class="input mono" style="color:var(--faint)">xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx</div>
-        <p class="help">In Cencori: any project → Settings → Integrations → CostGraph → Billing account id.</p>
-      </div>
-      <div style="text-align:right"><button class="btn" type="button">Create connection</button></div>
+      <div class="field"><label>Card button links to</label><div class="input mono">https://console.cencori.com/settings/integrations/costgraph</div></div>
+      <div class="field"><label>Connection created by Cencori</label><div class="input locked">provider <span class="mono">cencori</span> · display name <span class="mono">Cencori</span></div></div>
+      <div class="field"><label>Billing account</label><div class="input locked">The customer's Cencori organization id <span class="lock">Set by Cencori</span></div>
+        <p class="help">Shown in the connections list under the Cencori entry, not as a generic FOCUS push.</p></div>
     </div>
   </div>
 
   <h2>4 · Labels CostGraph shows from our data</h2>
-  <p class="note">Service breakdowns, the provider page and Graph AI answers read our FOCUS columns. Today every row says "Cencori AI Gateway".</p>
+  <p class="note">Service breakdowns, the provider page and Graph AI answers read our FOCUS columns.</p>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Where</th><th>Today</th><th>Proposed</th></tr></thead>
+      <thead><tr><th>Where</th><th>Value</th></tr></thead>
       <tbody>
-        <tr><td>Card name</td><td><s>Cencori AI Gateway</s></td><td>Cencori</td></tr>
-        <tr><td>Card category</td><td><s>AI gateway / observability</s></td><td>AI infrastructure</td></tr>
-        <tr><td>Service (text, chat, sessions)</td><td><s>Cencori AI Gateway</s></td><td>Cencori Text Generation</td></tr>
-        <tr><td>Service (embeddings, memory search)</td><td><s>Cencori AI Gateway</s></td><td>Cencori Embeddings</td></tr>
-        <tr><td>Service (images · audio · vision · documents)</td><td><s>Cencori AI Gateway</s></td><td>Cencori Image Generation · Audio · Vision · Documents</td></tr>
-        <tr><td>Provider page header</td><td>—</td><td>Cencori is a deep technology company building the infrastructure AI runs on. This connection carries what your products spend through Cencori — model calls across text, embeddings, images, audio and vision — priced at what Cencori billed, by project and by customer.</td></tr>
+        <tr><td>Card name</td><td>Cencori <span style="color:var(--muted)">(not <s>Cencori AI Gateway</s>)</span></td></tr>
+        <tr><td>Card category</td><td>AI infrastructure <span style="color:var(--muted)">(not <s>AI gateway / observability</s>)</span></td></tr>
+        <tr><td>Provider · Publisher</td><td><span class="mono">cencori</span> · the model's maker (<span class="mono">anthropic</span>, <span class="mono">openai</span>, …)</td></tr>
+        <tr><td>Service</td><td>Cencori Text Generation · Cencori Embeddings · Cencori Image Generation · Cencori Audio · Cencori Vision · Cencori Documents · Cencori Moderation · Cencori Web Search</td></tr>
+        <tr><td>SKU</td><td><span class="mono">provider/model</span>, e.g. <span class="mono">anthropic/claude-sonnet-5</span></td></tr>
+        <tr><td>Sub-account · Resource</td><td>The Cencori project (or the customer's end user / tenant) · the Cencori project, by name</td></tr>
+        <tr><td>Provider page header</td><td>Cencori is a deep technology company building the infrastructure AI runs on. This connection carries what your products spend through Cencori — model calls across text, embeddings, images, audio and vision — priced at what Cencori billed, by project and by customer.</td></tr>
       </tbody>
     </table>
   </div>
