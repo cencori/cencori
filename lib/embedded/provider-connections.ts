@@ -29,6 +29,7 @@ const OFFICIAL_BASE_URLS: Record<string, string[]> = {
     helix: ['https://api.launchverse.app/api/v1'],
     centaur: ['https://api.okeymeta.com.ng/v1'],
     bai: ['https://api.b.ai/v1'],
+    typesafe: ['https://api.typesafe.ai/v1'],
 };
 
 function normalizeBaseUrl(value: string): string {
@@ -44,7 +45,7 @@ export function isCanonicalOfficialBaseUrl(provider: string, baseUrl: string): b
 const OFFICIAL_PROVIDERS = new Set([
     'openai', 'anthropic', 'google', 'cohere', 'xai', 'deepseek', 'groq', 'mistral',
     'together', 'perplexity', 'huggingface', 'zai', 'cerebras', 'qwen',
-    'meta', 'maximo', 'helix', 'centaur', 'bai',
+    'meta', 'maximo', 'helix', 'centaur', 'bai', 'typesafe',
 ]);
 
 export function isOfficialProvider(provider: string): boolean {

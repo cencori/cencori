@@ -95,9 +95,11 @@ const allCatalogModels: FlatModel[] = SUPPORTED_PROVIDERS.flatMap((provider) =>
     }))
 );
 
-// Filter out image/embedding models for standard chat playground
+// Filter out image/embedding models for standard chat playground. Judgment
+// models (TypeSafe Jev) are evaluation-only — no chat completions — so they
+// are excluded here and served by POST /v1/judgments instead.
 const chatCatalogModels = allCatalogModels.filter(
-    (m) => !m.type.includes("image") && !m.type.includes("embedding")
+    (m) => !m.type.includes("image") && !m.type.includes("embedding") && !m.type.includes("judgment")
 );
 
 // ─── Provider icon mapping ──────────────────────────────────────────────────
@@ -126,6 +128,7 @@ const PROVIDER_ICONS: Record<string, (size: number) => React.ReactNode> = {
     minimax: (s) => <Minimax.Avatar size={s} />,
     baidu: (s) => <Baidu.Color size={s} />,
     zai: (s) => <ZAI size={s} />,
+    bai: (s) => <DeepSeek.Color size={s} />,
     cerebras: (s) => <Cerebras.Color size={s} />,
     maximo: (s) => <MaximoIcon size={s} />,
     helix: (s) => <HelixIcon size={s} />,

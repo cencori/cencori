@@ -44,7 +44,7 @@ export interface EmbeddedConnectionRow {
 const MIRRORABLE_PROVIDERS = new Set([
     'openai', 'anthropic', 'google', 'mistral', 'groq', 'cohere',
     'together', 'perplexity', 'xai', 'meta', 'huggingface', 'qwen', 'deepseek',
-    'zai', 'cerebras', 'maximo', 'helix', 'bai', 'centaur',
+    'zai', 'cerebras', 'maximo', 'helix', 'bai', 'centaur', 'typesafe',
     'deepgram', 'cartesia', 'spitch', 'assemblyai', 'elevenlabs',
 ]);
 

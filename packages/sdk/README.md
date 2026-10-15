@@ -196,6 +196,27 @@ import { VisionUploader } from 'cencori/react';
 
 Full API in [docs](https://cencori.com/docs/ai/endpoints/vision).
 
+### Judgment (Structured Decisions)
+
+Yes/no, choice, and score answers with probabilities over any state — no generated text. Any `judgment` catalog model works here (TypeSafe's Jev today).
+
+```typescript
+const result = await cencori.judgment.judge({
+  state: 'I was charged twice. Please refund the duplicate.',
+  questions: {
+    department: {
+      type: 'choice',
+      instructions: 'Which team should handle this?',
+      criteria: { billing: 'Payments, invoicing, refunds', technical: 'Bugs, outages' },
+    },
+    requests_refund: { type: 'noul', instructions: 'Does the customer request a refund?' },
+  },
+});
+// result.answers.department.choice === 'billing'
+```
+
+Full API in [docs](https://cencori.com/docs/api/judgments).
+
 ### Documents (PDF & Image Extraction)
 
 Extract text from PDFs and images, summarize documents, and answer questions about them. Text-based PDFs use native parsing — no LLM tokens, free.

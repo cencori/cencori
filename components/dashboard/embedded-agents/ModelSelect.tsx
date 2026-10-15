@@ -67,6 +67,7 @@ const PROVIDER_ICONS: Record<string, (size: number) => React.ReactNode> = {
   minimax: (s) => <Minimax.Avatar size={s} />,
   baidu: (s) => <Baidu.Color size={s} />,
   zai: (s) => <ZAI size={s} />,
+  bai: (s) => <DeepSeek.Color size={s} />,
   cerebras: (s) => <Cerebras size={s} />,
   maximo: (s) => <MaximoIcon size={s} />,
   helix: (s) => <HelixIcon size={s} />,

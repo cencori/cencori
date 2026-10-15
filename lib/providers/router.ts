@@ -84,13 +84,19 @@ const MODEL_PROVIDER_OVERRIDES: Record<string, string> = {
     'helix-advisor': 'helix',
     // Centaur stealth preview (bare id, no provider prefix to infer from)
     'centaur': 'centaur',
-    // B.AI — backend provider for DeepSeek and GLM models. These are shown
-    // under their public-facing provider names (deepseek, zai) in the catalog
-    // but route through b.ai for inference. See also: catalog entries in
+    // B.AI — public catalog provider since 2026-10-15 (Z.AI rows hidden).
+    // These ids would prefix-match the wrong vendor (glm- → zai, deepseek- →
+    // deepseek, qwen → qwen), so each needs an explicit override to the `bai`
+    // endpoint that actually serves it. See also: catalog entries in
     // config.ts and OPENAI_COMPATIBLE_ENV_VARS in providers-setup.ts.
+    // Legacy `deepseek-v4-flash` (+ vision-exp) kept for backward compat:
+    // DeepSeek retired those builds on 2026-09-10 and serves V4.1-Flash
+    // behind them.
     'deepseek-v4-flash': 'bai',
     'deepseek-v4-flash-vision-exp': 'bai',
     'glm-5.3-flash': 'bai',
+    'deepseek-v4.1-flash': 'bai',
+    'qwen3.8-flash': 'bai',
 };
 
 /**
@@ -174,6 +180,13 @@ export class ProviderRouter {
         // DeepSeek models
         if (modelName.startsWith('deepseek-')) {
             return 'deepseek';
+        }
+
+        // TypeSafe Jev (Judgment API) — evaluation-only models. They ride
+        // POST /v1/judgments, never chat completions; the prefix only tells
+        // callers which provider owns the id.
+        if (modelName.startsWith('jev-')) {
+            return 'typesafe';
         }
 
         // Perplexity models
