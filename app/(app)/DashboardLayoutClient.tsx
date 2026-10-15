@@ -36,6 +36,7 @@ import {
   type DashboardUser,
 } from "@/lib/auth/dashboard-user-cache";
 import { getConsoleRoute, getConsoleSurface } from "@/lib/console/routing";
+import { sanitizeAuthRedirectTarget } from "@/lib/auth-redirect";
 
 const CommandPalette = dynamic(
   () => import("@/components/dashboard/CommandPalette").then((mod) => mod.CommandPalette),
@@ -80,8 +81,12 @@ export default function DashboardLayoutClient({
         if (mounted) {
           setAuthState({ loading: true, user: null });
         }
-        // Carry the page they were trying to open through the login round-trip.
-        const returnTo = `${window.location.pathname}${window.location.search}`;
+        // Carry the page they were trying to open through the login round-trip
+        // (minus any single-use OAuth residue — a dead ?code= would otherwise
+        // be reused as the next `next` and fail again).
+        const returnTo =
+          sanitizeAuthRedirectTarget(`${window.location.pathname}${window.location.search}`) ??
+          window.location.pathname;
         router.replace(`/login?redirect=${encodeURIComponent(returnTo)}`);
         return;
       }
