@@ -502,12 +502,18 @@ async function findPushConnection(params: {
     });
     if (!res.ok) return null;
     const json = await res.json().catch(() => ({})) as {
-        data?: Array<{ connection_id?: unknown; provider_account_id?: unknown; ingest_mode?: unknown; provider?: unknown }>;
+        data?: Array<{ connection_id?: unknown; provider_account_id?: unknown; ingest_mode?: unknown; provider?: unknown; created_at?: unknown }>;
     };
-    const match = (json.data ?? []).find((c) =>
+    const candidates = (json.data ?? []).filter((c) =>
         c.provider_account_id === params.billingAccountId
         && c.ingest_mode === 'push'
         && (!c.provider || c.provider === 'cencori')
         && typeof c.connection_id === 'string');
-    return match ? (match.connection_id as string) : null;
+    // Prefer one already bound to provider "cencori", then the newest. An unbound connection may
+    // never accept a push: on 2026-10-14 a hand-made one stayed stuck on CostGraph's
+    // "Failed to record connection provider" while a bound one beside it worked.
+    candidates.sort((a, b) =>
+        Number(b.provider === 'cencori') - Number(a.provider === 'cencori')
+        || String(b.created_at ?? '').localeCompare(String(a.created_at ?? '')));
+    return candidates.length ? (candidates[0].connection_id as string) : null;
 }
