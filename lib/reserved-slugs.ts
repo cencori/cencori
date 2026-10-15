@@ -15,6 +15,7 @@ export const RESERVED_ORG_SLUGS: ReadonlySet<string> = new Set([
     // App-level routes
     "account",
     "api",
+    "auth",
     "dashboard",
 
     // Route groups' children (top-level URLs from each group)

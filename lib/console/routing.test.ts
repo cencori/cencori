@@ -68,8 +68,12 @@ describe("console routing", () => {
       .toBe("/acme/~/billing");
   });
 
-  it("canonicalizes existing console bookmarks without breaking their scope", () => {
-    expect(getCanonicalConsoleRedirect("/acme/api")).toEqual({
+  it("never treats auth routes as org URLs (the OAuth callback must stay reachable)", () => {
+    expect(getCanonicalConsoleRedirect("/auth/callback")).toBeNull();
+    expect(getConsoleRoute("/auth/callback")).toBeNull();
+  });
+
+  it("canonicalizes existing console bookmarks without breaking their scope", () => {    expect(getCanonicalConsoleRedirect("/acme/api")).toEqual({
       canonicalPath: "/home",
       organizationSlug: "acme",
       projectSlug: "api",
