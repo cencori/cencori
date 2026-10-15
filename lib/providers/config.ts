@@ -60,15 +60,13 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         website: 'https://z.ai',
         docsUrl: 'https://docs.z.ai/guides/llm/glm-5.2',
         keyPrefix: '',
-        models: [
-            { id: 'glm-5.2', name: 'GLM-5.2', type: ['chat', 'reasoning'], contextWindow: 1000000, description: 'Flagship model, 1M context, coding & agentic, reasoning effort (max/high)', capabilities: { tools: true }, addedAt: '2026-06-15' },
-            // Shown under Z.AI (the lab that makes it) but routed through B.AI
-            // (see router.ts). Paid since 2026-09-23: the B.AI zero-credit promo
-            // ended ("credit insufficient balance: balance=0") and the Z.AI key
-            // is unfunded, so there is no free path left. Bills from the active
-            // `bai:glm-5.3-flash` pricing row.
-            { id: 'glm-5.3-flash', name: 'GLM-5.3 Flash', type: ['chat', 'reasoning'], contextWindow: 1000000, description: 'Fast GLM model, 1M context, economical reasoning', capabilities: { tools: true }, addedAt: '2026-08-21' },
-        ],
+        // Hidden 2026-10-15. GLM is now served through B.AI (see the `bai`
+        // provider below): `glm-5.3-flash` moved there, and `glm-5.2` has no
+        // funded path (the Z.AI key is unfunded). The entry stays so a
+        // customer can still bring their own Z.AI key; BYOK routing does not
+        // depend on this list. To restore managed Z.AI: re-add only ids that
+        // exist upstream, each with a model_pricing row.
+        models: [],
     },
     {
         id: 'openai',
@@ -435,28 +433,19 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         website: 'https://b.ai',
         docsUrl: 'https://b.ai/docs',
         keyPrefix: 'sk-',
-        // Backend provider for GLM (and formerly DeepSeek) models that are shown
-        // to customers under their real vendor's name. The router overrides in
-        // router.ts steer the model ids here transparently.
-        //
-        // This list is EMPTY on purpose, and must stay that way. Anything added
-        // here becomes a visible catalog row: components/models/ModelCatalog.tsx
-        // flattens every provider's `models` with no de-duplication, and because
-        // these ids are free, publicProviderLabel brands them "Cencori" — the
-        // same label the `zai` entry gets. The result was two rows with the same
-        // id, the same provider and no way to tell them apart, which is what
-        // `glm-5.3-flash` looked like here until 2026-09-10.
-        //
-        // Pricing does NOT come from this list. B.AI keeps its own rows under the
-        // `bai` namespace (20260830_170000_bai_deepseek_glm_catalog.sql) and the
-        // free override lives in free-models.ts as `bai:glm-5.3-flash` — which
-        // must stay, because the router resolves the model to `bai` before
-        // pricing is looked up. Removing the catalog row does not remove either.
-        //
-        // Also gone from here on 2026-09-10: deepseek-v4-flash and its vision
-        // variant, whose zero-credit promo ended ("credit insufficient balance:
-        // balance=0 required=4"). Their paid `bai` pricing rows are still active.
-        models: [],
+        // Public catalog since 2026-10-15: Z.AI rows are hidden and GLM plus
+        // DeepSeek plus Qwen flash tiers are served through B.AI under B.AI's
+        // own name. Previously this list stayed empty on purpose to avoid a
+        // duplicate `glm-5.3-flash` row (shown under `zai`, routed via `bai`);
+        // with `zai` emptied there is exactly one row per id again, so the
+        // backend-only rule no longer applies. Each id needs an active
+        // `bai:<id>` model_pricing row (see the bai catalog migration) and a
+        // router override in router.ts, otherwise it 503s / misroutes.
+        models: [
+            { id: 'glm-5.3-flash', name: 'GLM-5.3 Flash', type: ['chat', 'reasoning'], contextWindow: 1000000, description: 'Fast GLM model, 1M context, economical reasoning, $0.15/$0.50 per 1M', capabilities: { tools: true }, addedAt: '2026-08-26' },
+            { id: 'deepseek-v4.1-flash', name: 'DeepSeek V4.1 Flash', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'Native multimodal MoE flash tier, 1M context, $0.15/$0.60 per 1M off-peak', capabilities: { tools: true, structuredOutput: true }, addedAt: '2026-09-10' },
+            { id: 'qwen3.8-flash', name: 'Qwen3.8 Flash', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'Fast Qwen flash tier, hybrid reasoning, 1M context, $0.15/$0.47 per 1M', capabilities: { tools: true, structuredOutput: true }, addedAt: '2026-08-26' },
+        ],
     },
     {
         id: 'centaur',
@@ -471,6 +460,30 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         // stopped being reachable. If the partnership resumes, re-add with a
         // real model id and pricing rows rather than restoring the codename.
         models: [],
+    },
+    // ── Judgment provider (TypeSafe Jev) ─────────────────────────────
+    // Jev is evaluation-only: it answers typed questions (yes/no, choice,
+    // score) about a state and returns probabilities — no chat completions,
+    // no text generation. Its rows carry the `judgment` type so chat
+    // surfaces (playground, agent studio, tensor policies) never pick them
+    // up; they are served by POST /v1/judgments (the Judgment API), which
+    // proxies TypeSafe's POST /v1/systemone. Each id needs an active
+    // `typesafe:<id>` model_pricing row, otherwise it 503s like any unpriced
+    // model. Verified live 2026-10-15: GET /v1/models lists the `jev-latest`
+    // and `jev-preview` aliases (both 2026-09-10, both resolving to
+    // `jev-1.13.0`); versioned ids are accepted whether or not listed.
+    {
+        id: 'typesafe',
+        name: 'TypeSafe',
+        icon: '/providers/voice.svg',
+        website: 'https://typesafe.ai',
+        docsUrl: 'https://docs.typesafe.ai',
+        keyPrefix: 'apikey_',
+        models: [
+            { id: 'jev-latest', name: 'Jev Latest', type: ['judgment'], contextWindow: 64000, description: 'Flagship System One decision model (resolves to jev-1.13.0), yes/no, choice & score answers with probabilities, $0.042 per 1M input, output tokens unbilled', addedAt: '2026-09-10' },
+            { id: 'jev-preview', name: 'Jev Preview', type: ['judgment'], contextWindow: 64000, description: 'Preview build of Jev, ahead of latest when a preview is available, $0.042 per 1M input, output tokens unbilled', addedAt: '2026-09-10' },
+            { id: 'jev-1.13.0', name: 'Jev 1.13', type: ['judgment'], contextWindow: 64000, description: 'Pinned Jev 1.13 release, 64k per request, $0.042 per 1M input, output tokens unbilled', addedAt: '2026-09-10' },
+        ],
     },
     // ── Voice providers (BYOK) ──────────────────────────────────
     // Models are chosen per-call on the Voice endpoints, so these carry no

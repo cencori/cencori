@@ -10,7 +10,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/components/ui/toast";
-import { AudioLines, Check, ChevronRight, Eye, EyeOff, Key, Loader2, Plus, Trash2, X } from "lucide-react";
+import { AudioLines, Check, ChevronRight, Eye, EyeOff, Key, Loader2, Plus, Scale, Trash2, X } from "lucide-react";
 import { OpenAI, Anthropic, Google, Mistral, Cohere, Perplexity, Groq, XAI, Together, Meta, HuggingFace, Qwen, DeepSeek, ZAI } from "@lobehub/icons";
 import { SUPPORTED_PROVIDERS, getModelsForProvider, getChatModelsForProvider, getImageModelsForProvider, type AIProviderConfig } from "@/lib/providers/config";
 import { Button } from "@/components/ui/button";
@@ -45,7 +45,8 @@ const PROVIDER_LOGOS: Record<string, React.ReactNode> = {
     helix: <Image src="/providers/helix.svg" alt="Helix" width={20} height={20} className="rounded-sm" />,
     bai: <DeepSeek.Color size={20} />,
     centaur: <Image src="/providers/centaur.svg" alt="Centaur" width={20} height={20} className="rounded-sm" />,
-    // Voice providers (no brand icons in the icon set) — neutral voice glyph
+    // Judgment provider (TypeSafe Jev) — decision models, no brand icon in the set
+    typesafe: <Scale size={18} />,    // Voice providers (no brand icons in the icon set) — neutral voice glyph
     deepgram: <AudioLines size={18} />,
     cartesia: <AudioLines size={18} />,
     spitch: <AudioLines size={18} />,

@@ -1,7 +1,7 @@
 {
     "$schema": "https://json.schemastore.org/package.json",
     "name": "cencori",
-    "version": "1.8.2",
+    "version": "1.8.3",
     "description": "Cencori - The unified infrastructure layer for AI applications. One SDK for AI Gateway, Compute, Workflow, and Storage.",
     "main": "dist/index.js",
     "module": "dist/index.mjs",
@@ -41,6 +41,11 @@
             "types": "./dist/voice/index.d.ts",
             "import": "./dist/voice/index.mjs",
             "require": "./dist/voice/index.js"
+        },
+        "./judgment": {
+            "types": "./dist/judgment/index.d.ts",
+            "import": "./dist/judgment/index.mjs",
+            "require": "./dist/judgment/index.js"
         },
         "./documents": {
             "types": "./dist/documents/index.d.ts",

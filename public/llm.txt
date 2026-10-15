@@ -616,6 +616,7 @@ Common endpoints:
 - `POST /v1/vision/describe` · `POST /v1/vision/ocr` · `POST /v1/vision/classify`
 - `POST /v1/documents/extract` · `POST /v1/documents/summarize` · `POST /v1/documents/query`
 - `POST /v1/audio/speech` (text-to-speech) · `POST /v1/audio/transcriptions` (speech-to-text)
+- `POST /v1/judgments` (structured decisions: noul/choice/score with probabilities)
 - `POST /api/v1/telemetry/web`
 
 All endpoints below use the same `CENCORI_API_KEY: csk_...` header and `https://cencori.com` origin.
@@ -924,6 +925,44 @@ curl https://api.cencori.com/v1/audio/transcriptions \
   -F "file=@meeting.mp3" -F "model=whisper-1"
 ```
 
+## Judgment Endpoints
+
+Structured decisions from decision models (TypeSafe's Jev) — never generated text. Any `judgment`-type catalog model works here through the same endpoint.
+
+`POST /v1/judgments` — JSON body `{ "state": "...", "questions": {...}, "model": "jev-latest" }`.
+`state` is a string, JSON object, or array. Each question needs `instructions` plus:
+- `noul`: yes/no question → `{ "noul": 0.95 }` (probability of yes)
+- `choice`: `criteria` map of 1–255 options → `{ "choice", "confidence", "probabilities" }`
+- `score`: `criteria` array of 2–10 ordered levels → `{ "score", "confidence", "legend", "probabilities" }`
+
+Models: `jev-latest` (default), `jev-preview`, `jev-1.13.0`. Aliases resolve upstream — the response names the version that judged.
+64k-token budget per request (state plus longest question must fit 32k); over-budget requests are rejected before billing.
+Input tokens billed at $0.042/MTok; output tokens unbilled. `GET /v1/judgments` lists models with live pricing.
+
+```bash
+curl https://api.cencori.com/v1/judgments \
+  -H "CENCORI_API_KEY: csk_..." -H "Content-Type: application/json" \
+  -d '{ "model": "jev-latest", "state": "I was charged twice. Refund please.",
+        "questions": { "refund": { "type": "noul", "instructions": "Requests a refund?" } } }'
+```
+
+```typescript
+import { Cencori } from 'cencori'; // judgment namespace requires cencori@1.8.3+ (or 'cencori/judgment')
+
+const cencori = new Cencori({ apiKey: process.env.CENCORI_API_KEY });
+const result = await cencori.judgment.judge({
+  state: 'I was charged twice. Please refund the duplicate.',
+  questions: {
+    department: {
+      type: 'choice',
+      instructions: 'Which team should handle this?',
+      criteria: { billing: 'Payments, invoicing, refunds', technical: 'Bugs, outages' },
+    },
+  },
+});
+console.log(result.answers.department.choice); // 'billing'
+```
+
 ## Cencori Web
 
 Cencori Web is the first-party web intelligence layer for agents. It does not call Tavily, Brave, Serper, Exa, Firecrawl, Browserbase, or another hosted search provider. Cencori owns the crawler, corpus, local embeddings, hybrid ranking, extraction, browser workers, and evidence path.
@@ -1108,7 +1147,7 @@ Requires `cencori@1.8.0` for the SDK helpers.
 
 Endpoints (GET, CORS `*`, cached):
 - `https://cencori.com/api/models` — models + providers. Filters: `?provider=openai`,
-  `?type=reasoning|chat|code|search|vision|image`, `?search=gpt`, repeatable
+  `?type=reasoning|chat|code|search|vision|image|judgment`, `?search=gpt`, repeatable
   `?capability=tools` (reasoning, vision, code, search, image, tools,
   structuredOutput, fileInput, videoInput, audioInput, caching).
 - `https://cencori.com/api/providers` — providers only
@@ -1224,6 +1263,7 @@ When integrating Cencori into a project:
 - TanStack AI: https://cencori.com/docs/integrations/tanstack
 - Authentication: https://cencori.com/docs/api/authentication
 - Chat API: https://cencori.com/docs/api/chat
+- Judgment API: https://cencori.com/docs/api/judgments
 - Model Catalog API: https://cencori.com/docs/api/catalog
 - Cencori Web API: https://cencori.com/docs/api/web
 - Build a Web Research Agent: https://cencori.com/docs/guides/build-a-web-research-agent

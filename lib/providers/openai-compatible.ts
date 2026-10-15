@@ -161,10 +161,11 @@ export function openAICompatibleCacheParams(
 /**
  * Providers whose thinking models take their trace back as `reasoning_content`
  * on assistant turns: DeepSeek requires it after a tool call (400 without),
- * and Kimi (Moonshot) and GLM (Z.ai) expect it across tool calls. Everyone
+ * and Kimi (Moonshot) and GLM (Z.ai) expect it across tool calls. B.AI proxies
+ * DeepSeek and GLM, so it echoes for the same reason. Everyone
  * else gets history without it, as they always had.
  */
-const REASONING_ECHO_PROVIDERS: ReadonlySet<string> = new Set(['deepseek', 'moonshot', 'zai']);
+const REASONING_ECHO_PROVIDERS: ReadonlySet<string> = new Set(['deepseek', 'moonshot', 'zai', 'bai']);
 
 export function echoesReasoning(providerName: string): boolean {
     return REASONING_ECHO_PROVIDERS.has(providerName);

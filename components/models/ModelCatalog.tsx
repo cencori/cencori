@@ -20,7 +20,7 @@ import {
 import { SUPPORTED_PROVIDERS, type AIModel, type ModelCapabilities } from "@/lib/providers/config";
 import { formatContextWindow, getModelDisplayPrice } from "@/lib/providers/display-pricing";
 import { CENCORI_PROVIDER_LABEL, publicProviderDisplayName, publicProviderLabel } from "@/lib/providers/branding";
-import { Search, ChevronDown, ChevronUp, Copy, Check, Brain, Command, Eye, Code, Globe, Image, Wrench, FileJson, FileInput, Video, Mic, Zap } from "lucide-react";
+import { Search, ChevronDown, ChevronUp, Copy, Check, Brain, Command, Eye, Code, Globe, Image, Wrench, FileJson, FileInput, Video, Mic, Zap, Scale } from "lucide-react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
     ChatIcon,
@@ -128,6 +128,9 @@ const PROVIDER_ICONS: Record<string, (size: number) => React.ReactNode> = {
     alibaba: (s) => <Alibaba.Color size={s} />,
     baidu: (s) => <Baidu.Color size={s} />,
     zai: (s) => <ZAI size={s} />,
+    bai: (s) => <DeepSeek.Color size={s} />,
+    // Judgment provider (TypeSafe Jev) — no brand icon in the set, scale glyph
+    typesafe: (s) => <Scale size={s} style={{ width: s, height: s }} />,
     [CENCORI_PROVIDER_LABEL]: (s) => <CencoriIcon size={s} />,
     maximo: (s) => <MaximoIcon size={s} />,
     helix: (s) => <HelixIcon size={s} />,
@@ -149,6 +152,7 @@ const TYPE_COLORS: Record<string, string> = {
     vision: "bg-teal-500/10 text-teal-400 border-teal-500/20",
     embedding: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
     image: "bg-pink-500/10 text-pink-400 border-pink-500/20",
+    judgment: "bg-orange-500/10 text-orange-400 border-orange-500/20",
 };
 
 const CAPABILITY_ICONS: Record<string, React.ComponentProps<typeof HugeiconsIcon>["icon"]> = {
@@ -169,6 +173,7 @@ const CAPABILITY_LABELS: Record<string, string> = {
     vision: "Vision",
     embedding: "Embedding",
     image: "Image Generation",
+    judgment: "Judgment",
 };
 
 // ─── Feature filters (Vercel-style capabilities menu) ───────────────────────

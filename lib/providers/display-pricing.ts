@@ -143,6 +143,10 @@ export function getModelDisplayPrice(
         if (id.includes('reasoner') || id.includes('speciale') || id.includes('r1')) {
             return price(0.55, 2.19);
         }
+        // V4.1 Flash via B.AI (GA 2026-09-10, 1M context): DeepSeek off-peak
+        // $0.15 in (cache miss) / $0.60 out per 1M; peak is 2x. Must precede
+        // the legacy V4 Flash catch-all below.
+        if (id.includes('deepseek-v4.1-flash')) return price(0.15, 0.6);
         if (id.includes('flash')) return price(0.07, 0.14);
         return price(0.14, 0.28);
     }
@@ -158,6 +162,9 @@ export function getModelDisplayPrice(
 
     // Qwen / Alibaba
     if (id.includes('qwen') || id.includes('qwq')) {
+        // Qwen3.8 Flash via B.AI (2026-08-26, 1M context): $0.15 in / $0.47
+        // out per 1M. Must precede the generic qwen catch-all ($0.10).
+        if (id.includes('qwen3.8-flash') || id.includes('qwen3-8-flash')) return price(0.15, 0.47);
         if (id.includes('72b') || id.includes('max')) return price(0.4, 0.4);
         if (id.includes('32b') || id.includes('plus')) return price(0.2, 0.2);
         return price(0.1, 0.1);
@@ -194,8 +201,17 @@ export function getModelDisplayPrice(
     // Helix Advisor
     if (id === 'helix-advisor') return price(0.5, 1.5);
 
-    // GLM (Z.AI)
+    // GLM (Z.AI via B.AI)
+    // GLM-5.3 Flash standard reference (effective 2026-09-10 UTC+8):
+    // $0.15 in / $0.50 out / $0.03 cache-read per 1M. Must precede the
+    // generic GLM catch-all (flagship-era $0.50/$1.50).
+    if (id.includes('glm-5.3-flash')) return price(0.15, 0.5);
     if (id.includes('glm')) return price(0.5, 1.5);
+
+    // Jev (TypeSafe System One, via the Judgment API)
+    // $42 per Btok = $0.042 per 1M input tokens; output tokens are free.
+    // Source: https://docs.typesafe.ai/models
+    if (id.startsWith('jev-')) return price(0.042, 0);
 
     // Cerebras / Groq OSS
     if (id.includes('gpt-oss') || id.includes('gemma-')) return price(0.5, 1.5);

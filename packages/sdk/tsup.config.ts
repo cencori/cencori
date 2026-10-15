@@ -9,6 +9,7 @@ export default defineConfig({
         'catalog/index': 'src/catalog/index.ts',
         'vision/index': 'src/vision/index.ts',
         'voice/index': 'src/voice/index.ts',
+        'judgment/index': 'src/judgment/index.ts',
         'documents/index': 'src/documents/index.ts',
         'react/index': 'src/react/index.ts',
         'compute/index': 'src/compute/index.ts',

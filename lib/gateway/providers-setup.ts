@@ -62,9 +62,10 @@ const OPENAI_COMPATIBLE_ENV_VARS: Record<string, string[]> = {
     helix: ['HELIX_API_KEY'],
     // Centaur stealth-preview key (partner-provisioned, one-week window).
     centaur: ['CENTAUR_API_KEY'],
-    // B.AI — backend provider for DeepSeek and GLM models rebranded under
-    // their public-facing provider names (see MODEL_PROVIDER_OVERRIDES in
-    // router.ts and the catalog entries in config.ts).
+    // B.AI — public catalog provider since 2026-10-15 for the flash tiers
+    // (glm-5.3-flash, deepseek-v4.1-flash, qwen3.8-flash). Z.AI rows are
+    // hidden; see MODEL_PROVIDER_OVERRIDES in router.ts and the catalog
+    // entries in config.ts.
     bai: ['BAI_API_KEY'],
 };
 
@@ -225,10 +226,13 @@ const TENSOR_OPEN_WEIGHT_MODEL_MARKERS = [
 ];
 
 /**
- * The two models Trial and Starter run on. Tensor picks between them for each turn (the app's Auto
+ * The models Trial and Starter run on. Tensor picks between them for each turn (the app's Auto
  * names the one it wants), and every plan above Starter may use them too.
+ * `deepseek-v4-flash` is the legacy id DeepSeek still accepts (served by
+ * V4.1-Flash since the 2026-09-10 retirement); `deepseek-v4.1-flash` is the
+ * catalog id.
  */
-const TENSOR_STARTER_MODEL_MARKERS = ['deepseek-v4-flash', 'maximo-atlas'];
+const TENSOR_STARTER_MODEL_MARKERS = ['deepseek-v4-flash', 'deepseek-v4.1-flash', 'maximo-atlas'];
 
 export function resolveTensorPlanModel(
     requestedModel: string,

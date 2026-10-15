@@ -94,7 +94,7 @@ describe('DeepSeek thinking trace round-trip', () => {
 describe('which providers get the thinking trace back', () => {
     it('echoes it to the thinking providers that take it, and to no one else', async () => {
         const { echoesReasoning } = await import('@/lib/providers/openai-compatible');
-        for (const provider of ['deepseek', 'moonshot', 'zai']) {
+        for (const provider of ['deepseek', 'moonshot', 'zai', 'bai']) {
             expect(echoesReasoning(provider)).toBe(true);
         }
         // Strict APIs reject the unknown field, and a trace from one model must not reach another.

@@ -139,6 +139,24 @@ export {
     type TranscriptWord,
     type VoiceModelInfo,
 } from './voice';
+export {
+    JudgmentNamespace,
+    type JudgmentQuestionType,
+    type JudgmentState,
+    type NoulQuestion,
+    type ChoiceQuestion,
+    type ScoreQuestion,
+    type JudgmentQuestion,
+    type JudgeRequest,
+    type NoulAnswer,
+    type ChoiceAnswer,
+    type ScoreAnswer,
+    type JudgmentAnswer,
+    type JudgmentUsage,
+    type JudgeResult,
+    type JudgmentModelInfo,
+    type JudgmentModelsResponse,
+} from './judgment';
 export { AgentsNamespace, type Agent, type AgentConfig, type AgentListItem, type CreateAgentParams, type UpdateAgentParams, type AgentKey, type CreateAgentKeyParams } from './agents';
 export { ComputeNamespace } from './compute';
 export { WorkflowNamespace } from './workflow';

@@ -115,12 +115,16 @@ describe('model catalog pricing coverage', () => {
         // endpoint nor a first-class client cannot be called by any code path.
         const { OPENAI_COMPATIBLE_ENDPOINTS } = await import('@/lib/providers/openai-compatible');
         const FIRST_CLASS_PROVIDERS = new Set(['openai', 'anthropic', 'google', 'cohere']);
+        // Providers served by a dedicated gateway path instead of chat
+        // completions: typesafe (Judgment API, POST /v1/judgments).
+        const DEDICATED_PATH_PROVIDERS = new Set(['typesafe']);
 
         const unroutable = SUPPORTED_PROVIDERS
             .filter((provider) => provider.models.length > 0)
             .filter((provider) =>
                 !(provider.id in OPENAI_COMPATIBLE_ENDPOINTS)
-                && !FIRST_CLASS_PROVIDERS.has(provider.id))
+                && !FIRST_CLASS_PROVIDERS.has(provider.id)
+                && !DEDICATED_PATH_PROVIDERS.has(provider.id))
             .map((provider) => provider.id);
 
         expect(unroutable, `Providers with models but no route: ${unroutable.join(', ')}`)
