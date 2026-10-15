@@ -8730,6 +8730,125 @@
         ]
       }
     },
+    "/v1/usage/focus": {
+      "get": {
+        "summary": "Usage as FOCUS 1.2 records (json|csv)",
+        "description": "FinOps export: usage as FOCUS 1.2 billing records. Auth with an organization usage export key (cuk_) for every project in the organization (optionally narrowed with project_id), or a secret project key for that project only.",
+        "responses": {
+          "200": {
+            "description": "FOCUS records",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "records": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "next_cursor": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  }
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "getUsageFocus",
+        "tags": [
+          "Usage"
+        ],
+        "parameters": [
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "description": "RFC 3339 or YYYY-MM-DD; default yesterday UTC",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "description": "RFC 3339 or YYYY-MM-DD; window max 92 days",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sub_account",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "project",
+                "end_user",
+                "tenant",
+                "none"
+              ]
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "json",
+                "csv"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5000
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "description": "Export-key callers only: narrow to one project",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
     "/v1/webhook-deliveries": {
       "get": {
         "summary": "Delivery log",
