@@ -131,6 +131,138 @@ export function getPostLoginDefault(currentOrigin: string): string {
     return getConsoleOrigin(currentOrigin)?.concat("/home") ?? "/dashboard";
 }
 
+/**
+ * Base URL for the OAuth callback (`/auth/callback`).
+ *
+ * The whole auth flow (form, callback, cookies) must live where the session
+ * is used — the console host. When the form is rendered on a main-app host
+ * (cencori.com, localhost), the callback itself must still be on the console
+ * counterpart so Supabase returns there directly instead of bouncing through
+ * the main host and losing the console destination.
+ *
+ * Product subdomains (scan, pitch, …) and unknown hosts have no console
+ * counterpart and keep their own origin.
+ */
+export function getOAuthCallbackBase(currentOrigin: string): string {
+    return getConsoleOrigin(currentOrigin) ?? currentOrigin;
+}
+
+/**
+ * Absolute console `next` value for OAuth / email flows that have no explicit
+ * `?redirect=` target.
+ *
+ * Unlike {@link getPostLoginDefault} (which is relative on console for
+ * same-origin `router.push` navigation), this is always absolute on the
+ * console host so the destination survives a host switch — e.g. Supabase
+ * falling back to its Site URL (cencori.com) when the console callback URL
+ * isn't allowlisted. A relative `/home` decoded on the main host would
+ * otherwise resolve to `https://cencori.com/home` (a 404) instead of the
+ * console home.
+ */
+export function getOAuthDefaultNext(currentOrigin: string): string {
+    try {
+        const url = new URL(currentOrigin);
+        if (isConsoleHostname(url.hostname)) {
+            return new URL("/home", url.origin).toString();
+        }
+    } catch {
+        // Fall through to console resolution below.
+    }
+    return resolveConsoleBaseUrl(currentOrigin).concat("/home");
+}
+
+/**
+ * Rewrite a post-auth destination that would otherwise strand the user on
+ * the main site.
+ *
+ * When the OAuth callback lands on a main-app host (Supabase Site-URL
+ * fallback, manually entered URL, stale bookmark) with a relative console
+ * path such as `/home`, resolving it against the main origin keeps the user
+ * on `cencori.com`. Console paths have no meaning there (`/home` is
+ * reserved, not a marketing page), so bounce them to the console counterpart.
+ * Absolute `https://cencori.com/home`-style targets are rewritten the same
+ * way. Everything else passes through untouched.
+ */
+export function getConsoleAwareNavigationTarget(
+    navigationTarget: string,
+    currentOrigin: string,
+): string {
+    const consoleOrigin = getConsoleOrigin(currentOrigin);
+    if (!consoleOrigin) return navigationTarget;
+
+    const isRelative = navigationTarget.startsWith("/") && !navigationTarget.startsWith("//");
+    let pathname: string | null = null;
+    if (isRelative) {
+        try {
+            pathname = new URL(navigationTarget, "http://localhost").pathname;
+        } catch {
+            return navigationTarget;
+        }
+    } else {
+        try {
+            const candidate = new URL(navigationTarget);
+            const currentHostname = new URL(currentOrigin).hostname.toLowerCase();
+            if (candidate.hostname.toLowerCase() !== currentHostname) {
+                return navigationTarget;
+            }
+            pathname = candidate.pathname;
+        } catch {
+            return navigationTarget;
+        }
+    }
+
+    if (!pathname) return navigationTarget;
+    // Console-only surfaces (no marketing equivalent on the main host).
+    // Keep this list in sync with lib/console/routing.ts PROJECT_ROOTS /
+    // ORGANIZATION_ROOTS. `/home` is the post-login default; the rest are
+    // deep links that must not strand on cencori.com either.
+    const CONSOLE_PATHS = new Set([
+        "/home",
+        "/agents",
+        "/embedded-agents",
+        "/observability",
+        "/logs",
+        "/ai-gateway",
+        "/security",
+        "/memory",
+        "/deployments",
+        "/monetization",
+        "/webhooks",
+        "/settings",
+        "/projects",
+        "/billing",
+        "/usage",
+        "/teams",
+        "/audit-log",
+        "/governance",
+        "/organization",
+    ]);
+    const root = `/${pathname.split("/").filter(Boolean)[0] ?? ""}`;
+    const isConsolePath =
+        pathname === "/home" ||
+        pathname.startsWith("/home/") ||
+        (CONSOLE_PATHS.has(root) &&
+            // `/settings` on the main host is the account page; on console it
+            // is the workspace settings — only bounce the exact console shape
+            // plus its sub-paths, which is what this is.
+            true);
+
+    if (!isConsolePath) return navigationTarget;
+
+    if (isRelative) {
+        return new URL(navigationTarget, `${consoleOrigin}/`).toString();
+    }
+    try {
+        const absolute = new URL(navigationTarget);
+        const consoleUrl = new URL(consoleOrigin);
+        absolute.protocol = consoleUrl.protocol;
+        absolute.host = consoleUrl.host;
+        return absolute.toString();
+    } catch {
+        return navigationTarget;
+    }
+}
+
 function isAllowedAuthRedirectHost(hostname: string, currentHostname: string): boolean {
     const target = hostname.toLowerCase();
     const current = currentHostname.toLowerCase();

@@ -1,6 +1,7 @@
 import React from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { getConsoleUrl } from "@/lib/auth-redirect";
 
 interface CTAProps {
     isAuthenticated?: boolean;
@@ -31,7 +32,7 @@ export const CTA = ({ isAuthenticated: providedIsAuthenticated }: CTAProps) => {
                         </p>
 
                         <div className="flex flex-row gap-2 justify-center">
-                            <Link href={isAuthenticated ? "/dashboard" : "/login"}>
+                            <Link href={getConsoleUrl(isAuthenticated ? "/home" : "/signup")}>
                                 <Button size="default" className="h-8 px-4 text-xs font-medium rounded-md bg-foreground text-background hover:bg-foreground/90 transition-all">
                                     {isAuthenticated ? "Go to Dashboard" : "Get Started Free"}
                                 </Button>
