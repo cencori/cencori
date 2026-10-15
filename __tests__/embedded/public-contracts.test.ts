@@ -56,7 +56,7 @@ describe('Embedded Agents public contracts', () => {
             ({ path, method }) => `${method.toUpperCase()} ${normalizePath(path)}`,
         );
 
-        expect(documented).toHaveLength(126);
+        expect(documented).toHaveLength(127);
         expect(documented.filter((operation) => !handlers.includes(operation))).toEqual([]);
     });
 
@@ -167,10 +167,10 @@ describe('Embedded Agents public contracts', () => {
         const pythonVersion = read('packages/python-sdk/pyproject.toml').match(/^version = "([^"]+)"/m)?.[1];
         const llm = read('public/llm.txt');
 
-        expect(sdk.version).toBe('1.7.1');
+        expect(sdk.version).toBe('1.8.3');
         expect(mcp.version).toBe('0.8.0');
         expect(pythonVersion).toBe('1.5.0');
-        expect(llm).toContain('`cencori@1.7.1`');
+        expect(llm).toContain('`cencori@1.8.3`');
         expect(llm).toContain('`@cencori/mcp@0.8.0`');
         expect(llm).toContain('Embedded Agents Python SDK: not yet published');
         expect(llm).not.toContain('`cencori>=1.5.0`');
