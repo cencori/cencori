@@ -17,6 +17,7 @@ The AI Gateway is Cencori's runtime control point. Your application sends AI tra
 | `/v1/audio/transcriptions` | Speech-to-text | OpenAI |
 | `/v1/audio/speech` | Text-to-speech | OpenAI |
 | `/v1/moderations` | Content moderation | OpenAI |
+| `/v1/judgments` | Structured decisions (yes/no, choice, score with probabilities) | TypeSafe |
 | `https://api.cencori.com/v1/chat/completions` | OpenAI-compatible chat endpoint | OpenAI-compatible clients |
 
 Use `https://api.cencori.com/v1` as the base URL for OpenAI-compatible SDKs. Most SDKs append `/chat/completions` automatically.

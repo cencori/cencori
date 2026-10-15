@@ -94,6 +94,8 @@ export const MODEL_MAPPINGS: Record<string, Record<string, string>> = {
     'deepseek-v4-pro': { 'openai': 'gpt-5', 'anthropic': 'claude-opus-4-5', 'google': 'gemini-3.1-pro-preview' },
     'deepseek-v4-flash': { 'openai': 'gpt-4o', 'anthropic': 'claude-sonnet-4-5', 'google': 'gemini-2.5-flash' },
     'deepseek-v4-flash-vision-exp': { 'openai': 'gpt-4o', 'anthropic': 'claude-sonnet-4-5', 'google': 'gemini-2.5-flash' },
+    'deepseek-v4.1-flash': { 'openai': 'gpt-4o', 'anthropic': 'claude-sonnet-4-5', 'google': 'gemini-2.5-flash' },
+    'qwen3.8-flash': { 'openai': 'gpt-4o-mini', 'anthropic': 'claude-haiku-4-5', 'google': 'gemini-2.5-flash-lite' },
     'glm-5.3-flash': { 'openai': 'gpt-4o-mini', 'anthropic': 'claude-haiku-4-5', 'google': 'gemini-2.5-flash-lite' },
 };
 

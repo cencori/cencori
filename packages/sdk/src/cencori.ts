@@ -30,6 +30,7 @@ import { AINamespace } from './ai';
 import { AgentsNamespace } from './agents';
 import { VisionNamespace } from './vision';
 import { VoiceNamespace } from './voice';
+import { JudgmentNamespace } from './judgment';
 import { DocumentsNamespace } from './documents';
 import { SessionsNamespace } from './sessions';
 import { ComputeNamespace } from './compute';
@@ -140,6 +141,23 @@ export class Cencori {
      * });
      */
     readonly voice: VoiceNamespace;
+
+    /**
+     * Judgment - Structured decisions from decision models (TypeSafe Jev)
+     *
+     * @example
+     * const result = await cencori.judgment.judge({
+     *   state: 'I was charged twice. Please refund the duplicate.',
+     *   questions: {
+     *     department: {
+     *       type: 'choice',
+     *       instructions: 'Which team should handle this?',
+     *       criteria: { billing: 'Payments, invoicing, refunds', technical: 'Bugs, outages' },
+     *     },
+     *   },
+     * });
+     */
+    readonly judgment: JudgmentNamespace;
 
     /**
      * Documents - Extract text from PDFs and images, summarize, and query
@@ -301,6 +319,7 @@ export class Cencori {
         this.chat = new ChatNamespace(this.config);
         this.vision = new VisionNamespace(this.config);
         this.voice = new VoiceNamespace(this.config);
+        this.judgment = new JudgmentNamespace(this.config);
         this.documents = new DocumentsNamespace(this.config);
         this.agents = new AgentsNamespace(this.config);
         this.compute = new ComputeNamespace();

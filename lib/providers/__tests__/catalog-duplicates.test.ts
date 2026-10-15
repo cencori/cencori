@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { SUPPORTED_PROVIDERS } from '../config';
 import { publicProviderLabel } from '../branding';
+import { ProviderRouter } from '../router';
 
 /**
  * Duplicate catalog row guard.
@@ -9,18 +10,16 @@ import { publicProviderLabel } from '../branding';
  * provider's `models` array with no de-duplication, so a model id listed under
  * two providers renders as two rows. That is usually survivable — the rows at
  * least name different providers — but not for free models: publicProviderLabel
- * brands every free model "Cencori", so both rows show the same id, the same
- * provider and the same FREE badge, with nothing to tell them apart.
+ * used to brand every free model "Cencori", so both rows showed the same id,
+ * the same provider and the same FREE badge, with nothing to tell them apart.
  *
- * That is exactly what happened to `glm-5.3-flash`. It was listed under `zai`
- * for branding and again under `bai` (the provider that actually serves it) on
- * the belief that the pricing catalog test needed a catalog entry per pricing
- * row. It does not — that test reads the reviewed-pricing migration, which has
- * no `bai` rows — so the second entry bought nothing and cost a phantom row in
- * the customer-facing catalog.
+ * That is exactly what happened to `glm-5.3-flash` before 2026-09-10. It was
+ * listed under `zai` for branding and again under `bai` (the provider that
+ * actually serves it). Since 2026-10-15 `zai` is hidden and `bai` is the
+ * public catalog provider, so there is exactly one row per id again.
  *
- * The fix is structural: a backend provider carries pricing rows and routing
- * overrides, never catalog entries. This test holds that line.
+ * The rule now: one catalog entry per servable id, under the provider that
+ * routes it. This test holds that line.
  */
 describe('catalog has no duplicate model ids', () => {
     const rows = SUPPORTED_PROVIDERS.flatMap(p => p.models.map(m => ({ provider: p.id, id: m.id, free: m.free })));
@@ -52,15 +51,32 @@ describe('catalog has no duplicate model ids', () => {
         expect(collisions).toEqual([]);
     });
 
-    it('keeps backend-only providers out of the catalog', () => {
-        // B.AI serves GLM (and formerly DeepSeek) but is never a provider a
-        // customer picks: its models are advertised under the vendor that makes
-        // them. Pricing rows and router overrides carry it instead. `meta`,
-        // `together`, `qwen` and `centaur` are empty for their own reasons —
-        // see the comments on each block — but the same rule applies: adding a
-        // row here puts it in front of customers.
-        const bai = SUPPORTED_PROVIDERS.find(p => p.id === 'bai');
-        expect(bai, 'bai provider should still exist for routing').toBeDefined();
-        expect(bai!.models).toEqual([]);
+    it('keeps judgment ids under the provider that serves them, off the chat path', () => {
+        // Jev is evaluation-only (POST /v1/judgments, never chat completions).
+        // Each id must live under exactly one provider — `typesafe` — route
+        // there, and carry the `judgment` type so chat surfaces (playground,
+        // agent studio, tensor policies) never pick it up.
+        const router = new ProviderRouter();
+        for (const id of ['jev-latest', 'jev-preview', 'jev-1.13.0']) {
+            const rows = SUPPORTED_PROVIDERS.flatMap(p => p.models.filter(m => m.id === id).map(m => ({ provider: p.id, types: Array.isArray(m.type) ? m.type : [m.type] })));
+            expect(rows.map(r => r.provider), id).toEqual(['typesafe']);
+            expect(rows[0].types, id).toContain('judgment');
+            expect(rows[0].types, id).not.toContain('chat');
+            expect(router.detectProvider(id), id).toBe('typesafe');
+        }
+    });
+    it('keeps the B.AI flash ids under the provider that routes them', () => {
+        // Since 2026-10-15 `bai` is the public catalog provider for the flash
+        // tiers (Z.AI rows hidden). Each id must live under exactly one
+        // provider — `bai` — and route there, otherwise the row strands in the
+        // wrong provider filter or 503s on missing pricing.
+        const router = new ProviderRouter();
+        for (const id of ['glm-5.3-flash', 'deepseek-v4.1-flash', 'qwen3.8-flash']) {
+            const owners = SUPPORTED_PROVIDERS.filter(p => p.models.some(m => m.id === id)).map(p => p.id);
+            expect(owners, id).toEqual(['bai']);
+            expect(router.detectProvider(id), id).toBe('bai');
+        }
+        // The hidden vendor stays hidden.
+        expect(SUPPORTED_PROVIDERS.find(p => p.id === 'zai')!.models).toEqual([]);
     });
 });
