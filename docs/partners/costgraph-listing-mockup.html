@@ -43,6 +43,8 @@
   .card.dim { opacity: .55; }
   .title { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 15px; }
   .logo { width: 18px; height: 18px; flex: none; border-radius: 4px; background: var(--border); }
+  /* Our mark, bare: no radius, background or frame around it. */
+  .mark { width: 18px; height: 18px; flex: none; display: block; }
   .desc { color: var(--muted); font-size: 13px; margin: 6px 0 0; }
   .foot { margin-top: auto; padding-top: 14px; display: flex; align-items: center; justify-content: space-between; }
   .guide { color: var(--faint); font-size: 12.5px; }
@@ -96,7 +98,7 @@
       <span class="verdict good">Proposed</span>
       <div class="card ours">
         <div class="title">
-          <svg class="logo" style="background:none" viewBox="0 0 21924 21924" aria-label="Cencori">
+          <svg class="mark" viewBox="0 0 21924 21924" aria-label="Cencori">
             <defs><clipPath id="c"><rect width="21924" height="21924" rx="594"/></clipPath></defs>
             <g clip-path="url(#c)" fill="var(--mark)">
               <circle cx="7744" r="7744"/><circle cy="14180" r="7744"/><circle cx="21924" cy="7744" r="7744"/><circle cx="14180" cy="21924" r="7744"/>
@@ -120,7 +122,7 @@
     <div class="card dim"><div class="title"><span class="logo"></span>Anthropic</div><p class="desc">AI / LLM. We pull it daily, or you push it yourself.</p><div class="foot"><span class="guide">Setup guide ›</span><button class="btn" type="button">Connect</button></div></div>
     <div class="card ours">
       <div class="title">
-        <svg class="logo" style="background:none" viewBox="0 0 21924 21924" aria-label="Cencori">
+        <svg class="mark" viewBox="0 0 21924 21924" aria-label="Cencori">
           <defs><clipPath id="c2"><rect width="21924" height="21924" rx="594"/></clipPath></defs>
           <g clip-path="url(#c2)" fill="var(--mark)">
             <circle cx="7744" r="7744"/><circle cy="14180" r="7744"/><circle cx="21924" cy="7744" r="7744"/><circle cx="14180" cy="21924" r="7744"/>
