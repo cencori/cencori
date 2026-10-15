@@ -90,6 +90,11 @@ export async function POST(req: NextRequest) {
 
     let model = DEFAULT_JUDGMENT_MODEL;
     let provider = 'typesafe';
+    // Set once the body validates; every logGatewayRequest call site below
+    // must carry a requestPayload (see log-payload-coverage.test.ts). State
+    // itself is never logged — it can hold PII — only the model and the
+    // question ids.
+    let requestForLog: Record<string, unknown> | null = null;
 
     try {
         let body: unknown;
@@ -101,6 +106,7 @@ export async function POST(req: NextRequest) {
 
         const judged = validateJudgmentBody(body);
         model = judged.model ?? DEFAULT_JUDGMENT_MODEL;
+        requestForLog = { model, questions: Object.keys(judged.questions) };
 
         // Vendor-neutral: the model's router prefix selects the adapter, so a
         // new decision vendor works here with no route changes.
@@ -147,6 +153,7 @@ export async function POST(req: NextRequest) {
                 provider,
                 status: 'error',
                 errorMessage: `No ${provider} key configured`,
+                requestPayload: requestForLog ?? { model },
             });
             return addGatewayHeaders(
                 NextResponse.json(
@@ -215,6 +222,7 @@ export async function POST(req: NextRequest) {
                 provider,
                 status: 'error',
                 errorMessage: error.message,
+                requestPayload: requestForLog ?? { model },
             });
             const status = error.status === 429 ? 429 : 502;
             return addGatewayHeaders(
@@ -229,6 +237,7 @@ export async function POST(req: NextRequest) {
             provider,
             status: 'error',
             errorMessage: error instanceof Error ? error.message : 'Unknown error',
+            requestPayload: requestForLog ?? { model },
         });
         return addGatewayHeaders(
             NextResponse.json({ error: 'internal_error', message: 'Judgment request failed' }, { status: 500 }),
