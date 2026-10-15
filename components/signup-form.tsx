@@ -13,6 +13,8 @@ import {
   getOAuthCallbackBase,
   getOAuthDefaultNext,
   getPostLoginDefault,
+  resolvePostAuthDestination,
+  sanitizeAuthRedirectTarget,
 } from "@/lib/auth-redirect";
 import {
   clearSignupWelcomeEmailPending,
@@ -40,7 +42,8 @@ type SignupFormProps = React.ComponentProps<"form">;
 export function SignupForm({ className, ...props }: SignupFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectParam = searchParams.get("redirect");
+  const redirectParam = sanitizeAuthRedirectTarget(searchParams.get("redirect"));
+  const errorParam = searchParams.get("error");
   const isTensorSignUp = redirectParam?.startsWith("/tensor/sign-in?") ?? false;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,14 +56,14 @@ export function SignupForm({ className, ...props }: SignupFormProps) {
   // sessions correctly stay on the form.
   useEffect(() => {
     let cancelled = false;
+    if (errorParam) {
+      setError(errorParam);
+    }
     const redirectIfSignedIn = async () => {
       try {
         const { data } = await supabase.auth.getSession();
         if (!cancelled && data.session?.user) {
-          const { navigationTarget } = resolveAuthRedirectTargets(
-            redirectParam,
-            { defaultPath: getPostLoginDefault(window.location.origin) },
-          );
+          const navigationTarget = resolvePostAuthDestination(redirectParam, window.location.origin);
           const destination = isAuthFormTarget(navigationTarget)
             ? getPostLoginDefault(window.location.origin)
             : navigationTarget;
@@ -75,10 +78,7 @@ export function SignupForm({ className, ...props }: SignupFormProps) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
       if (!cancelled && event === "SIGNED_IN" && session?.user) {
-        const { navigationTarget } = resolveAuthRedirectTargets(
-          redirectParam,
-          { defaultPath: getPostLoginDefault(window.location.origin) },
-        );
+        const navigationTarget = resolvePostAuthDestination(redirectParam, window.location.origin);
         const destination = isAuthFormTarget(navigationTarget)
           ? getPostLoginDefault(window.location.origin)
           : navigationTarget;
@@ -89,7 +89,7 @@ export function SignupForm({ className, ...props }: SignupFormProps) {
       cancelled = true;
       subscription.unsubscribe();
     };
-  }, [redirectParam]);
+  }, [redirectParam, errorParam]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();

@@ -19,6 +19,67 @@ function normalizeOrigin(value: string | undefined): string | null {
 }
 
 /**
+ * Strip single-use OAuth residue from a post-auth destination.
+ *
+ * When an unauthenticated request carrying `?code=` / `?token_hash=` (an
+ * OAuth or email-link return that never reached `/auth/callback`) gets
+ * bounced to `/login?redirect=<here>`, embedding the raw URL poisons every
+ * retry: the dead code is single-use, so reusing it as the next `next`
+ * guarantees another failure, and each bounce nests the residue deeper
+ * (`/home?code=A` → `redirect=/home?code=A` → `next=/home?code=A` → …).
+ *
+ * Destinations never legitimately contain these keys — the callback consumes
+ * them — so they are always safe to drop. Everything else (`token` for
+ * invites, Tensor query, marketing UTMs) is preserved. `type`/`next` ride
+ * along with the residue signature and are dropped only when a code is
+ * present, since `?next=` is meaningless outside the callback itself.
+ *
+ * Accepts relative or absolute targets; returns the same shape (null in →
+ * null out). Never invents a destination — worst case the bare path remains.
+ */
+export function sanitizeAuthRedirectTarget<T extends string | null | undefined>(target: T): T {
+    if (!target) return target;
+    const raw = target.trim();
+    if (!raw) return target;
+    const absolute = /^https?:\/\//i.test(raw);
+    let url: URL;
+    try {
+        url = absolute ? new URL(raw) : new URL(raw, "http://localhost");
+    } catch {
+        return target;
+    }
+    const params = url.searchParams;
+    const hasSingleUse = params.has("code") || params.has("token_hash");
+    for (const key of ["code", "token_hash", "oauth_token", "state", "error", "error_description", "error_code"]) {
+        params.delete(key);
+    }
+    if (hasSingleUse) {
+        params.delete("type");
+        params.delete("next");
+    }
+    // Nothing left but residue (e.g. "?code=X") — the path alone is the intent.
+    if (absolute) return url.toString() as T;
+    return `${url.pathname}${params.toString() ? `?${params.toString()}` : ""}${url.hash}` as T;
+}
+
+/**
+ * Full post-auth destination pipeline for client navigations: sanitize
+ * residue, resolve against the allowlist, then bounce console-only paths to
+ * the console host. Server routes apply the same steps around
+ * {@link resolveAuthRedirectTargets} directly.
+ */
+export function resolvePostAuthDestination(
+    redirectParam: string | null | undefined,
+    currentOrigin: string,
+): string {
+    const { navigationTarget } = resolveAuthRedirectTargets(
+        sanitizeAuthRedirectTarget(redirectParam),
+        { currentOrigin, defaultPath: getPostLoginDefault(currentOrigin) },
+    );
+    return getConsoleAwareNavigationTarget(navigationTarget, currentOrigin);
+}
+
+/**
  * Public console destination for links whose intent is to enter the product.
  * Marketing pages use an absolute URL so auth and dashboard navigation begin
  * on the console host instead of briefly entering the main application host.
@@ -297,11 +358,24 @@ export function resolveAuthRedirectTargets(
     options?: ResolveAuthRedirectOptions
 ): ResolvedAuthRedirect {
     const baseOrigin = resolveBaseOrigin(options);
-    const defaultPath = options?.defaultPath ?? "/dashboard";
-    const fallbackUrl = new URL(
-        defaultPath.startsWith("/") ? defaultPath : `/${defaultPath}`,
-        baseOrigin
-    );
+    const defaultPath = (options?.defaultPath ?? "/dashboard").trim() || "/dashboard";
+    // defaultPath is usually a relative path, but getPostLoginDefault() returns
+    // an absolute console URL on main-app hosts — resolving that against
+    // baseOrigin would produce garbage like /https://console… (this stranded
+    // main-host callbacks on cencori.com). Absolute defaults stand on their own.
+    let fallbackUrl: URL;
+    if (/^https?:\/\//i.test(defaultPath)) {
+        try {
+            fallbackUrl = new URL(defaultPath);
+        } catch {
+            fallbackUrl = new URL("/dashboard", baseOrigin);
+        }
+    } else {
+        fallbackUrl = new URL(
+            defaultPath.startsWith("/") ? defaultPath : `/${defaultPath}`,
+            baseOrigin
+        );
+    }
 
     let resolved = fallbackUrl;
 

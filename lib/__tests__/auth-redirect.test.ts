@@ -8,6 +8,8 @@ import {
     getOAuthCallbackBase,
     getOAuthDefaultNext,
     getConsoleAwareNavigationTarget,
+    resolvePostAuthDestination,
+    sanitizeAuthRedirectTarget,
 } from "@/lib/auth-redirect";
 
 describe("getConsoleUrl", () => {
@@ -61,6 +63,19 @@ describe("resolveAuthRedirectTargets", () => {
 
         expect(result.oauthRedirectTo).toBe("https://cencori.com/dashboard");
         expect(result.navigationTarget).toBe("/dashboard");
+    });
+
+    test("honors absolute default paths (console home on main hosts)", () => {
+        // getPostLoginDefault() returns an absolute URL on main-app hosts.
+        // Resolving it against the base origin used to yield garbage like
+        // /https://console.cencori.com/home and strand the callback on
+        // cencori.com.
+        const result = resolveAuthRedirectTargets(null, {
+            currentOrigin: "https://cencori.com",
+            defaultPath: "https://console.cencori.com/home",
+        });
+
+        expect(result.navigationTarget).toBe("https://console.cencori.com/home");
     });
 });
 
@@ -126,5 +141,39 @@ describe("getConsoleAwareNavigationTarget", () => {
         expect(getConsoleAwareNavigationTarget("/home", "https://console.cencori.com")).toBe("/home");
         expect(getConsoleAwareNavigationTarget("/pricing", "https://cencori.com")).toBe("/pricing");
         expect(getConsoleAwareNavigationTarget("/dashboard", "https://cencori.com")).toBe("/dashboard");
+    });
+});
+
+describe("sanitizeAuthRedirectTarget", () => {
+    test("strips dead OAuth codes so a bounced return can't poison the retry", () => {
+        expect(sanitizeAuthRedirectTarget("/home?code=376689d3-2c66-436d-a3eb-c27394054461&next=%2Fhome")).toBe(
+            "/home",
+        );
+        expect(sanitizeAuthRedirectTarget("/home?token_hash=abc&type=magiclink")).toBe("/home");
+    });
+
+    test("preserves legit query (invite tokens, app params)", () => {
+        expect(sanitizeAuthRedirectTarget("/invite?token=abc123")).toBe("/invite?token=abc123");
+        expect(sanitizeAuthRedirectTarget("/tensor/sign-in?callback_url=https%3A%2F%2Fx")).toBe(
+            "/tensor/sign-in?callback_url=https%3A%2F%2Fx",
+        );
+    });
+
+    test("handles absolute targets and null", () => {
+        expect(sanitizeAuthRedirectTarget("https://cencori.com/home?code=X")).toBe("https://cencori.com/home");
+        expect(sanitizeAuthRedirectTarget(null)).toBeNull();
+        expect(sanitizeAuthRedirectTarget("/home")).toBe("/home");
+    });
+});
+
+describe("resolvePostAuthDestination", () => {
+    test("recovers a poisoned redirect to the clean console home", () => {
+        expect(
+            resolvePostAuthDestination(
+                "/home?code=376689d3-2c66-436d-a3eb-c27394054461&next=%2Fhome",
+                "https://console.cencori.com",
+            ),
+        ).toBe("/home");
+        expect(resolvePostAuthDestination(null, "https://cencori.com")).toBe("https://console.cencori.com/home");
     });
 });

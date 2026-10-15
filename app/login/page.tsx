@@ -5,7 +5,7 @@ import { AuthGradient } from "@/components/auth/auth-gradient";
 import { LoginForm } from "@/components/login-form"
 import Link from "next/link"
 import { createServerClient } from "@/lib/supabaseServer";
-import { getConsoleOrigin, getPostLoginDefault, getSafeSignedInDestination } from "@/lib/auth-redirect";
+import { getConsoleOrigin, getPostLoginDefault, getSafeSignedInDestination, sanitizeAuthRedirectTarget } from "@/lib/auth-redirect";
 
 function LoginPageContent() {
   return (
@@ -45,7 +45,7 @@ export default async function LoginPage({
   const proto = headerStore.get("x-forwarded-proto") ?? "http";
   const origin = `${proto}://${host}`;
   if (data.user) {
-    redirect(getSafeSignedInDestination(params?.redirect, getPostLoginDefault(origin)));
+    redirect(getSafeSignedInDestination(sanitizeAuthRedirectTarget(params?.redirect), getPostLoginDefault(origin)));
   }
   // Bare login on a main-app host starts on the console host instead, so the
   // whole flow (form, callback, cookies) lives where the session is used.

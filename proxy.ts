@@ -16,6 +16,7 @@ import {
   isConsoleHostname,
 } from "@/lib/console/routing";
 import { getMainSiteUrl } from "@/lib/main-site-url";
+import { sanitizeAuthRedirectTarget } from "@/lib/auth-redirect";
 
 const LAST_ORG_COOKIE = "cencori:last-org";
 const LAST_ORG_MAX_AGE = 60 * 60 * 24 * 365; // 1 year
@@ -895,7 +896,12 @@ export async function proxy(request: NextRequest) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
     loginUrl.search = "";
-    loginUrl.searchParams.set("redirect", `${pathname}${request.nextUrl.search}`);
+    // Strip single-use OAuth residue (stale ?code=/token_hash) so a bounced
+    // provider return can't poison the retry — the dead code would otherwise
+    // be reused verbatim as the next `next` and fail again, nesting deeper
+    // every round-trip. Legit query (invite tokens, etc.) is preserved.
+    const returnTo = sanitizeAuthRedirectTarget(`${pathname}${request.nextUrl.search}`) ?? pathname;
+    loginUrl.searchParams.set("redirect", returnTo);
     return applySecurityHeaders(NextResponse.redirect(loginUrl));
   }
 
@@ -907,7 +913,7 @@ export async function proxy(request: NextRequest) {
   // see the form as expected.
   if (!isFile && !isScanSubdomain && userId && isAuthPagePath(pathname)) {
     let destination = resolveSignedInDestination(
-      request.nextUrl.searchParams.get("redirect"),
+      sanitizeAuthRedirectTarget(request.nextUrl.searchParams.get("redirect")),
       request.nextUrl.origin,
       request.nextUrl.hostname,
     );

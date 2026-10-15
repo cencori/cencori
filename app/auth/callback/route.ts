@@ -5,6 +5,7 @@ import {
     getConsoleOrigin,
     resolveAuthRedirectTargets,
     getPostLoginDefault,
+    sanitizeAuthRedirectTarget,
 } from "@/lib/auth-redirect";
 
 // Mirrors @supabase/auth-js EmailOtpType (not re-exported by supabase-js).
@@ -45,7 +46,10 @@ export async function GET(request: NextRequest) {
         currentOrigin: origin,
         defaultPath: getPostLoginDefault(origin),
     });
-    const navigationTarget = getConsoleAwareNavigationTarget(rawTarget, origin);
+    // Belt-and-braces: a stale code must never propagate into the landing URL
+    // (it is single-use — the next load would carry a dead credential).
+    const navigationTarget =
+        sanitizeAuthRedirectTarget(getConsoleAwareNavigationTarget(rawTarget, origin)) ?? rawTarget;
 
     // Error / missing-code redirects stay on the console host when the
     // callback itself ran on a main-app host — the bare main-host login

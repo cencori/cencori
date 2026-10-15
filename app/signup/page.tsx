@@ -5,7 +5,7 @@ import { AuthGradient } from "@/components/auth/auth-gradient";
 import { SignupForm } from "@/components/signup-form";
 import Link from "next/link";
 import { createServerClient } from "@/lib/supabaseServer";
-import { getConsoleOrigin, getPostLoginDefault, getSafeSignedInDestination } from "@/lib/auth-redirect";
+import { getConsoleOrigin, getPostLoginDefault, getSafeSignedInDestination, sanitizeAuthRedirectTarget } from "@/lib/auth-redirect";
 
 function SignupPageContent() {
   return (
@@ -45,7 +45,7 @@ export default async function SignupPage({
   const proto = headerStore.get("x-forwarded-proto") ?? "http";
   const origin = `${proto}://${host}`;
   if (data.user) {
-    redirect(getSafeSignedInDestination(params?.redirect, getPostLoginDefault(origin)));
+    redirect(getSafeSignedInDestination(sanitizeAuthRedirectTarget(params?.redirect), getPostLoginDefault(origin)));
   }
   // Keep legacy and manually entered main-site signup URLs aligned with the
   // dashboard-intent links: the complete auth flow starts on the console host.

@@ -13,6 +13,8 @@ import {
   getOAuthCallbackBase,
   getOAuthDefaultNext,
   getPostLoginDefault,
+  resolvePostAuthDestination,
+  sanitizeAuthRedirectTarget,
 } from "@/lib/auth-redirect";
 import { clearSignupWelcomeEmailPending, markSignupWelcomeEmailPending } from "@/lib/auth-welcome";
 import Link from "next/link";
@@ -52,7 +54,11 @@ type LoginFormProps = React.ComponentProps<"form">;
 export function LoginForm({ className, ...props }: LoginFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectParam = searchParams.get("redirect");
+  // Sanitize single-use OAuth residue out of an inherited redirect (a bounced
+  // provider return embeds ?code=, which is dead on reuse — see
+  // sanitizeAuthRedirectTarget). Legit targets (invite tokens, …) pass through.
+  const redirectParam = sanitizeAuthRedirectTarget(searchParams.get("redirect"));
+  const errorParam = searchParams.get("error");
   const isTensorSignIn = redirectParam?.startsWith("/tensor/sign-in?") ?? false;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -107,14 +113,36 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
   // sessions correctly stay on the form.
   useEffect(() => {
     let cancelled = false;
+    // A provider return that landed here instead of /auth/callback (Site-URL
+    // fallback, stale bookmark) strands its single-use code on a page that
+    // never exchanges it. Forward it to the callback instead of leaving the
+    // user staring at the form.
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("code") || params.has("token_hash")) {
+      const callbackUrl = new URL("/auth/callback", window.location.origin);
+      for (const key of ["code", "token_hash", "type"] as const) {
+        const value = params.get(key);
+        if (value) callbackUrl.searchParams.set(key, value);
+      }
+      callbackUrl.searchParams.set(
+        "next",
+        resolvePostAuthDestination(redirectParam, window.location.origin),
+      );
+      window.location.replace(callbackUrl.toString());
+      return () => {
+        cancelled = true;
+      };
+    }
+    // OAuth failures redirect here with ?error= — surface it instead of
+    // showing a pristine form with no explanation.
+    if (errorParam) {
+      setError(errorParam);
+    }
     const redirectIfSignedIn = async () => {
       try {
         const { data } = await supabase.auth.getSession();
         if (!cancelled && data.session?.user) {
-          const { navigationTarget } = resolveAuthRedirectTargets(
-            redirectParam,
-            { defaultPath: getPostLoginDefault(window.location.origin) },
-          );
+          const navigationTarget = resolvePostAuthDestination(redirectParam, window.location.origin);
           const destination = isAuthFormTarget(navigationTarget)
             ? getPostLoginDefault(window.location.origin)
             : navigationTarget;
@@ -129,10 +157,7 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
       if (!cancelled && event === "SIGNED_IN" && session?.user) {
-        const { navigationTarget } = resolveAuthRedirectTargets(
-          redirectParam,
-          { defaultPath: getPostLoginDefault(window.location.origin) },
-        );
+        const navigationTarget = resolvePostAuthDestination(redirectParam, window.location.origin);
         const destination = isAuthFormTarget(navigationTarget)
           ? getPostLoginDefault(window.location.origin)
           : navigationTarget;
@@ -143,7 +168,7 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
       cancelled = true;
       subscription.unsubscribe();
     };
-  }, [redirectParam]);
+  }, [redirectParam, errorParam]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
