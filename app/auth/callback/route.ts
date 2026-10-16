@@ -7,6 +7,7 @@ import {
     getPostLoginDefault,
     sanitizeAuthRedirectTarget,
 } from "@/lib/auth-redirect";
+import { isConsoleHostname } from "@/lib/console/routing";
 
 // Mirrors @supabase/auth-js EmailOtpType (not re-exported by supabase-js).
 type EmailOtpType = "signup" | "invite" | "magiclink" | "recovery" | "email_change" | "email";
@@ -48,8 +49,22 @@ export async function GET(request: NextRequest) {
     });
     // Belt-and-braces: a stale code must never propagate into the landing URL
     // (it is single-use — the next load would carry a dead credential).
-    const navigationTarget =
+    let navigationTarget =
         sanitizeAuthRedirectTarget(getConsoleAwareNavigationTarget(rawTarget, origin)) ?? rawTarget;
+
+    // A console Google/GitHub sign-in must never strand on the marketing site:
+    // "/" is the marketing homepage and "/dashboard" is retired to the
+    // console host, so either one landing here means the `next` destination
+    // was lost (Supabase Site-URL fallback, stale bookmark). The console home
+    // is the only sane default — the proxy would bounce "/dashboard" anyway,
+    // but this lands in one hop with the session cookies attached.
+    if (isConsoleHostname(hostname) && navigationTarget === "/dashboard") {
+        navigationTarget = "/home";
+    }
+    const mainConsoleOrigin = getConsoleOrigin(origin);
+    if (mainConsoleOrigin && (navigationTarget === "/" || navigationTarget === "/dashboard")) {
+        navigationTarget = `${mainConsoleOrigin}/home`;
+    }
 
     // Error / missing-code redirects stay on the console host when the
     // callback itself ran on a main-app host — the bare main-host login
