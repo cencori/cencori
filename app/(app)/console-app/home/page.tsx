@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { ConsoleHomeOverview } from "@/components/dashboard/project-overview/ConsoleHomeOverview";
 import OrganizationLayoutClient from "../../[orgSlug]/OrganizationLayoutClient";
-import { getActiveConsoleWorkspace } from "@/lib/console/active-workspace";
+import { getActiveConsoleOrganization, getActiveConsoleWorkspace } from "@/lib/console/active-workspace";
 import { createServerClient } from "@/lib/supabaseServer";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 
@@ -13,7 +13,15 @@ export default async function ConsoleHomePage() {
     getActiveConsoleWorkspace(),
     supabase.auth.getUser(),
   ]);
-  if (!workspace) redirect("/onboarding");
+  if (!workspace) {
+    // No project yet. An existing organization means project creation (not
+    // org creation) is the next step — /projects lists the empty registry
+    // with its New-project menu. Only users with no organization at all go
+    // to /onboarding. Without this split, every fresh Google sign-up looped
+    // on onboarding forever: it creates organizations, never projects.
+    const organization = await getActiveConsoleOrganization();
+    redirect(organization ? "/projects" : "/onboarding");
+  }
 
   // First name and balance fan out from (workspace, user) — also parallel.
   const [firstNameResult, balanceResult] = await Promise.all([

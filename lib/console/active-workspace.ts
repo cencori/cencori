@@ -24,12 +24,69 @@ export interface ActiveConsoleWorkspace {
   };
 }
 
+export interface ActiveConsoleOrganization {
+  id: string;
+  name: string;
+  slug: string;
+  subscriptionTier: string | null;
+}
+
+/**
+ * Resolve the organization used by organization-scoped console URLs such as
+ * /projects or /billing.
+ *
+ * Unlike {@link getActiveConsoleWorkspace} this does not require a project:
+ * a user whose organization exists but has no projects yet (fresh Google
+ * sign-up, invite accepted before project creation) still has an org context.
+ * Returning null here means the user genuinely has no organization and the
+ * org-creation onboarding is the right destination.
+ */
+export const getActiveConsoleOrganization = cache(async (): Promise<ActiveConsoleOrganization | null> => {
+  const supabase = await createServerClient();
+  const { data: { user } } = await withSupabaseRetry(
+    () => supabase.auth.getUser(),
+    { operation: "console org auth.getUser" },
+  );
+  if (!user) return null;
+
+  const cookieStore = await cookies();
+  const preferredOrgSlug = cookieStore.get(ACTIVE_ORG_COOKIE)?.value ?? null;
+
+  const { data: organizations, error: organizationsError } = await withSupabaseRetry(
+    () => supabase
+      .from("organizations")
+      .select("id, name, slug, subscription_tier"),
+    { operation: "console org organizations" },
+  );
+
+  if (organizationsError) {
+    throw new Error(`Could not load console organizations: ${organizationsError.message}`);
+  }
+  if (!organizations?.length) return null;
+
+  const organization = (
+    preferredOrgSlug
+      ? organizations.find((candidate) => candidate.slug === preferredOrgSlug)
+      : null
+  ) ?? organizations[0];
+  if (!organization) return null;
+
+  return {
+    id: organization.id,
+    name: organization.name,
+    slug: organization.slug,
+    subscriptionTier: organization.subscription_tier ?? null,
+  };
+});
+
 /**
  * Resolve the workspace used by project-centric console URLs such as /home.
  *
  * Cookie values are preferences, never authorization. Both organization and
  * project reads still pass through the signed-in user's RLS policies before a
- * workspace can be returned.
+ * workspace can be returned. Returns null when the user has no project yet —
+ * callers must fall back to {@link getActiveConsoleOrganization} (org-level
+ * routes such as /projects) instead of sending the user back to org creation.
  */
 export const getActiveConsoleWorkspace = cache(async (): Promise<ActiveConsoleWorkspace | null> => {
   const supabase = await createServerClient();

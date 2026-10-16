@@ -41,10 +41,12 @@ export default function ConsoleWorkspaceBootstrapPage() {
       });
       if (!response.ok) throw new Error("Could not load your console workspace.");
 
-      const payload = (await response.json()) as { workspace?: unknown };
+      const payload = (await response.json()) as { workspace?: unknown; hasOrganization?: boolean };
       if (!payload.workspace) {
         settledRef.current = true;
-        router.replace("/onboarding");
+        // Org exists but no project yet → project creation, not org
+        // creation. Sending these users to /onboarding loops forever there.
+        router.replace(payload.hasOrganization ? "/projects" : "/onboarding");
         return;
       }
 

@@ -428,6 +428,33 @@ export async function proxy(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
 
+  // A provider return that missed /auth/callback (Supabase Site-URL fallback
+  // to the marketing root, stale bookmark) strands its single-use code on a
+  // page that never exchanges it — the user stares at cencori.com with ?code=
+  // and can't do anything. Forward it to the callback on the same host,
+  // preserving the page as `next`; the callback exchanges the code and
+  // bounces console-only paths to the console counterpart. Scan keeps its own
+  // auth and has no /auth/callback route, so it is excluded.
+  if (
+    request.method === "GET" &&
+    !isScanSubdomain &&
+    !(pathname.includes(".") && !pathname.startsWith("/.well-known")) &&
+    pathname !== "/auth/callback" &&
+    (request.nextUrl.searchParams.has("code") || request.nextUrl.searchParams.has("token_hash"))
+  ) {
+    const callbackUrl = request.nextUrl.clone();
+    callbackUrl.pathname = "/auth/callback";
+    const residueFree =
+      sanitizeAuthRedirectTarget(`${pathname}${request.nextUrl.search}`) ?? pathname;
+    callbackUrl.search = "";
+    for (const key of ["code", "token_hash", "type"] as const) {
+      const value = request.nextUrl.searchParams.get(key);
+      if (value) callbackUrl.searchParams.set(key, value);
+    }
+    callbackUrl.searchParams.set("next", residueFree);
+    return applySecurityHeaders(NextResponse.redirect(callbackUrl));
+  }
+
   // The console host is dashboard-only. Public documentation always lives on
   // the main site, including in local development.
   if (isConsoleSubdomain && (pathname === "/docs" || pathname.startsWith("/docs/"))) {

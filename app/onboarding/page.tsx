@@ -64,9 +64,30 @@ function OnboardingContent() {
       setCheckingAuth(false);
       return;
     }
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) {
         router.replace("/login");
+        return;
+      }
+      // Already owns or belongs to an organization (e.g. finished onboarding
+      // in another tab, or has an org but no project yet) — org creation
+      // would mint a duplicate and loop. /dashboard resolves to their org.
+      const { data: existing } = await supabase
+        .from("organizations")
+        .select("id")
+        .eq("owner_id", user.id)
+        .limit(1);
+      if (existing && existing.length > 0) {
+        router.replace("/dashboard");
+        return;
+      }
+      const { data: membership } = await supabase
+        .from("organization_members")
+        .select("user_id")
+        .eq("user_id", user.id)
+        .limit(1);
+      if (membership && membership.length > 0) {
+        router.replace("/dashboard");
         return;
       }
       const metadataName =

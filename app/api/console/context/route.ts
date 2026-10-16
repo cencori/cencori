@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies, headers } from "next/headers";
 import { createServerClient } from "@/lib/supabaseServer";
 import { withSupabaseRetry } from "@/lib/supabase-retry";
-import { getActiveConsoleWorkspace } from "@/lib/console/active-workspace";
+import { getActiveConsoleOrganization, getActiveConsoleWorkspace } from "@/lib/console/active-workspace";
 import {
   ACTIVE_ORG_COOKIE,
   ACTIVE_PROJECT_COOKIE,
@@ -24,7 +24,14 @@ function cookieOptions(isProduction: boolean) {
 export async function GET() {
   const workspace = await getActiveConsoleWorkspace();
   if (!workspace) {
-    return NextResponse.json({ workspace: null }, { status: 200 });
+    // Tell the bootstrap page whether org-level routes (e.g. /projects) can
+    // serve this user, so it doesn't bounce org-havers without a project
+    // back to org creation. Mirrors console-app/home's redirect logic.
+    const organization = await getActiveConsoleOrganization();
+    return NextResponse.json(
+      { workspace: null, hasOrganization: organization !== null },
+      { status: 200 },
+    );
   }
 
   const host = (await headers()).get("host") ?? "";
