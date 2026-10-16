@@ -7,3 +7,10 @@ tmp
 coverage
 playwright-report
 output
+# Nested dependency installs — Vercel installs root deps remotely; uploading
+# these (demo apps, sub-packages) only bloats the CLI upload by ~1GB+.
+**/node_modules
+# Rust build artifacts — nothing in the web app imports sdk-rust.
+packages/sdk-rust/target
+# Python venv for the SDK package.
+packages/python-sdk/venv
