@@ -900,7 +900,7 @@ export default function OrganizationLayoutClient({
                                     <span className="flex-1">Help & Resources</span>
                                 </button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="start" side="top" sideOffset={4} className="w-80 max-h-none overflow-visible !border-0 !bg-[#101010] p-1 font-mono shadow-[0_18px_48px_rgba(0,0,0,0.35)]">
+                            <DropdownMenuContent align="start" side="top" sideOffset={4} className="w-80 max-h-none overflow-visible !border-0 !bg-[#f3f3f1] dark:!bg-[#101010] p-1 font-mono shadow-[0_18px_48px_rgba(0,0,0,0.35)]">
                                 <DropdownMenuItem asChild className="text-sm py-1.5 cursor-pointer">
                                     <Link href={getMainSiteUrl("/docs/troubleshooting")} className="flex justify-between w-full items-center">
                                         Troubleshooting
@@ -914,7 +914,7 @@ export default function OrganizationLayoutClient({
                                     </Link>
                                 </DropdownMenuItem>
                                 <DropdownMenuItem asChild className="text-sm py-1.5 cursor-pointer">
-                                    <Link href="/status" className="flex justify-between w-full items-center">
+                                    <Link href="https://cencori.status.outray.app/" target="_blank" rel="noopener noreferrer" className="flex justify-between w-full items-center">
                                         Cencori status
                                         <Activity className="h-3.5 w-3.5 shrink-0" />
                                     </Link>
