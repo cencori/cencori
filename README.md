@@ -646,9 +646,8 @@ Open [http://localhost:3000](http://localhost:3000) to see the dashboard.
 
 Cencori uses a prepaid credits system with transparent markup on provider costs:
 
-- **Free Tier**: Gemini access only
-- **Paid Tiers**: Access to OpenAI, Anthropic, and custom providers
-- **Credits**: Pay-as-you-go with no monthly fees
+- **Plans**: Free to build and test; Pro ($29/mo) and Team ($99/mo) unlock security, failover, caching, observability, and higher limits
+- **Credits**: All managed AI usage bills to prepaid credits; BYOK calls bill your provider directly
 - **Transparent Pricing**: See exact provider cost + markup
 
 View detailed pricing at [cencori.com/pricing](https://cencori.com/pricing)

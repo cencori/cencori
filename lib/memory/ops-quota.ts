@@ -4,8 +4,8 @@
  * Stored-count quota (quota.ts) caps what sits in Postgres. This caps what
  * RUNS: every opted-in turn costs a search embedding plus ~2–3 managed LLM
  * calls (extraction + reconciliation, +1 with the entity graph). All of it
- * is absorbed by Cencori on shared Groq/Cerebras/Gemini quota, so volume —
- * not stored rows — is the abuse and cost vector (MON-6).
+ * bills to the org's prepaid credits and runs on shared Groq/Cerebras/Gemini
+ * quota, so volume — not stored rows — is the shared-key abuse vector (MON-6).
  *
  * Two dimensions, project-monthly first (protects the shared keys), then
  * per-end-user daily (a single hot user). Both ride the shared Redis

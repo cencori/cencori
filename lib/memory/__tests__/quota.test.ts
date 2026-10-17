@@ -32,8 +32,8 @@ describe('checkMemoryQuota', () => {
     });
 
     it('uses the pro limit for pro tier', async () => {
-        const status = await checkMemoryQuota(mockSupabaseWithCount(99_999), 'proj_1', 'pro');
-        expect(status).toEqual({ allowed: true, used: 99_999, limit: 100_000 });
+        const status = await checkMemoryQuota(mockSupabaseWithCount(49_999), 'proj_1', 'pro');
+        expect(status).toEqual({ allowed: true, used: 49_999, limit: 50_000 });
     });
 
     it('never blocks enterprise (infinite quota, no count query)', async () => {
