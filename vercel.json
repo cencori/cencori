@@ -25,6 +25,10 @@
             "destination": "/api/v1/responses"
         },
         {
+            "source": "/v1/judgments",
+            "destination": "/api/v1/judgments"
+        },
+        {
             "source": "/v1/sessions",
             "destination": "/api/v1/sessions"
         },
