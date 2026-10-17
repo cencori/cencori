@@ -45,12 +45,16 @@ Cencori is multi-cloud and multi-region by default.
 
 To ensure fair usage and stability, the following limits apply:
 
-| Limit | Free Tier | Pro Plan | Enterprise |
-|-------|-----------|----------|------------|
-| **Concurrent Requests** | 10 | 100 | Unlimited |
-| **Requests per Month** | 10k | 1M | Custom |
-| **Log Retention** | 3 Days | 30 Days | 90+ Days |
-| **Team Members** | 1 | 5 | Unlimited |
+| Limit | Free | Pro | Team | Enterprise |
+|-------|------|-----|------|------------|
+| **Projects** | 1 | Unlimited | Unlimited | Unlimited |
+| **Log retention** | 7 days | 30 days | 90 days | Unlimited |
+| **Memory store** (per project) | 1,000 | 50,000 | 100,000 | Unlimited |
+| **Memory ops** (search/write, per month) | 2k / 1k | 50k / 5k | 200k / 10k | Unlimited |
+| **Governance (org-wide policy)** | — | — | ✓ | ✓ |
+| **SSO/SAML, SLA, SIEM streaming** | — | — | — | ✓ |
+
+Requests are not capped by plan — AI usage is metered and billed in prepaid credits, while BYOK calls bill the provider directly. Spend caps and rate limits are configured per project key.
 
 ## Keys & Authentication
 

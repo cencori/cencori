@@ -35,7 +35,7 @@ const tiers: Array<{
         features: [
             "1 active project",
             "100+ AI models",
-            "1,000 memory store",
+            "1,000 memory store · 2k/1k ops per mo",
             "Community support",
             "No credit card required",
         ],
@@ -56,7 +56,7 @@ const tiers: Array<{
         features: [
             "Unlimited projects",
             "Monetization",
-            "100,000 memory store",
+            "50,000 memory store · 50k/5k ops per mo",
             "Full security pipeline",
             "Jailbreak detection",
             "PII masking & audit trails",
@@ -79,7 +79,7 @@ const tiers: Array<{
         features: [
             "Unlimited projects",
             "Monetization",
-            "500,000 memory store",
+            "100,000 memory store · 200k/10k ops per mo",
             "Full security pipeline",
             "PII masking & jailbreak detection",
             "Team seats & collaboration",
@@ -160,15 +160,15 @@ const matrixSections: Array<{
     },
     {
         title: "Memory",
-        description: "The memory layer of the AI cloud. Reads never block; writes 429 with an upgrade path when a tier fills.",
+        description: "The memory layer of the AI cloud. Reads never block; writes 429 with an upgrade path when a tier fills. Search/write volume bills to prepaid credits.",
         rows: [
             {
                 feature: "Stored memories per project",
-                values: { free: "1,000", pro: "100,000", team: "500,000", enterprise: "Unlimited" },
+                values: { free: "1,000", pro: "50,000", team: "100,000", enterprise: "Unlimited" },
             },
             {
                 feature: "Monthly operations (search / write)",
-                values: { free: "10k / 2k", pro: "500k / 100k", team: "2M / 500k", enterprise: "Unlimited" },
+                values: { free: "2k / 1k", pro: "50k / 5k", team: "200k / 10k", enterprise: "Unlimited" },
             },
             {
                 feature: "Memory scopes",
@@ -216,11 +216,11 @@ const matrixSections: Array<{
         rows: [
             {
                 feature: "Request logs & analytics",
-                values: { free: false, pro: true, team: true, enterprise: true },
+                values: { free: "7 day retention", pro: true, team: true, enterprise: true },
             },
             {
                 feature: "Cost tracking",
-                values: { free: false, pro: true, team: true, enterprise: true },
+                values: { free: "7 day retention", pro: true, team: true, enterprise: true },
             },
         ],
     },
@@ -414,8 +414,9 @@ export function Pricing() {
                         Pick a plan to power your AI applications.
                     </h1>
                     <p className="mx-auto mt-4 max-w-2xl text-sm text-muted-foreground md:text-base">
-                        Free tier includes unlimited requests. Pro unlocks security scanning,
-                        failover, caching, and observability. You pay providers directly for AI usage.
+                        Free tier to build and test. Pro unlocks security scanning,
+                        failover, caching, and observability. AI usage is billed in
+                        prepaid credits — or bring your own keys and pay providers directly.
                     </p>
                 </div>
 

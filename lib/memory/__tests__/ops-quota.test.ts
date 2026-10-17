@@ -33,9 +33,11 @@ describe('memory ops quota tables', () => {
         );
     });
 
-    it('pilot allowance fits comfortably inside pro writes', () => {
-        // 5,000 turns/mo pilot << 100,000 pro writes/mo.
-        expect(getMemoryOpsQuota('pro').writes).toBeGreaterThanOrEqual(20 * 5_000);
+    it('pilot allowance still fits pro writes at the tier bound', () => {
+        // 5,000 turns/mo pilot ≈ the 5,000 pro writes/mo cap exactly (one
+        // write op per turn). Heavier pilots pin custom monthly caps, billed
+        // to credits past tier.
+        expect(getMemoryOpsQuota('pro').writes).toBeGreaterThanOrEqual(5_000);
     });
 });
 
@@ -58,7 +60,7 @@ describe('checkMemoryOpsQuota', () => {
     it('denies on the project bucket without consulting the user bucket', async () => {
         mockedCheck.mockResolvedValueOnce(deny());
         const status = await checkMemoryOpsQuota('proj_1', 'free', 'user_a', 'write');
-        expect(status).toMatchObject({ allowed: false, scope: 'project', limit: 2000, used: 2000 });
+        expect(status).toMatchObject({ allowed: false, scope: 'project', limit: 1000, used: 1000 });
         expect(status.resetMs).toBeGreaterThan(0);
         expect(mockedCheck).toHaveBeenCalledTimes(1);
     });

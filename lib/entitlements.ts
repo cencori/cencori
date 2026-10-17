@@ -199,8 +199,8 @@ export function hasFeature(tier: SubscriptionTier, feature: keyof TierFeatures):
 // Metered by count of memories per project, 10KB content cap per memory.
 export const MEMORY_QUOTA: Record<SubscriptionTier, number> = {
   free: 1_000,
-  pro: 100_000,
-  team: 500_000,
+  pro: 50_000,
+  team: 100_000,
   enterprise: Number.POSITIVE_INFINITY,
 };
 
@@ -212,20 +212,24 @@ export function getMemoryQuota(tier: SubscriptionTier): number {
 // Stored count (MEMORY_QUOTA) caps what sits in the DB; operations cap what
 // runs on the shared managed keys. Every opted-in turn costs ~2–3 managed
 // LLM calls (extraction + reconciliation, +1 with the entity graph on) plus
-// embeddings — all absorbed by Cencori. Without an ops cap, one hot tenant
-// can burn the shared Groq/Cerebras/Gemini quota or run up the bill (MON-6).
-// Two dimensions: per-project monthly (protects the shared keys) and per
-// end-user daily (protects against a single hot user). Both enforced in
-// lib/memory/ops-quota.ts via the shared Redis fixed-window limiter.
+// embeddings — billed to the org's prepaid credits (memory/writeback.ts →
+// incrementUsage). Without an ops cap, one hot tenant can burn the shared
+// Groq/Cerebras/Gemini quota (MON-6). Paid allowances are sized so a fully
+// maxed project's monthly background LLM COGS stays bounded against plan
+// revenue (pro: searches ≈ $7.5, writes ≈ $15 on $29; team: ≈ $30 + $30 on
+// $99; median usage sits far below). Two dimensions: per-project monthly (protects the
+// shared keys) and per end-user daily (protects against a single hot user).
+// Both enforced in lib/memory/ops-quota.ts via the shared Redis fixed-window
+// limiter.
 export interface MemoryOpsQuota {
   searches: number;
   writes: number;
 }
 
 export const MEMORY_OPS_QUOTA: Record<SubscriptionTier, MemoryOpsQuota> = {
-  free: { searches: 10_000, writes: 2_000 },
-  pro: { searches: 500_000, writes: 100_000 },
-  team: { searches: 2_000_000, writes: 500_000 },
+  free: { searches: 2_000, writes: 1_000 },
+  pro: { searches: 50_000, writes: 5_000 },
+  team: { searches: 200_000, writes: 10_000 },
   enterprise: { searches: Number.POSITIVE_INFINITY, writes: Number.POSITIVE_INFINITY },
 };
 
