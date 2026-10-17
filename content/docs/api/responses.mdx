@@ -371,7 +371,7 @@ const response = await cencori.ai.responses({
 });
 ```
 
-Uploaded files are chunked and inserted into `scan_chat_memory` with the source prefix `file:<filename>`. They persist for the lifetime of your project and can be discovered by any subsequent `file_search` request.
+Uploaded files are chunked and indexed under your project's private file index. Chunks are retained for 30 days and can be discovered by any subsequent `file_search` request.
 
 ## Streaming
 
