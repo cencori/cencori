@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 type Mac = "apple-silicon" | "intel";
+type OperatingSystem = "mac" | "windows" | "other";
 
 const UNQUARANTINE = "xattr -dr com.apple.quarantine /Applications/Tensor.app";
 
@@ -11,6 +12,22 @@ const LABELS: Record<Mac, string> = {
   "apple-silicon": "Apple Silicon",
   intel: "Intel",
 };
+
+function AppleIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M16.37 12.6c-.02-2.3 1.88-3.4 1.96-3.46-1.07-1.56-2.73-1.78-3.32-1.8-1.41-.14-2.76.83-3.47.83-.72 0-1.82-.81-3-.79-1.54.02-2.96.9-3.75 2.27-1.6 2.78-.41 6.88 1.15 9.13.76 1.1 1.67 2.33 2.86 2.29 1.15-.05 1.58-.74 2.97-.74 1.38 0 1.77.74 2.98.72 1.23-.02 2.01-1.12 2.76-2.22.87-1.27 1.23-2.5 1.25-2.57-.03-.01-2.4-.92-2.42-3.66zM14.1 5.86c.63-.77 1.06-1.83.94-2.89-.91.04-2.01.6-2.66 1.37-.58.67-1.09 1.75-.96 2.79 1.02.08 2.05-.52 2.68-1.27z" />
+    </svg>
+  );
+}
+
+function WindowsIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M3 4.7 10.6 3.65v7.62H3V4.7Zm8.7-1.2L21 2.2v9.07h-9.3V3.5ZM3 12.32h7.6v7.63L3 18.9v-6.58Zm8.7 0H21v9.08l-9.3-1.3v-7.78Z" />
+    </svg>
+  );
+}
 
 /**
  * Which Mac this is, as far as the browser will say. Chromium answers directly; Safari and
@@ -71,19 +88,27 @@ function CopyCommand() {
 }
 
 /**
- * The download page for early testers: the right build for their Mac in one click, then the three
- * steps that get an app without an Apple Developer ID past Gatekeeper on its first launch.
+ * The download page for early testers: the right build for their OS in one click, followed by the
+ * platform-specific steps for opening an unsigned early-access build.
  */
 export function TensorDownload() {
   const [mac, setMac] = useState<Mac>("apple-silicon");
-  const [isMac, setIsMac] = useState(true);
+  const [operatingSystem, setOperatingSystem] = useState<OperatingSystem>("mac");
 
   useEffect(() => {
-    setIsMac(/Mac/i.test(navigator.userAgent) && !/iPhone|iPad/i.test(navigator.userAgent));
+    const userAgent = navigator.userAgent;
+    if (/Windows/i.test(userAgent)) {
+      setOperatingSystem("windows");
+    } else if (/Mac/i.test(userAgent) && !/iPhone|iPad/i.test(userAgent)) {
+      setOperatingSystem("mac");
+    } else {
+      setOperatingSystem("other");
+    }
     void detectMac().then(setMac);
   }, []);
 
   const other: Mac = mac === "apple-silicon" ? "intel" : "apple-silicon";
+  const isWindows = operatingSystem === "windows";
 
   return (
     <div className="marketing-theme dark relative isolate min-h-screen bg-black text-white [color-scheme:dark]">
@@ -100,77 +125,140 @@ export function TensorDownload() {
           Download Tensor
         </h1>
         <p className="font-inter mt-4 max-w-xl text-[0.98rem] leading-relaxed text-white/60">
-          Early access for macOS. Thanks for testing it with us.
+          Early access for macOS and Windows. Thanks for testing it with us.
         </p>
 
         <div className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-3">
           <a
-            href={`/tensor/download/${mac}`}
+            href={isWindows ? "/tensor/download/windows" : `/tensor/download/${mac}`}
             className="font-inter inline-flex min-h-[2.6rem] items-center gap-2.5 rounded-full bg-[#f3f3ef] px-5 text-[0.95rem] font-medium tracking-[-0.005em] text-[#050505] transition-colors hover:bg-[#e4e4de]"
           >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d="M16.37 12.6c-.02-2.3 1.88-3.4 1.96-3.46-1.07-1.56-2.73-1.78-3.32-1.8-1.41-.14-2.76.83-3.47.83-.72 0-1.82-.81-3-.79-1.54.02-2.96.9-3.75 2.27-1.6 2.78-.41 6.88 1.15 9.13.76 1.1 1.67 2.33 2.86 2.29 1.15-.05 1.58-.74 2.97-.74 1.38 0 1.77.74 2.98.72 1.23-.02 2.01-1.12 2.76-2.22.87-1.27 1.23-2.5 1.25-2.57-.03-.01-2.4-.92-2.42-3.66zM14.1 5.86c.63-.77 1.06-1.83.94-2.89-.91.04-2.01.6-2.66 1.37-.58.67-1.09 1.75-.96 2.79 1.02.08 2.05-.52 2.68-1.27z" />
-            </svg>
-            Download for Mac
+            {isWindows ? <WindowsIcon /> : <AppleIcon />}
+            Download for {isWindows ? "Windows" : "Mac"}
           </a>
-          <span className="font-inter text-sm text-white/45">
-            {LABELS[mac]} ·{" "}
-            <a href={`/tensor/download/${other}`} className="text-white/70 underline underline-offset-4 hover:text-white">
-              {LABELS[other]} instead
-            </a>
-          </span>
+          {isWindows ? (
+            <span className="font-inter text-sm text-white/45">
+              Windows 10/11 x64 ·{" "}
+              {/* A full navigation lets the route handler hand the browser a binary download. */}
+              {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+              <a
+                href="/tensor/download/apple-silicon"
+                className="text-white/70 underline underline-offset-4 hover:text-white"
+              >
+                Download for Mac
+              </a>
+            </span>
+          ) : (
+            <span className="font-inter text-sm text-white/45">
+              {LABELS[mac]} ·{" "}
+              <a
+                href={`/tensor/download/${other}`}
+                className="text-white/70 underline underline-offset-4 hover:text-white"
+              >
+                {LABELS[other]} instead
+              </a>{" "}
+              ·{" "}
+              {/* A full navigation lets the route handler hand the browser a binary download. */}
+              {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+              <a
+                href="/tensor/download/windows"
+                className="text-white/70 underline underline-offset-4 hover:text-white"
+              >
+                Windows
+              </a>
+            </span>
+          )}
         </div>
-        {isMac ? null : (
+        {operatingSystem === "other" ? (
           <p className="font-inter mt-4 text-sm text-white/45">
-            Tensor runs on macOS for now. Open this page on your Mac to download it.
+            Tensor currently supports macOS and Windows. Choose the build for the computer where
+            you’ll run it.
           </p>
-        )}
+        ) : null}
 
         <section aria-labelledby="install-title" className="mt-16">
           <h2 id="install-title" className="font-inter text-lg font-medium tracking-tight">
             Install
           </h2>
-          <ol className="font-inter mt-6 space-y-8 text-[0.95rem] leading-relaxed text-white/70">
-            <li className="grid grid-cols-[1.75rem_minmax(0,1fr)] gap-3">
-              <span className="text-white/35">1</span>
-              <div>
-                <p className="text-white">Move Tensor to Applications</p>
-                <p className="mt-1">Open the file you downloaded and drag Tensor into the Applications folder.</p>
-              </div>
-            </li>
-            <li className="grid grid-cols-[1.75rem_minmax(0,1fr)] gap-3">
-              <span className="text-white/35">2</span>
-              <div className="min-w-0">
-                <p className="text-white">Let macOS open it</p>
-                <p className="mt-1">
-                  This early build isn’t signed with an Apple Developer ID yet, so macOS will refuse to
-                  open it, or say it’s damaged. It isn’t. Open Terminal, paste this, and press Return:
-                </p>
-                <CopyCommand />
-                <p className="mt-3 text-sm text-white/45">
-                  Prefer not to use Terminal? Try opening Tensor once, then go to System Settings →
-                  Privacy &amp; Security and choose <span className="text-white/70">Open Anyway</span>.
-                </p>
-              </div>
-            </li>
-            <li className="grid grid-cols-[1.75rem_minmax(0,1fr)] gap-3">
-              <span className="text-white/35">3</span>
-              <div>
-                <p className="text-white">Open Tensor and sign in</p>
-                <p className="mt-1">
-                  Sign in with your Cencori account, choose a project folder, and start a task.{" "}
-                  <Link href="/tensor/docs" className="text-white underline underline-offset-4">
-                    Read the docs
-                  </Link>
-                  .
-                </p>
-              </div>
-            </li>
-          </ol>
+          {isWindows ? <WindowsInstallSteps /> : <MacInstallSteps />}
         </section>
 
         <p className="font-inter mt-auto pt-16 text-xs text-white/40">© 2026 Cencori, Inc.</p>
       </main>
     </div>
+  );
+}
+
+function MacInstallSteps() {
+  return (
+    <ol className="font-inter mt-6 space-y-8 text-[0.95rem] leading-relaxed text-white/70">
+      <li className="grid grid-cols-[1.75rem_minmax(0,1fr)] gap-3">
+        <span className="text-white/35">1</span>
+        <div>
+          <p className="text-white">Move Tensor to Applications</p>
+          <p className="mt-1">Open the file you downloaded and drag Tensor into the Applications folder.</p>
+        </div>
+      </li>
+      <li className="grid grid-cols-[1.75rem_minmax(0,1fr)] gap-3">
+        <span className="text-white/35">2</span>
+        <div className="min-w-0">
+          <p className="text-white">Let macOS open it</p>
+          <p className="mt-1">
+            This early build isn’t signed with an Apple Developer ID yet, so macOS will refuse to open
+            it, or say it’s damaged. It isn’t. Open Terminal, paste this, and press Return:
+          </p>
+          <CopyCommand />
+          <p className="mt-3 text-sm text-white/45">
+            Prefer not to use Terminal? Try opening Tensor once, then go to System Settings → Privacy
+            &amp; Security and choose <span className="text-white/70">Open Anyway</span>.
+          </p>
+        </div>
+      </li>
+      <FinalInstallStep />
+    </ol>
+  );
+}
+
+function WindowsInstallSteps() {
+  return (
+    <ol className="font-inter mt-6 space-y-8 text-[0.95rem] leading-relaxed text-white/70">
+      <li className="grid grid-cols-[1.75rem_minmax(0,1fr)] gap-3">
+        <span className="text-white/35">1</span>
+        <div>
+          <p className="text-white">Run the Tensor installer</p>
+          <p className="mt-1">Open Tensor-x64-setup.exe from your Downloads folder.</p>
+        </div>
+      </li>
+      <li className="grid grid-cols-[1.75rem_minmax(0,1fr)] gap-3">
+        <span className="text-white/35">2</span>
+        <div>
+          <p className="text-white">Allow the early-access build</p>
+          <p className="mt-1">
+            Tensor isn’t Authenticode-signed yet. If Microsoft Defender SmartScreen appears, choose{" "}
+            <span className="text-white">More info</span>, confirm the publisher is listed as unknown,
+            then choose <span className="text-white">Run anyway</span>.
+          </p>
+        </div>
+      </li>
+      <FinalInstallStep />
+    </ol>
+  );
+}
+
+function FinalInstallStep() {
+  return (
+    <li className="grid grid-cols-[1.75rem_minmax(0,1fr)] gap-3">
+      <span className="text-white/35">3</span>
+      <div>
+        <p className="text-white">Open Tensor and sign in</p>
+        <p className="mt-1">
+          Sign in with your Cencori account, choose a project folder, and start a task.{" "}
+          <Link href="/tensor/docs" className="text-white underline underline-offset-4">
+            Read the docs
+          </Link>
+          .
+        </p>
+      </div>
+    </li>
   );
 }
