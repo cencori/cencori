@@ -124,6 +124,7 @@ type PreparedRun = {
     runManifest: import('@/lib/embedded/manifest').CapabilityManifest;
     runSnapshots: Map<string, import('@/lib/embedded/mcp').McpServerSnapshot>;
     runMcpTools: ResponsesTool[];
+    runConnector: RunnerConnectorContext;
     runNetPolicy: import('@/lib/embedded/net-policy').NetworkPolicy;
     systemParts: string[];
     baseMessages: UnifiedMessage[];
@@ -137,6 +138,14 @@ type ModelCallResult = {
     cost: { providerCostUsd: number; cencoriChargeUsd: number; markupPercentage: number };
     model: string;
     provider: string;
+};
+
+/** Per-run connector dispatch context: hosted tools, snapshots, connections, connector configs. */
+type RunnerConnectorContext = {
+    tools: Array<{ type: 'function'; function: { name: string; description: string; parameters: Record<string, unknown> }; needsApproval?: boolean }>;
+    snapshots: Map<string, import('@/lib/embedded/connector-ops').ConnectorSnapshot>;
+    rows: Map<string, Record<string, unknown>>;
+    configs: Map<string, Record<string, unknown>>;
 };
 
 type LoopOutcome = {
@@ -303,6 +312,28 @@ async function prepareRunExecution(args: {
         runManifest.mcp_tools,
         new Map([...runSnapshots].map(([id, snap]) => [id, snap.tools])),
     );
+    // Imported connector ops (manifest connection_tools): snapshots feed the
+    // hosted tool schemas; connection rows + connector oauth configs feed
+    // dispatch-time credential injection.
+    const { loadConnectorSnapshots, connectorManifestTools } = await import('@/lib/embedded/connector-ops');
+    const runConnectorSnapshots = runManifest.connection_tools.length > 0
+        ? await loadConnectorSnapshots(supabase as never, run.project_id, runManifest.connection_tools.map((t) => t.connection_id))
+        : new Map<string, import('@/lib/embedded/connector-ops').ConnectorSnapshot>();
+    const runConnectorTools = connectorManifestTools(runManifest.connection_tools, runConnectorSnapshots);
+    const runConnectorRows = new Map<string, Record<string, unknown>>();
+    const runConnectorConfigs = new Map<string, Record<string, unknown>>();
+    if (runConnectorSnapshots.size > 0) {
+        const connIds = [...runConnectorSnapshots.values()].map((s) => s.id);
+        const { data: connRows } = await supabase.from('tool_connections').select('id, connector_slug, metadata, encrypted_access_ref, encrypted_refresh_ref, expires_at').eq('project_id', run.project_id).in('id', connIds);
+        for (const row of (connRows ?? []) as Record<string, unknown>[]) runConnectorRows.set(String(row.id).toLowerCase(), row);
+        const slugs = [...new Set([...runConnectorRows.values()].map((r) => (r.connector_slug as string) ?? '').filter(Boolean))];
+        if (slugs.length > 0) {
+            const { data: connectorRows } = await supabase.from('connectors').select('slug, oauth_config').in('slug', slugs);
+            for (const row of (connectorRows ?? []) as Array<{ slug: string; oauth_config?: unknown }>) {
+                runConnectorConfigs.set(row.slug, ((row.oauth_config ?? {}) as Record<string, unknown>));
+            }
+        }
+    }
     const { resolveActionNetworkPolicy } = await import('@/lib/embedded/net-policy');
     const runNetPolicy = await resolveActionNetworkPolicy(supabase as never, { project_id: run.project_id, run_id: runId, approval_policy: {} });
 
@@ -317,6 +348,7 @@ async function prepareRunExecution(args: {
             input, inputText, responseFormat, wantsJson,
             citations, skillsFailed: (skills as { failed?: boolean }).failed === true, runSkillsBlock, runSkillIds,
             runManifest, runSnapshots, runMcpTools, runNetPolicy,
+            runConnector: { tools: runConnectorTools, snapshots: runConnectorSnapshots, rows: runConnectorRows, configs: runConnectorConfigs },
             systemParts, baseMessages,
             preGatewayMs: Date.now() - executorStartedAt,
         },
@@ -330,6 +362,7 @@ type LoopContext = {
     baseMessages: UnifiedMessage[];
     runMcpTools: ResponsesTool[];
     runSnapshots: Map<string, import('@/lib/embedded/mcp').McpServerSnapshot>;
+    runConnector: RunnerConnectorContext;
     runNetPolicy: import('@/lib/embedded/net-policy').NetworkPolicy;
     organizationId: string;
     abortController: AbortController;
@@ -356,6 +389,7 @@ async function runModelLoop(
 ): Promise<LoopOutcome> {
     const { supabase, run, runId, organizationId, abortController, throwIfCancelled } = ctx;
     const { callMcpTool, mcpAuthHeaders, mcpIdentityHeaders } = await import('@/lib/embedded/mcp');
+    const { parseConnectorHostedToolName } = await import('@/lib/embedded/connector-ops');
     const { parseMcpHostedToolName } = await import('@/lib/embedded/turn-tools');
     const { classifyTool } = await import('@/lib/embedded/tool-risk');
     const { checkEgress } = await import('@/lib/embedded/net-policy');
@@ -408,6 +442,84 @@ async function runModelLoop(
         let progressed = false;
         for (const tc of calls) {
             const parsed = parseMcpHostedToolName(tc.function.name);
+            const parsedConn = parsed ? null : parseConnectorHostedToolName(tc.function.name);
+            if (parsedConn) {
+                const { findConnectorSnapshot, classifyConnectorOp, connectorOpInput } = await import('@/lib/embedded/connector-ops');
+                const connSnap = findConnectorSnapshot(ctx.runConnector.snapshots, parsedConn.connShort);
+                const operation = connSnap?.operations.find((o) => o.name === parsedConn.op);
+                if (!connSnap || !operation) {
+                    loopMessages = [...loopMessages, { role: 'tool' as const, content: `Unknown tool '${tc.function.name}': operation not imported for this agent version`, toolCallId: tc.id }];
+                    progressed = true;
+                    continue;
+                }
+                const classification = classifyConnectorOp(operation.method);
+                let args: Record<string, unknown> = {};
+                try {
+                    args = JSON.parse(tc.function.arguments || '{}') as Record<string, unknown>;
+                } catch {
+                    loopMessages = [...loopMessages, { role: 'tool' as const, content: `Invalid arguments JSON for '${tc.function.name}'`, toolCallId: tc.id }];
+                    progressed = true;
+                    continue;
+                }
+                if (classification.approval !== 'auto') {
+                    const executionKey = `run_${runId}_i${iteration}_${tc.id}`.slice(0, 64);
+                    const { data: action } = await supabase.from('actions').insert({
+                        project_id: run.project_id,
+                        tenant_id: run.tenant_id,
+                        run_id: runId,
+                        session_id: null,
+                        turn_number: null,
+                        tool_name: tc.function.name,
+                        risk_level: classification.risk,
+                        status: 'pending',
+                        sanitized_arguments: args,
+                        approval_policy: { connection_id: connSnap.id, op: { name: operation.name, method: operation.method, path: operation.path } },
+                        expires_at: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+                        execution_key: executionKey,
+                    }).select('id').single();
+                    pendingApprovals.push({ action_id: (action as { id: string } | null)?.id ?? tc.id, tool: tc.function.name });
+                    continue;
+                }
+                const connRow = ctx.runConnector.rows.get(connSnap.id.toLowerCase());
+                let baseUrl = connSnap.baseUrl;
+                if (connRow) baseUrl = ((connRow.metadata ?? {}) as { base_url?: string }).base_url ?? baseUrl;
+                if (!connRow || !baseUrl) {
+                    loopMessages = [...loopMessages, { role: 'tool' as const, content: `Tool '${tc.function.name}' unavailable: connection has no base_url`, toolCallId: tc.id }];
+                    executedToolCalls.push({ tool: tc.function.name, status: 'failed', action_id: tc.id });
+                    hooks?.onToolCompleted?.({ tool: tc.function.name, status: 'failed', action_id: tc.id });
+                    progressed = true;
+                    continue;
+                }
+                const egress = await checkEgress(baseUrl, ctx.runNetPolicy);
+                if (!egress.allowed) {
+                    loopMessages = [...loopMessages, { role: 'tool' as const, content: `Network policy denied connector egress to ${egress.host ?? 'unknown host'}: ${egress.reason}`, toolCallId: tc.id }];
+                    executedToolCalls.push({ tool: tc.function.name, status: 'failed', action_id: tc.id });
+                    hooks?.onToolCompleted?.({ tool: tc.function.name, status: 'failed', action_id: tc.id });
+                    progressed = true;
+                    continue;
+                }
+                try {
+                    const { executeConnectorHttp } = await import('@/lib/embedded/tool-executor');
+                    const out = await executeConnectorHttp(supabase as never, {
+                        connection: connRow as { id: string; connector_slug?: string; encrypted_access_ref: string | null; encrypted_refresh_ref: string | null; expires_at: string | null },
+                        organizationId,
+                        connectorConfig: { ...((ctx.runConnector.configs.get((connRow.connector_slug as string) ?? '') ?? {}) as Record<string, unknown>), base_url: baseUrl },
+                        input: connectorOpInput(operation, args),
+                        executionKey: tc.id,
+                    });
+                    loopMessages = [...loopMessages, { role: 'tool' as const, content: JSON.stringify(out ?? null).slice(0, 8000), toolCallId: tc.id }];
+                    executedToolCalls.push({ tool: tc.function.name, status: 'executed', action_id: tc.id });
+                    await appendRunEvent(supabase as never, runId, 'tool_call.completed', { run_id: runId, tool: tc.function.name, action_id: tc.id, executed_by: 'host' });
+                    hooks?.onToolCompleted?.({ tool: tc.function.name, status: 'executed', action_id: tc.id });
+                    progressed = true;
+                } catch (e) {
+                    loopMessages = [...loopMessages, { role: 'tool' as const, content: `Tool '${tc.function.name}' failed: ${(e instanceof Error ? e.message : 'unknown').slice(0, 500)}`, toolCallId: tc.id }];
+                    executedToolCalls.push({ tool: tc.function.name, status: 'failed', action_id: tc.id });
+                    hooks?.onToolCompleted?.({ tool: tc.function.name, status: 'failed', action_id: tc.id });
+                    progressed = true;
+                }
+                continue;
+            }
             const server = parsed
                 ? [...ctx.runSnapshots.values()].find((s) => s.id.replace(/-/g, '').toLowerCase().startsWith(parsed.serverShort.toLowerCase()) && s.tools.some((t) => t.name === parsed.tool))
                 : undefined;
@@ -743,7 +855,7 @@ async function executeRun(runId: string): Promise<void> {
                     maxTokens: config.max_output_tokens ?? undefined,
                     signal: abortController.signal,
                     ...(reasoningEffort ? { reasoningEffort } : {}),
-                    ...(prep.runMcpTools.length > 0 ? { tools: prep.runMcpTools as never } : {}),
+                    ...(prep.runMcpTools.length + prep.runConnector.tools.length > 0 ? { tools: [...prep.runMcpTools, ...prep.runConnector.tools] as never } : {}),
                 },
                 requestId: `run_${runId}`,
                 ...(pinnedConnectionId ? { pinnedConnectionId } : {}),
@@ -763,6 +875,7 @@ async function executeRun(runId: string): Promise<void> {
                 baseMessages: prep.baseMessages,
                 runMcpTools: prep.runMcpTools,
                 runSnapshots: prep.runSnapshots,
+                runConnector: prep.runConnector,
                 runNetPolicy: prep.runNetPolicy,
                 organizationId,
                 abortController,
@@ -844,7 +957,7 @@ async function executeRunStream(runId: string, emit: StreamEmit): Promise<void> 
             pinnedConnectionId: prep.pinnedConnectionId,
             autoRouterInput: {
                 text: prep.baseMessages?.map((m) => m.content ?? '').join('\n') ?? null,
-                tools: (prep.runMcpTools as unknown[] | null) ?? null,
+                tools: [...prep.runMcpTools, ...prep.runConnector.tools],
                 hasImage: false,
             },
         });
@@ -869,7 +982,7 @@ async function executeRunStream(runId: string, emit: StreamEmit): Promise<void> 
                     stream: true,
                     signal: abortController.signal,
                     ...(prep.reasoningEffort ? { reasoningEffort: prep.reasoningEffort } : {}),
-                    ...(prep.runMcpTools.length > 0 ? { tools: prep.runMcpTools as never } : {}),
+                    ...(prep.runMcpTools.length + prep.runConnector.tools.length > 0 ? { tools: [...prep.runMcpTools, ...prep.runConnector.tools] as never } : {}),
                 },
                 resolved: resolved as never,
                 requestId: `run_${runId}`,
@@ -927,6 +1040,7 @@ async function executeRunStream(runId: string, emit: StreamEmit): Promise<void> 
                 baseMessages: prep.baseMessages,
                 runMcpTools: prep.runMcpTools,
                 runSnapshots: prep.runSnapshots,
+                runConnector: prep.runConnector,
                 runNetPolicy: prep.runNetPolicy,
                 organizationId: prep.organizationId,
                 abortController,

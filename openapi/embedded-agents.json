@@ -653,7 +653,8 @@
           "config": {
             "type": "object",
             "properties": {},
-            "additionalProperties": true
+            "additionalProperties": true,
+            "description": " Config may declare `connection_tools` (imported connector operations exposed as hosted tools)."
           },
           "requirements": {
             "type": "object",
@@ -3906,6 +3907,55 @@
         "required": [
           "data",
           "next_cursor"
+        ]
+      },
+      "ConnectionImportRequest": {
+        "type": "object",
+        "description": "Inline OpenAPI JSON document or a https URL to fetch; optional `operations` filter (all imported otherwise).",
+        "properties": {
+          "spec": {
+            "type": "object",
+            "description": "Inline OpenAPI 3.x JSON document.",
+            "additionalProperties": true
+          },
+          "spec_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "https URL returning the OpenAPI document as JSON."
+          },
+          "operations": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Import only these operationIds; unknown ids are rejected."
+          }
+        }
+      },
+      "ConnectionImportResult": {
+        "type": "object",
+        "properties": {
+          "imported": {
+            "type": "integer"
+          },
+          "base_url": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "operations": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "imported",
+          "base_url",
+          "operations"
         ]
       }
     },
@@ -9184,6 +9234,49 @@
             }
           }
         ]
+      }
+    },
+    "/v1/connections/{connectionId}/import": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ConnectionId"
+        }
+      ],
+      "post": {
+        "summary": "Import OpenAPI operations onto a connection",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectionImportResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "description": "Parses an OpenAPI 3.x (JSON) spec — inline `spec` or a https `spec_url` — into connector operations stored on the connection metadata; capped at 60 operations. Manifest `connection_tools` grants then expose hosted `conn__` tools. Requires a secret project key (`secret_key_required` otherwise).",
+        "operationId": "postConnectionsByConnectionIdImport",
+        "tags": [
+          "Connections"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectionImportRequest"
+              }
+            }
+          }
+        }
       }
     }
   },

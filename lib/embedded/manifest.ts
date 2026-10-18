@@ -23,6 +23,8 @@ export interface CapabilityManifest {
     skills: Array<{ skill_version_id: string }>;
     tools: Array<{ type: string; name: string; description?: string; parameters?: Record<string, unknown> }>;
     connection_requirements: Array<{ connector: string; scopes: string[] }>;
+    /** Imported OpenAPI operations exposed as hosted `conn__` tools (phase-2 connector tools). */
+    connection_tools: Array<{ connection_id: string; operations?: string[] }>;
     mcp_tools: Array<{ server_id: string; tool: string }>;
     subagents: Array<{ agent_version_id: string; max_calls?: number; timeout_ms?: number; budget_limit?: number }>;
     policy: {
@@ -39,7 +41,7 @@ export interface CapabilityManifest {
 export function normalizeManifest(config: Record<string, unknown>): CapabilityManifest {
     const c = config as Record<string, unknown> & {
         instructions?: string; system_prompt?: string; skills?: unknown; tools?: unknown;
-        connection_requirements?: unknown; mcp_tools?: unknown; subagents?: unknown; policy?: unknown;
+        connection_requirements?: unknown; connection_tools?: unknown; mcp_tools?: unknown; subagents?: unknown; policy?: unknown;
     };
     const tools = Array.isArray(c.tools)
         ? (c.tools as unknown[]).map((t) => typeof t === 'string' ? { type: 'builtin', name: t } : (t as CapabilityManifest['tools'][number])).filter((t) => t && typeof t.name === 'string' && t.name.trim()).map((t) => ({
@@ -62,6 +64,12 @@ export function normalizeManifest(config: Record<string, unknown>): CapabilityMa
         tools,
         connection_requirements: Array.isArray(c.connection_requirements)
             ? (c.connection_requirements as Array<{ connector?: string; scopes?: string[] }>).filter((r) => r?.connector).map((r) => ({ connector: r.connector as string, scopes: r.scopes ?? [] }))
+            : [],
+        connection_tools: Array.isArray(c.connection_tools)
+            ? (c.connection_tools as Array<{ connection_id?: string; operations?: unknown[] }>).filter((t) => t?.connection_id).map((t) => ({
+                connection_id: t.connection_id as string,
+                ...(Array.isArray(t.operations) ? { operations: (t.operations as unknown[]).filter((o) => typeof o === 'string') as string[] } : {}),
+            }))
             : [],
         mcp_tools: Array.isArray(c.mcp_tools)
             ? (c.mcp_tools as Array<{ server_id?: string; tool?: string }>).filter((m) => m?.server_id && m?.tool).map((m) => ({ server_id: m.server_id as string, tool: m.tool as string }))
@@ -273,6 +281,30 @@ export async function validateManifest(
             errors.push(`MCP tool '${ref.tool}' is not in the discovery snapshot of '${ref.server_id}'`);
         } else if (snapshot.length === 0) {
             warnings.push(`MCP server '${ref.server_id}' has an empty tool snapshot; refresh discovery before publishing`);
+        }
+    }
+
+    // Connector tools: connection must exist in-project and active, and the
+    // referenced operations must come from an imported OpenAPI catalog.
+    for (const ref of m.connection_tools) {
+        const { data: conn } = await supabase.from('tool_connections').select('id, status, metadata').eq('project_id', opts.projectId).eq('id', dePrefix(ref.connection_id)).maybeSingle();
+        if (!conn) {
+            errors.push(`connection '${ref.connection_id}' not found in this project`);
+            continue;
+        }
+        if ((conn.status as string) !== 'active') {
+            errors.push(`connection '${ref.connection_id}' is ${(conn.status as string) ?? 'not active'}; connector tools against it can never execute`);
+        }
+        const imported = ((conn.metadata ?? {}) as { operations?: Array<{ name: string }> }).operations ?? [];
+        if (imported.length === 0) {
+            errors.push(`connection '${ref.connection_id}' has no imported operations; run the OpenAPI import first`);
+            continue;
+        }
+        const importedNames = new Set(imported.map((op) => op.name));
+        for (const op of ref.operations ?? []) {
+            if (!importedNames.has(op)) {
+                errors.push(`connector operation '${op}' is not imported on '${ref.connection_id}'`);
+            }
         }
     }
 

@@ -1,0 +1,49 @@
+---
+title: "Connector Tools"
+description: "Import any OpenAPI spec onto a connection and expose its operations as hosted agent tools — no wrapper code."
+section: "Embedded Agents"
+order: 7
+---
+
+## Import a spec
+
+Every connection can carry imported operations. Point Cencori at an OpenAPI 3.x JSON document (inline or via a https URL) and it parses each path+method into a connector operation — stored on the connection's metadata, capped at 60:
+
+```bash
+curl -X POST https://cencori.com/v1/connections/con_9f8e7d6c5b4a1234/import \
+  -H "Authorization: Bearer sk_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{"spec_url": "https://api.acme.example/openapi.json"}'
+```
+
+```json
+{
+  "imported": 14,
+  "base_url": "https://api.acme.example/v1",
+  "title": "Acme CRM",
+  "operations": ["get_order", "create_order", "delete_order"]
+}
+```
+
+Operation IDs come from the spec's `operationId` (or are synthesized from the path). The https `servers[0]` URL becomes the connection's `base_url`. Re-run the import anytime to refresh.
+
+## Expose them to agents
+
+List the connection in a version manifest's `connection_tools` (optionally filtered to specific operations):
+
+```json
+{
+  "connection_tools": [
+    { "connection_id": "con_9f8e7d6c5b4a1234", "operations": ["get_order"] }
+  ]
+}
+```
+
+Agents see hosted tools named `conn__<connection>__<operation>` — the same pattern as `mcp__` MCP tools.
+
+## Execution and safety
+
+- **GET/HEAD** operations are classified as reads: the run loop executes them directly after the egress policy allows the base host.
+- **Other methods** are writes; **DELETE** is destructive. They create approval actions — same risk/expiry model as any other action, approved via `POST /v1/actions/{actionId}/approve`, which dispatches against the connection's live credential.
+- Arguments map to path parameters (required), `query`, `headers`, and `body` — path params are URL-encoded; the secret is injected as `Authorization: Bearer` and never reaches the model.
+- Sessions do not execute connector tools server-side: a turn pauses with the tool call and your client resumes with the result, exactly like other function tools.
