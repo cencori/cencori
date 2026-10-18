@@ -76,6 +76,16 @@ function storeError(error: unknown): WebRuntimeError {
     return new WebRuntimeError('web_database_unavailable', message, 503);
 }
 
+/**
+ * SQLSTATE 57014 (`canceling statement due to statement timeout`): the hosted
+ * database tier cancelled the statement. The hybrid v2 search function is the
+ * one that outgrows these budgets as the corpus grows, so both stores degrade
+ * to the lexical v1 function on this error class instead of failing the search.
+ */
+function isStatementTimeout(message: string): boolean {
+    return /canceling statement|statement timeout|57014/i.test(message);
+}
+
 export class SupabaseWebDataStore implements WebDataStore {
     readonly backend = 'supabase' as const;
 
@@ -106,19 +116,26 @@ export class SupabaseWebDataStore implements WebDataStore {
             p_language: options.language,
             p_query_embedding: options.queryEmbedding,
         });
-        if (error && /search_cencori_web_v2|schema cache|PGRST202/i.test(error.message)) {
-            const fallback = await this.client.rpc('search_cencori_web', {
-                p_project_id: projectId,
-                p_query: query,
-                p_limit: options.limit,
-                p_domain: options.domain,
-                p_fresh_after: options.freshAfter,
-            });
-            if (fallback.error) throw storeError(fallback.error.message);
-            return Array.isArray(fallback.data) ? fallback.data as WebStoreRow[] : [];
+        if (error) {
+            const missing = /search_cencori_web_v2|schema cache|PGRST202/i.test(error.message);
+            if (missing || isStatementTimeout(error.message)) {
+                return this.searchLexical(projectId, query, options);
+            }
         }
         if (error) throw storeError(error.message);
         return Array.isArray(data) ? data as WebStoreRow[] : [];
+    }
+
+    private async searchLexical(projectId: string, query: string, options: WebSearchStoreOptions): Promise<WebStoreRow[]> {
+        const fallback = await this.client.rpc('search_cencori_web', {
+            p_project_id: projectId,
+            p_query: query,
+            p_limit: options.limit,
+            p_domain: options.domain,
+            p_fresh_after: options.freshAfter,
+        });
+        if (fallback.error) throw storeError(fallback.error.message);
+        return Array.isArray(fallback.data) ? fallback.data as WebStoreRow[] : [];
     }
 
     async createCrawlJob(record: WebStoreRow): Promise<WebStoreRow> {
@@ -359,6 +376,10 @@ export class PostgresWebDataStore implements WebDataStore {
             max: Number(process.env.CENCORI_WEB_DATABASE_POOL_SIZE || 10),
             idleTimeoutMillis: 30_000,
             connectionTimeoutMillis: 10_000,
+            // Own the per-statement budget here instead of waiting for the
+            // hosted database tier to enforce its unverifiable server default;
+            // 8s is comfortably under the search-critical API timeouts.
+            statement_timeout: Number(process.env.CENCORI_WEB_STATEMENT_TIMEOUT_MS || 8_000),
             application_name: 'cencori-web',
             ...options,
         });
@@ -412,10 +433,21 @@ export class PostgresWebDataStore implements WebDataStore {
     }
 
     async searchDocuments(projectId: string, query: string, options: WebSearchStoreOptions): Promise<WebStoreRow[]> {
-        return this.rows(
-            'SELECT * FROM public.search_cencori_web_v2($1::uuid, $2::text, $3::real[], $4::integer, $5::text, $6::timestamptz, $7::text)',
-            [projectId, query, options.queryEmbedding, options.limit, options.domain, options.freshAfter, options.language],
-        );
+        try {
+            return await this.rows(
+                'SELECT * FROM public.search_cencori_web_v2($1::uuid, $2::text, $3::real[], $4::integer, $5::text, $6::timestamptz, $7::text)',
+                [projectId, query, options.queryEmbedding, options.limit, options.domain, options.freshAfter, options.language],
+            );
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            if (isStatementTimeout(message)) {
+                return this.rows(
+                    'SELECT * FROM public.search_cencori_web($1::uuid, $2::text, $3::integer, $4::text, $5::timestamptz)',
+                    [projectId, query, options.limit, options.domain, options.freshAfter],
+                );
+            }
+            throw error;
+        }
     }
 
     async createCrawlJob(record: WebStoreRow): Promise<WebStoreRow> {

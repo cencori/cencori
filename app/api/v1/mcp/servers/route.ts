@@ -10,7 +10,10 @@ export async function OPTIONS() {
 }
 
 function serialize(row: Record<string, unknown>) {
-    return { ...row, id: withPrefix('mcp', row.id as string) };
+    // identity_secret is write-only: the plaintext is returned once below at
+    // creation for out-of-band verification; the ciphertext never leaves here.
+    const { identity_secret: _stripped, ...rest } = row;
+    return { ...rest, id: withPrefix('mcp', row.id as string) };
 }
 
 async function resolveTenant(supabase: ReturnType<typeof createAdminClient>, projectId: string, tenantId: string | undefined) {
@@ -92,6 +95,11 @@ export async function POST(req: NextRequest) {
         lastError = e instanceof Error ? e.message.slice(0, 500) : 'Discovery failed';
     }
 
+    // Mint the per-server identity secret. Standard remote-MCP servers use it
+    // to verify the signed end-user identity headers we send on every
+    // `tools/call`; it is returned once here and never again over the API.
+    const identitySecret = `mcpis_${crypto.randomBytes(24).toString('hex')}`;
+    const { encryptApiKey } = await import('@/lib/encryption');
     const { data, error } = await supabase
         .from('mcp_servers')
         .insert({
@@ -105,6 +113,7 @@ export async function POST(req: NextRequest) {
             tool_snapshot: snapshot,
             last_discovered_at: snapshot.discovered_at as string | null,
             last_error: lastError,
+            identity_secret: encryptApiKey(identitySecret, validation.context.organizationId),
         })
         .select('*')
         .single();
@@ -113,7 +122,7 @@ export async function POST(req: NextRequest) {
     }
     // Contract shape is McpDiscoveryResult (nested `server`), not the bare row.
     const { toMcpDiscoveryResult } = await import('@/lib/embedded/mcp');
-    const server = serialize(data as Record<string, unknown>);
+    const server = { ...serialize(data as Record<string, unknown>), identity_secret: identitySecret };
     const snapshotTools = ((snapshot.tools ?? []) as import('@/lib/embedded/mcp').DiscoveredTool[]);
     return addGatewayHeaders(NextResponse.json(toMcpDiscoveryResult(server, snapshotTools), { status: 201 }), { requestId });
 }
