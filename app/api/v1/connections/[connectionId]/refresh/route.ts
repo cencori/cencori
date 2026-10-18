@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { validateGatewayRequest, addGatewayHeaders, handleCorsPreFlight } from '@/lib/gateway-middleware';
 import { embeddedError, dePrefixId, withPrefix } from '@/lib/embedded/http';
-import { refreshAccessToken } from '@/lib/embedded/oauth';
+import { refreshAccessToken, oauthClientConfig } from '@/lib/embedded/oauth';
 import { encryptApiKey, decryptApiKey } from '@/lib/encryption';
 import crypto from 'crypto';
 
@@ -33,13 +33,21 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ connection
         return addGatewayHeaders(embeddedError(409, 'invalid_request_error', 'No refresh token stored for this connection', { requestId }), { requestId });
     }
     const { data: connector } = await supabase.from('connectors').select('oauth_config').eq('slug', c.connector_slug).maybeSingle();
-    const cfg = ((connector?.oauth_config ?? {}) as { token_url?: string; client_id?: string; client_secret?: string });
+    const connMeta = ((conn.metadata ?? {}) as { oauth?: { token_url?: string; token_auth?: 'form' | 'basic'; client_id?: string; client_secret_ref?: string } }).oauth ?? null;
+    const clientSecretOverride = connMeta?.client_secret_ref ? decryptApiKey(connMeta.client_secret_ref, validation.context.organizationId) : undefined;
+    const cfg = oauthClientConfig(c.connector_slug, ((connector?.oauth_config ?? {}) as Record<string, unknown>), {
+        client_id: connMeta?.client_id,
+        client_secret: clientSecretOverride,
+        token_url: connMeta?.token_url,
+    });
+    const tokenAuth = connMeta?.token_auth ?? cfg.tokenAuth;
     try {
         const refreshed = await refreshAccessToken({
-            tokenUrl: cfg.token_url || 'https://oauth2.googleapis.com/token',
-            clientId: cfg.client_id || process.env.CENCORI_GMAIL_CLIENT_ID || '',
-            clientSecret: cfg.client_secret || process.env.CENCORI_GMAIL_CLIENT_SECRET || '',
+            tokenUrl: cfg.tokenUrl,
+            clientId: cfg.clientId,
+            clientSecret: cfg.clientSecret,
             refreshToken: decryptApiKey(c.encrypted_refresh_ref, validation.context.organizationId),
+            tokenAuth,
         });
         const { data: updated } = await supabase.from('tool_connections').update({
             encrypted_access_ref: encryptApiKey(refreshed.access_token, validation.context.organizationId),

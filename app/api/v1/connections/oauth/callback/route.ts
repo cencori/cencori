@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { handleCorsPreFlight } from '@/lib/gateway-middleware';
-import { exchangeCodeForTokens, signOAuthState } from '@/lib/embedded/oauth';
-import { encryptApiKey } from '@/lib/encryption';
+import { exchangeCodeForTokens, signOAuthState, oauthClientConfig } from '@/lib/embedded/oauth';
+import { encryptApiKey, decryptApiKey } from '@/lib/encryption';
 
 export async function OPTIONS() {
     return handleCorsPreFlight();
@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
     if (!row) {
         return NextResponse.json({ error: { message: 'Unknown or expired OAuth state', code: 'invalid_request_error' } }, { status: 400 });
     }
-    const oauth = row as { project_id: string; connection_id: string; connector_slug: string; code_verifier: string | null; redirect_uri: string; scopes: string[]; expires_at: string };
+    const oauth = row as { project_id: string; connection_id: string; connector_slug: string; code_verifier: string | null; redirect_uri: string; scopes: string[]; metadata?: Record<string, unknown>; expires_at: string };
     if (Date.parse(oauth.expires_at) <= Date.now()) {
         await supabase.from('oauth_states').delete().eq('state', state);
         return NextResponse.json({ error: { message: 'OAuth state expired', code: 'invalid_request_error' } }, { status: 410 });
@@ -38,16 +38,22 @@ export async function GET(req: NextRequest) {
     const { data: project } = await supabase.from('projects').select('organization_id').eq('id', oauth.project_id).maybeSingle();
     const organizationId = (project?.organization_id as string) ?? '';
     const { data: connector } = await supabase.from('connectors').select('oauth_config').eq('slug', oauth.connector_slug).maybeSingle();
-    const oauthConfig = ((connector?.oauth_config ?? {}) as { token_url?: string; client_id?: string; client_secret?: string });
-    const tokenUrl = oauthConfig.token_url || 'https://oauth2.googleapis.com/token';
-    const clientId = oauthConfig.client_id || process.env.CENCORI_GMAIL_CLIENT_ID || '';
-    const clientSecret = oauthConfig.client_secret || process.env.CENCORI_GMAIL_CLIENT_SECRET || '';
-    if (!clientId || !clientSecret || !organizationId) {
+    // Endpoints and (BYO) client credentials resolved at authorize time ride
+    // in the state metadata; the secret is an org-scoped encrypted ref.
+    const stateMeta = ((oauth.metadata ?? {}) as { auth_url?: string; token_url?: string; token_auth?: 'form' | 'basic'; client_id?: string; client_secret_ref?: string });
+    const clientSecretOverride = stateMeta.client_secret_ref ? decryptApiKey(stateMeta.client_secret_ref, organizationId) : undefined;
+    const creds = oauthClientConfig(oauth.connector_slug, ((connector?.oauth_config ?? {}) as Record<string, unknown>), {
+        client_id: stateMeta.client_id,
+        client_secret: clientSecretOverride,
+        token_url: stateMeta.token_url,
+    });
+    const tokenAuth = stateMeta.token_auth ?? creds.tokenAuth;
+    if (!creds.clientId || !creds.clientSecret || !organizationId) {
         return NextResponse.json({ error: { message: 'OAuth client is not configured', code: 'invalid_request_error' } }, { status: 500 });
     }
 
     try {
-        const tokens = await exchangeCodeForTokens({ tokenUrl, clientId, clientSecret, code, redirectUri: oauth.redirect_uri, codeVerifier: oauth.code_verifier });
+        const tokens = await exchangeCodeForTokens({ tokenUrl: creds.tokenUrl, clientId: creds.clientId, clientSecret: creds.clientSecret, code, redirectUri: oauth.redirect_uri, codeVerifier: oauth.code_verifier, tokenAuth });
         await supabase.from('tool_connections').update({
             encrypted_access_ref: encryptApiKey(tokens.access_token, organizationId),
             encrypted_refresh_ref: tokens.refresh_token ? encryptApiKey(tokens.refresh_token, organizationId) : undefined,

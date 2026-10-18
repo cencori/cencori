@@ -37,9 +37,46 @@ async function dispatchExecution(
         return { result: { message_id: out.message_id, tool: action.tool_name } };
     }
 
+    // Hosted-name / MCP binding signatures are computed before dispatch so the
+    // generic-HTTP branch can exclude them explicitly.
     const mcpServerId = policy.mcp_server_id as string | undefined;
     const hosted = parseMcpHostedToolName(action.tool_name);
-    if (mcpServerId || tool.startsWith('mcp.') || hosted) {
+
+    // generic-http connections: relay the sanitized HTTP request with the
+    // bound credential injected as Bearer — credential never leaves the
+    // dispatch path; egress policy applies to the base host first.
+    const genericConnId = (policy.connection_id as string | undefined) ?? (action.sanitized_arguments._connection_id as string | undefined);
+    if (genericConnId && !tool.includes('gmail') && !mcpServerId && !hosted) {
+        const { data: gConn } = await supabase.from('tool_connections').select('*').eq('project_id', action.project_id).eq('id', dePrefixId(genericConnId)).maybeSingle();
+        if (gConn && (gConn as { connector_slug?: string }).connector_slug === 'generic-http') {
+            const g = gConn as { metadata?: Record<string, unknown> };
+            const base = ((g.metadata ?? {}).base_url) as string | undefined;
+            if (!base) throw new Error('Connection metadata.base_url is required for generic HTTP calls');
+            const { assertSafeOutboundUrl } = await import('@/lib/security/outbound-url');
+            assertSafeOutboundUrl(base);
+            const { resolveActionNetworkPolicy, checkEgress } = await import('@/lib/embedded/net-policy');
+            const netPolicy = await resolveActionNetworkPolicy(supabase as never, { project_id: action.project_id, run_id: (action as { run_id?: string | null }).run_id ?? null, approval_policy: action.approval_policy });
+            const egress = await checkEgress(base, netPolicy);
+            if (!egress.allowed) {
+                throw new Error(`Network policy denied HTTP egress to ${egress.host ?? 'unknown host'}: ${egress.reason}`);
+            }
+            const { data: gConnector } = await supabase.from('connectors').select('oauth_config').eq('slug', 'generic-http').maybeSingle();
+            const httpArgs = action.sanitized_arguments as { method?: string; path?: string; query?: Record<string, string>; headers?: Record<string, string>; body?: unknown };
+            const { executeConnectorHttp } = await import('@/lib/embedded/tool-executor');
+            const out = await executeConnectorHttp(supabase, {
+                connection: gConn as { id: string; connector_slug?: string; encrypted_access_ref: string | null; encrypted_refresh_ref: string | null; expires_at: string | null },
+                organizationId,
+                connectorConfig: ((gConnector?.oauth_config ?? {}) as Record<string, unknown>),
+                input: { method: httpArgs.method as 'GET' | undefined, path: httpArgs.path ?? '', query: httpArgs.query, headers: httpArgs.headers, body: httpArgs.body },
+                executionKey: action.execution_key,
+            });
+            return { result: { tool: action.tool_name, status: out.status, output: out.body } };
+        }
+        if (!gConn) throw new Error('Bound connection not found in this project');
+    }
+
+    const mcpBranch = mcpServerId || tool.startsWith('mcp.') || hosted;
+    if (mcpBranch) {
         // Explicit server binding wins; otherwise resolve a hosted
         // `mcp__<server>__<tool>` name against this project's servers.
         let sid = mcpServerId ? dePrefixId(mcpServerId) : null;
