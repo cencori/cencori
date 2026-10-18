@@ -75,6 +75,26 @@ describe('parseOpenApiOps', () => {
         expect(parseOpenApiOps(SPEC, ['get_order']).map((o) => o.name)).toEqual(['get_order']);
     });
 
+    it('suffixes truncation collisions instead of dropping operations', () => {
+        const spec = {
+            openapi: '3.1.0',
+            paths: {
+                '/crm/objects/2026-09/contacts/batch/update': { post: { summary: 'Update many' } },
+                '/crm/objects/2026-09/contacts/batch/upsert': { post: { summary: 'Upsert many' } },
+            },
+        };
+        const ops = parseOpenApiOps(spec);
+        expect(ops).toHaveLength(2);
+        expect(ops[0].name).not.toBe(ops[1].name);
+        expect(ops[1].name.endsWith('_2')).toBe(true);
+    });
+
+    it('suffixes duplicate operationIds instead of dropping', () => {
+        const spec = { ...SPEC, paths: { '/pings/a': { get: { operationId: 'ping_it' } }, '/pings/b': { get: { operationId: 'ping_it' } } } };
+        const ops = parseOpenApiOps(spec);
+        expect(ops.map((o) => o.name)).toEqual(['ping_it', 'ping_it_2']);
+    });
+
     it('rejects invalid specs and unknown filters', () => {
         expect(() => parseOpenApiOps({ openapi: '2.0' })).toThrow(ConnectorOpError);
         expect(() => parseOpenApiOps(SPEC, ['missing_op'])).toThrow(/not found in spec/);
@@ -177,6 +197,36 @@ describe('param overrides', () => {
         expect(props.internal_token).toBeUndefined();
         expect(out[0].parameters.required).toEqual(['id', 'status']);
         expect(out[1]).toBe(base[1]);
+    });
+
+    it('matches glob keys when the exact op name is absent', () => {
+        const out = applyParamOverrides(
+            [{ ...base[0], name: 'post_crm_objects_202609_contacts_search', parameters: { type: 'object', properties: { body: { type: 'object', properties: { filterGroups: { type: 'array' } } } }, required: [] } }],
+            { '*_contacts_search': { description: 'Search DSL', params: { 'body.filterGroups': { description: 'AND/OR filter groups' } } } },
+        );
+        const body = (out[0].parameters.properties as Record<string, Record<string, unknown>>).body as Record<string, Record<string, unknown>>;
+        expect(out[0].description).toBe('Search DSL');
+        expect((body.properties as Record<string, Record<string, unknown>>).filterGroups.description).toBe('AND/OR filter groups');
+    });
+
+    it('patches nested dot-path params without mutating the source operation', () => {
+        const withQuery: ConnectorOperation[] = [{
+            ...base[0],
+            parameters: {
+                type: 'object',
+                properties: { query: { type: 'object', properties: { expand: { type: 'string' }, limit: { type: 'integer' } } } },
+                required: ['id'],
+                additionalProperties: true,
+            },
+        }];
+        const before = JSON.stringify(withQuery);
+        const out = applyParamOverrides(withQuery, {
+            get_order: { params: { 'query.expand': { description: 'Related objects to embed' }, 'query.ghost': { description: 'ignored' } } },
+        });
+        expect(JSON.stringify(withQuery)).toBe(before);
+        const query = (out[0].parameters.properties as Record<string, Record<string, unknown>>).query as Record<string, unknown>;
+        expect((query.properties as Record<string, Record<string, unknown>>).expand.description).toBe('Related objects to embed');
+        expect(query.type).toBe('object');
     });
 
     it('ignores required hints for unknown params and passes through cleanly', () => {
