@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
     if (!validation.success) return validation.response;
     if (validation.context.keyType !== 'secret') return addGatewayHeaders(embeddedError(403, 'secret_key_required', 'This operation requires a secret project key', { requestId }), { requestId });
     const supabase = createAdminClient();
-    const { data, error } = await supabase.from('connectors').select('slug, name, auth_type, default_scopes, mcp_transport, risk_defaults, status').eq('status', 'active').order('slug');
+    const { data, error } = await supabase.from('connectors').select('slug, name, auth_type, default_scopes, mcp_transport, risk_defaults, status, managed_auth').eq('status', 'active').order('slug');
     if (error) return addGatewayHeaders(embeddedError(500, 'invalid_request_error', error.message, { requestId }), { requestId });
     return addGatewayHeaders(NextResponse.json({ data: data ?? [], next_cursor: null }), { requestId });
 }

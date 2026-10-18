@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { validateGatewayRequest, addGatewayHeaders, handleCorsPreFlight } from '@/lib/gateway-middleware';
 import { embeddedError, dePrefixId } from '@/lib/embedded/http';
-import { ConnectorOpError, fetchOpenApiSpec, parseOpenApiOps, parseOpenApiBaseUrl } from '@/lib/embedded/connector-ops';
+import { ConnectorOpError, fetchOpenApiSpec, parseOpenApiOps, parseOpenApiBaseUrl, applyParamOverrides, type ParamOverrides } from '@/lib/embedded/connector-ops';
 import crypto from 'crypto';
 
 export async function OPTIONS() {
@@ -35,7 +35,14 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ connection
 
     try {
         const raw = body.spec ?? await fetchOpenApiSpec(body.spec_url as string);
-        const operations = parseOpenApiOps(raw, body.operations);
+        const slug = (conn.connector_slug as string) ?? '';
+        const { data: connector } = slug
+            ? await supabase.from('connectors').select('managed_auth, param_overrides').eq('slug', slug).maybeSingle()
+            : { data: null };
+        let operations = parseOpenApiOps(raw, body.operations);
+        // Curated enrichment from the connector catalog rides along at import
+        // time, so shipped snapshots are self-contained.
+        operations = applyParamOverrides(operations, ((connector?.param_overrides ?? {}) as ParamOverrides));
         const specBaseUrl = parseOpenApiBaseUrl(raw);
         const baseUrl = specBaseUrl
             ?? (typeof c.metadata.base_url === 'string' && c.metadata.base_url.startsWith('https://') ? c.metadata.base_url : null);

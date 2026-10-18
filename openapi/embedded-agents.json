@@ -1295,6 +1295,10 @@
             "type": "object",
             "properties": {},
             "additionalProperties": true
+          },
+          "managed_auth": {
+            "type": "boolean",
+            "description": "Platform-managed OAuth client credentials are available — authorize without BYO client_id/secret."
           }
         },
         "required": [
@@ -3911,7 +3915,7 @@
       },
       "ConnectionImportRequest": {
         "type": "object",
-        "description": "Inline OpenAPI JSON document or a https URL to fetch; optional `operations` filter (all imported otherwise).",
+        "description": "Inline OpenAPI JSON document or a https URL to fetch; optional `operations` filter (all imported otherwise). Connector-catalog param overrides are merged into the parsed operations at import time.",
         "properties": {
           "spec": {
             "type": "object",

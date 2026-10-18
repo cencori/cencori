@@ -16,8 +16,8 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ connectorId
     if (validation.context.keyType !== 'secret') return addGatewayHeaders(embeddedError(403, 'secret_key_required', 'This operation requires a secret project key', { requestId }), { requestId });
     const { connectorId } = await ctx.params;
     const supabase = createAdminClient();
-    const { data } = await supabase.from('connectors').select('slug, name, auth_type, default_scopes, mcp_transport, risk_defaults, status').eq('slug', connectorId).maybeSingle();
-    const row = data ?? (await supabase.from('connectors').select('slug, name, auth_type, default_scopes, mcp_transport, risk_defaults, status').eq('id', connectorId).maybeSingle()).data;
+    const { data } = await supabase.from('connectors').select('slug, name, auth_type, default_scopes, mcp_transport, risk_defaults, status, managed_auth').eq('slug', connectorId).maybeSingle();
+    const row = data ?? (await supabase.from('connectors').select('slug, name, auth_type, default_scopes, mcp_transport, risk_defaults, status, managed_auth').eq('id', connectorId).maybeSingle()).data;
     if (!row) return addGatewayHeaders(embeddedError(404, 'invalid_request_error', 'Connector not found', { requestId }), { requestId });
     return addGatewayHeaders(NextResponse.json(row), { requestId });
 }
