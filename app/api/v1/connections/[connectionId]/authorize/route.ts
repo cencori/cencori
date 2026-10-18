@@ -21,7 +21,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ connection
     const { data: conn } = await supabase.from('tool_connections').select('*').eq('project_id', validation.context.projectId).eq('id', dePrefixId(connectionId)).maybeSingle();
     if (!conn) return addGatewayHeaders(embeddedError(404, 'invalid_request_error', 'Connection not found', { requestId }), { requestId });
     const slug = (conn.connector_slug as string) ?? 'gmail';
-    const { data: connector } = await supabase.from('connectors').select('oauth_config, default_scopes, auth_type').eq('slug', slug).maybeSingle();
+    const { data: connector } = await supabase.from('connectors').select('oauth_config, default_scopes, auth_type, managed_auth').eq('slug', slug).maybeSingle();
     if (!connector || (connector.auth_type as string) !== 'oauth2') {
         return addGatewayHeaders(embeddedError(400, 'invalid_request_error', `Connector ${slug} does not use OAuth`, { requestId }), { requestId });
     }
@@ -37,7 +37,17 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ connection
     try {
         const endpoints = await resolveOauthEndpoints({ slug, connectorConfig, discoveryUrl: body.discovery_url ?? null });
         const creds = oauthClientConfig(slug, connectorConfig, { client_id: body.client_id, client_secret: body.client_secret });
-        if (!creds.clientId) return addGatewayHeaders(embeddedError(500, 'invalid_request_error', 'OAuth client is not configured (env or client_id)', { requestId }), { requestId });
+        if (!creds.clientId) {
+            const connectorManaged = (connector?.managed_auth as boolean | null) === true;
+            return addGatewayHeaders(embeddedError(
+                500,
+                'invalid_request_error',
+                connectorManaged
+                    ? `Platform-managed credentials for ${slug} are not configured yet — retry later or pass client_id/client_secret`
+                    : 'OAuth client is not configured — pass client_id/client_secret for a BYO connector (env fallback: CENCORI_OAUTH_' + slug.toUpperCase().replace(/-/g, '_') + '_*)',
+                { requestId },
+            ), { requestId });
+        }
 
         // BYO / discovered provider context rides with the state (secret as an
         // org-scoped encrypted ref) and persists to the connection so the

@@ -47,3 +47,10 @@ Agents see hosted tools named `conn__<connection>__<operation>` — the same pat
 - **Other methods** are writes; **DELETE** is destructive. They create approval actions — same risk/expiry model as any other action, approved via `POST /v1/actions/{actionId}/approve`, which dispatches against the connection's live credential.
 - Arguments map to path parameters (required), `query`, `headers`, and `body` — path params are URL-encoded; the secret is injected as `Authorization: Bearer` and never reaches the model.
 - Sessions do not execute connector tools server-side: a turn pauses with the tool call and your client resumes with the result, exactly like other function tools.
+
+## Zero-setup auth and enrichment
+
+Two catalog conveniences make imports production-grade without wrapper code:
+
+- **Managed OAuth** — catalog connectors flagged `managed_auth` ship with platform OAuth clients: create the connection and authorize with no client_id/secret (Gmail today; `GET /v1/connectors` shows the flag). Other OAuth connectors are BYO: pass `client_id`/`client_secret` (and optionally `discovery_url`) at `authorize` — they persist to the connection, so refreshes need no re-submission.
+- **Param enrichment** — the connector catalog carries curated `param_overrides` (per-operation descriptions, enums, required hints, dropped params) merged into parsed operations at import time. Additive metadata only, so a stale override can at worst confuse a model, never alter runtime behavior.

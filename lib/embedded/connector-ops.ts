@@ -202,6 +202,47 @@ export function classifyConnectorOp(method: string): { risk: 'read' | 'write' | 
     return { risk: 'write', approval: 'required' };
 }
 
+/**
+ * Curated per-operation enrichment, stored on `connectors.param_overrides` and
+ * applied when a spec is imported. Additive metadata only (descriptions, enums,
+ * required hints, dropped params) — never executable, so drift can only degrade
+ * model guidance, not runtime behavior.
+ */
+export type ParamOverrides = Record<string, {
+    description?: string;
+    params?: Record<string, { description?: string; enum?: string[]; drop?: boolean }>;
+    required?: string[];
+}>;
+
+export function applyParamOverrides(operations: ConnectorOperation[], overrides: ParamOverrides): ConnectorOperation[] {
+    if (!overrides || typeof overrides !== 'object') return operations;
+    return operations.map((operation) => {
+        const o = overrides[operation.name];
+        if (!o) return operation;
+        const properties = { ...((operation.parameters.properties as Record<string, unknown>) ?? {}) };
+        for (const [name, patch] of Object.entries(o.params ?? {})) {
+            if (patch.drop) {
+                delete properties[name];
+                continue;
+            }
+            const current = (properties[name] ?? {}) as Record<string, unknown>;
+            if (patch.description !== undefined) current.description = patch.description;
+            if (patch.enum !== undefined) current.enum = patch.enum;
+            properties[name] = current;
+        }
+        const required = [...new Set([...((operation.parameters.required as string[]) ?? []), ...(o.required ?? []).filter((name) => name in properties)])];
+        for (const req of o.required ?? []) {
+            const prop = properties[req] as Record<string, unknown> | undefined;
+            if (prop) prop.required = true;
+        }
+        return {
+            ...operation,
+            ...(o.description !== undefined ? { description: o.description.slice(0, 500) } : {}),
+            parameters: { type: 'object' as const, properties, required, additionalProperties: true },
+        };
+    });
+}
+
 /** Build hosted function tools from imported-operation snapshots (invisible when missing). */
 export function connectorManifestTools(
     refs: Array<{ connection_id: string; operations?: string[] }>,

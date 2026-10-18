@@ -8,6 +8,7 @@ vi.mock('@/lib/security/outbound-url', () => ({
 import {
     CONNECTOR_OPS_MAX,
     ConnectorOpError,
+    applyParamOverrides,
     classifyConnectorOp,
     connectorHostedToolName,
     connectorManifestTools,
@@ -134,6 +135,55 @@ describe('connectorOpInput', () => {
         expect(() => connectorOpInput({ method: 'GET', path: '/orders/{id}' }, {})).toThrow(/Missing path parameter/);
         expect(connectorOpInput({ method: 'POST', path: '/orders' }, { body: { item: 'x' } }).body).toEqual({ item: 'x' });
         expect(connectorOpInput({ method: 'GET', path: '/orders' }, {}).body).toBeUndefined();
+    });
+});
+
+describe('param overrides', () => {
+    const base: ConnectorOperation[] = [
+        {
+            name: 'get_order',
+            method: 'GET',
+            path: '/orders/{id}',
+            description: 'Get order',
+            pathParams: ['id'],
+            parameters: {
+                type: 'object',
+                properties: {
+                    id: { type: 'string', required: true },
+                    status: { type: 'string' },
+                    internal_token: { type: 'string' },
+                },
+                required: ['id'],
+                additionalProperties: true,
+            },
+        },
+        { name: 'untouched', method: 'GET', path: '/ping', description: 'Ping', pathParams: [], parameters: { type: 'object', properties: {}, required: [] } },
+    ];
+
+    it('patches descriptions/enums, adds required, drops params, overrides op description', () => {
+        const out = applyParamOverrides(base, {
+            get_order: {
+                description: 'Fetch a single order by id',
+                params: {
+                    status: { description: 'Filter by lifecycle', enum: ['open', 'paid'] },
+                    internal_token: { drop: true },
+                },
+                required: ['status'],
+            },
+        });
+        const props = out[0].parameters.properties as Record<string, Record<string, unknown>>;
+        expect(out[0].description).toBe('Fetch a single order by id');
+        expect(props.status).toEqual({ type: 'string', description: 'Filter by lifecycle', enum: ['open', 'paid'], required: true });
+        expect(props.internal_token).toBeUndefined();
+        expect(out[0].parameters.required).toEqual(['id', 'status']);
+        expect(out[1]).toBe(base[1]);
+    });
+
+    it('ignores required hints for unknown params and passes through cleanly', () => {
+        const out = applyParamOverrides(base, { get_order: { required: ['ghost'] } });
+        expect(out[0].parameters.required).toEqual(['id']);
+        expect(applyParamOverrides(base, {})).toEqual(base);
+        expect(applyParamOverrides(base, undefined as never)).toEqual(base);
     });
 });
 
