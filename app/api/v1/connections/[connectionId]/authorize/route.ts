@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { validateGatewayRequest, addGatewayHeaders, handleCorsPreFlight } from '@/lib/gateway-middleware';
 import { embeddedError, dePrefixId } from '@/lib/embedded/http';
-import { createAuthorizationUrl } from '@/lib/embedded/oauth';
+import { createAuthorizationUrl, oauthClientConfig, resolveOauthEndpoints } from '@/lib/embedded/oauth';
+import { encryptApiKey } from '@/lib/encryption';
 import crypto from 'crypto';
 
 export async function OPTIONS() {
@@ -25,24 +26,43 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ connection
         return addGatewayHeaders(embeddedError(400, 'invalid_request_error', `Connector ${slug} does not use OAuth`, { requestId }), { requestId });
     }
 
-    let body: { redirect_uri?: string; scopes?: string[]; client_id?: string } = {};
+    let body: { redirect_uri?: string; scopes?: string[]; client_id?: string; client_secret?: string; discovery_url?: string } = {};
     try {
         body = await req.json().catch(() => ({}));
     } catch {
         body = {};
     }
     const redirectUri = body.redirect_uri || `${process.env.NEXT_PUBLIC_APP_URL || 'https://cencori.com'}/api/v1/connections/oauth/callback`;
-    const clientId = body.client_id || process.env.CENCORI_GMAIL_CLIENT_ID || '';
-    if (!clientId) return addGatewayHeaders(embeddedError(500, 'invalid_request_error', 'OAuth client is not configured', { requestId }), { requestId });
-
+    const connectorConfig = (connector.oauth_config ?? {}) as Record<string, unknown>;
     try {
+        const endpoints = await resolveOauthEndpoints({ slug, connectorConfig, discoveryUrl: body.discovery_url ?? null });
+        const creds = oauthClientConfig(slug, connectorConfig, { client_id: body.client_id, client_secret: body.client_secret });
+        if (!creds.clientId) return addGatewayHeaders(embeddedError(500, 'invalid_request_error', 'OAuth client is not configured (env or client_id)', { requestId }), { requestId });
+
+        // BYO / discovered provider context rides with the state (secret as an
+        // org-scoped encrypted ref) and persists to the connection so the
+        // refresh endpoint can renew without re-submitting credentials.
+        const metadata: Record<string, unknown> = {
+            auth_url: endpoints.auth_url,
+            token_url: endpoints.token_url,
+            token_auth: endpoints.token_auth,
+            client_id: creds.clientId,
+        };
+        if (creds.clientSecret) metadata.client_secret_ref = encryptApiKey(creds.clientSecret, validation.context.organizationId);
+        if (body.client_id || body.client_secret) {
+            await supabase.from('tool_connections').update({
+                metadata: { ...((conn.metadata ?? {}) as Record<string, unknown>), oauth: metadata },
+            }).eq('id', conn.id);
+        }
+
         const { url, state } = await createAuthorizationUrl(supabase as never, {
             projectId: validation.context.projectId,
             connectionId: (conn.id as string),
             connectorSlug: slug,
             redirectUri,
             scopes: body.scopes ?? ((connector.default_scopes ?? []) as string[]),
-        }, { oauth_config: (connector.oauth_config ?? {}) as { auth_url?: string }, default_scopes: ((connector.default_scopes ?? []) as string[]) }, clientId);
+            metadata,
+        }, { oauth_config: { auth_url: endpoints.auth_url, token_url: endpoints.token_url }, default_scopes: ((connector.default_scopes ?? []) as string[]) }, creds.clientId);
         return addGatewayHeaders(NextResponse.json({ authorize_url: url, state, expires_in: 900 }), { requestId });
     } catch (e) {
         return addGatewayHeaders(embeddedError(500, 'invalid_request_error', e instanceof Error ? e.message : 'Failed to create authorization URL', { requestId }), { requestId });

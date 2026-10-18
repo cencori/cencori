@@ -23,6 +23,16 @@ The response is a discovery result: the `server` object plus its freshly discove
 
 If the server requires an OAuth credential or API key, first create a tool connection (see [Actions and Approvals](/docs/embedded-agents/actions-approvals)) and pass `auth_connection_id`; Cencori decrypts it only at call time and injects it as an `Authorization: Bearer` header.
 
+## Registry
+
+Don't know where to point? The registry lists Cencori-verified first-party servers (Notion, Linear, Atlassian, Sentry, GitHub, Stripe, Figma, PayPal, Cloudflare Docs) — each entry carries the `url` to register, its transport, auth requirement, and a `registered` marker for your project:
+
+```bash
+curl https://cencori.com/v1/mcp/registry -H "CENCORI_API_KEY: sk_secret_..."
+```
+
+Entries with `requires_auth: true` front OAuth-gated APIs — register an auth connection for the same provider and pass `auth_connection_id` so calls ride the tenant's own consent.
+
 ## Use the tools
 
 Grant tools in an agent manifest (`mcp.servers[].tools`), or reference them directly in a run's `tools` array. Each grant is exposed to the model under a deterministic hosted name:

@@ -3534,6 +3534,19 @@
             "items": {
               "type": "string"
             }
+          },
+          "discovery_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "generic-oidc only: an OpenID Connect Discovery 1.0 document; Cencori resolves authorization_endpoint/token_endpoint (https only) for this connection."
+          },
+          "client_secret": {
+            "type": "string",
+            "description": "Bring-your-own app secret paired with client_id; persisted as an org-scoped encrypted ref on the connection (write-only)."
+          },
+          "client_id": {
+            "type": "string",
+            "description": "Bring-your-own OAuth app id when the connector has no platform-registered client; pairs with client_secret."
           }
         },
         "additionalProperties": false
@@ -3812,6 +3825,88 @@
           }
         },
         "additionalProperties": false
+      },
+      "McpRegistryEntry": {
+        "type": "object",
+        "description": "One curated remote MCP server in the Cencori registry. Register it with POST /v1/mcp/servers.",
+        "properties": {
+          "slug": {
+            "type": "string",
+            "description": "Stable catalog key (use with any naming you like; registration takes the url)."
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "category": {
+            "type": "string"
+          },
+          "vendor": {
+            "type": "string",
+            "nullable": true
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "Remote MCP server endpoint to pass as `url` to POST /v1/mcp/servers."
+          },
+          "transport": {
+            "type": "string"
+          },
+          "requires_auth": {
+            "type": "boolean",
+            "description": "True when the server fronts OAuth-gated APIs; pair with an auth_connection_id at registration."
+          },
+          "docs_url": {
+            "type": "string",
+            "nullable": true
+          },
+          "verified": {
+            "type": "boolean",
+            "description": "Cencori probed the endpoint (reachable, auth-gated where expected) before listing."
+          },
+          "verified_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "registered": {
+            "type": "boolean",
+            "description": "True when this project already registered a server with this url."
+          }
+        },
+        "required": [
+          "slug",
+          "name",
+          "category",
+          "url",
+          "transport",
+          "requires_auth",
+          "verified",
+          "registered"
+        ]
+      },
+      "McpRegistryList": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/McpRegistryEntry"
+            }
+          },
+          "next_cursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "next_cursor"
+        ]
       }
     },
     "parameters": {
@@ -9052,6 +9147,44 @@
           "$ref": "#/components/parameters/WebhookId"
         }
       ]
+    },
+    "/v1/mcp/registry": {
+      "get": {
+        "summary": "Curated remote MCP server registry",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpRegistryList"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "description": "Requires a secret project key (`secret_key_required` otherwise). Verified first-party servers (Notion, Linear, Atlassian, Sentry, GitHub, Stripe, Figma, PayPal, Cloudflare Docs); filter with ?category=.",
+        "operationId": "getMcpRegistry",
+        "tags": [
+          "MCP"
+        ],
+        "parameters": [
+          {
+            "name": "category",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
     }
   },
   "externalDocs": {
