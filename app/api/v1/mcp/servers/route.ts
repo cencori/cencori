@@ -12,7 +12,8 @@ export async function OPTIONS() {
 function serialize(row: Record<string, unknown>) {
     // identity_secret is write-only: the plaintext is returned once below at
     // creation for out-of-band verification; the ciphertext never leaves here.
-    const { identity_secret: _stripped, ...rest } = row;
+    const { identity_secret, ...rest } = row;
+    void identity_secret;
     return { ...rest, id: withPrefix('mcp', row.id as string) };
 }
 
