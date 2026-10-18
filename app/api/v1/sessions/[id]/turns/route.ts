@@ -213,7 +213,12 @@ export async function POST(
         }
 
         // ── Parse Request Body ──
-        const body = await req.json() as TurnRequestBody & { input: ResponsesRequest['input'] };
+        let body: TurnRequestBody & { input: ResponsesRequest['input'] };
+        try {
+            body = await req.json() as TurnRequestBody & { input: ResponsesRequest['input'] };
+        } catch {
+            return respondError(400, 'Request body is not valid JSON', 'invalid_json');
+        }
 
         // Installed versions override legacy agent_configs: the normalized
         // manifest is the runtime source of truth whenever the session
@@ -271,6 +276,19 @@ export async function POST(
                     effectiveBrowserEnabled = intersectBrowserEnabled(manifest.policy, (ins as { overlay_config?: unknown }).overlay_config);
                 }
             }
+        }
+
+        // Installed manifests are the runtime tool and instruction authority:
+        // turn-level tools/instructions would silently change installed behavior,
+        // so reject them instead of dropping them. Legacy (non-installed)
+        // sessions continue to honor both fields.
+        if (installedManifest && ((typeof body.instructions === 'string' && body.instructions.trim().length > 0) || (Array.isArray(body.tools) && body.tools.length > 0))) {
+            const fields = [Array.isArray(body.tools) && body.tools.length > 0 ? 'tools' : null, typeof body.instructions === 'string' && body.instructions.trim().length > 0 ? 'instructions' : null].filter(Boolean).join(' and ');
+            return respondError(
+                400,
+                `Turn-level ${fields} are not supported for installed agents: the published agent manifest is the runtime authority for tools and instructions. Update the installed agent version, or remove ${fields} from the turn request.`,
+                'unsupported_turn_fields',
+            );
         }
 
         if (!body.model && !agentConfig?.model && !gatewayCtx?.defaultModel) {

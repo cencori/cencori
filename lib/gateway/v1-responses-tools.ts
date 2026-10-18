@@ -107,11 +107,20 @@ export async function executeWebSearch(
             },
         };
     } catch (error) {
+        const raw = error instanceof Error ? error.message : String(error);
+        // A failed tool call must not abort the response, but database-internal
+        // errors (e.g. PostgreSQL `canceling statement due to statement
+        // timeout`) are implementation detail: surface a clean reason to the
+        // model/client and log the underlying cause for the request logs.
+        const cleanMessage = /canceling statement|statement timeout|57014/i.test(raw)
+            ? 'Web search timed out querying the Cencori index; try again, lower `search_context_size`, or use the Cencori Web API (cencori.web.search) meanwhile.'
+            : raw;
+        console.error('[web_search_preview] failed:', raw);
         return {
             type: 'web_search_call',
             id: callId,
             status: 'failed',
-            error: error instanceof Error ? error.message : 'Web search failed',
+            error: cleanMessage,
         };
     }
 }
@@ -198,11 +207,16 @@ export async function executeFileSearch(
             },
         };
     } catch (error) {
+        const raw = error instanceof Error ? error.message : 'File search failed';
+        const cleanMessage = /canceling statement|statement timeout|57014/i.test(raw)
+            ? 'File search timed out querying the project index; try again with a narrower query or fewer `max_num_results`.'
+            : raw;
+        console.error('[file_search] failed:', raw);
         return {
             type: 'file_search_call',
             id: callId,
             status: 'failed',
-            error: error instanceof Error ? error.message : 'File search failed',
+            error: cleanMessage,
         };
     }
 }

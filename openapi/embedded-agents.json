@@ -846,7 +846,8 @@
           "id": {
             "type": "string",
             "example": "ins_abc"
-          },          "tenant_id": {
+          },
+          "tenant_id": {
             "type": "string"
           },
           "agent_id": {
@@ -1859,6 +1860,15 @@
           "status": {
             "type": "string"
           },
+          "tool_snapshot": {
+            "type": "object",
+            "description": "Last discovery snapshot: tool list and discovery timestamp.",
+            "additionalProperties": true
+          },
+          "identity_secret": {
+            "type": "string",
+            "description": "Per-server shared secret returned once at creation (POST /v1/mcp/servers only). Standard remote-MCP servers use it to verify the HMAC-signed end-user identity headers (X-Cencori-User-Context, X-Cencori-User-Timestamp, X-Cencori-User-Signature) that Cencori attaches to every tools/call dispatch. Never returned afterwards."
+          },
           "created_at": {
             "type": "string",
             "format": "date-time"
@@ -1874,7 +1884,8 @@
           "url",
           "transport",
           "status"
-        ]
+        ],
+        "description": "A registered remote MCP server. On every tools/call Cencori sends HMAC-signed end-user identity headers (tenant_id as the customer-facing external id, external_user_id, installation/run/session ids) verifiable with identity_secret."
       },
       "McpServerList": {
         "type": "object",
@@ -3657,6 +3668,7 @@
           "input": {},
           "tools": {
             "type": "array",
+            "description": "Function tools appended for this turn. Honored for legacy (non-installation) sessions only; for installed agents the published manifest is the runtime tool authority and turn-level tools are rejected with 400 unsupported_turn_fields.",
             "items": {
               "type": "object",
               "properties": {},
@@ -3664,7 +3676,8 @@
             }
           },
           "instructions": {
-            "type": "string"
+            "type": "string",
+            "description": "System instructions for this turn. Honored for legacy (non-installation) sessions only; for installed agents instructions come from the published manifest and turn-level instructions are rejected with 400 unsupported_turn_fields."
           },
           "agent_id": {
             "type": "string"
@@ -4317,7 +4330,7 @@
       },
       "patch": {
         "summary": "Update installation overlays/policy",
-        "description": "Scalar fields patch in place. version pins a published version. knowledge_base_ids and connection_ids replace the grant sets atomically when present (empty clears); absent leaves them unchanged. Every granted ID is validated for existence, project scope, and tenant compatibility before mutation.",
+        "description": "Requires a secret project key (`secret_key_required` otherwise).",
         "responses": {
           "200": {
             "description": "OK",
@@ -4336,7 +4349,6 @@
             "$ref": "#/components/responses/Error"
           }
         },
-        "description": "Requires a secret project key (`secret_key_required` otherwise).",
         "operationId": "patchAgentInstallationsByInstallationId",
         "tags": [
           "Installations"
@@ -4819,7 +4831,7 @@
     "/v1/agents/{agentId}/runs": {
       "get": {
         "summary": "List agent run history",
-        "description": "Paginated run history for one agent: queued, running, cancelled, failed, and completed runs. Usage rows cannot substitute for this collection.",        "description": "Paginated run history for one agent: queued, running, cancelled, failed, and completed runs. Usage rows cannot substitute for this collection.",
+        "description": "Paginated run history for one agent: queued, running, cancelled, failed, and completed runs. Usage rows cannot substitute for this collection.",
         "responses": {
           "200": {
             "description": "Run history",

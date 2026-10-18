@@ -1,6 +1,7 @@
 import { safeOutboundFetch } from '@/lib/security/outbound-url';
 import type { createAdminClient } from '@/lib/supabaseAdmin';
-import { decryptApiKey } from '@/lib/encryption';
+import { decryptApiKey, encryptApiKey } from '@/lib/encryption';
+import { createHmac, randomBytes } from 'crypto';
 import { dePrefixId } from './http';
 
 type Admin = ReturnType<typeof createAdminClient>;
@@ -168,6 +169,89 @@ export async function mcpAuthHeaders(
     } catch {
         return {};
     }
+}
+
+/**
+ * End-user identity context included in signed headers on remote MCP
+ * `tools/call` requests so customer servers can attribute every call to the
+ * tenant/end user it was performed for. `tenantId` carries the CUSTOMER-FACING
+ *tenant identifier (`platform_tenants.external_id`), not our internal UUID.
+ */
+export interface McpUserContext {
+    projectId: string;
+    tool: string;
+    tenantId: string | null;
+    externalUserId: string | null;
+    installationId?: string | null;
+    runId?: string | null;
+    sessionId?: string | null;
+    turnNumber?: number | null;
+}
+
+const IDENTITY_CONTEXT_HEADER = 'X-Cencori-User-Context';
+const IDENTITY_TIMESTAMP_HEADER = 'X-Cencori-User-Timestamp';
+const IDENTITY_SIGNATURE_HEADER = 'X-Cencori-User-Signature';
+
+/**
+ * Reuse the server's stored identity secret, minting one on first use. The
+ * secret is a per-server shared secret returned once at registration so the
+ * customer's server can verify our HMAC; we persist it encrypted
+ * (AES-256-GCM, org-scoped, see lib/encryption.ts) like other connection
+ * secrets and decrypt only inside the dispatch path.
+ */
+async function ensureIdentitySecret(supabase: Admin, serverId: string, organizationId: string): Promise<string | null> {
+    const { data: row } = await supabase.from('mcp_servers').select('identity_secret').eq('id', serverId).maybeSingle();
+    const stored = (row as { identity_secret?: string | null } | null)?.identity_secret ?? null;
+    if (stored) {
+        try {
+            return decryptApiKey(stored, organizationId);
+        } catch {
+            return null;
+        }
+    }
+    const secret = `mcpis_${randomBytes(24).toString('hex')}`;
+    const { error } = await supabase
+        .from('mcp_servers')
+        .update({ identity_secret: encryptApiKey(secret, organizationId) })
+        .eq('id', serverId);
+    if (error) return null;
+    return secret;
+}
+
+/**
+ * Headers proving WHO a remote MCP call is for. The claims are
+ * base64url(JSON) in `X-Cencori-User-Context`; `X-Cencori-User-Signature`
+ * is `sha256=<hex>` HMAC-SHA256 over `<timestamp>.<claims>` with the
+ * server's identity secret (same envelope as webhook signatures).
+ * Verification snippet ships in the embedded-agents docs.
+ */
+export async function mcpIdentityHeaders(
+    supabase: Admin,
+    serverId: string,
+    organizationId: string,
+    context: McpUserContext,
+): Promise<Record<string, string>> {
+    const secret = await ensureIdentitySecret(supabase, serverId, organizationId);
+    if (!secret) return {};
+    const claims = {
+        project_id: context.projectId,
+        tool: context.tool,
+        tenant_id: context.tenantId,
+        external_user_id: context.externalUserId,
+        installation_id: context.installationId ?? null,
+        run_id: context.runId ?? null,
+        session_id: context.sessionId ?? null,
+        turn_number: context.turnNumber ?? null,
+        iat: Math.floor(Date.now() / 1000),
+    };
+    const encodedClaims = Buffer.from(JSON.stringify(claims), 'utf8').toString('base64url');
+    const timestamp = String(claims.iat);
+    const signature = `sha256=${createHmac('sha256', secret).update(`${timestamp}.${encodedClaims}`).digest('hex')}`;
+    return {
+        [IDENTITY_CONTEXT_HEADER]: encodedClaims,
+        [IDENTITY_TIMESTAMP_HEADER]: timestamp,
+        [IDENTITY_SIGNATURE_HEADER]: signature,
+    };
 }
 
 /** Authenticated tool call sharing the discovery transport (modern-first, legacy fallback). */

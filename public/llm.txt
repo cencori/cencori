@@ -1238,7 +1238,7 @@ Agent versions carry a capability manifest (model + reasoning effort only when t
 
 TypeScript SDK namespaces: `tenants`, `clientTokens`, `models`, `providerConnections`, `agentVersions`, `installations`, `runs`, `actions`, `knowledge`, `connections`, `mcpServers`, `skills`, `skillImports`, `webhooks`, `usage`, `endUsers`, `ratePlans`. The Python Embedded Agents SDK is not yet published; use these endpoints directly from Python until its release is announced.
 
-Docs: https://cencori.com/docs/embedded-agents/overview (overview, authentication, manifests, skills, actions, webhooks, usage, runs).
+Docs: https://cencori.com/docs/embedded-agents/overview (overview, authentication, manifests, skills, remote MCP servers, actions, webhooks, usage, runs, memory isolation).
 
 ## Decision Rules For Code Agents
 

@@ -13,7 +13,7 @@ export async function OPTIONS() {
 
 async function dispatchExecution(
     supabase: ReturnType<typeof createAdminClient>,
-    action: { id: string; tool_name: string; status?: string; run_id?: string | null; sanitized_arguments: Record<string, unknown>; approval_policy: Record<string, unknown>; execution_key: string; project_id: string },
+    action: { id: string; tool_name: string; status?: string; run_id?: string | null; sanitized_arguments: Record<string, unknown>; approval_policy: Record<string, unknown>; execution_key: string; project_id: string; tenant_id?: string | null; session_id?: string | null; turn_number?: number | null },
     organizationId: string,
 ): Promise<{ result: Record<string, unknown> }> {
     const policy = action.approval_policy ?? {};
@@ -57,7 +57,7 @@ async function dispatchExecution(
             ? await supabase.from('mcp_servers').select('*').eq('project_id', action.project_id).eq('id', sid).maybeSingle()
             : { data: null };
         if (!server) throw new Error('MCP server not found in this project');
-        const s = server as { url: string; transport?: string; auth_connection_id?: string | null };
+        const s = server as { id: string; url: string; transport?: string; auth_connection_id?: string | null };
         // Default-deny egress: the effective version ∩ installation network
         // policy must allowlist the server host (plus outbound safety).
         const { resolveActionNetworkPolicy, checkEgress } = await import('@/lib/embedded/net-policy');
@@ -68,8 +68,31 @@ async function dispatchExecution(
         }
         // Same authenticated client as discovery: project-scoped credential,
         // modern stateless transport with legacy session fallback.
-        const { mcpAuthHeaders, callMcpTool } = await import('@/lib/embedded/mcp');
-        const headers = await mcpAuthHeaders(supabase as never, action.project_id, organizationId, s.auth_connection_id ?? null);
+        const { mcpAuthHeaders, callMcpTool, mcpIdentityHeaders } = await import('@/lib/embedded/mcp');
+        // Signed end-user identity context: customer-facing tenant id and the
+        // originating run's external_user_id (when the action is run-scoped).
+        let tenantExternalId: string | null = null;
+        if (action.tenant_id) {
+            const { data: tenantRow } = await supabase.from('platform_tenants').select('external_id').eq('id', action.tenant_id).maybeSingle();
+            tenantExternalId = (tenantRow as { external_id?: string | null } | null)?.external_id ?? null;
+        }
+        let externalUserId: string | null = null;
+        if (action.run_id) {
+            const { data: runRow } = await supabase.from('embedded_runs').select('external_user_id').eq('id', action.run_id).maybeSingle();
+            externalUserId = (runRow as { external_user_id?: string | null } | null)?.external_user_id ?? null;
+        }
+        const headers = {
+            ...(await mcpAuthHeaders(supabase as never, action.project_id, organizationId, s.auth_connection_id ?? null)),
+            ...(await mcpIdentityHeaders(supabase as never, s.id, organizationId, {
+                projectId: action.project_id,
+                tool: action.tool_name,
+                tenantId: action.tenant_id ? tenantExternalId : null,
+                externalUserId,
+                runId: action.run_id ?? null,
+                sessionId: action.session_id ?? null,
+                turnNumber: action.turn_number ?? null,
+            })),
+        };
         const output = await callMcpTool({ url: s.url, headers, transport: s.transport === 'sse' ? 'sse' : 'streamable-http', tool: mcpTool, args: action.sanitized_arguments });
         return { result: { tool: action.tool_name, output: output ?? null, egress: { host: egress.host, allowed: true } } };
     }
@@ -101,6 +124,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ actionId: 
         id: string; tool_name: string; status: string; expires_at: string | null;
         sanitized_arguments: Record<string, unknown>; approval_policy: Record<string, unknown>;
         execution_key: string; project_id: string; result: Record<string, unknown> | null;
+        tenant_id: string | null; run_id: string | null; session_id: string | null; turn_number: number | null;
     };
 
     if (action.expires_at && Date.parse(action.expires_at) <= Date.now() && action.status === 'pending') {

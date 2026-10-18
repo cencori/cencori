@@ -355,11 +355,18 @@ async function runModelLoop(
     hooks?: LoopHooks,
 ): Promise<LoopOutcome> {
     const { supabase, run, runId, organizationId, abortController, throwIfCancelled } = ctx;
-    const { callMcpTool, mcpAuthHeaders } = await import('@/lib/embedded/mcp');
+    const { callMcpTool, mcpAuthHeaders, mcpIdentityHeaders } = await import('@/lib/embedded/mcp');
     const { parseMcpHostedToolName } = await import('@/lib/embedded/turn-tools');
     const { classifyTool } = await import('@/lib/embedded/tool-risk');
     const { checkEgress } = await import('@/lib/embedded/net-policy');
     const { enforceSpendGate } = await import('@/lib/embedded/budgets');
+    // Customer-facing tenant identifier for the signed identity headers sent
+    // on remote MCP tool calls (mcpIdentityHeaders).
+    let tenantExternalId: string | null = null;
+    if (run.tenant_id) {
+        const { data: tenantRow } = await supabase.from('platform_tenants').select('external_id').eq('id', run.tenant_id).maybeSingle();
+        tenantExternalId = (tenantRow as { external_id?: string | null } | null)?.external_id ?? null;
+    }
     let loopMessages = [...ctx.baseMessages];
     let response: ModelCallResult | null = null;
     let totalPrompt = 0;
@@ -443,7 +450,19 @@ async function runModelLoop(
                 continue;
             }
             try {
-                const headers = await mcpAuthHeaders(supabase as never, run.project_id, organizationId, server.authConnectionId);
+                // Connection credentials ride as Bearer; identity rides as
+                // HMAC-signed end-user context headers (tenant/external_user_id).
+                const headers = {
+                    ...(await mcpAuthHeaders(supabase as never, run.project_id, organizationId, server.authConnectionId)),
+                    ...(await mcpIdentityHeaders(supabase as never, server.id, organizationId, {
+                        projectId: run.project_id,
+                        tool: tc.function.name,
+                        tenantId: run.tenant_id ? tenantExternalId : null,
+                        externalUserId: run.external_user_id,
+                        installationId: run.installation_id,
+                        runId,
+                    })),
+                };
                 const output = await callMcpTool({ url: server.url, headers, transport: server.transport === 'sse' ? 'sse' : 'streamable-http', tool: parsed.tool, args });
                 loopMessages = [...loopMessages, { role: 'tool' as const, content: typeof output === 'string' ? output : JSON.stringify(output ?? null).slice(0, 8000), toolCallId: tc.id }];
                 executedToolCalls.push({ tool: tc.function.name, status: 'executed', action_id: tc.id });

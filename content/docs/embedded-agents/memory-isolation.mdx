@@ -1,0 +1,50 @@
+---
+title: "Memory Isolation"
+description: "How tenant, end-user, and agent scoping keeps each caller's memory separate — including remote MCP callbacks."
+section: "Embedded Agents"
+order: 7
+---
+
+## What isolation means
+
+Every embedded memory operation — recall before a turn, write after one, `file_search` over project memory, knowledge retrieval — is scoped to the caller before it touches the store:
+
+- **Project** — everything under a secret-key session, run, or turn is bounded by the project the key belongs to.
+- **Tenant** — pass `tenant_id` (your external tenant id) and the workspace boundary tightens to that tenant: memory, knowledge grants, skills, and spend budgets all resolve through it.
+- **End user** — pass `external_user_id` and personal memory (`user` scope) is that end user's and nobody else's.
+
+That ordering is enforced, not advisory: a client token scoped to `tenantId` **cannot** fabricate a different tenant or end user, delegation creates fresh state with **no inherited installation or session**, and delegation runs inherit the submitting tenant only — never another app's workspace.
+
+## Sessions and runs
+
+```bash
+curl -X POST https://cencori.com/v1/sessions \
+  -H "CENCORI_API_KEY: sk_secret_..." \
+  -d '{"agent_id": "agt_...", "tenant_id": "ten_...", "external_user_id": "u_42"}'
+```
+
+The session's turns are memory-aware: recall and writeback target the scoped slice automatically, knowledge and skill retrieval run under the same filter, and the session's event log is attributable per tenant and end user. Runs created through `POST /v1/agents/:id/runs` carry the same `tenant_id` and `external_user_id` on the run row — which is exactly what the [remote MCP identity headers](/docs/embedded-agents/remote-mcp-servers) sign on every tool dispatch.
+
+## The common mistake: cross-store memory
+
+Two memory lanes exist, and they do **not** mix:
+
+1. **Embedded session memory** — the agent's working memory, isolated per tenant/end user as above.
+2. **Your product's memory** — anything your backend writes with your own API key via the `cencori.memory.*` API or gateway `memory` flag.
+
+When an isolated invocation needs memory, use the lane that the caller's identity scopes:
+
+- Inside a session/turn, let the built-in memory tools run — they already operate on the caller's slice.
+- Inside a remote MCP server, take `tenant_id` / `external_user_id` from the **signed identity headers**, and make your Cencori callback with the same values — e.g. a scoped `cencori.memory.recall(tenantClaims.tenant_id …)`.
+
+Do **not** have an isolated call write into a shared, fixed agent memory bucket "under the model's own name". A single shared bucket turns every tenant's context into one pool and breaks the isolation promise: anything a tenant contributed would be recallable for others.
+
+## Delegation, briefly
+
+`POST /v1/agents/:id/runs/delegate` spawns child runs under the **submitting** tenant with fresh sessions and no installation rent. If a child run needs end-user memory, the delegate request must carry `external_user_id` explicitly — isolation never assumes it from a parent context.
+
+## Backstops
+
+- `GET /v1/tenants/:id/export` walks the tenant's data for portability; deletion is real deletion.
+- Memory quota errors surface `memory_quota_exceeded` with upgrade URLs; a tenant's spend gate cannot be bypassed by child runs.
+- Governance data-control notes: secrets stay write-only (connections, identity secrets), and memory PII is redacted before persisting — the store never becomes the side channel that undoes isolation.

@@ -10,7 +10,10 @@ export async function OPTIONS() {
 }
 
 function serialize(row: Record<string, unknown>) {
-    return { ...row, id: withPrefix('mcp', row.id as string) };
+    // identity_secret is write-only (returned once at creation); the
+    // ciphertext never appears in GET/PATCH responses.
+    const { identity_secret: _stripped, ...rest } = row;
+    return { ...rest, id: withPrefix('mcp', row.id as string) };
 }
 
 async function loadServer(supabase: ReturnType<typeof createAdminClient>, projectId: string, serverId: string) {

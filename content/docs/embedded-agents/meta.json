@@ -6,9 +6,11 @@
     "migration-guide",
     "manifests-browser-subagents",
     "skills",
+    "remote-mcp-servers",
     "actions-approvals",
     "webhooks",
     "runs-delegation",
+    "memory-isolation",
     "usage-billing"
   ]
 }
