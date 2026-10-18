@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 
 /**
- * Stable download links for Tensor: /tensor/download/apple-silicon and /tensor/download/intel.
+ * Stable download links for Tensor: /tensor/download/apple-silicon, /tensor/download/intel, and
+ * /tensor/download/windows.
  *
  * They point at the newest release in the public tensor-releases repository, whose installers keep
  * the same file names from release to release. So these links never change, and where the files
@@ -12,6 +13,7 @@ const RELEASES = "https://github.com/cencori/tensor-releases/releases/latest/dow
 const INSTALLERS: Record<string, string> = {
   "apple-silicon": "Tensor-arm64.dmg",
   intel: "Tensor-x64.dmg",
+  windows: "Tensor-x64-setup.exe",
 };
 
 export async function GET(
