@@ -532,8 +532,22 @@ export async function POST(
                 mcpSnapshots = null;
             }
         }
+        // Connector snapshots: imported OpenAPI operations for manifest grants.
+        let connectorSnapshots: Map<string, import('@/lib/embedded/connector-ops').ConnectorSnapshot> | null = null;
+        if (installedManifest && installedManifest.connection_tools.length > 0) {
+            try {
+                const { loadConnectorSnapshots } = await import('@/lib/embedded/connector-ops');
+                connectorSnapshots = await loadConnectorSnapshots(
+                    adminClient as never,
+                    (gatewayCtx as GatewayContext).projectId,
+                    installedManifest.connection_tools.map((t) => t.connection_id),
+                );
+            } catch {
+                connectorSnapshots = null;
+            }
+        }
         const tools: ResponsesRequest['tools'] = installedManifest
-            ? installedTurnTools(installedManifest, effectiveNetworkPolicy ?? { mode: 'none', allowed_hosts: [] }, effectiveBrowserEnabled, mcpSnapshots)
+            ? installedTurnTools(installedManifest, effectiveNetworkPolicy ?? { mode: 'none', allowed_hosts: [] }, effectiveBrowserEnabled, mcpSnapshots, connectorSnapshots)
             : [...(body.tools || [])];
         if (!installedManifest && agentId && agentConfig?.tools && agentConfig.tools.length > 0) {
             const existingTypes = new Set<string>(tools.map(t => t.type));

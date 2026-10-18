@@ -4,6 +4,7 @@ import type { NetworkPolicy } from './net-policy';
 import { dePrefixId } from './http';
 import { classifyTool } from './tool-risk';
 import type { DiscoveredTool } from './mcp';
+import { connectorManifestTools, type ConnectorSnapshot } from './connector-ops';
 
 /**
  * Deterministic hosted name for a manifest MCP tool grant. The model only
@@ -86,6 +87,7 @@ export function installedTurnTools(
     network: NetworkPolicy,
     browserEnabled?: boolean,
     mcpSnapshots?: Map<string, DiscoveredTool[]> | null,
+    connectorSnapshots?: Map<string, ConnectorSnapshot> | null,
 ): ResponsesTool[] {
     const tools: ResponsesTool[] = [];
     const seen = new Set<string>();
@@ -118,6 +120,13 @@ export function installedTurnTools(
         const name = (tool as { function: { name: string } }).function.name;
         if (seen.has(`function:${name}`)) continue;
         tools.push(tool);
+        seen.add(`function:${name}`);
+    }
+    // Connector tools: imported OpenAPI operations, same invisible-if-missing rule.
+    for (const tool of connectorManifestTools(manifest.connection_tools ?? [], connectorSnapshots)) {
+        const name = tool.function.name;
+        if (seen.has(`function:${name}`)) continue;
+        tools.push(tool as unknown as ResponsesTool);
         seen.add(`function:${name}`);
     }
     return tools;

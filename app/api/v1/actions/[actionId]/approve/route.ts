@@ -42,16 +42,26 @@ async function dispatchExecution(
     const mcpServerId = policy.mcp_server_id as string | undefined;
     const hosted = parseMcpHostedToolName(action.tool_name);
 
-    // generic-http connections: relay the sanitized HTTP request with the
-    // bound credential injected as Bearer — credential never leaves the
-    // dispatch path; egress policy applies to the base host first.
+    // Connection-bound dispatch: `generic-http` relays (policy.connection_id +
+    // sanitized path) or imported connector operations (policy.op) — the bound
+    // credential is injected as Bearer and never leaves the dispatch path;
+    // egress policy applies to the base host first.
     const genericConnId = (policy.connection_id as string | undefined) ?? (action.sanitized_arguments._connection_id as string | undefined);
+    const opSpec = policy.op as { name: string; method?: string; path?: string } | undefined;
     if (genericConnId && !tool.includes('gmail') && !mcpServerId && !hosted) {
         const { data: gConn } = await supabase.from('tool_connections').select('*').eq('project_id', action.project_id).eq('id', dePrefixId(genericConnId)).maybeSingle();
-        if (gConn && (gConn as { connector_slug?: string }).connector_slug === 'generic-http') {
-            const g = gConn as { metadata?: Record<string, unknown> };
-            const base = ((g.metadata ?? {}).base_url) as string | undefined;
-            if (!base) throw new Error('Connection metadata.base_url is required for generic HTTP calls');
+        if (gConn && (((gConn as { connector_slug?: string }).connector_slug === 'generic-http') || opSpec)) {
+            const g = gConn as { connector_slug?: string; metadata?: Record<string, unknown> };
+            const gMetadata = g.metadata ?? {};
+            // Live imported operation wins over the creation-time copy; fall
+            // back to the frozen op spec when the catalog moved on.
+            const importedOps = ((gMetadata.operations ?? []) as Array<{ name: string; method: string; path: string }>);
+            const liveOp = opSpec ? importedOps.find((op) => op.name === opSpec.name) : undefined;
+            const opMethod = (liveOp?.method ?? opSpec?.method ?? '').toUpperCase();
+            const opPath = liveOp?.path ?? opSpec?.path ?? (action.sanitized_arguments as { path?: string }).path ?? '';
+            if (opSpec && !opMethod) throw new Error(`Connector operation '${opSpec.name}' is no longer imported on this connection`);
+            const base = (gMetadata.base_url as string | undefined) ?? action.approval_policy.base_url as string | undefined;
+            if (!base) throw new Error('Connection metadata.base_url is required for connector HTTP calls');
             const { assertSafeOutboundUrl } = await import('@/lib/security/outbound-url');
             assertSafeOutboundUrl(base);
             const { resolveActionNetworkPolicy, checkEgress } = await import('@/lib/embedded/net-policy');
@@ -60,17 +70,24 @@ async function dispatchExecution(
             if (!egress.allowed) {
                 throw new Error(`Network policy denied HTTP egress to ${egress.host ?? 'unknown host'}: ${egress.reason}`);
             }
-            const { data: gConnector } = await supabase.from('connectors').select('oauth_config').eq('slug', 'generic-http').maybeSingle();
+            const { data: gConnector } = await supabase.from('connectors').select('oauth_config').eq('slug', (g.connector_slug ?? 'generic-http')).maybeSingle();
             const httpArgs = action.sanitized_arguments as { method?: string; path?: string; query?: Record<string, string>; headers?: Record<string, string>; body?: unknown };
             const { executeConnectorHttp } = await import('@/lib/embedded/tool-executor');
+            const input = opSpec
+                ? { method: opMethod as 'GET' | undefined, path: opPath, query: httpArgs.query, headers: httpArgs.headers, body: httpArgs.body }
+                : { method: httpArgs.method as 'GET' | undefined, path: opPath, query: httpArgs.query, headers: httpArgs.headers, body: httpArgs.body };
             const out = await executeConnectorHttp(supabase, {
                 connection: gConn as { id: string; connector_slug?: string; encrypted_access_ref: string | null; encrypted_refresh_ref: string | null; expires_at: string | null },
                 organizationId,
-                connectorConfig: ((gConnector?.oauth_config ?? {}) as Record<string, unknown>),
-                input: { method: httpArgs.method as 'GET' | undefined, path: httpArgs.path ?? '', query: httpArgs.query, headers: httpArgs.headers, body: httpArgs.body },
+                connectorConfig: { ...((gConnector?.oauth_config ?? {}) as Record<string, unknown>), base_url: base },
+                input,
                 executionKey: action.execution_key,
             });
-            return { result: { tool: action.tool_name, status: out.status, output: out.body } };
+            return {
+                result: opSpec
+                    ? { tool: action.tool_name, operation: opSpec.name, status: out.status, output: out.body }
+                    : { tool: action.tool_name, status: out.status, output: out.body },
+            };
         }
         if (!gConn) throw new Error('Bound connection not found in this project');
     }
