@@ -114,8 +114,17 @@ export function parseOpenApiOps(raw: unknown, filter?: string[]): ConnectorOpera
             const rawParams = (op.parameters as unknown[] | undefined) ?? [];
             const allParams = [...pathParamsAll, ...rawParams];
             const isName = typeof op.operationId === 'string' && /^[A-Za-z0-9_-]{1,40}$/.test(op.operationId);
-            const name = isName ? (op.operationId as string) : `${method}_${cleanSegment(path)}`.slice(0, 40);
-            if (seen.has(name)) continue;
+            // Synthesized names collide after truncation (e.g. HubSpot's
+            // batch/update vs batch/upsert → `..._batch_u`): suffix `_2`, `_3`,
+            // … instead of silently dropping the duplicate operation.
+            const baseName = isName ? (op.operationId as string) : `${method}_${cleanSegment(path)}`.slice(0, 39);
+            let name = baseName;
+            let n = 1;
+            while (seen.has(name)) {
+                n += 1;
+                const suffix = `_${n}`;
+                name = baseName.slice(0, 39 - suffix.length) + suffix;
+            }
             if (filterSet && !filterSet.has(name)) continue;
 
             const pathParams: string[] = [];
@@ -206,29 +215,68 @@ export function classifyConnectorOp(method: string): { risk: 'read' | 'write' | 
  * Curated per-operation enrichment, stored on `connectors.param_overrides` and
  * applied when a spec is imported. Additive metadata only (descriptions, enums,
  * required hints, dropped params) — never executable, so drift can only degrade
- * model guidance, not runtime behavior.
+ * model guidance, not runtime behavior. Keys match exact operation names first,
+ * then glob keys (`*_search`) so date-versioned vendor specs (HubSpot bumps the
+ * version in every synthesized name) keep matching across releases.
  */
 export type ParamOverrides = Record<string, {
     description?: string;
+    /** Top-level property names, or `parent.child` dot paths (e.g. `body.filterGroups`, `query.limit`). */
     params?: Record<string, { description?: string; enum?: string[]; drop?: boolean }>;
     required?: string[];
 }>;
 
+function overrideFor(operationName: string, overrides: ParamOverrides): ParamOverrides[string] | undefined {
+    const exact = overrides[operationName];
+    if (exact) return exact;
+    for (const [key, value] of Object.entries(overrides)) {
+        if (!key.includes('*')) continue;
+        const re = new RegExp(`^${key.replace(/[.*+?^${}()|[\]\\]/g, (c) => (c === '*' ? '[A-Za-z0-9_]*' : `\\${c}`))}$`);
+        if (re.test(operationName)) return value;
+    }
+    return undefined;
+}
+
+/** Merge a param patch onto a copy of `current` (never the source object). */
+function mergeParamPatch(current: Record<string, unknown>, patch: { description?: string; enum?: string[]; drop?: boolean }): Record<string, unknown> {
+    const next: Record<string, unknown> = { ...current };
+    if (patch.description !== undefined) next.description = patch.description;
+    if (patch.enum !== undefined) next.enum = patch.enum;
+    return next;
+}
+
 export function applyParamOverrides(operations: ConnectorOperation[], overrides: ParamOverrides): ConnectorOperation[] {
     if (!overrides || typeof overrides !== 'object') return operations;
     return operations.map((operation) => {
-        const o = overrides[operation.name];
+        const o = overrideFor(operation.name, overrides);
         if (!o) return operation;
         const properties = { ...((operation.parameters.properties as Record<string, unknown>) ?? {}) };
         for (const [name, patch] of Object.entries(o.params ?? {})) {
+            const dotted = name.includes('.');
+            const [topKey, childKey] = dotted ? name.split('.', 2) : [name, name];
             if (patch.drop) {
-                delete properties[name];
+                if (dotted) {
+                    const topProp = { ...((properties[topKey] ?? {}) as Record<string, unknown>) };
+                    const nestedProps = { ...((topProp.properties ?? {}) as Record<string, unknown>) };
+                    if (!(childKey in nestedProps)) continue;
+                    delete nestedProps[childKey];
+                    topProp.properties = nestedProps;
+                    properties[topKey] = topProp;
+                } else {
+                    delete properties[name];
+                }
                 continue;
             }
-            const current = (properties[name] ?? {}) as Record<string, unknown>;
-            if (patch.description !== undefined) current.description = patch.description;
-            if (patch.enum !== undefined) current.enum = patch.enum;
-            properties[name] = current;
+            if (dotted) {
+                const topProp = { ...((properties[topKey] ?? {}) as Record<string, unknown>) };
+                const nestedProps = { ...((topProp.properties ?? {}) as Record<string, unknown>) };
+                if (!(childKey in nestedProps)) continue;
+                nestedProps[childKey] = mergeParamPatch((nestedProps[childKey] ?? {}) as Record<string, unknown>, patch);
+                topProp.properties = nestedProps;
+                properties[topKey] = topProp;
+            } else {
+                properties[name] = mergeParamPatch((properties[name] ?? {}) as Record<string, unknown>, patch);
+            }
         }
         const required = [...new Set([...((operation.parameters.required as string[]) ?? []), ...(o.required ?? []).filter((name) => name in properties)])];
         for (const req of o.required ?? []) {
