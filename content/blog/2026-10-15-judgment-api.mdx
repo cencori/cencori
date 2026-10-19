@@ -1,0 +1,79 @@
+---
+title: "Introducing Judgment API"
+slug: "judgment-api"
+date: "2026-10-15"
+excerpt: "Jev decision models are live on Cencori through one endpoint: send a state plus yes/no, choice, and score questions, get back probabilities your code can branch on. Input-token billing, BYOK, and SDK support included."
+coverImage: "/newsroom/images/covers/judgment.jpg"
+authors: []
+tags: ["Product", "Judgment API", "TypeSafe", "Jev", "Developers"]
+category: "product"
+published: true
+---
+import { Callout } from "@/components/blog/Callout";
+
+Most model APIs generate text. Sometimes you don't want text — you want a **decision**: is this urgent, which team owns it, how angry is this customer on a scale of three.
+
+Today we're launching the **Judgment API**: structured decisions from decision models, through the same billable, logged gateway as everything else on Cencori. First up is TypeSafe's **Jev** — and any future decision model plugs into the same endpoint with no integration changes on your side.
+
+## What it does
+
+Send a **state** (text, JSON, or an array) plus **typed questions**. Get back one answer per question with probabilities — never generated prose:
+
+| Type | You ask | You get |
+|------|---------|---------|
+| `noul` | A yes/no question | `noul`: probability of yes, 0–1 |
+| `choice` | Pick one of up to 255 options you define | `choice`, `confidence`, full `probabilities` |
+| `score` | Rate against 2–10 ordered levels | `score`, `confidence`, `legend`, full `probabilities` |
+
+```typescript
+import { Cencori } from 'cencori';
+
+const cencori = new Cencori({ apiKey: process.env.CENCORI_API_KEY });
+
+const result = await cencori.judgment.judge({
+  state: "I've been trying to connect my Stripe account for 3 days. Losing sales. Help ASAP.",
+  questions: {
+    department: {
+      type: 'choice',
+      instructions: 'Which team should handle this?',
+      criteria: {
+        billing: 'Payments, invoicing, refunds',
+        technical: 'Bugs, outages, integrations',
+      },
+    },
+    is_urgent: { type: 'noul', instructions: 'Does this convey urgency?' },
+  },
+});
+
+if (result.answers.department.type === 'choice' && result.answers.department.confidence > 0.8) {
+  routeTicket(result.answers.department.choice); // 'technical'
+}
+```
+
+Or raw HTTP — `POST /v1/judgments` with your `CENCORI_API_KEY`, same envelope. `GET /v1/judgments` lists models with live pricing, no key required.
+
+## Why probabilities beat parsing
+
+The classic pattern is asking a chat model to "reply with JSON" and praying the output parses. Judgment inverts it: the model never writes, so there is nothing to parse. `confidence` becomes a second axis for your code — act above your threshold, escalate to a person or a reasoning model below it:
+
+- Route support tickets by department, urgency, and sentiment in **one request** (questions evaluate in parallel against the same state)
+- Gate automation: refund under $50 when `requests_refund > 0.9` **and** confidence is high, else queue for review
+- Score content against your own rubric — toxicity, quality, completeness — with a full distribution, not a single label
+
+<Callout type="info">
+Jev accepts text only — no image, audio, or video input. Clef reads images (and video upstream) by tokenizing them at the input rate. Budgets are per model, enforced before billing: 64k tokens for Jev and Clef, 24k for Clef Flash.
+</Callout>
+
+## Models live today
+
+`jev-latest` (default), `jev-preview`, and the pinned `jev-1.13.0`. Aliases resolve upstream, so the response always names the version that actually judged. And the endpoint is vendor-neutral: **Cloudflare's Clef decision models** are live on it too — `clef-latest` (27B, $0.24/MTok input), `clef-omni` ($0.15/MTok, the tier that adds audio and video states), and `clef-flash` (9B, $0.038/MTok, 24k budget). Same body, same envelope; switch by changing one string.
+
+## Pricing and keys
+
+Jev bills **input tokens only** at $0.042 per million, as does Clef at $0.24 per million and Clef Flash at $0.038 — output tokens are unbilled everywhere. Bring your own TypeSafe or Cloudflare key in Project → Providers and calls aren't charged at all — managed-key calls bill to credits like every other gateway request, with the same logs, spend caps, and key allowlists.
+
+## What it's not
+
+Judgment classifies and rates content you already have. It won't write your reply, summarize your document, or chain multi-step reasoning — pair it with [Chat](/docs/api/chat) or [Responses](/docs/api/responses): let generation produce, let judgment verify, route, and gate.
+
+Full reference: [Judgment API docs](/docs/api/judgments).

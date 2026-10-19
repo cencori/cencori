@@ -10,16 +10,15 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/components/ui/toast";
-import { AudioLines, Check, ChevronRight, Eye, EyeOff, Key, Loader2, Plus, Scale, Trash2, X } from "lucide-react";
-import { OpenAI, Anthropic, Google, Mistral, Cohere, Perplexity, Groq, XAI, Together, Meta, HuggingFace, Qwen, DeepSeek, ZAI } from "@lobehub/icons";
-import { SUPPORTED_PROVIDERS, getModelsForProvider, getChatModelsForProvider, getImageModelsForProvider, type AIProviderConfig } from "@/lib/providers/config";
+import { AudioLines, Check, ChevronRight, Eye, EyeOff, Loader2, Plus, Trash2, X } from "lucide-react";
+import { OpenAI, Anthropic, Google, Mistral, Cohere, Cerebras, Perplexity, Groq, XAI, Together, Meta, HuggingFace, Qwen, DeepSeek, ZAI, Cloudflare, ElevenLabs, AssemblyAI } from "@lobehub/icons";
+import { SUPPORTED_PROVIDERS, type AIProviderConfig } from "@/lib/providers/config";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import Image from "next/image";
@@ -40,18 +39,18 @@ const PROVIDER_LOGOS: Record<string, React.ReactNode> = {
     qwen: <Qwen.Color size={20} />,
     deepseek: <DeepSeek.Color size={20} />,
     zai: <ZAI size={20} />,
-    cerebras: <Key size={16} className="text-muted-foreground" />,
-    maximo: <Image src="/providers/maximo.svg" alt="Maximo AI" width={20} height={20} className="rounded-sm" />,
+    cerebras: <Cerebras.Color size={20} />,
+    cloudflare: <Cloudflare.Color size={20} />,
+    maximo: <Image src="/partners/max.jpeg" alt="Maximo AI" width={20} height={20} className="rounded-sm object-cover" />,
     helix: <Image src="/providers/helix.svg" alt="Helix" width={20} height={20} className="rounded-sm" />,
-    bai: <DeepSeek.Color size={20} />,
-    centaur: <Image src="/providers/centaur.svg" alt="Centaur" width={20} height={20} className="rounded-sm" />,
+    bai: <img src="/providers/bai.png" alt="B.AI" width={20} height={20} className="rounded-[5px] object-cover" style={{ width: 20, height: 20 }} />,
     // Judgment provider (TypeSafe Jev) — decision models, no brand icon in the set
-    typesafe: <Scale size={18} />,    // Voice providers (no brand icons in the icon set) — neutral voice glyph
+    typesafe: <Image src="/providers/typesafe.png" alt="TypeSafe" width={18} height={18} className="rounded-[5px]" />,    // Voice providers (no brand icons in the icon set) — neutral voice glyph
     deepgram: <AudioLines size={18} />,
     cartesia: <AudioLines size={18} />,
-    spitch: <AudioLines size={18} />,
-    assemblyai: <AudioLines size={18} />,
-    elevenlabs: <AudioLines size={18} />,
+    spitch: <Image src="/providers/spitch.png" alt="Spitch" width={20} height={20} className="rounded-[5px] object-cover" />,
+    assemblyai: <AssemblyAI.Color size={20} />,
+    elevenlabs: <ElevenLabs size={20} />,
 };
 
 function getProviderLogo(providerId: string, size: 'sm' | 'md' = 'md') {
@@ -73,8 +72,6 @@ interface ProviderKeyData {
     keyHint?: string;
     apiKey?: string;
     isActive: boolean;
-    defaultModel?: string;
-    defaultImageModel?: string;
     createdAt?: string;
     source?: 'dashboard' | 'api';
     connectionId?: string;
@@ -98,8 +95,6 @@ export function ProviderKeyManager({ projectId }: ProviderKeyManagerProps) {
     const [selectedProvider, setSelectedProvider] = useState<AIProviderConfig | null>(null);
     const [apiKey, setApiKey] = useState("");
     const [showKey, setShowKey] = useState(false);
-    const [selectedModel, setSelectedModel] = useState("");
-    const [selectedImageModel, setSelectedImageModel] = useState("");
     const [setAsDefault, setSetAsDefault] = useState(false);
     const [dialogOpen, setDialogOpen] = useState(false);
     const [existingKeyHint, setExistingKeyHint] = useState<string | null>(null);
@@ -118,7 +113,7 @@ export function ProviderKeyManager({ projectId }: ProviderKeyManagerProps) {
 
     // Add/update key mutation
     const addKeyMutation = useMutation({
-        mutationFn: async (payload: { provider: string; apiKey: string; setAsDefault?: boolean; defaultModel?: string; defaultImageModel?: string }) => {
+        mutationFn: async (payload: { provider: string; apiKey: string; setAsDefault?: boolean }) => {
             const res = await fetch(`/api/projects/${projectId}/provider-keys`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -182,15 +177,13 @@ export function ProviderKeyManager({ projectId }: ProviderKeyManagerProps) {
 
     // Update existing key mutation
     const updateKeyMutation = useMutation({
-        mutationFn: async (payload: { provider: string; apiKey?: string; setAsDefault?: boolean; defaultModel?: string; defaultImageModel?: string }) => {
+        mutationFn: async (payload: { provider: string; apiKey?: string; setAsDefault?: boolean }) => {
             const res = await fetch(`/api/projects/${projectId}/provider-keys/${payload.provider}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     apiKey: payload.apiKey || undefined,
                     setAsDefault: payload.setAsDefault,
-                    defaultModel: payload.defaultModel || undefined,
-                    defaultImageModel: payload.defaultImageModel || undefined,
                 }),
             });
             if (!res.ok) throw new Error("Failed to update key settings");
@@ -209,8 +202,6 @@ export function ProviderKeyManager({ projectId }: ProviderKeyManagerProps) {
         setSelectedProvider(null);
         setApiKey("");
         setShowKey(false);
-        setSelectedModel("");
-        setSelectedImageModel("");
         setSetAsDefault(false);
         setExistingKeyHint(null);
     };
@@ -226,8 +217,6 @@ export function ProviderKeyManager({ projectId }: ProviderKeyManagerProps) {
                 // Only send apiKey if the user typed something new and it's different from the already saved one
                 apiKey: apiKey && apiKey !== existingKey?.apiKey ? apiKey : undefined,
                 setAsDefault: setAsDefault,
-                defaultModel: selectedModel || undefined,
-                defaultImageModel: selectedImageModel || undefined,
             });
         } else {
             if (!apiKey) return;
@@ -235,43 +224,18 @@ export function ProviderKeyManager({ projectId }: ProviderKeyManagerProps) {
                 provider: selectedProvider.id,
                 apiKey,
                 setAsDefault: setAsDefault,
-                defaultModel: selectedModel || undefined,
-                defaultImageModel: selectedImageModel || undefined,
             });
         }
     };
 
     const openAddDialog = (provider: AIProviderConfig) => {
         setSelectedProvider(provider);
-        const chatModels = getChatModelsForProvider(provider.id);
-        const imageModels = getImageModelsForProvider(provider.id);
 
         // Check if provider already has a key
         const existingKey = data?.providers.find(p => p.provider === provider.id);
 
         // Initialize Set as Default tracking based on global defaults
         setSetAsDefault(data?.defaults?.provider === provider.id);
-
-        // Initializing model selections:
-        // Priority: 1. Per-provider default model, 2. Global project default (if this provider matches), 3. First available
-        if (existingKey?.defaultModel) {
-            setSelectedModel(existingKey.defaultModel);
-        } else if (existingKey?.hasKey && data?.defaults?.provider === provider.id && data?.defaults?.model) {
-            setSelectedModel(data.defaults.model);
-        } else if (chatModels.length > 0) {
-            setSelectedModel(chatModels[0].id);
-        }
-
-        // Set default image model
-        if (existingKey?.defaultImageModel) {
-            setSelectedImageModel(existingKey.defaultImageModel);
-        } else if (existingKey?.hasKey && data?.defaults?.provider === provider.id && data?.defaults?.imageModel) {
-            setSelectedImageModel(data.defaults.imageModel);
-        } else if (imageModels.length > 0) {
-            setSelectedImageModel(imageModels[0].id);
-        } else {
-            setSelectedImageModel("");
-        }
 
         if (existingKey?.hasKey) {
             setExistingKeyHint(existingKey.keyHint || '***');
@@ -405,47 +369,10 @@ export function ProviderKeyManager({ projectId }: ProviderKeyManagerProps) {
                                     {showKey ? <EyeOff className="h-3 w-3 text-muted-foreground" /> : <Eye className="h-3 w-3 text-muted-foreground" />}
                                 </Button>
                             </div>
+                            {selectedProvider?.keyFormatHint && (
+                                <p className="text-[10px] text-muted-foreground">{selectedProvider.keyFormatHint}</p>
+                            )}
                         </div>
-
-                        {/* Model Selection — hidden for voice providers, which have no default chat model */}
-                        {selectedProvider && getChatModelsForProvider(selectedProvider.id).length > 0 && (
-                            <div className="space-y-1.5">
-                                <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Default Model</Label>
-                                <Select value={selectedModel} onValueChange={setSelectedModel}>
-                                    <SelectTrigger className="h-8 rounded-lg text-[11px] bg-muted/30 border-border/50">
-                                        <SelectValue placeholder="Select..." />
-                                    </SelectTrigger>
-                                    <SelectContent className="rounded-lg">
-                                        {getChatModelsForProvider(selectedProvider.id).map((model) => (
-                                            <SelectItem key={model.id} value={model.id} className="text-[11px] py-1.5">
-                                                <span>{model.name}</span>
-                                                <span className="ml-1.5 text-muted-foreground">({model.type})</span>
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        )}
-
-                        {/* Image Model Selection - only for providers with image models */}
-                        {selectedProvider && getImageModelsForProvider(selectedProvider.id).length > 0 && (
-                            <div className="space-y-1.5">
-                                <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Default Image Model</Label>
-                                <Select value={selectedImageModel} onValueChange={setSelectedImageModel}>
-                                    <SelectTrigger className="h-8 rounded-lg text-[11px] bg-muted/30 border-border/50">
-                                        <SelectValue placeholder="Select..." />
-                                    </SelectTrigger>
-                                    <SelectContent className="rounded-lg">
-                                        {getImageModelsForProvider(selectedProvider.id).map((model) => (
-                                            <SelectItem key={model.id} value={model.id} className="text-[11px] py-1.5">
-                                                <span>{model.name}</span>
-                                                <span className="ml-1.5 text-muted-foreground">{model.description}</span>
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        )}
 
                         {/* Set as Default */}
                         <div className="flex items-center gap-2 pt-1">

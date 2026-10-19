@@ -213,6 +213,14 @@ export function getModelDisplayPrice(
     // Source: https://docs.typesafe.ai/models
     if (id.startsWith('jev-')) return price(0.042, 0);
 
+    // Clef (Cloudflare Workers AI, via the Judgment API)
+    // clef $0.24, clef-omni $0.15, clef-flash $0.038 per 1M input (Oct 2026);
+    // all bill input tokens only.
+    // Source: https://developers.cloudflare.com/workers-ai/platform/pricing/
+    if (id === 'clef-latest') return price(0.24, 0);
+    if (id === 'clef-omni') return price(0.15, 0);
+    if (id === 'clef-flash') return price(0.038, 0);
+
     // Cerebras / Groq OSS
     if (id.includes('gpt-oss') || id.includes('gemma-')) return price(0.5, 1.5);
 

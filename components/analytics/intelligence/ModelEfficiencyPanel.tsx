@@ -19,6 +19,7 @@ import {
     Perplexity,
     Qwen,
     Together,
+    Cloudflare,
     XAI,
 } from '@lobehub/icons';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -81,6 +82,7 @@ const PROVIDER_LOGOS: Record<string, (size: number) => ReactNode> = {
     cerebras: size => <Cerebras.Color size={size} />,
     assemblyai: size => <AssemblyAI.Color size={size} />,
     elevenlabs: size => <ElevenLabs size={size} />,
+    spitch: size => <img src="/providers/spitch.png" alt="Spitch" width={size} height={size} className="rounded-[5px] object-cover" style={{ width: size, height: size }} />,
     mistral: size => <Mistral.Color size={size} />,
     cohere: size => <Cohere.Color size={size} />,
     perplexity: size => <Perplexity.Color size={size} />,
@@ -91,6 +93,9 @@ const PROVIDER_LOGOS: Record<string, (size: number) => ReactNode> = {
     huggingface: size => <HuggingFace.Color size={size} />,
     qwen: size => <Qwen.Avatar size={size} />,
     deepseek: size => <DeepSeek.Color size={size} />,
+    cloudflare: size => <Cloudflare.Color size={size} />,
+    typesafe: size => <img src="/providers/typesafe.png" alt="TypeSafe" width={size} height={size} className="rounded-[5px] object-cover" style={{ width: size, height: size }} />,
+    bai: size => <img src="/providers/bai.png" alt="B.AI" width={size} height={size} className="rounded-[5px] object-cover" style={{ width: size, height: size }} />,
 };
 
 function providerKey(provider: string): string {

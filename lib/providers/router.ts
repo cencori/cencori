@@ -189,6 +189,13 @@ export class ProviderRouter {
             return 'typesafe';
         }
 
+        // Cloudflare Clef (Judgment API) — same evaluation-only family. The
+        // upstream run endpoint is always @cf/cloudflare/clef; the body's
+        // `model` field ('clef'|'clef-flash') selects the size.
+        if (modelName.startsWith('clef-')) {
+            return 'cloudflare';
+        }
+
         // Perplexity models
         if (modelName.includes('sonar')) {
             return 'perplexity';

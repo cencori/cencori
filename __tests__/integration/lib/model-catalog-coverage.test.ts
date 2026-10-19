@@ -116,8 +116,8 @@ describe('model catalog pricing coverage', () => {
         const { OPENAI_COMPATIBLE_ENDPOINTS } = await import('@/lib/providers/openai-compatible');
         const FIRST_CLASS_PROVIDERS = new Set(['openai', 'anthropic', 'google', 'cohere']);
         // Providers served by a dedicated gateway path instead of chat
-        // completions: typesafe (Judgment API, POST /v1/judgments).
-        const DEDICATED_PATH_PROVIDERS = new Set(['typesafe']);
+        // completions: typesafe and cloudflare (Judgment API, POST /v1/judgments).
+        const DEDICATED_PATH_PROVIDERS = new Set(['typesafe', 'cloudflare']);
 
         const unroutable = SUPPORTED_PROVIDERS
             .filter((provider) => provider.models.length > 0)

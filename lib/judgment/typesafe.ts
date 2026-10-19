@@ -77,16 +77,44 @@ export class JudgmentUpstreamError extends Error {
 }
 
 /** Every `judgment`-type row in the provider catalog — the Judgment API's model list. */
+export interface JudgmentCatalogRow {
+    id: string;
+    name: string;
+    provider: string;
+    contextWindow: number;
+}
+
+export function findJudgmentCatalogModel(model: string): JudgmentCatalogRow | undefined {
+    for (const provider of SUPPORTED_PROVIDERS) {
+        const row = provider.models.find(
+            (m) => m.id === model && ((Array.isArray(m.type) ? m.type : [m.type]).includes('judgment')),
+        );
+        if (row) {
+            return {
+                id: row.id,
+                name: row.name,
+                provider: provider.id,
+                contextWindow: row.contextWindow,
+            };
+        }
+    }
+    return undefined;
+}
+
 export function listJudgmentCatalogModels(): string[] {
+    return listJudgmentCatalogRows().map((row) => row.id);
+}
+
+export function listJudgmentCatalogRows(): JudgmentCatalogRow[] {
     return SUPPORTED_PROVIDERS.flatMap((provider) =>
         provider.models
             .filter((m) => (Array.isArray(m.type) ? m.type : [m.type]).includes('judgment'))
-            .map((m) => m.id),
+            .map((m) => ({ id: m.id, name: m.name, provider: provider.id, contextWindow: m.contextWindow })),
     );
 }
 
 export function isJudgmentCatalogModel(model: string): boolean {
-    return listJudgmentCatalogModels().includes(model);
+    return findJudgmentCatalogModel(model) !== undefined;
 }
 
 // ── Key resolution ─────────────────────────────────────────────
@@ -134,6 +162,8 @@ function estimateTokens(value: unknown): number {
     return Math.ceil(JSON.stringify(value ?? '').length / 4);
 }
 
+export { isRecord, estimateTokens };
+
 export function validateJudgmentBody(body: unknown): JudgmentRequest {
     if (!isRecord(body)) {
         throw new JudgmentRequestError('invalid_request', 'Request body must be a JSON object');
@@ -180,7 +210,8 @@ export function validateJudgmentBody(body: unknown): JudgmentRequest {
     // Catalog-driven: any `judgment`-type catalog row is accepted, so a new
     // decision model only needs a config entry (plus pricing + adapter) to
     // work here. See lib/judgment/registry.ts.
-    if (!isJudgmentCatalogModel(resolvedModel)) {
+    const catalogRow = findJudgmentCatalogModel(resolvedModel);
+    if (!catalogRow) {
         const known = listJudgmentCatalogModels().join(', ') || DEFAULT_JUDGMENT_MODEL;
         throw new JudgmentRequestError(
             'unknown_model',
@@ -189,15 +220,17 @@ export function validateJudgmentBody(body: unknown): JudgmentRequest {
         );
     }
 
-    // Client-side context guard: the 64k budget covers state plus all
-    // questions combined. Upstream 422s over-budget requests; this 400 names
-    // the limit before the request is billed.
+    // Client-side context guard, per model (Jev 64k; Clef 64k/24k): the
+    // budget covers state plus all questions combined. Upstream 4xxs
+    // over-budget requests; this 400 names the limit before the request is
+    // billed.
+    const budget = catalogRow.contextWindow > 0 ? catalogRow.contextWindow : JUDGMENT_CONTEXT_TOKENS;
     const longest = Math.max(...Object.values(questions).map((q) => estimateTokens(q)));
     const estimated = estimateTokens(state) + longest;
-    if (estimated > JUDGMENT_CONTEXT_TOKENS) {
+    if (estimated > budget) {
         throw new JudgmentRequestError(
             'context_exceeded',
-            `Estimated ~${estimated.toLocaleString()} tokens exceeds Jev's ${JUDGMENT_CONTEXT_TOKENS.toLocaleString()}-token per-request budget (state plus longest question must fit 32k)`,
+            `Estimated ~${estimated.toLocaleString()} tokens exceeds ${catalogRow.name}'s ${budget.toLocaleString()}-token per-request budget (measured as state plus the longest question, ~4 characters per token)`,
         );
     }
 

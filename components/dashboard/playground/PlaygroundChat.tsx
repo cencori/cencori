@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import {
     OpenAI, Anthropic, Google, Mistral, Cohere,
-    Perplexity, Groq, XAI, Together,
+    Perplexity, Groq, XAI, Together, Cloudflare,
     Meta, HuggingFace, Qwen, DeepSeek,
     Minimax, Baidu, ZAI, Cerebras,
 } from "@lobehub/icons";
@@ -128,10 +128,11 @@ const PROVIDER_ICONS: Record<string, (size: number) => React.ReactNode> = {
     minimax: (s) => <Minimax.Avatar size={s} />,
     baidu: (s) => <Baidu.Color size={s} />,
     zai: (s) => <ZAI size={s} />,
-    bai: (s) => <DeepSeek.Color size={s} />,
+    bai: (s) => <img src="/providers/bai.png" alt="B.AI" width={s} height={s} className="rounded-[5px] object-cover" style={{ width: s, height: s }} />,
     cerebras: (s) => <Cerebras.Color size={s} />,
     maximo: (s) => <MaximoIcon size={s} />,
     helix: (s) => <HelixIcon size={s} />,
+    cloudflare: (s) => <Cloudflare.Color size={s} />,
 };
 
 function ProviderIcon({ providerId, size = 14 }: { providerId: string; size?: number }) {

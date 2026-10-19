@@ -3,12 +3,12 @@
  *
  * POST /v1/judgments
  *
- * Structured decisions via decision models (TypeSafe's Jev today, any
- * `judgment`-type catalog row tomorrow): send a state plus typed questions
- * (noul / choice / score), get back probabilities — never generated text.
- * Vendors plug in through lib/judgment/registry.ts; this route owns the
- * gateway pipeline (validation, access policy, key resolution, pricing,
- * logging, usage) and stays vendor-neutral.
+ * Structured decisions via decision models (TypeSafe's Jev and Cloudflare's
+ * Clef, any `judgment`-type catalog row beyond that): send a state plus typed
+ * questions (noul / choice / score), get back probabilities — never
+ * generated text. Vendors plug in through lib/judgment/registry.ts; this
+ * route owns the gateway pipeline (validation, access policy, key
+ * resolution, pricing, logging, usage) and stays vendor-neutral.
  *
  * GET lists the judgment models with their pricing.
  */
@@ -42,11 +42,11 @@ export async function OPTIONS() {
     return handleCorsPreFlight();
 }
 
-function judgmentCatalogEntries(): Array<{ id: string; provider: string }> {
+function judgmentCatalogEntries(): Array<{ id: string; provider: string; contextWindow: number }> {
     return SUPPORTED_PROVIDERS.flatMap((provider) =>
         provider.models
             .filter((m) => (Array.isArray(m.type) ? m.type : [m.type]).includes('judgment'))
-            .map((m) => ({ id: m.id, provider: provider.id })),
+            .map((m) => ({ id: m.id, provider: provider.id, contextWindow: m.contextWindow })),
     );
 }
 
@@ -55,7 +55,7 @@ export async function GET() {
         object: 'list',
         endpoint: 'POST /v1/judgments',
         context_tokens: JUDGMENT_CONTEXT_TOKENS,
-        data: judgmentCatalogEntries().map(({ id, provider }) => {
+        data: judgmentCatalogEntries().map(({ id, provider, contextWindow }) => {
             const price = getModelDisplayPrice(id, 'judgment');
             const adapter = getJudgmentAdapter(provider);
             return {
@@ -63,7 +63,7 @@ export async function GET() {
                 object: 'model' as const,
                 owned_by: provider,
                 type: 'judgment',
-                context_window: JUDGMENT_CONTEXT_TOKENS,
+                context_window: contextWindow,
                 available: adapter !== null,
                 ...(adapter === null ? { unavailable_reason: 'provider_unavailable' } : {}),
                 pricing: {

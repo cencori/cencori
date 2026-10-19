@@ -55,14 +55,22 @@ describe('catalog has no duplicate model ids', () => {
         // Jev is evaluation-only (POST /v1/judgments, never chat completions).
         // Each id must live under exactly one provider — `typesafe` — route
         // there, and carry the `judgment` type so chat surfaces (playground,
-        // agent studio, tensor policies) never pick it up.
+        // agent studio, tensor policies) never pick it up. Clef rides the
+        // same judgment route under `cloudflare` (lib/judgment/clef.ts).
         const router = new ProviderRouter();
-        for (const id of ['jev-latest', 'jev-preview', 'jev-1.13.0']) {
+        for (const [id, provider] of [
+            ['jev-latest', 'typesafe'],
+            ['jev-preview', 'typesafe'],
+            ['jev-1.13.0', 'typesafe'],
+            ['clef-latest', 'cloudflare'],
+            ['clef-flash', 'cloudflare'],
+            ['clef-omni', 'cloudflare'],
+        ] as const) {
             const rows = SUPPORTED_PROVIDERS.flatMap(p => p.models.filter(m => m.id === id).map(m => ({ provider: p.id, types: Array.isArray(m.type) ? m.type : [m.type] })));
-            expect(rows.map(r => r.provider), id).toEqual(['typesafe']);
+            expect(rows.map(r => r.provider), id).toEqual([provider]);
             expect(rows[0].types, id).toContain('judgment');
             expect(rows[0].types, id).not.toContain('chat');
-            expect(router.detectProvider(id), id).toBe('typesafe');
+            expect(router.detectProvider(id), id).toBe(provider);
         }
     });
     it('keeps the B.AI flash ids under the provider that routes them', () => {

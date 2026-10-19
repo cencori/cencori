@@ -11,6 +11,7 @@ import {
   Groq,
   XAI,
   Together,
+  Cloudflare,
   Meta,
   HuggingFace,
   Qwen,
@@ -67,10 +68,11 @@ const PROVIDER_ICONS: Record<string, (size: number) => React.ReactNode> = {
   minimax: (s) => <Minimax.Avatar size={s} />,
   baidu: (s) => <Baidu.Color size={s} />,
   zai: (s) => <ZAI size={s} />,
-  bai: (s) => <DeepSeek.Color size={s} />,
+  bai: (s) => <img src="/providers/bai.png" alt="B.AI" width={s} height={s} className="rounded-[5px] object-cover" style={{ width: s, height: s }} />,
   cerebras: (s) => <Cerebras size={s} />,
   maximo: (s) => <MaximoIcon size={s} />,
   helix: (s) => <HelixIcon size={s} />,
+  cloudflare: (s) => <Cloudflare.Color size={s} />,
 };
 
 export function ModelProviderIcon({ providerId, size = 14 }: { providerId: string; size?: number }) {
