@@ -35,9 +35,16 @@ export const metadata: Metadata = {
 };
 
 export default function RootPage() {
-  const latestPost = getAllPosts().find(
+  const posts = getAllPosts().filter(
     (post) => post.category !== "changelog" && !post.externalUrl,
   );
+  const latestPost = posts[0];
+  const newsPosts = posts.slice(0, 3).map((post) => ({
+    title: post.title,
+    href: getPostUrl(post),
+    cover: post.coverImage,
+    date: post.date,
+  }));
 
   return (
     <CencoriFuturePage
@@ -46,6 +53,7 @@ export default function RootPage() {
           ? { title: latestPost.title, href: getPostUrl(latestPost) }
           : null
       }
+      newsPosts={newsPosts}
     />
   );
 }
