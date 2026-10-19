@@ -198,7 +198,7 @@ Full API in [docs](https://cencori.com/docs/ai/endpoints/vision).
 
 ### Judgment (Structured Decisions)
 
-Yes/no, choice, and score answers with probabilities over any state — no generated text. Any `judgment` catalog model works here (TypeSafe's Jev today).
+Yes/no, choice, and score answers with probabilities over any state — no generated text. Any `judgment` catalog model works here (TypeSafe's Jev and Cloudflare's Clef today; see `cencori.judgment.listModels()`).
 
 ```typescript
 const result = await cencori.judgment.judge({

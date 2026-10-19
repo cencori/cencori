@@ -49,6 +49,7 @@ export interface AIProviderConfig {
     website: string;
     docsUrl: string;
     keyPrefix: string; // Expected API key prefix (e.g., "sk-" for OpenAI)
+    keyFormatHint?: string; // Shown under the key input when the saved value is a composite, not a prefixed key
     models: AIModel[];
 }
 
@@ -429,7 +430,7 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
     {
         id: 'bai',
         name: 'B.AI',
-        icon: '/providers/deepseek.svg',
+        icon: '/providers/bai.png',
         website: 'https://b.ai',
         docsUrl: 'https://b.ai/docs',
         keyPrefix: 'sk-',
@@ -446,20 +447,6 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
             { id: 'deepseek-v4.1-flash', name: 'DeepSeek V4.1 Flash', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'Native multimodal MoE flash tier, 1M context, $0.15/$0.60 per 1M off-peak', capabilities: { tools: true, structuredOutput: true }, addedAt: '2026-09-10' },
             { id: 'qwen3.8-flash', name: 'Qwen3.8 Flash', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'Fast Qwen flash tier, hybrid reasoning, 1M context, $0.15/$0.47 per 1M', capabilities: { tools: true, structuredOutput: true }, addedAt: '2026-08-26' },
         ],
-    },
-    {
-        id: 'centaur',
-        name: 'Centaur',
-        icon: '/providers/centaur.svg',
-        website: '',
-        docsUrl: '',
-        keyPrefix: '',
-        // Emptied 2026-09-10. The stealth preview's agreed free window closed on
-        // 2026-08-29 and the endpoint now answers "Incorrect API key provided",
-        // so the model had been advertised as free for twelve days after it
-        // stopped being reachable. If the partnership resumes, re-add with a
-        // real model id and pricing rows rather than restoring the codename.
-        models: [],
     },
     // ── Judgment provider (TypeSafe Jev) ─────────────────────────────
     // Jev is evaluation-only: it answers typed questions (yes/no, choice,
@@ -483,6 +470,32 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
             { id: 'jev-latest', name: 'Jev Latest', type: ['judgment'], contextWindow: 64000, description: 'Flagship System One decision model (resolves to jev-1.13.0), yes/no, choice & score answers with probabilities, $0.042 per 1M input, output tokens unbilled', addedAt: '2026-09-10' },
             { id: 'jev-preview', name: 'Jev Preview', type: ['judgment'], contextWindow: 64000, description: 'Preview build of Jev, ahead of latest when a preview is available, $0.042 per 1M input, output tokens unbilled', addedAt: '2026-09-10' },
             { id: 'jev-1.13.0', name: 'Jev 1.13', type: ['judgment'], contextWindow: 64000, description: 'Pinned Jev 1.13 release, 64k per request, $0.042 per 1M input, output tokens unbilled', addedAt: '2026-09-10' },
+        ],
+    },
+    // ── Judgment provider 2 (Cloudflare Clef) ────────────────────────
+    // Clef is Cloudflare's decision-model family on Workers AI — same family
+    // as TypeSafe's Jev (Cloudflare's own changelog calls it out). It answers
+    // typed questions (noul / choice / score) about a state with per-option
+    // probabilities, never generated text, so it rides POST /v1/judgments
+    // exactly like Jev: `judgment`-typed rows here, adapters in
+    // lib/judgment/registry.ts, `cloudflare:<id>` model_pricing rows.
+    // Verified live 2026-10-18 against workers-ai/platform/pricing and the
+    // model pages: clef $0.24 per 1M input, clef-flash $0.038 per 1M (its
+    // hosted context is 24K — Oct 2026 context drop), clef-omni $0.15 per 1M
+    // (adds WAV/MP3 audio and MP4/WebM video). All bill input tokens only.
+    // Each size is served at its own run path — see lib/judgment/clef.ts.
+    {
+        id: 'cloudflare',
+        name: 'Cloudflare',
+        icon: '/providers/voice.svg',
+        website: 'https://developers.cloudflare.com/ai/',
+        docsUrl: 'https://developers.cloudflare.com/ai/models/@cf/cloudflare/clef/',
+        keyPrefix: '',
+        keyFormatHint: 'Workers AI runs inside a Cloudflare account — save your key as <ACCOUNT_ID>:<API_TOKEN>',
+        models: [
+            { id: 'clef-latest', name: 'Clef Latest', type: ['judgment'], contextWindow: 65536, description: 'Flagship Clef decision model, 27B multimodal (text, JSON, images, video), 64k context, $0.24 per 1M input, output tokens unbilled', addedAt: '2026-10-18' },
+            { id: 'clef-flash', name: 'Clef Flash', type: ['judgment'], contextWindow: 24576, description: 'Fast 9B Clef decision model, text and JSON states, 24k context, $0.038 per 1M input, output tokens unbilled', addedAt: '2026-10-18' },
+            { id: 'clef-omni', name: 'Clef Omni', type: ['judgment'], contextWindow: 65536, description: 'Omni Clef decision model, text, JSON, images, WAV/MP3 audio and MP4/WebM video states, 64k context, $0.15 per 1M input, output tokens unbilled', addedAt: '2026-10-18' },
         ],
     },
     // ── Voice providers (BYOK) ──────────────────────────────────
@@ -510,7 +523,7 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
     {
         id: 'spitch',
         name: 'Spitch',
-        icon: '/providers/voice.svg',
+        icon: '/providers/spitch.png',
         website: 'https://spitch.app',
         docsUrl: 'https://docs.spi-tch.com',
         keyPrefix: '',

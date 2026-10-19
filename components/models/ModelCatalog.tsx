@@ -20,7 +20,7 @@ import {
 import { SUPPORTED_PROVIDERS, type AIModel, type ModelCapabilities } from "@/lib/providers/config";
 import { formatContextWindow, getModelDisplayPrice } from "@/lib/providers/display-pricing";
 import { CENCORI_PROVIDER_LABEL, publicProviderDisplayName, publicProviderLabel } from "@/lib/providers/branding";
-import { Search, ChevronDown, ChevronUp, Copy, Check, Brain, Command, Eye, Code, Globe, Image, Wrench, FileJson, FileInput, Video, Mic, Zap, Scale } from "lucide-react";
+import { Search, ChevronDown, ChevronUp, Copy, Check, Brain, Command, Eye, Code, Globe, Image, Wrench, FileJson, FileInput, Video, Mic, Zap } from "lucide-react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
     ChatIcon,
@@ -78,6 +78,14 @@ const HelixIcon = ({ size }: { size: number }) => (
     <img src="/providers/helix.svg" alt="Helix" width={size} height={size} style={{ width: size, height: size }} />
 );
 
+const TypeSafeIcon = ({ size }: { size: number }) => (
+    <img src="/providers/typesafe.png" alt="TypeSafe" width={size} height={size} className="rounded-[5px] object-cover" style={{ width: size, height: size }} />
+);
+
+const BAIIcon = ({ size }: { size: number }) => (
+    <img src="/providers/bai.png" alt="B.AI" width={size} height={size} className="rounded-[5px] object-cover" style={{ width: size, height: size }} />
+);
+
 // Models Cencori serves on its own accounts carry Cencori's mark rather than the
 // upstream's — see lib/providers/branding.ts. Two files so the logo stays legible
 // on either background. Rendered at 75% of the slot: the wordmark asset reads
@@ -128,9 +136,9 @@ const PROVIDER_ICONS: Record<string, (size: number) => React.ReactNode> = {
     alibaba: (s) => <Alibaba.Color size={s} />,
     baidu: (s) => <Baidu.Color size={s} />,
     zai: (s) => <ZAI size={s} />,
-    bai: (s) => <DeepSeek.Color size={s} />,
-    // Judgment provider (TypeSafe Jev) — no brand icon in the set, scale glyph
-    typesafe: (s) => <Scale size={s} style={{ width: s, height: s }} />,
+    bai: (s) => <BAIIcon size={s} />,
+    // Judgment provider (TypeSafe Jev) — no brand icon in the set, brand asset
+    typesafe: (s) => <TypeSafeIcon size={s} />,
     [CENCORI_PROVIDER_LABEL]: (s) => <CencoriIcon size={s} />,
     maximo: (s) => <MaximoIcon size={s} />,
     helix: (s) => <HelixIcon size={s} />,

@@ -1,13 +1,13 @@
 ---
 title: "Judgment API"
-description: "Structured decisions from decision models (TypeSafe Jev) — yes/no, choice, and score answers with probabilities over any state."
+description: "Structured decisions from decision models (TypeSafe Jev, Cloudflare Clef) — yes/no, choice, and score answers with probabilities over any state."
 section: "API Reference"
 order: 11
 ---
 
-Get calibrated decisions instead of generated text. Send a **state** plus **typed questions** and get back one answer per question with probabilities your code can branch on — routing tickets, gating automation on confidence, scoring content against a rubric. Any `judgment`-type catalog model works through this same endpoint (TypeSafe's Jev today).
+Get calibrated decisions instead of generated text. Send a **state** plus **typed questions** and get back one answer per question with probabilities your code can branch on — routing tickets, gating automation on confidence, scoring content against a rubric. Any `judgment`-type catalog model works through this same endpoint (TypeSafe's Jev and Cloudflare's Clef today).
 
-This is a proxy over TypeSafe's System One API (`POST /v1/systemone`): Cencori adds its own auth, per-project keys (BYOK), input-token billing, logging, and usage metering.
+Two vendors are wired in, one request contract. TypeSafe models proxy the System One API (`POST /v1/systemone`); Cloudflare Clef models run at one Workers AI path per size (`POST /accounts/.../ai/run/@cf/cloudflare/clef[-flash|-omni]`). Cencori adds its own auth, per-project keys (BYOK), input-token billing, logging, and usage metering either way.
 
 ## Endpoints
 
@@ -16,7 +16,7 @@ This is a proxy over TypeSafe's System One API (`POST /v1/systemone`): Cencori a
 | `POST /v1/judgments` | Judge a state against typed questions |
 | `GET /v1/judgments` | Judgment models + pricing + limits (no key required) |
 
-Authenticate with your Cencori key (`CENCORI_API_KEY: csk_...` header or `Authorization: Bearer`). A TypeSafe key is resolved per project — your own `typesafe` provider key first, the managed key as fallback. BYOK calls are not charged; managed calls bill input tokens at $0.042/MTok (output tokens are unbilled).
+Authenticate with your Cencori key (`CENCORI_API_KEY: csk_...` header or `Authorization: Bearer`). A vendor key is resolved per project — your own provider key first (`typesafe`, `cloudflare`), the managed key as fallback. BYOK calls are not charged; managed calls bill input tokens (output tokens are unbilled): Jev at $0.042/MTok, Clef at $0.24/MTok, Clef Flash at $0.038/MTok, Clef Omni at $0.15/MTok. Adding a project key in [Project Settings](/docs/console) makes calls BYOK — save a Workers AI key under Cloudflare as `<ACCOUNT_ID>:<API_TOKEN>` (Workers AI runs inside a Cloudflare account, so both halves are needed). A `typesafe` key is the API key alone.
 
 ## Quick start
 
@@ -77,17 +77,20 @@ Omit `model` to use the default (`jev-latest`). Aliases resolve upstream — the
 
 Every question needs `instructions`. `choice` needs `criteria` as an option → rubric map (use `null` where an option needs no detail); `score` needs `criteria` as the ordered level array. `noul` accepts optional `true`/`false` criteria describing each side. Answers come back under the same ids you sent.
 
-`state` is what the questions are about: a string, a JSON object, or an array of text. The 64k-token per-request budget covers the state plus all questions combined (state plus the single longest question must fit 32k) — over-budget requests are rejected before billing.
+`state` is what the questions are about: a string, a JSON object, or an array of text. The per-request budget covers the state plus all questions combined, measured as the state plus the single longest question (~4 characters per token, enforced before billing): 64k tokens for Jev, 64k for Clef and Clef Omni, 24k for Clef Flash. Over-budget requests are rejected before billing.
 
 ## Models
 
-| Model | Meaning |
-|-------|---------|
-| `jev-latest` | Latest stable Jev release (default) |
-| `jev-preview` | Preview build, ahead of latest when one exists |
-| `jev-1.13.0` | Pinned release |
+| Model | Vendor | Notes |
+|-------|--------|-------|
+| `jev-latest` | TypeSafe | Latest stable Jev release (default) |
+| `jev-preview` | TypeSafe | Preview build, ahead of latest when one exists |
+| `jev-1.13.0` | TypeSafe | Pinned release |
+| `clef-latest` | Cloudflare | Flagship 27B Clef (image/video states supported upstream) |
+| `clef-flash` | Cloudflare | Fast 9B Clef, cheap tier ($0.038/MTok), 24k budget |
+| `clef-omni` | Cloudflare | Omni Clef — the tier that adds WAV/MP3 audio and MP4/WebM video states upstream |
 
-`GET /v1/judgments` is the authoritative list with live pricing and availability.
+`GET /v1/judgments` is the authoritative list with live pricing, context windows, and availability.
 
 ## Response
 
@@ -117,7 +120,7 @@ Every question needs `instructions`. `choice` needs `criteria` as an option → 
 | `invalid_questions` / `invalid_state` / `context_exceeded` | 400 | Fix the request (limits above); nothing was billed |
 | `unknown_model` | 404 | Not a judgment model id — see `GET /v1/judgments` |
 | `model_not_allowed` | 403 | The calling key is not granted this model |
-| `provider_connection_required` | 402 | No TypeSafe key configured — add a `typesafe` provider key |
+| `provider_connection_required` | 402 | No vendor key configured — add a `typesafe` or `cloudflare` provider key |
 | `rate_limited` | 429 | Upstream rate limit; honor `retry-after` and retry with backoff |
 | `provider_auth` / `provider_validation` / `upstream_error` | 502 | Upstream rejected the key or the call |
 

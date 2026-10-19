@@ -26,10 +26,10 @@ vi.mock('@/lib/gateway/model-access', () => ({
 
 vi.mock('@/lib/judgment/registry', () => ({
     getJudgmentAdapter: vi.fn((provider: string) =>
-        provider === 'typesafe'
+        provider === 'typesafe' || provider === 'cloudflare'
             ? {
-                provider: 'typesafe',
-                managedEnvVar: 'TYPESAFE_API_KEY',
+                provider,
+                managedEnvVar: provider === 'cloudflare' ? 'CLOUDFLARE_API_TOKEN' : 'TYPESAFE_API_KEY',
                 evaluate: mocks.evaluate,
                 price: mocks.price,
                 resolveKey: mocks.resolveKey,
@@ -41,8 +41,8 @@ vi.mock('@/lib/judgment/registry', () => ({
             throw Object.assign(new Error(`Unknown judgment model '${model}'.`), { code: 'unknown_model', status: 404 });
         }
         return {
-            provider: 'typesafe',
-            managedEnvVar: 'TYPESAFE_API_KEY',
+            provider: model.startsWith('clef-') ? 'cloudflare' : 'typesafe',
+            managedEnvVar: model.startsWith('clef-') ? 'CLOUDFLARE_API_TOKEN' : 'TYPESAFE_API_KEY',
             evaluate: mocks.evaluate,
             price: mocks.price,
             resolveKey: mocks.resolveKey,
@@ -163,9 +163,11 @@ describe('GET /v1/judgments', () => {
     it('lists the judgment models', async () => {
         const res = await GET();
         const body = await res.json();
-        expect(body.data.map((m: { id: string }) => m.id)).toEqual(['jev-latest', 'jev-preview', 'jev-1.13.0']);
+        expect(body.data.map((m: { id: string }) => m.id)).toEqual([
+            'jev-latest', 'jev-preview', 'jev-1.13.0', 'clef-latest', 'clef-flash', 'clef-omni',
+        ]);
         for (const row of body.data) {
-            expect(row.owned_by).toBe('typesafe');
+            expect(row.owned_by).toBe(row.id.startsWith('clef-') ? 'cloudflare' : 'typesafe');
             expect(row.type).toBe('judgment');
             expect(row.available).toBe(true);
         }

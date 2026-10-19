@@ -928,7 +928,7 @@ curl https://api.cencori.com/v1/audio/transcriptions \
 
 ## Judgment Endpoints
 
-Structured decisions from decision models (TypeSafe's Jev) — never generated text. Any `judgment`-type catalog model works here through the same endpoint.
+Structured decisions from decision models (TypeSafe's Jev, Cloudflare's Clef) — never generated text. Any `judgment`-type catalog model works here through the same endpoint.
 
 `POST /api/v1/judgments` (alias `POST /v1/judgments`) — JSON body `{ "state": "...", "questions": {...}, "model": "jev-latest" }`.
 `state` is a string, JSON object, or array. Each question needs `instructions` plus:
@@ -936,9 +936,9 @@ Structured decisions from decision models (TypeSafe's Jev) — never generated t
 - `choice`: `criteria` map of 1–255 options → `{ "choice", "confidence", "probabilities" }`
 - `score`: `criteria` array of 2–10 ordered levels → `{ "score", "confidence", "legend", "probabilities" }`
 
-Models: `jev-latest` (default), `jev-preview`, `jev-1.13.0`. Aliases resolve upstream — the response names the version that judged.
-64k-token budget per request (state plus longest question must fit 32k); over-budget requests are rejected before billing.
-Input tokens billed at $0.042/MTok; output tokens unbilled. `GET /api/v1/judgments` lists models with live pricing.
+Models: `jev-latest` (default), `jev-preview`, `jev-1.13.0` (TypeSafe); `clef-latest`, `clef-flash`, `clef-omni` (Cloudflare). Aliases resolve upstream — the response names the version that judged.
+Per-request budgets, measured as state plus the longest question (~4 chars/token), enforced before billing: Jev 64k tokens, Clef 64k, Clef Flash 24k.
+Input tokens billed per vendor; output tokens unbilled. Jev $0.042/MTok; Clef $0.24/MTok; Clef Flash $0.038/MTok. cloudflare BYOK keys are stored as `<ACCOUNT_ID>:<API_TOKEN>`. `GET /api/v1/judgments` lists models with live pricing and context windows.
 
 ```bash
 curl https://cencori.com/api/v1/judgments \

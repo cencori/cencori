@@ -6,14 +6,25 @@
  * same endpoint, the same auth, and the same billing. Each vendor behind it
  * gets one adapter here: how to resolve its key, call it, and price it.
  *
- * Adding a second decision vendor is three steps, no route changes:
+ * Adding another decision vendor is three steps, no route changes:
  *   1. catalog rows with `type: ['judgment']` in lib/providers/config.ts,
- *      plus a `jev-`-style prefix rule in lib/providers/router.ts,
+ *      plus a `<vendor>-` prefix rule in lib/providers/router.ts,
  *   2. an adapter below (key env, evaluate, price),
  *   3. active `<provider>:<model>` model_pricing rows.
+ *
+ * Two vendors are wired today: TypeSafe (Jev — ./typesafe.ts) and Cloudflare
+ * (Clef — ./clef.ts). Both share the route's transport, validation shape and
+ * error mapping; they differ only in the upstream contract and key format.
  */
 
 import { ProviderRouter } from '@/lib/providers/router';
+import {
+    CLEF_MANAGED_TOKEN_ENV_VAR,
+    CLEF_PROVIDER,
+    evaluateClefJudgment,
+    priceClefJudgment,
+    resolveClefKey,
+} from './clef';
 import {
     DEFAULT_JUDGMENT_MODEL,
     JUDGMENT_PROVIDER,
@@ -58,6 +69,14 @@ const ADAPTERS: Record<string, JudgmentAdapter> = {
         price: priceJudgment,
         resolveKey: (supabase, projectId, organizationId) =>
             resolveJudgmentKey(supabase, projectId, organizationId, JUDGMENT_PROVIDER, TYPESAFE_MANAGED_ENV_VAR),
+    },
+    [CLEF_PROVIDER]: {
+        provider: CLEF_PROVIDER,
+        managedEnvVar: CLEF_MANAGED_TOKEN_ENV_VAR,
+        evaluate: evaluateClefJudgment,
+        price: priceClefJudgment,
+        resolveKey: (supabase, projectId, organizationId) =>
+            resolveClefKey(supabase, projectId, organizationId),
     },
 };
 
