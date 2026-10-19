@@ -24,8 +24,6 @@ export type ResponsesContentPart = Record<string, unknown>;
 export type ContentLimits = {
     /** Per-field cap on text, matching the caller's own text limit. */
     maxTextBytes: number;
-    /** Per-image cap. A `data:` URL carries base64 bytes, so this bounds the decoded image too. */
-    maxImageBytes: number;
     maxImages: number;
 };
 
@@ -158,11 +156,7 @@ export function measureResponsesContent(
                 imageCount: 0,
             };
         }
-        const bytes = utf8Bytes(image.url);
-        if (bytes > limits.maxImageBytes) {
-            return { error: `${label} contains an image that exceeds the per-image limit.`, textBytes: 0, imageBytes: 0, imageCount: 0 };
-        }
-        imageBytes += bytes;
+        imageBytes += utf8Bytes(image.url);
     }
 
     return { textBytes, imageBytes, imageCount };
