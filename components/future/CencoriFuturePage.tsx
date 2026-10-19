@@ -350,8 +350,10 @@ function useScrollChoreography(
 
 export function CencoriFuturePage({
   recentNews,
+  newsPosts = [],
 }: {
   recentNews: NewsBannerProps | null;
+  newsPosts?: Array<{ title: string; href: string; cover: string; date: string }>;
 }) {
   const beliefRef = useRef<HTMLElement>(null);
   const thesisRef = useRef<HTMLParagraphElement>(null);
@@ -689,6 +691,42 @@ export function CencoriFuturePage({
               </li>
             ))}
           </ul>
+        </div>
+      </section>
+
+      <section className={styles.stories} id="news">
+        <div className={styles.storiesHead}>
+          <p className={styles.sectionEyebrow}>News</p>
+          <Link className={styles.storiesAll} href="/newsroom">
+            View all news
+          </Link>
+        </div>
+
+        <div className={styles.storiesGrid}>
+          {newsPosts.map((post) => (
+            <Link
+              className={styles.storyCard}
+              href={post.href}
+              key={post.href}
+            >
+              <span className={styles.storyCover}>
+                <Image
+                  alt={`${post.title} cover`}
+                  className={styles.storyImage}
+                  fill
+                  sizes="(max-width: 900px) 100vw, 33vw"
+                  src={post.cover}
+                />
+              </span>
+              <span className={styles.storyName}>{post.title}</span>
+              <span className={styles.storyDate}>
+                {new Date(`${post.date}T00:00:00`).toLocaleDateString(
+                  "en-US",
+                  { month: "short", day: "numeric", year: "numeric" },
+                )}
+              </span>
+            </Link>
+          ))}
         </div>
       </section>
 
