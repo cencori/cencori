@@ -18,7 +18,7 @@ import { toOpenAIMessages } from '@/lib/providers/utils';
 
 const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB';
 
-const LIMITS = { maxTextBytes: 1024, maxImageBytes: 1024, maxImages: 3 };
+const LIMITS = { maxTextBytes: 1024, maxImages: 3 };
 
 describe('normalizeResponsesContent', () => {
     it('passes a plain string through', () => {
@@ -96,10 +96,14 @@ describe('measureResponsesContent', () => {
         );
     });
 
-    it('holds one image to the per-image cap', () => {
-        const oversized = `data:image/png;base64,${'A'.repeat(2048)}`;
-        expect(measureResponsesContent([{ type: 'input_image', image_url: oversized }], 'Message content', LIMITS).error)
-            .toBe('Message content contains an image that exceeds the per-image limit.');
+    /** An image's byte size is no longer the gateway's business; size now ends at the body cap. */
+    it('measures any image size without rejecting it', () => {
+        const huge = `data:image/png;base64,${'A'.repeat(4 * 1024 * 1024)}`;
+        const measured = measureResponsesContent([{ type: 'input_image', image_url: huge }], 'Message content', LIMITS);
+
+        expect(measured.error).toBeUndefined();
+        expect(measured.imageCount).toBe(1);
+        expect(measured.imageBytes).toBe(huge.length);
     });
 
     it('caps how many images one item may carry', () => {
@@ -152,6 +156,17 @@ describe('validateResponsesInput', () => {
             call_id: `call-${index}`,
             output: [{ type: 'input_image', image_url: PNG }],
         }));
+
+        expect(validateResponsesInput(input)).toBeNull();
+    });
+
+    /** Images no longer carry a byte budget: a full-resolution screenshot replays every turn. */
+    it('accepts large full-quality images replayed across turns', () => {
+        const huge = `data:image/png;base64,${'B'.repeat(3 * 1024 * 1024)}`;
+        const input = [
+            { type: 'function_call_output', call_id: 'call-1', output: [{ type: 'input_image', image_url: huge }] },
+            { type: 'function_call_output', call_id: 'call-2', output: [{ type: 'input_image', image_url: huge }] },
+        ];
 
         expect(validateResponsesInput(input)).toBeNull();
     });

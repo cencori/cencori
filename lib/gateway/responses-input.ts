@@ -19,15 +19,16 @@ const MAX_TOTAL_INLINE_FILE_BYTES = 2 * 1024 * 1024;
 export const MAX_TEXT_FIELD_BYTES = 1024 * 1024;
 const MAX_FILENAME_LENGTH = 255;
 
-// Images get their own budget rather than sharing the inline-file one. An agent replays its whole
-// conversation on every request, so each screenshot it has ever looked at is resent — a shared cap
-// would start failing a long session partway through, which is the failure this path exists to end.
+// Images no longer carry a per-request byte budget. The agent replays its whole conversation on
+// every turn, so a rolling byte cap failed the very sessions this path serves the longest: images
+// silently accumulate until the transcript crosses an invisible line, and history can't be undone.
+// Size is governed one layer out (the proxy body cap) and by what the providers themselves accept,
+// both of which are far more generous than any turn here needs. The image *count* guard stays:
+// it is bound by turn structure, not size, and a four-thousand-screenshot history is a client bug.
 const MAX_INPUT_IMAGES = 40;
-const MAX_TOTAL_IMAGE_BYTES = 4 * 1024 * 1024;
 
 const CONTENT_LIMITS = {
     maxTextBytes: MAX_TEXT_FIELD_BYTES,
-    maxImageBytes: MAX_INLINE_FILE_BYTES,
     maxImages: MAX_INPUT_IMAGES,
 } as const;
 
@@ -78,17 +79,12 @@ export function validateResponsesInput(input: unknown): string | null {
     let totalFileBytes = 0;
     let totalTextBytes = 0;
     let imageCount = 0;
-    let totalImageBytes = 0;
 
-    /** Holds one item's images against the request-wide budget. */
-    const chargeImages = (measured: { imageCount: number; imageBytes: number }): string | null => {
+    /** Holds one item's images against the request-wide count. */
+    const chargeImages = (measured: { imageCount: number }): string | null => {
         imageCount += measured.imageCount;
         if (imageCount > MAX_INPUT_IMAGES) {
             return `Input may contain at most ${MAX_INPUT_IMAGES} images.`;
-        }
-        totalImageBytes += measured.imageBytes;
-        if (totalImageBytes > MAX_TOTAL_IMAGE_BYTES) {
-            return 'Images exceed the 4 MiB combined limit.';
         }
         return null;
     };

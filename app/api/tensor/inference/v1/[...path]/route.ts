@@ -78,8 +78,10 @@ const ROUTES: Record<
 /** The product's own Cencori key. Server-only: it is never sent to a client. */
 const PRODUCT_KEY = process.env.BASECODE_GATEWAY_API_KEY?.trim();
 
-/** A turn's worth of prompt is large, and refusing it here would be a worse failure than the cost. */
-const MAX_BODY_BYTES = 8 * 1024 * 1024;
+/** Images no longer carry a gateway byte budget, so this bounds the turn instead. Generous, not
+  unbounded: the proxy buffers the request to inject the caller, and a serverless function cannot
+  accept an arbitrary body. */
+const MAX_BODY_BYTES = 32 * 1024 * 1024;
 
 function json(body: unknown, status: number) {
   return NextResponse.json(body, { headers: noStoreHeaders(), status });
