@@ -49,6 +49,9 @@ vi.mock('@/app/api/v1/chat/completions/route', () => ({
 vi.mock('@/app/api/v1/models/route', () => ({
     GET: (...args: unknown[]) => mockGatewayModels(...args),
 }));
+vi.mock('@/app/api/v1/judgments/route', () => ({
+    POST: vi.fn(),
+}));
 
 const PRODUCT_KEY = 'csk_the_products_own_key';
 process.env.BASECODE_GATEWAY_API_KEY = PRODUCT_KEY;
@@ -227,6 +230,37 @@ describe('what the product key may be spent on', () => {
         const response = await POST(request(), at('chat', 'completions'));
 
         expect(response.status).toBe(429);
+        expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    /**
+     * Jev decides things about a turn (which model takes it); it is not a turn. It must not spend
+     * a task, and it must keep working for a user at their limit, whose next turn still needs one.
+     */
+    it('passes Jev judgments through without charging them against the plan', async () => {
+        signedIn(false, 'pass_budget_limit');
+
+        const response = await POST(
+            request({ model: 'jev-latest', state: 'hi', questions: {} }),
+            at('judgments'),
+        );
+
+        expect(response.status).toBe(200);
+        expect(mockRpc).not.toHaveBeenCalled();
+        expect((global.fetch as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]).toBe(
+            'https://api.cencori.com/v1/judgments'
+        );
+    });
+
+    it('keeps judgments small', async () => {
+        signedIn(true);
+
+        const response = await POST(
+            request({ model: 'jev-latest', state: 'x'.repeat(70 * 1024), questions: {} }),
+            at('judgments'),
+        );
+
+        expect(response.status).toBe(413);
         expect(global.fetch).not.toHaveBeenCalled();
     });
 

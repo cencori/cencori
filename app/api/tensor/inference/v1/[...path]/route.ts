@@ -56,12 +56,27 @@ type GatewayHandler = (req: NextRequest) => Promise<Response>;
  */
 const ROUTES: Record<
   string,
-  { generates: boolean; methods: string[]; handler: () => Promise<GatewayHandler> }
+  {
+    generates: boolean;
+    methods: string[];
+    handler: () => Promise<GatewayHandler>;
+    /** A tighter body limit than a turn's, for a route that has no business carrying much. */
+    maxBodyBytes?: number;
+  }
 > = {
   "chat/completions": {
     generates: true,
     methods: ["POST"],
     handler: async () => (await import("@/app/api/v1/chat/completions/route")).POST,
+  },
+  // Jev decisions the app makes about a turn (which model takes it), not a turn of its own: it is
+  // not checked against the plan and never spends a task. A call is one short prompt and a few
+  // questions, a fraction of a cent of input at most, and the limit below keeps it that way.
+  judgments: {
+    generates: false,
+    methods: ["POST"],
+    handler: async () => (await import("@/app/api/v1/judgments/route")).POST,
+    maxBodyBytes: 64 * 1024,
   },
   models: {
     generates: false,
@@ -114,7 +129,7 @@ async function forward(req: NextRequest, path: string[]): Promise<Response> {
   let body: string | undefined;
   if (req.method === "POST") {
     body = await req.text();
-    if (body.length > MAX_BODY_BYTES) {
+    if (body.length > (route.maxBodyBytes ?? MAX_BODY_BYTES)) {
       return json({ error: "This request is too large to send.", code: "request_too_large" }, 413);
     }
   }
