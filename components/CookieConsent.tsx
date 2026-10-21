@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
 import Link from "next/link";
+import { isStatusHostname } from "@/lib/status-host";
 
 const COOKIE_CONSENT_KEY = "cencori-cookie-consent";
 
@@ -29,6 +30,10 @@ export function CookieConsent() {
     const [analyticsEnabled, setAnalyticsEnabled] = useState(false);
 
     useEffect(() => {
+        // The status pages set no cookies of their own; don't cover them.
+        // Analytics consent stays at its default (denied) there.
+        if (isStatusHostname(window.location.host) || window.location.pathname.startsWith("/status")) return;
+
         const stored = localStorage.getItem(COOKIE_CONSENT_KEY);
 
         if (stored === "accepted" || stored === "rejected") {
