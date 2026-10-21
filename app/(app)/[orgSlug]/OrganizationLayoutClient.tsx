@@ -914,7 +914,7 @@ export default function OrganizationLayoutClient({
                                     </Link>
                                 </DropdownMenuItem>
                                 <DropdownMenuItem asChild className="text-sm py-1.5 cursor-pointer">
-                                    <Link href="https://cencori.status.outray.app/" target="_blank" rel="noopener noreferrer" className="flex justify-between w-full items-center">
+                                    <Link href="https://status.cencori.com" target="_blank" rel="noopener noreferrer" className="flex justify-between w-full items-center">
                                         Cencori status
                                         <Activity className="h-3.5 w-3.5 shrink-0" />
                                     </Link>
