@@ -15,6 +15,8 @@ export const RESERVED_ORG_SLUGS: ReadonlySet<string> = new Set([
     // App-level routes
     "account",
     "api",
+    // Public API prefix (/v1/* rewrites to /api/v1/*)
+    "v1",
     "auth",
     "dashboard",
 
