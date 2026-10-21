@@ -31,10 +31,7 @@ MIGRATION_DATABASE_URL = "{{@db.PRIVATE_CONNECTION_STRING}}"
 
 [databases.db]
 engine = "postgresql"
-# Production Supabase runs 17.6, but Brimble offers no 17 yet. 16 works as a
-# logical-replication / pg_restore target; strip `SET transaction_timeout`
-# from v17 dumps. Move to 17 when Brimble adds it.
-version = "16"
+version = "17"
 region = "afr-west"
 cpu = 2
 memory = "8gb"
