@@ -1,3 +1,4 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
 import { writeAuditLog } from '@/lib/audit-log';
@@ -29,7 +30,7 @@ export async function GET(
     const { projectId } = await params;
     const supabase = await createServerClient();
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await getAuthUser(supabase);
     if (userError || !user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -88,7 +89,7 @@ export async function PUT(
     const { projectId } = await params;
     const supabase = await createServerClient();
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await getAuthUser(supabase);
     if (userError || !user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

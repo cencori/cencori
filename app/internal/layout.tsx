@@ -1,3 +1,4 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { createServerClient } from '@/lib/supabaseServer';
 import { checkInternalAccess } from '@/lib/internal-access';
 import { InternalShell } from '@/components/internal/internal-shell';
@@ -9,7 +10,7 @@ export default async function InternalLayout({
     children: React.ReactNode;
 }) {
     const supabase = await createServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user } } = await getAuthUser(supabase);
 
     // Not logged in → show login form
     if (!user) {

@@ -1,3 +1,4 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { redirect } from "next/navigation";
 import { ConsoleHomeOverview } from "@/components/dashboard/project-overview/ConsoleHomeOverview";
 import OrganizationLayoutClient from "../../[orgSlug]/OrganizationLayoutClient";
@@ -11,7 +12,7 @@ export default async function ConsoleHomePage() {
   // Workspace resolution and session are independent — together, not series.
   const [workspace, { data: { user } }] = await Promise.all([
     getActiveConsoleWorkspace(),
-    supabase.auth.getUser(),
+    getAuthUser(supabase),
   ]);
   if (!workspace) {
     // No project yet. An existing organization means project creation (not

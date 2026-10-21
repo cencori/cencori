@@ -1,4 +1,5 @@
 'use server';
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 
 import { createServerClient } from '@/lib/supabaseServer';
 import { revalidatePath } from 'next/cache';
@@ -26,7 +27,7 @@ export async function importGitHubProject({
   const supabase = await createServerClient();
 
   // Authenticate user
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  const { data: { user }, error: userError } = await getAuthUser(supabase);
 
   if (userError || !user) {
     console.error('User not authenticated:', userError);

@@ -1,4 +1,5 @@
 "use client";
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -64,7 +65,7 @@ function OnboardingContent() {
       setCheckingAuth(false);
       return;
     }
-    supabase.auth.getUser().then(async ({ data: { user } }) => {
+    getAuthUser(supabase).then(async ({ data: { user } }) => {
       if (!user) {
         router.replace("/login");
         return;
@@ -135,7 +136,7 @@ function OnboardingContent() {
       try {
         const {
           data: { user },
-        } = await supabase.auth.getUser();
+        } = await getAuthUser(supabase);
         if (!user) {
           toast.error("You must be logged in.");
           return null;

@@ -1,3 +1,4 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { SendByte } from '@sendbyte/node';
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
@@ -54,7 +55,7 @@ async function lookupLocation(ip: string): Promise<string | null> {
 
 export async function POST(request: NextRequest) {
   const supabase = await createServerClient();
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  const { data: { user }, error: userError } = await getAuthUser(supabase);
 
   if (userError || !user?.email) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

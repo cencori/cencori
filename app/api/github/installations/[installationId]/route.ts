@@ -1,3 +1,4 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 /**
  * DELETE /api/github/installations/:installationId?organizationId=...
  *
@@ -17,7 +18,7 @@ export async function DELETE(
     { params }: { params: Promise<{ installationId: string }> },
 ) {
     const supabase = await createServerClient();
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await getAuthUser(supabase);
     if (userError || !user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

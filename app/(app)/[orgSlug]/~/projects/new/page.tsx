@@ -1,3 +1,4 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 /* eslint-disable react/no-unescaped-entities */
 "use client";
 
@@ -85,7 +86,7 @@ function useOrganization(orgSlug: string) {
   return useQuery({
     queryKey: ["organizationProjectCreation", orgSlug],
     queryFn: async () => {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      const { data: { user }, error: userError } = await getAuthUser(supabase);
       if (userError || !user) throw new Error("Not authenticated");
 
       const { data: orgData, error: fetchError } = await supabase
@@ -125,7 +126,7 @@ export default function NewProjectPage({ params }: PageProps) {
   const onSubmit = async (values: FormValues) => {
     setLoading(true);
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user } } = await getAuthUser(supabase);
 
     if (!user) {
       toast.error("You must be logged in to create a project.");

@@ -1,3 +1,4 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
@@ -108,7 +109,7 @@ export async function GET(
             const userClient = createClient(supabaseUrl, supabaseAnonKey, {
                 global: { headers: { Authorization: authHeader } },
             });
-            const { data: { user }, error: authError } = await userClient.auth.getUser();
+            const { data: { user }, error: authError } = await getAuthUser(userClient);
             if (authError || !user) return respondError(401, 'Unauthorized', 'unauthorized');
             userId = user.id;
         }
@@ -176,7 +177,7 @@ export async function PATCH(
             const userClient = createClient(supabaseUrl, supabaseAnonKey, {
                 global: { headers: { Authorization: authHeader } },
             });
-            const { data: { user }, error: authError } = await userClient.auth.getUser();
+            const { data: { user }, error: authError } = await getAuthUser(userClient);
             if (authError || !user) return respondError(401, 'Unauthorized', 'unauthorized');
             userId = user.id;
         }
@@ -333,7 +334,7 @@ export async function DELETE(
             const userClient = createClient(supabaseUrl, supabaseAnonKey, {
                 global: { headers: { Authorization: authHeader } },
             });
-            const { data: { user }, error: authError } = await userClient.auth.getUser();
+            const { data: { user }, error: authError } = await getAuthUser(userClient);
             if (authError || !user) return respondError(401, 'Unauthorized', 'unauthorized');
             userId = user.id;
         }

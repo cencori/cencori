@@ -1,3 +1,4 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabaseServer";
 import { createClient } from "@supabase/supabase-js";
@@ -25,7 +26,7 @@ export async function POST(req: NextRequest) {
         let userId: string | null = null;
         try {
             const supabase = await createServerClient();
-            const { data: { user } } = await supabase.auth.getUser();
+            const { data: { user } } = await getAuthUser(supabase);
             if (user) userId = user.id;
         } catch (err) {
             console.warn("Failed to get user session:", err);

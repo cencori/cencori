@@ -1,3 +1,4 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { redirect } from "next/navigation";
 import { Logo } from "@/components/logo";
 import {
@@ -35,7 +36,7 @@ export default async function TensorSignInPage({ searchParams }: TensorSignInPag
   }
 
   const supabase = await createServerClient();
-  const { data } = await supabase.auth.getUser();
+  const { data } = await getAuthUser(supabase);
   if (!data.user) {
     const returnTo = tensorSignInPath(challenge, state, redirectUri);
     redirect(`/login?redirect=${encodeURIComponent(returnTo)}`);

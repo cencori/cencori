@@ -1,3 +1,4 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabaseServer";
 import { hasFeature, type SubscriptionTier } from "@/lib/entitlements";
@@ -36,7 +37,7 @@ function parseTimeRange(timeRange: string): Date {
 
 async function getOrgWithAccess(orgSlug: string) {
     const supabase = await createServerClient();
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await getAuthUser(supabase);
     if (userError || !user) return { error: "Unauthorized", status: 401 };
 
     const { data: org } = await supabase

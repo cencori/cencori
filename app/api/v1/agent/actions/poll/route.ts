@@ -1,3 +1,4 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 /**
  * Shadow Mode — Action Approval Polling
  * 
@@ -96,7 +97,7 @@ export async function GET(req: NextRequest) {
             const userClient = createClient(supabaseUrl, supabaseAnonKey, {
                 global: { headers: { Authorization: authHeader } },
             });
-            const { data: { user }, error: authError } = await userClient.auth.getUser();
+            const { data: { user }, error: authError } = await getAuthUser(userClient);
             if (authError || !user) {
                 return respond(
                     NextResponse.json({ error: "Unauthorized" }, { status: 401 }),

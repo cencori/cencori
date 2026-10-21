@@ -1,4 +1,5 @@
 "use client";
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 
 import React, { useEffect, useState, use } from "react";
 import { useSearchParams } from "next/navigation";
@@ -100,7 +101,7 @@ function useCurrentUser() {
     return useQuery({
         queryKey: ["currentUser"],
         queryFn: async () => {
-            const { data: { user } } = await supabase.auth.getUser();
+            const { data: { user } } = await getAuthUser(supabase);
             return user;
         },
         staleTime: 60 * 1000,

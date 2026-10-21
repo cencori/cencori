@@ -1,3 +1,4 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { safeProviderFetch } from "@/lib/security/outbound-url";
@@ -16,7 +17,7 @@ type TitleMessage = { role: "user" | "assistant"; content: string };
 
 export async function POST(request: NextRequest) {
     const supabase = await createServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user } } = await getAuthUser(supabase);
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const apiKey = process.env.CENCORI_COPILOT_API_KEY;

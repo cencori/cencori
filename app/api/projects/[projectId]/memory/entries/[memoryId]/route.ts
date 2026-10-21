@@ -1,3 +1,4 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 /**
  * DELETE /api/projects/:projectId/memory/entries/:memoryId — hard-forget one
  * memory from the dashboard.
@@ -51,7 +52,7 @@ export async function DELETE(
         if (deleteError) throw deleteError;
 
         const authClient = await createServerClient();
-        const { data: { user } } = await authClient.auth.getUser();
+        const { data: { user } } = await getAuthUser(authClient);
 
         writeAuditLog({
             organizationId: access.organizationId,

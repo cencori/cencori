@@ -1,5 +1,6 @@
  
 "use client";
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 
 import React, { useState, use } from "react";
 import { useRouter } from "next/navigation";
@@ -56,7 +57,7 @@ function useProjectForEdit(orgSlug: string, projectSlug: string) {
   return useQuery({
     queryKey: ["projectEdit", orgSlug, projectSlug],
     queryFn: async () => {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      const { data: { user }, error: userError } = await getAuthUser(supabase);
       if (userError || !user) throw new Error("Not authenticated");
 
       const { data: orgData, error: orgError } = await supabase
@@ -104,7 +105,7 @@ export default function EditProjectPage({ params }: PageProps) {
 
   const onSubmit = async (values: FormValues) => {
     setSubmitting(true);
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user } } = await getAuthUser(supabase);
 
     if (!user) {
       toast.error("You must be logged in to update a project.");

@@ -1,3 +1,4 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
@@ -7,7 +8,7 @@ import { MODEL_MAPPINGS } from '@/lib/providers/failover';
 // POST — seed DB with hardcoded MODEL_MAPPINGS (idempotent via upsert)
 export async function POST() {
     const supabase = await createServerClient();
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await getAuthUser(supabase);
 
     if (userError || !user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

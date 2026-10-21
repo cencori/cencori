@@ -1,3 +1,4 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { Suspense } from "react";
 import { Metadata } from "next";
 import { redirect } from "next/navigation";
@@ -43,7 +44,7 @@ export async function generateMetadata({
 // run the same check for canonical console pages.)
 async function RequireSession({ orgSlug }: { orgSlug: string }) {
   const supabase = await createServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await getAuthUser(supabase);
 
   if (!user) {
     redirect(`/login?redirect=${encodeURIComponent(`/${orgSlug}`)}`);

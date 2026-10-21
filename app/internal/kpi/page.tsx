@@ -1,3 +1,4 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { createServerClient } from "@/lib/supabaseServer";
 import Link from "next/link";
 
@@ -5,7 +6,7 @@ export default async function InternalKPIDashboard() {
     const supabase = await createServerClient();
 
     // User is already authenticated via /internal/layout.tsx
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user } } = await getAuthUser(supabase);
 
     // Fetch KPI data
     const now = new Date();

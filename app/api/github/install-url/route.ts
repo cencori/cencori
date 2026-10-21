@@ -1,3 +1,4 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
 import { createGithubInstallState } from '@/lib/github-install-state';
@@ -14,7 +15,7 @@ const DEFAULT_GITHUB_APP_SLUG = 'cencori';
  */
 export async function GET(req: NextRequest) {
     const supabase = await createServerClient();
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await getAuthUser(supabase);
 
     if (userError || !user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
