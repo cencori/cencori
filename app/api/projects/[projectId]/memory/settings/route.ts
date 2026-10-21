@@ -1,3 +1,4 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 /**
  * GET|PATCH /api/projects/:projectId/memory/settings — the project's gateway
  * memory configuration (kill switch, graph layer, extraction tuning).
@@ -135,7 +136,7 @@ export async function PATCH(
         const modelChoices = withCurrentModel(MEMORY_MODEL_CHOICES, settings.extractionModel);
 
         const authClient = await createServerClient();
-        const { data: { user } } = await authClient.auth.getUser();
+        const { data: { user } } = await getAuthUser(authClient);
         writeAuditLog({
             organizationId: access.organizationId,
             projectId,

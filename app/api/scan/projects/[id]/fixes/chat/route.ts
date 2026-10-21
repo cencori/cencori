@@ -1,3 +1,4 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { NextRequest } from "next/server";
 import { getInstallationOctokit } from "@/lib/github";
 import { createServerClient } from "@/lib/supabaseServer";
@@ -628,7 +629,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     const { id } = await params;
     const supabase = await createServerClient();
     const strictEnforcement = isScanStrictEnforcementEnabled();
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await getAuthUser(supabase);
 
     if (userError || !user) {
         return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });

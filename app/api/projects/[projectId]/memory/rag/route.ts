@@ -1,3 +1,4 @@
+import { getAuthUser as readAuthUser } from "@/lib/auth/get-auth-user";
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabaseServer";
 import { createClient } from "@supabase/supabase-js";
@@ -29,7 +30,7 @@ const adminClient = createClient(
 // Helper to get authenticated user
 async function getAuthUser() {
     const supabase = await createServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user } } = await readAuthUser(supabase);
     return user;
 }
 

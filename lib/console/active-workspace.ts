@@ -1,3 +1,4 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 import "server-only";
 
 import { cache } from "react";
@@ -44,7 +45,7 @@ export interface ActiveConsoleOrganization {
 export const getActiveConsoleOrganization = cache(async (): Promise<ActiveConsoleOrganization | null> => {
   const supabase = await createServerClient();
   const { data: { user } } = await withSupabaseRetry(
-    () => supabase.auth.getUser(),
+    () => getAuthUser(supabase),
     { operation: "console org auth.getUser" },
   );
   if (!user) return null;
@@ -94,7 +95,7 @@ export const getActiveConsoleWorkspace = cache(async (): Promise<ActiveConsoleWo
   // Vercel->Supabase socket blip (UND_ERR_SOCKET/ECONNRESET, Oct 2026
   // incident) must not take down /home, /login, /billing, /memory.
   const { data: { user } } = await withSupabaseRetry(
-    () => supabase.auth.getUser(),
+    () => getAuthUser(supabase),
     { operation: "console auth.getUser" },
   );
   if (!user) return null;

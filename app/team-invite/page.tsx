@@ -1,4 +1,5 @@
 'use client';
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -28,7 +29,7 @@ function InviteAcceptContent() {
     async function checkAuthAndAccept() {
         setStatus('checking_auth');
 
-        const { data: { user } } = await supabase.auth.getUser();
+        const { data: { user } } = await getAuthUser(supabase);
 
         if (!user) {
             setStatus('not_logged_in');

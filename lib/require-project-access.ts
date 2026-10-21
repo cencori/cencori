@@ -1,3 +1,4 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
@@ -26,7 +27,7 @@ export type ProjectAccessResult =
 export async function requireProjectAccess(projectId: string): Promise<ProjectAccessResult> {
     const supabase = await createServerClient();
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await getAuthUser(supabase);
     if (userError || !user) {
         return { ok: false, response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
     }

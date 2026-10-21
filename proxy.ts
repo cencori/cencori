@@ -1,3 +1,4 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
@@ -902,7 +903,7 @@ export async function proxy(request: NextRequest) {
 
     const {
       data: { user },
-    } = await supabase.auth.getUser();
+    } = await getAuthUser(supabase);
     userId = user?.id ?? null;
   }
 

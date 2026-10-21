@@ -1,4 +1,5 @@
 "use client";
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 
 import { ReactNode, useState, useEffect, useRef } from "react";
 import Link from "next/link";
@@ -73,7 +74,7 @@ export function CourseLayout({ children, hero, courseId, courseTitle, steps }: C
     }, [courseId, pathname]);
 
     useEffect(() => {
-        supabase.auth.getUser().then(({ data }: { data: any }) => {
+        getAuthUser(supabase).then(({ data }: { data: any }) => {
             if (data.user) {
                 setUser({
                     email: data.user.email,

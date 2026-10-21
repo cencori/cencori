@@ -1,4 +1,5 @@
 "use server";
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabaseServer";
@@ -9,7 +10,7 @@ export async function GET(request: NextRequest) {
         const supabase = await createServerClient();
         const supabaseAdmin = createAdminClient();
 
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        const { data: { user }, error: userError } = await getAuthUser(supabase);
         if (userError || !user) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
@@ -55,7 +56,7 @@ export async function PATCH(request: NextRequest) {
         const supabaseAdmin = createAdminClient();
         const body = await request.json();
 
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        const { data: { user }, error: userError } = await getAuthUser(supabase);
         if (userError || !user) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
@@ -126,7 +127,7 @@ export async function DELETE(request: NextRequest) {
         const supabase = await createServerClient();
         const supabaseAdmin = createAdminClient();
 
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        const { data: { user }, error: userError } = await getAuthUser(supabase);
         if (userError || !user) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }

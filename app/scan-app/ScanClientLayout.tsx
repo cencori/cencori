@@ -1,4 +1,5 @@
 "use client";
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -58,7 +59,7 @@ export default function ScanLayout({ children }: ScanLayoutProps) {
     // Check auth
     useEffect(() => {
         const checkAuth = async () => {
-            const { data, error } = await supabase.auth.getUser();
+            const { data, error } = await getAuthUser(supabase);
             if (!error && data.user) {
                 setUser(data.user as User);
             } else {

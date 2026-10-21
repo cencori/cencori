@@ -1,3 +1,4 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
@@ -21,7 +22,7 @@ async function verifyAdmin(userId: string, userEmail: string | undefined) {
 // GET — list all model mappings
 export async function GET() {
     const supabase = await createServerClient();
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await getAuthUser(supabase);
 
     if (userError || !user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -47,7 +48,7 @@ export async function GET() {
 // POST — create a new mapping
 export async function POST(req: NextRequest) {
     const supabase = await createServerClient();
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await getAuthUser(supabase);
 
     if (userError || !user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -84,7 +85,7 @@ export async function POST(req: NextRequest) {
 // DELETE — delete a mapping by id
 export async function DELETE(req: NextRequest) {
     const supabase = await createServerClient();
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await getAuthUser(supabase);
 
     if (userError || !user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

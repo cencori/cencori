@@ -1,3 +1,4 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { randomBytes } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import {
@@ -42,7 +43,7 @@ export async function POST(request: NextRequest) {
   }
 
   const supabase = await createServerClient();
-  const { data } = await supabase.auth.getUser();
+  const { data } = await getAuthUser(supabase);
   const user = data.user;
   if (!user?.email) {
     const returnTo = tensorSignInPath(challenge, state, redirectUri);

@@ -1,3 +1,4 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 /**
  * Shared Gateway Middleware
  * 
@@ -418,7 +419,7 @@ return {
             // Check if there is an authenticated dashboard user via cookies/session
             const { createServerClient } = await import('@/lib/supabaseServer');
             const userSupabase = await createServerClient();
-            const { data: { user } } = await userSupabase.auth.getUser();
+            const { data: { user } } = await getAuthUser(userSupabase);
 
             if (user) {
                 // Check if they passed a Project ID via header

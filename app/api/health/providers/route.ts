@@ -1,3 +1,4 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { NextResponse } from 'next/server';
 import { getAllCircuitStates } from '@/lib/providers/circuit-breaker';
 import { createServerClient } from '@/lib/supabaseServer';
@@ -17,7 +18,7 @@ const KNOWN_PROVIDERS = [
 export async function GET() {
     try {
         const supabase = await createServerClient();
-        const { data: { user } } = await supabase.auth.getUser();
+        const { data: { user } } = await getAuthUser(supabase);
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }

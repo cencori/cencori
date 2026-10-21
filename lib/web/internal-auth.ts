@@ -1,3 +1,4 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 import crypto from 'node:crypto';
 import type { NextRequest } from 'next/server';
 import { checkInternalAccess } from '@/lib/internal-access';
@@ -17,7 +18,7 @@ export async function authorizeWebCrawlAdmin(req: NextRequest): Promise<boolean>
     }
 
     const supabase = await createServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user } } = await getAuthUser(supabase);
     if (!user) return false;
     return checkInternalAccess(user.id, user.email);
 }
