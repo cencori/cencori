@@ -1,8 +1,8 @@
 /**
  * Read-only client for OutRay's headless status API.
  *
- * OutRay runs the monitors (status.cencori.com is its hosted page); this feeds
- * the Cencori-branded page at /status. Anything added in OutRay — a monitor,
+ * OutRay runs the monitors; this feeds the Cencori-branded status page
+ * (status.cencori.com, served from app/status). Anything added in OutRay — a monitor,
  * component, or group — appears here without a code change.
  *
  * Public, no key. Responses are cached upstream for 15s; poll at most once a
@@ -15,8 +15,12 @@ export const OUTRAY_STATUS_URL =
 /** POST { email } to subscribe to incident updates. CORS is open. */
 export const OUTRAY_SUBSCRIBE_URL = `${OUTRAY_STATUS_URL}/subscribe`;
 
-/** OutRay's hosted page: the fallback when the API can't be reached. */
-export const HOSTED_STATUS_PAGE_URL = 'https://status.cencori.com';
+/**
+ * OutRay's own hosted page: the fallback when the API can't be reached. Runs
+ * on OutRay's infrastructure, so it stays up when ours doesn't.
+ * (status.cencori.com is now this branded page, not OutRay's.)
+ */
+export const HOSTED_STATUS_PAGE_URL = 'https://cencori.status.outray.app';
 
 export type OutrayState = 'operational' | 'degraded' | 'outage' | 'unknown';
 

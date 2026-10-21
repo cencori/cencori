@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import {
@@ -7,6 +8,7 @@ import {
   type OutrayIncident,
   type OutrayStatusPage,
 } from '@/lib/outray-status';
+import { statusBasePath, statusMainSiteHref } from '@/lib/status-host';
 import { StatusShell } from '../status-shell';
 import { MOCK_INCIDENTS } from './mock-incidents'; // TEMPORARY: remove with mock-incidents.ts
 
@@ -166,6 +168,8 @@ function MonthSection({ month, incidents }: { month: string; incidents: DatedInc
 }
 
 export default async function StatusHistoryPage() {
+  const host = (await headers()).get('host') ?? '';
+  const basePath = statusBasePath(host);
   const live = await getOutrayStatus();
   // TEMPORARY: design fixtures, development only. Remove with mock-incidents.ts.
   const data = live && process.env.NODE_ENV === 'development'
@@ -175,9 +179,9 @@ export default async function StatusHistoryPage() {
   const range = data ? historyRange(data, incidents) : null;
 
   return (
-    <StatusShell subscriptionsEnabled={Boolean(data?.subscriptionsEnabled)}>
+    <StatusShell subscriptionsEnabled={Boolean(data?.subscriptionsEnabled)} mainSiteHref={statusMainSiteHref(host)}>
       <nav aria-label="Breadcrumb" className="text-sm text-muted-foreground">
-        <Link href="/status" className="hover:text-foreground">Cencori</Link>
+        <Link href={basePath || '/'} className="hover:text-foreground">Cencori</Link>
         <span className="px-1.5">/</span>
         <span className="text-foreground">History</span>
       </nav>
@@ -202,7 +206,7 @@ export default async function StatusHistoryPage() {
       ) : (
         <p className="text-sm text-muted-foreground">
           History is temporarily unavailable here.{' '}
-          <a href={HOSTED_STATUS_PAGE_URL} className="underline underline-offset-4">Open status.cencori.com</a>
+          <a href={HOSTED_STATUS_PAGE_URL} className="underline underline-offset-4">Open our backup status page</a>
         </p>
       )}
     </StatusShell>
