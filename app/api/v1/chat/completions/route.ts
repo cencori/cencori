@@ -90,11 +90,20 @@ type ChatMessage = {
     // DeepSeek thinking mode needs its own trace echoed back on later turns.
     reasoning_content?: string;
 };
+const REASONING_EFFORTS = ["none", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
+
+// Unknown values are dropped rather than forwarded, so a typo falls back to the
+// model's default effort instead of a provider 400.
+function parseReasoningEffort(value: unknown): UnifiedChatRequest["reasoningEffort"] {
+    return REASONING_EFFORTS.find((effort) => effort === value);
+}
+
 type ChatRequestBody = {
     model?: string;
     messages?: ChatMessage[];
     tools?: Tool[];
     tool_choice?: UnifiedChatRequest["toolChoice"];
+    reasoning_effort?: unknown;
     stream?: boolean;
     temperature?: number;
     max_tokens?: number;
@@ -1041,6 +1050,7 @@ export async function POST(req: NextRequest) {
             stream: shouldStream,
             tools: tools as Tool[] | undefined,
             toolChoice: tool_choice,
+            reasoningEffort: parseReasoningEffort(body.reasoning_effort),
             endUserId,
             endUserQuota,
             recordEndUserUsage: maybeRecordEndUserUsage,

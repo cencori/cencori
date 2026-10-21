@@ -49,6 +49,7 @@ export type V1ExecuteParams = {
     stream: boolean;
     tools?: Tool[];
     toolChoice?: UnifiedChatRequest['toolChoice'];
+    reasoningEffort?: UnifiedChatRequest['reasoningEffort'];
     frequencyPenalty?: number;
     presencePenalty?: number;
     /**
@@ -276,6 +277,7 @@ export async function runV1ProviderExecution(
             stream: params.stream,
             tools: params.tools,
             toolChoice: params.toolChoice,
+            reasoningEffort: params.reasoningEffort,
             userId: params.endUserId || undefined,
             frequencyPenalty: params.frequencyPenalty,
             presencePenalty: params.presencePenalty,

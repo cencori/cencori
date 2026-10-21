@@ -26,6 +26,14 @@ import {
 import { getPricingFromDB } from './pricing';
 import { toOpenAIMessages, estimateTokenCount } from './utils';
 import { normalizeProviderError, ServiceUnavailableError } from './errors';
+import {
+    needsOpenAIResponsesApi,
+    responsesFinishReason,
+    responsesText,
+    responsesToolCalls,
+    responsesUsageAsChat,
+    toResponsesParams,
+} from './openai-responses';
 
 export function openAICompletionLimits(request: Pick<UnifiedChatRequest, 'model' | 'maxTokens' | 'temperature'>) {
     // GPT-6 defaults to reasoning effort "medium", which rejects sampling
@@ -117,6 +125,10 @@ export class OpenAIProvider extends AIProvider {
         const { signal, timedOut } = attemptSignal(request.signal, transport.timeoutMs);
 
         try {
+            if (needsOpenAIResponsesApi(request)) {
+                return await this.executeResponses(request, transport, signal, startTime);
+            }
+
             // Convert tools to OpenAI format
             const tools: ChatCompletionTool[] | undefined = request.tools?.map(t => ({
                 type: 'function' as const,
@@ -232,6 +244,10 @@ export class OpenAIProvider extends AIProvider {
     async *stream(request: UnifiedChatRequest): AsyncGenerator<StreamChunk> {
         // Streams never retry: a partially-yielded stream cannot be replayed.
         const transport = resolveProviderTransport(this.transport, request);
+        if (needsOpenAIResponsesApi(request)) {
+            yield* this.streamResponses(request, transport);
+            return;
+        }
         try {
             // Convert tools to OpenAI format
             const tools: ChatCompletionTool[] | undefined = request.tools?.map(t => ({
@@ -328,6 +344,105 @@ export class OpenAIProvider extends AIProvider {
                     toolCalls,
                     ...(usage ? { usage } : {}),
                 };
+            }
+        } catch (error) {
+            throw normalizeProviderError(this.providerName, error);
+        }
+    }
+
+    /** Unary call through the Responses API; see openai-responses.ts for why. */
+    private async executeResponses(
+        request: UnifiedChatRequest,
+        transport: ResolvedProviderTransport,
+        signal: AbortSignal | undefined,
+        startTime: number,
+    ): Promise<UnifiedChatResponse> {
+        const response = await this.clientFor(transport).responses.create(
+            { ...toResponsesParams(request), stream: false },
+            { signal, timeout: transport.timeoutMs, maxRetries: 0 },
+        );
+
+        const usage = responsesUsageAsChat(response.usage);
+        const pricing = await this.getPricing(request.model);
+        const { promptTokens: billablePromptTokens, cached } = splitOpenAICachedTokens(usage);
+        const providerCost = this.calculateCost(billablePromptTokens, usage.completion_tokens, pricing, cached);
+
+        enforceRequestBudget({
+            provider: this.providerName,
+            model: request.model,
+            costUsd: providerCost,
+            budgetUsd: request.maxCostUsd,
+            usage: {
+                promptTokens: usage.prompt_tokens,
+                completionTokens: usage.completion_tokens,
+                totalTokens: usage.total_tokens,
+            },
+        });
+
+        return {
+            content: responsesText(response),
+            model: response.model,
+            provider: this.providerName,
+            usage: {
+                promptTokens: usage.prompt_tokens,
+                completionTokens: usage.completion_tokens,
+                totalTokens: usage.total_tokens,
+                uncachedPromptTokens: billablePromptTokens,
+                ...(cached.cacheReadTokens ? { cacheReadTokens: cached.cacheReadTokens } : {}),
+            },
+            cost: {
+                providerCostUsd: providerCost,
+                cencoriChargeUsd: providerCost,
+                markupPercentage: 0,
+            },
+            latencyMs: Date.now() - startTime,
+            finishReason: responsesFinishReason(response),
+            toolCalls: responsesToolCalls(response),
+        };
+    }
+
+    /**
+     * Streaming call through the Responses API. Text streams as it arrives;
+     * tool calls, finish reason and usage land together on the terminal
+     * chunk, because consumers stop reading at the first finishReason.
+     */
+    private async *streamResponses(
+        request: UnifiedChatRequest,
+        transport: ResolvedProviderTransport,
+    ): AsyncGenerator<StreamChunk> {
+        try {
+            const stream = await this.clientFor(transport).responses.create(
+                { ...toResponsesParams(request), stream: true },
+                {
+                    signal: transportSignal(request.signal, transport.timeoutMs),
+                    timeout: transport.timeoutMs,
+                    maxRetries: 0,
+                },
+            );
+
+            for await (const event of stream) {
+                if (event.type === 'response.output_text.delta') {
+                    yield { delta: event.delta };
+                } else if (event.type === 'response.completed' || event.type === 'response.incomplete') {
+                    const { promptTokens, cached } = splitOpenAICachedTokens(responsesUsageAsChat(event.response.usage));
+                    const usage = event.response.usage;
+                    yield {
+                        delta: '',
+                        finishReason: responsesFinishReason(event.response),
+                        toolCalls: responsesToolCalls(event.response),
+                        usage: {
+                            promptTokens,
+                            completionTokens: usage?.output_tokens ?? 0,
+                            totalTokens: usage?.total_tokens ?? 0,
+                            ...(cached.cacheReadTokens ? { cacheReadTokens: cached.cacheReadTokens } : {}),
+                        },
+                    };
+                    return;
+                } else if (event.type === 'response.failed') {
+                    throw new Error(event.response.error?.message || 'OpenAI response failed');
+                } else if (event.type === 'error') {
+                    throw new Error(event.message);
+                }
             }
         } catch (error) {
             throw normalizeProviderError(this.providerName, error);
