@@ -1,6 +1,7 @@
-import { getAuthUser } from "@/lib/auth/get-auth-user";
 /* eslint-disable react/no-unescaped-entities */
 "use client";
+
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 
 import { useRouter } from "next/navigation";
 import React, { useState, use } from "react";
