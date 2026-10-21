@@ -83,7 +83,7 @@ export function getModelDisplayPrice(
     // Dotted id never matches the gpt-6-sol prefix above ('gpt-6.' vs 'gpt-6-')
     // and would otherwise fall through to the $0.50/$1.50 generic catch-all.
     if (id.startsWith('gpt-6.1-sol')) return price(2, 10);
-    if (id.startsWith('gpt-6-luna')) return price(0.2, 0.5);
+    if (id.startsWith('gpt-6-luna')) return price(0.1, 0.5);
     if (id.startsWith('gpt-5.5-pro')) return price(30, 180);
     // GPT-5 flagship
     if (

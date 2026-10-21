@@ -4,6 +4,7 @@ import { publicProviderLabel } from '@/lib/providers/branding';
 import { hasStaticPricing } from '@/lib/providers/pricing';
 import { resolveApiKeyModelAccess } from '@/lib/gateway/model-access';
 import { getManagedProviderNames } from '@/lib/gateway/providers-setup';
+import { getManagedJudgmentProviderNames } from '@/lib/judgment/registry';
 import type { ModelSource, ModelUnavailableReason, UnifiedModelRow } from './types';
 
 type Admin = ReturnType<typeof createAdminClient>;
@@ -60,6 +61,7 @@ export async function buildUnifiedModelRegistry(
     const q = opts.query ?? {};
 
     const managedProviders = getManagedProviderNames();
+    for (const provider of getManagedJudgmentProviderNames()) managedProviders.add(provider);
 
     // Project BYOK/custom presence expands usable set.
     const byokProviders = new Set<string>();

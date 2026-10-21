@@ -1,6 +1,6 @@
 /** @vitest-environment node */
-import { describe, expect, it } from 'vitest';
-import { getJudgmentAdapter, resolveJudgmentAdapter } from '../registry';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { getJudgmentAdapter, getManagedJudgmentProviderNames, resolveJudgmentAdapter } from '../registry';
 
 describe('judgment provider registry', () => {
     it('serves every catalog judgment model through the same route contract', () => {
@@ -23,6 +23,20 @@ describe('judgment provider registry', () => {
             expect(typeof adapter.price).toBe('function');
             expect(typeof adapter.resolveKey).toBe('function');
         }
+    });
+
+    describe('managed judgment providers', () => {
+        afterEach(() => vi.unstubAllEnvs());
+
+        it('lists a vendor only when every managed env var is set', () => {
+            vi.stubEnv('TYPESAFE_API_KEY', 'ts-key');
+            vi.stubEnv('CLOUDFLARE_API_TOKEN', 'cf-token');
+            vi.stubEnv('CLOUDFLARE_ACCOUNT_ID', '');
+            expect([...getManagedJudgmentProviderNames()]).toEqual(['typesafe']);
+
+            vi.stubEnv('CLOUDFLARE_ACCOUNT_ID', 'acct');
+            expect(getManagedJudgmentProviderNames()).toEqual(new Set(['typesafe', 'cloudflare']));
+        });
     });
 
     it('fails closed on unknown ids', () => {

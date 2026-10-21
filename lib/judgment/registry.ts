@@ -19,6 +19,7 @@
 
 import { ProviderRouter } from '@/lib/providers/router';
 import {
+    CLEF_MANAGED_ACCOUNT_ENV_VAR,
     CLEF_MANAGED_TOKEN_ENV_VAR,
     CLEF_PROVIDER,
     evaluateClefJudgment,
@@ -48,6 +49,8 @@ export interface JudgmentEvaluation {
 export interface JudgmentAdapter {
     provider: string;
     managedEnvVar: string;
+    /** Every env var the managed (Cencori-paid) key needs; all must be set. */
+    managedEnvVars: string[];
     evaluate: (
         apiKey: string,
         request: JudgmentRequest,
@@ -65,6 +68,7 @@ const ADAPTERS: Record<string, JudgmentAdapter> = {
     [JUDGMENT_PROVIDER]: {
         provider: JUDGMENT_PROVIDER,
         managedEnvVar: TYPESAFE_MANAGED_ENV_VAR,
+        managedEnvVars: [TYPESAFE_MANAGED_ENV_VAR],
         evaluate: evaluateJudgment,
         price: priceJudgment,
         resolveKey: (supabase, projectId, organizationId) =>
@@ -73,6 +77,7 @@ const ADAPTERS: Record<string, JudgmentAdapter> = {
     [CLEF_PROVIDER]: {
         provider: CLEF_PROVIDER,
         managedEnvVar: CLEF_MANAGED_TOKEN_ENV_VAR,
+        managedEnvVars: [CLEF_MANAGED_ACCOUNT_ENV_VAR, CLEF_MANAGED_TOKEN_ENV_VAR],
         evaluate: evaluateClefJudgment,
         price: priceClefJudgment,
         resolveKey: (supabase, projectId, organizationId) =>
@@ -82,6 +87,19 @@ const ADAPTERS: Record<string, JudgmentAdapter> = {
 
 export function getJudgmentAdapter(provider: string): JudgmentAdapter | null {
     return ADAPTERS[provider.trim().toLowerCase()] ?? null;
+}
+
+/**
+ * Judgment vendors Cencori can serve on its own key. They are not chat
+ * providers, so the gateway's managed-provider set never lists them; the
+ * model catalog adds these so /v1/models reports judgment models available.
+ */
+export function getManagedJudgmentProviderNames(): Set<string> {
+    const providers = new Set<string>();
+    for (const adapter of Object.values(ADAPTERS)) {
+        if (adapter.managedEnvVars.every((name) => process.env[name]?.trim())) providers.add(adapter.provider);
+    }
+    return providers;
 }
 
 /**
