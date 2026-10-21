@@ -2,6 +2,9 @@ import { isReservedSlug } from "@/lib/reserved-slugs";
 
 export const CONSOLE_INTERNAL_PREFIX = "/console-app";
 
+/** Carries the requested public path through the internal bootstrap rewrite. */
+export const CONSOLE_BOOTSTRAP_PATH_PARAM = "__console_path";
+
 export const ACTIVE_ORG_COOKIE = "cencori:active-org";
 export const ACTIVE_PROJECT_COOKIE = "cencori:active-project";
 
