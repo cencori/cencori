@@ -1,0 +1,40 @@
+#:schema https://brimble.io/schema/brimble.json
+
+# Cencori on Brimble, Lagos (afr-west). See docs/rfcs/RFC-0001-supabase-to-brimble-postgres.md.
+# Phase 0: the app runs here against Supabase as today; `db` is the empty
+# target database for the migration rehearsals. Single node by decision
+# (2026-10-21); HA would place replicas outside Nigeria.
+
+[services.web]
+type = "web"
+region = "afr-west"
+
+[services.web.build]
+runtime = { node = "22" }
+install = "npm ci"
+command = "npm run build"
+
+[services.web.deploy]
+start = "npm start"
+health = "/api/v1/health"
+
+[services.web.resources]
+cpu = 2
+memory = "4gb"
+
+[services.web.env]
+NODE_ENV = "production"
+# next build --webpack needs more than Node's default heap (see next.config.ts).
+NODE_OPTIONS = "--max-old-space-size=6144"
+# Not read by the app yet; wired for Phase 2 of the RFC.
+MIGRATION_DATABASE_URL = "{{@db.PRIVATE_CONNECTION_STRING}}"
+
+[databases.db]
+engine = "postgresql"
+version = "17"
+region = "afr-west"
+cpu = 2
+memory = "8gb"
+disk = "50gb"
+public = false
+backups = { schedule = "0 2 * * *", timezone = "Africa/Lagos", keep = "30d" }
