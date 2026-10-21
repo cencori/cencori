@@ -7,6 +7,7 @@ import { RESERVED_ORG_SLUGS } from "@/lib/reserved-slugs";
 import {
   ACTIVE_ORG_COOKIE,
   ACTIVE_PROJECT_COOKIE,
+  CONSOLE_BOOTSTRAP_PATH_PARAM,
   CONSOLE_INTERNAL_PREFIX,
   buildScopedConsolePath,
   getCanonicalConsoleRedirect,
@@ -807,9 +808,11 @@ export async function proxy(request: NextRequest) {
         // context on the client for all later flat routes.
         url.pathname = `${CONSOLE_INTERNAL_PREFIX}/home`;
       } else {
-        // A direct deep link before the workspace cookie exists gets one
-        // lightweight bootstrap render, then refreshes at the same public URL.
+        // A direct deep link before the workspace cookie exists resolves the
+        // workspace server-side and redirects through the slug URL, which the
+        // canonical redirect above turns back into this URL with cookies set.
         url.pathname = `${CONSOLE_INTERNAL_PREFIX}/bootstrap`;
+        url.searchParams.set(CONSOLE_BOOTSTRAP_PATH_PARAM, consoleRoute.canonicalPath);
       }
       rewriteUrl = url;
       response = NextResponse.rewrite(url);

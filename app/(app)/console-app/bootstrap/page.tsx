@@ -1,120 +1,54 @@
-"use client";
+import { redirect } from "next/navigation";
+import { getActiveConsoleOrganization, getActiveConsoleWorkspace } from "@/lib/console/active-workspace";
+import {
+  buildScopedConsolePath,
+  CONSOLE_BOOTSTRAP_PATH_PARAM,
+  getConsoleRoute,
+} from "@/lib/console/routing";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
-const RESOLVE_TIMEOUT_MS = 10_000;
-// If the refreshed render still lands back here, cookies aren't sticking
-// (blocked storage, dropped Set-Cookie). Refreshing again would loop
-// forever on a blank screen, so fail visibly instead.
-const MAX_AUTO_REFRESHES = 1;
-// router.refresh() does not remount us — if the refreshed render still
-// resolves to this page, no effect refires and no guard trips. Watchdog
-// turns that silent stall into a visible, retryable error.
-const POST_REFRESH_WATCHDOG_MS = 6_000;
+// A direct deep link (e.g. /ai-gateway) before the workspace cookies exist.
+// Resolving here and redirecting to the slug URL lets the proxy's canonical
+// redirect set the cookies and land back on the requested URL — no client
+// render, context fetch, or refresh, so no placeholder paints before the
+// real page and its own skeletons.
+export default async function ConsoleWorkspaceBootstrapPage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
+  const params = await searchParams;
+  const requested = params[CONSOLE_BOOTSTRAP_PATH_PARAM];
+  // Only paths the console router accepts — never an arbitrary redirect target.
+  const route = typeof requested === "string" ? getConsoleRoute(requested) : null;
+  if (!route) redirect("/home");
 
-export default function ConsoleWorkspaceBootstrapPage() {
-  const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
-  const refreshesRef = useRef(0);
-  const settledRef = useRef(false);
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (key === CONSOLE_BOOTSTRAP_PATH_PARAM || value === undefined) continue;
+    for (const item of Array.isArray(value) ? value : [value]) query.append(key, item);
+  }
+  const search = query.size ? `?${query}` : "";
 
-  useEffect(() => {
-    return () => {
-      settledRef.current = true;
-    };
-  }, []);
-
-  const resolveWorkspace = useCallback(async () => {
-    setError(null);
-
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), RESOLVE_TIMEOUT_MS);
-
-    try {
-      const response = await fetch("/api/console/context", {
-        cache: "no-store",
-        credentials: "same-origin",
-        signal: controller.signal,
-      });
-      if (!response.ok) throw new Error("Could not load your console workspace.");
-
-      const payload = (await response.json()) as { workspace?: unknown; hasOrganization?: boolean };
-      if (!payload.workspace) {
-        settledRef.current = true;
-        // Org exists but no project yet → project creation, not org
-        // creation. Sending these users to /onboarding loops forever there.
-        router.replace(payload.hasOrganization ? "/projects" : "/onboarding");
-        return;
-      }
-
-      // The context response sets the active workspace cookies. Refreshing
-      // keeps the requested public URL while middleware routes it internally.
-      // If we're still mounted after the watchdog window, the refreshed
-      // render resolved back here — cookies didn't apply — so say so
-      // instead of hanging on the skeleton.
-      refreshesRef.current += 1;
-      if (refreshesRef.current > MAX_AUTO_REFRESHES) {
-        throw new Error(
-          "Your workspace was found but this browser isn't keeping its context. Check cookie settings, then try again.",
-        );
-      }
-      router.refresh();
-      setTimeout(() => {
-        if (!settledRef.current) {
-          setError(
-            "Your workspace was found but this page isn't picking it up. Check cookie settings, then try again.",
-          );
-        }
-      }, POST_REFRESH_WATCHDOG_MS);
-    } catch (bootstrapError) {
-      if (settledRef.current) return;
-      setError(
-        bootstrapError instanceof DOMException && bootstrapError.name === "AbortError"
-          ? "Loading your workspace is taking too long. Check your connection, then try again."
-          : bootstrapError instanceof Error
-            ? bootstrapError.message
-            : "Could not load your console workspace.",
-      );
-    } finally {
-      clearTimeout(timeout);
-    }
-  }, [router]);
-
-  useEffect(() => {
-    void resolveWorkspace();
-  }, [resolveWorkspace]);
-
-  if (!error) {
-    return (
-      <div
-        className="mx-auto w-full max-w-[1360px] px-6 py-8"
-        role="status"
-        aria-label="Loading dashboard"
-      >
-        <div className="mb-8 space-y-2">
-          <Skeleton className="h-5 w-28" />
-          <Skeleton className="h-3 w-72 max-w-full" />
-        </div>
-        <div className="grid gap-4 md:grid-cols-2">
-          <Skeleton className="h-36 rounded-xl" />
-          <Skeleton className="h-36 rounded-xl" />
-        </div>
-        <Skeleton className="mt-4 h-64 rounded-xl" />
-        <span className="sr-only">Loading the dashboard</span>
-      </div>
+  const workspace = await getActiveConsoleWorkspace();
+  if (workspace) {
+    const scopedPath = buildScopedConsolePath(
+      route,
+      workspace.organization.slug,
+      workspace.project.slug,
     );
+    if (scopedPath) redirect(`${scopedPath}${search}`);
   }
 
-  return (
-    <main className="mx-auto flex min-h-[60vh] w-full max-w-lg flex-col items-start justify-center px-6">
-      <h1 className="text-lg font-medium">Console unavailable</h1>
-      <p className="mt-2 text-sm text-muted-foreground">{error}</p>
-      <Button type="button" size="sm" className="mt-5" onClick={() => void resolveWorkspace()}>
-        Try again
-      </Button>
-    </main>
-  );
+  // No project yet. Organization-scoped pages still work; project pages send
+  // users with an organization to project creation, and users without one to
+  // org creation (mirrors console-app/home).
+  const organization = await getActiveConsoleOrganization();
+  if (!organization) redirect("/onboarding");
+  if (route.scope === "organization") {
+    const scopedPath = buildScopedConsolePath(route, organization.slug);
+    if (scopedPath) redirect(`${scopedPath}${search}`);
+  }
+  redirect("/projects");
 }
