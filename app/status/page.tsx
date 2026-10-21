@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import { getOutrayStatus } from '@/lib/outray-status';
+import { statusBasePath, statusMainSiteHref } from '@/lib/status-host';
 import StatusPageClient from './status-page-client';
 
 export const metadata: Metadata = {
@@ -15,6 +17,13 @@ export const metadata: Metadata = {
 export const revalidate = 30;
 
 export default async function StatusPage() {
+  const host = (await headers()).get('host') ?? '';
   const initial = await getOutrayStatus();
-  return <StatusPageClient initial={initial} />;
+  return (
+    <StatusPageClient
+      initial={initial}
+      basePath={statusBasePath(host)}
+      mainSiteHref={statusMainSiteHref(host)}
+    />
+  );
 }

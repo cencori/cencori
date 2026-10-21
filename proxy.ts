@@ -17,6 +17,12 @@ import {
   isConsoleHostname,
 } from "@/lib/console/routing";
 import { getMainSiteUrl } from "@/lib/main-site-url";
+import {
+  getStatusOriginForHostname,
+  isStatusHostname,
+  statusInternalPath,
+  statusPublicPath,
+} from "@/lib/status-host";
 import { sanitizeAuthRedirectTarget } from "@/lib/auth-redirect";
 
 const LAST_ORG_COOKIE = "cencori:last-org";
@@ -462,6 +468,40 @@ export async function proxy(request: NextRequest) {
     const docsUrl = new URL(getMainSiteUrl(pathname, request.nextUrl.origin));
     docsUrl.search = request.nextUrl.search;
     return applySecurityHeaders(NextResponse.redirect(docsUrl, 308));
+  }
+
+  // status.cencori.com serves the branded status page at its root. Old
+  // /status/* links redirect to clean paths; anything else belongs to the main
+  // site. The main site's /status pages redirect to the subdomain.
+  if (!(pathname.includes(".") && !pathname.startsWith("/.well-known")) && !pathname.startsWith("/api/")) {
+    if (isStatusHostname(hostname)) {
+      const publicPath = statusPublicPath(pathname);
+      if (publicPath) {
+        const cleanUrl = request.nextUrl.clone();
+        cleanUrl.pathname = publicPath;
+        return applySecurityHeaders(NextResponse.redirect(cleanUrl, 308));
+      }
+      if (pathname === "/" || pathname === "/history") {
+        const statusUrl = request.nextUrl.clone();
+        statusUrl.pathname = statusInternalPath(pathname);
+        return applySecurityHeaders(NextResponse.rewrite(statusUrl));
+      }
+      const mainUrl = new URL(getMainSiteUrl(pathname, "https://cencori.com"));
+      if (domain === "status.localhost") {
+        mainUrl.protocol = "http:";
+        mainUrl.host = hostname.replace(/^status\./, "");
+      }
+      mainUrl.search = request.nextUrl.search;
+      return applySecurityHeaders(NextResponse.redirect(mainUrl, 308));
+    }
+
+    const statusPath = statusPublicPath(pathname);
+    const statusOrigin = statusPath ? getStatusOriginForHostname(hostname) : null;
+    if (statusPath && statusOrigin) {
+      const statusUrl = new URL(statusPath, statusOrigin);
+      statusUrl.search = request.nextUrl.search;
+      return applySecurityHeaders(NextResponse.redirect(statusUrl, 308));
+    }
   }
 
   // Internal console routes are implementation details. Canonical console

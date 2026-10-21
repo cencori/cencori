@@ -12,9 +12,12 @@ export const STATUS_BUTTON =
 // screen on short pages and after the content on long ones.
 export function StatusShell({
   subscriptionsEnabled,
+  mainSiteHref,
   children,
 }: {
   subscriptionsEnabled: boolean;
+  /** The logo's link: cencori.com's home (absolute on the status subdomain). */
+  mainSiteHref: string;
   children: ReactNode;
 }) {
   return (
@@ -22,7 +25,7 @@ export function StatusShell({
       <div className="mx-auto flex min-h-screen w-full max-w-3xl flex-col px-4 pt-16 sm:px-6">
         <header className="mb-8 flex items-center justify-between gap-4">
           {/* Same lockup as the site nav's "CENCORI Developers". */}
-          <Link href="/" aria-label="Cencori home" className="inline-flex items-center gap-3">
+          <Link href={mainSiteHref} aria-label="Cencori home" className="inline-flex items-center gap-3">
             <Image
               alt="Cencori"
               className="block h-auto w-[7.2rem] object-contain"

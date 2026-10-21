@@ -246,11 +246,11 @@ function Components({ data }: { data: OutrayStatusPage }) {
   );
 }
 
-function ViewHistoryButton() {
+function ViewHistoryButton({ basePath }: { basePath: string }) {
   return (
     <div className="mt-10 flex justify-center">
       <Link
-        href="/status/history"
+        href={`${basePath}/history`}
         className={STATUS_BUTTON}
       >
         View history
@@ -267,22 +267,31 @@ function Unavailable() {
         Live status is still published on our independent status page.
       </p>
       <a href={HOSTED_STATUS_PAGE_URL} className="mt-4 inline-block text-sm font-medium underline underline-offset-4">
-        Open status.cencori.com
+        Open our backup status page
       </a>
     </section>
   );
 }
 
-export default function StatusPageClient({ initial }: { initial: OutrayStatusPage | null }) {
+export default function StatusPageClient({
+  initial,
+  basePath,
+  mainSiteHref,
+}: {
+  initial: OutrayStatusPage | null;
+  /** "" on status.cencori.com, "/status" on other hosts. */
+  basePath: string;
+  mainSiteHref: string;
+}) {
   const data = useOutrayStatus(initial);
 
   return (
-    <StatusShell subscriptionsEnabled={Boolean(data?.subscriptionsEnabled)}>
+    <StatusShell subscriptionsEnabled={Boolean(data?.subscriptionsEnabled)} mainSiteHref={mainSiteHref}>
       {data ? (
         <>
           <OverallBanner data={data} />
           <Components data={data} />
-          <ViewHistoryButton />
+          <ViewHistoryButton basePath={basePath} />
         </>
       ) : (
         <Unavailable />
