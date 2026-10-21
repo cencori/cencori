@@ -15,6 +15,17 @@ import { MOCK_INCIDENTS } from './mock-incidents'; // TEMPORARY: remove with moc
 export const metadata: Metadata = {
   title: { absolute: 'Status history | Cencori' },
   description: 'Past incidents and maintenance for Cencori.',
+  openGraph: {
+    title: 'Cencori Status history',
+    description: 'Past incidents and maintenance for Cencori.',
+    images: ['/og/status'],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Cencori Status history',
+    description: 'Past incidents and maintenance for Cencori.',
+    images: ['/og/status'],
+  },
 };
 
 export const revalidate = 30;
