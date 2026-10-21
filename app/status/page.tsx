@@ -10,6 +10,13 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Cencori Status',
     description: 'Live status, 90-day uptime, and incident history for Cencori.',
+    images: ['/og/status'],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Cencori Status',
+    description: 'Live status, 90-day uptime, and incident history for Cencori.',
+    images: ['/og/status'],
   },
 };
 
