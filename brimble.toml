@@ -16,6 +16,8 @@ command = "npm run build"
 
 [services.web.deploy]
 start = "npm start"
+# Creates the Better Auth tables (idempotent). Workbench is read-only.
+before_start = "node scripts/brimble-apply-sql.mjs"
 health = "/api/v1/health"
 
 [services.web.resources]
