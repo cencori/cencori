@@ -11,7 +11,9 @@ region = "afr-west"
 
 [services.web.build]
 runtime = { node = "22" }
-install = "npm ci"
+# NODE_ENV=production (below) makes npm skip devDependencies, and next build
+# then stops to install TypeScript; the first Lagos build timed out at 25 min.
+install = "npm ci --include=dev --no-audit --no-fund"
 command = "npm run build"
 
 [services.web.deploy]
