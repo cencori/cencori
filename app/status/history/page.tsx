@@ -164,10 +164,10 @@ function IncidentRow({ item, basePath }: { item: DatedIncident; basePath: string
         <span aria-hidden="true" className={cn('w-[3px] shrink-0 rounded-full', severityColor(item.kind))} />
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline justify-between gap-4">
-            <p className="text-sm font-medium">{item.title}</p>
+            <p className="min-w-0 truncate text-sm font-medium">{item.title}</p>
             {at ? <time dateTime={at.toISOString()} className="shrink-0 text-xs text-muted-foreground">{TIME.format(at)} UTC</time> : null}
           </div>
-          {note ? <p className="mt-1 text-sm text-muted-foreground">{note}</p> : null}
+          {note ? <p className="mt-1 truncate text-sm text-muted-foreground">{note.replace(/\s+/g, ' ')}</p> : null}
         </div>
       </Link>
     </li>
