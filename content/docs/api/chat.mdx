@@ -40,7 +40,7 @@ const cencori = new Cencori({
 });
 
 const response = await cencori.ai.chat({
-  model: 'gpt-4o',
+  model: 'gpt-6-sol',
   messages: [
     { role: 'system', content: 'You are a helpful assistant.' },
     { role: 'user', content: 'What is the capital of France?' },
@@ -59,7 +59,7 @@ console.log(response.usage.totalTokens);
 ```json
 {
   "id": "chatcmpl_123",
-  "model": "gpt-4o",
+  "model": "gpt-6-sol",
   "content": "The capital of France is Paris.",
   "toolCalls": null,
   "finishReason": "stop",
@@ -80,7 +80,7 @@ curl https://cencori.com/api/ai/chat \
   -H "CENCORI_API_KEY: csk_..." \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "gpt-4o",
+    "model": "gpt-6-sol",
     "messages": [{"role": "user", "content": "Hello!"}],
     "stream": false
   }'
@@ -97,7 +97,7 @@ curl https://api.cencori.com/v1/chat/completions \
   -H "Authorization: Bearer csk_..." \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "gpt-4o",
+    "model": "gpt-6-sol",
     "messages": [{"role": "user", "content": "Hello!"}]
   }'
 ```
@@ -118,6 +118,8 @@ When configuring an SDK, set the base URL to `https://api.cencori.com/v1`, not t
 | `userId` or `user` | string | No | End-user identifier for attribution and Monetization |
 | `timeout_ms` | number | No | Per-request provider timeout in ms (1–300000, capped). Bounds one provider attempt |
 | `max_cost_usd` | number | No | Per-request cost budget in USD. Unary calls fail before returning; streams surface it at final tally as HTTP 402 `budget_exceeded` |
+| `reasoning_effort` | string | No | `none`, `minimal`, `low`, `medium`, `high`, `xhigh` or `max`, on reasoning models. `/v1/chat/completions` only |
+| `knowledge_bases` | string[] | No | Up to 3 knowledge base ids to ground the answer in, with citations. See [Knowledge bases](#knowledge-bases-rag). `/v1/chat/completions` only |
 
 ## OpenAI-Compatible Response Shape
 
@@ -126,7 +128,7 @@ When configuring an SDK, set the base URL to `https://api.cencori.com/v1`, not t
   "id": "chatcmpl-abc123",
   "object": "chat.completion",
   "created": 1677652288,
-  "model": "gpt-4o",
+  "model": "gpt-6-sol",
   "choices": [
     {
       "index": 0,
@@ -145,13 +147,51 @@ When configuring an SDK, set the base URL to `https://api.cencori.com/v1`, not t
 }
 ```
 
+## Knowledge bases (RAG)
+
+Name up to three [knowledge bases](/docs/embedded-agents/overview) and Cencori searches them with the user's latest message before calling the model. The best-matching passages are added to the prompt, the model is told to cite them with `[1]`-style markers, and the response says which passage each marker points to.
+
+```bash
+curl https://api.cencori.com/v1/chat/completions \
+  -H "Authorization: Bearer $CENCORI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-6-sol",
+    "messages": [{ "role": "user", "content": "How long do refunds take?" }],
+    "knowledge_bases": ["kb_8f2c..."]
+  }'
+```
+
+The response carries a `knowledge` object next to `choices`:
+
+```json
+{
+  "choices": [{ "message": { "role": "assistant", "content": "Refunds are processed within 5 business days [1]." } }],
+  "knowledge": {
+    "knowledge_bases": ["kb_8f2c..."],
+    "citations": [
+      { "n": 1, "chunk_id": "4b1e...", "source_id": "src_91ad...", "ord": 3, "page": 2, "score": 0.91 }
+    ]
+  }
+}
+```
+
+When streaming, the same citations arrive as JSON in the `X-Cencori-Knowledge-Citations` response header, before the first token.
+
+- Up to 5 passages are used per request, the best matches across all named bases.
+- Requires a secret project key. Publishable (browser) keys get `403 secret_key_required`.
+- Only project-wide knowledge bases can be used here. Tenant-scoped bases return `403 tenant_scope_mismatch`; query those through a session on their agent installation.
+- An unknown id returns `404 knowledge_base_not_found`.
+- Retrieval fails open: if search is unavailable, the request still runs, just without passages, and `citations` is empty.
+- The query embedding is billed like any embedding call. Grounded requests skip the prompt cache, so answers reflect the current documents.
+
 ## Streaming
 
 ### SDK Streaming
 
 ```typescript
 const stream = cencori.ai.chatStream({
-  model: 'gpt-4o',
+  model: 'gpt-6-sol',
   messages: [{ role: 'user', content: 'Tell me a story.' }],
 });
 
@@ -167,7 +207,7 @@ curl -N https://api.cencori.com/v1/chat/completions \
   -H "Authorization: Bearer csk_..." \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "gpt-4o",
+    "model": "gpt-6-sol",
     "messages": [{"role": "user", "content": "Tell me a story."}],
     "stream": true
   }'
@@ -177,7 +217,7 @@ curl -N https://api.cencori.com/v1/chat/completions \
 
 ```typescript
 const response = await cencori.ai.chat({
-  model: 'gpt-4o',
+  model: 'gpt-6-sol',
   messages: [{ role: 'user', content: 'What is the weather in Tokyo?' }],
   tools: [
     {
@@ -214,7 +254,7 @@ import { CencoriError, RateLimitError } from 'cencori';
 
 try {
   await cencori.ai.chat({
-    model: 'gpt-4o',
+    model: 'gpt-6-sol',
     messages: [{ role: 'user', content: 'Hello!' }],
   });
 } catch (error) {

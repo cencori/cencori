@@ -74,6 +74,8 @@ import {
 } from "@/lib/gateway/fast-lane";
 import { warmGatewayProjectConfig } from "@/lib/gateway/request-config";
 import { isAutoRouterModel } from "@/lib/gateway/auto-router";
+import { dePrefixId, withPrefix } from "@/lib/embedded/http";
+import { retrieveKnowledge, TURN_KNOWLEDGE_MAX_KBS, type TurnKnowledge } from "@/lib/embedded/turn-knowledge";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -117,6 +119,8 @@ type ChatRequestBody = {
         variables?: Record<string, string>;
     };
     memory?: MemoryDirectiveInput;
+    /** Knowledge base ids (`kb_...`) to ground the answer in, with citations. */
+    knowledge_bases?: unknown;
     routing_profile?: GatewayRoutingProfile;
     /** Fast-lane passthrough: skip gateway guards/cache/retries (own safety layers). */
     passthrough?: boolean;
@@ -604,6 +608,44 @@ export async function POST(req: NextRequest) {
             memoryDirective = normalizeDirectiveScope(parsedDirective.directive, gatewayCtx.organizationId);
         }
 
+        // ── Knowledge bases (RAG): opt-in by naming them ──
+        // Only project-wide (platform) bases are readable here. Tenant-scoped
+        // bases stay behind Sessions/agent installations, where the tenant
+        // binding is checked. Publishable keys ship to browsers, so they can't
+        // pull knowledge into a prompt anyone could then ask to repeat.
+        let knowledgeBaseIds: string[] = [];
+        if (body.knowledge_bases !== undefined) {
+            const requested = body.knowledge_bases;
+            if (!Array.isArray(requested) || requested.length === 0 || !requested.every((id) => typeof id === "string" && id.trim())) {
+                return respondError(400, "knowledge_bases must be a non-empty array of knowledge base ids.", "invalid_knowledge_bases");
+            }
+            if (requested.length > TURN_KNOWLEDGE_MAX_KBS) {
+                return respondError(400, `knowledge_bases accepts at most ${TURN_KNOWLEDGE_MAX_KBS} ids.`, "invalid_knowledge_bases");
+            }
+            if (gatewayCtx.keyType === "publishable") {
+                return respondError(403, "knowledge_bases requires a secret project key.", "secret_key_required");
+            }
+            const ids = [...new Set(requested.map((id: string) => dePrefixId(id.trim())))];
+            const { data: kbs, error: kbError } = await adminClient
+                .from("knowledge_bases")
+                .select("id, tenant_id")
+                .eq("project_id", gatewayCtx.projectId)
+                .in("id", ids);
+            if (kbError) {
+                return respondError(500, "Failed to load knowledge bases.", "knowledge_bases_unavailable");
+            }
+            const found = new Map(((kbs ?? []) as Array<{ id: string; tenant_id: string | null }>).map((kb) => [kb.id, kb]));
+            const missing = ids.find((id) => !found.has(id));
+            if (missing) {
+                return respondError(404, `Knowledge base '${withPrefix("kb", missing)}' not found.`, "knowledge_base_not_found");
+            }
+            const tenantScoped = ids.find((id) => found.get(id)?.tenant_id);
+            if (tenantScoped) {
+                return respondError(403, `Knowledge base '${withPrefix("kb", tenantScoped)}' is tenant-scoped; query it through a session on its agent installation.`, "tenant_scope_mismatch");
+            }
+            knowledgeBaseIds = ids;
+        }
+
         const pipelineMessages: UnifiedMessage[] = isVisionRequest
             ? toVisionGuardMessages(messages)
             : toUnifiedMessages(messages);
@@ -654,6 +696,37 @@ export async function POST(req: NextRequest) {
                     },
                 })
                 : Promise.resolve([]);
+
+        // Knowledge retrieval overlaps the input pipeline the same way, and
+        // is fail-open too: no hits means the request runs ungrounded.
+        const knowledgePromise: Promise<TurnKnowledge> = knowledgeBaseIds.length > 0
+            ? retrieveKnowledge(adminClient, {
+                projectId: activeGatewayCtx.projectId,
+                organizationId: activeGatewayCtx.organizationId,
+                knowledgeBaseIds,
+                queryText: lastUserMessageText,
+                onEmbeddingUsage: usage => {
+                    waitUntil(Promise.all([
+                        logGatewayRequest(activeGatewayCtx, {
+                            endpoint: "knowledge/search",
+                            model: usage.model,
+                            provider: usage.provider,
+                            status: "success",
+                            promptTokens: usage.totalTokens,
+                            completionTokens: 0,
+                            totalTokens: usage.totalTokens,
+                            costUsd: usage.cencoriChargeUsd,
+                            providerCostUsd: usage.providerCostUsd,
+                            cencoriChargeUsd: usage.cencoriChargeUsd,
+                            markupPercentage: usage.markupPercentage,
+                            metadata: { source: "chat_knowledge_retrieval" },
+                            requestPayload: promptPayload(lastUserMessageText, { model: usage.model }),
+                        }),
+                        incrementUsage(activeGatewayCtx, usage.cencoriChargeUsd),
+                    ]).then(() => undefined));
+                },
+            })
+            : Promise.resolve({ block: null, citations: [] });
 
         // Fast-lane (passthrough): caller runs its own safety layers, so skip
         // the input scan + custom rules + governance policies in the critical
@@ -728,6 +801,27 @@ export async function POST(req: NextRequest) {
             }
             guardedMessages.splice(insertAt, 0, memoryMessage);
         }
+
+        // ── Knowledge injection ──
+        // Same placement as memory: after the leading system messages (which
+        // now include the memory block), before the first non-system turn.
+        const knowledge = await knowledgePromise;
+        const knowledgeCitations = knowledge.citations.map((c) => ({
+            chunk_id: c.chunk_id,
+            source_id: withPrefix("src", c.source_id),
+            ord: c.ord ?? null,
+            page: c.page ?? null,
+            score: c.score,
+        }));
+        if (knowledge.block) {
+            let insertAt = 0;
+            while (insertAt < guardedMessages.length && guardedMessages[insertAt].role === "system") {
+                insertAt++;
+            }
+            guardedMessages.splice(insertAt, 0, { role: "system", content: knowledge.block });
+        }
+        // Citation numbers match the [#] markers the model is told to use.
+        const knowledgeHeaderValue = JSON.stringify(knowledgeCitations.map((c, i) => ({ n: i + 1, ...c })));
 
         messages = guardedMessages.map((m) => ({
             role: m.role,
@@ -819,6 +913,9 @@ export async function POST(req: NextRequest) {
                     String(retrievedMemories.length)
                 );
             }
+            if (knowledgeBaseIds.length > 0) {
+                visionResponse.headers.set('X-Cencori-Knowledge-Citations', knowledgeHeaderValue);
+            }
             return respond(visionResponse as NextResponse);
         }
 
@@ -838,7 +935,9 @@ export async function POST(req: NextRequest) {
         // Auto-router responses are never cached: the concrete model depends
         // on the project's BYOK set at request time, so an `auto` cache key
         // could serve a model the current key set can no longer reach.
-        if (gatewayCtx && !tools && !skipCache && !memoryDirective?.retrieve && !fastLane && !isAutoRouterModel(model)) {
+        // Knowledge-grounded answers skip it too: the bases change under the
+        // same prompt as sources are added or re-synced.
+        if (gatewayCtx && !tools && !skipCache && !memoryDirective?.retrieve && knowledgeBaseIds.length === 0 && !fastLane && !isAutoRouterModel(model)) {
             try {
                 // Try cache first - use cached config if available
                 const cachedConfig = await getCachedCacheConfig(gatewayCtx.projectId);
@@ -1131,6 +1230,13 @@ export async function POST(req: NextRequest) {
                 };
             }
 
+            if (knowledgeBaseIds.length > 0) {
+                (responseJson as Record<string, unknown>).knowledge = {
+                    knowledge_bases: knowledgeBaseIds.map((id) => withPrefix("kb", id)),
+                    citations: knowledgeCitations.map((c, i) => ({ n: i + 1, ...c })),
+                };
+            }
+
             // Safety classification: what the input guards verdicts, so a 200
             // whose model "resisted on its own" is distinguishable from a
             // request that was never scanned.
@@ -1142,6 +1248,9 @@ export async function POST(req: NextRequest) {
         maybeLogPromptUsage();
         for (const [header, value] of Object.entries(safetyHeaders(buildInputSafetyBlock(inputPipeline)))) {
             execResult.response.headers.set(header, value);
+        }
+        if (knowledgeBaseIds.length > 0) {
+            execResult.response.headers.set('X-Cencori-Knowledge-Citations', knowledgeHeaderValue);
         }
         if (memoryDirective) {
             execResult.response.headers.set(
