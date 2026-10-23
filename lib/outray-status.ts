@@ -66,8 +66,24 @@ export interface OutrayGroup {
   components: OutrayComponent[];
 }
 
-// Confirmed against live incidents (2026-10-23). `updates` has only been seen
-// empty, so its entries stay loosely typed.
+/**
+ * A posted team update. Confirmed from a live update (2026-10-23): id, status
+ * (investigating | identified | monitoring | resolved), note (plain text),
+ * body (formatted document), publishedAt. Other fields are tolerated.
+ */
+export interface OutrayIncidentUpdate {
+  stage?: string;
+  status?: string;
+  /** Plain-text version of the update. */
+  note?: string;
+  /** The editor document (TipTap JSON), sent as an object. */
+  body?: unknown;
+  message?: string;
+  createdAt?: string;
+  publishedAt?: string;
+}
+
+// Confirmed against live incidents (2026-10-23).
 export interface OutrayIncident {
   id: string;
   title: string;
@@ -81,7 +97,7 @@ export interface OutrayIncident {
   components: string[];
   latestNote: string | null;
   latestNoteAt: string | null;
-  updates: unknown[];
+  updates: OutrayIncidentUpdate[];
 }
 
 export interface OutrayStatusPage {
@@ -98,6 +114,19 @@ export interface OutrayStatusPage {
   groups: OutrayGroup[];
   standaloneComponents: OutrayComponent[];
   incidents: OutrayIncident[];
+}
+
+/** One incident by id, or null when OutRay doesn't know it (404) or can't be reached. */
+export async function getOutrayIncident(id: string): Promise<OutrayIncident | null> {
+  try {
+    const response = await fetch(`${OUTRAY_STATUS_URL}/incidents/${encodeURIComponent(id)}`, {
+      next: { revalidate: 30 },
+    });
+    if (!response.ok) return null;
+    return (await response.json()) as OutrayIncident;
+  } catch {
+    return null;
+  }
 }
 
 export async function getOutrayStatus(): Promise<OutrayStatusPage | null> {

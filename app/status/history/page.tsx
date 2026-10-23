@@ -152,24 +152,29 @@ function summary(incident: OutrayIncident | null): string | null {
   return incident.status === 'open' ? 'Ongoing.' : 'Resolved.';
 }
 
-function IncidentRow({ item }: { item: DatedIncident }) {
+function IncidentRow({ item, basePath }: { item: DatedIncident; basePath: string }) {
   const { at } = item;
   const note = summary(item.incident);
   return (
-    <li className="flex gap-4 py-3">
-      <span aria-hidden="true" className={cn('w-[3px] shrink-0 rounded-full', severityColor(item.kind))} />
-      <div className="min-w-0 flex-1">
-        <div className="flex items-baseline justify-between gap-4">
-          <p className="text-sm font-medium">{item.title}</p>
-          {at ? <time dateTime={at.toISOString()} className="shrink-0 text-xs text-muted-foreground">{TIME.format(at)} UTC</time> : null}
+    <li>
+      <Link
+        href={`${basePath}/incidents/${item.id}`}
+        className="-mx-3 flex gap-4 rounded-md px-3 py-3 transition-colors hover:bg-white/5 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/40"
+      >
+        <span aria-hidden="true" className={cn('w-[3px] shrink-0 rounded-full', severityColor(item.kind))} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-baseline justify-between gap-4">
+            <p className="text-sm font-medium">{item.title}</p>
+            {at ? <time dateTime={at.toISOString()} className="shrink-0 text-xs text-muted-foreground">{TIME.format(at)} UTC</time> : null}
+          </div>
+          {note ? <p className="mt-1 text-sm text-muted-foreground">{note}</p> : null}
         </div>
-        {note ? <p className="mt-1 text-sm text-muted-foreground">{note}</p> : null}
-      </div>
+      </Link>
     </li>
   );
 }
 
-function MonthSection({ month, incidents }: { month: string; incidents: DatedIncident[] }) {
+function MonthSection({ month, incidents, basePath }: { month: string; incidents: DatedIncident[]; basePath: string }) {
   const days = [...new Set(incidents.map((item) => item.day))];
   return (
     <section aria-labelledby={`month-${month}`} className="border-t border-border pt-6">
@@ -188,7 +193,7 @@ function MonthSection({ month, incidents }: { month: string; incidents: DatedInc
                 {incidents
                   .filter((item) => item.day === day)
                   .map((item) => (
-                    <IncidentRow key={item.id} item={item} />
+                    <IncidentRow key={item.id} item={item} basePath={basePath} />
                   ))}
               </ul>
             </div>
@@ -228,7 +233,7 @@ export default async function StatusHistoryPage() {
       {data && range ? (
         <div className="space-y-8">
           {monthsInRange(range.first, range.last).map((month) => (
-            <MonthSection key={month} month={month} incidents={incidents.filter((item) => item.day.startsWith(month))} />
+            <MonthSection key={month} month={month} basePath={basePath} incidents={incidents.filter((item) => item.day.startsWith(month))} />
           ))}
         </div>
       ) : (

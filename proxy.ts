@@ -481,7 +481,7 @@ export async function proxy(request: NextRequest) {
         cleanUrl.pathname = publicPath;
         return applySecurityHeaders(NextResponse.redirect(cleanUrl, 308));
       }
-      if (pathname === "/" || pathname === "/history") {
+      if (pathname === "/" || pathname === "/history" || /^\/incidents\/[^/]+$/.test(pathname)) {
         const statusUrl = request.nextUrl.clone();
         statusUrl.pathname = statusInternalPath(pathname);
         return applySecurityHeaders(NextResponse.rewrite(statusUrl));
