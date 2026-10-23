@@ -24,6 +24,18 @@ export async function POST(request: NextRequest) {
     auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
   });
   const { data, error } = await supabase.auth.refreshSession({ refresh_token: refreshToken });
+  // Only a refusal of the grant itself ends the session. An outage, a timeout or a rate limit is
+  // answered as unavailable instead: the app reads "expired" as a sign-out, and signing someone
+  // out over a blip upstream costs them their place for nothing.
+  const grantRefused =
+    !error || error.status === 400 || error.status === 401 || error.status === 403;
+  if (error && !grantRefused) {
+    console.error("[Tensor Auth] Session refresh unavailable", error.status, error.code);
+    return NextResponse.json(
+      { error: "Cencori could not refresh your session right now. Try again in a moment." },
+      { headers: noStoreHeaders(), status: 503 },
+    );
+  }
   if (error || !data.session || !data.user) {
     return NextResponse.json(
       { error: "Your Cencori session expired. Sign in again." },
