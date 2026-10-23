@@ -7,6 +7,8 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabaseClient";
+import { isBetterAuthEnabled } from "@/lib/auth/flags";
+import { authClient } from "@/lib/auth/auth-client";
 import {
   isAuthFormTarget,
   resolveAuthRedirectTargets,
@@ -140,8 +142,10 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
     }
     const redirectIfSignedIn = async () => {
       try {
-        const { data } = await supabase.auth.getSession();
-        if (!cancelled && data.session?.user) {
+        const signedIn = isBetterAuthEnabled()
+          ? Boolean((await authClient.getSession()).data?.user)
+          : Boolean((await supabase.auth.getSession()).data.session?.user);
+        if (!cancelled && signedIn) {
           const navigationTarget = resolvePostAuthDestination(redirectParam, window.location.origin);
           const destination = isAuthFormTarget(navigationTarget)
             ? getPostLoginDefault(window.location.origin)
@@ -153,6 +157,14 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
       }
     };
     void redirectIfSignedIn();
+    // Better Auth sign-ins here always end in a full navigation (password via
+    // /api/auth/login, social via the provider redirect), so there is no
+    // in-page auth event to listen for.
+    if (isBetterAuthEnabled()) {
+      return () => {
+        cancelled = true;
+      };
+    }
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
@@ -239,13 +251,22 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
       const redirectTo = `${callbackBase}/auth/callback?next=${encodeURIComponent(navigationTarget)}`;
 
       markSignupWelcomeEmailPending();
-      const { error: oauthError } = await supabase.auth.signInWithOAuth({
-        provider,
-        options: { redirectTo },
-      });
+      // Better Auth handles the provider callback itself (/api/auth/callback/
+      // <provider>), sets the session cookie, then sends the browser to
+      // callbackURL; failures come back to the login page with ?error=.
+      const { error: oauthError } = isBetterAuthEnabled()
+        ? await authClient.signIn.social({
+            provider,
+            callbackURL: navigationTarget,
+            errorCallbackURL: `${window.location.origin}/login`,
+          })
+        : await supabase.auth.signInWithOAuth({
+            provider,
+            options: { redirectTo },
+          });
       if (oauthError) {
         clearSignupWelcomeEmailPending();
-        setError(oauthError.message);
+        setError(oauthError.message ?? "Unable to sign in.");
         setLoading(false);
       }
     } catch (err) {
