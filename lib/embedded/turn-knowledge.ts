@@ -1,5 +1,8 @@
 import type { createAdminClient } from '@/lib/supabaseAdmin';
 import type { MemoryEmbeddingResult } from '@/lib/memory/embeddings';
+// Passages go to the model whole. Cutting them shorter than they were
+// chunked drops facts the search matched on (it used to keep 500 of 1000).
+import { KNOWLEDGE_CHUNK_SIZE } from './knowledge';
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -179,7 +182,7 @@ export async function retrieveKnowledge(
             .slice(0, TURN_KNOWLEDGE_MAX_CITATIONS);
 
         return {
-            block: buildKnowledgeBlock(hits.map((h) => h.content.slice(0, 500))),
+            block: buildKnowledgeBlock(hits.map((h) => h.content.slice(0, KNOWLEDGE_CHUNK_SIZE))),
             citations: hits.map((h) => ({
                 chunk_id: h.id,
                 source_id: h.source_id,
@@ -223,7 +226,7 @@ export async function retrieveTurnKnowledge(
             if (error) continue;
             for (const h of (hits ?? []) as Array<{ id: string; source_id: string; ord?: number | null; content: string; similarity: number }>) {
                 citations.push({ chunk_id: h.id, source_id: h.source_id, ord: h.ord ?? null, score: h.similarity });
-                snippets.push(h.content.slice(0, 500));
+                snippets.push(h.content.slice(0, KNOWLEDGE_CHUNK_SIZE));
                 if (citations.length >= TURN_KNOWLEDGE_MAX_CITATIONS) break;
             }
             if (citations.length >= TURN_KNOWLEDGE_MAX_CITATIONS) break;
