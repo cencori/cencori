@@ -1,4 +1,5 @@
 "use client";
+import { browserAuth } from "@/lib/auth/browser-auth";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -66,12 +67,12 @@ export function MobileMenu({
 
   useEffect(() => {
     let cancelled = false;
-    supabase.auth.getSession().then(({ data }) => {
+    browserAuth.getSession().then(({ data }) => {
       if (!cancelled && data.session?.user) setIsAuthenticated(true);
     });
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
+    } = browserAuth.onAuthStateChange((event, session) => {
       if (cancelled) return;
       if (event === "SIGNED_IN" && session?.user) setIsAuthenticated(true);
       else if (event === "SIGNED_OUT") setIsAuthenticated(false);

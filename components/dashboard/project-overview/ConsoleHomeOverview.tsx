@@ -1,4 +1,5 @@
 "use client";
+import { browserAuth } from "@/lib/auth/browser-auth";
 
 import Image, { type StaticImageData } from "next/image";
 import Link from "next/link";
@@ -35,7 +36,7 @@ function useFirstName(initialFirstName: string | null) {
     const { data } = useQuery({
         queryKey: ["consoleHomeProfile"],
         queryFn: async () => {
-            const sessionResult = await supabase.auth.getSession();
+            const sessionResult = await browserAuth.getSession();
             const meta = sessionResult.data.session?.user.user_metadata;
             const metaName: string | null =
                 meta?.first_name || meta?.given_name || meta?.name?.split(" ")[0] || null;

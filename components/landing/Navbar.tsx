@@ -1,4 +1,5 @@
 "use client";
+import { browserAuth } from "@/lib/auth/browser-auth";
 
 import {
     AiBookIcon,
@@ -486,7 +487,7 @@ export default function Navbar({
                                                 </span>
                                             </DropdownMenuItem>
                                             <DropdownMenuItem className="text-xs py-1.5 cursor-pointer text-red-500 focus:text-red-500 flex justify-between" onClick={async () => {
-                                                    await supabase.auth.signOut({ scope: "local" });
+                                                    await browserAuth.signOut({ scope: "local" });
                                                     router.push("/login");
                                                 }}>
                                                 Log out
