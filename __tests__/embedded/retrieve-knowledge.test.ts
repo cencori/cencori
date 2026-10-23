@@ -49,6 +49,16 @@ describe('retrieveKnowledge', () => {
         expect(result.block).toContain('[1] b fact 1');
     });
 
+    it('sends whole passages to the model, not a truncated prefix', async () => {
+        const passage = `${'Shift rules. '.repeat(45)}Ada already worked a double shift on Monday.`;
+        expect(passage.length).toBeGreaterThan(500);
+        const result = await retrieveKnowledge(
+            supabaseWith({ a: [{ ...hit('a', 1, 0.9), content: passage }] }) as never,
+            { ...base, knowledgeBaseIds: ['a'] },
+        );
+        expect(result.block).toContain('Ada already worked a double shift on Monday.');
+    });
+
     it('reports embedding usage so the query can be billed', async () => {
         const onEmbeddingUsage = vi.fn();
         await retrieveKnowledge(supabaseWith({ a: [hit('a', 1, 0.8)] }) as never, { ...base, knowledgeBaseIds: ['a'], onEmbeddingUsage });
