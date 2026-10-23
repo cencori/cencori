@@ -5,13 +5,8 @@ import { DevelopersBuild } from "@/components/developers/DevelopersBuild";
 import { DevelopersBlog } from "@/components/developers/DevelopersBlog";
 import { DevelopersFaq } from "@/components/developers/DevelopersFaq";
 import { DevelopersCTA } from "@/components/developers/DevelopersCTA";
-import { buildOgImageUrl } from "@/lib/og";
 
-const developersOgImage = buildOgImageUrl({
-  title: "Cencori for Developers",
-  subtitle: "One API for every frontier model",
-  type: "docs",
-});
+const developersOgImage = "/og/developers?v=2";
 
 export const metadata: Metadata = {
   title: "Cencori for Developers | Build and run AI",
