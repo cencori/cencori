@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { resolveAuthRedirectTargets } from "@/lib/auth-redirect";
+import { isBetterAuthEnabled } from "@/lib/auth/flags";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!;
@@ -31,6 +32,10 @@ export async function POST(req: NextRequest) {
 
     if (!email || !code) {
       return NextResponse.json({ error: "Email and code are required" }, { status: 400 });
+    }
+
+    if (isBetterAuthEnabled()) {
+      return confirmWithBetterAuth(req, String(email), String(code), navigationTarget);
     }
 
     const admin = createAdminClient();
@@ -152,4 +157,41 @@ export async function POST(req: NextRequest) {
     console.error("Confirm verification code error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
+}
+
+const OTP_ERRORS: Record<string, string> = {
+  INVALID_OTP: "Invalid code",
+  OTP_EXPIRED: "Code expired",
+  TOO_MANY_ATTEMPTS: "Too many attempts. Request a new code.",
+};
+
+// Better Auth path (RFC-0001 cutover): verifying the email OTP marks the email
+// verified and, with autoSignInAfterVerification, signs the user in; the
+// session leaves as Set-Cookie, same as the Supabase path above.
+async function confirmWithBetterAuth(
+  req: NextRequest,
+  email: string,
+  code: string,
+  navigationTarget: string,
+): Promise<NextResponse> {
+  const { auth } = await import("@/lib/auth/better-auth");
+  const result = await auth.api.verifyEmailOTP({
+    body: { email: email.toLowerCase(), otp: code },
+    headers: req.headers,
+    asResponse: true,
+  });
+
+  if (!result.ok) {
+    const body = await result.json().catch(() => ({}));
+    return NextResponse.json(
+      { error: OTP_ERRORS[body?.code] ?? body?.message ?? "Failed to verify code" },
+      { status: 400 },
+    );
+  }
+
+  const response = NextResponse.json({ success: true, redirectTo: navigationTarget });
+  for (const cookie of result.headers.getSetCookie()) {
+    response.headers.append("set-cookie", cookie);
+  }
+  return response;
 }
