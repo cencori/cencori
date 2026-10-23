@@ -51,7 +51,7 @@ export type TensorPlanRow = {
   price_ngn_minor: number | null;
   price_usd_minor: number | null;
   billing_period_days: number;
-  /** Tasks in a pass; for the trial, tasks ever. Null is unlimited. */
+  /** Tasks in a pass; for the trial, tasks a month. Null is unlimited. */
   task_limit: number | null;
   /** Provider cost one task may reach. */
   task_cost_cap_microusd: number | null;
@@ -200,10 +200,24 @@ export async function getTensorBillingSnapshot(admin: Admin, userId: string) {
   const plan = await getTensorPlan(admin, planCode);
   const onTrial = planCode === "free";
 
-  // An allowance belongs to a pass, so its period starts exactly when the pass did; the trial's
-  // opens with the account. Matching the start rather than "whichever period covers today" is what
-  // keeps a period from the weekly model that came before from being read as the current one.
-  const periodStart = onTrial ? account.created_at : (account.entitlement_starts_at ?? account.created_at);
+  // An allowance belongs to a pass, so its period starts exactly when the pass did; the trial's is
+  // the current month counted from the account's creation, worked out by the same function the
+  // reservation uses so the two cannot disagree on where a month starts. Matching the start
+  // rather than "whichever period covers today" is what keeps a period from the weekly model that
+  // came before from being read as the current one.
+  let periodStart = account.entitlement_starts_at ?? account.created_at;
+  let resetsAt = account.entitlement_ends_at;
+  if (onTrial) {
+    const { data: trialPeriod, error: trialError } = await admin
+      .rpc("basecode_trial_period", { p_created_at: account.created_at })
+      .single();
+    const window = trialPeriod as { starts_at?: unknown; ends_at?: unknown } | null;
+    if (trialError || typeof window?.starts_at !== "string" || typeof window.ends_at !== "string") {
+      throw new Error("Could not load the Tensor trial period.");
+    }
+    periodStart = window.starts_at;
+    resetsAt = window.ends_at;
+  }
   const { data: period, error } = await admin
     .from("basecode_usage_periods")
     .select("ends_at, requests_used, cost_used_microusd")
@@ -221,9 +235,6 @@ export async function getTensorBillingSnapshot(admin: Admin, userId: string) {
     percentageOf(tasksUsed, tasksLimit),
     percentageOf(Number(period?.cost_used_microusd ?? 0), plan.pass_budget_microusd),
   );
-  // A trial never turns over: there is nothing to wait for, only a pass to buy.
-  const resetsAt = onTrial ? null : account.entitlement_ends_at;
-
   // Token spend across every device on this account. Deliberately separate from the meter above:
   // the plan is counted in tasks and provider cost, never in tokens. Left off entirely when the
   // account has no rows yet, because absent has to read as unknown rather than as zero.
@@ -241,7 +252,8 @@ export async function getTensorBillingSnapshot(admin: Admin, userId: string) {
       tier: onTrial ? ("trial" as const) : plan.code,
       name: plan.name,
       modelPolicy: plan.model_policy,
-      // When the pass ends. Nothing renews by itself; the name is the one released builds read.
+      // When the allowance resets: the pass's end, or the trial's next month. The name is the one
+      // released builds read.
       renewsAt: resetsAt,
       // Both currencies, because nothing here knows which one a given account pays in -- checkout
       // decides that from the payment provider, not from the account. The client picks; a plan
