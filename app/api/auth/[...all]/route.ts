@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { toNextJsHandler } from "better-auth/next-js";
+import { isBetterAuthEnabled } from "@/lib/auth/flags";
 
 // Better Auth endpoints under /api/auth/*. The existing /api/auth/login,
 // /api/auth/forgot-password and /api/auth/sso/lookup routes are more
@@ -7,10 +8,8 @@ import { toNextJsHandler } from "better-auth/next-js";
 // (RFC-0001 §4): imported lazily so a disabled deploy never connects to
 // the Better Auth database.
 
-const enabled = process.env.BETTER_AUTH_ENABLED === "true";
-
 async function handle(request: Request): Promise<Response> {
-    if (!enabled) {
+    if (!isBetterAuthEnabled()) {
         return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
     const { auth } = await import("@/lib/auth/better-auth");

@@ -1,5 +1,5 @@
 "use client";
-import { getAuthUser } from "@/lib/auth/get-auth-user";
+import { getBrowserAuthUser } from "@/lib/auth/get-browser-auth-user";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -59,7 +59,7 @@ export default function ScanLayout({ children }: ScanLayoutProps) {
     // Check auth
     useEffect(() => {
         const checkAuth = async () => {
-            const { data, error } = await getAuthUser(supabase);
+            const { data, error } = await getBrowserAuthUser(supabase);
             if (!error && data.user) {
                 setUser(data.user as User);
             } else {

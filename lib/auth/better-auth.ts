@@ -3,6 +3,7 @@ import "server-only";
 import { betterAuth } from "better-auth";
 import { hashPassword, verifyPassword } from "better-auth/crypto";
 import { nextCookies } from "better-auth/next-js";
+import { bearer } from "better-auth/plugins";
 import { dash } from "@better-auth/infra";
 import bcrypt from "bcryptjs";
 import { Pool } from "pg";
@@ -85,6 +86,9 @@ export const auth = betterAuth({
             kvUrl: process.env.BETTER_AUTH_KV_URL,
             apiKey: process.env.BETTER_AUTH_API_KEY,
         }),
+        // Accept "Authorization: Bearer <session token>" from the Tensor
+        // desktop app, which has no cookies.
+        bearer(),
         // Must stay last so auth calls made from server actions can set cookies.
         nextCookies(),
     ],

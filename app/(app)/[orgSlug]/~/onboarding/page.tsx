@@ -1,5 +1,5 @@
 "use client";
-import { getAuthUser } from "@/lib/auth/get-auth-user";
+import { getBrowserAuthUser } from "@/lib/auth/get-browser-auth-user";
 
 import { useRouter } from "next/navigation";
 import { useState, use } from "react";
@@ -188,7 +188,7 @@ function useOrganization(orgSlug: string) {
   return useQuery({
     queryKey: ["organizationOnboarding", orgSlug],
     queryFn: async () => {
-      const { data: { user }, error: userError } = await getAuthUser(supabase);
+      const { data: { user }, error: userError } = await getBrowserAuthUser(supabase);
       if (userError || !user) throw new Error("Not authenticated");
 
       const { data: orgData, error: fetchError } = await supabase
@@ -238,7 +238,7 @@ export default function OnboardingPage({ params }: PageProps) {
   const onCreateProject = async (values: FormValues) => {
     setCreating(true);
 
-    const { data: { user } } = await getAuthUser(supabase);
+    const { data: { user } } = await getBrowserAuthUser(supabase);
     if (!user) {
       toast.error("You must be logged in to create a project.");
       setCreating(false);

@@ -1,5 +1,5 @@
 "use client";
-import { getAuthUser } from "@/lib/auth/get-auth-user";
+import { getBrowserAuthUser } from "@/lib/auth/get-browser-auth-user";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -111,7 +111,7 @@ export function CreateProjectDialog({
     const onSubmit = async (values: FormValues) => {
         setLoading(true);
 
-        const { data: { user } } = await getAuthUser(supabase);
+        const { data: { user } } = await getBrowserAuthUser(supabase);
         if (!user) {
             toast.error("You must be logged in to create a project.");
             setLoading(false);

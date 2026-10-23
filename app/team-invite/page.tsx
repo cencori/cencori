@@ -1,5 +1,5 @@
 'use client';
-import { getAuthUser } from "@/lib/auth/get-auth-user";
+import { getBrowserAuthUser } from "@/lib/auth/get-browser-auth-user";
 
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -29,7 +29,7 @@ function InviteAcceptContent() {
     async function checkAuthAndAccept() {
         setStatus('checking_auth');
 
-        const { data: { user } } = await getAuthUser(supabase);
+        const { data: { user } } = await getBrowserAuthUser(supabase);
 
         if (!user) {
             setStatus('not_logged_in');
