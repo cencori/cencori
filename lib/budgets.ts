@@ -60,6 +60,15 @@ function getCurrentMonthRange(): { start: Date; end: Date } {
     return { start, end };
 }
 
+// The DB fallback below reads every one of the month's rows. When Redis is
+// unavailable it would otherwise run on every gateway request (twice: spend cap
+// check and budget alerts); on 2026-10-22 an exhausted Upstash quota turned that
+// into scans per request and took the database down. Within one server, share
+// an in-flight scan and reuse its result for a minute.
+const DB_SPEND_TTL_MS = 60_000;
+const dbSpendCache = new Map<string, { total: number; at: number }>();
+const dbSpendInFlight = new Map<string, Promise<number>>();
+
 /**
  * Get current month spend for a project.
  * Uses Redis counter first (fast), falls back to DB aggregate (slow).
@@ -79,6 +88,17 @@ export async function getCurrentMonthSpend(projectId: string): Promise<number> {
     }
 
     // DB fallback — only on cold start or Redis miss
+    const cached = dbSpendCache.get(projectId);
+    if (cached && Date.now() - cached.at < DB_SPEND_TTL_MS) return cached.total;
+    const inFlight = dbSpendInFlight.get(projectId);
+    if (inFlight) return inFlight;
+
+    const scan = sumMonthSpendFromDb(projectId, client).finally(() => dbSpendInFlight.delete(projectId));
+    dbSpendInFlight.set(projectId, scan);
+    return scan;
+}
+
+async function sumMonthSpendFromDb(projectId: string, client: Redis | null): Promise<number> {
     const supabase = createAdminClient();
     const { start, end } = getCurrentMonthRange();
 
@@ -102,10 +122,14 @@ export async function getCurrentMonthSpend(projectId: string): Promise<number> {
         );
     } catch (error) {
         console.error('[Budget] Error fetching spend:', error);
+        // Remember the failure too, so a struggling database isn't re-scanned
+        // by every request; 0 is what this path already returned on error.
+        dbSpendCache.set(projectId, { total: 0, at: Date.now() });
         return 0;
     }
 
     const total = data.reduce((sum, req) => sum + (req.cencori_charge_usd || 0), 0);
+    dbSpendCache.set(projectId, { total, at: Date.now() });
 
     // Seed Redis so subsequent requests are fast
     if (client) {
@@ -138,9 +162,17 @@ export function incrementSpendCounter(projectId: string, costUsd: number): void 
 }
 
 /**
- * Get budget status for a project
+ * Get budget status for a project.
+ *
+ * `onlyIfConfigured` skips the month's spend lookup when the project has
+ * neither an enforced spend cap nor a monthly budget, so nothing could use it
+ * (currentSpend is then 0). The per-request gateway paths pass it; the
+ * dashboard wants the real figure regardless.
  */
-export async function getBudgetStatus(projectId: string): Promise<BudgetStatus> {
+export async function getBudgetStatus(
+    projectId: string,
+    opts: { onlyIfConfigured?: boolean } = {},
+): Promise<BudgetStatus> {
     const supabase = createAdminClient();
 
     // Get project budget settings
@@ -163,10 +195,11 @@ export async function getBudgetStatus(projectId: string): Promise<BudgetStatus> 
         };
     }
 
-    const currentSpend = await getCurrentMonthSpend(projectId);
     const monthlyBudget = project.monthly_budget ? parseFloat(project.monthly_budget) : null;
     const spendCap = project.spend_cap ? parseFloat(project.spend_cap) : null;
     const enforceSpendCap = project.enforce_spend_cap || false;
+    const spendMatters = (enforceSpendCap && spendCap !== null) || monthlyBudget !== null;
+    const currentSpend = !opts.onlyIfConfigured || spendMatters ? await getCurrentMonthSpend(projectId) : 0;
 
     const percentUsed = monthlyBudget ? (currentSpend / monthlyBudget) * 100 : null;
     const isCapReached = enforceSpendCap && spendCap !== null && currentSpend >= spendCap;
@@ -237,7 +270,7 @@ export async function checkSpendCap(projectId: string): Promise<BudgetCheckResul
     }
 
     // Slow path: full DB query (only on cold start)
-    const status = await getBudgetStatus(projectId);
+    const status = await getBudgetStatus(projectId, { onlyIfConfigured: true });
 
     // Cache the config for fast checks next time
     if (client) {
@@ -271,7 +304,7 @@ export async function checkAndSendBudgetAlerts(
     organizationId: string
 ): Promise<void> {
     const supabase = createAdminClient();
-    const status = await getBudgetStatus(projectId);
+    const status = await getBudgetStatus(projectId, { onlyIfConfigured: true });
 
     // Skip if no budget set or alerts disabled
     if (!status.monthlyBudget || !status.alertsEnabled || status.percentUsed === null) {
