@@ -81,5 +81,8 @@ region = "afr-west"
 cpu = 2
 memory = "8gb"
 disk = "50gb"
-public = false
+# TEMPORARY for the big-table copy run (RFC-0001 §6): reachable from one
+# IP only. Revert to public = false and drop allow_ips right after.
+public = true
+allow_ips = ["102.89.46.122/32"]
 backups = { schedule = "0 2 * * *", timezone = "Africa/Lagos", keep = "30d" }
