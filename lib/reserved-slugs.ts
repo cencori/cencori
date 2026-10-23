@@ -48,6 +48,7 @@ export const RESERVED_ORG_SLUGS: ReadonlySet<string> = new Set([
     "press",
     "scan",
     "security",
+    "status",
     "shipped",
     "subscribe",
     // (products)/*
