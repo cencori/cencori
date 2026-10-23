@@ -185,6 +185,17 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      {
+        // Uploaded files (app/api/files) also end in .jpg/.webp, but they are
+        // looked up per request; the rule above would pin even a 404 for a year.
+        source: "/api/files/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=86400",
+          },
+        ],
+      },
     ];
   },
 };
