@@ -16,6 +16,16 @@ import { Pool } from "pg";
 // (BETTER_AUTH_DATABASE_URL), never to Supabase.
 
 const isProd = process.env.NODE_ENV === "production";
+// One session for cencori.com, console., scan. and api. — but only when the
+// app is served from cencori.com: a browser drops a .cencori.com cookie set
+// by any other host (cencori.brimble.app during the rehearsals).
+const onCencoriDomain = (() => {
+    try {
+        return new URL(process.env.BETTER_AUTH_URL ?? "").hostname.endsWith("cencori.com");
+    } catch {
+        return false;
+    }
+})();
 
 const pool = new Pool({
     connectionString: process.env.BETTER_AUTH_DATABASE_URL,
@@ -118,7 +128,7 @@ export const auth = betterAuth({
 
     advanced: {
         database: { generateId: "uuid" },
-        crossSubDomainCookies: { enabled: isProd, domain: ".cencori.com" },
+        crossSubDomainCookies: { enabled: isProd && onCencoriDomain, domain: ".cencori.com" },
         useSecureCookies: isProd,
     },
 
