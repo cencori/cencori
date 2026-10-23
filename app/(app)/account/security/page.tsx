@@ -1,4 +1,5 @@
 "use client";
+import { browserAuth } from "@/lib/auth/browser-auth";
 
 import React, { useState, useEffect } from "react";
 import { ShieldCheck, Key, Smartphone, Monitor, Laptop, Tablet, Globe, LogOut, Loader2 } from "lucide-react";
@@ -57,7 +58,7 @@ export default function SecurityPage() {
     const handleSignOutOtherDevices = async () => {
         setIsSigningOut(true);
         try {
-            const { error } = await supabase.auth.signOut({ scope: "others" });
+            const { error } = await browserAuth.signOut({ scope: "others" });
 
             if (error) throw error;
 

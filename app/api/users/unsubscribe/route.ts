@@ -1,3 +1,4 @@
+import { adminUsers } from "@/lib/auth/admin-users";
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { verifyUserUnsubscribeToken } from '@/lib/user-unsubscribe';
@@ -17,7 +18,7 @@ async function optOutUser(
     }
 
     const admin = createAdminClient();
-    const { data: userData, error: fetchError } = await admin.auth.admin.getUserById(uid);
+    const { data: userData, error: fetchError } = await adminUsers.getUserById(uid);
     if (fetchError || !userData?.user) {
         return { ok: false, reason: 'invalid_token' };
     }
@@ -27,7 +28,7 @@ async function optOutUser(
         return { ok: true, alreadyUnsubscribed: true };
     }
 
-    const { error: updateError } = await admin.auth.admin.updateUserById(uid, {
+    const { error: updateError } = await adminUsers.updateUserById(uid, {
         user_metadata: {
             ...currentMeta,
             marketing_opted_out_at: new Date().toISOString(),

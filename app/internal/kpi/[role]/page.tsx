@@ -1,5 +1,5 @@
 "use client";
-import { getAuthUser } from "@/lib/auth/get-auth-user";
+import { getBrowserAuthUser } from "@/lib/auth/get-browser-auth-user";
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -47,7 +47,7 @@ export default function RoleKPIPage() {
     useEffect(() => {
         async function loadData() {
             // Check auth
-            const { data: { user } } = await getAuthUser(supabase);
+            const { data: { user } } = await getBrowserAuthUser(supabase);
             if (!user || !user.email?.endsWith('@cencori.com')) {
                 router.push('/internal/kpi/login');
                 return;
@@ -99,7 +99,7 @@ export default function RoleKPIPage() {
         setError(null);
         setSuccess(false);
 
-        const { data: { user } } = await getAuthUser(supabase);
+        const { data: { user } } = await getBrowserAuthUser(supabase);
 
         try {
             for (const metric of role?.metrics || []) {

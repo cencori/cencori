@@ -1,3 +1,4 @@
+import { adminUsers } from "@/lib/auth/admin-users";
 /**
  * Recipient lookup for launch / test emails.
  *
@@ -47,7 +48,7 @@ export async function lookupRecipientName(email: string): Promise<RecipientName>
 
     try {
         const admin = createAdminClient();
-        const { data } = await admin.auth.admin.listUsers({ perPage: 1000 });
+        const { data } = await adminUsers.listUsers({ perPage: 1000 });
         const found = data?.users?.find(u => u.email?.toLowerCase() === normalized);
         if (!found) return fallbackFromEmail(email);
 

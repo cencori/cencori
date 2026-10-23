@@ -1,4 +1,5 @@
 "use server";
+import { adminUsers } from "@/lib/auth/admin-users";
 import { getAuthUser } from "@/lib/auth/get-auth-user";
 
 import { NextRequest, NextResponse } from "next/server";
@@ -136,7 +137,7 @@ export async function DELETE(request: NextRequest) {
             .from("user_profiles")
             .delete()
             .eq("id", user.id);
-        const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(user.id);
+        const { error: deleteError } = await adminUsers.deleteUser(user.id);
 
         if (deleteError) {
             console.error("Error deleting user:", deleteError);
