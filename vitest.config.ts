@@ -39,6 +39,9 @@ export default defineConfig({
     resolve: {
         alias: {
             '@': path.resolve(__dirname, './'),
+            // Next enforces server-only at build time; under jsdom the real
+            // package throws on import, so tests get an empty module.
+            'server-only': path.resolve(__dirname, './vitest.server-only.ts'),
         },
     },
 });
