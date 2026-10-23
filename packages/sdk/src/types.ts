@@ -94,6 +94,29 @@ export interface ChatRequest {
         /** Template variables to interpolate (e.g. {{tier}} → 'pro') */
         variables?: Record<string, string>;
     };
+    /**
+     * Knowledge base ids (`kb_...`, up to 3) to ground the answer in. The
+     * gateway searches them with the latest user message, adds the best
+     * passages to the prompt, and the model cites them as `[1]`, `[2]`...
+     * Requires a secret key; tenant-scoped bases are queried via Sessions.
+     *
+     * @example
+     * knowledgeBases: ['kb_8f2c...']
+     */
+    knowledgeBases?: string[];
+}
+
+/** A passage the answer was grounded in. `n` matches the model's `[n]` marker. */
+export interface KnowledgeCitation {
+    n: number;
+    chunkId: string;
+    sourceId: string;
+    /** Chunk position within its source. */
+    ord: number | null;
+    /** Page number, for paged sources like PDFs. */
+    page: number | null;
+    /** Similarity to the query, 0–1. */
+    score: number;
 }
 
 export interface ChatResponse {
@@ -119,6 +142,11 @@ export interface ChatResponse {
     safety?: {
         scanned: boolean;
         input?: { safe: boolean; layer: string; riskScore: number; reasons: string[] };
+    };
+    /** Present when `knowledgeBases` was set: which passages were used. */
+    knowledge?: {
+        knowledgeBases: string[];
+        citations: KnowledgeCitation[];
     };
 }
 

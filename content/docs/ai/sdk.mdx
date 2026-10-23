@@ -88,12 +88,9 @@ const results = await cencori.memory.search({
   limit: 5,
 });
 
-const response = await cencori.ai.rag({
-  model: 'gpt-4o',
-  messages: [{ role: 'user', content: 'Refund policy?' }],
-  namespace: 'docs',
-});
 ```
+
+To answer questions from your own documents with citations, use [knowledge bases](/docs/api/chat#knowledge-bases-rag): upload files with `cencori.knowledge.addFileSource()`, then pass `knowledgeBases` to `cencori.ai.chat()`.
 
 ## Available Methods
 
@@ -103,7 +100,8 @@ const response = await cencori.ai.rag({
 | `cencori.ai.chatStream()` | Streaming chat |
 | `cencori.ai.generateImage()` | Image generation |
 | `cencori.ai.embeddings()` | Vector embeddings |
-| `cencori.ai.rag()` | RAG with memory search |
+| `cencori.ai.chat({ knowledgeBases })` | Answers grounded in your knowledge bases, with citations |
+| `cencori.knowledge.addFileSource()` | Upload a PDF, DOCX or other document to a knowledge base |
 | `cencori.memory.store()` | Store memory (namespace store) |
 | `cencori.memory.search()` | Semantic search (namespace store) |
 | `cencori.telemetry.reportWebRequest()` | Report web traffic to dashboard |

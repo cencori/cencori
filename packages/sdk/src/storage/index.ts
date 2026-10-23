@@ -49,26 +49,24 @@ class VectorsNamespace {
 
 class KnowledgeNamespace {
     /**
-     * Query the knowledge base
-     * 
-     * 🚧 Coming Soon - This feature is not yet available.
+     * @deprecated Never implemented. Use `cencori.knowledge.search()`, or
+     * ground a chat with `cencori.ai.chat({ knowledgeBases: [...] })`.
      */
     async query(question: string): Promise<never> {
         throw new Error(
-            `cencori.storage.knowledge.query() is coming soon! ` +
-            `Join our waitlist at https://cencori.com/memory`
+            `cencori.storage.knowledge.query() is not available. ` +
+            `Use cencori.knowledge.search(kbId, { query }), or cencori.ai.chat({ knowledgeBases: [kbId], ... }).`
         );
     }
 
     /**
-     * Add documents to knowledge base
-     * 
-     * 🚧 Coming Soon - This feature is not yet available.
+     * @deprecated Never implemented. Use `cencori.knowledge.addInlineSource()`
+     * or `cencori.knowledge.addFileSource()`.
      */
     async add(documents: { content: string; metadata?: Record<string, unknown> }[]): Promise<never> {
         throw new Error(
-            `cencori.storage.knowledge.add() is coming soon! ` +
-            `Join our waitlist at https://cencori.com/memory`
+            `cencori.storage.knowledge.add() is not available. ` +
+            `Use cencori.knowledge.addInlineSource(kbId, text) or cencori.knowledge.addFileSource(kbId, file).`
         );
     }
 }

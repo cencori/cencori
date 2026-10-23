@@ -13,6 +13,7 @@ import type {
     ChatRequest,
     ChatResponse,
     CompletionRequest,
+    KnowledgeCitation,
     EmbeddingRequest,
     EmbeddingResponse,
     GenerateObjectRequest,
@@ -27,7 +28,39 @@ import { fetchWithRetry } from '../utils';
 import { throwCencoriError } from '../errors';
 
 // API Response types
+interface WireKnowledgeCitation {
+    n: number;
+    chunk_id: string;
+    source_id: string;
+    ord?: number | null;
+    page?: number | null;
+    score: number;
+}
+
+function toKnowledgeCitations(raw: WireKnowledgeCitation[] | undefined): KnowledgeCitation[] {
+    return (raw ?? []).map((c) => ({
+        n: c.n,
+        chunkId: c.chunk_id,
+        sourceId: c.source_id,
+        ord: c.ord ?? null,
+        page: c.page ?? null,
+        score: c.score,
+    }));
+}
+
+/** Streaming responses carry citations in a header, before the first token. */
+function citationsFromHeader(response: Response): KnowledgeCitation[] | undefined {
+    const raw = response.headers.get('X-Cencori-Knowledge-Citations');
+    if (!raw) return undefined;
+    try {
+        return toKnowledgeCitations(JSON.parse(raw) as WireKnowledgeCitation[]);
+    } catch {
+        return undefined;
+    }
+}
+
 interface OpenAIChatResponse {
+    knowledge?: { knowledge_bases: string[]; citations: WireKnowledgeCitation[] };
     id?: string;
     model?: string;
     cost_usd?: number;
@@ -92,6 +125,11 @@ export interface StreamChunk {
     toolCalls?: ToolCall[];
     /** Error message if the stream encountered an error */
     error?: string;
+    /**
+     * On the first chunk only, when `knowledgeBases` was set: the passages
+     * the answer is grounded in, so citations can render before the text.
+     */
+    citations?: KnowledgeCitation[];
 }
 
 export class AINamespace {
@@ -127,6 +165,7 @@ export class AINamespace {
                 tools: request.tools,
                 toolChoice: request.toolChoice,
                 prompt: request.prompt,
+                knowledgeBases: request.knowledgeBases,
             }),
         });
 
@@ -163,6 +202,12 @@ export class AINamespace {
             provider: data.provider,
             requestId: response.headers.get('X-Request-Id'),
             safety: data.safety,
+            ...(data.knowledge ? {
+                knowledge: {
+                    knowledgeBases: data.knowledge.knowledge_bases,
+                    citations: toKnowledgeCitations(data.knowledge.citations),
+                },
+            } : {}),
         };
     }
 
@@ -192,6 +237,7 @@ export class AINamespace {
                 tools: request.tools,
                 toolChoice: request.toolChoice,
                 prompt: request.prompt,
+                knowledgeBases: request.knowledgeBases,
             }),
         });
 
@@ -207,6 +253,7 @@ export class AINamespace {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
+        let citations = citationsFromHeader(response);
 
         try {
             while (true) {
@@ -232,6 +279,10 @@ export class AINamespace {
 
                     try {
                         const chunk = JSON.parse(data) as StreamChunk;
+                        if (citations) {
+                            chunk.citations = citations;
+                            citations = undefined;
+                        }
                         yield chunk;
                     } catch {
                         // Skip malformed JSON
@@ -439,6 +490,10 @@ export class AINamespace {
     }
 
     /**
+     * @deprecated `/api/ai/rag` is not available on the hosted gateway. Use
+     * knowledge bases instead: `cencori.ai.chat({ model, messages,
+     * knowledgeBases: ['kb_...'] })` returns the answer with citations.
+     *
      * RAG (Retrieval-Augmented Generation) - Chat with automatic memory context
      * 
      * Searches your memory namespace for relevant context and includes it
@@ -650,6 +705,10 @@ export class AINamespace {
     }
 
     /**
+     * @deprecated `/api/ai/rag` is not available on the hosted gateway. Use
+     * `cencori.ai.chatStream({ ..., knowledgeBases: ['kb_...'] })`; the first
+     * chunk carries `citations`.
+     *
      * Stream RAG responses with automatic memory context
      * 
      * @example

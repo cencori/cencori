@@ -222,3 +222,53 @@ describe('AINamespace generateObject', () => {
         expect(result.usage.totalTokens).toBe(17);
     });
 });
+
+describe('AINamespace knowledge bases', () => {
+    const wireCitation = { n: 1, chunk_id: 'chunk-1', source_id: 'src_1', ord: 3, page: 2, score: 0.91 };
+    const citation = { n: 1, chunkId: 'chunk-1', sourceId: 'src_1', ord: 3, page: 2, score: 0.91 };
+
+    it('sends knowledgeBases and maps the knowledge object', async () => {
+        const ns = createNamespace();
+        const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValueOnce(new Response(JSON.stringify({
+            content: 'Refunds take 5 days [1].',
+            model: 'gpt-6-sol',
+            usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
+            knowledge: { knowledge_bases: ['kb_1'], citations: [wireCitation] },
+        }), { status: 200 }));
+
+        const result = await ns.chat({
+            model: 'gpt-6-sol',
+            messages: [{ role: 'user', content: 'How long do refunds take?' }],
+            knowledgeBases: ['kb_1'],
+        });
+
+        const sent = JSON.parse(String((fetchSpy.mock.calls[0][1] as RequestInit).body));
+        expect(sent.knowledgeBases).toEqual(['kb_1']);
+        expect(result.knowledge).toEqual({ knowledgeBases: ['kb_1'], citations: [citation] });
+    });
+
+    it('leaves knowledge undefined on ungrounded responses', async () => {
+        const ns = createNamespace();
+        vi.spyOn(global, 'fetch').mockResolvedValueOnce(new Response(JSON.stringify({ content: 'hi' }), { status: 200 }));
+        const result = await ns.chat({ model: 'gpt-6-sol', messages: [{ role: 'user', content: 'hi' }] });
+        expect(result.knowledge).toBeUndefined();
+    });
+
+    it('puts header citations on the first stream chunk only', async () => {
+        const ns = createNamespace();
+        const sse = 'data: {"delta":"Refunds "}\n\ndata: {"delta":"take 5 days [1]."}\n\ndata: [DONE]\n\n';
+        vi.spyOn(global, 'fetch').mockResolvedValueOnce(new Response(sse, {
+            status: 200,
+            headers: { 'X-Cencori-Knowledge-Citations': JSON.stringify([wireCitation]) },
+        }));
+
+        const chunks = [];
+        for await (const chunk of ns.chatStream({ model: 'gpt-6-sol', messages: [{ role: 'user', content: 'q' }], knowledgeBases: ['kb_1'] })) {
+            chunks.push(chunk);
+        }
+
+        expect(chunks).toHaveLength(2);
+        expect(chunks[0].citations).toEqual([citation]);
+        expect(chunks[1].citations).toBeUndefined();
+    });
+});
