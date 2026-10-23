@@ -26,6 +26,7 @@ import {
   statusPublicPath,
 } from "@/lib/status-host";
 import { sanitizeAuthRedirectTarget } from "@/lib/auth-redirect";
+import { maintenanceResponse } from "@/lib/maintenance";
 
 const LAST_ORG_COOKIE = "cencori:last-org";
 const LAST_ORG_MAX_AGE = 60 * 60 * 24 * 365; // 1 year
@@ -419,9 +420,34 @@ async function canAccessProject(
   return { allowed: !!membership, status: membership ? 200 : 403 };
 }
 
+/**
+ * The /api paths the proxy handled before the matcher took in all of /api for
+ * maintenance mode. Every other /api path only gets the maintenance check.
+ */
+function isProxiedApiPath(pathname: string): boolean {
+  return (
+    /^\/api\/(projects|organizations|memory|v1\/memory)(\/|$)/.test(pathname) ||
+    pathname === "/api/github/repositories" ||
+    pathname === "/api/github/detect" ||
+    pathname === "/api/ai/rag" ||
+    pathname === "/api/internal/metrics/overview" ||
+    pathname === "/api/internal/admins/verify"
+  );
+}
+
 export async function proxy(request: NextRequest) {
   const hostname = request.headers.get("host") ?? "";
   const domain = hostname.split(":")[0].toLowerCase();
+
+  // Maintenance mode (RFC-0001 cutover) comes before everything else. The
+  // status host stays up so people can follow the window.
+  if (!isStatusHostname(hostname)) {
+    const maintenance = await maintenanceResponse(request);
+    if (maintenance) return applySecurityHeaders(maintenance);
+  }
+  if (/^\/api/.test(request.nextUrl.pathname) && !isProxiedApiPath(request.nextUrl.pathname)) {
+    return NextResponse.next();
+  }
   const isConsoleSubdomain = isConsoleHostname(hostname);
   const isScanSubdomain =
     domain === "scan.cencori.com" ||
@@ -1101,15 +1127,8 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!api|_next/static|_next/image|favicon.ico).*)",
-    "/api/projects/:path*",
-    "/api/organizations/:path*",
-    "/api/github/repositories",
-    "/api/github/detect",
-    "/api/memory/:path*",
-    "/api/v1/memory/:path*",
-    "/api/ai/rag",
-    "/api/internal/metrics/overview",
-    "/api/internal/admins/verify",
+    // All of /api for maintenance mode; isProxiedApiPath() picks the ones that
+    // get the rest of the proxy.
+    "/((?!_next/static|_next/image|favicon.ico).*)",
   ],
 };
