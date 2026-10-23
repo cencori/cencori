@@ -1,3 +1,4 @@
+import { adminUsers } from "@/lib/auth/admin-users";
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { isCencoriEmail } from '@/lib/internal-access';
@@ -23,7 +24,7 @@ export async function POST(req: NextRequest) {
     const admin = createAdminClient();
 
     // Create user with auto-confirmed email (no verification needed)
-    const { data, error } = await admin.auth.admin.createUser({
+    const { data, error } = await adminUsers.createUser({
         email: trimmed,
         password,
         email_confirm: true,

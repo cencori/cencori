@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabaseServer";
+import { isBetterAuthEnabled } from "@/lib/auth/flags";
 
 export async function POST(req: Request) {
   try {
@@ -7,6 +8,17 @@ export async function POST(req: Request) {
 
     if (!email || typeof email !== "string") {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
+    }
+
+    // Better Auth emails a one-time link (lib/email/password-reset-email.ts)
+    // that lands on /reset-password?token=…. It answers the same whether or
+    // not the account exists, so this can't be used to probe for emails.
+    if (isBetterAuthEnabled()) {
+      const { auth } = await import("@/lib/auth/better-auth");
+      await auth.api.requestPasswordReset({
+        body: { email: email.toLowerCase(), redirectTo: "/reset-password" },
+      });
+      return NextResponse.json({ success: true });
     }
 
     const supabase = await createServerClient();

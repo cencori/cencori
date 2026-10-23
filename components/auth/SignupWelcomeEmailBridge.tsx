@@ -1,4 +1,5 @@
 "use client";
+import { browserAuth } from "@/lib/auth/browser-auth";
 
 import { useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
@@ -110,7 +111,7 @@ export function SignupWelcomeEmailBridge() {
         };
 
         const trySessionSendWithRetry = async (attempt = 0) => {
-            const { data: { session } }: { data: { session: Session | null } } = await supabase.auth.getSession();
+            const { data: { session } }: { data: { session: Session | null } } = await browserAuth.getSession();
             if (cancelled) return;
 
             await processSession(session);
@@ -129,7 +130,7 @@ export function SignupWelcomeEmailBridge() {
 
         const {
             data: { subscription },
-        } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
+        } = browserAuth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
             if (session?.user?.email && event !== "SIGNED_OUT") {
                 void processSession(session);
             }

@@ -1,13 +1,12 @@
 import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
-import { createAdminClient } from '@/lib/supabaseAdmin';
 import { checkInternalAccess } from '@/lib/internal-access';
-import { ensureStorageBucket } from '@/lib/storage-buckets';
+import { ensureFileBucket, fileUrl, putFile } from '@/lib/storage/files';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-const BUCKET = 'email-images';
+const BUCKET = 'email-images' as const;
 
 export async function POST(req: NextRequest) {
     const supabase = await createServerClient();
@@ -37,9 +36,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'File must be under 5 MB' }, { status: 400 });
         }
 
-        const admin = createAdminClient();
-
-        const bucketError = await ensureStorageBucket(admin, BUCKET, {
+        const bucketError = await ensureFileBucket(BUCKET, {
             public: true,
             fileSizeLimit: MAX_FILE_SIZE,
             allowedMimeTypes: ALLOWED_TYPES,
@@ -59,21 +56,14 @@ export async function POST(req: NextRequest) {
 
         const buffer = Buffer.from(await file.arrayBuffer());
 
-        const { error: uploadError } = await admin.storage
-            .from(BUCKET)
-            .upload(filePath, buffer, {
-                contentType: file.type,
-                upsert: false,
-            });
+        const { error: uploadError } = await putFile(BUCKET, filePath, buffer, file.type, { upsert: false });
 
         if (uploadError) {
             console.error('[Email Image Upload] Storage error:', uploadError);
-            return NextResponse.json({ error: uploadError.message || 'Failed to upload image' }, { status: 500 });
+            return NextResponse.json({ error: uploadError || 'Failed to upload image' }, { status: 500 });
         }
 
-        const { data: urlData } = admin.storage.from(BUCKET).getPublicUrl(filePath);
-
-        return NextResponse.json({ url: urlData.publicUrl });
+        return NextResponse.json({ url: fileUrl(BUCKET, filePath) });
 
     } catch (error) {
         console.error('[Email Image Upload] Unexpected error:', error);

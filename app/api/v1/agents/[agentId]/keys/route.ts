@@ -1,6 +1,6 @@
 import { getAuthUser } from "@/lib/auth/get-auth-user";
 import crypto from 'crypto';
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from "@/lib/data/supabase-js";
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { handleCorsPreFlight } from '@/lib/gateway-middleware';

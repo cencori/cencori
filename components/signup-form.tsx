@@ -7,6 +7,8 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabaseClient";
+import { isBetterAuthEnabled } from "@/lib/auth/flags";
+import { authClient } from "@/lib/auth/auth-client";
 import {
   isAuthFormTarget,
   resolveAuthRedirectTargets,
@@ -61,8 +63,10 @@ export function SignupForm({ className, ...props }: SignupFormProps) {
     }
     const redirectIfSignedIn = async () => {
       try {
-        const { data } = await supabase.auth.getSession();
-        if (!cancelled && data.session?.user) {
+        const signedIn = isBetterAuthEnabled()
+          ? Boolean((await authClient.getSession()).data?.user)
+          : Boolean((await supabase.auth.getSession()).data.session?.user);
+        if (!cancelled && signedIn) {
           const navigationTarget = resolvePostAuthDestination(redirectParam, window.location.origin);
           const destination = isAuthFormTarget(navigationTarget)
             ? getPostLoginDefault(window.location.origin)
@@ -74,6 +78,13 @@ export function SignupForm({ className, ...props }: SignupFormProps) {
       }
     };
     void redirectIfSignedIn();
+    // Better Auth sign-ups end in a full navigation (verify page or provider
+    // redirect), so there is no in-page auth event to listen for.
+    if (isBetterAuthEnabled()) {
+      return () => {
+        cancelled = true;
+      };
+    }
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
@@ -131,21 +142,37 @@ export function SignupForm({ className, ...props }: SignupFormProps) {
       const callbackBase = redirectParam ? window.location.origin : getOAuthCallbackBase(window.location.origin);
       const emailRedirectTo = `${callbackBase}/auth/callback?next=${encodeURIComponent(navigationTarget)}`;
 
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: { emailRedirectTo },
-      });
+      let userId: string;
+      if (isBetterAuthEnabled()) {
+        // Creates the account unverified (requireEmailVerification); the
+        // code below verifies it and signs the user in.
+        const { data: signUpData, error: signUpError } = await authClient.signUp.email({
+          email,
+          password,
+          name: email.split("@")[0],
+        });
+        if (signUpError) {
+          setError(signUpError.message ?? "Unable to create your account.");
+          setLoading(false);
+          return;
+        }
+        userId = signUpData?.user?.id ?? "";
+      } else {
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { emailRedirectTo },
+        });
 
-      if (signUpError) {
-        setError(signUpError.message);
-        setLoading(false);
-        return;
+        if (signUpError) {
+          setError(signUpError.message);
+          setLoading(false);
+          return;
+        }
+        userId = signUpData.user?.id ?? "";
       }
 
       markSignupWelcomeEmailPending();
-
-      const userId = signUpData.user?.id ?? "";
 
       await fetch("/api/verify/send-code", {
         method: "POST",
@@ -177,13 +204,19 @@ export function SignupForm({ className, ...props }: SignupFormProps) {
       const redirectTo = `${callbackBase}/auth/callback?next=${encodeURIComponent(navigationTarget)}`;
 
       markSignupWelcomeEmailPending();
-      const { error: oauthError } = await supabase.auth.signInWithOAuth({
-        provider,
-        options: { redirectTo },
-      });
+      const { error: oauthError } = isBetterAuthEnabled()
+        ? await authClient.signIn.social({
+            provider,
+            callbackURL: navigationTarget,
+            errorCallbackURL: `${window.location.origin}/signup`,
+          })
+        : await supabase.auth.signInWithOAuth({
+            provider,
+            options: { redirectTo },
+          });
       if (oauthError) {
         clearSignupWelcomeEmailPending();
-        setError(oauthError.message);
+        setError(oauthError.message ?? "Unable to sign in.");
         setLoading(false);
       }
     } catch (err) {

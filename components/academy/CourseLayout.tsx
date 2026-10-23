@@ -1,5 +1,5 @@
 "use client";
-import { getAuthUser } from "@/lib/auth/get-auth-user";
+import { getBrowserAuthUser } from "@/lib/auth/get-browser-auth-user";
 
 import { ReactNode, useState, useEffect, useRef } from "react";
 import Link from "next/link";
@@ -74,7 +74,7 @@ export function CourseLayout({ children, hero, courseId, courseTitle, steps }: C
     }, [courseId, pathname]);
 
     useEffect(() => {
-        getAuthUser(supabase).then(({ data }: { data: any }) => {
+        getBrowserAuthUser(supabase).then(({ data }: { data: any }) => {
             if (data.user) {
                 setUser({
                     email: data.user.email,

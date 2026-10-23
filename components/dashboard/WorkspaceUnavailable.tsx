@@ -1,4 +1,5 @@
 "use client";
+import { browserAuth } from "@/lib/auth/browser-auth";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -27,7 +28,7 @@ export function WorkspaceUnavailable({ orgSlug }: { orgSlug: string }) {
 
     useEffect(() => {
         let mounted = true;
-        void supabase.auth.getSession().then(({ data: { session } }) => {
+        void browserAuth.getSession().then(({ data: { session } }) => {
             if (mounted) setEmail(session?.user?.email ?? null);
         });
         return () => {
@@ -39,7 +40,7 @@ export function WorkspaceUnavailable({ orgSlug }: { orgSlug: string }) {
         setBusy(true);
         beginIntentionalSignOut();
         try {
-            await supabase.auth.signOut({ scope: "local" });
+            await browserAuth.signOut({ scope: "local" });
         } catch {
             // Local cookie clearing is what matters before we hand off to login.
         }

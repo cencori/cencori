@@ -1,6 +1,6 @@
 import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@/lib/data/supabase-js";
 import { createServerClient } from "@/lib/supabaseServer";
 
 /**

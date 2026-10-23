@@ -31,6 +31,14 @@ try {
             throw new Error(`${file}: ${error.message}`);
         }
     }
+
+    // PostgREST logs in as `authenticator` (0003_postgrest_roles.sql); its
+    // password comes from the environment so it never sits in a SQL file.
+    const authenticatorPassword = process.env.POSTGREST_AUTHENTICATOR_PASSWORD;
+    if (authenticatorPassword) {
+        await client.query(`alter role authenticator with login password ${client.escapeLiteral(authenticatorPassword)}`);
+        console.log("[brimble-apply-sql] set authenticator password");
+    }
 } finally {
     await client.end();
 }

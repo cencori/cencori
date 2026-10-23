@@ -13,6 +13,7 @@ import {
 } from "@/lib/tensor-auth";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { createServerClient } from "@/lib/supabaseServer";
+import { isBetterAuthEnabled } from "@/lib/auth/flags";
 
 export async function POST(request: NextRequest) {
   let payload: unknown;
@@ -61,10 +62,14 @@ export async function POST(request: NextRequest) {
     .from("basecode_auth_codes")
     .delete()
     .lt("expires_at", new Date().toISOString());
-  const { data: link, error: linkError } = await admin.auth.admin.generateLink({
-    email: user.email.toLowerCase(),
-    type: "magiclink",
-  });
+  // Under Better Auth the exchange creates the session itself
+  // (lib/auth/tensor-sessions.ts), so there is no magic link to stash.
+  const { data: link, error: linkError } = isBetterAuthEnabled()
+    ? { data: { properties: { hashed_token: "better-auth" } }, error: null }
+    : await admin.auth.admin.generateLink({
+        email: user.email.toLowerCase(),
+        type: "magiclink",
+      });
   const token = link?.properties?.hashed_token;
   if (linkError || !token) {
     console.error("[TensorAuth] Could not create session handoff", linkError);

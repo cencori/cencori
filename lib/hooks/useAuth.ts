@@ -1,4 +1,5 @@
 "use client";
+import { browserAuth } from "@/lib/auth/browser-auth";
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
@@ -11,7 +12,7 @@ export function useAuth() {
 
     useEffect(() => {
         const checkUser = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
+            const { data: { session } } = await browserAuth.getSession();
             if (session?.user) {
                 setIsAuthenticated(true);
                 const { user } = session;
@@ -35,7 +36,7 @@ export function useAuth() {
         };
         checkUser();
 
-        const { data: authListener } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
+        const { data: authListener } = browserAuth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
             if (session?.user) {
                 setIsAuthenticated(true);
                 const { user } = session;

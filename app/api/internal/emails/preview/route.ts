@@ -1,3 +1,4 @@
+import { adminUsers } from "@/lib/auth/admin-users";
 import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
@@ -28,7 +29,7 @@ export async function POST(req: NextRequest) {
     let page = 1;
 
     while (confirmedCount < maxRecipients) {
-        const { data, error } = await supabaseAdmin.auth.admin.listUsers({
+        const { data, error } = await adminUsers.listUsers({
             page,
             perPage: USERS_PAGE_SIZE,
         });

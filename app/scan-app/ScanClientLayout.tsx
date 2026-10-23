@@ -1,5 +1,6 @@
 "use client";
-import { getAuthUser } from "@/lib/auth/get-auth-user";
+import { browserAuth } from "@/lib/auth/browser-auth";
+import { getBrowserAuthUser } from "@/lib/auth/get-browser-auth-user";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -59,7 +60,7 @@ export default function ScanLayout({ children }: ScanLayoutProps) {
     // Check auth
     useEffect(() => {
         const checkAuth = async () => {
-            const { data, error } = await getAuthUser(supabase);
+            const { data, error } = await getBrowserAuthUser(supabase);
             if (!error && data.user) {
                 setUser(data.user as User);
             } else {
@@ -68,7 +69,7 @@ export default function ScanLayout({ children }: ScanLayoutProps) {
         };
         checkAuth();
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+        const { data: { subscription } } = browserAuth.onAuthStateChange(
             (_event: AuthChangeEvent, session: Session | null) => {
                 if (session?.user) {
                     setUser(session.user as User);
@@ -289,7 +290,7 @@ export default function ScanLayout({ children }: ScanLayoutProps) {
                                 <DropdownMenuItem
                                     className="text-xs py-1.5 cursor-pointer text-red-500 focus:text-red-500"
                                     onClick={async () => {
-                                        await supabase.auth.signOut({ scope: "local" });
+                                        await browserAuth.signOut({ scope: "local" });
                                         window.location.href = logoutHref;
                                     }}
                                 >

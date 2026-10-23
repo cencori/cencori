@@ -1,5 +1,6 @@
 import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { NextRequest, NextResponse } from 'next/server';
+import { resolvePublicOrigin } from '@/lib/public-origin';
 import { createServerClient } from '@/lib/supabaseServer';
 import { canManageProjectIntegrations, getProjectAccessContext } from '@/lib/edge-integrations/access';
 import { hasVercelProvisioningConfig } from '@/lib/edge-integrations/vercel';
@@ -40,7 +41,7 @@ export async function GET(
     const edgePath = buildEdgePath(orgSlug, projectSlug);
 
     if (userError || !user) {
-        const redirectUrl = new URL(edgePath, req.url);
+        const redirectUrl = new URL(edgePath, resolvePublicOrigin(req));
         redirectUrl.searchParams.set('vercel', 'forbidden');
         return NextResponse.redirect(redirectUrl);
     }
@@ -50,13 +51,13 @@ export async function GET(
         const access = await getProjectAccessContext(projectId, user.id);
 
         if (!access || !canManageProjectIntegrations(access)) {
-            const redirectUrl = new URL(edgePath, req.url);
+            const redirectUrl = new URL(edgePath, resolvePublicOrigin(req));
             redirectUrl.searchParams.set('vercel', 'forbidden');
             return NextResponse.redirect(redirectUrl);
         }
 
         if (!hasVercelInstallStateSecret() || !hasVercelProvisioningConfig()) {
-            const redirectUrl = new URL(edgePath, req.url);
+            const redirectUrl = new URL(edgePath, resolvePublicOrigin(req));
             redirectUrl.searchParams.set('vercel', 'not_configured');
             return NextResponse.redirect(redirectUrl);
         }
@@ -72,7 +73,7 @@ export async function GET(
 
         const installUrl = buildInstallUrl(state);
         if (!installUrl) {
-            const redirectUrl = new URL(edgePath, req.url);
+            const redirectUrl = new URL(edgePath, resolvePublicOrigin(req));
             redirectUrl.searchParams.set('vercel', 'not_configured');
             return NextResponse.redirect(redirectUrl);
         }
@@ -80,7 +81,7 @@ export async function GET(
         return NextResponse.redirect(installUrl);
     } catch (error) {
         console.error('[Vercel Install] Failed to create install redirect:', error);
-        const redirectUrl = new URL(edgePath, req.url);
+        const redirectUrl = new URL(edgePath, resolvePublicOrigin(req));
         redirectUrl.searchParams.set('vercel', 'callback_error');
         redirectUrl.searchParams.set('reason', 'Failed to start Vercel install');
         return NextResponse.redirect(redirectUrl);

@@ -8,6 +8,8 @@ import {
     sanitizeAuthRedirectTarget,
 } from "@/lib/auth-redirect";
 import { isConsoleHostname } from "@/lib/console/routing";
+import { isBetterAuthEnabled } from "@/lib/auth/flags";
+import { resolvePublicOrigin } from "@/lib/public-origin";
 
 // Mirrors @supabase/auth-js EmailOtpType (not re-exported by supabase-js).
 type EmailOtpType = "signup" | "invite" | "magiclink" | "recovery" | "email_change" | "email";
@@ -31,7 +33,11 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!;
 
 export async function GET(request: NextRequest) {
-    const { searchParams, origin, hostname } = request.nextUrl;
+    const { searchParams } = request.nextUrl;
+    // Not request.nextUrl's origin: behind Brimble's proxy that is the
+    // container's own http://localhost:8000.
+    const origin = resolvePublicOrigin(request);
+    const { hostname } = new URL(origin);
     // OAuth / PKCE (email confirmation on the PKCE flow) uses `code`; email
     // templates using {{ .TokenHash }} use `token_hash` + `type`. Support both.
     const code = searchParams.get("code");
@@ -77,6 +83,12 @@ export async function GET(request: NextRequest) {
 
     if (oauthError) {
         return loginWithError(oauthError);
+    }
+    // Better Auth runs provider returns at /api/auth/callback/<provider> and
+    // has already set the session; old links and the proxy's stray-?code=
+    // forwarding still land here, so just continue to the destination.
+    if (isBetterAuthEnabled()) {
+        return NextResponse.redirect(new URL(navigationTarget, origin));
     }
     if (!code && !(tokenHash && otpType)) {
         return NextResponse.redirect(new URL("/login", loginBase));
