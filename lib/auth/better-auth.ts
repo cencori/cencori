@@ -3,8 +3,9 @@ import "server-only";
 import { betterAuth } from "better-auth";
 import { hashPassword, verifyPassword } from "better-auth/crypto";
 import { nextCookies } from "better-auth/next-js";
-import { bearer } from "better-auth/plugins";
+import { bearer, emailOTP } from "better-auth/plugins";
 import { dash } from "@better-auth/infra";
+import { sendVerificationCodeEmail } from "@/lib/email/verification-code-email";
 import bcrypt from "bcryptjs";
 import { Pool } from "pg";
 
@@ -55,7 +56,15 @@ export const auth = betterAuth({
             verify: ({ hash, password }) =>
                 hash.startsWith("$2") ? bcrypt.compare(password, hash) : verifyPassword({ hash, password }),
         },
+        // Same as Supabase today: a new account must confirm its email with
+        // the 6-digit code before it can sign in with a password. Every
+        // migrated user is already verified.
+        requireEmailVerification: true,
     },
+
+    // Verifying the emailed code signs the new user straight in
+    // (/api/verify/confirm-code), as the Supabase flow does.
+    emailVerification: { autoSignInAfterVerification: true },
 
     // Only providers whose credentials are set, so a deploy without them
     // (before the OAuth apps get the new callback URLs) still starts.
@@ -99,6 +108,17 @@ export const auth = betterAuth({
         // Accept "Authorization: Bearer <session token>" from the Tensor
         // desktop app, which has no cookies.
         bearer(),
+        // The 6-digit sign-up code (/api/verify/send-code, confirm-code).
+        // Same rules and email as the Supabase-era flow: 10 minutes, 5 tries.
+        emailOTP({
+            otpLength: 6,
+            expiresIn: 600,
+            allowedAttempts: 5,
+            storeOTP: "hashed",
+            sendVerificationOTP: async ({ email, otp }) => {
+                await sendVerificationCodeEmail({ to: email, code: otp });
+            },
+        }),
         // Must stay last so auth calls made from server actions can set cookies.
         nextCookies(),
     ],
