@@ -30,9 +30,11 @@ function normalizeOrigin(value: string | undefined): string | null {
  *
  * Destinations never legitimately contain these keys — the callback consumes
  * them — so they are always safe to drop. Everything else (`token` for
- * invites, Tensor query, marketing UTMs) is preserved. `type`/`next` ride
- * along with the residue signature and are dropped only when a code is
- * present, since `?next=` is meaningless outside the callback itself.
+ * invites, Tensor query, marketing UTMs) is preserved. `type`/`next`/`state`
+ * ride along with the residue signature and are dropped only when a code is
+ * present: `?next=` is meaningless outside the callback itself, and `state`
+ * is also Tensor's own sign-in parameter. Dropping it unconditionally sent
+ * everyone who had to log in first to "This sign-in link isn't valid".
  *
  * Accepts relative or absolute targets; returns the same shape (null in →
  * null out). Never invents a destination — worst case the bare path remains.
@@ -50,12 +52,13 @@ export function sanitizeAuthRedirectTarget<T extends string | null | undefined>(
     }
     const params = url.searchParams;
     const hasSingleUse = params.has("code") || params.has("token_hash");
-    for (const key of ["code", "token_hash", "oauth_token", "state", "error", "error_description", "error_code"]) {
+    for (const key of ["code", "token_hash", "oauth_token", "error", "error_description", "error_code"]) {
         params.delete(key);
     }
     if (hasSingleUse) {
         params.delete("type");
         params.delete("next");
+        params.delete("state");
     }
     // Nothing left but residue (e.g. "?code=X") — the path alone is the intent.
     if (absolute) return url.toString() as T;
