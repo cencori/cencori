@@ -40,6 +40,9 @@ function s3Config(): S3Config {
             secretAccessKey,
             service: "s3",
             region: process.env.FILES_S3_REGION || "los",
+            // aws4fetch retries 5xx up to 10 times with backoff by default,
+            // which holds an avatar request open for ~20 s while storage is down.
+            retries: 1,
         }),
         // Path-style addressing, as Brimble requires.
         bucketUrl: `${endpoint.replace(/\/$/, "")}/${bucket}`,
