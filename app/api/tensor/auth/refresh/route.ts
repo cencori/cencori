@@ -1,6 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { noStoreHeaders } from "@/lib/tensor-auth";
+import { isBetterAuthEnabled } from "@/lib/auth/flags";
+import { refreshTensorSession } from "@/lib/auth/tensor-sessions";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!;
@@ -18,6 +20,17 @@ export async function POST(request: NextRequest) {
       { error: "The Tensor session is invalid." },
       { headers: noStoreHeaders(), status: 400 },
     );
+  }
+
+  if (isBetterAuthEnabled()) {
+    const session = await refreshTensorSession(refreshToken);
+    if (!session) {
+      return NextResponse.json(
+        { error: "Your Cencori session expired. Sign in again." },
+        { headers: noStoreHeaders(), status: 401 },
+      );
+    }
+    return NextResponse.json(session, { headers: noStoreHeaders() });
   }
 
   const supabase = createClient(supabaseUrl, supabaseKey, {
