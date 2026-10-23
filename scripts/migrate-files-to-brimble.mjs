@@ -9,6 +9,7 @@
 //
 //   node scripts/migrate-files-to-brimble.mjs           dry run: list what would be copied
 //   node scripts/migrate-files-to-brimble.mjs --apply   copy, then rewrite URLs in TARGET
+//   … --apply --files-only                              copy only (TARGET_DATABASE_URL not needed)
 //
 // Each Supabase bucket becomes a key prefix: avatars/<key>, email-images/<key>…
 // Re-runnable: objects are overwritten in place and the URL rewrite only
@@ -18,6 +19,7 @@ import { AwsClient } from "aws4fetch";
 import pg from "pg";
 
 const apply = process.argv.includes("--apply");
+const filesOnly = process.argv.includes("--files-only");
 const BUCKETS = ["avatars", "email-images", "sender-avatars", "scan-exports"];
 // Columns that hold a Supabase public URL to rewrite.
 const URL_COLUMNS = [
@@ -114,4 +116,4 @@ for (const bucket of BUCKETS) {
     }
 }
 console.log(apply ? `copied ${files} files (${bytes} bytes)` : `dry run: ${files} files would be copied`);
-if (apply) await rewriteUrls();
+if (apply && !filesOnly) await rewriteUrls();
