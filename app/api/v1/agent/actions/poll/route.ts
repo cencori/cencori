@@ -14,7 +14,7 @@ import { getAuthUser } from "@/lib/auth/get-auth-user";
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@/lib/data/supabase-js";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import crypto from "crypto";
 import { addGatewayHeaders } from "@/lib/gateway-middleware";

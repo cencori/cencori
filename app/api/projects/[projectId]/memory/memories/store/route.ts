@@ -1,7 +1,7 @@
 import { getAuthUser as readAuthUser } from "@/lib/auth/get-auth-user";
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabaseServer";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@/lib/data/supabase-js";
 import OpenAI from "openai";
 import {
     calculateTokenCharge,

@@ -5,33 +5,71 @@
 # target database for the migration rehearsals. Single node by decision
 # (2026-10-21); HA would place replicas outside Nigeria.
 
-[services.web]
+[services.cencori]
 type = "web"
 region = "afr-west"
 
-[services.web.build]
+[services.cencori.build]
 runtime = { node = "22" }
 # NODE_ENV=production (below) makes npm skip devDependencies, and next build
 # then stops to install TypeScript; the first Lagos build timed out at 25 min.
 install = "npm ci --include=dev --no-audit --no-fund"
 command = "npm run build"
 
-[services.web.deploy]
+[services.cencori.deploy]
 start = "npm start"
 # Creates the Better Auth tables (idempotent). Workbench is read-only.
 before_start = "node scripts/brimble-apply-sql.mjs"
 health = "/api/v1/health"
 
-[services.web.resources]
+[services.cencori.resources]
 cpu = 2
 memory = "4gb"
 
-[services.web.env]
+[services.cencori.env]
 NODE_ENV = "production"
 # next build --webpack needs more than Node's default heap (see next.config.ts).
 NODE_OPTIONS = "--max-old-space-size=6144"
 # Not read by the app yet; wired for Phase 2 of the RFC.
 MIGRATION_DATABASE_URL = "{{@db.PRIVATE_CONNECTION_STRING}}"
+POSTGREST_URL = "http://rest.service.brimble.internal:3000"
+
+# PostgREST: the app's queries after the cutover (lib/data/postgrest-fetch.ts).
+# Private only; the app reaches it at http://rest.service.brimble.internal:3000.
+# libpq reads the PG* variables, so the password stays a secret, not a URI.
+[services.rest]
+type = "web"
+region = "afr-west"
+root = "deploy/postgrest"
+
+[services.rest.build]
+dockerfile = "Dockerfile"
+
+[services.rest.deploy]
+port = 3000
+health = "/"
+
+[services.rest.resources]
+cpu = 1
+memory = "1gb"
+
+[services.rest.network]
+public = false
+
+[services.rest.env]
+PGRST_DB_URI = "postgresql://"
+PGHOST = "{{@db.PRIVATE_SERVICE_HOST}}"
+PGPORT = "{{@db.SERVICE_PORT}}"
+PGDATABASE = "{{@db.DB_NAME}}"
+PGUSER = "authenticator"
+PGRST_DB_SCHEMAS = "public"
+PGRST_DB_ANON_ROLE = "anon"
+PGRST_DB_EXTRA_SEARCH_PATH = "public,extensions"
+PGRST_JWT_AUD = "authenticated"
+PGRST_SERVER_PORT = "3000"
+
+[services.rest.secrets]
+required = ["PGPASSWORD", "PGRST_JWT_SECRET"]
 
 [databases.db]
 engine = "postgresql"
