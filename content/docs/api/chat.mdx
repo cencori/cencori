@@ -119,7 +119,7 @@ When configuring an SDK, set the base URL to `https://api.cencori.com/v1`, not t
 | `timeout_ms` | number | No | Per-request provider timeout in ms (1–300000, capped). Bounds one provider attempt |
 | `max_cost_usd` | number | No | Per-request cost budget in USD. Unary calls fail before returning; streams surface it at final tally as HTTP 402 `budget_exceeded` |
 | `reasoning_effort` | string | No | `none`, `minimal`, `low`, `medium`, `high`, `xhigh` or `max`, on reasoning models. `/v1/chat/completions` only |
-| `knowledge_bases` | string[] | No | Up to 3 knowledge base ids to ground the answer in, with citations. See [Knowledge bases](#knowledge-bases-rag). `/v1/chat/completions` only |
+| `knowledge_bases` (`knowledgeBases` in the SDK) | string[] | No | Up to 3 knowledge base ids to ground the answer in, with citations. See [Knowledge bases](#knowledge-bases-rag) |
 
 ## OpenAI-Compatible Response Shape
 
@@ -151,6 +151,28 @@ When configuring an SDK, set the base URL to `https://api.cencori.com/v1`, not t
 
 Name up to three [knowledge bases](/docs/embedded-agents/overview) and Cencori searches them with the user's latest message before calling the model. The best-matching passages are added to the prompt, the model is told to cite them with `[1]`-style markers, and the response says which passage each marker points to.
 
+With the SDK (`cencori` 1.9.0 or later), create a base, upload a file, and ask:
+
+```typescript
+const kb = await cencori.knowledge.createBase({ name: 'Support docs' });
+
+const pdf = new Blob([await fs.readFile('refund-policy.pdf')], { type: 'application/pdf' });
+await cencori.knowledge.addFileSource(kb.id, pdf, { filename: 'refund-policy.pdf' });
+
+const response = await cencori.ai.chat({
+  model: 'gpt-6-sol',
+  messages: [{ role: 'user', content: 'How long do refunds take?' }],
+  knowledgeBases: [kb.id],
+});
+
+console.log(response.content);             // "Refunds are processed within 5 business days [1]."
+console.log(response.knowledge?.citations); // [{ n: 1, sourceId: 'src_...', page: 2, score: 0.91, ... }]
+```
+
+Uploads take PDF, DOCX, Markdown, HTML, CSV, JSON or plain text, up to 8MB a file, or raw text with `addInlineSource(kb.id, text)`. Indexing runs after the upload returns: a source is usable once `getSource()` reports `status: 'ready'`. Uploads that look like prompt injection are held as `stale` for review instead of indexed.
+
+Over HTTP:
+
 ```bash
 curl https://api.cencori.com/v1/chat/completions \
   -H "Authorization: Bearer $CENCORI_API_KEY" \
@@ -176,7 +198,7 @@ The response carries a `knowledge` object next to `choices`:
 }
 ```
 
-When streaming, the same citations arrive as JSON in the `X-Cencori-Knowledge-Citations` response header, before the first token.
+When streaming, the same citations arrive as JSON in the `X-Cencori-Knowledge-Citations` response header, before the first token. With `cencori.ai.chatStream()`, the first chunk carries them as `chunk.citations`.
 
 - Up to 5 passages are used per request, the best matches across all named bases.
 - Requires a secret project key. Publishable (browser) keys get `403 secret_key_required`.

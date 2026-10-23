@@ -17,6 +17,14 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { promptPayload } from '@/lib/gateway/log-payload';
+import {
+    injectKnowledge,
+    KNOWLEDGE_CITATIONS_HEADER,
+    knowledgeCitations as toKnowledgeCitations,
+    knowledgeResponseField,
+    resolveRequestedKnowledgeBases,
+    startKnowledgeRetrieval,
+} from '@/lib/gateway/chat-knowledge';
 import { buildInputSafetyBlock, safetyHeaders } from '@/lib/gateway/safety-response';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { waitUntil } from '@vercel/functions';
@@ -368,6 +376,23 @@ export async function POST(req: NextRequest) {
             memoryDirective = normalizeDirectiveScope(parsedDirective.directive, ctx.organizationId);
         }
 
+        // ── Knowledge bases (RAG): same contract as /v1 ──
+        let knowledgeBaseIds: string[] = [];
+        const requestedKnowledgeBases = body.knowledgeBases ?? body.knowledge_bases;
+        if (requestedKnowledgeBases !== undefined) {
+            const knowledgeRequest = await resolveRequestedKnowledgeBases(supabase, ctx, requestedKnowledgeBases);
+            if (!knowledgeRequest.ok) {
+                return wrap(
+                    NextResponse.json(
+                        { error: knowledgeRequest.code, message: knowledgeRequest.message },
+                        { status: knowledgeRequest.status }
+                    ),
+                    ctx
+                );
+            }
+            knowledgeBaseIds = knowledgeRequest.ids;
+        }
+
         const lastUserMessageText =
             [...unifiedMessages].reverse().find((m) => m.role === 'user')?.content ?? '';
         const memoryPromise: Promise<RetrievedMemory[]> =
@@ -402,6 +427,7 @@ export async function POST(req: NextRequest) {
                       },
                   })
                 : Promise.resolve([]);
+        const knowledgePromise = startKnowledgeRetrieval(supabase, ctx, knowledgeBaseIds, lastUserMessageText);
 
         // ── Data-plane split: one fetch warms the per-project config so the
         // pipeline and provider resolution below hit memory, not Supabase. ──
@@ -484,6 +510,12 @@ export async function POST(req: NextRequest) {
             unifiedMessages.splice(insertAt, 0, memoryMessage);
         }
 
+        // Knowledge injection after memory, same placement rules.
+        const knowledge = await knowledgePromise;
+        injectKnowledge(unifiedMessages, knowledge);
+        const knowledgeCitations = toKnowledgeCitations(knowledge);
+        const knowledgeHeaderValue = JSON.stringify(knowledgeCitations);
+
         // ── Model resolution (legacy chain, incl. hardcoded fallback) ──
         // `auto` / `cencori-auto` is the BYOK-only auto-router (task-based).
         // Preserve it so runV1ProviderExecution resolves it via BYOK keys;
@@ -502,13 +534,15 @@ export async function POST(req: NextRequest) {
             requestedModel = await getFallbackModel(requestedModel, inputPipeline.route.provider);
         }
 
-        // ── Prompt cache (skip both directions when memory retrieval active) ──
+        // ── Prompt cache (skip both directions when memory retrieval or
+        // knowledge grounding is active) ──
         const cacheEligible =
             !isVisionRequest
             &&
             !isStreaming
             && (!Array.isArray(tools) || tools.length === 0)
-            && !memoryDirective?.retrieve;
+            && !memoryDirective?.retrieve
+            && knowledgeBaseIds.length === 0;
         const skipCache = req.headers.get('x-skip-cache')?.toLowerCase() === 'true';
 
         let cacheConfig: CacheConfig | null = null;
@@ -744,6 +778,9 @@ export async function POST(req: NextRequest) {
                         String(retrievedMemories.length)
                     );
                 }
+                if (knowledgeBaseIds.length > 0) {
+                    response.headers.set(KNOWLEDGE_CITATIONS_HEADER, knowledgeHeaderValue);
+                }
                 return wrap(response as NextResponse, ctx);
             } catch (err) {
                 const message = err instanceof Error ? err.message : 'vision_route_failed';
@@ -845,6 +882,9 @@ export async function POST(req: NextRequest) {
                     String(retrievedMemories.length)
                 );
             }
+            if (knowledgeBaseIds.length > 0) {
+                execResult.response.headers.set(KNOWLEDGE_CITATIONS_HEADER, knowledgeHeaderValue);
+            }
             return wrap(execResult.response, ctx);
         }
 
@@ -893,6 +933,10 @@ export async function POST(req: NextRequest) {
                 write_status: memoryDirective.write ? 'pending' : 'disabled',
                 write_request_id: memoryDirective.write ? ctx.requestId : null,
             };
+        }
+
+        if (knowledgeBaseIds.length > 0) {
+            responseBody.knowledge = knowledgeResponseField(knowledgeBaseIds, knowledgeCitations);
         }
 
         responseBody.safety = buildInputSafetyBlock(inputPipeline);

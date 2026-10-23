@@ -84,6 +84,7 @@ vi.mock('@/lib/config-cache', () => ({
 
 vi.mock('@/lib/gateway/agent-context', () => ({
     resolveAgentContext: vi.fn(async () => ({ errorCode: 'agent_not_found' })),
+    loadAgentKeyContext: vi.fn(async () => ({ agentConfigModel: null })),
 }));
 
 vi.mock('@/lib/prompts/registry', () => ({
@@ -97,6 +98,8 @@ vi.mock('@/lib/supabaseAdmin', () => ({
             const query = {
                 select: () => query,
                 eq: () => query,
+                single: async () => ({ data: null, error: null }),
+                maybeSingle: async () => ({ data: null, error: null }),
                 in: (_col: string, ids: string[]) => Promise.resolve({
                     data: table === 'knowledge_bases'
                         ? routeMocks.knowledgeBaseRows.filter((kb) => ids.includes(kb.id))
@@ -135,6 +138,7 @@ vi.mock('@/lib/memory/writeback', () => ({
 }));
 
 import { POST } from '@/app/api/v1/chat/completions/route';
+import { POST as nativePost } from '@/app/api/ai/chat/route';
 
 const OPENAI_RESPONSE = {
     id: 'chatcmpl-1',
@@ -237,6 +241,60 @@ describe('chat completions knowledge bases', () => {
         routeMocks.knowledgeBaseRows = [{ id: KB_ID, tenant_id: null }];
         routeMocks.validateGatewayRequest.mockResolvedValue({ success: true, context: { ...ctx, keyType: 'publishable' } });
         expect((await POST(chatRequest({ ...CHAT_REQUEST_BODY, knowledge_bases: [KB_ID] }))).status).toBe(403);
+        expect(routeMocks.retrieveKnowledge).not.toHaveBeenCalled();
+    });
+});
+
+describe('native /api/ai/chat knowledge bases', () => {
+    function nativeRequest(body: Record<string, unknown>): NextRequest {
+        return new NextRequest('http://x/api/ai/chat', {
+            method: 'POST',
+            body: JSON.stringify(body),
+            headers: { 'Content-Type': 'application/json', CENCORI_API_KEY: 'csk_test' },
+        });
+    }
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        routeMocks.validateGatewayRequest.mockResolvedValue({ success: true, context: createMockGatewayContext() });
+        routeMocks.runGatewayInputPipeline.mockImplementation(
+            async (args: { messages: unknown[] }) => createMockInputPipelineSuccess(args.messages as never)
+        );
+        routeMocks.getCachedCacheConfig.mockResolvedValue(null);
+        routeMocks.getProjectCacheConfig.mockResolvedValue({ cacheEnabled: false, excludedModels: [] });
+        routeMocks.knowledgeBaseRows = [{ id: KB_ID, tenant_id: null }];
+        routeMocks.retrieveKnowledge.mockResolvedValue({
+            block: 'Company knowledge relevant to this request.\n\n[1] Refunds are processed within 5 business days.',
+            citations: [{ chunk_id: 'chunk-1', source_id: 'source-1', ord: 0, page: 2, score: 0.91 }],
+        });
+        routeMocks.runV1ProviderExecution.mockImplementation(async () => ({
+            ok: true,
+            response: NextResponse.json({ content: 'Refunds take 5 days [1].', model: 'gpt-6-sol' }),
+        }));
+    });
+
+    it('accepts camelCase knowledgeBases, injects the block and returns citations', async () => {
+        const res = await nativePost(nativeRequest({ ...CHAT_REQUEST_BODY, knowledgeBases: [`kb_${KB_ID}`] }));
+        expect(res.status).toBe(200);
+
+        const execArgs = routeMocks.runV1ProviderExecution.mock.calls[0][0] as {
+            messages: Array<{ role: string; content: string }>;
+        };
+        expect(execArgs.messages.some((m) => m.role === 'system' && m.content.includes('Refunds are processed'))).toBe(true);
+        expect((await res.json()).knowledge).toEqual({
+            knowledge_bases: [`kb_${KB_ID}`],
+            citations: [{ n: 1, chunk_id: 'chunk-1', source_id: 'src_source-1', ord: 0, page: 2, score: 0.91 }],
+        });
+    });
+
+    it('returns flat errors for bad or foreign bases', async () => {
+        const bad = await nativePost(nativeRequest({ ...CHAT_REQUEST_BODY, knowledge_bases: [] }));
+        expect(bad.status).toBe(400);
+        expect(await bad.json()).toMatchObject({ error: 'invalid_knowledge_bases' });
+
+        routeMocks.knowledgeBaseRows = [];
+        const missing = await nativePost(nativeRequest({ ...CHAT_REQUEST_BODY, knowledgeBases: [KB_ID] }));
+        expect(missing.status).toBe(404);
         expect(routeMocks.retrieveKnowledge).not.toHaveBeenCalled();
     });
 });

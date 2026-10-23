@@ -49,7 +49,7 @@ Use one of these integration paths:
 Current minimum versions:
 - Cencori Web TypeScript SDK: `cencori@1.6.1`
 - Cencori Web MCP server: `@cencori/mcp@0.7.1`
-- Embedded Agents TypeScript SDK: `cencori@1.8.3`
+- Embedded Agents TypeScript SDK: `cencori@1.9.0`
 - Public catalog helpers (`listCatalogModels`, `listCatalogProviders`, `providerLogoUrl`): `cencori@1.8.0`
 - Embedded Agents Python SDK: not yet published; use the HTTP API for Python integrations
 - Embedded Agents MCP inspection: `@cencori/mcp@0.8.0`
@@ -321,6 +321,32 @@ console.log(response.content);
 console.log(response.toolCalls);
 console.log(response.usage.totalTokens);
 ```
+
+### Chat with Knowledge Bases (RAG, cencori@1.9.0+)
+
+Ground an answer in your own documents. Pass up to 3 knowledge base ids; the
+gateway searches them with the latest user message, adds the best 5 passages
+to the prompt, and the model cites them as `[1]`, `[2]`. Requires a secret key.
+Only project-wide bases work here; tenant-scoped bases go through Sessions.
+
+```typescript
+const kb = await cencori.knowledge.createBase({ name: 'Support docs' });
+const source = await cencori.knowledge.addFileSource(kb.id, pdfBlob, { filename: 'refund-policy.pdf' }); // PDF, DOCX, MD, HTML, CSV, JSON, TXT; 8MB max
+// Wait for (await cencori.knowledge.getSource(kb.id, source.id)).status === 'ready' before asking about a new file.
+
+const response = await cencori.ai.chat({
+  model: 'claude-opus-5-5',
+  messages: [{ role: 'user', content: 'How long do refunds take?' }],
+  knowledgeBases: [kb.id],
+});
+console.log(response.knowledge?.citations); // [{ n, chunkId, sourceId, ord, page, score }]
+```
+
+Streaming: the first `chatStream()` chunk carries `citations`. Over HTTP, send
+`knowledge_bases` on `/v1/chat/completions` (or `knowledgeBases` on
+`/api/ai/chat`); the response has a `knowledge` object, or an
+`X-Cencori-Knowledge-Citations` header when streaming. Do not use
+`cencori.ai.rag()` or `cencori.storage.knowledge`: both are deprecated and fail.
 
 ### Chat Streaming
 

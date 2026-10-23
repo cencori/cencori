@@ -106,3 +106,21 @@ describe('embedded SDK request diagnostics', () => {
         expect(error.requestId).toBe('req_gw_1');
     });
 });
+
+describe('knowledge file upload', () => {
+    it('sends multipart form data without a JSON content type', async () => {
+        const { KnowledgeNamespace } = await import('./index');
+        const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValueOnce(new Response('{"id":"src_1"}', { status: 201 }));
+        const pdf = new Blob(['%PDF-1.4'], { type: 'application/pdf' });
+
+        await new KnowledgeNamespace(config).addFileSource('kb_1', pdf, { filename: 'handbook.pdf', metadata: { team: 'support' } });
+
+        const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+        expect(url).toBe('https://cencori.com/v1/knowledge-bases/kb_1/sources');
+        expect(init.body).toBeInstanceOf(FormData);
+        expect((init.headers as Record<string, string>)['Content-Type']).toBeUndefined();
+        const form = init.body as FormData;
+        expect((form.get('file') as File).name).toBe('handbook.pdf');
+        expect(form.get('metadata')).toBe('{"team":"support"}');
+    });
+});

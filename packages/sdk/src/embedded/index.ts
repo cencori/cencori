@@ -46,16 +46,18 @@ export function parseRetryAfterSeconds(value: string | null | undefined, nowMs: 
 }
 
 async function request<T>(config: Required<CencoriConfig>, method: string, path: string, body?: unknown, extraHeaders?: Record<string, string>, options?: EmbeddedRequestOptions): Promise<T> {
+    // FormData sets its own multipart Content-Type (with the boundary).
+    const isForm = typeof FormData !== 'undefined' && body instanceof FormData;
     const response = await fetch(`${config.baseUrl}${path}`, {
         method,
         signal: options?.signal,
         headers: {
             'CENCORI_API_KEY': config.apiKey,
-            'Content-Type': 'application/json',
+            ...(isForm ? {} : { 'Content-Type': 'application/json' }),
             ...config.headers,
             ...extraHeaders,
         },
-        body: body ? JSON.stringify(body) : undefined,
+        body: isForm ? (body as FormData) : body ? JSON.stringify(body) : undefined,
     });
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' })) as {
@@ -344,15 +346,46 @@ export class ActionsNamespace {
 
 // ── Knowledge ────────────────────────────────────────────
 
+export interface KnowledgeBase {
+    id: string;
+    project_id: string;
+    tenant_id: string | null;
+    name: string;
+    scope_type: string;
+    region: string | null;
+    retention_policy: Record<string, unknown>;
+    status: string;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface KnowledgeSource {
+    id: string;
+    knowledge_base_id: string;
+    source_type: 'inline' | 'file';
+    mime: string | null;
+    bytes: number | null;
+    /**
+     * `queued` → `processing` → `ready`. `failed` carries an `error`;
+     * `stale` means held for review after a prompt-injection scan.
+     */
+    status: 'queued' | 'processing' | 'ready' | 'failed' | 'stale';
+    checksum: string | null;
+    error: string | null;
+    metadata: Record<string, unknown>;
+    created_at: string;
+    updated_at: string;
+}
+
 export class KnowledgeNamespace {
     constructor(private config: Required<CencoriConfig>) {}
-    createBase(params: { name: string; tenant_id?: string; scope_type?: string; region?: string }): Promise<unknown> {
+    createBase(params: { name: string; tenant_id?: string; scope_type?: string; region?: string }): Promise<KnowledgeBase> {
         return request(this.config, 'POST', '/v1/knowledge-bases', params);
     }
-    listBases(tenantId?: string): Promise<{ data: unknown[]; next_cursor: string | null }> {
+    listBases(tenantId?: string): Promise<{ data: KnowledgeBase[]; next_cursor: string | null }> {
         return request(this.config, 'GET', `/v1/knowledge-bases${qs({ tenant_id: tenantId })}`);
     }
-    getBase(kbId: string): Promise<unknown> {
+    getBase(kbId: string): Promise<KnowledgeBase> {
         return request(this.config, 'GET', `/v1/knowledge-bases/${kbId}`);
     }
     updateBase(kbId: string, params: { name?: string; status?: string; retention_policy?: Record<string, unknown> }): Promise<unknown> {
@@ -361,13 +394,28 @@ export class KnowledgeNamespace {
     removeBase(kbId: string): Promise<{ deleted: boolean }> {
         return request(this.config, 'DELETE', `/v1/knowledge-bases/${kbId}`);
     }
-    addInlineSource(kbId: string, text: string, metadata?: Record<string, unknown>): Promise<unknown> {
+    addInlineSource(kbId: string, text: string, metadata?: Record<string, unknown>): Promise<KnowledgeSource> {
         return request(this.config, 'POST', `/v1/knowledge-bases/${kbId}/sources`, { text, metadata });
     }
-    listSources(kbId: string): Promise<{ data: unknown[]; next_cursor: string | null }> {
+    /**
+     * Upload a file (PDF, DOCX, Markdown, HTML, CSV, JSON or plain text, up
+     * to 8MB). It is extracted, chunked and embedded server-side.
+     *
+     * @example
+     * const pdf = new Blob([await fs.readFile('handbook.pdf')], { type: 'application/pdf' });
+     * await cencori.knowledge.addFileSource(kb.id, pdf, { filename: 'handbook.pdf' });
+     */
+    addFileSource(kbId: string, file: Blob, options?: { filename?: string; metadata?: Record<string, unknown> }): Promise<KnowledgeSource> {
+        const form = new FormData();
+        const filename = options?.filename ?? (file as Blob & { name?: string }).name ?? 'upload';
+        form.append('file', file, filename);
+        if (options?.metadata) form.append('metadata', JSON.stringify(options.metadata));
+        return request(this.config, 'POST', `/v1/knowledge-bases/${kbId}/sources`, form);
+    }
+    listSources(kbId: string): Promise<{ data: KnowledgeSource[]; next_cursor: string | null }> {
         return request(this.config, 'GET', `/v1/knowledge-bases/${kbId}/sources`);
     }
-    getSource(kbId: string, sourceId: string): Promise<unknown> {
+    getSource(kbId: string, sourceId: string): Promise<KnowledgeSource> {
         return request(this.config, 'GET', `/v1/knowledge-bases/${kbId}/sources/${sourceId}`);
     }
     removeSource(kbId: string, sourceId: string): Promise<{ deleted: boolean }> {
