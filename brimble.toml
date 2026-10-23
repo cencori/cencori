@@ -32,10 +32,13 @@ NODE_ENV = "production"
 NODE_OPTIONS = "--max-old-space-size=6144"
 # Not read by the app yet; wired for Phase 2 of the RFC.
 MIGRATION_DATABASE_URL = "{{@db.PRIVATE_CONNECTION_STRING}}"
-POSTGREST_URL = "http://rest.service.brimble.internal:3000"
+# The `postgrest` project, created from the postgrest/postgrest:v16.5 image
+# outside this file: Brimble builds services.rest with Railpack and ignores
+# build.dockerfile. Move it back here once that's fixed.
+POSTGREST_URL = "http://postgrest.virtual.brimble.internal:3000"
 
 # PostgREST: the app's queries after the cutover (lib/data/postgrest-fetch.ts).
-# Private only; the app reaches it at http://rest.service.brimble.internal:3000.
+# Not serving yet (see POSTGREST_URL above); kept so the config is ready.
 # libpq reads the PG* variables, so the password stays a secret, not a URI.
 [services.rest]
 type = "web"
