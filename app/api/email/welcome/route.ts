@@ -1,3 +1,4 @@
+import { adminUsers } from "@/lib/auth/admin-users";
 import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { SendByte } from '@sendbyte/node';
 import { NextRequest, NextResponse } from 'next/server';
@@ -62,7 +63,7 @@ export async function POST(request: NextRequest) {
     }
 
     const supabaseAdmin = createAdminClient();
-    const { data: adminUserData, error: adminUserError } = await supabaseAdmin.auth.admin.getUserById(user.id);
+    const { data: adminUserData, error: adminUserError } = await adminUsers.getUserById(user.id);
     if (adminUserError || !adminUserData?.user) {
       console.error('[Welcome Email] Failed to load user metadata:', adminUserError);
       return NextResponse.json({ error: 'Failed to load user metadata' }, { status: 500 });
@@ -128,7 +129,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { error: metadataUpdateError } = await supabaseAdmin.auth.admin.updateUserById(user.id, {
+    const { error: metadataUpdateError } = await adminUsers.updateUserById(user.id, {
       user_metadata: {
         ...currentUserMetadata,
         welcome_email_sent_at: new Date().toISOString(),

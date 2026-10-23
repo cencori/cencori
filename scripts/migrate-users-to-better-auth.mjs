@@ -1,7 +1,7 @@
 // Copies Supabase Auth users into the Better Auth tables (RFC-0001 §4).
 //
 //   SOURCE_DATABASE_URL       Supabase Postgres, read-only role (only SELECTs run)
-//   BETTER_AUTH_DATABASE_URL  Brimble Postgres with database/brimble/0001_better_auth.sql applied
+//   BETTER_AUTH_DATABASE_URL  Brimble Postgres with database/brimble/*.sql applied
 //
 //   node scripts/migrate-users-to-better-auth.mjs            dry run: read, validate, report
 //   node scripts/migrate-users-to-better-auth.mjs --apply    write, in one transaction
@@ -60,6 +60,8 @@ export function buildRows(users, identities) {
             email,
             emailVerified: u.email_confirmed_at != null,
             image: avatar(u),
+            // Supabase user_metadata (welcome/login-alert/opt-out flags, names).
+            metadata: u.raw_user_meta_data || {},
             createdAt: u.created_at,
             updatedAt: u.updated_at || u.created_at,
         });
@@ -145,11 +147,12 @@ async function main() {
         await target.query("begin");
         for (const u of outUsers) {
             await target.query(
-                `insert into auth_users (id, name, email, "emailVerified", image, "createdAt", "updatedAt")
-                 values ($1, $2, $3, $4, $5, $6, $7)
+                `insert into auth_users (id, name, email, "emailVerified", image, metadata, "createdAt", "updatedAt")
+                 values ($1, $2, $3, $4, $5, $6, $7, $8)
                  on conflict (id) do update set name = excluded.name, email = excluded.email,
-                   "emailVerified" = excluded."emailVerified", image = excluded.image, "updatedAt" = excluded."updatedAt"`,
-                [u.id, u.name, u.email, u.emailVerified, u.image, u.createdAt, u.updatedAt],
+                   "emailVerified" = excluded."emailVerified", image = excluded.image,
+                   metadata = excluded.metadata, "updatedAt" = excluded."updatedAt"`,
+                [u.id, u.name, u.email, u.emailVerified, u.image, JSON.stringify(u.metadata), u.createdAt, u.updatedAt],
             );
         }
         for (const a of accounts) {

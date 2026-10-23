@@ -53,6 +53,16 @@ export const browserAuth = {
         return { data: { subscription: { unsubscribe } } };
     },
 
+    // Onboarding saves the user's name. Under Better Auth the name is the
+    // user's own field (user_metadata.full_name/name read back from it).
+    async updateUser(attributes: { data: Record<string, unknown> }): Promise<{ error: { message: string } | null }> {
+        if (!isBetterAuthEnabled()) return supabase.auth.updateUser(attributes);
+        const name = attributes.data.full_name ?? attributes.data.name;
+        if (typeof name !== "string" || !name.trim()) return { error: null };
+        const { error } = await authClient.updateUser({ name: name.trim() });
+        return { error: error ? { message: error.message ?? "Could not save your name." } : null };
+    },
+
     async signOut(options?: { scope?: "global" | "local" | "others" }): Promise<{ error: Error | null }> {
         if (!isBetterAuthEnabled()) return supabase.auth.signOut(options);
         const { error } = await authClient.signOut();

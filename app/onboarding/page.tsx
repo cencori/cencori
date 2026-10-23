@@ -1,4 +1,5 @@
 "use client";
+import { browserAuth } from "@/lib/auth/browser-auth";
 import { getBrowserAuthUser } from "@/lib/auth/get-browser-auth-user";
 
 import { useRouter, useSearchParams } from "next/navigation";
@@ -144,7 +145,7 @@ function OnboardingContent() {
 
         const [firstName, ...remainingNameParts] = normalizedFullName.split(" ");
         const lastName = remainingNameParts.join(" ");
-        const { error: metadataError } = await supabase.auth.updateUser({
+        const { error: metadataError } = await browserAuth.updateUser({
           data: {
             full_name: normalizedFullName,
             name: normalizedFullName,

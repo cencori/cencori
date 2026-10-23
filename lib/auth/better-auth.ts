@@ -42,7 +42,14 @@ export const auth = betterAuth({
     // Table names that can't be confused with the existing public.users
     // profile table. Users keep their Supabase UUIDs (generateId "uuid"), so
     // the 51 foreign keys to auth.users can be repointed to auth_users.
-    user: { modelName: "auth_users" },
+    user: {
+        modelName: "auth_users",
+        // Supabase's user_metadata (welcome/login-alert/opt-out flags, names),
+        // written server-side only (lib/auth/admin-users.ts).
+        additionalFields: {
+            metadata: { type: "json", required: false, input: false },
+        },
+    },
     session: {
         modelName: "auth_sessions",
         // Supabase refresh tokens never expired, so users stayed signed in

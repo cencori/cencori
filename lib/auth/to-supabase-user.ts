@@ -11,6 +11,20 @@ export interface BetterAuthUser {
     emailVerified: boolean;
     createdAt: Date | string;
     updatedAt: Date | string;
+    // Supabase's user_metadata, carried over (auth_users.metadata).
+    metadata?: Record<string, unknown> | string | null;
+}
+
+function parseMetadata(metadata: BetterAuthUser["metadata"]): Record<string, unknown> {
+    if (!metadata) return {};
+    if (typeof metadata === "string") {
+        try {
+            return JSON.parse(metadata) as Record<string, unknown>;
+        } catch {
+            return {};
+        }
+    }
+    return metadata;
 }
 
 export function toSupabaseUser(user: BetterAuthUser): User {
@@ -25,6 +39,7 @@ export function toSupabaseUser(user: BetterAuthUser): User {
         updated_at: new Date(user.updatedAt).toISOString(),
         app_metadata: {},
         user_metadata: {
+            ...parseMetadata(user.metadata),
             full_name: user.name,
             name: user.name,
             avatar_url: user.image ?? undefined,

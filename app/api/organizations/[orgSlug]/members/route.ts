@@ -1,3 +1,4 @@
+import { adminUsers } from "@/lib/auth/admin-users";
 import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { NextRequest, NextResponse } from "next/server";
 import type { User } from "@supabase/supabase-js";
@@ -102,7 +103,7 @@ export async function GET(
         const batch = memberIds.slice(index, index + batchSize);
         const users = await Promise.all(
             batch.map(async (userId) => {
-                const { data, error } = await admin.auth.admin.getUserById(userId);
+                const { data, error } = await adminUsers.getUserById(userId);
                 return error ? null : data.user;
             }),
         );
