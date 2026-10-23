@@ -159,6 +159,16 @@ describe("sanitizeAuthRedirectTarget", () => {
         );
     });
 
+    test("keeps Tensor's sign-in state, which the app needs to finish signing in", () => {
+        const challenge = "a".repeat(43);
+        const state = "b".repeat(43);
+        const tensor = `/tensor/sign-in?code_challenge=${challenge}&state=${state}`;
+        expect(sanitizeAuthRedirectTarget(tensor)).toBe(tensor);
+        expect(resolvePostAuthDestination(tensor, "https://console.cencori.com")).toBe(tensor);
+        // An OAuth return's state is still residue, and goes with its code.
+        expect(sanitizeAuthRedirectTarget(`/home?code=X&state=${state}`)).toBe("/home");
+    });
+
     test("handles absolute targets and null", () => {
         expect(sanitizeAuthRedirectTarget("https://cencori.com/home?code=X")).toBe("https://cencori.com/home");
         expect(sanitizeAuthRedirectTarget(null)).toBeNull();
