@@ -43,7 +43,17 @@ export const auth = betterAuth({
     // profile table. Users keep their Supabase UUIDs (generateId "uuid"), so
     // the 51 foreign keys to auth.users can be repointed to auth_users.
     user: { modelName: "auth_users" },
-    session: { modelName: "auth_sessions" },
+    session: {
+        modelName: "auth_sessions",
+        // Supabase refresh tokens never expired, so users stayed signed in
+        // indefinitely. 30 days, extended while in use (at most daily), keeps
+        // active users signed in without a surprise logout.
+        expiresIn: 60 * 60 * 24 * 30,
+        updateAge: 60 * 60 * 24,
+        // proxy.ts reads the session on every request; a short signed cookie
+        // cache avoids a database lookup each time.
+        cookieCache: { enabled: true, maxAge: 5 * 60 },
+    },
     account: { modelName: "auth_accounts" },
     verification: { modelName: "auth_verifications" },
 

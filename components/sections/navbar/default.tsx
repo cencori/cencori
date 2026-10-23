@@ -1,3 +1,4 @@
+import { browserAuth } from "@/lib/auth/browser-auth";
 import { type VariantProps } from "class-variance-authority";
 import { CreditCard, Menu, Settings, UserPlus, Users, Shield, Book, Rocket, Code, Laptop, Share2, Building2, Workflow, DollarSign, LifeBuoy, Rss, Layers, Search, BriefcaseBusiness, UsersRound, Factory, ScrollText, CalendarDays, Handshake, Ship, LockKeyhole, HardHat, FileText, Blocks, FlaskConical, Gauge, Terminal, Globe, User, BookOpen, FileWarning, Package2 } from "lucide-react";
 import { ReactNode } from "react";
@@ -331,7 +332,7 @@ export default function Navbar({
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
                         onClick={async () => {
-                          await supabase.auth.signOut({ scope: "local" });
+                          await browserAuth.signOut({ scope: "local" });
                           router.push("/login");
                         }}
                         className="cursor-pointer"

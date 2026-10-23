@@ -1,4 +1,5 @@
 "use client";
+import { browserAuth } from "@/lib/auth/browser-auth";
 
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
@@ -159,7 +160,7 @@ export default function ProfilePage() {
 
             beginIntentionalSignOut();
             clearClientSessionCaches();
-            await supabase.auth.signOut({ scope: "local" });
+            await browserAuth.signOut({ scope: "local" });
             router.push("/");
             toast.success("Account deleted");
         } catch (error) {

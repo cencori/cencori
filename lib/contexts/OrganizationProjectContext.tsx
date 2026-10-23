@@ -1,4 +1,5 @@
 "use client";
+import { browserAuth } from "@/lib/auth/browser-auth";
 
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -94,7 +95,7 @@ export const OrganizationProjectProvider = ({ children }: { children: ReactNode 
             const {
                 data: { session },
                 error: sessionError,
-            } = await supabase.auth.getSession();
+            } = await browserAuth.getSession();
 
             if (sessionError || !session?.user) {
                 console.error("User not logged in:", sessionError?.message);

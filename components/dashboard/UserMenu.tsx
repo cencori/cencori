@@ -1,4 +1,5 @@
 "use client";
+import { browserAuth } from "@/lib/auth/browser-auth";
 
 import { usePathname, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -64,7 +65,7 @@ export function UserMenu({ organization }: UserMenuProps) {
     useEffect(() => {
         let cancelled = false;
 
-        supabase.auth.getSession().then(({ data: { session } }: { data: { session: Session | null } }) => {
+        browserAuth.getSession().then(({ data: { session } }: { data: { session: Session | null } }) => {
             if (cancelled) return;
             if (session?.user) {
                 const meta = session.user.user_metadata;
@@ -283,7 +284,7 @@ export function UserMenu({ organization }: UserMenuProps) {
                             // user just asked for.
                             beginIntentionalSignOut();
                             clearClientSessionCaches();
-                            await supabase.auth.signOut({ scope: "local" });
+                            await browserAuth.signOut({ scope: "local" });
                             posthog.reset();
                             router.push("/login");
                         }}

@@ -1,4 +1,5 @@
 "use client";
+import { browserAuth } from "@/lib/auth/browser-auth";
 
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -96,13 +97,13 @@ export default function ScanDashboardPage() {
 
         const init = async () => {
             // Let Supabase settle auth state before first protected API call.
-            await supabase.auth.getSession();
+            await browserAuth.getSession();
             await fetchProjectsAndEntitlement();
         };
 
         void init();
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+        const { data: { subscription } } = browserAuth.onAuthStateChange(
             (_event: AuthChangeEvent, session: Session | null) => {
                 if (session?.user) {
                     void fetchProjectsAndEntitlement();

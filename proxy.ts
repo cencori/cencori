@@ -1,4 +1,5 @@
 import { getAuthUser } from "@/lib/auth/get-auth-user";
+import { isBetterAuthEnabled } from "@/lib/auth/flags";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
@@ -856,7 +857,11 @@ export async function proxy(request: NextRequest) {
 
   const hasSessionCookie = request.cookies
     .getAll()
-    .some((cookie) => cookie.name.startsWith("sb-") && cookie.name.includes("auth-token"));
+    .some((cookie) =>
+      isBetterAuthEnabled()
+        ? cookie.name.endsWith("better-auth.session_token")
+        : cookie.name.startsWith("sb-") && cookie.name.includes("auth-token"),
+    );
 
   const shouldRefreshAuth = shouldRefreshAuthSession(
     pathname,
@@ -869,7 +874,18 @@ export async function proxy(request: NextRequest) {
 
   let userId: string | null = null;
 
-  if (shouldRefreshAuth) {
+  if (shouldRefreshAuth && isBetterAuthEnabled()) {
+    // Better Auth (RFC-0001 cutover): read the session from this request's
+    // cookies; when Better Auth extends it, forward the refreshed cookie.
+    const { auth } = await import("@/lib/auth/better-auth");
+    const result = await auth.api
+      .getSession({ headers: request.headers, returnHeaders: true })
+      .catch(() => null);
+    userId = result?.response?.user?.id ?? null;
+    for (const cookie of result?.headers?.getSetCookie() ?? []) {
+      response.headers.append("set-cookie", cookie);
+    }
+  } else if (shouldRefreshAuth) {
     // 3. Supabase Auth Session Refresh (only on auth-sensitive routes)
     // Determine cookie domain for cross-subdomain auth
     const isProduction = domain.endsWith("cencori.com");

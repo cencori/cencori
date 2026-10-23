@@ -1,4 +1,5 @@
 "use client";
+import { browserAuth } from "@/lib/auth/browser-auth";
 
 import { ArrowUpRight03Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -347,12 +348,12 @@ export function SiteNav({
   // no user, so the Log in / Sign up links remain.
   useEffect(() => {
     let cancelled = false;
-    supabase.auth.getSession().then(({ data }) => {
+    browserAuth.getSession().then(({ data }) => {
       if (!cancelled && data.session?.user) setIsAuthenticated(true);
     });
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
+    } = browserAuth.onAuthStateChange((event, session) => {
       if (cancelled) return;
       if (event === "SIGNED_IN" && session?.user) setIsAuthenticated(true);
       else if (event === "SIGNED_OUT") setIsAuthenticated(false);

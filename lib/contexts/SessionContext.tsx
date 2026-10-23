@@ -1,4 +1,5 @@
 "use client";
+import { browserAuth } from "@/lib/auth/browser-auth";
 
 import React, {
     createContext,
@@ -83,7 +84,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         let userId: string | null = null;
         let email: string | null = null;
         try {
-            const { data: { session } } = await supabase.auth.getSession();
+            const { data: { session } } = await browserAuth.getSession();
             userId = session?.user?.id ?? null;
             email = session?.user?.email ?? null;
         } catch {
@@ -126,7 +127,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         void (async () => {
             if (interrupted.current) return;
 
-            const { data: { session } } = await supabase.auth.getSession();
+            const { data: { session } } = await browserAuth.getSession();
             const userId = session?.user?.id ?? null;
 
             if (!userId) {
@@ -155,7 +156,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
         // auth-js still fires for same-tab transitions and token refreshes;
         // those are the cheapest possible signal when they do arrive.
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+        const { data: { subscription } } = browserAuth.onAuthStateChange(() => {
             void verify();
         });
 

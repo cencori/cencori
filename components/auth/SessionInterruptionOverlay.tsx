@@ -1,4 +1,5 @@
 "use client";
+import { browserAuth } from "@/lib/auth/browser-auth";
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -40,7 +41,7 @@ export function SessionInterruptionOverlay({
         setBusy(true);
         beginIntentionalSignOut();
         try {
-            await supabase.auth.signOut({ scope: "local" });
+            await browserAuth.signOut({ scope: "local" });
         } catch {
             // Already gone server-side is fine — we only need the local cookie
             // cleared before handing the user back to the login screen.
