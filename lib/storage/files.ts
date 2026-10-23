@@ -78,13 +78,13 @@ export async function putFile(
             .upload(key, body, { contentType, upsert });
         return { error: error?.message ?? null };
     }
+    // `upsert: false` isn't enforced here: Lagos rejects If-None-Match outright
+    // (400, 2026-10-23), and every caller already writes a unique,
+    // timestamped key.
     const response = await s3Config().client.fetch(objectUrl(bucket, key), {
         method: "PUT",
         body: body as Uint8Array<ArrayBuffer>,
-        headers: {
-            "content-type": contentType,
-            ...(upsert ? {} : { "if-none-match": "*" }),
-        },
+        headers: { "content-type": contentType },
     });
     return { error: response.ok ? null : `Upload failed (${response.status})` };
 }
