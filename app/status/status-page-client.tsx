@@ -3,13 +3,10 @@
 // Structure and data only — visual design to be directed. Every piece of the
 // page is a named component below so it can be restyled in place.
 
-import AlertCircleIcon from '@hugeicons/core-free-icons/AlertCircleIcon';
-import BadgeXIcon from '@hugeicons/core-free-icons/BadgeXIcon';
-import CheckmarkBadge02Icon from '@hugeicons/core-free-icons/CheckmarkBadge02Icon';
-import { HugeiconsIcon } from '@hugeicons/react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { StateIcon } from './state-icon';
 import { STATUS_BUTTON, StatusShell } from './status-shell';
 import {
   HOSTED_STATUS_PAGE_URL,
@@ -49,14 +46,6 @@ const BANNER_COLORS: Record<OutrayState, string> = {
   degraded: 'bg-[#171005]',
   outage: 'bg-[#1a0707]',
   unknown: 'bg-zinc-900',
-};
-
-// One icon per state, used by the banner, component rows and bar tooltips.
-// "No data" has no icon of its own and stays a grey dot.
-const STATE_ICONS: Record<Exclude<OutrayState, 'unknown'>, { icon: typeof CheckmarkBadge02Icon; color: string }> = {
-  operational: { icon: CheckmarkBadge02Icon, color: 'text-emerald-400' },
-  degraded: { icon: AlertCircleIcon, color: 'text-amber-400' },
-  outage: { icon: BadgeXIcon, color: 'text-red-400' },
 };
 
 function useOutrayStatus(initial: OutrayStatusPage | null) {
@@ -101,14 +90,6 @@ function formatDate(value: string): string {
   });
 }
 
-
-function StateIcon({ state, className }: { state: OutrayState; className: string }) {
-  if (state === 'unknown') {
-    return <span aria-hidden="true" className="inline-block size-2 shrink-0 rounded-full bg-zinc-500" />;
-  }
-  const { icon, color } = STATE_ICONS[state];
-  return <HugeiconsIcon icon={icon} aria-hidden="true" className={cn('shrink-0', color, className)} />;
-}
 
 function OverallBanner({ data }: { data: OutrayStatusPage }) {
   return (
