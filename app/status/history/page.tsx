@@ -10,7 +10,6 @@ import {
 } from '@/lib/outray-status';
 import { statusBasePath, statusMainSiteHref } from '@/lib/status-host';
 import { StatusShell } from '../status-shell';
-import { MOCK_INCIDENTS } from './mock-incidents'; // TEMPORARY: remove with mock-incidents.ts
 
 export const metadata: Metadata = {
   title: { absolute: 'Status history | Cencori' },
@@ -39,11 +38,13 @@ const TIME = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digi
 
 // Severity bar colour. Impact values are unconfirmed until OutRay publishes a
 // real incident; anything unrecognised reads as a minor incident.
-function impactColor(impact: string | undefined): string {
-  switch (impact?.toLowerCase()) {
+function severityColor(kind: string | null): string {
+  switch (kind?.toLowerCase()) {
+    case 'downtime':
+    case 'outage':
+    case 'down':
     case 'major':
     case 'critical':
-    case 'outage':
       return 'bg-red-500';
     case 'maintenance':
       return 'bg-sky-500';
@@ -53,7 +54,12 @@ function impactColor(impact: string | undefined): string {
 }
 
 interface DatedIncident {
-  incident: OutrayIncident;
+  id: string;
+  title: string;
+  /** The full record; absent for incidents older than OutRay's latest 25. */
+  incident: OutrayIncident | null;
+  /** Severity, from the history day it appears on, else the incident's stage. */
+  kind: string | null;
   /** UTC calendar day, "YYYY-MM-DD". */
   day: string;
   at: Date | null;
@@ -62,22 +68,35 @@ interface DatedIncident {
 // Incidents come from two places: the latest 25 at the page level, and each
 // component's 90-day history. Merge and de-duplicate by id.
 function collectIncidents(data: OutrayStatusPage): DatedIncident[] {
-  const byId = new Map<string, DatedIncident>();
-  const add = (incident: OutrayIncident, fallbackDay?: string) => {
-    if (!incident?.id || byId.has(incident.id)) return;
-    const stamp = incident.startedAt ?? incident.createdAt;
-    const at = stamp ? new Date(stamp) : null;
-    const day = at && !Number.isNaN(at.getTime()) ? at.toISOString().slice(0, 10) : fallbackDay;
-    if (!day) return;
-    byId.set(incident.id, { incident, day, at: at && !Number.isNaN(at.getTime()) ? at : null });
-  };
-
-  for (const incident of data.incidents) add(incident);
+  // Severity and first day for every incident the 90-day history mentions.
+  const fromHistory = new Map<string, { title: string; kind: string | null; day: string }>();
   const components = [...data.standaloneComponents, ...data.groups.flatMap((group) => group.components)];
   for (const component of components) {
     for (const day of component.history) {
-      for (const incident of day.incidents) add(incident, day.date);
+      for (const ref of day.incidents) {
+        const seen = fromHistory.get(ref.id);
+        if (!seen || day.date < seen.day) {
+          fromHistory.set(ref.id, { title: ref.title, kind: day.incidentKind ?? seen?.kind ?? null, day: day.date });
+        }
+      }
     }
+  }
+
+  const byId = new Map<string, DatedIncident>();
+  for (const incident of data.incidents) {
+    const at = new Date(incident.startedAt);
+    if (Number.isNaN(at.getTime())) continue;
+    byId.set(incident.id, {
+      id: incident.id,
+      title: incident.title,
+      incident,
+      kind: fromHistory.get(incident.id)?.kind ?? incident.stage,
+      day: at.toISOString().slice(0, 10),
+      at,
+    });
+  }
+  for (const [id, ref] of fromHistory) {
+    if (!byId.has(id)) byId.set(id, { id, title: ref.title, incident: null, kind: ref.kind, day: ref.day, at: null });
   }
 
   return [...byId.values()].sort((a, b) =>
@@ -126,23 +145,25 @@ function monthsInRange(first: string, last: string): string[] {
 
 const utcDate = (key: string) => new Date(`${key.length === 7 ? `${key}-01` : key}T00:00:00Z`);
 
-function latestUpdate(incident: OutrayIncident): string | null {
-  const update = incident.updates?.[0];
-  return update?.body ?? update?.message ?? null;
+// The latest note, or where the incident stands when no note was posted.
+function summary(incident: OutrayIncident | null): string | null {
+  if (!incident) return null;
+  if (incident.latestNote) return incident.latestNote;
+  return incident.status === 'open' ? 'Ongoing.' : 'Resolved.';
 }
 
 function IncidentRow({ item }: { item: DatedIncident }) {
-  const { incident, at } = item;
-  const summary = latestUpdate(incident);
+  const { at } = item;
+  const note = summary(item.incident);
   return (
     <li className="flex gap-4 py-3">
-      <span aria-hidden="true" className={cn('w-[3px] shrink-0 rounded-full', impactColor(incident.impact))} />
+      <span aria-hidden="true" className={cn('w-[3px] shrink-0 rounded-full', severityColor(item.kind))} />
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-4">
-          <p className="text-sm font-medium">{incident.title ?? incident.name ?? 'Incident'}</p>
+          <p className="text-sm font-medium">{item.title}</p>
           {at ? <time dateTime={at.toISOString()} className="shrink-0 text-xs text-muted-foreground">{TIME.format(at)} UTC</time> : null}
         </div>
-        {summary ? <p className="mt-1 text-sm text-muted-foreground">{summary}</p> : null}
+        {note ? <p className="mt-1 text-sm text-muted-foreground">{note}</p> : null}
       </div>
     </li>
   );
@@ -167,7 +188,7 @@ function MonthSection({ month, incidents }: { month: string; incidents: DatedInc
                 {incidents
                   .filter((item) => item.day === day)
                   .map((item) => (
-                    <IncidentRow key={item.incident.id} item={item} />
+                    <IncidentRow key={item.id} item={item} />
                   ))}
               </ul>
             </div>
@@ -181,11 +202,7 @@ function MonthSection({ month, incidents }: { month: string; incidents: DatedInc
 export default async function StatusHistoryPage() {
   const host = (await headers()).get('host') ?? '';
   const basePath = statusBasePath(host);
-  const live = await getOutrayStatus();
-  // TEMPORARY: design fixtures, development only. Remove with mock-incidents.ts.
-  const data = live && process.env.NODE_ENV === 'development'
-    ? { ...live, incidents: [...MOCK_INCIDENTS, ...live.incidents] }
-    : live;
+  const data = await getOutrayStatus();
   const incidents = data ? collectIncidents(data) : [];
   const range = data ? historyRange(data, incidents) : null;
 

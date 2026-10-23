@@ -33,8 +33,17 @@ export interface OutrayHistoryDay {
   reportedMonitors: number;
   expectedMonitors: number;
   incidentMinutes: number;
+  /** Severity of the day's incidents, e.g. "downtime". */
   incidentKind: string | null;
-  incidents: OutrayIncident[];
+  incidents: OutrayIncidentRef[];
+}
+
+/** A day's short reference to an incident; the full record is in `incidents`. */
+export interface OutrayIncidentRef {
+  id: string;
+  title: string;
+  minutes: number;
+  automatic: boolean;
 }
 
 export interface OutrayComponent {
@@ -57,26 +66,22 @@ export interface OutrayGroup {
   components: OutrayComponent[];
 }
 
-// The page has no incidents yet, so this shape isn't confirmed against a live
-// response. Fields are optional on purpose; tighten once one is published.
-export interface OutrayIncidentUpdate {
-  status?: string;
-  body?: string;
-  message?: string;
-  createdAt?: string;
-}
-
+// Confirmed against live incidents (2026-10-23). `updates` has only been seen
+// empty, so its entries stay loosely typed.
 export interface OutrayIncident {
   id: string;
-  title?: string;
-  name?: string;
-  status?: string;
-  impact?: string;
-  createdAt?: string;
-  startedAt?: string;
-  resolvedAt?: string | null;
-  updatedAt?: string;
-  updates?: OutrayIncidentUpdate[];
+  title: string;
+  /** "open" | "resolved" */
+  status: string;
+  /** e.g. "down" while open, "recovered" once resolved. */
+  stage: string;
+  startedAt: string;
+  resolvedAt: string | null;
+  /** Component names. */
+  components: string[];
+  latestNote: string | null;
+  latestNoteAt: string | null;
+  updates: unknown[];
 }
 
 export interface OutrayStatusPage {

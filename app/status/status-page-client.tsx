@@ -3,6 +3,8 @@
 // Structure and data only — visual design to be directed. Every piece of the
 // page is a named component below so it can be restyled in place.
 
+import AlertCircleIcon from '@hugeicons/core-free-icons/AlertCircleIcon';
+import BadgeXIcon from '@hugeicons/core-free-icons/BadgeXIcon';
 import CheckmarkBadge02Icon from '@hugeicons/core-free-icons/CheckmarkBadge02Icon';
 import { HugeiconsIcon } from '@hugeicons/react';
 import Link from 'next/link';
@@ -49,11 +51,12 @@ const BANNER_COLORS: Record<OutrayState, string> = {
   unknown: 'bg-zinc-900',
 };
 
-const BANNER_ICON_COLORS: Record<OutrayState, string> = {
-  operational: 'text-emerald-400',
-  degraded: 'bg-amber-400',
-  outage: 'bg-red-400',
-  unknown: 'bg-zinc-400',
+// One icon per state, used by the banner, component rows and bar tooltips.
+// "No data" has no icon of its own and stays a grey dot.
+const STATE_ICONS: Record<Exclude<OutrayState, 'unknown'>, { icon: typeof CheckmarkBadge02Icon; color: string }> = {
+  operational: { icon: CheckmarkBadge02Icon, color: 'text-emerald-400' },
+  degraded: { icon: AlertCircleIcon, color: 'text-amber-400' },
+  outage: { icon: BadgeXIcon, color: 'text-red-400' },
 };
 
 function useOutrayStatus(initial: OutrayStatusPage | null) {
@@ -99,23 +102,19 @@ function formatDate(value: string): string {
 }
 
 
-function StateDot({ state }: { state: OutrayState }) {
-  return <span aria-hidden="true" className={cn('inline-block size-2 shrink-0 rounded-full', STATE_COLORS[state])} />;
+function StateIcon({ state, className }: { state: OutrayState; className: string }) {
+  if (state === 'unknown') {
+    return <span aria-hidden="true" className="inline-block size-2 shrink-0 rounded-full bg-zinc-500" />;
+  }
+  const { icon, color } = STATE_ICONS[state];
+  return <HugeiconsIcon icon={icon} aria-hidden="true" className={cn('shrink-0', color, className)} />;
 }
 
 function OverallBanner({ data }: { data: OutrayStatusPage }) {
   return (
     <section aria-live="polite" className={cn('rounded-md px-5 py-3.5 text-white', BANNER_COLORS[data.state])}>
       <div className="flex items-center gap-2.5">
-        {data.state === 'operational' ? (
-          <HugeiconsIcon
-            icon={CheckmarkBadge02Icon}
-            aria-hidden="true"
-            className={cn('size-5 shrink-0', BANNER_ICON_COLORS.operational)}
-          />
-        ) : (
-          <span aria-hidden="true" className={cn('inline-block size-2 shrink-0 rounded-full', BANNER_ICON_COLORS[data.state])} />
-        )}
+        <StateIcon state={data.state} className="size-5" />
         <h1 className="text-lg font-medium">{OVERALL_LABELS[data.state]}</h1>
       </div>
       {data.description ? <p className="mt-3 text-sm text-white/80">{data.description}</p> : null}
@@ -149,7 +148,7 @@ function DayTooltip({ day, index, total }: { day: OutrayHistoryDay; index: numbe
     >
       <p className="font-medium">{formatDate(day.date)}</p>
       <p className="mt-0.5 flex items-center gap-1.5 text-white/80">
-        <StateDot state={day.state} />
+        <StateIcon state={day.state} className="size-3.5" />
         {STATE_LABELS[day.state]}
       </p>
       {dayDetails(day).map((detail) => (
@@ -194,15 +193,7 @@ function ComponentRow({ component }: { component: OutrayComponent }) {
     <li className="border-b border-border py-4 last:border-b-0">
       <div className="flex items-center justify-between gap-4">
         <div className="flex min-w-0 items-center gap-2.5">
-          {component.state === 'operational' ? (
-            <HugeiconsIcon
-              icon={CheckmarkBadge02Icon}
-              aria-hidden="true"
-              className={cn('size-4 shrink-0', BANNER_ICON_COLORS.operational)}
-            />
-          ) : (
-            <StateDot state={component.state} />
-          )}
+          <StateIcon state={component.state} className="size-4" />
           <span className="truncate text-sm font-medium">{component.name}</span>
           <span className="sr-only">{STATE_LABELS[component.state]}</span>
         </div>
