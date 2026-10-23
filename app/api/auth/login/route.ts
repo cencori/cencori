@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { isBetterAuthEnabled } from "@/lib/auth/flags";
+import { resolvePublicOrigin } from "@/lib/public-origin";
 import {
     getConsoleAwareNavigationTarget,
     resolveAuthRedirectTargets,
@@ -28,7 +29,10 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!;
 
 export async function POST(request: NextRequest) {
-    const { origin, hostname } = request.nextUrl;
+    // Not request.nextUrl: behind Brimble's proxy that is the container's own
+    // http://localhost:8000, which would send sign-ins to console.localhost.
+    const origin = resolvePublicOrigin(request);
+    const { hostname } = new URL(origin);
 
     let email: string;
     let password: string;
