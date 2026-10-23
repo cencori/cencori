@@ -30,6 +30,8 @@ clean_schema() {
   sed -E \
     -e '/^(GRANT|REVOKE) .* (TO|FROM) (migration_reader|postgres|supabase_[a-z_]+|dashboard_user|pgsodium_[a-z_]+);$/d' \
     -e '/^ALTER DEFAULT PRIVILEGES /d' \
+    -e '/^CREATE SCHEMA public;$/d' \
+    -e '/^COMMENT ON SCHEMA public IS /d' \
     -e 's/REFERENCES auth\.users\(id\)/REFERENCES public.auth_users(id)/g'
 }
 
@@ -44,6 +46,22 @@ log "3/6 schema: tables, functions, policies, grants"
 "$PG_BIN/pg_dump" "$SOURCE_DATABASE_URL" --schema=public --no-owner --section=pre-data > "$WORK/pre.sql"
 clean_schema < "$WORK/pre.sql" > "$WORK/pre.clean.sql"
 target -f "$WORK/pre.clean.sql"
+
+# Rows that reference an excluded table can't be loaded either (their FKs
+# would fail), so exclude every table that depends on one, transitively.
+if [[ -n "${EXCLUDE_DATA_TABLES:-}" ]]; then
+  excluded_list="$(printf "'%s'," $EXCLUDE_DATA_TABLES)"
+  dependents="$("$PG_BIN/psql" "$SOURCE_DATABASE_URL" -Atc "
+    with recursive deps(child) as (
+      select c.conrelid::regclass::text from pg_constraint c
+      where c.contype = 'f' and c.confrelid::regclass::text in (${excluded_list%,})
+        and c.conrelid <> c.confrelid
+      union
+      select c.conrelid::regclass::text from pg_constraint c join deps d on c.confrelid::regclass::text = d.child
+      where c.contype = 'f'
+    ) select string_agg(distinct child, ' ') from deps")"
+  EXCLUDE_DATA_TABLES="$EXCLUDE_DATA_TABLES ${dependents}"
+fi
 
 log "4/6 data${EXCLUDE_DATA_TABLES:+ (skipping rows of: $EXCLUDE_DATA_TABLES)}"
 exclude_args=()
