@@ -20,6 +20,12 @@ import { createHash } from "node:crypto";
 import pg from "pg";
 
 const apply = process.argv.includes("--apply");
+// Supabase doesn't let the project's own roles grant usage on the auth
+// schema, so the read-only migration user reads auth.users / auth.identities
+// through views in a private `migration` schema (SOURCE_AUTH_SCHEMA=migration).
+const sourceAuthSchema = process.env.SOURCE_AUTH_SCHEMA ?? "auth";
+const usersTable = sourceAuthSchema === "auth" ? "auth.users" : `${sourceAuthSchema}.auth_users`;
+const identitiesTable = sourceAuthSchema === "auth" ? "auth.identities" : `${sourceAuthSchema}.auth_identities`;
 const SOCIAL = new Set(["google", "github"]);
 
 function stableUuid(...parts) {
@@ -38,6 +44,16 @@ function avatar(user) {
     const meta = user.raw_user_meta_data || {};
     const url = meta.avatar_url || meta.picture;
     return typeof url === "string" && url ? url : null;
+}
+
+// libpq's sslmode=require means "encrypt, don't verify the certificate";
+// node-postgres reads it as full verification, which fails against
+// Supabase's pooler (its own CA). Match libpq, as pg_dump/psql do.
+function clientConfig(url) {
+    const parsed = new URL(url);
+    if (parsed.searchParams.get("sslmode") !== "require") return { connectionString: url };
+    parsed.searchParams.delete("sslmode");
+    return { connectionString: parsed.toString(), ssl: { rejectUnauthorized: false } };
 }
 
 export function buildRows(users, identities) {
@@ -110,16 +126,16 @@ async function main() {
     if (!sourceUrl) throw new Error("SOURCE_DATABASE_URL is required");
     if (apply && !targetUrl) throw new Error("BETTER_AUTH_DATABASE_URL is required with --apply");
 
-    const source = new pg.Client({ connectionString: sourceUrl });
+    const source = new pg.Client(clientConfig(sourceUrl));
     await source.connect();
     let users, identities;
     try {
         await source.query("begin read only");
         ({ rows: users } = await source.query(
-            "select id, email, encrypted_password, email_confirmed_at, raw_user_meta_data, created_at, updated_at, deleted_at from auth.users order by created_at",
+            `select id, email, encrypted_password, email_confirmed_at, raw_user_meta_data, created_at, updated_at, deleted_at from ${usersTable} order by created_at`,
         ));
         ({ rows: identities } = await source.query(
-            "select user_id, provider, provider_id, created_at, updated_at from auth.identities order by created_at",
+            `select user_id, provider, provider_id, created_at, updated_at from ${identitiesTable} order by created_at`,
         ));
         await source.query("commit");
     } finally {
@@ -135,7 +151,7 @@ async function main() {
 
     if (!targetUrl) { console.log("dry run (no target)"); return; }
 
-    const target = new pg.Client({ connectionString: targetUrl });
+    const target = new pg.Client(clientConfig(targetUrl));
     await target.connect();
     try {
         const { rows: [before] } = await target.query(
