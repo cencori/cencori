@@ -8,6 +8,8 @@ import {
   sha256,
 } from "@/lib/tensor-auth";
 import { createAdminClient } from "@/lib/supabaseAdmin";
+import { isBetterAuthEnabled } from "@/lib/auth/flags";
+import { createTensorSession } from "@/lib/auth/tensor-sessions";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!;
@@ -35,7 +37,7 @@ export async function POST(request: NextRequest) {
   const now = new Date().toISOString();
   const { data: handoff } = await admin
     .from("basecode_auth_codes")
-    .select("id, code_challenge, magic_link_token")
+    .select("id, code_challenge, magic_link_token, user_id")
     .eq("code_hash", sha256(code))
     .gt("expires_at", now)
     .maybeSingle();
@@ -47,6 +49,20 @@ export async function POST(request: NextRequest) {
     !sameValue(handoff.code_challenge, expectedChallenge)
   ) {
     return errorResponse();
+  }
+
+  if (isBetterAuthEnabled()) {
+    // Consume the code first (single use), then mint the session.
+    const { data: consumed } = await admin
+      .from("basecode_auth_codes")
+      .delete()
+      .eq("id", handoff.id)
+      .select("id")
+      .maybeSingle();
+    if (!consumed) return errorResponse();
+    const session = await createTensorSession(handoff.user_id);
+    if (!session) return errorResponse(401);
+    return NextResponse.json(session, { headers: noStoreHeaders() });
   }
 
   const supabase = createClient(supabaseUrl, supabaseKey, {

@@ -8,6 +8,7 @@ import {
     sanitizeAuthRedirectTarget,
 } from "@/lib/auth-redirect";
 import { isConsoleHostname } from "@/lib/console/routing";
+import { isBetterAuthEnabled } from "@/lib/auth/flags";
 
 // Mirrors @supabase/auth-js EmailOtpType (not re-exported by supabase-js).
 type EmailOtpType = "signup" | "invite" | "magiclink" | "recovery" | "email_change" | "email";
@@ -77,6 +78,12 @@ export async function GET(request: NextRequest) {
 
     if (oauthError) {
         return loginWithError(oauthError);
+    }
+    // Better Auth runs provider returns at /api/auth/callback/<provider> and
+    // has already set the session; old links and the proxy's stray-?code=
+    // forwarding still land here, so just continue to the destination.
+    if (isBetterAuthEnabled()) {
+        return NextResponse.redirect(new URL(navigationTarget, origin));
     }
     if (!code && !(tokenHash && otpType)) {
         return NextResponse.redirect(new URL("/login", loginBase));
