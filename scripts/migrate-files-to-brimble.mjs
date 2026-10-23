@@ -47,6 +47,13 @@ const publicBase = required("FILES_PUBLIC_BASE_URL").replace(/\/$/, "");
 const storageHeaders = { apikey: serviceKey, authorization: `Bearer ${serviceKey}` };
 const encodePath = (path) => path.split("/").map(encodeURIComponent).join("/");
 
+// Supabase serves these downloads as application/octet-stream; keep the real image type.
+const TYPES = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", gif: "image/gif", webp: "image/webp", json: "application/json", csv: "text/csv" };
+function typeFor(key, served) {
+    if (served && served !== "application/octet-stream") return served;
+    return TYPES[key.split(".").pop().toLowerCase()] ?? "application/octet-stream";
+}
+
 // Supabase's list API returns one folder level; folders have no id.
 async function listObjects(bucket, prefix = "") {
     const response = await fetch(`${supabaseUrl}/storage/v1/object/list/${bucket}`, {
@@ -73,7 +80,7 @@ async function copy(bucket, key) {
     const target = await s3.fetch(`${bucketUrl}/${encodePath(`${bucket}/${key}`)}`, {
         method: "PUT",
         body,
-        headers: { "content-type": source.headers.get("content-type") || "application/octet-stream" },
+        headers: { "content-type": typeFor(key, source.headers.get("content-type")) },
     });
     if (!target.ok) throw new Error(`upload ${bucket}/${key}: ${target.status} ${await target.text()}`);
     return body.length;
