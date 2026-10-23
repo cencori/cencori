@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { noStoreHeaders } from "@/lib/tensor-auth";
 import { authenticateTensorBillingRequest } from "@/lib/tensor-billing";
 import { profileJson, readProfileRow, writeProfile } from "@/lib/tensor-profile";
+import { fileUrl, listFiles, putFile, removeFiles } from "@/lib/storage/files";
 
-const BUCKET = "avatars";
+const BUCKET = "avatars" as const;
 const MAX_BYTES = 2 * 1024 * 1024;
 /**
  * Matched against what the bytes say they are, not against a filename anyone can rename.
@@ -59,12 +60,7 @@ export async function POST(request: NextRequest) {
 
   // Named by the moment it arrived so a replaced picture never reuses a URL a client has cached.
   const path = `${session.user.id}/${Date.now()}.${extension}`;
-  const { error: uploadError } = await session.admin.storage
-    .from(BUCKET)
-    .upload(path, Buffer.from(await file.arrayBuffer()), {
-      contentType: file.type,
-      upsert: true,
-    });
+  const { error: uploadError } = await putFile(BUCKET, path, Buffer.from(await file.arrayBuffer()), file.type);
   if (uploadError) {
     console.error("[Tensor Profile] Avatar upload failed", uploadError);
     return NextResponse.json(
@@ -73,8 +69,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { data: url } = session.admin.storage.from(BUCKET).getPublicUrl(path);
-  const written = await writeProfile(session.admin, session.user.id, { avatar_url: url.publicUrl });
+  const written = await writeProfile(session.admin, session.user.id, { avatar_url: fileUrl(BUCKET, path) });
   if (written.error) {
     return NextResponse.json(
       { error: written.error },
@@ -84,11 +79,8 @@ export async function POST(request: NextRequest) {
 
   // Only once the new picture is the one on record: a delete that runs first would leave the
   // account with no picture at all if the upload behind it failed.
-  const { data: existing } = await session.admin.storage.from(BUCKET).list(session.user.id);
-  const stale = (existing ?? [])
-    .map((item) => `${session.user.id}/${item.name}`)
-    .filter((name) => name !== path);
-  if (stale.length > 0) await session.admin.storage.from(BUCKET).remove(stale);
+  const stale = (await listFiles(BUCKET, session.user.id)).filter((name) => name !== path);
+  await removeFiles(BUCKET, stale);
 
   const row = await readProfileRow(session.admin, session.user.id);
   return NextResponse.json(
