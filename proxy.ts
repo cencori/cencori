@@ -993,8 +993,14 @@ export async function proxy(request: NextRequest) {
       );
     }
 
+    // After the cutover the access check reads the Brimble PostgREST, like
+    // every other admin client (lib/supabaseAdmin.ts), not Supabase.
+    const adminFetch = isBetterAuthEnabled()
+      ? (await import("@/lib/data/postgrest-fetch")).postgrestFetch("service")
+      : undefined;
     const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
+      ...(adminFetch ? { global: { fetch: adminFetch } } : {}),
     });
 
     const projectId = extractProjectId(pathname);
