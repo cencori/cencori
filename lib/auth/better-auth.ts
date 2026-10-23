@@ -25,6 +25,16 @@ export const auth = betterAuth({
     baseURL: process.env.BETTER_AUTH_URL,
     basePath: "/api/auth",
     secret: process.env.BETTER_AUTH_SECRET,
+    // Origins Better Auth may redirect to after sign-in (callbackURL) and
+    // accept requests from: the app's own URL plus the cencori.com hosts the
+    // console, scan and main site run on. BETTER_AUTH_TRUSTED_ORIGINS adds
+    // more, comma-separated (e.g. a staging host).
+    trustedOrigins: [
+        ...(process.env.BETTER_AUTH_URL ? [new URL(process.env.BETTER_AUTH_URL).origin] : []),
+        "https://cencori.com",
+        "https://*.cencori.com",
+        ...(process.env.BETTER_AUTH_TRUSTED_ORIGINS ?? "").split(",").map((o) => o.trim()).filter(Boolean),
+    ],
     database: pool,
 
     // Table names that can't be confused with the existing public.users

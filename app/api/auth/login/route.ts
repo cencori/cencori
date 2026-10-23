@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { isBetterAuthEnabled } from "@/lib/auth/flags";
 import {
     getConsoleAwareNavigationTarget,
     resolveAuthRedirectTargets,
@@ -54,6 +55,10 @@ export async function POST(request: NextRequest) {
     });
     const navigationTarget = getConsoleAwareNavigationTarget(rawTarget, origin);
 
+    if (isBetterAuthEnabled()) {
+        return signInWithBetterAuth(request, email, password, navigationTarget);
+    }
+
     const isProduction = hostname.endsWith("cencori.com");
 
     // Build the response first so the session cookies attach to it.
@@ -87,5 +92,41 @@ export async function POST(request: NextRequest) {
         );
     }
 
+    return response;
+}
+
+// Better Auth path (RFC-0001 cutover). Same contract as above: the session
+// cookie arrives as a Set-Cookie header, and errors use the codes the login
+// form already maps to friendly copy.
+async function signInWithBetterAuth(
+    request: NextRequest,
+    email: string,
+    password: string,
+    navigationTarget: string,
+): Promise<NextResponse> {
+    const { auth } = await import("@/lib/auth/better-auth");
+    const result = await auth.api.signInEmail({
+        body: { email, password },
+        headers: request.headers,
+        asResponse: true,
+    });
+
+    if (!result.ok) {
+        const body = await result.json().catch(() => ({}));
+        const code = result.status === 429
+            ? "over_request_rate_limit"
+            : body?.code === "INVALID_EMAIL_OR_PASSWORD"
+                ? "invalid_credentials"
+                : body?.code;
+        return NextResponse.json(
+            { error: body?.message ?? "Unable to sign in.", code },
+            { status: result.status },
+        );
+    }
+
+    const response = NextResponse.json({ redirectTo: navigationTarget });
+    for (const cookie of result.headers.getSetCookie()) {
+        response.headers.append("set-cookie", cookie);
+    }
     return response;
 }
