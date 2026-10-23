@@ -1,4 +1,5 @@
 import type { createAdminClient } from '@/lib/supabaseAdmin';
+import type { MemoryEmbeddingResult } from '@/lib/memory/embeddings';
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -6,7 +7,17 @@ export interface TurnCitation {
     chunk_id: string;
     source_id: string;
     ord?: number | null;
+    page?: number | null;
     score: number;
+}
+
+interface KnowledgeHit {
+    id: string;
+    source_id: string;
+    ord?: number | null;
+    page?: number | null;
+    content: string;
+    similarity: number;
 }
 
 export interface TurnKnowledge {
@@ -129,6 +140,59 @@ export async function retrieveTurnSkills(
  * Tenant isolation holds because chunks are filtered by knowledge_base_id,
  * and bindings are installation-scoped (verified at session creation).
  */
+/**
+ * Retrieve cited chunks from caller-named knowledge bases (chat completions'
+ * `knowledge_bases` field). The caller has already checked the ids belong to
+ * the project. All bases are searched in parallel and the best hits overall
+ * are kept, so one large base can't crowd out a better match in another.
+ * Fail-open like memory: any failure yields an empty result.
+ */
+export async function retrieveKnowledge(
+    supabase: Admin,
+    opts: {
+        projectId: string;
+        organizationId: string;
+        knowledgeBaseIds: string[];
+        queryText: string;
+        onEmbeddingUsage?: (usage: MemoryEmbeddingResult) => void;
+    },
+): Promise<TurnKnowledge> {
+    const empty: TurnKnowledge = { block: null, citations: [] };
+    const kbIds = opts.knowledgeBaseIds.slice(0, TURN_KNOWLEDGE_MAX_KBS);
+    if (kbIds.length === 0 || !opts.queryText.trim()) return empty;
+    try {
+        const { embedForMemory } = await import('@/lib/memory/embeddings');
+        const embedded = await embedForMemory(supabase as never, opts.projectId, opts.organizationId, opts.queryText.slice(0, 2000));
+        opts.onEmbeddingUsage?.(embedded);
+        const vector = `[${embedded.embeddings[0].join(',')}]`;
+
+        const results = await Promise.all(kbIds.map(async (kbId) => {
+            const { data, error } = await supabase.rpc('match_knowledge_chunks', {
+                p_knowledge_base_id: kbId,
+                p_query_embedding: vector,
+                p_match_count: TURN_KNOWLEDGE_MAX_CITATIONS,
+            });
+            return error ? [] : ((data ?? []) as KnowledgeHit[]);
+        }));
+        const hits = results.flat()
+            .sort((a, b) => b.similarity - a.similarity)
+            .slice(0, TURN_KNOWLEDGE_MAX_CITATIONS);
+
+        return {
+            block: buildKnowledgeBlock(hits.map((h) => h.content.slice(0, 500))),
+            citations: hits.map((h) => ({
+                chunk_id: h.id,
+                source_id: h.source_id,
+                ord: h.ord ?? null,
+                page: h.page ?? null,
+                score: h.similarity,
+            })),
+        };
+    } catch {
+        return empty;
+    }
+}
+
 export async function retrieveTurnKnowledge(
     supabase: Admin,
     opts: { projectId: string; organizationId: string; installationId: string | null; queryText: string },
