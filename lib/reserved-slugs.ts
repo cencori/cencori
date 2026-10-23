@@ -16,6 +16,10 @@ export const RESERVED_ORG_SLUGS: ReadonlySet<string> = new Set([
     "account",
     "api",
     "auth",
+    // Public API paths (vercel.json rewrites /v1/* to /api/v1/*). Unreserved,
+    // the proxy read `v1` as an org slug and 308'd every SDK call made with
+    // the default https://cencori.com base URL to the console.
+    "v1",
     "dashboard",
 
     // Route groups' children (top-level URLs from each group)
