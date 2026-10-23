@@ -6,6 +6,7 @@ import { nextCookies } from "better-auth/next-js";
 import { bearer, emailOTP } from "better-auth/plugins";
 import { dash } from "@better-auth/infra";
 import { sendVerificationCodeEmail } from "@/lib/email/verification-code-email";
+import { sendPasswordResetEmail } from "@/lib/email/password-reset-email";
 import bcrypt from "bcryptjs";
 import { Pool } from "pg";
 
@@ -60,6 +61,11 @@ export const auth = betterAuth({
         // the 6-digit code before it can sign in with a password. Every
         // migrated user is already verified.
         requireEmailVerification: true,
+        // Reset link (/api/auth/forgot-password → email → /reset-password).
+        resetPasswordTokenExpiresIn: 3600,
+        sendResetPassword: async ({ user, url }) => {
+            await sendPasswordResetEmail({ to: user.email, url });
+        },
     },
 
     // Verifying the emailed code signs the new user straight in

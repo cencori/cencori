@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import { isBetterAuthEnabled } from "@/lib/auth/flags";
+import { authClient } from "@/lib/auth/auth-client";
 import { Eye, EyeOff } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
@@ -15,8 +17,19 @@ export default function ResetPasswordPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  // Better Auth's emailed link checks the token, then lands here with
+  // ?token=… (valid) or ?error=INVALID_TOKEN (expired or used).
+  const [resetToken, setResetToken] = useState<string | null>(null);
 
   useEffect(() => {
+    if (isBetterAuthEnabled()) {
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get("token");
+      setResetToken(token);
+      setSession(Boolean(token) && !params.get("error"));
+      return;
+    }
+
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) {
         setSession(true);
@@ -46,10 +59,12 @@ export default function ResetPasswordPage() {
     }
 
     try {
-      const { error: updateError } = await supabase.auth.updateUser({ password });
+      const { error: updateError } = isBetterAuthEnabled()
+        ? await authClient.resetPassword({ newPassword: password, token: resetToken ?? "" })
+        : await supabase.auth.updateUser({ password });
 
       if (updateError) {
-        setError(updateError.message);
+        setError(updateError.message ?? "Unable to reset your password.");
         return;
       }
 
