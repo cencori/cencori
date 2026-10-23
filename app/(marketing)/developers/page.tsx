@@ -6,7 +6,7 @@ import { DevelopersBlog } from "@/components/developers/DevelopersBlog";
 import { DevelopersFaq } from "@/components/developers/DevelopersFaq";
 import { DevelopersCTA } from "@/components/developers/DevelopersCTA";
 
-const developersOgImage = "/og/developers";
+const developersOgImage = "/og/developers?v=2";
 
 export const metadata: Metadata = {
   title: "Cencori for Developers | Build and run AI",
