@@ -1,3 +1,4 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
 import { canManageProjectIntegrations, getProjectAccessContext } from '@/lib/edge-integrations/access';
@@ -9,7 +10,7 @@ export async function DELETE(
     { params }: { params: Promise<{ projectId: string; integrationId: string }> }
 ) {
     const supabase = await createServerClient();
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await getAuthUser(supabase);
 
     if (userError || !user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

@@ -1,3 +1,4 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { NextRequest, NextResponse } from "next/server";
 import { getStripeBillingClient } from "@/lib/stripe-billing";
 import { upsertStripeCustomerProfile } from "@/lib/billing/stripe-customer-profile";
@@ -18,7 +19,7 @@ export async function POST(req: NextRequest) {
     const {
       data: { user },
       error: userError,
-    } = await supabase.auth.getUser();
+    } = await getAuthUser(supabase);
 
     if (userError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

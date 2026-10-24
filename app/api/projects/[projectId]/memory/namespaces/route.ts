@@ -1,5 +1,6 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@/lib/data/supabase-js";
 import { createServerClient } from "@/lib/supabaseServer";
 
 /**
@@ -19,7 +20,7 @@ type RouteParams = { params: Promise<{ projectId: string }> };
 export async function GET(request: NextRequest, context: RouteParams) {
     try {
         const supabase = await createServerClient();
-        const { data: { user } } = await supabase.auth.getUser();
+        const { data: { user } } = await getAuthUser(supabase);
         if (!user) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
@@ -87,7 +88,7 @@ export async function GET(request: NextRequest, context: RouteParams) {
 export async function POST(request: NextRequest, context: RouteParams) {
     try {
         const supabase = await createServerClient();
-        const { data: { user } } = await supabase.auth.getUser();
+        const { data: { user } } = await getAuthUser(supabase);
         if (!user) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }

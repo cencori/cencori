@@ -269,7 +269,7 @@ export default function OrganizationLayoutClient({
     }, [activeProject, routeProjectSlug, orgSlug, workspaceProjects, organization?.id]);
     const scopeProjectSlug = isInsideProject ? projectSlug : stickyProjectSlug;
     const scopedProjectHref = (subpath: string) =>
-        consoleMode ? `/${subpath}` : `${orgBase}/${scopeProjectSlug}${subpath}`;
+        consoleMode ? `/${subpath}` : `${orgBase}/${scopeProjectSlug}/${subpath}`;
     const orgProductHref = (subpath: string) =>
         consoleMode ? `/organization/${subpath}` : `${orgBase}/~/${subpath}`;
     const observabilityHref = scopeProjectSlug

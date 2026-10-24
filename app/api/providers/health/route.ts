@@ -1,3 +1,4 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { NextResponse } from 'next/server';
 import { getCircuitStatus } from '@/lib/providers/circuit-breaker';
 import { createServerClient } from '@/lib/supabaseServer';
@@ -154,7 +155,7 @@ async function pingProvider(provider: typeof PROVIDERS[0]): Promise<ProviderHeal
 
 export async function GET() {
     const supabase = await createServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user } } = await getAuthUser(supabase);
     if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

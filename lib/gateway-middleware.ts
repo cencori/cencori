@@ -1,3 +1,4 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 /**
  * Shared Gateway Middleware
  * 
@@ -267,11 +268,13 @@ export async function validateGatewayRequest(req: NextRequest): Promise<GatewayV
     const fallbackIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
     const requestSourceIp = vercelIp || fallbackIp || req.headers.get('x-real-ip');
     const clientIp = customerProvidedIp || vercelIp || fallbackIp || 'unknown';
-    // Use customer-provided country header first, then Vercel's free geolocation
+    // Use customer-provided country header first, then the platform's free geolocation:
+    // Vercel's headers on Vercel, Cloudflare's (in front of Brimble) elsewhere.
     let countryCode = req.headers.get('x-cencori-user-country');
     if (!countryCode) {
         const geo = geolocation(req);
-        countryCode = geo.country || null;
+        const cfCountry = req.headers.get('cf-ipcountry');
+        countryCode = geo.country || (cfCountry && cfCountry !== 'XX' ? cfCountry : null);
     }
 
     // ── Public Playground (no auth required) ──
@@ -416,7 +419,7 @@ return {
             // Check if there is an authenticated dashboard user via cookies/session
             const { createServerClient } = await import('@/lib/supabaseServer');
             const userSupabase = await createServerClient();
-            const { data: { user } } = await userSupabase.auth.getUser();
+            const { data: { user } } = await getAuthUser(userSupabase);
 
             if (user) {
                 // Check if they passed a Project ID via header

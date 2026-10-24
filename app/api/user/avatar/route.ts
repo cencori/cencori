@@ -1,10 +1,12 @@
 "use server";
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabaseServer";
 import { createAdminClient } from "@/lib/supabaseAdmin";
+import { fileUrl, listFiles, putFile, removeFiles } from "@/lib/storage/files";
 
-const BUCKET_NAME = "avatars";
+const BUCKET_NAME = "avatars" as const;
 const MAX_FILE_SIZE = 2 * 1024 * 1024;
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
 
@@ -13,7 +15,7 @@ export async function POST(request: NextRequest) {
         const supabase = await createServerClient();
         const supabaseAdmin = createAdminClient();
 
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        const { data: { user }, error: userError } = await getAuthUser(supabase);
         if (userError || !user) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
@@ -37,32 +39,16 @@ export async function POST(request: NextRequest) {
         const arrayBuffer = await file.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
 
-        const { data: existingFiles } = await supabaseAdmin.storage
-            .from(BUCKET_NAME)
-            .list(user.id);
+        await removeFiles(BUCKET_NAME, await listFiles(BUCKET_NAME, user.id));
 
-        if (existingFiles && existingFiles.length > 0) {
-            const filesToDelete = existingFiles.map(f => `${user.id}/${f.name}`);
-            await supabaseAdmin.storage.from(BUCKET_NAME).remove(filesToDelete);
-        }
-
-        const { error: uploadError } = await supabaseAdmin.storage
-            .from(BUCKET_NAME)
-            .upload(fileName, buffer, {
-                contentType: file.type,
-                upsert: true,
-            });
+        const { error: uploadError } = await putFile(BUCKET_NAME, fileName, buffer, file.type);
 
         if (uploadError) {
             console.error("Upload error:", uploadError);
             return NextResponse.json({ error: "Failed to upload avatar" }, { status: 500 });
         }
 
-        const { data: urlData } = supabaseAdmin.storage
-            .from(BUCKET_NAME)
-            .getPublicUrl(fileName);
-
-        const avatarUrl = urlData.publicUrl;
+        const avatarUrl = fileUrl(BUCKET_NAME, fileName);
 
         const { data: existingProfile } = await supabaseAdmin
             .from("user_profiles")
@@ -93,19 +79,12 @@ export async function DELETE(request: NextRequest) {
         const supabase = await createServerClient();
         const supabaseAdmin = createAdminClient();
 
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        const { data: { user }, error: userError } = await getAuthUser(supabase);
         if (userError || !user) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const { data: existingFiles } = await supabaseAdmin.storage
-            .from(BUCKET_NAME)
-            .list(user.id);
-
-        if (existingFiles && existingFiles.length > 0) {
-            const filesToDelete = existingFiles.map(f => `${user.id}/${f.name}`);
-            await supabaseAdmin.storage.from(BUCKET_NAME).remove(filesToDelete);
-        }
+        await removeFiles(BUCKET_NAME, await listFiles(BUCKET_NAME, user.id));
 
         await supabaseAdmin
             .from("user_profiles")

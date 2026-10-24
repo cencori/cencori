@@ -1,3 +1,4 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { NextRequest } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
@@ -153,7 +154,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
     const reconnectMode = requestUrl.searchParams.get('reconnect') === '1';
     const supabase = await createServerClient();
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await getAuthUser(supabase);
 
     if (userError || !user) {
         return new Response(JSON.stringify({ error: 'Unauthorized' }), {

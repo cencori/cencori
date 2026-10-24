@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { isBetterAuthEnabled } from "@/lib/auth/flags";
+import { resolvePublicOrigin } from "@/lib/public-origin";
 import {
     getConsoleAwareNavigationTarget,
     resolveAuthRedirectTargets,
@@ -27,7 +29,10 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!;
 
 export async function POST(request: NextRequest) {
-    const { origin, hostname } = request.nextUrl;
+    // Not request.nextUrl: behind Brimble's proxy that is the container's own
+    // http://localhost:8000, which would send sign-ins to console.localhost.
+    const origin = resolvePublicOrigin(request);
+    const { hostname } = new URL(origin);
 
     let email: string;
     let password: string;
@@ -53,6 +58,10 @@ export async function POST(request: NextRequest) {
         defaultPath: getPostLoginDefault(origin),
     });
     const navigationTarget = getConsoleAwareNavigationTarget(rawTarget, origin);
+
+    if (isBetterAuthEnabled()) {
+        return signInWithBetterAuth(request, email, password, navigationTarget);
+    }
 
     const isProduction = hostname.endsWith("cencori.com");
 
@@ -87,5 +96,41 @@ export async function POST(request: NextRequest) {
         );
     }
 
+    return response;
+}
+
+// Better Auth path (RFC-0001 cutover). Same contract as above: the session
+// cookie arrives as a Set-Cookie header, and errors use the codes the login
+// form already maps to friendly copy.
+async function signInWithBetterAuth(
+    request: NextRequest,
+    email: string,
+    password: string,
+    navigationTarget: string,
+): Promise<NextResponse> {
+    const { auth } = await import("@/lib/auth/better-auth");
+    const result = await auth.api.signInEmail({
+        body: { email, password },
+        headers: request.headers,
+        asResponse: true,
+    });
+
+    if (!result.ok) {
+        const body = await result.json().catch(() => ({}));
+        const code = result.status === 429
+            ? "over_request_rate_limit"
+            : body?.code === "INVALID_EMAIL_OR_PASSWORD"
+                ? "invalid_credentials"
+                : body?.code;
+        return NextResponse.json(
+            { error: body?.message ?? "Unable to sign in.", code },
+            { status: result.status },
+        );
+    }
+
+    const response = NextResponse.json({ redirectTo: navigationTarget });
+    for (const cookie of result.headers.getSetCookie()) {
+        response.headers.append("set-cookie", cookie);
+    }
     return response;
 }

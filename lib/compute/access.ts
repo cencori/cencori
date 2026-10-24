@@ -1,3 +1,4 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 /**
  * Shared project-access guard for Cencori Compute routes.
  * Resolves the caller (dashboard session) and confirms owner/admin access.
@@ -18,7 +19,7 @@ export async function requireProjectAccess(
     projectId: string,
 ): Promise<{ ok: true; access: ProjectAccess } | { ok: false; response: NextResponse }> {
     const supabase = await createServerClient();
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await getAuthUser(supabase);
     if (userError || !user) {
         return { ok: false, response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
     }

@@ -1,4 +1,5 @@
 'use server'
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 
 import { createServerClient } from "@/lib/supabaseServer";
 import { createAdminClient } from "@/lib/supabaseAdmin";
@@ -87,7 +88,7 @@ export type BillingOperationsState = {
 
 async function getAuthorizedOrgBillingDetails(orgSlug: string): Promise<{ org: OrgBillingDetails } | { error: string }> {
     const supabase = await createServerClient();
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await getAuthUser(supabase);
 
     if (userError || !user) {
         return { error: 'Unauthorized' };
@@ -131,7 +132,7 @@ async function getAuthorizedOrgBillingDetails(orgSlug: string): Promise<{ org: O
 
 async function getAuthorizedOrgOperatorContext(orgSlug: string): Promise<OperatorContext | { error: string }> {
     const supabase = await createServerClient();
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await getAuthUser(supabase);
 
     if (userError || !user) {
         return { error: 'Unauthorized' };

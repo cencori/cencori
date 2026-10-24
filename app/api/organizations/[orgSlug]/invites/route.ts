@@ -1,3 +1,5 @@
+import { adminUsers } from "@/lib/auth/admin-users";
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { NextRequest, NextResponse } from 'next/server';
 import { SendByte } from '@sendbyte/node';
 import { createServerClient } from '@/lib/supabaseServer';
@@ -30,7 +32,7 @@ export async function POST(
 ) {
     const { orgSlug } = await params;
     const supabase = await createServerClient();
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await getAuthUser(supabase);
 
     if (userError || !user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -77,7 +79,7 @@ export async function POST(
 
     const normalizedEmail = email.toLowerCase().trim();
 
-    const { data: existingAuthUser } = await supabaseAdmin.auth.admin.listUsers();
+    const { data: existingAuthUser } = await adminUsers.listUsers();
     const matchingUser = existingAuthUser?.users?.find(
         u => u.email?.toLowerCase() === normalizedEmail
     );
@@ -218,7 +220,7 @@ export async function GET(
 ) {
     const { orgSlug } = await params;
     const supabase = await createServerClient();
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await getAuthUser(supabase);
 
     if (userError || !user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

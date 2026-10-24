@@ -1,6 +1,7 @@
+import { getAuthUser as readAuthUser } from "@/lib/auth/get-auth-user";
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabaseServer";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@/lib/data/supabase-js";
 import OpenAI from "openai";
 import {
     parseCreditsBalance,
@@ -21,7 +22,7 @@ interface RouteParams {
 // Helper to get authenticated user
 async function getAuthUser() {
     const supabase = await createServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user } } = await readAuthUser(supabase);
     return user;
 }
 

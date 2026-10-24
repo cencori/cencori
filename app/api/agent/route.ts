@@ -1,3 +1,4 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import type { ChatCompletionMessageFunctionToolCall, ChatCompletionMessageParam } from "openai/resources/chat/completions";
@@ -101,7 +102,7 @@ async function verifyOrganizationAccess(
 export async function POST(request: NextRequest) {
     try {
         const supabase = await createServerClient();
-        const { data: { user } } = await supabase.auth.getUser();
+        const { data: { user } } = await getAuthUser(supabase);
         if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
         const body = await request.json();
