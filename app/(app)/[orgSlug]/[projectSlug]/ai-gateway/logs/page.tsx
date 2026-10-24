@@ -1,0 +1,229 @@
+'use client';
+
+import { useState, use } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/lib/supabaseClient';
+import { RequestLogsTable } from '@/components/audit/RequestLogsTable';
+import { TimeRangeSelector } from '@/components/audit/TimeRangeSelector';
+import { ExportButton } from '@/components/audit/ExportButton';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { Search, X } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useProjectIdBySlug } from '@/lib/hooks/useQueries';
+
+interface PageProps {
+    params: Promise<{
+        orgSlug: string;
+        projectSlug: string;
+    }>;
+}
+
+interface ApiKey {
+    id: string;
+    name: string;
+    key_prefix: string;
+    environment: string | null;
+}
+
+function useProjectId(orgSlug: string, projectSlug: string) {
+    return useProjectIdBySlug(orgSlug, projectSlug);
+}
+
+export default function RequestLogsPage({ params }: PageProps) {
+    const { orgSlug, projectSlug } = use(params);
+
+    const [aiFilters, setAiFilters] = useState({
+        status: 'all',
+        model: 'all',
+        time_range: '7d',
+        search: '',
+        api_key_id: 'all',
+    });
+
+    const [aiSearchInput, setAiSearchInput] = useState('');
+
+    const { data: projectId, isLoading } = useProjectId(orgSlug, projectSlug);
+
+    const { data: modelOptions } = useQuery<string[]>({
+        queryKey: ['log-models', projectId, aiFilters.time_range],
+        queryFn: async () => {
+            const params = new URLSearchParams({
+                time_range: aiFilters.time_range,
+            });
+            const response = await fetch(`/api/projects/${projectId}/logs/models?${params}`);
+            if (!response.ok) throw new Error('Failed to fetch models');
+            const data = await response.json();
+            return (data.models || []) as string[];
+        },
+        enabled: !!projectId,
+        staleTime: 60 * 1000,
+    });
+
+    const { data: apiKeys } = useQuery<ApiKey[]>({
+        queryKey: ['api-keys-filter', projectId],
+        queryFn: async () => {
+            const { data } = await supabase
+                .from('api_keys')
+                .select('id, name, key_prefix, environment')
+                .eq('project_id', projectId)
+                .is('revoked_at', null);
+            return (data as ApiKey[]) || [];
+        },
+        enabled: !!projectId,
+        staleTime: 60 * 1000,
+    });
+
+    // No environments anymore — one key, production. Show all active keys.
+    const filteredApiKeys = apiKeys;
+
+    const handleAiSearchSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        setAiFilters((prev) => ({ ...prev, search: aiSearchInput }));
+    };
+
+    const handleClearAiFilters = () => {
+        setAiFilters({
+            status: 'all',
+            model: 'all',
+            time_range: '7d',
+            search: '',
+            api_key_id: 'all',
+        });
+        setAiSearchInput('');
+    };
+
+    const hasActiveAiFilters =
+        aiFilters.status !== 'all'
+        || aiFilters.model !== 'all'
+        || aiFilters.search.length > 0
+        || aiFilters.time_range !== '7d'
+        || aiFilters.api_key_id !== 'all';
+
+    if (!isLoading && !projectId) {
+        return (
+            <div className="w-full max-w-[1360px] mx-auto px-6 py-8">
+                <div className="text-center py-16">
+                    <p className="text-sm font-medium">Project not found</p>
+                    <p className="text-xs text-muted-foreground mt-1">Unable to load request logs</p>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="w-full max-w-[1360px] mx-auto px-6 py-8">
+            <div className="mb-6">
+                <h1 className="text-base font-medium">Logs</h1>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                    View and monitor all AI requests for this project.
+                </p>
+            </div>
+
+            <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-3 mb-4">
+                    <Select
+                        value={aiFilters.status}
+                        onValueChange={(value) => setAiFilters((prev) => ({ ...prev, status: value }))}
+                    >
+                        <SelectTrigger className="w-[130px] h-7 text-xs shadow-none dark:shadow-xs">
+                            <SelectValue placeholder="All statuses" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all" className="text-xs">All statuses</SelectItem>
+                            <SelectItem value="success" className="text-xs">Success</SelectItem>
+                            <SelectItem value="success_fallback" className="text-xs">Fallback Used</SelectItem>
+                            <SelectItem value="filtered" className="text-xs">Filtered</SelectItem>
+                            <SelectItem value="blocked_output" className="text-xs">Blocked</SelectItem>
+                            <SelectItem value="error" className="text-xs">Error</SelectItem>
+                            <SelectItem value="rate_limited" className="text-xs">Rate Limited</SelectItem>
+                        </SelectContent>
+                    </Select>
+
+                    <Select
+                        value={aiFilters.model}
+                        onValueChange={(value) => setAiFilters((prev) => ({ ...prev, model: value }))}
+                    >
+                        <SelectTrigger className="w-[150px] h-7 text-xs shadow-none dark:shadow-xs">
+                            <SelectValue placeholder="All models" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all" className="text-xs">All models</SelectItem>
+                            {modelOptions?.map((model) => (
+                                <SelectItem key={model} value={model} className="text-xs">
+                                    {model}
+                                </SelectItem>
+                            ))}
+                            {aiFilters.model !== 'all' && !modelOptions?.includes(aiFilters.model) && (
+                                <SelectItem value={aiFilters.model} className="text-xs">
+                                    {aiFilters.model}
+                                </SelectItem>
+                            )}
+                        </SelectContent>
+                    </Select>
+
+                    <TimeRangeSelector
+                        value={aiFilters.time_range}
+                        onChange={(value) => setAiFilters((prev) => ({ ...prev, time_range: value }))}
+                    />
+
+                    <Select
+                        value={aiFilters.api_key_id}
+                        onValueChange={(value) => setAiFilters((prev) => ({ ...prev, api_key_id: value }))}
+                    >
+                        <SelectTrigger className="w-[190px] h-7 text-xs shadow-none dark:shadow-xs">
+                            <SelectValue placeholder="All API keys" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all" className="text-xs">All API keys</SelectItem>
+                            {filteredApiKeys?.map((key) => (
+                                <SelectItem key={key.id} value={key.id} className="text-xs">
+                                    {key.name} ({key.key_prefix}...)
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+
+                    <form onSubmit={handleAiSearchSubmit} className="relative">
+                        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                        <Input
+                            placeholder="Search AI requests..."
+                            value={aiSearchInput}
+                            onChange={(e) => setAiSearchInput(e.target.value)}
+                            className="w-40 sm:w-56 h-7 pl-7 text-xs rounded border-border/50 bg-transparent placeholder:text-muted-foreground/60 shadow-none dark:shadow-xs"
+                        />
+                    </form>
+
+                    {hasActiveAiFilters && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs px-2"
+                            onClick={handleClearAiFilters}
+                        >
+                            <X className="h-3 w-3 mr-1" />
+                            Clear
+                        </Button>
+                    )}
+
+                    <div className="ml-auto">
+                        {projectId ? (
+                            <ExportButton projectId={projectId} filters={aiFilters} environment="production" />
+                        ) : (
+                            <Skeleton className="h-7 w-16" />
+                        )}
+                    </div>
+                </div>
+
+                <RequestLogsTable projectId={projectId} filters={aiFilters} />
+            </div>
+        </div>
+    );
+}
