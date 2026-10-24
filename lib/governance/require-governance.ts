@@ -14,6 +14,7 @@ import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { requireGovernancePermission, type GovernancePermission } from '@/lib/governance/rbac';
 import { requireTierFeatureForOrg } from '@/lib/require-tier-feature';
+import { isGovernanceEnabled } from '@/lib/governance/flag';
 
 type SupabaseAdmin = ReturnType<typeof createAdminClient>;
 
@@ -26,6 +27,13 @@ export async function requireGovernanceAuth(
     permission: GovernancePermission,
     options?: { requirePaidControls?: boolean },
 ): Promise<GovernanceAuth> {
+    if (!isGovernanceEnabled()) {
+        return {
+            ok: false,
+            response: NextResponse.json({ error: 'Governance is not enabled on this deployment' }, { status: 503 }),
+        };
+    }
+
     const supabaseUser = await createServerClient();
     const { data: { user }, error } = await getAuthUser(supabaseUser);
     if (error || !user) {

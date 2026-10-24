@@ -14,6 +14,7 @@
 
 import type { createAdminClient } from '@/lib/supabaseAdmin';
 import { deliverAuditEntry } from '@/lib/governance/delivery';
+import { isGovernanceEnabled } from '@/lib/governance/flag';
 
 type SupabaseAdmin = ReturnType<typeof createAdminClient>;
 
@@ -29,6 +30,7 @@ export async function recordSessionApprovalRequested(
         model?: string | null;
     },
 ): Promise<void> {
+    if (!isGovernanceEnabled()) return;
     await deliverAuditEntry(supabase, {
         orgId: p.orgId,
         eventType: 'session.approval.requested',
@@ -60,6 +62,7 @@ export async function recordSessionApprovalResolved(
         actorIp?: string | null;
     },
 ): Promise<void> {
+    if (!isGovernanceEnabled()) return;
     const approved = p.resolution === 'approved';
     await deliverAuditEntry(supabase, {
         orgId: p.orgId,
