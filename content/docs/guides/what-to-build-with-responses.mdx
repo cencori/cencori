@@ -257,7 +257,7 @@ const response = await cencori.ai.responses({
 
 If that customer is over quota you get a `429` with `Retry-After`; if their plan doesn't include the model you get a `403` with `end_user_model_not_allowed`. Usage and your margin are recorded per request.
 
-**Ship it as:** a metered AI feature inside your SaaS. See [Monetization Setup](/docs/guides/monetization-setup) for the plan configuration.
+**Ship it as:** a metered AI feature inside your SaaS. See [Revenue Setup](/docs/guides/monetization-setup) for the plan configuration.
 
 ## 8. An agent with a human in the loop
 
@@ -277,8 +277,7 @@ For numeric work today, have the model emit structured output (recipe 3) and do 
 
 None of these bypass your controls when controls are enabled. Every request above passes through the same pipeline as any gateway call:
 
-- **Input guard (opt-in)** — prompt-injection and jailbreak detection, PII blocking before the prompt reaches a provider. Off by default; enable in **Project > Security**.
-- **Output guard** — legacy output scanning alone never blocks; output enforcement requires a governance policy or custom data rule. Tokenized values are restored on the way back to you, so the client still sees the original.
+- **PII protection (opt-in)** — blocks requests that contain personal data before the prompt reaches a provider. Off by default; turn on in the project's **Settings → General**.
 - **Audit logging** — model, provider, tokens, cost, latency, and end user recorded per request
 - **Failover** — provider outages route to a fallback without changing your code
 - **Cost tracking** — provider cost and your charge, per request

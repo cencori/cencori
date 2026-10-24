@@ -37,7 +37,7 @@ claude-sonnet-4.5
 gemini-2.5-flash
 ```
 
-If the dashboard offers a free, managed, or catalog model for your project, use it first. That removes provider-key setup from the first test. If you want to use your own OpenAI, Anthropic, Google, xAI, or custom provider account, add that provider in **Project > Providers** before testing.
+If the dashboard offers a free, managed, or catalog model for your project, use it first. That removes provider-key setup from the first test. If you want to use your own OpenAI, Anthropic, Google, or xAI account, add that provider's key in **AI Gateway → BYOK** before testing.
 
 ## 2. Add the Cencori Key to Your Server
 
@@ -198,7 +198,7 @@ Use separate Cencori projects or keys for development and production if you want
 |---------|---------|-----|
 | `Missing API key` | The server process cannot read `CENCORI_API_KEY` | Add the env var and restart the server |
 | `Invalid API key` | The key is wrong, revoked, or being sent in the wrong header | Create a new secret key and use `Authorization: Bearer ...` for `/v1` clients |
-| `Provider 'openai' is not configured` | Cencori auth worked, but the selected model cannot route | Use a catalog/free model that is enabled, or add the provider in **Project > Providers** |
+| `Provider 'openai' is not configured` | Cencori auth worked, but the selected model cannot route | Use a catalog/free model that is enabled, or add the provider in **AI Gateway → BYOK** |
 | No dashboard log | Your app did not call Cencori | Check the base URL, route handler, SDK import, and environment |
 | Works locally, fails in production | Production env is missing the key or provider setup | Add the env var to your host and verify the production project |
 | Browser shows the key | A secret key was placed in client-side code | Move the AI call behind a server route |

@@ -10,7 +10,7 @@ This guide gets a real Cencori request running. If you already have an app, use 
 Cencori sits between your app and model providers, so there are two separate setup pieces:
 
 - **Cencori project key**: authenticates your app to Cencori. This is the `CENCORI_API_KEY` value your code uses.
-- **Provider access**: lets Cencori route to OpenAI, Anthropic, Google, or another provider. Use Cencori managed access when it is enabled for your project, or add your own provider key in **Project > Providers**.
+- **Provider access**: lets Cencori route to OpenAI, Anthropic, Google, or another provider. Use Cencori managed access when it is enabled for your project, or add your own provider key in **AI Gateway → BYOK**.
 
 If your first request says `Provider 'openai' is not configured`, your Cencori key is valid. You still need provider access for that model.
 
@@ -37,7 +37,7 @@ Choose the model you want to call, then make sure your project can route to it:
 1. Open **Models** or **Playground** in your project.
 2. Pick one model ID for the first test.
 3. If a free, managed, or catalog model is enabled for your project, use that first.
-4. If you want BYOK or a custom provider, open **Project > Providers** and add the provider before testing.
+4. If you want to use your own provider key (BYOK), open **AI Gateway → BYOK** and add it before testing.
 
 For the fastest first test, use one known model such as `gpt-4o`, `claude-sonnet-4.5`, or `gemini-2.5-flash`.
 
@@ -66,7 +66,7 @@ The short version:
 2. Create a `csk_...` key in **API Keys**.
 3. Store it as `CENCORI_API_KEY` on your server.
 4. Change your SDK client or base URL.
-5. Send one request and confirm it appears in **Logs**.
+5. Send one request and confirm it appears in **AI Gateway → Logs**.
 
 ## 5. Verify With cURL
 
@@ -100,14 +100,14 @@ All requests are logged in your dashboard with:
 - Full prompt and response
 - Token usage and costs
 - Latency metrics
-- Security scan results (only when scanning or a policy/rule is enabled; otherwise expect no incidents)
+- Requests blocked by PII protection, shown as **Filtered** (only when PII protection is on)
 
 ## Common Setup Issues
 
 | Symptom | What it usually means | Fix |
 |---------|------------------------|-----|
 | `Missing API key` or `Invalid API key` | Your Cencori project key is absent, revoked, or in the wrong header | Set `CENCORI_API_KEY`, restart your server, and use `CENCORI_API_KEY` for native endpoints or `Authorization: Bearer ...` for OpenAI-compatible clients |
-| `Provider 'openai' is not configured` | Cencori auth worked, but the project cannot route to that upstream provider | Add provider access in **Project > Providers** or choose a model whose provider is configured |
+| `Provider 'openai' is not configured` | Cencori auth worked, but the project cannot route to that upstream provider | Add your provider key in **AI Gateway → BYOK** or choose a model whose provider is configured |
 | No request appears in Logs | Your app is still calling the provider directly | Check the base URL, SDK import, and server route |
 | Works locally but fails in production | The production environment is missing `CENCORI_API_KEY` | Add the env var to Vercel, Render, Fly, or your host and redeploy |
 | Browser bundle exposes `csk_...` | Secret key was used client-side | Move Cencori calls into a server route; only use publishable keys for browser-specific flows |
@@ -120,4 +120,4 @@ All requests are logged in your dashboard with:
 | [AI Gateway](/docs/ai/gateway) | Learn about multi-provider routing |
 | [Cencori SDK](/docs/ai/sdk) | Explore SDK methods |
 | [Vercel AI SDK](/docs/ai/vercel-sdk) | Use Cencori with `streamText()` and `useChat()` |
-| [Security](/docs/security/scan) | Configure security rules |
+| [PII Protection](/docs/security/pii-detection) | Block requests that contain personal data |

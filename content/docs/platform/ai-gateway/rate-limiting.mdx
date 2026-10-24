@@ -141,7 +141,7 @@ async function makeSmartRequest(messages: any[]) {
 1. **Implement Exponential Backoff:** Always retry rate-limited requests with exponential backoff rather than aggressive retries.
 2. **Monitor Headers:** Track `X-RateLimit-Remaining` to know when you're approaching limits.
 3. **Use Request Queues:** Queue requests and process them at a controlled rate to stay under limits.
-4. **Cache Responses:** Cache identical requests (semantic caching) to reduce request count.
+4. **Cache Responses:** Turn on [Response caching](/docs/platform/ai-gateway/caching) so repeated identical requests are served from cache.
 5. **Distribute Load:** If hitting limits, consider using multiple projects (each has its own 60/min window).
 6. **Audio calls count too:** transcriptions and speech each consume one request per minute window; multiplier projects for heavy audio workloads.
 

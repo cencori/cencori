@@ -9,7 +9,7 @@ order: 2
 
 If you're currently using the OpenAI SDK directly, switching to Cencori gives you immediate access to:
 
-- **Opt-in Security:** PII detection and prompt injection blocking (off by default; enable in Project > Security)
+- **Opt-in PII Protection:** block requests that contain personal data (off by default; turn on in the project's **Settings → General**)
 - **Complete Logging:** Every request logged with full metadata
 - **Multi-Provider Support:** Switch to Anthropic or Gemini without code changes
 - **Cost Tracking:** Real-time cost monitoring and analytics
@@ -46,7 +46,7 @@ const cencori = new Cencori({
   apiKey: process.env.CENCORI_API_KEY,
 });
 
-// Security scanning is opt-in (Project > Security)
+// PII protection is opt-in (project Settings → General)
 // Request logging built-in
 // Multi-provider support
 const response = await cencori.ai.chat({
@@ -145,10 +145,10 @@ for await (const chunk of stream) {
 ## Testing Your Migration
 
 1. Make a simple chat request and verify the response
-2. Check the Cencori dashboard for request logs
-3. Verify security incidents are being detected (if any)
+2. Check **AI Gateway → Logs** in the Cencori dashboard
+3. If you turned on PII protection, confirm blocked requests show as **Filtered**
 4. Test streaming if you use it
-5. Monitor costs in the analytics dashboard
+5. Monitor costs on the **AI Gateway** overview
 
 ## Bonus: Features You Get for Free
 
@@ -163,13 +163,13 @@ const response = await cencori.ai.chat({
 });
 ```
 
-### Security Monitoring
-Enable scanning in **Project > Security** to detect PII and prompt injection on inputs. Output enforcement additionally requires a governance policy or custom data rule. With scanning off (default), requests pass through as `200 OK` and no incidents are logged.
+### PII Protection
+Turn on **PII protection** in the project's **Settings → General** to block requests that contain personal data. With it off (default), requests pass through as `200 OK`.
 
 ### Cost Breakdown
 See exact costs per request, per model, per provider in real-time. Compare costs across different models easily.
 
 ## Next Steps
 - [Explore multi-provider support](/docs/ai/providers)
-- [Learn about security features](/docs/security/content-filtering)
+- [Learn about PII protection](/docs/security/pii-detection)
 - [View your dashboard](/dashboard)
