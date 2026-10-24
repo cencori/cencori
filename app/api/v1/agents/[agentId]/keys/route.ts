@@ -1,5 +1,6 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 import crypto from 'crypto';
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from "@/lib/data/supabase-js";
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { handleCorsPreFlight } from '@/lib/gateway-middleware';
@@ -41,7 +42,7 @@ export async function POST(
             const userClient = createClient(supabaseUrl, supabaseAnonKey, {
                 global: { headers: { Authorization: authHeader } },
             });
-            const { data: { user }, error: authError } = await userClient.auth.getUser();
+            const { data: { user }, error: authError } = await getAuthUser(userClient);
             if (authError || !user) return respondError(401, 'Unauthorized', 'unauthorized');
             userId = user.id;
 

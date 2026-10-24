@@ -1,4 +1,5 @@
 "use client";
+import { getBrowserAuthUser } from "@/lib/auth/get-browser-auth-user";
 
 import { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -46,7 +47,7 @@ export default function AgentSetupPage() {
     // Check auth on mount — redirect to login if not signed in
     useEffect(() => {
         if (!token) return;
-        supabase.auth.getUser().then(({ data: { user } }: { data: { user: unknown } }) => {
+        getBrowserAuthUser(supabase).then(({ data: { user } }: { data: { user: unknown } }) => {
             if (!user) {
                 const returnUrl = `/dashboard/agent-setup?token=${token}`;
                 router.replace(`/login?redirect=${encodeURIComponent(returnUrl)}`);
@@ -61,7 +62,7 @@ export default function AgentSetupPage() {
         queryKey: ["setupProjects"],
         enabled: step !== "auth_check",
         queryFn: async () => {
-            const { data: { user } } = await supabase.auth.getUser();
+            const { data: { user } } = await getBrowserAuthUser(supabase);
             if (!user) return [];
 
             const { data: memberships } = await supabase

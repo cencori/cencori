@@ -1,4 +1,5 @@
 "use client";
+import { browserAuth } from "@/lib/auth/browser-auth";
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -39,7 +40,7 @@ function InvitePageContent() {
         // Check auth status and fetch invite details
         const init = async () => {
             // Use getSession which is more reliable on client-side
-            const { data: { session }, error } = await supabase.auth.getSession();
+            const { data: { session }, error } = await browserAuth.getSession();
             console.log('[Invite] Session check:', { hasSession: !!session, error });
 
             if (session?.user) {
@@ -76,7 +77,7 @@ function InvitePageContent() {
 
         // Listen for auth state changes (e.g., user logs in from another tab or redirects back)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
+        const { data: { subscription } } = browserAuth.onAuthStateChange((_event: any, session: any) => {
             if (session?.user) {
                 setUser({ email: session.user.email || "" });
             } else {

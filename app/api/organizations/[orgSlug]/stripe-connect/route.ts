@@ -1,3 +1,4 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabaseServer";
 import { createAdminClient } from "@/lib/supabaseAdmin";
@@ -6,7 +7,7 @@ import { resolveConsoleBaseUrl } from "@/lib/auth-redirect";
 
 async function getOrgAsAdmin(orgSlug: string) {
     const supabase = await createServerClient();
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await getAuthUser(supabase);
     if (userError || !user) return { error: "Not authenticated", status: 401 };
 
     const { data: org } = await supabase

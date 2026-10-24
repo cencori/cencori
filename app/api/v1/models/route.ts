@@ -1,3 +1,4 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import crypto from 'crypto';
@@ -132,7 +133,7 @@ export async function GET(req: NextRequest) {
             global: { headers: { Authorization: authHeader } },
         });
 
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        const { data: { user }, error: authError } = await getAuthUser(supabase);
 
         if (!authError && user) {
             isAuthenticated = true;

@@ -1,4 +1,5 @@
 "use client";
+import { browserAuth } from "@/lib/auth/browser-auth";
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -299,7 +300,7 @@ export function MobileNav({ projectSlug, user, avatar }: MobileNavProps) {
                             onClick={async () => {
                                 beginIntentionalSignOut();
                                 clearClientSessionCaches();
-                                await supabase.auth.signOut({ scope: "local" });
+                                await browserAuth.signOut({ scope: "local" });
                                 router.push("/login");
                             }}
                         >

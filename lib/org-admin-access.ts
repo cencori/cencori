@@ -1,3 +1,4 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { createServerClient } from '@/lib/supabaseServer';
 
 /**
@@ -12,7 +13,7 @@ export async function requireOrgOwnerOrAdmin(orgSlug: string): Promise<
     | { ok: false; error: string; status: number }
 > {
     const supabase = await createServerClient();
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await getAuthUser(supabase);
     if (userError || !user) return { ok: false, error: 'Not signed in.', status: 401 };
 
     const { data: org } = await supabase

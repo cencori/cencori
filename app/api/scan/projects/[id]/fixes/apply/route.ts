@@ -1,3 +1,4 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
@@ -196,7 +197,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     console.log(`[Fix Apply] Starting PR creation for project ${id}`);
 
     // Auth check
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await getAuthUser(supabase);
     if (userError || !user) {
         console.log('[Fix Apply] Unauthorized request');
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

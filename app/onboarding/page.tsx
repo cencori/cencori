@@ -1,4 +1,6 @@
 "use client";
+import { browserAuth } from "@/lib/auth/browser-auth";
+import { getBrowserAuthUser } from "@/lib/auth/get-browser-auth-user";
 
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -64,7 +66,7 @@ function OnboardingContent() {
       setCheckingAuth(false);
       return;
     }
-    supabase.auth.getUser().then(async ({ data: { user } }) => {
+    getBrowserAuthUser(supabase).then(async ({ data: { user } }) => {
       if (!user) {
         router.replace("/login");
         return;
@@ -135,7 +137,7 @@ function OnboardingContent() {
       try {
         const {
           data: { user },
-        } = await supabase.auth.getUser();
+        } = await getBrowserAuthUser(supabase);
         if (!user) {
           toast.error("You must be logged in.");
           return null;
@@ -143,7 +145,7 @@ function OnboardingContent() {
 
         const [firstName, ...remainingNameParts] = normalizedFullName.split(" ");
         const lastName = remainingNameParts.join(" ");
-        const { error: metadataError } = await supabase.auth.updateUser({
+        const { error: metadataError } = await browserAuth.updateUser({
           data: {
             full_name: normalizedFullName,
             name: normalizedFullName,

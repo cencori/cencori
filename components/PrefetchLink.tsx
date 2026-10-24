@@ -1,4 +1,5 @@
 "use client";
+import { getBrowserAuthUser } from "@/lib/auth/get-browser-auth-user";
 
 import React from "react";
 import Link from "next/link";
@@ -108,7 +109,7 @@ export const prefetchHelpers = {
         await queryClient.prefetchQuery({
             queryKey: ["orgSettings", orgSlug],
             queryFn: async () => {
-                const { data: { user } } = await supabase.auth.getUser();
+                const { data: { user } } = await getBrowserAuthUser(supabase);
                 if (!user) return null;
 
                 const { data: orgData } = await supabase
@@ -149,7 +150,7 @@ export const prefetchHelpers = {
         await queryClient.prefetchQuery({
             queryKey: ["orgProjects", orgSlug],
             queryFn: async () => {
-                const { data: { user } } = await supabase.auth.getUser();
+                const { data: { user } } = await getBrowserAuthUser(supabase);
                 if (!user) return null;
 
                 const { data: orgData } = await supabase

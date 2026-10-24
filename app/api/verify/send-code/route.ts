@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
-import { SendByte } from "@sendbyte/node";
+import { isBetterAuthEnabled } from "@/lib/auth/flags";
+import { sendVerificationCodeEmail } from "@/lib/email/verification-code-email";
 
 function generateCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -12,6 +13,16 @@ export async function POST(req: Request) {
 
     if (!email || typeof email !== "string") {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
+    }
+
+    // Better Auth issues, stores (hashed) and emails the code itself through
+    // its email OTP plugin, with the same email (lib/auth/better-auth.ts).
+    if (isBetterAuthEnabled()) {
+      const { auth } = await import("@/lib/auth/better-auth");
+      await auth.api.sendVerificationOTP({
+        body: { email: email.toLowerCase(), type: "email-verification" },
+      });
+      return NextResponse.json({ success: true });
     }
 
     const code = generateCode();
@@ -43,40 +54,10 @@ export async function POST(req: Request) {
       }
     }
 
-    const SENDBYTE_API_KEY = process.env.SENDBYTE_API_KEY;
-    if (SENDBYTE_API_KEY) {
-      try {
-        const sendbyte = new SendByte(SENDBYTE_API_KEY);
-        await sendbyte.emails.send({
-          from: "Cencori <system@send.cencori.com>",
-          to: email,
-          subject: "Your verification code",
-          html: `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;margin:0;padding:0;color:#111;">
-<div style="max-width:560px;margin:0 auto;padding:32px 24px;">
-  <p style="margin:0 0 24px;font-size:14px;line-height:1.6;color:#555;">${greeting}</p>
-  <p style="margin:0 0 24px;font-size:14px;line-height:1.6;color:#555;">Use the code below to verify your account.</p>
-  <div style="text-align:center;margin:32px 0;">
-    <span style="display:inline-block;font-size:42px;font-weight:700;letter-spacing:12px;color:#111;background:#f5f5f5;padding:20px 28px;border-radius:8px;">${code}</span>
-  </div>
-  <p style="margin:0 0 24px;font-size:13px;line-height:1.6;color:#999;">This code expires in 10 minutes. If you didn&rsquo;t request this, you can safely ignore this email.</p>
-  <div style="margin-top:32px;padding-top:24px;border-top:1px solid #eee;">
-    <p style="margin:0 0 12px;font-size:12px;color:#999;text-align:center;"><a href="https://cencori.com/docs" style="color:#888;text-decoration:underline;">Docs</a> &nbsp;&middot;&nbsp; <a href="https://cencori.com/newsroom" style="color:#888;text-decoration:underline;">Newsroom</a></p>
-    <p style="margin:0 0 8px;font-size:12px;color:#999;text-align:center;">Making AI infrastructure accessible &mdash; so builders can build and scale with confidence.</p>
-    <p style="margin:0 4px 0;font-size:11px;color:#aaa;text-align:center;">Cencori, Inc. &middot; San Francisco, CA</p>
-  </div>
-</div>
-</body>
-</html>`,
-        });
-      } catch (emailErr) {
-        console.error("Failed to send verification email:", emailErr);
-      }
+    try {
+      await sendVerificationCodeEmail({ to: email, code, greeting });
+    } catch (emailErr) {
+      console.error("Failed to send verification email:", emailErr);
     }
 
     return NextResponse.json({ success: true });

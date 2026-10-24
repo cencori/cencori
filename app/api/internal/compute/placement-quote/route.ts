@@ -1,3 +1,4 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 /**
  * Internal: what a Compute machine shape costs us, and the cheapest equivalent on each cloud
  * CostGraph prices. Input to the v2 runtime placement decision.
@@ -14,7 +15,7 @@ import { machineShape, quotePlacement } from '@/lib/compute/placement-pricing';
 
 export async function GET(req: NextRequest) {
     const supabase = await createServerClient();
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await getAuthUser(supabase);
     if (userError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     if (!(await checkInternalAccess(user.id, user.email))) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });

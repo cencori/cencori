@@ -1,16 +1,17 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { checkInternalAccess } from '@/lib/internal-access';
-import { ensureStorageBucket } from '@/lib/storage-buckets';
+import { ensureFileBucket, fileUrl, putFile } from '@/lib/storage/files';
 
 const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2 MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-const BUCKET = 'sender-avatars';
+const BUCKET = 'sender-avatars' as const;
 
 export async function POST(req: NextRequest) {
     const supabase = await createServerClient();
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await getAuthUser(supabase);
     if (userError || !user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -41,7 +42,7 @@ export async function POST(req: NextRequest) {
 
     const admin = createAdminClient();
 
-    const bucketError = await ensureStorageBucket(admin, BUCKET, {
+    const bucketError = await ensureFileBucket(BUCKET, {
         public: true,
         fileSizeLimit: MAX_FILE_SIZE,
         allowedMimeTypes: ALLOWED_TYPES,
@@ -66,23 +67,15 @@ export async function POST(req: NextRequest) {
     const ext = file.name.split('.').pop()?.toLowerCase() || 'png';
     const filePath = `${profileId}.${ext}`;
 
-    // Upload to Supabase Storage
     const buffer = Buffer.from(await file.arrayBuffer());
-    const { error: uploadError } = await admin.storage
-        .from(BUCKET)
-        .upload(filePath, buffer, {
-            contentType: file.type,
-            upsert: true,
-        });
+    const { error: uploadError } = await putFile(BUCKET, filePath, buffer, file.type);
 
     if (uploadError) {
         console.error('[Avatar Upload] Storage error:', uploadError);
-        return NextResponse.json({ error: uploadError.message || 'Failed to upload file' }, { status: 500 });
+        return NextResponse.json({ error: uploadError || 'Failed to upload file' }, { status: 500 });
     }
 
-    // Get public URL
-    const { data: urlData } = admin.storage.from(BUCKET).getPublicUrl(filePath);
-    const avatarUrl = `${urlData.publicUrl}?t=${Date.now()}`; // cache-bust
+    const avatarUrl = `${fileUrl(BUCKET, filePath)}?t=${Date.now()}`; // cache-bust
 
     // Update the profile
     const { error: updateError } = await admin

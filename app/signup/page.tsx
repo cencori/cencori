@@ -1,3 +1,4 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
@@ -39,7 +40,7 @@ export default async function SignupPage({
 }) {
   const params = await searchParams;
   const supabase = await createServerClient();
-  const { data } = await supabase.auth.getUser();
+  const { data } = await getAuthUser(supabase);
   const headerStore = await headers();
   const host = headerStore.get("x-forwarded-host") ?? headerStore.get("host") ?? "localhost:3000";
   const proto = headerStore.get("x-forwarded-proto") ?? "http";

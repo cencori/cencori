@@ -1,3 +1,4 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { createServerClient } from "@/lib/supabaseServer";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -15,7 +16,7 @@ const LAST_ORG_COOKIE = "cencori:last-org";
  */
 export default async function DashboardHome() {
     const supabase = await createServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user } } = await getAuthUser(supabase);
     if (!user) redirect("/login");
 
     // 1. Last-visited org — validate the user is still a member.

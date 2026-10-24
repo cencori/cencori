@@ -1,3 +1,5 @@
+import { adminUsers } from "@/lib/auth/admin-users";
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { SendByte } from '@sendbyte/node';
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
@@ -54,7 +56,7 @@ async function lookupLocation(ip: string): Promise<string | null> {
 
 export async function POST(request: NextRequest) {
   const supabase = await createServerClient();
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  const { data: { user }, error: userError } = await getAuthUser(supabase);
 
   if (userError || !user?.email) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -74,7 +76,7 @@ export async function POST(request: NextRequest) {
     }
 
     const supabaseAdmin = createAdminClient();
-    const { data: adminUserData, error: adminUserError } = await supabaseAdmin.auth.admin.getUserById(user.id);
+    const { data: adminUserData, error: adminUserError } = await adminUsers.getUserById(user.id);
     if (adminUserError || !adminUserData?.user) {
       return NextResponse.json({ error: 'Failed to load user metadata' }, { status: 500 });
     }
@@ -168,7 +170,7 @@ export async function POST(request: NextRequest) {
     if (ip) updateMeta.last_login_ip = ip;
     updateMeta.last_login_alert_sent_at = new Date().toISOString();
 
-    await supabaseAdmin.auth.admin.updateUserById(user.id, {
+    await adminUsers.updateUserById(user.id, {
       user_metadata: { ...meta, ...updateMeta },
     });
 

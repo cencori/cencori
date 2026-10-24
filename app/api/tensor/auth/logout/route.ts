@@ -1,6 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { noStoreHeaders } from "@/lib/tensor-auth";
+import { isBetterAuthEnabled } from "@/lib/auth/flags";
+import { revokeTensorSession } from "@/lib/auth/tensor-sessions";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!;
@@ -14,6 +16,13 @@ export async function POST(request: NextRequest) {
     refreshToken = typeof body.refresh_token === "string" ? body.refresh_token : "";
   } catch {
     // Local sign-out still succeeds when the remote session is already gone.
+  }
+
+  if (isBetterAuthEnabled()) {
+    // Both tokens are the same Better Auth session token.
+    const token = accessToken || refreshToken;
+    if (token && token.length < 4096) await revokeTensorSession(token).catch(() => {});
+    return NextResponse.json({ ok: true }, { headers: noStoreHeaders() });
   }
 
   if (accessToken && refreshToken && accessToken.length < 16_384 && refreshToken.length < 4096) {

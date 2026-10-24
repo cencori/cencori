@@ -1,3 +1,4 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { createHash } from "node:crypto";
 import type { User } from "@supabase/supabase-js";
 import { getCachedTensorUser, setCachedTensorUser } from "@/lib/config-cache";
@@ -21,7 +22,7 @@ export async function authenticateTensorDataRequest(
   const tokenHash = createHash("sha256").update(token).digest("hex");
   const cached = await getCachedTensorUser<User>(tokenHash);
   if (cached?.id) return { admin, user: cached };
-  const { data, error } = await admin.auth.getUser(token);
+  const { data, error } = await getAuthUser(admin, token);
   if (error || !data.user) return null;
   void setCachedTensorUser(tokenHash, data.user, tokenExpiry(token));
   return { admin, user: data.user };

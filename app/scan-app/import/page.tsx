@@ -1,4 +1,5 @@
 "use client";
+import { browserAuth } from "@/lib/auth/browser-auth";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -144,14 +145,14 @@ export default function ImportRepoPage() {
             // When returning from OAuth callback (?code=...), let the auth client
             // settle the browser session before first protected API call.
             if (typeof window !== 'undefined' && window.location.search.includes('code=')) {
-                await supabase.auth.getSession();
+                await browserAuth.getSession();
             }
             await fetchRepos();
         };
 
         void init();
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+        const { data: { subscription } } = browserAuth.onAuthStateChange(
             (_event: AuthChangeEvent, session: Session | null) => {
                 if (session?.user) {
                     void fetchRepos();

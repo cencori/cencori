@@ -1,5 +1,19 @@
 import type { NextConfig } from "next";
 import { createMDX } from "fumadocs-mdx/next";
+import vercelConfig from "./vercel.json";
+
+// vercel.json stays the single source for the public /v1/* rewrites and the
+// legacy redirects. Vercel applies it itself; anywhere else (`next start` on
+// Brimble) Next has to apply it. Host-conditioned rules are skipped because
+// proxy.ts already rewrites the pitch/design subdomains, and applying them
+// twice would double the path prefix.
+const onVercel = Boolean(process.env.VERCEL);
+const portableRewrites = onVercel
+  ? []
+  : vercelConfig.rewrites
+      .filter((rule) => !("has" in rule))
+      .map(({ source, destination }) => ({ source, destination }));
+const portableRedirects = onVercel ? [] : vercelConfig.redirects;
 
 const nextConfig: NextConfig = {
   // Exercise local subdomains with the same host-based routing as production.
@@ -39,27 +53,33 @@ const nextConfig: NextConfig = {
     },
   },
   async rewrites() {
-    return [
-      // Legacy desktop API prefix. Rewritten (not redirected) so POST bodies
-      // survive: old builds calling /api/basecode/* reach the same handlers
-      // as /api/tensor/*.
-      { source: "/api/basecode/:path*", destination: "/api/tensor/:path*" },
-      // Serve the docs landing page directly so social crawlers receive the
-      // introduction metadata without needing to follow a redirect.
-      { source: "/docs", destination: "/docs/introduction" },
-      // Most agents probe /llms.txt (llmstxt.org convention); our file lives at
-      // /llm.txt. Serve the same content at /llms.txt with a 200 (a rewrite, not
-      // a redirect, so fetchers that don't follow 3xx still get the guide).
-      { source: "/llms.txt", destination: "/llm.txt" },
-      // "View as Markdown" and agents fetch `<docs page>.md`. Rewrites run
-      // before dynamic routes, so these win over app/docs/[[...slug]].
-      { source: "/docs/:path+.md", destination: "/api/docs/markdown/:path+" },
-      { source: "/arcie/docs.md", destination: "/api/arcie/docs/markdown" },
-      { source: "/arcie/docs/:path+.md", destination: "/api/arcie/docs/markdown/:path+" },
-    ];
+    return {
+      // Like vercel.json rewrites, these run before filesystem routes.
+      beforeFiles: portableRewrites,
+      afterFiles: [
+        // Legacy desktop API prefix. Rewritten (not redirected) so POST bodies
+        // survive: old builds calling /api/basecode/* reach the same handlers
+        // as /api/tensor/*.
+        { source: "/api/basecode/:path*", destination: "/api/tensor/:path*" },
+        // Serve the docs landing page directly so social crawlers receive the
+        // introduction metadata without needing to follow a redirect.
+        { source: "/docs", destination: "/docs/introduction" },
+        // Most agents probe /llms.txt (llmstxt.org convention); our file lives at
+        // /llm.txt. Serve the same content at /llms.txt with a 200 (a rewrite, not
+        // a redirect, so fetchers that don't follow 3xx still get the guide).
+        { source: "/llms.txt", destination: "/llm.txt" },
+        // "View as Markdown" and agents fetch `<docs page>.md`. Rewrites run
+        // before dynamic routes, so these win over app/docs/[[...slug]].
+        { source: "/docs/:path+.md", destination: "/api/docs/markdown/:path+" },
+        { source: "/arcie/docs.md", destination: "/api/arcie/docs/markdown" },
+        { source: "/arcie/docs/:path+.md", destination: "/api/arcie/docs/markdown/:path+" },
+      ],
+      fallback: [],
+    };
   },
   async redirects() {
     return [
+      ...portableRedirects,
       {
         source: "/blog/computing-infrastructure-global-ai-runs-on",
         destination: "/thesis",
@@ -162,6 +182,17 @@ const nextConfig: NextConfig = {
           {
             key: "Cache-Control",
             value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
+      {
+        // Uploaded files (app/api/files) also end in .jpg/.webp, but they are
+        // looked up per request; the rule above would pin even a 404 for a year.
+        source: "/api/files/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=86400",
           },
         ],
       },

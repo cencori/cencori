@@ -1,4 +1,5 @@
 'use server';
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 
 import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
@@ -36,7 +37,7 @@ export async function deployAgentProject(input: DeployAgentProjectInput): Promis
     }
 
     const supabase = await createServerClient();
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await getAuthUser(supabase);
     if (userError || !user) return { ok: false, error: 'Not signed in.' };
 
     // Org membership

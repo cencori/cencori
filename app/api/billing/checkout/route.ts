@@ -1,3 +1,4 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { NextRequest, NextResponse } from "next/server";
 import { getStripeCheckoutReturnUrl, parseCheckoutSelection } from "@/lib/billing/checkout-contract";
 import { resolveConsoleBaseUrl } from "@/lib/auth-redirect";
@@ -34,7 +35,7 @@ export async function POST(req: NextRequest) {
     const {
       data: { user },
       error: userError,
-    } = await supabase.auth.getUser();
+    } = await getAuthUser(supabase);
 
     if (userError || !user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

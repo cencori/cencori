@@ -1,4 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
+import { getAuthUser } from "@/lib/auth/get-auth-user";
+import { createClient } from "@/lib/data/supabase-js";
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { createAdminClient } from '@/lib/supabaseAdmin';
@@ -98,7 +99,7 @@ export async function POST(req: NextRequest) {
             const userClient = createClient(supabaseUrl, supabaseAnonKey, {
                 global: { headers: { Authorization: authHeader } },
             });
-            const { data: { user }, error: authError } = await userClient.auth.getUser();
+            const { data: { user }, error: authError } = await getAuthUser(userClient);
             if (authError || !user) return respondError(401, 'Unauthorized', 'unauthorized');
             authenticatedUserId = user.id;
             projectId = '';
@@ -227,7 +228,7 @@ export async function GET(req: NextRequest) {
             const userClient = createClient(supabaseUrl, supabaseAnonKey, {
                 global: { headers: { Authorization: authHeader } },
             });
-            const { data: { user }, error: authError } = await userClient.auth.getUser();
+            const { data: { user }, error: authError } = await getAuthUser(userClient);
             if (authError || !user) return respondError(401, 'Unauthorized', 'unauthorized');
 
             const { searchParams } = new URL(req.url);

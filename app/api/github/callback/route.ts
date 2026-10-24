@@ -1,3 +1,4 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
@@ -107,7 +108,7 @@ export async function GET(req: NextRequest) {
   }
 
   // Get current user
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await getAuthUser(supabase);
   const linkedUserId = user?.id || (signatureValid ? stateUserId : null);
 
   if (setupAction === 'install' || setupAction === 'update') {

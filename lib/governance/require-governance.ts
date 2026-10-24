@@ -1,3 +1,4 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 /**
  * Session-auth + governance-permission gate for the governance API (PRD M1/M0.4).
  *
@@ -26,7 +27,7 @@ export async function requireGovernanceAuth(
     options?: { requirePaidControls?: boolean },
 ): Promise<GovernanceAuth> {
     const supabaseUser = await createServerClient();
-    const { data: { user }, error } = await supabaseUser.auth.getUser();
+    const { data: { user }, error } = await getAuthUser(supabaseUser);
     if (error || !user) {
         return { ok: false, response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
     }

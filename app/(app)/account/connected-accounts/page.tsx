@@ -1,4 +1,5 @@
 "use client";
+import { getBrowserAuthUser } from "@/lib/auth/get-browser-auth-user";
 
 import React from "react";
 import { supabase } from "@/lib/supabaseClient";
@@ -38,7 +39,7 @@ export default function ConnectedAccountsPage() {
 
     React.useEffect(() => {
         async function fetchIdentities() {
-            const { data: { user } } = await supabase.auth.getUser();
+            const { data: { user } } = await getBrowserAuthUser(supabase);
             if (!user) return;
 
             const identities = user.identities || [];
@@ -74,7 +75,7 @@ export default function ConnectedAccountsPage() {
 
     const handleDisconnect = async (providerId: string) => {
         try {
-            const { data: { user } } = await supabase.auth.getUser();
+            const { data: { user } } = await getBrowserAuthUser(supabase);
             if (!user) return;
 
             const identity = user.identities?.find((i: { provider: string }) => i.provider === providerId);

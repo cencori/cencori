@@ -1,4 +1,5 @@
 "use client";
+import { browserAuth } from "@/lib/auth/browser-auth";
 
 import React, { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
@@ -68,7 +69,7 @@ export default function DashboardLayoutClient({
     }
 
     async function check() {
-      const { data: { session }, error } = await supabase.auth.getSession();
+      const { data: { session }, error } = await browserAuth.getSession();
       if (error || !session?.user) {
         // This request already passed middleware.ts (or the org layout's
         // server-side check), so the session is valid as far as the server is
@@ -117,7 +118,7 @@ export default function DashboardLayoutClient({
     }
     check();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
+    const { data: { subscription } } = browserAuth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
       if (event === "SIGNED_OUT") {
         // No redirect from here. A deliberate log-out navigates itself, and an
         // involuntary one (expired token, sign-out in another tab) belongs to

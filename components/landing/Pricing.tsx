@@ -1,4 +1,5 @@
 "use client";
+import { browserAuth } from "@/lib/auth/browser-auth";
 
 import React, { useEffect, useState } from "react";
 import { ArrowRight, Check, Minus } from "lucide-react";
@@ -330,7 +331,7 @@ export function Pricing() {
         const checkAuth = async () => {
             const {
                 data: { session },
-            } = await supabase.auth.getSession();
+            } = await browserAuth.getSession();
             setIsAuthenticated(!!session);
             if (session?.user) {
                 const { data: membership } = await supabase
@@ -346,7 +347,7 @@ export function Pricing() {
         };
         checkAuth();
 
-        const { data: authListener } = supabase.auth.onAuthStateChange(
+        const { data: authListener } = browserAuth.onAuthStateChange(
             (_event: string, session: { user: { user_metadata?: Record<string, unknown>; email?: string; id?: string } } | null) => {
                 setIsAuthenticated(!!session);
             }

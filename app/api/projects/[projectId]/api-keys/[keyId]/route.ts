@@ -1,3 +1,4 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabaseServer";
 import { trackEvent } from "@/lib/track-event";
@@ -11,7 +12,7 @@ export async function PATCH(
         const supabase = await createServerClient();
         const { projectId, keyId } = await params;
 
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        const { data: { user }, error: userError } = await getAuthUser(supabase);
         if (userError || !user) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
@@ -82,7 +83,7 @@ export async function DELETE(
         const supabase = await createServerClient();
         const { projectId, keyId } = await params;
 
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        const { data: { user }, error: userError } = await getAuthUser(supabase);
         if (userError || !user) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }

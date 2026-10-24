@@ -1,3 +1,4 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 import type { User } from "@supabase/supabase-js";
 import type { NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
@@ -108,12 +109,12 @@ export async function authenticateTensorBillingRequest(
   if (authorization?.startsWith("Bearer ")) {
     const token = authorization.slice(7).trim();
     if (!token || token.length > 4096) return null;
-    const { data, error } = await admin.auth.getUser(token);
+    const { data, error } = await getAuthUser(admin, token);
     return error || !data.user ? null : { admin, user: data.user };
   }
 
   const client = await createServerClient();
-  const { data, error } = await client.auth.getUser();
+  const { data, error } = await getAuthUser(client);
   return error || !data.user ? null : { admin, user: data.user };
 }
 

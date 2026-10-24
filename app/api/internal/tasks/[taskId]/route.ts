@@ -1,3 +1,4 @@
+import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
 
@@ -7,7 +8,7 @@ const VALID_DEPARTMENTS = ['engineering', 'sales', 'marketing', 'product', 'oper
 
 async function getInternalUser() {
     const supabase = await createServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user } } = await getAuthUser(supabase);
     if (!user?.email) return null;
     const isCencori = user.email.endsWith('@cencori.com') || process.env.NODE_ENV === 'development';
     if (!isCencori) return null;

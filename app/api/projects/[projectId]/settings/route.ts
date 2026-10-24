@@ -2,7 +2,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireProjectAccess } from '@/lib/require-project-access';
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@/lib/data/supabase-js";
 import { writeAuditLog } from "@/lib/audit-log";
 import { invalidateFailoverConfig } from '@/lib/config-cache';
 
