@@ -19,6 +19,7 @@ import { runGatewayInputPipeline } from '@/lib/gateway/input-guard';
 import {
     ALLOWED_USER_MESSAGE,
     JAILBREAK_USER_MESSAGE,
+    PII_USER_MESSAGE,
     toUnifiedMessages,
 } from '@/lib/gateway/__tests__/fixtures';
 import { createMockSupabaseForSecurity } from '@/lib/gateway/__tests__/mock-supabase';
@@ -46,9 +47,9 @@ describe('Gateway input pipeline contract', () => {
         }
     });
 
-    it('blocks jailbreak prompts when explicitly enabled', async () => {
+    it('blocks PII when protection is enabled', async () => {
         const supabase = createMockSupabaseForSecurity({ tier: 'pro' });
-        const messages = toUnifiedMessages([{ role: 'user', content: JAILBREAK_USER_MESSAGE }]);
+        const messages = toUnifiedMessages([{ role: 'user', content: PII_USER_MESSAGE }]);
 
         const result = await runGatewayInputPipeline({
             supabase: supabase as never,
@@ -62,6 +63,20 @@ describe('Gateway input pipeline contract', () => {
             expect(result.status).toBe(403);
             expect(result.code).toBe('security_violation');
         }
+    });
+
+    it('allows jailbreak-style prompts even with protection on (only PII is checked)', async () => {
+        const supabase = createMockSupabaseForSecurity({ tier: 'pro' });
+        const messages = toUnifiedMessages([{ role: 'user', content: JAILBREAK_USER_MESSAGE }]);
+
+        const result = await runGatewayInputPipeline({
+            supabase: supabase as never,
+            projectId: 'proj-1',
+            tier: 'pro',
+            messages,
+        });
+
+        expect(result.ok).toBe(true);
     });
 
     it('allows jailbreak prompts when scanning was never enabled (no defaults, any tier)', async () => {
@@ -105,43 +120,9 @@ describe('Gateway input pipeline contract', () => {
         expect(result.ok).toBe(true);
     });
 
-    it('blocks when custom data rule matches', async () => {
-        const supabase = createMockSupabaseForSecurity({
-            tier: 'pro',
-            customRules: [
-                {
-                    id: 'rule-1',
-                    project_id: 'proj-1',
-                    name: 'block-secret',
-                    pattern: 'SECRET_TOKEN_123',
-                    match_type: 'keywords',
-                    action: 'block',
-                    priority: 10,
-                    is_active: true,
-                },
-            ],
-        });
-        const messages = toUnifiedMessages([
-            { role: 'user', content: 'Please process SECRET_TOKEN_123 now' },
-        ]);
-
-        const result = await runGatewayInputPipeline({
-            supabase: supabase as never,
-            projectId: 'proj-1',
-            tier: 'pro',
-            messages,
-        });
-
-        expect(result.ok).toBe(false);
-        if (!result.ok) {
-            expect(result.code).toBe('data_rule_block');
-            expect(result.status).toBe(403);
-        }
-    });
-
     it('same fixture: Pro block decision is identical across two invocations (route parity baseline)', async () => {
         const supabase = createMockSupabaseForSecurity({ tier: 'pro' });
-        const messages = toUnifiedMessages([{ role: 'user', content: JAILBREAK_USER_MESSAGE }]);
+        const messages = toUnifiedMessages([{ role: 'user', content: PII_USER_MESSAGE }]);
         const params = {
             supabase: supabase as never,
             projectId: 'proj-parity',

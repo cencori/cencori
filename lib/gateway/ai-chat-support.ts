@@ -1,5 +1,4 @@
 import crypto from 'crypto';
-import { checkOutputSecurity } from '@/lib/safety/multi-layer-check';
 import type { SecurityCheckResult } from '@/lib/safety/multi-layer-check';
 import type { UnifiedMessage } from '@/lib/providers/base';
 import { deTokenize } from '@/lib/safety/custom-data-rules';
@@ -127,24 +126,8 @@ export function validateCachedOutput(params: {
     /** Explicit dashboard opt-in. Without it cached output is served as-is. */
     outputScanningEnabled?: boolean;
 }): string | null {
-    const finalContent = params.tokenMap
+    // Output is no longer scanned, so a cache hit is always served as-is.
+    return params.tokenMap
         ? deTokenize(params.cachedContent, params.tokenMap)
         : params.cachedContent;
-    if (params.outputScanningEnabled !== true) {
-        return finalContent;
-    }
-    const outputSecurity = checkOutputSecurity(
-        finalContent,
-        {
-            inputText: params.inputText,
-            inputSecurityResult: params.inputSecurity,
-            conversationHistory: params.conversationHistory,
-        },
-        { enableOutputScanning: true }
-    );
-    if (!outputSecurity.safe) {
-        console.warn('[Cache] Ignoring cache hit because output failed current policy checks');
-        return null;
-    }
-    return finalContent;
 }

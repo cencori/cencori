@@ -1,202 +1,56 @@
-import { checkContent, SafetyResult, ContentFilterConfig } from './content-filter';
-import { detectJailbreak, JailbreakDetectionResult, isJailbreakRisky } from './jailbreak-detector';
-import { scanOutput, OutputScanResult, ScanContext, shouldBlockOutput } from './output-scanner';
+import { detectPII } from './content-filter';
+
+/**
+ * Gateway input protection: PII only, and only when the project opted in.
+ *
+ * Cencori does not make security decisions for users by default. Jailbreak,
+ * prompt-injection keyword, intent and output scanning were removed: they were
+ * heuristic, produced false positives, and added latency to every request.
+ */
 
 export interface SecurityCheckResult {
     safe: boolean;
     reasons: string[];
-    layer: 'input' | 'output' | 'jailbreak' | 'multi';
+    layer: 'input' | 'output';
     riskScore: number;
     confidence: number;
-    blockedContent?: {
-        type: string;
-        examples: string[];
-    };
-    details?: {
-        inputCheck?: SafetyResult;
-        jailbreakCheck?: JailbreakDetectionResult;
-        outputCheck?: OutputScanResult;
-    };
 }
 
 export interface ProjectSecurityConfig {
-    /** Explicit dashboard opt-in. Absent/false = every scanner below is off. */
+    /** Dashboard opt-in for PII protection. Absent/false = nothing is checked. */
     enabled?: boolean;
-    inputThreshold?: number; // 0-1, default 0.5
-    outputThreshold?: number; // 0-1, default 0.6 (slightly more lenient than input)
-    jailbreakThreshold?: number; // 0-1, default 0.7
-    enableOutputScanning?: boolean; // default false; on only via explicit dashboard opt-in
-    enableJailbreakDetection?: boolean; // default false; on only via explicit dashboard opt-in
-    enableObfuscatedPII?: boolean; // default false; on only via explicit dashboard opt-in
-    enableIntentAnalysis?: boolean; // default false; on only via explicit dashboard opt-in
+    filterPII?: boolean;
 }
 
+const PASS: SecurityCheckResult = {
+    safe: true,
+    reasons: [],
+    layer: 'input',
+    riskScore: 0,
+    confidence: 1,
+};
+
 /**
- * Phase 1: Check input before sending to AI model
+ * Check user input before it reaches the model. Blocks when PII protection is
+ * on and any PII is found.
  */
 export function checkInputSecurity(
     inputText: string,
-    conversationHistory?: Array<{ role: string; content: string }>,
+    _conversationHistory?: Array<{ role: string; content: string }>,
     config?: ProjectSecurityConfig
 ): SecurityCheckResult {
-    // No defaults: without an explicit opt-in config every scanner stays off
-    // and the check is a pass-through (also skipping the regex work).
-    const enableJailbreak = config?.enableJailbreakDetection ?? false;
-    const enableObfuscatedPII = config?.enableObfuscatedPII ?? false;
-    const enableIntentAnalysis = config?.enableIntentAnalysis ?? false;
-
-    if (!enableJailbreak && !enableObfuscatedPII && !enableIntentAnalysis) {
-        return {
-            safe: true,
-            reasons: [],
-            layer: 'input',
-            riskScore: 0,
-            confidence: 1,
-        };
+    if (config?.enabled !== true || config.filterPII === false) {
+        return PASS;
     }
 
-    // 1. Content filtering
-    const contentFilterConfig: ContentFilterConfig = {
-        threshold: config?.inputThreshold ?? 0.5,
-        enableObfuscatedPII,
-        enableIntentAnalysis,
-    };
-
-    const inputCheck = checkContent(inputText, contentFilterConfig);
-
-    // 2. Jailbreak detection
-    let jailbreakCheck: JailbreakDetectionResult | undefined;
-    if (enableJailbreak) {
-        jailbreakCheck = detectJailbreak(inputText, conversationHistory);
-    }
-
-    // Aggregate results
-    const reasons: string[] = [];
-    let totalRisk = 0;
-    let layer: SecurityCheckResult['layer'] = 'input';
-
-    // Input filtering results
-    if (!inputCheck.safe) {
-        reasons.push(...inputCheck.reasons.map(r => `[Input] ${r}`));
-        totalRisk += (1 - inputCheck.score);
-        layer = 'input';
-    }
-
-    // Jailbreak results
-    if (jailbreakCheck && isJailbreakRisky(jailbreakCheck, config?.jailbreakThreshold)) {
-        reasons.push(...jailbreakCheck.patterns.map(p => `[Jailbreak] ${p}`));
-        totalRisk += jailbreakCheck.risk;
-        layer = jailbreakCheck.risk > (1 - inputCheck.score) ? 'jailbreak' : 'multi';
-    }
-
-    const safe = inputCheck.safe && (!jailbreakCheck || !isJailbreakRisky(jailbreakCheck, config?.jailbreakThreshold));
-    const riskScore = Math.min(totalRisk, 1.0);
-    const confidence = Math.max(
-        inputCheck.safe ? 0 : (1 - inputCheck.score),
-        jailbreakCheck?.confidence || 0
-    );
+    const pii = detectPII(inputText);
+    if (pii.safe) return PASS;
 
     return {
-        safe,
-        reasons,
-        layer,
-        riskScore,
-        confidence,
-        details: {
-            inputCheck,
-            jailbreakCheck,
-        },
-    };
-}
-
-/**
- * Phase 2: Check output from AI model before returning to user
- */
-export function checkOutputSecurity(
-    outputText: string,
-    context: {
-        inputText: string;
-        inputSecurityResult?: SecurityCheckResult;
-        conversationHistory?: Array<{ role: string; content: string }>;
-    },
-    config?: ProjectSecurityConfig
-): SecurityCheckResult {
-    const enableOutput = config?.enableOutputScanning ?? false;
-
-    if (!enableOutput) {
-        return {
-            safe: true,
-            reasons: [],
-            layer: 'output',
-            riskScore: 0,
-            confidence: 0,
-        };
-    }
-
-    // Scan output with context
-    const scanContext: ScanContext = {
-        inputText: context.inputText,
-        jailbreakRisk: context.inputSecurityResult?.details?.jailbreakCheck?.risk,
-        conversationHistory: context.conversationHistory,
-    };
-
-    const outputCheck = scanOutput(outputText, scanContext);
-
-    const safe = !shouldBlockOutput(outputCheck);
-    const reasons = outputCheck.reasons.map(r => `[Output] ${r}`);
-
-    return {
-        safe,
-        reasons,
-        layer: 'output',
-        riskScore: outputCheck.riskScore,
-        confidence: outputCheck.confidence,
-        blockedContent: outputCheck.blockedContent,
-        details: {
-            outputCheck,
-        },
-    };
-}
-
-/**
- * Comprehensive security check combining all layers
- */
-export async function comprehensiveSecurityCheck(params: {
-    input: string;
-    output?: string;
-    conversationHistory?: Array<{ role: string; content: string }>;
-    projectConfig?: ProjectSecurityConfig;
-}): Promise<{
-    inputResult: SecurityCheckResult;
-    outputResult?: SecurityCheckResult;
-    overallSafe: boolean;
-}> {
-    // Phase 1: Check input
-    const inputResult = checkInputSecurity(
-        params.input,
-        params.conversationHistory,
-        params.projectConfig
-    );
-
-    // Phase 2: Check output (if provided)
-    let outputResult: SecurityCheckResult | undefined;
-    if (params.output) {
-        outputResult = checkOutputSecurity(
-            params.output,
-            {
-                inputText: params.input,
-                inputSecurityResult: inputResult,
-                conversationHistory: params.conversationHistory,
-            },
-            params.projectConfig
-        );
-    }
-
-    const overallSafe = inputResult.safe && (!outputResult || outputResult.safe);
-
-    return {
-        inputResult,
-        outputResult,
-        overallSafe,
+        safe: false,
+        reasons: pii.reasons.map((reason) => `[PII] ${reason}`),
+        layer: 'input',
+        riskScore: 1,
+        confidence: 1,
     };
 }
