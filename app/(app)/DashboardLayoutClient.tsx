@@ -284,6 +284,18 @@ function LayoutContent({ user, avatar, name, children, initialAgentOpen, initial
   const isEmbeddedAgents = pathname === "/agents" || pathname.endsWith("/agents");
   const isFixedWorkspace = isPlayground || isEmbeddedAgents;
   const isOnboardingFlow = pathname.includes("/onboarding");
+  // Project settings (every tab) swaps the header's credits + Copilot buttons
+  // for a single way out to organization settings.
+  const isProjectSettingsPage = isCanonicalConsoleRoute
+    ? consoleRoute?.scope === "project" && (pathname === "/settings" || pathname.startsWith("/settings/"))
+    : Boolean(routeProjectSlug) && pathname.startsWith(`/${routeOrgSlug}/${routeProjectSlug}/settings`);
+  // Organization settings (General, Advanced, Teams, Billing, Usage, Audit Log) do the
+  // same in reverse: one button back to the selected project's settings.
+  const ORGANIZATION_SETTINGS_AREAS = ["settings", "teams", "billing", "usage", "audit-log"];
+  const isOrganizationSettingsPage = isCanonicalConsoleRoute
+    ? pathname === "/organization/settings"
+      || (consoleRoute?.scope === "organization" && ORGANIZATION_SETTINGS_AREAS.slice(1).includes(pathname.split("/")[1] ?? ""))
+    : Boolean(routeOrgSlug) && pathname.split("/")[2] === "~" && ORGANIZATION_SETTINGS_AREAS.includes(pathname.split("/")[3] ?? "");
   const hasDesktopSidebar = (Boolean(orgSlug) || isCanonicalConsoleRoute)
     && !pathname.includes("/projects/new")
     && !pathname.includes("/projects/import");
@@ -295,6 +307,15 @@ function LayoutContent({ user, avatar, name, children, initialAgentOpen, initial
     isCanonicalConsoleRoute ? activeProject ?? undefined : undefined
   );
   const currentOrgId = currentOrg?.id ?? null;
+  const settingsProjectSlug = (
+    activeProject && (activeProject.orgSlug === orgSlug || activeProject.organization_id === currentOrgId)
+      ? activeProject
+      : projects.find((proj) => proj.orgSlug === orgSlug)
+  )?.slug ?? null;
+  const projectSettingsHref = isCanonicalConsoleRoute
+    ? (settingsProjectSlug ? "/settings" : null)
+    : (orgSlug && settingsProjectSlug ? `/${orgSlug}/${settingsProjectSlug}/settings` : null);
+  const isSettingsPage = isProjectSettingsPage || isOrganizationSettingsPage;
   // The provider's org payload already carries the balance, so the pill
   // paints from it with no mount-time request. The 30s interval below keeps
   // it fresh; initialData is only the first paint.
@@ -337,7 +358,7 @@ function LayoutContent({ user, avatar, name, children, initialAgentOpen, initial
   // Matches the gateway: under a cent (or in debt) can't serve requests.
   const isOutOfCredits = creditsBalance < 0.01;
   const creditsPillClassName = [
-    "hidden lg:inline-flex h-6 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-medium transition-colors",
+    "hidden lg:inline-flex h-6 items-center gap-1.5 rounded-[4px] border px-2 text-[11px] font-medium transition-colors",
     isOutOfCredits
       ? "border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/15"
       : isLowCredits
@@ -348,7 +369,7 @@ function LayoutContent({ user, avatar, name, children, initialAgentOpen, initial
     ? "Credits --"
     : orgCreditsLoading
       ? "Credits..."
-      : formatCurrency(creditsBalance, 'USD', { maximumFractionDigits: 4, minimumFractionDigits: 2 });
+      : formatCurrency(creditsBalance, 'USD', { maximumFractionDigits: 2, minimumFractionDigits: 2 });
 
   return (
     <div
@@ -399,7 +420,25 @@ function LayoutContent({ user, avatar, name, children, initialAgentOpen, initial
 
         </div>
         <div className="flex items-center gap-2">
-          {orgSlug && (
+          {orgSlug && isProjectSettingsPage && (
+            <Link
+              href={isCanonicalConsoleRoute ? "/organization/settings" : `/${orgSlug}/~/settings`}
+              className="inline-flex h-7 items-center rounded-md bg-primary px-3 font-sans text-xs font-medium text-primary-foreground transition-[background-color,transform] hover:bg-primary/90 active:scale-[0.98]"
+            >
+              Organization settings
+            </Link>
+          )}
+
+          {isOrganizationSettingsPage && projectSettingsHref && (
+            <Link
+              href={projectSettingsHref}
+              className="inline-flex h-7 items-center rounded-md bg-primary px-3 font-sans text-xs font-medium text-primary-foreground transition-[background-color,transform] hover:bg-primary/90 active:scale-[0.98]"
+            >
+              Project settings
+            </Link>
+          )}
+
+          {orgSlug && !isSettingsPage && (
             <Link
               href={isCanonicalConsoleRoute ? "/billing" : `/${orgSlug}/~/billing`}
               className={creditsPillClassName}
@@ -412,7 +451,7 @@ function LayoutContent({ user, avatar, name, children, initialAgentOpen, initial
           )}
 
           {/* Hidden while Copilot is open: the panel has its own close. */}
-          {!agentOpen && (
+          {!agentOpen && !isSettingsPage && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <button

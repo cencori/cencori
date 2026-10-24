@@ -116,17 +116,15 @@ Every request requires a project API key:
 - **Preferred for `/api/ai/*`:** `CENCORI_API_KEY: csk_...`
 - **Preferred for `https://api.cencori.com/v1/*`:** `Authorization: Bearer csk_...`
 
-Create and manage project keys in the [dashboard](/dashboard). If authentication succeeds but routing fails with a provider configuration error, add provider access in **Project > Providers** or choose a model from an enabled provider.
+Create and manage project keys in the [dashboard](/dashboard). If authentication succeeds but routing fails with a provider configuration error, add your provider key in **AI Gateway → BYOK** or choose a model from an enabled provider.
 
-## Security (opt-in, off by default)
+## PII protection (opt-in, off by default)
 
-Gateway security scanning is explicit opt-in and applies identically to managed keys and BYOK, streaming and non-streaming, native and OpenAI-compatible endpoints.
+The gateway's only built-in request check is [PII protection](/docs/security/pii-detection). It applies the same way to managed keys and BYOK, streaming and non-streaming, native and OpenAI-compatible endpoints.
 
-- Default: `security_enabled = false` (or no settings row) means no input scan, no jailbreak/PII detection, no output scan. Requests return `200 OK` with original content unmodified. This is expected, not a bypass.
-- To enforce: go to **Project > Security > Enable security scanning**, then tune the Safety Threshold slider and the `filter_pii` / `filter_jailbreaks` / `filter_prompt_injection` toggles.
-- Input when on: heuristic block (`403 security_violation`) for PII (email, phone, SSN `123-45-6789`, Luhn-valid cards), injection keywords, and jailbreak signals. Either blocked or passed through — the gateway does not mask PII in-place for the client. Tokenize/redact actions from custom rules or governance policies protect the upstream provider only; the client still receives the restored original.
-- Output: the legacy output scanner alone never blocks a response (to avoid false-positive stream failures). Output enforcement requires an active governance policy (e.g. PCI-DSS / NDPR template) or custom data rule.
-- Bypass: `passthrough: true` / `fast_lane: true` body fields or `x-cencori-passthrough: true` / `x-cencori-fast-lane: true` headers skip all guards even when enabled.
-- Custom data rules and governance policies are separate opt-ins: creating one enforces it regardless of the master switch.
+- Default: off. Requests pass through unchanged and return `200 OK`, even if they contain personal data. This is expected, not a bypass.
+- To turn it on: open the project's **Settings → General**, and under **Request handling** turn on **PII protection** (paid plans).
+- When on: any email address, phone number, US SSN, or card number in the input blocks the request with `403 security_violation`. Nothing is masked — the request is either blocked or passed through unchanged. Model responses are not scanned.
+- Bypass: `passthrough: true` / `fast_lane: true` body fields, or `x-cencori-passthrough: true` / `x-cencori-fast-lane: true` headers, skip the check on chat requests.
 
-If you test with synthetic PII or injections and get `200 OK` with unmasked data, check **Project > Security** first before assuming a provider-key (BYOK) issue.
+If you test with an email or card number and get `200 OK`, check whether PII protection is on for the project before assuming a provider-key (BYOK) issue.

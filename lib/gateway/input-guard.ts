@@ -5,8 +5,8 @@ import { triggerSecurityWebhook } from '@/lib/webhooks';
 import type { SubscriptionTier } from '@/lib/entitlements';
 import type { UnifiedMessage } from '@/lib/providers/base';
 import {
-    fetchAndProcessCustomRules,
     applyCustomRulesToUserMessages,
+    type CustomRulesPipelineResult,
 } from '@/lib/gateway/custom-rules';
 import type { GatewayGuardBlock, GatewayInputPipelineResult } from '@/lib/gateway/guard-types';
 import { enforcePolicies, applyPolicyRedactions, type PolicyRedaction } from '@/lib/governance/policy-enforcement';
@@ -33,30 +33,29 @@ async function logSecurityBlock(
     inputSecurity: SecurityCheckResult,
     inputText: string
 ) {
-    const severity = inputSecurity.riskScore > 0.8 ? 'critical' : 'high';
+    const description = `Blocked PII: ${inputSecurity.reasons.map((r) => r.replace(/^\[PII\] /, '')).join(', ')}`;
     const { error } = await supabase.from('security_incidents').insert({
         project_id: params.projectId,
         api_key_id: params.apiKeyId ?? null,
         environment: params.environment || 'production',
-        incident_type: inputSecurity.layer,
-        severity,
-        description: `Blocked ${inputSecurity.layer} attack: ${inputSecurity.reasons.join(', ')}`,
+        incident_type: 'pii_input',
+        severity: 'high',
+        description,
         input_text: inputText,
-        risk_score: Math.min(Math.max(inputSecurity.riskScore, 0), 1),
-        details: inputSecurity.details,
+        risk_score: 1,
         action_taken: 'blocked',
         end_user_id: params.endUserId ?? null,
         blocked_at: 'input',
-        detection_method: inputSecurity.layer,
+        detection_method: 'pii',
     });
     if (error) {
         console.error('[SECURITY] Failed to log incident:', error);
     }
 
     void triggerSecurityWebhook(params.projectId, {
-        incident_type: inputSecurity.layer,
-        severity,
-        description: `Blocked ${inputSecurity.layer} attack: ${inputSecurity.reasons.join(', ')}`,
+        incident_type: 'pii_input',
+        severity: 'high',
+        description,
         end_user_id: params.endUserId || undefined,
     });
 }
@@ -86,8 +85,10 @@ async function logCustomRuleBlock(
 }
 
 /**
- * Shared pre-provider pipeline: jailbreak/PII input scan + custom data rules.
+ * Shared pre-provider pipeline: opt-in PII protection on the input.
  * Used by /api/v1/chat/completions and /api/ai/chat (and other gateway routes).
+ * Custom data rules are retired (no project used them); the empty result keeps
+ * downstream consumers' shape without a per-request cache lookup.
  */
 export async function runGatewayInputPipeline(
     params: RunGatewayInputPipelineParams
@@ -95,18 +96,15 @@ export async function runGatewayInputPipeline(
     const lastUser = params.messages.slice().reverse().find((m) => m.role === 'user');
     const inputText = lastUser?.content || '';
 
-    const [securityConfig, customRules] = await Promise.all([
-        getProjectSecurityConfig(
-            params.supabase,
-            params.projectId,
-            params.tier
-        ),
-        fetchAndProcessCustomRules(
-            params.supabase,
-            params.projectId,
-            inputText
-        ),
-    ]);
+    const securityConfig = await getProjectSecurityConfig(
+        params.supabase,
+        params.projectId,
+        params.tier
+    );
+    const customRules: CustomRulesPipelineResult = {
+        rules: [],
+        inputResult: { content: inputText, wasProcessed: false, matchedRules: [], shouldBlock: false },
+    };
 
     const inputSecurity = checkInputSecurity(inputText, params.messages, securityConfig);
 
@@ -116,9 +114,9 @@ export async function runGatewayInputPipeline(
             ok: false,
             status: 403,
             code: 'security_violation',
-            message: 'Security violation detected',
+            message: 'Request contains personal data (PII)',
             assistantMessage:
-                'I cannot provide that information as it may contain sensitive data or violates our safety policies.',
+                'This request was blocked because it contains personal data such as an email, phone number or card number.',
             reasons: inputSecurity.reasons,
         };
         return block;
@@ -165,7 +163,6 @@ export async function runGatewayInputPipeline(
             region: params.region,
             content: inputText,
             signals: {
-                jailbreak_score: inputSecurity.details?.jailbreakCheck?.risk ?? inputSecurity.riskScore,
                 risk_score: inputSecurity.riskScore,
             },
             apiKeyId: params.apiKeyId,

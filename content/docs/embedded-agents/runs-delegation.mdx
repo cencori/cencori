@@ -29,13 +29,12 @@ per-run cost joined to ours.
 
 ## Safety boundary
 
-Prompt-injection scanning, content filtering, and the `safety` verdict apply
-to model calls routed through the Cencori gateway — including the memory
-write path, which drops override-language facts before they persist. A
-self-hosted runtime calling providers directly bypasses all of it: route
-agent inference through the gateway (or a project key with scanning enabled)
-to inherit input guards, output scanning, and per-response classification.
-Scanning is per-project opt-in — check it is enabled before pen-testing it.
+PII protection and the `safety` verdict apply to model calls routed through
+the Cencori gateway. Separately, the memory write path always drops
+override-language facts before they persist. A self-hosted runtime calling
+providers directly bypasses all of it: route agent inference through the
+gateway to inherit PII protection and per-response classification. PII
+protection is per-project opt-in — check it is on before testing it.
 
 `POST /v1/agents/:id/runs` is idempotent (`Idempotency-Key` scoped to your project; same key + different body is `409`). Suspended tenants accept no new runs. Poll `GET /v1/runs/:id`, page through the durable JSON event log at `GET .../events?after=`, and cancel with `POST .../cancel` — cancellation wins executor races via conditional claims and cascades to active child runs.
 

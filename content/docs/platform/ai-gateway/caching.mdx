@@ -1,75 +1,79 @@
 ---
-title: "Prompt Cache"
-description: "Reduce costs and latency with Exact and Semantic caching."
+title: "Response Caching"
+description: "Reuse stored responses for repeated chat requests instead of calling the model again. Off by default."
 section: "AI Gateway"
 order: 3
 ---
 
-Prompt Cache reduces AI costs by 30-60% and latency by 95%.
+Response caching returns a stored response when your project sends the same chat request again, instead of calling the model. A cache hit costs nothing and returns much faster.
 
-## How It Works
+Response caching is **off by default** and available on every plan.
 
-Exact Match uses Redis for instant hits under 10ms. Semantic Match uses pgvector for similar prompts.
+## Turn it on
 
-Request arrives, check exact cache. No exact hit, check semantic cache. No semantic hit, call provider and store response.
+1. Open your project and go to **Settings → General**.
+2. Under **Request handling**, turn on **Response caching**.
 
-## Features
+Turning it on uses these defaults:
 
-Exact Match is Redis-backed with SHA-256 hash of normalized prompt. Case-insensitive and whitespace-normalized.
+| Setting | Default |
+| :--- | :--- |
+| Exact matching | On |
+| Similar-request (semantic) matching | Off |
+| Time to live | 1 hour |
+| Highest cacheable temperature | 0.2 |
+| Maximum stored entries | 10,000 |
 
-Semantic Match uses text-embedding-004 with configurable threshold. Default is 0.95. Best for paraphrased prompts.
+The switch only turns caching on or off; it does not change these values. Projects that already had caching tuned keep their existing settings.
 
-Smart Temperature Handling caches only low-temperature responses. Default max_cacheable_temperature is 0.2. Higher temperatures are skipped.
+## When a request is cached
 
-Model Exclusion lets you exclude specific models like o3-mini, o1, and claude-sonnet-4.5.
+Caching applies to chat requests (`/v1/chat/completions` and the SDK's `chat`) when all of these are true:
 
-## Configuration
+- The request's `temperature` is at or below the highest cacheable temperature (0.2 by default). A request without a `temperature` counts as `0`.
+- The request has no `tools`.
+- The request does not use memory retrieval or knowledge bases.
+- The request is not sent with `passthrough` / `fast_lane`.
+- The request does not have the `x-skip-cache: true` header.
 
-Navigate to Project and then Cache in Settings.
+On the SDK's `chat`, only non-streaming requests without images are cached. On `/v1/chat/completions`, streaming requests are cached too (exact matching only), and requests to the `auto` / `cencori-auto` model are never cached.
 
-```json
-{
-  "cache_enabled": true,
-  "exact_match_enabled": true,
-  "semantic_match_enabled": true,
-  "ttl_seconds": 3600,
-  "similarity_threshold": 0.95,
-  "max_entries": 10000,
-  "excluded_models": ["o3-mini"],
-  "max_cacheable_temperature": 0.2
-}
+## How matching works
+
+**Exact matching** returns a stored response when the new request has the same model, temperature, max tokens, and messages (role and content, ignoring leading and trailing whitespace) as an earlier one in the same project.
+
+**Similar-request (semantic) matching** returns a stored response when a non-streaming request is close in meaning to an earlier one, above a similarity threshold (0.95 by default). It is off by default.
+
+Cached responses expire after the time to live (1 hour by default).
+
+## Checking for a cache hit
+
+Responses served from the cache carry these headers:
+
+| Header | Value |
+| :--- | :--- |
+| `X-Cencori-Cache` | `HIT` (exact match) or `SEMANTIC-HIT` (similar request) |
+| `X-Cache` | `HIT-EXACT` or `HIT-SEMANTIC` |
+| `X-Cache-Similarity` | Similarity score, on semantic hits |
+
+## Skipping the cache for one request
+
+Send the `x-skip-cache: true` header to always call the model:
+
+```bash
+curl https://api.cencori.com/v1/chat/completions \
+  -H "Authorization: Bearer $CENCORI_API_KEY" \
+  -H "x-skip-cache: true" \
+  -H "Content-Type: application/json" \
+  -d '{"model": "gpt-4o-mini", "messages": [{"role": "user", "content": "Hello"}]}'
 ```
 
-## Analytics
+## Legacy text completions
 
-Track Hit Rate, Tokens Saved, Cost Saved, and Active Entries. Time ranges include Last 1 Hour, Last 24 Hours, Last 7 Days, Last 30 Days.
+The legacy text completions endpoint (`/api/ai/completions`) keeps its own exact-match cache for non-streaming requests. It runs whether or not Response caching is on.
 
-## Examples
+## Best practices
 
-Enable Exact Match for production use:
-
-```typescript
-const response = await cencori.chat({
-  model: 'gpt-4o-mini',
-  messages: [{ role: 'user', content: 'Hello' }],
-  cache: { mode: 'exact' }
-});
-```
-
-Enable Semantic Match for cost savings:
-
-```typescript
-const response = await cencori.chat({
-  model: 'gpt-4o',
-  messages: [{ role: 'user', content: 'Summarize' }],
-  cache: { mode: 'semantic', threshold: 0.95 }
-});
-```
-
-## Best Practices
-
-Enable Exact Match first. Start with high threshold for semantic. Exclude reasoning models. Lower TTL for dynamic data.
-
-## Limits
-
-TTL is 1 hour default. Max entries is 10,000. Similarity threshold is 0.95. Max temperature is 0.2.
+- Use caching for repeated, deterministic requests (low temperature), such as classification or fixed prompts.
+- Keep system prompts and message structure stable so repeated requests match exactly.
+- Leave caching off for requests whose answer must reflect changing data.
