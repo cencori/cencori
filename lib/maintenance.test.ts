@@ -72,35 +72,49 @@ describe("maintenanceResponse", () => {
     expect(await maintenanceResponse(req("https://cencori.com/api/v1/health"))).toBeNull();
   });
 
-  it("lets the bypass token through by header and by cookie, not a wrong one", async () => {
+  it("lets the bypass cookie through, not a wrong one, and ignores the old header and query", async () => {
     row.current = { enabled: true, message: null, retry_after_seconds: 600 };
-    const { maintenanceResponse, MAINTENANCE_BYPASS_HEADER, MAINTENANCE_BYPASS_COOKIE } = await load();
+    const { maintenanceResponse, MAINTENANCE_BYPASS_COOKIE } = await load();
     expect(
       await maintenanceResponse(
-        req("https://cencori.com/api/projects/x", { headers: { [MAINTENANCE_BYPASS_HEADER]: "s3cret-token" } }),
-      ),
-    ).toBeNull();
-    expect(
-      await maintenanceResponse(
-        req("https://cencori.com/dashboard", { headers: { cookie: `${MAINTENANCE_BYPASS_COOKIE}=s3cret-token` } }),
+        req("https://cencori.com/api/projects/x", { headers: { cookie: `${MAINTENANCE_BYPASS_COOKIE}=s3cret-token` } }),
       ),
     ).toBeNull();
     const wrong = await maintenanceResponse(
-      req("https://cencori.com/dashboard", { headers: { [MAINTENANCE_BYPASS_HEADER]: "nope" } }),
+      req("https://cencori.com/dashboard", { headers: { cookie: `${MAINTENANCE_BYPASS_COOKIE}=nope` } }),
     );
     expect(wrong?.status).toBe(503);
+    const header = await maintenanceResponse(
+      req("https://cencori.com/api/projects/x", { headers: { "x-cencori-maintenance-bypass": "s3cret-token" } }),
+    );
+    expect(header?.status).toBe(503);
+    expect((await maintenanceResponse(req("https://cencori.com/?maintenance_bypass=s3cret-token")))?.status).toBe(503);
   });
 
-  it("sets the bypass cookie from the query parameter and strips it", async () => {
-    row.current = { enabled: true, message: null, retry_after_seconds: 600 };
-    const { maintenanceResponse, MAINTENANCE_BYPASS_COOKIE } = await load();
-    const res = await maintenanceResponse(req("https://cencori.com/dashboard?a=1&maintenance_bypass=s3cret-token"));
-    expect(res?.status).toBe(307);
-    expect(res?.headers.get("location")).toBe("https://cencori.com/dashboard?a=1");
-    expect(res?.cookies.get(MAINTENANCE_BYPASS_COOKIE)?.value).toBe("s3cret-token");
+  it("sets the bypass cookie from a POSTed token, even before the window", async () => {
+    const { maintenanceResponse, MAINTENANCE_BYPASS_COOKIE, MAINTENANCE_BYPASS_PATH } = await load();
+    const post = (token: string) =>
+      new NextRequest(new URL(`https://cencori.com${MAINTENANCE_BYPASS_PATH}`), {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: `token=${token}`,
+      });
+    const ok = await maintenanceResponse(post("s3cret-token"));
+    expect(ok?.status).toBe(204);
+    expect(ok?.cookies.get(MAINTENANCE_BYPASS_COOKIE)?.value).toBe("s3cret-token");
 
-    const bad = await maintenanceResponse(req("https://cencori.com/dashboard?maintenance_bypass=nope"));
+    const bad = await maintenanceResponse(post("nope"));
+    expect(bad?.status).toBe(403);
     expect(bad?.cookies.get(MAINTENANCE_BYPASS_COOKIE)).toBeUndefined();
+    expect((await maintenanceResponse(req(`https://cencori.com${MAINTENANCE_BYPASS_PATH}`)))?.status).toBe(405);
+  });
+
+  it("serves a page that turns a #maintenance_bypass link into that POST", async () => {
+    row.current = { enabled: true, message: null, retry_after_seconds: 600 };
+    const { maintenanceResponse, MAINTENANCE_BYPASS_PATH } = await load();
+    const html = await (await maintenanceResponse(req("https://cencori.com/dashboard")))!.text();
+    expect(html).toContain("maintenance_bypass=");
+    expect(html).toContain(`fetch("${MAINTENANCE_BYPASS_PATH}"`);
   });
 
   it("honours MAINTENANCE_MODE without reading the database", async () => {

@@ -67,7 +67,9 @@ function isLocalhostHost(host: string): boolean {
 
 export async function POST(req: NextRequest) {
     const secret = getInternalIngestSecret();
-    const receivedSecret = req.headers.get('x-cencori-internal-key');
+    // Bearer first: Brimble's request logs redact Authorization but keep custom headers.
+    const receivedSecret = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
+        || req.headers.get('x-cencori-internal-key');
 
     if (!secret) {
         console.error('[Web Logs Ingest] Missing WEB_LOG_INGEST_SECRET');

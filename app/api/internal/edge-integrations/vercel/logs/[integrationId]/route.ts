@@ -206,7 +206,11 @@ export async function POST(
         organizationId: integration.organization_id,
     });
 
-    if (!secretsMatch(req.headers.get('x-cencori-edge-secret'), expectedSecret)) {
+    // Drains created since the move to Brimble send the secret as a Bearer token (its request
+    // logs redact Authorization, not custom headers); older drains still send the header.
+    const receivedSecret = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
+        || req.headers.get('x-cencori-edge-secret');
+    if (!secretsMatch(receivedSecret, expectedSecret)) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
