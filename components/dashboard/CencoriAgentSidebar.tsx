@@ -543,7 +543,7 @@ export function CencoriAgentSidebar({
             inert={!open}
             className={cn(
                 "fixed inset-0 z-50 flex flex-col bg-background dark:bg-black",
-                "lg:inset-y-0 lg:left-auto lg:right-0 lg:z-40 lg:border-l lg:border-border/30",
+                "lg:inset-y-0 lg:top-[var(--maintenance-banner-height,0px)] lg:left-auto lg:right-0 lg:z-40 lg:border-l lg:border-border/30",
                 AGENT_PANEL_WIDTH_CLASS,
                 open ? "translate-x-0" : "pointer-events-none translate-x-full",
             )}

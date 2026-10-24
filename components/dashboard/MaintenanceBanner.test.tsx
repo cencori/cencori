@@ -59,22 +59,24 @@ describe("MaintenanceBanner", () => {
   it("announces an upcoming window and stays dismissed for it", async () => {
     const scheduled = { start: inMinutes(60 * 24), end: inMinutes(60 * 24 + 30) };
     const el = await renderWith({ enabled: false, scheduled });
-    expect(el.textContent).toContain("Scheduled maintenance:");
+    expect(el.textContent).toContain("Scheduled maintenance");
+    expect(document.documentElement.style.getPropertyValue("--maintenance-banner-height")).toBe("48px");
 
     await act(async () => {
       el.querySelector<HTMLButtonElement>('button[aria-label="Dismiss"]')!.click();
     });
     expect(el.textContent).toBe("");
+    expect(document.documentElement.style.getPropertyValue("--maintenance-banner-height")).toBe("");
     expect(localStorage.getItem("cencori:maintenance-banner-dismissed")).toBe(`${scheduled.start}|${scheduled.end}`);
   });
 
   it("says the window is under way once it has started", async () => {
     const el = await renderWith({ enabled: false, scheduled: { start: inMinutes(-5), end: inMinutes(25) } });
-    expect(el.textContent).toContain("Maintenance under way:");
+    expect(el.textContent).toContain("Maintenance under way");
   });
 
   it("reminds bypass holders that maintenance is on", async () => {
     const el = await renderWith({ enabled: true, scheduled: null });
-    expect(el.textContent).toContain("Maintenance mode is on.");
+    expect(el.textContent).toContain("Maintenance mode is on");
   });
 });
