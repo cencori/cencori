@@ -3,10 +3,10 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { BundledLanguage } from "shiki";
-import { AudioLines } from "lucide-react";
+import { AudioLines, X } from "lucide-react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import Chat01Icon from "@hugeicons/core-free-icons/Chat01Icon";
 import Copy01Icon from "@hugeicons/core-free-icons/Copy01Icon";
@@ -25,16 +25,26 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   ProjectOverviewCharts,
   type ProjectOverviewChartPoint,
   type ProjectOverviewStats,
 } from "@/components/dashboard/project-overview/ProjectOverviewDashboard";
 import { useEnvironment } from "@/lib/contexts/EnvironmentContext";
-import { formatCurrency } from "@/lib/currency";
 import { queryKeys, useProjectIdBySlug } from "@/lib/hooks/useQueries";
 import { getConsoleRoute } from "@/lib/console/routing";
+import {
+  RecentRequests,
+  useRecentRequests,
+  type RecentRequest,
+} from "@/components/dashboard/project-overview/RecentRequests";
+import {
+  ModelBreakdown,
+  useModelBreakdown,
+  type ModelBreakdownData,
+  type ModelBreakdownTrend,
+} from "@/components/dashboard/project-overview/ModelBreakdown";
+import { isFeatureGateError } from "@/lib/feature-gate-client";
 
 type LanguageId = "typescript" | "python" | "go" | "rust" | "php";
 type ModalityId = "chat" | "image" | "voice";
@@ -52,21 +62,6 @@ interface ModalityOption {
   id: ModalityId;
   label: string;
   docsHref: string;
-}
-
-interface MonetizationConfig {
-  end_user_billing_enabled: boolean;
-  customer_markup_percentage: number;
-  billing_cycle: "daily" | "weekly" | "monthly";
-  default_rate_plan_id: string | null;
-}
-
-interface MonetizationStats {
-  total_end_users: number;
-  active_end_users: number;
-  provider_cost_usd: number;
-  customer_revenue_usd: number;
-  margin_usd: number;
 }
 
 const MODALITIES: ModalityOption[] = [
@@ -436,9 +431,7 @@ export function DeveloperQuickstart({
   projectSlug,
 }: DeveloperQuickstartProps) {
   const pathname = usePathname();
-  const monetizationHref = getConsoleRoute(pathname)
-    ? "/monetization"
-    : `/${orgSlug}/${projectSlug}/monetization`;
+  const logsHref = getConsoleRoute(pathname) ? "/ai-gateway/logs" : `/${orgSlug}/${projectSlug}/ai-gateway/logs`;
   const queryClient = useQueryClient();
   const { environment } = useEnvironment();
   const { data: projectId, isLoading: projectLoading } = useProjectIdBySlug(
@@ -450,10 +443,30 @@ export function DeveloperQuickstart({
   const [promptCopied, setPromptCopied] = useState(false);
   const [showGenerateKeyDialog, setShowGenerateKeyDialog] = useState(false);
   const [chartPeriod, setChartPeriod] = useState("7d");
+  // Dismissing hides the quick start and agent prompt for this project in
+  // this browser. Read after mount so server and client render the same.
+  const quickstartDismissedKey = `cencori:quickstart-dismissed:${orgSlug}/${projectSlug}`;
+  const [quickstartDismissed, setQuickstartDismissed] = useState(false);
+  useEffect(() => {
+    try {
+      setQuickstartDismissed(window.localStorage.getItem(quickstartDismissedKey) === "1");
+    } catch {
+      setQuickstartDismissed(false);
+    }
+  }, [quickstartDismissedKey]);
+  const dismissQuickstart = () => {
+    setQuickstartDismissed(true);
+    try {
+      window.localStorage.setItem(quickstartDismissedKey, "1");
+    } catch {
+      // Storage unavailable (private window); the dismissal lasts this visit.
+    }
+  };
   const {
-    data: statsData,
+    data: statsQueryData,
     isLoading: statsLoading,
     isError: statsError,
+    isPlaceholderData: statsIsPlaceholder,
     refetch: refetchStats,
   } = useQuery<{
     stats: ProjectOverviewStats;
@@ -473,54 +486,53 @@ export function DeveloperQuickstart({
     placeholderData: (previousData) => previousData,
   });
   const {
-    data: monetizationConfig,
-    isLoading: monetizationConfigLoading,
-    isError: monetizationConfigError,
-    refetch: refetchMonetizationConfig,
-  } = useQuery<MonetizationConfig>({
-    queryKey: ["endUserBillingConfig", projectId],
-    queryFn: async () => {
-      const response = await fetch(`/api/projects/${projectId}/end-user-billing`);
-      if (!response.ok) throw new Error("Failed to load monetization configuration");
-      return response.json();
-    },
-    enabled: Boolean(projectId),
-    staleTime: 30 * 1000,
-  });
-  const monetizationEnabled =
-    monetizationConfig?.end_user_billing_enabled ?? false;
-  const {
-    data: monetizationStats,
-    isLoading: monetizationStatsLoading,
-    isError: monetizationStatsError,
-    refetch: refetchMonetizationStats,
-  } = useQuery<MonetizationStats>({
-    queryKey: ["endUserBillingStats", projectId, "30d"],
-    queryFn: async () => {
-      const response = await fetch(
-        `/api/projects/${projectId}/end-user-billing/stats?period=30d`,
-      );
-      if (!response.ok) throw new Error("Failed to load monetization metrics");
-      return response.json();
-    },
-    enabled: Boolean(projectId && monetizationEnabled),
-    staleTime: 30 * 1000,
-    refetchInterval: 30 * 1000,
-    placeholderData: (previousData) => previousData,
-  });
-  const monetizationLoading =
-    projectLoading ||
-    monetizationConfigLoading ||
-    (monetizationEnabled && monetizationStatsLoading && !monetizationStats);
-  const monetizationError =
-    monetizationConfigError ||
-    (monetizationEnabled && monetizationStatsError);
-  const monetizationMarginRate =
-    (monetizationStats?.customer_revenue_usd ?? 0) > 0
-      ? ((monetizationStats?.margin_usd ?? 0) /
-          (monetizationStats?.customer_revenue_usd ?? 1)) *
-        100
-      : 0;
+    data: requestsQueryData,
+    isError: requestsError,
+    isPlaceholderData: requestsIsPlaceholder,
+  } = useRecentRequests(projectId ?? undefined, chartPeriod);
+  const { overview: breakdownQuery, trends: breakdownTrendsQuery } = useModelBreakdown(
+    projectId ?? undefined,
+    chartPeriod,
+    environment,
+  );
+  const breakdownGated =
+    isFeatureGateError(breakdownQuery.error) || isFeatureGateError(breakdownTrendsQuery.error);
+
+  // Usage and requests share the period picker, so they swap in together:
+  // keep showing the last pair until both answers for the new period land
+  // (or fail), instead of whichever request finishes first jumping ahead.
+  const [shownUsage, setShownUsage] = useState<{
+    stats: typeof statsQueryData;
+    requests: RecentRequest[] | undefined;
+    breakdown: ModelBreakdownData | undefined;
+    breakdownTrends: ModelBreakdownTrend[];
+    breakdownGroupBy: "10min" | "hour" | "day" | undefined;
+  } | null>(null);
+  const statsSettled = (statsQueryData !== undefined && !statsIsPlaceholder) || statsError;
+  const requestsSettled = (requestsQueryData !== undefined && !requestsIsPlaceholder) || requestsError;
+  const breakdownSettled =
+    ((breakdownQuery.data !== undefined && !breakdownQuery.isPlaceholderData) || breakdownQuery.isError)
+    && ((breakdownTrendsQuery.data !== undefined && !breakdownTrendsQuery.isPlaceholderData) || breakdownTrendsQuery.isError);
+  useEffect(() => {
+    if (statsSettled && requestsSettled && breakdownSettled) {
+      setShownUsage({
+        stats: statsQueryData,
+        requests: requestsQueryData?.requests,
+        breakdown: breakdownQuery.data,
+        breakdownTrends: breakdownTrendsQuery.data?.trends ?? [],
+        breakdownGroupBy: breakdownTrendsQuery.data?.group_by,
+      });
+    }
+  }, [
+    statsSettled,
+    requestsSettled,
+    breakdownSettled,
+    statsQueryData,
+    requestsQueryData,
+    breakdownQuery.data,
+    breakdownTrendsQuery.data,
+  ]);
+  const statsData = shownUsage?.stats;
   const active = LANGUAGES.find((language) => language.id === activeLanguage) ?? LANGUAGES[0];
   const activeModalityOption =
     MODALITIES.find((modality) => modality.id === activeModality) ?? MODALITIES[0];
@@ -554,14 +566,28 @@ Instructions:
   };
 
   return (
-    <section className="mx-auto w-full max-w-[980px] px-4 pb-16 pt-10 sm:px-6 sm:pt-14 lg:px-8 lg:pb-24 lg:pt-20">
-      <header className="mb-6">
-        <h1 className="text-[2rem] font-medium leading-none tracking-[-0.055em]">
-          Quick start
-        </h1>
-        <p className="mt-3 max-w-[60ch] text-xs leading-5 text-muted-foreground">
-          Choose your language and make your first request through Cencori.
-        </p>
+    <section className="mx-auto w-full max-w-[1180px] px-4 pb-4 pt-2 sm:px-6 sm:pt-4 lg:px-8 lg:pb-6 lg:pt-6">
+      {!quickstartDismissed && (
+      <>
+      <header className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-[2rem] font-medium leading-none tracking-[-0.055em]">
+            Quick start
+          </h1>
+          <p className="mt-3 max-w-[60ch] text-xs leading-5 text-muted-foreground">
+            Choose your language and make your first request through Cencori.
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={dismissQuickstart}
+          className="h-7 shrink-0 px-2 text-xs text-muted-foreground"
+        >
+          <X className="mr-1 h-3 w-3" />
+          Dismiss
+        </Button>
       </header>
 
       <div className="flex h-[30rem] flex-col overflow-hidden rounded-xl border border-border/60 bg-[#f3f3f1] shadow-[0_24px_80px_rgba(0,0,0,0.12)] dark:bg-[#111111]">
@@ -728,8 +754,10 @@ Instructions:
           </div>
         </div>
       </section>
+      </>
+      )}
 
-      <section className="mt-8" aria-labelledby="project-usage-heading">
+      <section className={quickstartDismissed ? undefined : "mt-8"} aria-labelledby="project-usage-heading">
         <div className="mb-4 flex items-center justify-between gap-4">
           <h2
             id="project-usage-heading"
@@ -777,141 +805,24 @@ Instructions:
           stats={statsData?.stats ?? null}
           chartData={statsData?.chartData ?? []}
           period={chartPeriod}
-          loading={projectLoading || (statsLoading && !statsData)}
+          loading={projectLoading || !shownUsage || (statsLoading && !statsData)}
         />
-      </section>
 
-      <section className="mt-8" aria-labelledby="project-monetization-heading">
-        <div className="mb-4 flex items-center justify-between gap-4">
-          <h2
-            id="project-monetization-heading"
-            className="text-sm font-medium tracking-[-0.02em]"
-          >
-            Monetization
-          </h2>
-          <Link
-            href={monetizationHref}
-            className="text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-          >
-            Open monetization <span aria-hidden="true">↗</span>
-          </Link>
-        </div>
+        <ModelBreakdown
+          data={shownUsage?.breakdown}
+          trends={shownUsage?.breakdownTrends ?? []}
+          groupBy={shownUsage?.breakdownGroupBy}
+          loading={projectLoading || !shownUsage}
+          gated={breakdownGated || (breakdownQuery.isError && !shownUsage?.breakdown)}
+        />
 
-        <div className="overflow-hidden rounded-xl bg-[#f3f3f1] ring-1 ring-inset ring-black/[0.05] dark:bg-[#111111] dark:ring-white/[0.045]">
-          {monetizationLoading ? (
-            <div className="grid gap-px bg-border/40 p-px sm:grid-cols-2 lg:grid-cols-4">
-              {Array.from({ length: 4 }).map((_, index) => (
-                <div key={index} className="bg-[#f3f3f1] p-5 dark:bg-[#111111]">
-                  <Skeleton className="h-3 w-24 rounded-sm" />
-                  <Skeleton className="mt-4 h-8 w-28 rounded-sm" />
-                  <Skeleton className="mt-3 h-3 w-20 rounded-sm" />
-                </div>
-              ))}
-            </div>
-          ) : monetizationError ? (
-            <div className="flex min-h-[12rem] flex-col items-center justify-center px-6 text-center">
-              <p className="text-sm font-medium">Monetization is unavailable</p>
-              <p className="mt-2 max-w-[42ch] text-[11px] leading-5 text-muted-foreground">
-                Cencori couldn&apos;t load this project&apos;s billing state.
-              </p>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="mt-4 h-7 px-3 text-[11px]"
-                onClick={() => {
-                  void refetchMonetizationConfig();
-                  if (monetizationEnabled) void refetchMonetizationStats();
-                }}
-              >
-                Try again
-              </Button>
-            </div>
-          ) : !monetizationEnabled ? (
-            <div className="flex min-h-[14rem] flex-col items-center justify-center px-6 text-center">
-              <span className="rounded-md border border-border/45 bg-muted/40 px-2 py-1 font-mono text-[9px] uppercase tracking-[0.12em] text-muted-foreground">
-                Not enabled
-              </span>
-              <p className="mt-5 text-sm font-medium tracking-[-0.015em]">
-                Turn AI usage into customer revenue
-              </p>
-              <p className="mt-2 max-w-[48ch] text-[11px] leading-5 text-muted-foreground">
-                Meter customer usage, apply pricing and quotas, then invoice through Stripe or your existing billing system.
-              </p>
-              <Button
-                asChild
-                className="mt-5 h-7 rounded-md bg-foreground px-3 text-[11px] font-medium text-background hover:bg-foreground/90"
-              >
-                <Link href={monetizationHref}>
-                  Configure monetization
-                </Link>
-              </Button>
-            </div>
-          ) : (
-            <>
-              <div className="grid sm:grid-cols-2 lg:grid-cols-4">
-                {[
-                  {
-                    label: "Customer revenue",
-                    value: formatCurrency(monetizationStats?.customer_revenue_usd ?? 0),
-                    detail: "Gross usage revenue",
-                  },
-                  {
-                    label: "Provider cost",
-                    value: formatCurrency(monetizationStats?.provider_cost_usd ?? 0),
-                    detail: "Underlying AI spend",
-                  },
-                  {
-                    label: "Margin",
-                    value: formatCurrency(monetizationStats?.margin_usd ?? 0),
-                    detail: `${monetizationMarginRate.toFixed(1)}% of revenue`,
-                  },
-                  {
-                    label: "Active customers",
-                    value: (monetizationStats?.active_end_users ?? 0).toLocaleString(),
-                    detail: `${(monetizationStats?.total_end_users ?? 0).toLocaleString()} total customers`,
-                  },
-                ].map((metric) => (
-                  <article
-                    key={metric.label}
-                    className="border-b border-black/[0.055] p-5 last:border-b-0 dark:border-white/[0.055] sm:[&:nth-child(odd)]:border-r sm:[&:nth-last-child(-n+2)]:border-b-0 lg:border-b-0 lg:border-r lg:last:border-r-0"
-                  >
-                    <p className="text-[10px] font-medium text-muted-foreground">
-                      {metric.label}
-                    </p>
-                    <p className="mt-3 font-mono text-xl font-medium tracking-[-0.04em] tabular-nums">
-                      {metric.value}
-                    </p>
-                    <p className="mt-2 text-[9px] text-muted-foreground">
-                      {metric.detail}
-                    </p>
-                  </article>
-                ))}
-              </div>
-
-              <dl className="grid border-t border-black/[0.055] text-[10px] dark:border-white/[0.055] sm:grid-cols-3">
-                <div className="flex items-center justify-between gap-4 border-b border-black/[0.055] px-5 py-3 dark:border-white/[0.055] sm:border-b-0 sm:border-r">
-                  <dt className="text-muted-foreground">Billing cycle</dt>
-                  <dd className="font-medium capitalize">
-                    {monetizationConfig?.billing_cycle ?? "monthly"}
-                  </dd>
-                </div>
-                <div className="flex items-center justify-between gap-4 border-b border-black/[0.055] px-5 py-3 dark:border-white/[0.055] sm:border-b-0 sm:border-r">
-                  <dt className="text-muted-foreground">Default markup</dt>
-                  <dd className="font-mono font-medium tabular-nums">
-                    {(monetizationConfig?.customer_markup_percentage ?? 0).toFixed(1)}%
-                  </dd>
-                </div>
-                <div className="flex items-center justify-between gap-4 px-5 py-3">
-                  <dt className="text-muted-foreground">Default plan</dt>
-                  <dd className="font-medium">
-                    {monetizationConfig?.default_rate_plan_id ? "Assigned" : "Not assigned"}
-                  </dd>
-                </div>
-              </dl>
-            </>
-          )}
-        </div>
+        <RecentRequests
+          projectId={projectId ?? undefined}
+          logsHref={logsHref}
+          requests={shownUsage?.requests ?? []}
+          loading={projectLoading || !shownUsage}
+          error={requestsError && !shownUsage?.requests}
+        />
       </section>
     </section>
   );

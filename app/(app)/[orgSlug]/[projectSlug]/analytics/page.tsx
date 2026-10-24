@@ -24,7 +24,7 @@ export default async function AnalyticsRedirectPage({ params, searchParams }: Pa
         }
     }
 
-    const destination = `/${orgSlug}/${projectSlug}/observability`;
+    const destination = `/${orgSlug}/${projectSlug}/ai-gateway`;
     const queryString = query.toString();
 
     redirect(queryString ? `${destination}?${queryString}` : destination);

@@ -22,7 +22,6 @@ import {
   Home,
   Plus,
   FileText,
-  Cpu,
   Lock,
   Building2,
   ChevronRight,
@@ -339,11 +338,11 @@ export function CommandPalette({
             keywords: ["token", "secret", "credentials", "key"],
           },
           {
-            id: "project-observability",
-            label: "Observability",
+            id: "project-usage",
+            label: "Usage",
             icon: <ObservabilityIcon className="h-3.5 w-3.5" />,
             action: () => navigate(
-              consoleMode ? "/observability" : `/${orgSlug}/${projectSlug}/observability`,
+              consoleMode ? "/ai-gateway" : `/${orgSlug}/${projectSlug}/ai-gateway`,
             ),
             keywords: [
               "observability",
@@ -360,18 +359,18 @@ export function CommandPalette({
             label: "Request Logs",
             icon: <ScrollText className="h-3.5 w-3.5" />,
             action: () => navigate(
-              consoleMode ? "/logs" : `/${orgSlug}/${projectSlug}/logs`,
+              consoleMode ? "/ai-gateway/logs" : `/${orgSlug}/${projectSlug}/ai-gateway/logs`,
             ),
             keywords: ["history", "requests", "debug", "trace"],
           },
           {
-            id: "security",
-            label: "Security",
+            id: "pii-protection",
+            label: "PII protection",
             icon: <ShieldCheckIcon className="h-3.5 w-3.5" />,
             action: () => navigate(
-              consoleMode ? "/security" : `/${orgSlug}/${projectSlug}/security`,
+              consoleMode ? "/settings" : `/${orgSlug}/${projectSlug}/settings`,
             ),
-            keywords: ["protection", "firewall", "rules", "safety"],
+            keywords: ["security", "pii", "personal data", "privacy", "safety"],
           },
           {
             id: "project-settings",
@@ -421,15 +420,6 @@ export function CommandPalette({
             icon: <ChartBarIcon className="h-3.5 w-3.5" />,
             action: () => navigate(consoleMode ? "/usage" : `/${orgSlug}/~/usage`),
             keywords: ["stats", "metrics", "usage"],
-          },
-          {
-            id: "providers",
-            label: "AI Providers",
-            icon: <Cpu className="h-3.5 w-3.5" />,
-            action: () => navigate(
-              consoleMode ? "/organization/providers" : `/${orgSlug}/~/providers`,
-            ),
-            keywords: ["openai", "anthropic", "claude", "gpt", "models"],
           },
           {
             id: "teams",
