@@ -38,7 +38,7 @@ interface Props {
     icon: IconSvgElement;
     /** Path segment appended after the project slug — e.g. "logs" produces
      *  `/{org}/{project}/logs`. Can include nested segments like
-     *  "ai-gateway/prompts". */
+     *  "ai-gateway/models". */
     destinationSuffix: string;
     /** Body copy shown in the empty state, when the org has no projects. */
     emptyStateBody: string;

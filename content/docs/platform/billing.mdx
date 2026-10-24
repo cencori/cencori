@@ -41,7 +41,7 @@ managed: provider_cost = cencori_charge_usd
 BYOK: cencori_charge_usd = 0
 ```
 
-The provider cost uses the configured model rate and reported usage. If you enable Monetization, your own end-user rate-plan markup is separate from this Cencori usage charge.
+The provider cost uses the configured model rate and reported usage. If you use [Revenue](/docs/platform/monetization) to bill your customers, the markup in your plans is separate from this Cencori usage charge.
 
 See [Credits System](/docs/platform/credits) for top-up and wallet details.
 
@@ -64,6 +64,6 @@ See [Bring Your Own Key (BYOK)](/docs/platform/byok).
 
 ## Where to Track Costs
 
-- Billing page (org-level balance and transactions)
-- Project logs and observability views
+- **Organization settings → Billing** (org-level balance and transactions)
+- **AI Gateway** overview and **AI Gateway → Logs** for each project
 - Request-level cost fields (`provider_cost_usd`, `cencori_charge_usd`, `markup_percentage`)

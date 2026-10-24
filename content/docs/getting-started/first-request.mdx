@@ -69,7 +69,7 @@ await cencori.ai.chat({ model: 'claude-sonnet-4.5', messages: [...] });
 await cencori.ai.chat({ model: 'gemini-2.5-flash', messages: [...] });
 ```
 
-If switching models returns a provider configuration error, add that provider in **Project > Providers** or choose a model from a provider already configured for the project.
+If switching models returns a provider configuration error, add that provider in **AI Gateway → BYOK** or choose a model from a provider already configured for the project.
 
 ## Direct cURL Check
 
@@ -89,10 +89,10 @@ curl https://cencori.com/api/ai/chat \
 
 After making requests, view them in your [dashboard](/dashboard):
 
-1. Navigate to the Logs tab
+1. Open **AI Gateway → Logs**
 2. See full request/response details
 3. Check token usage and costs
-4. View security scan results (only if you enabled scanning in Project > Security or added a policy/rule)
+4. See requests blocked by PII protection as **Filtered** (only if you turned PII protection on)
 
 ## Next Steps
 

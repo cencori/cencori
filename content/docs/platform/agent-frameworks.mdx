@@ -15,7 +15,7 @@ Cencori solves this by sitting between your agent and the LLM:
 - **Full observability:** See every request, token count, and cost
 - **Automatic failover:** If OpenAI is down, route to Anthropic
 - **Rate limiting:** Prevent runaway agents from burning your budget
-- **Security scanning:** Block prompt injection and unsafe outputs
+- **PII protection (opt-in):** Block requests that contain personal data
 - **Multi-provider:** Use any model from any provider
 
 ## How It Works
@@ -185,7 +185,7 @@ Once your agent is routing through Cencori, you get:
 | **Full Observability** | Every LLM call logged with tokens, cost, latency, and full request/response. |
 | **Cost Tracking** | Real-time spend tracking per agent, per task, per user. |
 | **Automatic Failover** | If OpenAI is down, automatically route to Anthropic or Gemini. |
-| **Opt-in Security Scanning** | Block prompt injection and PII on inputs after enabling **Project > Security**. Output blocking needs a governance policy or custom rule. |
+| **Opt-in PII Protection** | Block requests that contain personal data after turning on **PII protection** in the project's **Settings → General**. |
 
 ## Troubleshooting
 
@@ -199,6 +199,6 @@ Ensure you have the provider configured in your [AI Providers settings](/docs/ai
 Cencori fully supports streaming. Make sure your framework is configured to use `stream=True`.
 
 ## Next Steps
-- [Configure security policies for agents](/docs/security/content-filtering)
+- [Turn on PII protection for agents](/docs/security/pii-detection)
 - [Set up rate limits to prevent runaway costs](/docs/platform/ai-gateway/rate-limiting)
 - [Configure automatic failover](/docs/ai/failover)

@@ -105,8 +105,8 @@ export function AuditInfrastructureSettings({
                 </div>
 
                 <Button asChild size="sm" className="h-7 self-start px-3 text-xs">
-                    <Link href={isEnterprise ? `/${orgSlug}/~/governance` : "/contact/sales"}>
-                        {isEnterprise ? "Open governance" : "Talk to enterprise"}
+                    <Link href={isEnterprise ? `/${orgSlug}/~/audit-log` : "/contact/sales"}>
+                        {isEnterprise ? "Open audit log" : "Talk to enterprise"}
                     </Link>
                 </Button>
             </div>

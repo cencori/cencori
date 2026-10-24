@@ -14,7 +14,6 @@ import {
     SidebarMenuItem,
     SidebarMenuButton,
     SidebarGroup,
-    SidebarSeparator,
     SidebarFooter,
 } from "@/components/ui/sidebar";
 import {
@@ -27,28 +26,22 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Book, ArrowUpRight, HelpCircle, Wrench, Activity, Mail, FileText, Check, ChevronsUpDown, ChevronLeft, ChevronRight, Plus, Search, Command } from "lucide-react";
 import DashboardCircleIcon from "@hugeicons/core-free-icons/DashboardCircleIcon";
-import Analytics01Icon from "@hugeicons/core-free-icons/Analytics01Icon";
-import Activity03Icon from "@hugeicons/core-free-icons/Activity03Icon";
 import DiscoverSquareIcon from "@hugeicons/core-free-icons/DiscoverSquareIcon";
-import AiLockIcon from "@hugeicons/core-free-icons/AiLockIcon";
 import BrainIcon from "@hugeicons/core-free-icons/BrainIcon";
 import ThreeDRotateIcon from "@hugeicons/core-free-icons/ThreeDRotateIcon";
-import CreditCardAcceptIcon from "@hugeicons/core-free-icons/CreditCardAcceptIcon";
 import Settings02Icon from "@hugeicons/core-free-icons/Settings02Icon";
 import Configuration02Icon from "@hugeicons/core-free-icons/Configuration02Icon";
-import AiChat01Icon from "@hugeicons/core-free-icons/AiChat01Icon";
-import AiCloudIcon from "@hugeicons/core-free-icons/AiCloudIcon";
-import AiChipIcon from "@hugeicons/core-free-icons/AiChipIcon";
 import ThreeDMoveIcon from "@hugeicons/core-free-icons/ThreeDMoveIcon";
-import AiSettingIcon from "@hugeicons/core-free-icons/AiSettingIcon";
-import Blockchain03Icon from "@hugeicons/core-free-icons/Blockchain03Icon";
-import AiChemistry01Icon from "@hugeicons/core-free-icons/AiChemistry01Icon";
+import GameController03Icon from "@hugeicons/core-free-icons/GameController03Icon";
+import LeftToRightListDashIcon from "@hugeicons/core-free-icons/LeftToRightListDashIcon";
+import KeySquareIcon from "@hugeicons/core-free-icons/KeySquareIcon";
+import BadgeDollarSignIcon from "@hugeicons/core-free-icons/BadgeDollarSignIcon";
+import Blockchain01Icon from "@hugeicons/core-free-icons/Blockchain01Icon";
 import DollarCircleIcon from "@hugeicons/core-free-icons/DollarCircleIcon";
 import Chart01Icon from "@hugeicons/core-free-icons/Chart01Icon";
 import Loading03Icon from "@hugeicons/core-free-icons/Loading03Icon";
 import UserMultipleIcon from "@hugeicons/core-free-icons/UserMultipleIcon";
 import DocumentValidationIcon from "@hugeicons/core-free-icons/DocumentValidationIcon";
-import Building03Icon from "@hugeicons/core-free-icons/Building03Icon";
 import { useMobileSheet } from "@/lib/contexts/MobileSheetContext";
 import { useSession } from "@/lib/contexts/SessionContext";
 import { isAuthExpiredError } from "@/lib/auth/auth-errors";
@@ -124,6 +117,11 @@ function useOrganization(orgSlug: string) {
             return failureCount < 1;
         },
     });
+}
+
+// Revenue (formerly Monetization) keeps its own URL but belongs to the AI Gateway sub-nav.
+function isAiGatewayPath(pathname: string): boolean {
+    return pathname.includes("/ai-gateway") || /\/(revenue|monetization|end-user-billing)(\/|$)/.test(pathname);
 }
 
 export default function OrganizationLayoutClient({
@@ -214,12 +212,15 @@ export default function OrganizationLayoutClient({
     );
     // An integration's own page sits under Settings → Integrations.
     const isIntegrationPage = isProjectSettingsView && pathname.includes("/settings/integrations/");
-    const isOrganizationSettingsView = !isInsideProject && (
-        consoleMode ? pathname === "/organization/settings" : scopedArea === "settings"
-    );
-    const [activeView, setActiveView] = useState<"main" | "observability" | "ai-gateway" | "project-settings" | "settings">(() => {
-        if (pathname.includes("/observability")) return "observability";
-        if (pathname.includes("/ai-gateway")) return "ai-gateway";
+    // Teams, billing, usage and the audit log live under organization settings, so the
+    // settings sub-nav stays open on those pages too.
+    const organizationSettingsArea = consoleMode
+        ? (pathname === "/organization/settings" ? "settings" : pathname.split("/")[1])
+        : scopedArea;
+    const isOrganizationSettingsView = !isInsideProject
+        && ["settings", "teams", "billing", "usage", "audit-log"].includes(organizationSettingsArea ?? "");
+    const [activeView, setActiveView] = useState<"main" | "ai-gateway" | "project-settings" | "settings">(() => {
+        if (isAiGatewayPath(pathname)) return "ai-gateway";
         if (isProjectSettingsView) return "project-settings";
         if (isOrganizationSettingsView) return "settings";
         return "main";
@@ -272,9 +273,6 @@ export default function OrganizationLayoutClient({
         consoleMode ? `/${subpath}` : `${orgBase}/${scopeProjectSlug}/${subpath}`;
     const orgProductHref = (subpath: string) =>
         consoleMode ? `/organization/${subpath}` : `${orgBase}/~/${subpath}`;
-    const observabilityHref = scopeProjectSlug
-        ? scopedProjectHref("observability")
-        : orgProductHref("observability");
     const aiGatewayHref = scopeProjectSlug ? scopedProjectHref("ai-gateway") : orgProductHref("ai-gateway");
     // The sidebar Settings entry has one stable meaning: settings for the
     // selected project. Organization settings are entered deliberately from
@@ -283,16 +281,10 @@ export default function OrganizationLayoutClient({
     const settingsHref = consoleMode
         ? "/settings"
         : (scopeProjectSlug ? `${orgBase}/${scopeProjectSlug}/settings` : `${orgBase}/~/projects`);
-    const rawObservabilitySection = pathname.includes("/observability")
-        ? searchParams.get("section")
-        : null;
-    const observabilitySection = pendingSubnavEntry === "observability"
-        ? "overview"
-        : rawObservabilitySection === "http" || rawObservabilitySection === "api" || rawObservabilitySection === "web"
-        ? "overview"
-        : rawObservabilitySection || "overview";
     const organizationSettingsSection = pendingSubnavEntry === "settings"
         ? "general"
+        : organizationSettingsArea === "teams" || organizationSettingsArea === "billing" || organizationSettingsArea === "usage" || organizationSettingsArea === "audit-log"
+        ? organizationSettingsArea
         : searchParams.get("section") === "advanced" ? "advanced" : "general";
     const requestedProjectSettingsTab = searchParams.get("tab");
     // Local tab switches (sidebar → settings page event + replaceState) don't
@@ -360,9 +352,7 @@ export default function OrganizationLayoutClient({
     useEffect(() => {
         setPendingSubnavEntry(null);
         setPendingSettingsTab(null);
-        if (pathname.includes("/observability")) {
-            setActiveView("observability");
-        } else if (pathname.includes("/ai-gateway")) {
+        if (isAiGatewayPath(pathname)) {
             setActiveView("ai-gateway");
         } else if (isProjectSettingsView) {
             setActiveView("project-settings");
@@ -377,10 +367,9 @@ export default function OrganizationLayoutClient({
     // Warm their default pages while the shell is idle so one click can reveal
     // the submenu and its Overview/General page as a single, immediate action.
     useEffect(() => {
-        router.prefetch(observabilityHref);
         router.prefetch(aiGatewayHref);
         router.prefetch(settingsHref);
-    }, [aiGatewayHref, observabilityHref, router, settingsHref]);
+    }, [aiGatewayHref, router, settingsHref]);
 
     // Transient/network errors keep the last-good dashboard on screen; the
     // global ConnectivityWatcher tells the user to reconnect, and React Query
@@ -402,12 +391,12 @@ export default function OrganizationLayoutClient({
 
     // Layout groups (top → bottom):
     //   1. overviewItem                  — selected project's Overview
-    //   2. Observability toggle           — expands to observabilitySubItems
-    //   3. projectItems                  — Logs
+    //   2. (Observability folded into the AI Gateway overview)
+    //   3. (Logs moved under AI Gateway — logsItem)
     //   ── separator ──
     //   4. AI Gateway toggle             — expands to projectSubItems
-    //   5. projectSecondaryItems         — Security, Memory, Agents, Monetization, Deployments
-    //   6. orgItems                      — Billing, Usage, Teams, Audit Log
+    //   5. AI Gateway toggle, Agents, Memory, Deployments
+    //   6. (Teams, Billing, Usage, Audit Log sit under org Settings)
     //   7. bottomItems                   — Settings (fixed final position in every scope)
 
     const overviewItem = {
@@ -418,61 +407,41 @@ export default function OrganizationLayoutClient({
         label: "Overview",
     };
 
-    const observabilityItem = {
-        href: observabilityHref,
-        icon: <HugeiconsIcon icon={Analytics01Icon} className="!h-5 !w-5" />,
-        label: "Observability",
+
+    // Gateway request logs live under AI Gateway; the top level stays free
+    // for platform-wide logs (deployments, runtimes) later.
+    const logsItem = {
+        href: scopeProjectSlug ? scopedProjectHref("ai-gateway/logs") : orgProductHref("ai-gateway/logs"),
+        icon: <HugeiconsIcon icon={LeftToRightListDashIcon} className="!h-5 !w-5" />,
+        label: "Logs",
     };
 
-    const projectItems = [
-        {
-            href: scopeProjectSlug ? scopedProjectHref("logs") : orgProductHref("logs"),
-            icon: <HugeiconsIcon icon={Activity03Icon} className="!h-5 !w-5" />,
-            label: "Logs",
-        },
-    ];
-
-    const observabilitySubItems = [
-        { section: "overview", href: observabilityHref, icon: <HugeiconsIcon icon={DashboardCircleIcon} className="!h-5 !w-5" />, label: "Overview" },
-        { section: "ai", href: `${observabilityHref}?section=ai`, icon: <HugeiconsIcon icon={AiChipIcon} className="!h-5 !w-5" />, label: "AI" },
-        { section: "reliability", href: `${observabilityHref}?section=reliability`, icon: <HugeiconsIcon icon={Activity03Icon} className="!h-5 !w-5" />, label: "Reliability" },
-        { section: "security", href: `${observabilityHref}?section=security`, icon: <HugeiconsIcon icon={AiLockIcon} className="!h-5 !w-5" />, label: "Security" },
-        { section: "intelligence", href: `${observabilityHref}?section=intelligence`, icon: <HugeiconsIcon icon={AiChemistry01Icon} className="!h-5 !w-5" />, label: "Intelligence" },
-    ];
 
     const projectSubItems = [
         { href: aiGatewayHref, icon: <HugeiconsIcon icon={DashboardCircleIcon} className="!h-5 !w-5" />, label: "Overview" },
-        { href: scopeProjectSlug ? scopedProjectHref("ai-gateway/prompts") : orgProductHref("ai-gateway/prompts"), icon: <HugeiconsIcon icon={AiChat01Icon} className="!h-5 !w-5" />, label: "Prompts" },
-        { href: scopeProjectSlug ? scopedProjectHref("ai-gateway/providers") : orgProductHref("ai-gateway/providers"), icon: <HugeiconsIcon icon={AiCloudIcon} className="!h-5 !w-5" />, label: "BYOK" },
-        { href: scopeProjectSlug ? scopedProjectHref("ai-gateway/models") : orgProductHref("ai-gateway/models"), icon: <HugeiconsIcon icon={AiChipIcon} className="!h-5 !w-5" />, label: "Models" },
-        { href: scopeProjectSlug ? scopedProjectHref("ai-gateway/custom-providers") : orgProductHref("ai-gateway/custom-providers"), icon: <HugeiconsIcon icon={AiSettingIcon} className="!h-5 !w-5" />, label: "Custom Providers" },
-        { href: scopeProjectSlug ? scopedProjectHref("ai-gateway/cache") : orgProductHref("ai-gateway/cache"), icon: <HugeiconsIcon icon={Blockchain03Icon} className="!h-5 !w-5" />, label: "Cache" },
-        { href: scopeProjectSlug ? scopedProjectHref("ai-gateway/playground") : orgProductHref("ai-gateway/playground"), icon: <HugeiconsIcon icon={AiChemistry01Icon} className="!h-5 !w-5" />, label: "Playground" },
+        logsItem,
+        { href: scopeProjectSlug ? scopedProjectHref("ai-gateway/providers") : orgProductHref("ai-gateway/providers"), icon: <HugeiconsIcon icon={KeySquareIcon} className="!h-5 !w-5" />, label: "BYOK" },
+        { href: scopeProjectSlug ? scopedProjectHref("ai-gateway/models") : orgProductHref("ai-gateway/models"), icon: <HugeiconsIcon icon={Blockchain01Icon} className="!h-5 !w-5" />, label: "Models" },
+        { href: scopeProjectSlug ? scopedProjectHref("ai-gateway/playground") : orgProductHref("ai-gateway/playground"), icon: <HugeiconsIcon icon={GameController03Icon} className="!h-5 !w-5" />, label: "Playground" },
+        { href: scopeProjectSlug ? scopedProjectHref("revenue") : orgProductHref("revenue"), icon: <HugeiconsIcon icon={BadgeDollarSignIcon} className="!h-5 !w-5" />, label: "Revenue" },
     ];
 
-    const projectSecondaryItems = [
-        { href: scopeProjectSlug ? scopedProjectHref("security") : orgProductHref("security"), icon: <HugeiconsIcon icon={AiLockIcon} className="!h-5 !w-5" />, label: "Security" },
+    // Main sidebar groups. AI Gateway (a sub-menu toggle) leads BUILD.
+    const buildItems = [
+        { href: scopeProjectSlug ? scopedProjectHref("agents") : orgProductHref("agents"), icon: <HugeiconsIcon icon={ThreeDRotateIcon} className="!h-5 !w-5" />, label: "Agents" },
         // Memory belongs to the selected project, so keep it available while an
         // organization-level page is open instead of reshaping the sidebar.
         ...(scopeProjectSlug
             ? [{ href: consoleMode ? "/memory" : `${orgBase}/${scopeProjectSlug}/memory`, icon: <HugeiconsIcon icon={BrainIcon} className="!h-5 !w-5" />, label: "Memory" }]
             : []),
-        { href: scopeProjectSlug ? scopedProjectHref("agents") : orgProductHref("agents"), icon: <HugeiconsIcon icon={ThreeDRotateIcon} className="!h-5 !w-5" />, label: "Agents" },
-        { href: scopeProjectSlug ? scopedProjectHref("monetization") : orgProductHref("monetization"), icon: <HugeiconsIcon icon={CreditCardAcceptIcon} className="!h-5 !w-5" />, label: "Monetization" },
-        // Deployments stays attached to the selected project for the same stable
-        // project → organization → project navigation model.
-        ...(process.env.NODE_ENV !== "production"
-            ? [{ href: scopeProjectSlug ? scopedProjectHref("deployments") : orgProductHref("deployments"), icon: <HugeiconsIcon icon={ThreeDMoveIcon} className="!h-5 !w-5" />, label: "Deployments" }]
-            : []),
     ];
-
-    const orgItems = [
-        { href: consoleMode ? "/billing" : `${orgBase}/~/billing`, icon: <HugeiconsIcon icon={DollarCircleIcon} className="!h-5 !w-5" />, label: "Billing" },
-        { href: consoleMode ? "/usage" : `${orgBase}/~/usage`, icon: <HugeiconsIcon icon={Chart01Icon} className="!h-5 !w-5" />, label: "Usage" },
-        { href: consoleMode ? "/teams" : `${orgBase}/~/teams`, icon: <HugeiconsIcon icon={UserMultipleIcon} className="!h-5 !w-5" />, label: "Teams" },
-        { href: consoleMode ? "/audit-log" : `${orgBase}/~/audit-log`, icon: <HugeiconsIcon icon={DocumentValidationIcon} className="!h-5 !w-5" />, label: "Audit Log" },
-        { href: consoleMode ? "/governance" : `${orgBase}/~/governance`, icon: <HugeiconsIcon icon={Building03Icon} className="!h-5 !w-5" />, label: "Governance" },
-    ];
+    // Deployments stays attached to the selected project for the same stable
+    // project → organization → project navigation model.
+    const runItems = process.env.NODE_ENV !== "production"
+        ? [{ href: scopeProjectSlug ? scopedProjectHref("deployments") : orgProductHref("deployments"), icon: <HugeiconsIcon icon={ThreeDMoveIcon} className="!h-5 !w-5" />, label: "Deployments" }]
+        : [];
+    // Security is no longer a page: opt-in PII protection lives in project settings.
+    const projectSecondaryItems = [...buildItems, ...runItems];
 
     const bottomItems = [
         { href: settingsHref, icon: <HugeiconsIcon icon={Settings02Icon} className="!h-5 !w-5" />, label: "Settings" },
@@ -481,6 +450,10 @@ export default function OrganizationLayoutClient({
     const organizationSettingsItems = [
         { section: "general", href: consoleMode ? "/organization/settings" : `${orgBase}/~/settings`, icon: <HugeiconsIcon icon={Settings02Icon} className="!h-5 !w-5" />, label: "General" },
         { section: "advanced", href: consoleMode ? "/organization/settings?section=advanced" : `${orgBase}/~/settings?section=advanced`, icon: <HugeiconsIcon icon={Configuration02Icon} className="!h-5 !w-5" />, label: "Advanced" },
+        { section: "teams", href: consoleMode ? "/teams" : `${orgBase}/~/teams`, icon: <HugeiconsIcon icon={UserMultipleIcon} className="!h-5 !w-5" />, label: "Teams" },
+        { section: "billing", href: consoleMode ? "/billing" : `${orgBase}/~/billing`, icon: <HugeiconsIcon icon={DollarCircleIcon} className="!h-5 !w-5" />, label: "Billing" },
+        { section: "usage", href: consoleMode ? "/usage" : `${orgBase}/~/usage`, icon: <HugeiconsIcon icon={Chart01Icon} className="!h-5 !w-5" />, label: "Usage" },
+        { section: "audit-log", href: consoleMode ? "/audit-log" : `${orgBase}/~/audit-log`, icon: <HugeiconsIcon icon={DocumentValidationIcon} className="!h-5 !w-5" />, label: "Audit Log" },
     ];
 
     const projectSettingsItems = [
@@ -493,6 +466,17 @@ export default function OrganizationLayoutClient({
         { tab: "api", href: `${settingsHref}?tab=api`, label: "API" },
         { tab: "webhooks", href: `${settingsHref}?tab=webhooks`, label: "Webhooks" },
     ];
+
+    const renderMenuItem = (item: { href: string; icon: React.ReactNode; label: string }) => (
+        <SidebarMenuItem key={item.href}>
+            <SidebarMenuButton asChild tooltip={item.label} isActive={isActive(item.href)} size="sm">
+                <Link href={item.href} prefetch={true} onMouseEnter={() => prefetchRoute(item.href)}>
+                    {item.icon}
+                    <span className="text-sm">{item.label}</span>
+                </Link>
+            </SidebarMenuButton>
+        </SidebarMenuItem>
+    );
 
     const renderBottomItems = () => bottomItems.map((item) => {
         const isSettingsItem = item.label === "Settings";
@@ -535,7 +519,10 @@ export default function OrganizationLayoutClient({
     return (
         <SidebarProvider
             defaultOpen
-            className={isFixedWorkspace ? "h-full min-h-0 overflow-hidden" : undefined}
+            // The dashboard shell already fills the viewport (min-h-screen) and adds
+            // the header + banner offsets; a second full-height minimum here made
+            // every page scroll by that offset even when its content fit.
+            className={isFixedWorkspace ? "h-full min-h-0 overflow-hidden" : "min-h-0"}
         >
             {!isProjectCreation && (
                 <Sidebar
@@ -648,35 +635,7 @@ export default function OrganizationLayoutClient({
                                         </span>
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
-                                {activeView === "observability" ? (
-                                    <>
-                                        <SidebarMenuItem>
-                                            <SidebarMenuButton
-                                                onClick={() => setActiveView("main")}
-                                                size="sm"
-                                                className="gap-1 text-muted-foreground"
-                                            >
-                                                <ChevronLeft className="!h-5 !w-5" />
-                                                <span className="text-sm">Back</span>
-                                            </SidebarMenuButton>
-                                        </SidebarMenuItem>
-                                        {observabilitySubItems.map((item) => (
-                                            <SidebarMenuItem key={item.section}>
-                                                <SidebarMenuButton
-                                                    asChild
-                                                    tooltip={item.label}
-                                                    isActive={observabilitySection === item.section}
-                                                    size="sm"
-                                                >
-                                                    <Link href={item.href} prefetch={true} onMouseEnter={() => prefetchRoute(item.href)}>
-                                                        {item.icon}
-                                                        <span className="text-sm">{item.label}</span>
-                                                    </Link>
-                                                </SidebarMenuButton>
-                                            </SidebarMenuItem>
-                                        ))}
-                                    </>
-                                ) : activeView === "ai-gateway" ? (
+                                {activeView === "ai-gateway" ? (
                                     <>
                                         <SidebarMenuItem>
                                             <SidebarMenuButton
@@ -792,41 +751,6 @@ export default function OrganizationLayoutClient({
                                                 </Link>
                                             </SidebarMenuButton>
                                         </SidebarMenuItem>
-                                        {/* 2. Observability */}
-                                        <SidebarMenuItem>
-                                            <SidebarMenuButton
-                                                asChild
-                                                isActive={isActive(observabilityHref)}
-                                                size="sm"
-                                                className="gap-1"
-                                            >
-                                                <Link
-                                                    href={observabilityHref}
-                                                    prefetch={true}
-                                                    onClick={() => {
-                                                        setPendingSubnavEntry("observability");
-                                                        setActiveView("observability");
-                                                    }}
-                                                    onMouseEnter={() => prefetchRoute(observabilityHref)}
-                                                >
-                                                    {observabilityItem.icon}
-                                                    <span className="text-sm">{observabilityItem.label}</span>
-                                                    <ChevronRight className="!h-3 !w-3 ml-auto text-muted-foreground/50" />
-                                                </Link>
-                                            </SidebarMenuButton>
-                                        </SidebarMenuItem>
-                                        {/* 3. Logs */}
-                                        {projectItems.map((item) => (
-                                            <SidebarMenuItem key={item.href}>
-                                                <SidebarMenuButton asChild tooltip={item.label} isActive={isActive(item.href)} size="sm">
-                                                    <Link href={item.href} prefetch={true} onMouseEnter={() => prefetchRoute(item.href)}>
-                                                        {item.icon}
-                                                        <span className="text-sm">{item.label}</span>
-                                                    </Link>
-                                                </SidebarMenuButton>
-                                            </SidebarMenuItem>
-                                        ))}
-                                        <SidebarSeparator className="my-2 mx-0 w-full" />
                                         {/* 4. AI Gateway toggle */}
                                         <SidebarMenuItem>
                                             <SidebarMenuButton
@@ -850,30 +774,8 @@ export default function OrganizationLayoutClient({
                                                 </Link>
                                             </SidebarMenuButton>
                                         </SidebarMenuItem>
-                                        {/* 5. Security, Memory, Agents, Monetization, Deployments */}
-                                        {projectSecondaryItems.map((item) => (
-                                            <SidebarMenuItem key={item.href}>
-                                                <SidebarMenuButton asChild tooltip={item.label} isActive={isActive(item.href)} size="sm">
-                                                    <Link href={item.href} prefetch={true} onMouseEnter={() => prefetchRoute(item.href)}>
-                                                        {item.icon}
-                                                        <span className="text-sm">{item.label}</span>
-                                                    </Link>
-                                                </SidebarMenuButton>
-                                            </SidebarMenuItem>
-                                        ))}
-                                        <SidebarSeparator className="my-2 mx-0 w-full" />
-                                        {/* 6. Billing, Usage, Teams, Audit Log */}
-                                        {orgItems.map((item) => (
-                                            <SidebarMenuItem key={item.href}>
-                                                <SidebarMenuButton asChild tooltip={item.label} isActive={isActive(item.href)} size="sm">
-                                                    <Link href={item.href} prefetch={true} onMouseEnter={() => prefetchRoute(item.href)}>
-                                                        {item.icon}
-                                                        <span className="text-sm">{item.label}</span>
-                                                    </Link>
-                                                </SidebarMenuButton>
-                                            </SidebarMenuItem>
-                                        ))}
-                                        <SidebarSeparator className="my-2 mx-0 w-full" />
+                                        {buildItems.map(renderMenuItem)}
+                                        {runItems.map(renderMenuItem)}
                                         {renderBottomItems()}
                                     </>
                                 )}
@@ -972,10 +874,9 @@ export default function OrganizationLayoutClient({
                             <SidebarMenu>
                                 {[
                                     overviewItem,
-                                    observabilityItem,
-                                    ...projectItems,
+                                    logsItem,
                                     ...projectSecondaryItems,
-                                    ...orgItems,
+                                    ...organizationSettingsItems.filter((item) => item.section !== "general" && item.section !== "advanced"),
                                     ...bottomItems,
                                 ].map((item) => (
                                     <SidebarMenuItem key={item.href}>

@@ -1,23 +1,22 @@
 'use client';
 
-import { use } from 'react';
-import { Analytics01Icon } from '@hugeicons/core-free-icons';
-import { ProjectPickerLanding } from '@/components/dashboard/ProjectPickerLanding';
+import { use, useEffect } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { getConsoleRoute } from '@/lib/console/routing';
 
 interface PageProps {
     params: Promise<{ orgSlug: string }>;
 }
 
-export default function OrgObservabilityPickerPage({ params }: PageProps) {
+// Observability folded into the AI Gateway overview; keep old links working.
+export default function LegacyOrgObservabilityRedirect({ params }: PageProps) {
     const { orgSlug } = use(params);
-    return (
-        <ProjectPickerLanding
-            orgSlug={orgSlug}
-            title="Observability"
-            subtitle="Select a project to view its observability dashboard."
-            icon={Analytics01Icon}
-            destinationSuffix="observability"
-            emptyStateBody="Observability metrics live inside projects. Create a project to start capturing traces and metrics."
-        />
-    );
+    const pathname = usePathname();
+    const router = useRouter();
+
+    useEffect(() => {
+        router.replace(getConsoleRoute(pathname) ? '/organization/ai-gateway' : `/${orgSlug}/~/ai-gateway`);
+    }, [orgSlug, pathname, router]);
+
+    return null;
 }
