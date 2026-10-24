@@ -50,7 +50,7 @@ const sidebarItems = [
             { title: "Streaming", href: "/docs/ai/streaming" },
             { title: "Credits System", href: "/docs/platform/credits" },
             { title: "Rate Limiting", href: "/docs/platform/ai-gateway/rate-limiting" },
-            { title: "Security", href: "/docs/security/content-filtering" },
+            { title: "PII Protection", href: "/docs/security/pii-detection" },
         ],
     },
     {
@@ -70,14 +70,13 @@ const sidebarItems = [
         items: [
             { title: "Migrating from OpenAI", href: "/docs/guides/migrate-openai" },
             { title: "Migrating from Anthropic", href: "/docs/guides/migrate-anthropic" },
-            { title: "Custom Providers", href: "/docs/platform/ai-gateway/custom-providers" },
             { title: "Cost Optimization", href: "/docs/guides/cost-optimization" },
         ],
     },
     {
         title: "Security",
         items: [
-            { title: "PII Detection", href: "/docs/security/pii-detection" },
+            { title: "PII Protection", href: "/docs/security/pii-detection" },
         ],
     },
 ];

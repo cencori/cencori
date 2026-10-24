@@ -30,8 +30,9 @@ export const chat = onRequest(async (request, response) => {
     const result = await cencori.chat.create({
         model: "gpt-4o",
         messages: request.body.messages,
-        exclude_pii: true // Enable Cencori Security
     });
+    // To block requests that contain personal data, turn on PII protection
+    // in the project's Settings → General — it is not a request parameter.
 
     response.json(result);
   } catch (error) {

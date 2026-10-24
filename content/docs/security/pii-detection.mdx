@@ -1,37 +1,57 @@
 ---
-title: "PII Detection"
-description: "Opt-in PII blocking for gateway prompts. Enable per project; output enforcement needs a governance policy."
+title: "PII Protection"
+description: "Opt-in blocking of requests that contain personal data. Off by default; turn it on per project."
 section: "Security"
 order: 2
 ---
 
-> Gateway PII checks are **explicit opt-in and off by default**. If you send synthetic emails, SSNs, or test cards and get `200 OK` with unmasked data, that is the expected default — enable scanning first. This page covers the gateway. For repo scanning, see [Cencori Scan](/docs/security/scan).
+> PII protection is **off by default**. Cencori does not make security decisions for your project unless you turn this on. If you send an email address or a card number and get `200 OK`, that is the expected default. This page covers the gateway. For scanning code repositories, see [Cencori Scan](/docs/security/scan).
 
-## How enabling works
+PII protection is the only built-in request check in the Cencori gateway. When it is on, any request whose input contains personal data is blocked before it reaches the model provider.
 
-1. Go to **Project > Security**.
-2. Turn on **Enable security scanning** (`security_settings.security_enabled`).
-3. Keep `filter_pii` on and tune the **Safety Threshold** slider.
+## Turn it on
 
-No row or `false` = no input scan, no PII detection, no output scan, on every tier, for both BYOK and managed keys. Creating an active custom data rule or governance policy is itself opt-in and enforces regardless of the master switch.
+PII protection is available on paid plans (Pro, Team, and Enterprise).
 
-Do not use `.cencorirc` for gateway PII — that file configures the [Scan CLI](/docs/security/scan) only.
+1. Open your project and go to **Settings → General**.
+2. Under **Request handling**, turn on **PII protection**.
 
-## What input blocking actually detects
+The change applies to the next request. Turn the switch off to stop checking.
 
-When enabled, the input guard scores the last user message against heuristics (not a 25+ entity ML model):
+## What is detected
 
-| Category | What fires |
-|----------|------------|
-| **Email** | Standard `name@domain.tld` plus obfuscated `dot` / `[at]` variants |
-| **Phone** | NANP-like `123-456-7890` with optional country code |
+The check runs on the input text of a request (for chat, the last user message). It looks for:
+
+| Type | What matches |
+|------|--------------|
+| **Email address** | `name@domain.tld`, plus written-out forms such as `jane dot doe at example dot com` or `jane.doe [at] example [dot] com` |
+| **Phone number** | US-style 10-digit numbers such as `555-123-4567` or `(555) 123-4567`, with an optional country code |
 | **SSN (US)** | `123-45-6789` |
-| **Credit card** | 13–19 digit runs with Luhn pass, or digit runs with card context (`card`, `payment`, etc.) |
-| **Injection keywords** | `ignore previous instructions`, `you are now`, `jailbreak`, `bypass`, etc. (counts toward the same score) |
+| **Card number** | 13–19 digit numbers that pass the Luhn check, or digit runs next to words like `card` or `payment` |
 
-Score is compared against your Safety Threshold. On block the gateway returns `403` with `code: security_violation` (or `data_rule_block` for custom rules), logs a `security_incidents` row, and the request never reaches the provider.
+**Any single match blocks the request.** There is no score or sensitivity setting, and nothing is masked: the request is either blocked or passed through unchanged.
 
-There is no per-field Mask / Redact / Block / Off mode, and no client-visible masking like `u***@example.com`. The gateway either **blocks (403)** or **passes through (200 with original text)**. Tokenize / redact actions from custom data rules or governance policies protect the upstream provider only — the token map is detokenized before the response returns to you, so your client still sees the original.
+Only input is checked. Model responses are not scanned.
+
+The check applies to every gateway endpoint that takes text input: chat, Responses, sessions, embeddings, images, speech, transcription, documents, vision, and memory.
+
+## What a blocked request returns
+
+The request never reaches the provider. The gateway returns `403`:
+
+```json
+{
+  "error": {
+    "message": "Request contains personal data (PII)",
+    "type": "invalid_request_error",
+    "code": "security_violation"
+  },
+  "message": "This request was blocked because it contains personal data such as an email, phone number or card number.",
+  "reasons": ["[PII] Email address detected", "[PII] Phone number detected"]
+}
+```
+
+`reasons` lists each type of personal data that was found.
 
 ## Handling blocks in code
 
@@ -43,9 +63,9 @@ try {
   });
   return response.content;
 } catch (error: any) {
-  if (error.code === 'security_violation' || error.code === 'data_rule_block') {
+  if (error.code === 'security_violation') {
     return {
-      error: 'Your message contains sensitive information. Please remove personal details.',
+      error: 'Your message contains personal information. Please remove it and try again.',
       reasons: error.reasons,
     };
   }
@@ -53,48 +73,40 @@ try {
 }
 ```
 
-Actual error shape is flat (`error`, `message`, `code`, `reasons`) in the 4xx range — see [Error Reference](/docs/api/errors). There is no `PII_DETECTED` code with `details.patterns_detected`.
+See the [Error Reference](/docs/api/errors) for the general error shape.
 
-## Output PII is not blocked by this switch
+## Seeing blocked requests
 
-Enabling the master switch alone does **not** block PII in model responses. The legacy output scanner is intentionally non-blocking (broad heuristics caused false-positive stream failures). To enforce output:
+Blocked requests appear in **AI Gateway → Logs** with the **Filtered** status.
 
-- Install a governance template with output rules (e.g. **PCI-DSS Card-Data Protection**, **NDPR PII Redaction**) in **Governance**, then request activation + teammate approval, or
-- Create an active custom data rule for the output direction.
+To be notified as they happen, add a webhook in **Settings → Webhooks** and subscribe to the **Security Violation** event (`security.violation`):
 
-Without one of those, output SSN / card data returns `200 OK` unmasked even with scanning on. If you need proof for an audit, test input blocking and output policy separately.
+```json
+{
+  "event": "security.violation",
+  "timestamp": "2026-10-24T10:00:00.000Z",
+  "project_id": "proj_123",
+  "data": {
+    "incident_type": "pii_input",
+    "severity": "high",
+    "description": "Blocked PII: Email address detected",
+    "end_user_id": "user_456"
+  }
+}
+```
 
-## Viewing PII incidents
+`end_user_id` is included when the request identified an end user.
 
-Incidents are only written when a guard actually fires. With scanning off, expect no incidents.
+## Skipping the check
 
-1. Navigate to your project dashboard
-2. Click "Security" in the sidebar
-3. Filter by PII / jailbreak incident type
-
-## Custom patterns
-
-Use dashboard custom data rules for business IDs (e.g. `ORD-\d{6}`, employee IDs). For output redaction and approval-gated flows, prefer [Governance](/docs/security/governance) policies over regex alone.
+Chat requests sent with `passthrough: true` or `fast_lane: true` in the body, or with the `x-cencori-passthrough: true` or `x-cencori-fast-lane: true` header, skip PII protection. They also skip response caching and gateway retries. Use these only for callers that run their own checks.
 
 ## False positives
 
-Fictional data (e.g. `test@example.com`) can score as PII. Mitigations:
-
-- Lower the Safety Threshold (more lenient)
-- Turn off `filter_pii` for non-production projects
-- Narrow custom rules; keep gateway `passthrough: true` / `fast_lane: true` only for callers that run their own safety layers (it skips all guards)
+The phone pattern matches any 10-digit number in the formats above, so order numbers, account numbers, or reference IDs can be blocked. Example data such as `test@example.com` is also blocked. If your traffic legitimately contains these, keep PII protection off for that project, or reformat the identifiers before sending them.
 
 ## Best practices
 
-- Keep scanning **off** for speed unless you need enforcement; turn it **on** for production projects handling real user data.
-- Educate users to avoid sharing personal information in prompts — the gateway is a block, not a mask.
-- Review incidents weekly; adjust threshold rather than assuming per-type Mask/Redact settings exist.
-- For healthcare / finance strict compliance, combine input blocking + a governance output policy (deny-by-default) + audit ledger evidence packs.
-
-## Compliance benefits
-
-When enabled and logged, PII blocking supports:
-- **GDPR:** Prevent unauthorized processing of personal data
-- **HIPAA:** Protect patient health information
-- **SOC 2:** Demonstrate data protection controls
-- **CCPA:** California Consumer Privacy Act compliance
+- Turn PII protection on for production projects that handle real user input, and leave it off where you send test or synthetic data.
+- Tell your users not to share personal details in prompts — the gateway blocks, it does not mask.
+- Watch the Filtered requests in Logs after turning it on, to catch false positives early.

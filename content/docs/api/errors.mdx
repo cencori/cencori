@@ -63,7 +63,7 @@ These come from the shared gateway middleware before the endpoint runs:
 | `rate_limit_exceeded` | 429 | Per-project per-minute limit hit; body carries `retry_after_ms`, header carries `Retry-After` |
 | `rate_limit_unavailable` | 503 | Rate-limit backend down and fail-open is disabled |
 | `spend_cap_reached` | 402 | Monthly spend cap hit |
-| `byok_required` | 402 | `model: 'auto'` / `'cencori-auto'` with no usable BYOK key — none configured, or none priced/allowed for the task. Add a provider key in Project > Providers. Works at a zero credit balance; never falls back to managed keys |
+| `byok_required` | 402 | `model: 'auto'` / `'cencori-auto'` with no usable BYOK key — none configured, or none priced/allowed for the task. Add a provider key in AI Gateway → BYOK. Works at a zero credit balance; never falls back to managed keys |
 | `budget_exceeded` | 402 | Per-request `max_cost_usd` budget overrun. Unary calls fail before returning (no partial spend beyond the call); streams surface it at final tally. The message carries actual vs budget cost — use it as a stop signal for the issuing loop |
 
 ## Endpoint-level Codes
@@ -78,7 +78,7 @@ The AI endpoints return these via `error` (and `code` where meaningful):
 | `provider_timeout` | 504 | Long-running provider job (e.g. AssemblyAI polling) expired |
 | `internal_error` | 500 | Unexpected server failure |
 
-Security guards (input/output) return their own blocked responses with `error`, `message`, and `reasons` in the 4xx range — but only when enabled. Input blocks require **Project > Security > Enable security scanning**; output blocks additionally require a governance policy or active custom data rule. With everything off (default), PII and injections return `200 OK` unmodified.
+[PII protection](/docs/security/pii-detection) blocks return `403` with `error.code: security_violation`, plus a top-level `message` and `reasons` — but only when PII protection is on for the project (default off). With it off, requests containing personal data return `200 OK` unmodified.
 
 ## Rate Limit Headers
 
@@ -102,7 +102,7 @@ try {
 ## Troubleshooting
 
 - **`credit_balance_exhausted` (403)** — top up in `Organization → Billing`. Free/Enterprise tiers aren't credit-gated.
-- **`byok_required` (402)** — the project has no active BYOK key for the `auto` task (chat, embeddings, images, or speech). Add the provider key in Project > Providers; the error message lists the available BYOK providers. An image prompt with only text-model keys 402s the same way.
+- **`byok_required` (402)** — the project has no active BYOK key for the `auto` task (chat, embeddings, images, or speech). Add the provider key in AI Gateway → BYOK; the error message lists the available BYOK providers. An image prompt with only text-model keys 402s the same way.
 - **`budget_exceeded` (402)** — the call overspent its per-request `max_cost_usd`. Lower the budget pressure (smaller `max_tokens`, cheaper model) or raise the budget; agent loops should stop on this code, not retry into it.
 - **`rate_limit_exceeded` (429)** — 60 requests/min per project for all tiers. Back off for `Retry-After` seconds or use a second project.
 - **`provider_error` (400)** — read the `message`; the truncated upstream body is included.

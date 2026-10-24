@@ -93,7 +93,7 @@ describe('Gateway output pipeline contract', () => {
             expect.objectContaining({
                 orgId: 'org-out',
                 direction: 'output',
-                signals: { risk_score: 1 },
+                signals: { risk_score: 0 },
             })
         );
     });
@@ -137,7 +137,7 @@ describe('Gateway output pipeline contract', () => {
             expect.objectContaining({
                 orgId: 'org-policy',
                 direction: 'output',
-                signals: { risk_score: 1 },
+                signals: { risk_score: 0 },
             })
         );
     });

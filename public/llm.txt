@@ -16,7 +16,7 @@ Only use the APIs and patterns documented here.
 ## What Cencori Is
 
 Cencori is the runtime control layer for production AI.
-Your application sends AI traffic to Cencori, and Cencori handles routing, security enforcement, observability, and cost tracking.
+Your application sends AI traffic to Cencori, and Cencori handles routing, opt-in PII protection, observability, and cost tracking.
 
 ## Stable Public Surfaces
 
@@ -70,11 +70,11 @@ Use the existing product path:
 2. Pick one known-good model ID in Models or Playground.
 3. Confirm the project can route to that model:
    - use an enabled catalog, managed, or free model first when available
-   - otherwise add the upstream provider key in Project > Providers
+   - otherwise add the upstream provider key in AI Gateway → BYOK
 4. Create a secret project key in Project > API Keys.
 5. Store the key server-side as `CENCORI_API_KEY`.
 6. Change the existing SDK client, provider adapter, or base URL.
-7. Send one test request and verify it appears in dashboard Logs.
+7. Send one test request and verify it appears in the dashboard under AI Gateway → Logs.
 
 Use `create-cencori-app` only when the user wants a new Cencori starter app.
 For existing products, preserve the app's current auth, database, routing, UI, and response contract.
@@ -124,7 +124,7 @@ npx create-cencori-app my-ai-app --template nextjs --dev
 6. The scaffolded default first-test model is the `defaultModel` shipped in `cencori.config.ts`; users can switch to `claude-sonnet-5`, `gemini-3.1-pro-preview`, or `claude-opus-5-5` after provider access is confirmed.
 7. `--api-key` verifies Cencori authentication only. Users may still need provider access for the selected model.
 8. If key verification is temporarily unavailable, scaffolding may continue and the generated app reads `CENCORI_API_KEY` from the env file.
-9. After scaffolding, run `npm run dev` and confirm a request appears in dashboard Logs.
+9. After scaffolding, run `npm run dev` and confirm a request appears in the dashboard under AI Gateway → Logs.
 
 ## Do Not Use These As Public Contract Yet
 
@@ -1227,6 +1227,8 @@ Tool tiers:
 - Destructive (`CENCORI_MCP_DESTRUCTIVE=1`): `delete_memory`, `forget_memories` (by filter: namespace / before / ids), `delete_agent`, `delete_session`, `approve_session`, `reject_session`.
 
 Feature selection: `CENCORI_MCP_FEATURES` accepts `docs`, `guidance`, `gateway`, `agents`, `memory`, `sessions`, `web`, `governance`, `multimodal`, and `embedded`. Omit it to enable all features allowed by the key and action-tier flags.
+
+Governance is currently disabled on Cencori: the governance list/get and draft tools return 503 ("Governance is not enabled on this deployment"). Leave `governance` out of `CENCORI_MCP_FEATURES` to hide them.
 
 Safety: Web tools carry `openWorldHint: true`, and retrieved content is untrusted. Anything that costs money, enqueues work, or changes state is opt-in via env. Security-sensitive actions (API keys, billing, access, governance activation) are **never** executed by the MCP—the `how_to_*` tools return steps and a dashboard link.
 

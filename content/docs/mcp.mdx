@@ -105,6 +105,8 @@ Credential, billing, access, and governance-activation decisions are never execu
 - Billing: `how_to_change_plan`, `how_to_manage_billing`
 - Access: `how_to_manage_members`
 
+> **Governance is currently disabled on Cencori.** The governance read and draft tools return `503` (“Governance is not enabled on this deployment”), and the governance `how_to_*` links open the organization audit log. To hide these tools, leave `governance` out of `CENCORI_MCP_FEATURES`.
+
 ## Environment variables
 
 | Variable | Default | Description |

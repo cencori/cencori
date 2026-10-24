@@ -17,16 +17,15 @@ Every mutation to your organization or project configuration is recorded:
 | :--- | :--- |
 | **api_key** | Key created, revoked |
 | **provider** | Provider key added, updated, deleted, activated, deactivated |
-| **security** | Security settings changed, custom rules created/updated/deleted, incidents reviewed |
+| **security** | PII protection turned on or off, incidents reviewed |
 | **billing** | Subscription changes, credit top-ups, Stripe Connect connected/disconnected |
 | **budget** | Budget limits configured, alerts set |
 | **end_user** | End-user created, updated, blocked, unblocked, deleted |
-| **rate_plan** | Rate plan created, updated, deleted |
+| **rate_plan** | Plan created, updated, deleted (Revenue → Plans) |
 | **member** | Member invited, joined, left, role changed |
 | **sso** | SSO configured, updated |
 | **settings** | Project settings updated |
-| **prompt** | Prompt created, updated, deleted, version published, deployed |
-| **cache** | Cache settings configured |
+| **cache** | Response caching turned on or off |
 | **webhook** | Webhook created, updated, deleted |
 | **integration** | Edge integration added, updated, removed |
 | **agent** | Agent created, updated, configured |
@@ -49,29 +48,32 @@ Each log entry includes:
 
 ## Viewing Audit Logs
 
-Navigate to your organization's **Audit Log** page in the dashboard sidebar. The page shows a chronological table of all events.
+Open **Organization settings** (from the user menu) and go to **Audit Log**. The page shows a table of events, newest first.
+
+Audit logs are available on paid plans (Pro, Team, and Enterprise).
 
 ### Filtering
 
 Use the filter bar to narrow results:
 
-- **Category** — filter by area (API key, security, billing, etc.)
-- **Time range** — last hour, 24 hours, 7 days, 30 days, 90 days, or all time
+- **Category** — filter by area (API key, security, billing, etc.). The API key, member, and SSO categories require the Team or Enterprise plan.
+- **Time range** — last hour, 24 hours, or 7 days on Pro; 30 and 90 days on Team and Enterprise; all time on Enterprise
 - **Project** — scope to a specific project
 - **Search** — full-text search across event descriptions
 
-### Expanded Details
+### Event Details
 
-Click any row to expand it and view:
+Click any row to open the event details:
 
+- Actor, actor type, and source IP address
+- Scope (organization or project)
 - Resource type and ID
-- Actor IP address
-- Full ISO timestamp
-- Complete metadata JSON (includes before/after values where applicable)
+- Timestamp and event ID
+- Complete metadata JSON (includes before/after values where applicable), with a copy button
 
 ## Exporting
 
-Export audit logs in CSV or JSON format from the dashboard. Click the **CSV** or **JSON** button in the top-right corner of the audit log page.
+Click **Export** on the audit log page and choose **Export as CSV** or **Export as JSON**. Exports require the Team or Enterprise plan.
 
 Exports respect your current filters — if you've filtered to a specific category, time range, or project, only matching entries are exported.
 
@@ -99,5 +101,5 @@ Audit logs support common compliance requirements:
 ## Related
 
 - [AI Request Logs](/docs/guides/audit-logs) — individual AI request/response logs with token usage and cost
-- [Security](/docs/security/content-filtering) — PII detection, content filtering, and security incidents
+- [PII Protection](/docs/security/pii-detection) — opt-in blocking of requests that contain personal data
 - [Organizations](/docs/platform/organizations) — organization structure and member management

@@ -82,15 +82,10 @@ export async function getProjectSecurityConfig(
     projectId: string,
     _tier: SubscriptionTier = 'free'
 ): Promise<ProjectSecurityConfig> {
+    // Only PII protection remains; the other cached flags are ignored.
     const applyExplicit = (settings: CachedSecuritySettings): ProjectSecurityConfig => ({
         enabled: settings.enabled,
-        inputThreshold: settings.inputThreshold,
-        outputThreshold: settings.outputThreshold,
-        jailbreakThreshold: settings.jailbreakThreshold,
-        enableOutputScanning: settings.enabled,
-        enableJailbreakDetection: settings.enabled && settings.filterJailbreaks,
-        enableObfuscatedPII: settings.enabled && settings.filterPII,
-        enableIntentAnalysis: settings.enabled && settings.filterPromptInjection,
+        filterPII: settings.filterPII,
     });
 
     const cached = await getCachedSecurityConfig(projectId);

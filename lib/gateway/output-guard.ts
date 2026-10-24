@@ -1,8 +1,5 @@
 import type { createAdminClient } from '@/lib/supabaseAdmin';
-import {
-    checkOutputSecurity,
-    type SecurityCheckResult,
-} from '@/lib/safety/multi-layer-check';
+import type { SecurityCheckResult } from '@/lib/safety/multi-layer-check';
 import type { UnifiedMessage } from '@/lib/providers/base';
 import type { GatewayGuardBlock } from '@/lib/gateway/guard-types';
 import { enforcePolicies, type PolicyRedaction } from '@/lib/governance/policy-enforcement';
@@ -44,21 +41,8 @@ export async function runGatewayOutputGuard(
         return { ok: true };
     }
 
-    const outputSecurity = checkOutputSecurity(
-        params.outputText,
-        {
-            inputText: params.inputText,
-            inputSecurityResult: params.inputSecurity,
-            conversationHistory: params.conversationHistory,
-        },
-        params.securityEnabled === true ? { enableOutputScanning: true } : undefined
-    );
-
-    // The legacy output scanner uses broad substring and PII heuristics. Those
-    // signals are useful to an explicitly configured policy, but are not
-    // reliable enough to terminate a general-purpose model stream on their own
-    // (normal coding answers commonly contain words such as "vulnerability" or
-    // example contact data). Only policy-as-code may hard-stop output here.
+    // Output is never scanned (Cencori only offers opt-in PII protection on
+    // input). Only governance policy-as-code, when enabled, may act on output.
     const enforcement = await enforcePolicies(params.supabase, {
         orgId: params.organizationId,
         projectId: params.projectId,
@@ -67,7 +51,7 @@ export async function runGatewayOutputGuard(
         environment: params.environment,
         region: params.region,
         content: params.outputText,
-        signals: { risk_score: outputSecurity.riskScore },
+        signals: { risk_score: 0 },
         apiKeyId: params.apiKeyId,
     });
     if (enforcement.block) {

@@ -115,7 +115,7 @@ When configuring an SDK, set the base URL to `https://api.cencori.com/v1`, not t
 | `stream` | boolean | No | Stream the response |
 | `tools` | array | No | Function/tool definitions |
 | `toolChoice` | string or object | No | Tool selection mode |
-| `userId` or `user` | string | No | End-user identifier for attribution and Monetization |
+| `userId` or `user` | string | No | End-user identifier for attribution and Revenue metering |
 | `timeout_ms` | number | No | Per-request provider timeout in ms (1–300000, capped). Bounds one provider attempt |
 | `max_cost_usd` | number | No | Per-request cost budget in USD. Unary calls fail before returning; streams surface it at final tally as HTTP 402 `budget_exceeded` |
 | `reasoning_effort` | string | No | `none`, `minimal`, `low`, `medium`, `high`, `xhigh` or `max`, on reasoning models. `/v1/chat/completions` only |
@@ -291,24 +291,22 @@ try {
 
 ## Safety classification
 
-Every chat response carries what the input guards verdicts — so a 200 whose
-model resisted an attack is distinguishable from a request that was never
-scanned:
+Chat responses include a `safety` object that says whether [PII protection](/docs/security/pii-detection) checked the request:
 
 ```json
 {
   "choices": [ ... ],
   "safety": {
     "scanned": true,
-    "input": { "safe": false, "layer": "jailbreak", "riskScore": 0.86, "reasons": ["..."] }
+    "input": { "safe": true, "layer": "input", "riskScore": 0, "reasons": [] }
   }
 }
 ```
 
-Streams carry the same verdict as headers (`X-Cencori-Safety-Scanned`,
-`X-Cencori-Safety-Input`, `X-Cencori-Safety-Score`). `scanned: false` means
-the request ran the passthrough lane (your own safety layers apply). Only
-category-level reasons are exposed — never matched excerpts.
+- `scanned: true` — PII protection is on for the project and the input passed the check. A request that fails the check is not answered: it returns `403 security_violation` instead (see [What a blocked request returns](/docs/security/pii-detection#what-a-blocked-request-returns)).
+- `scanned: false` — PII protection is off for the project, or the request used the passthrough lane (`passthrough` / `fast_lane`).
+
+Streams carry the same information as headers: `X-Cencori-Safety-Scanned` (`true` / `false`), and when scanned, `X-Cencori-Safety-Input` and `X-Cencori-Safety-Score`.
 
 ## Auto-router (`auto` / `cencori-auto`)
 

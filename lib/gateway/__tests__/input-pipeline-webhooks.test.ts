@@ -15,13 +15,13 @@ vi.mock('@/lib/supabaseAdmin', () => ({
 }));
 
 import { runGatewayInputPipeline } from '@/lib/gateway/input-guard';
-import { JAILBREAK_USER_MESSAGE, toUnifiedMessages } from '@/lib/gateway/__tests__/fixtures';
+import { PII_USER_MESSAGE, toUnifiedMessages } from '@/lib/gateway/__tests__/fixtures';
 import { createMockSupabaseForSecurity } from '@/lib/gateway/__tests__/mock-supabase';
 
 describe('Gateway input pipeline webhooks', () => {
-    it('fires triggerSecurityWebhook on jailbreak block', async () => {
+    it('fires triggerSecurityWebhook on PII block', async () => {
         const supabase = createMockSupabaseForSecurity({ tier: 'pro' });
-        const messages = toUnifiedMessages([{ role: 'user', content: JAILBREAK_USER_MESSAGE }]);
+        const messages = toUnifiedMessages([{ role: 'user', content: PII_USER_MESSAGE }]);
 
         const result = await runGatewayInputPipeline({
             supabase: supabase as never,

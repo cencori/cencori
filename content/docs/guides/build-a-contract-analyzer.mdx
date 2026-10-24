@@ -242,7 +242,7 @@ Ship this to your app and you have a working contract Q&A tool. All the AI-magic
 
 **Handle the scanned-PDF error.** If `extract` returns `error: 'scanned_pdf_not_yet_supported'`, show the user a helpful message: "This PDF looks like a scan — try uploading each page as an image." Or rasterize on the client with pdf.js and send the pages to `/v1/vision` with the multi-image field.
 
-**Redact before you ship.** Contracts contain PII. If you're logging the extracted text anywhere your team can see, enable scanning in **Project > Security** for input blocking, and add a governance policy if you also need output enforcement — `cencori.ai.chat` does not mask PII automatically.
+**Redact before you ship.** Contracts contain PII, and `cencori.ai.chat` does not mask it. If you're logging the extracted text anywhere your team can see, redact it yourself. [PII protection](/docs/security/pii-detection) can block requests that contain personal data, but it blocks rather than masks — so it would reject most contracts.
 
 ## Try other document types
 

@@ -11,6 +11,7 @@
  * is provably complete) is PRD M0.2; this first wiring is fire-and-forget.
  */
 
+import { isGovernanceEnabled } from '@/lib/governance/flag';
 import type { GatewayContext, LogRequestParams } from '@/lib/gateway-middleware';
 import { hashContent, type GovernanceAuditInput, type GovernanceDecision } from '@/lib/governance/audit-ledger';
 import { deliverAuditEntry } from '@/lib/governance/delivery';
@@ -81,6 +82,6 @@ export async function recordGatewayGovernanceDecision(
     context: GatewayContext,
     params: LogRequestParams,
 ): Promise<void> {
-    if (!context.organizationId) return;
+    if (!context.organizationId || !isGovernanceEnabled()) return;
     await deliverAuditEntry(context.supabase, buildDecisionInput(context, params));
 }
