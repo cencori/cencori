@@ -539,7 +539,7 @@ export default function OrganizationLayoutClient({
         >
             {!isProjectCreation && (
                 <Sidebar
-                    className="top-0 hidden h-svh border-r border-sidebar-border/70 bg-sidebar lg:block"
+                    className="top-[var(--maintenance-banner-height,0px)] hidden h-[calc(100svh-var(--maintenance-banner-height,0px))] border-r border-sidebar-border/70 bg-sidebar lg:block"
                     onClickCapture={handleSidebarNavigationCapture}
                 >
                     <SidebarHeader className="h-12 shrink-0 justify-center p-1.5">
