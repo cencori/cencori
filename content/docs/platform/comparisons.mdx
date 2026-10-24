@@ -9,7 +9,7 @@ A common question is: *"How is Cencori different from X?"*
 
 The short answer: **Cencori is the Infrastructure Layer**. We are not just a model router, and we are not just a JS library. We are the cloud platform that powers your AI application.
 
-> Security rows below mean **opt-in native guards** (off by default; enable in **Project > Security**). Input blocking runs when enabled; output blocking additionally requires a governance policy or custom data rule.
+> Security rows below mean **opt-in PII protection** (off by default; turn it on in the project's **Settings → General**). When on, requests that contain personal data are blocked before they reach the provider.
 
 ## vs OpenRouter
 
@@ -20,7 +20,7 @@ The short answer: **Cencori is the Infrastructure Layer**. We are not just a mod
 | **Model Routing** | <Check /> Yes | <Check /> Yes (14+ Providers) |
 | **Unified API** | <Check /> Yes | <Check /> Yes (OpenAI Compatible) |
 | **Integrations** | <X /> No | <Check /> Vercel, Zapier, Supabase |
-| **Security** | <X /> No | <Check /> PII Blocking, Prompt Injection (opt-in) |
+| **Security** | <X /> No | <Check /> PII blocking (opt-in) |
 
 **Summary**: Use OpenRouter if you just need access to a specific model. Use Cencori if you are building a production application that needs security, reliability, and billing.
 
@@ -33,13 +33,13 @@ The short answer: **Cencori is the Infrastructure Layer**. We are not just a mod
 | **Model Routing** | <Check /> Yes (via Adapter) | <Check /> Yes (Native) |
 | **Unified API** | <Check /> Yes | <Check /> Yes |
 | **Integrations** | <Check /> Yes (Code) | <Check /> Yes (Native & Code) |
-| **Security** | <X /> No | <Check /> PII Blocking, Prompt Injection (opt-in) |
+| **Security** | <X /> No | <Check /> PII blocking (opt-in) |
 | **Hosting** | Self-hosted (e.g. EC2, Fargate) | Serverless Cloud |
 | **State** | Redis/Postgres (Manual) | Built-in Persistence |
 | **Retries** | You code it | Built-in (Exponential Backoff) |
 | **Observability** | LangSmith (Separate) | Integrated Dashboard |
 
-**Summary**: You can actually **use LangChain with Cencori**. Use LangChain for the graph logic, and let Cencori handle the LLM execution, security scanning, and billing/observability.
+**Summary**: You can actually **use LangChain with Cencori**. Use LangChain for the graph logic, and let Cencori handle the LLM execution, PII protection, and billing/observability.
 
 ## vs Vercel AI SDK
 
@@ -50,7 +50,7 @@ The short answer: **Cencori is the Infrastructure Layer**. We are not just a mod
 | **Model Routing** | <Check /> Yes (Client-side) | <Check /> Yes (Server-side) |
 | **Unified API** | <Check /> Yes | <Check /> Yes |
 | **Integrations** | <Check /> Yes (Frontend) | <Check /> Yes (Backend) |
-| **Security** | <X /> No (Client-side only) | <Check /> Enterprise-grade (PII, Injection, opt-in) |
+| **Security** | <X /> No (Client-side only) | <Check /> PII blocking (opt-in) |
 | **Role** | Frontend Library | Backend Engine |
 | **Focus** | UI State & Streaming | Intelligence & Security |
 
@@ -76,7 +76,7 @@ const result = await streamText({
 | **Model Routing** | <Check /> Yes | <Check /> Yes |
 | **Unified API** | <Check /> Yes | <Check /> Yes |
 | **Integrations** | <AlertTriangle /> Limited | <Check /> Vercel, Zapier, Supabase |
-| **Security** | <AlertTriangle /> Basic (Firewall) | <Check /> AI-Specific (PII, Jailbreak, opt-in) |
+| **Security** | <AlertTriangle /> Basic (Firewall) | <Check /> PII blocking (opt-in) |
 | **Primary Goal** | Caching & Rate Limiting | Production Infrastructure (Routing, Billing, Security) |
 | **Intelligence** | Passive (Network Layer) | Active (Application & Security Layer) |
 
@@ -91,7 +91,7 @@ const result = await streamText({
 | **Model Routing** | <Check /> Yes (Python Proxy) | <Check /> Yes (Global Edge) |
 | **Unified API** | <Check /> Yes | <Check /> Yes |
 | **Integrations** | <X /> No | <Check /> Vercel, Zapier, Supabase |
-| **Security** | <AlertTriangle /> Basic (API Key Mgmt) | <Check /> Enterprise-grade (PII, Injection, opt-in) |
+| **Security** | <AlertTriangle /> Basic (API Key Mgmt) | <Check /> PII blocking (opt-in) |
 | **Hosting** | Self-hosted | Serverless Cloud |
 
 **Summary**: LiteLLM is great for standardizing APIs if you want to manage your own proxy. Cencori provides the same standardization but adds managed infrastructure, security, and billing.
@@ -119,7 +119,7 @@ const result = await streamText({
 | **Model Routing** | <Check /> Yes (Local) | <Check /> Yes (Cloud) |
 | **Unified API** | <Check /> Yes | <Check /> Yes |
 | **Integrations** | <Check /> Yes (Code) | <Check /> Yes (Native) |
-| **Security** | <X /> No | <Check /> PII Blocking, Prompt Injection (opt-in) |
+| **Security** | <X /> No | <Check /> PII blocking (opt-in) |
 | **Hosting** | Self-hosted | Serverless Cloud |
 | **State** | Postgres (Manual) | Built-in Persistence |
 

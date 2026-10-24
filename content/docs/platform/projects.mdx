@@ -47,9 +47,11 @@ CENCORI_API_KEY=csk_...
 ## Project Settings
 
 ### General
-- **Name**: Update project identifier.
-- **Region**: View data residency location.
-- **Delete Project**: Permanently remove all data and logs.
+- **Project name** and **Project ID**: the name shown in the dashboard and the stable ID used in APIs and URLs.
+- **Request handling**: two optional switches, both off by default:
+  - **Response caching** — reuse stored responses for repeated requests instead of calling the model again.
+  - **PII protection** — block requests that contain emails, phone numbers, SSNs, or card numbers (paid plans). See [PII Protection](/docs/security/pii-detection).
+- **Delete project**: permanently remove the project and its data.
 
 ### AI Configuration
 Set project-wide defaults for your AI integration:
@@ -57,42 +59,32 @@ Set project-wide defaults for your AI integration:
 - **Rate Limits**: Set custom RPM (Requests Per Minute) protection.
 - **Spend Cap**: Enforce a hard limit on monthly spending.
 
-### Security Policies
-Security scanning is explicit opt-in (default off). Configure in **Project > Security**:
-- **Master switch**: `Enable security scanning`. Off (or no settings row) = no input/output checks on any tier, BYOK or managed.
-- **PII / Jailbreak / Prompt Injection toggles**: `filter_pii`, `filter_jailbreaks`, `filter_prompt_injection` gate sub-checks when the master switch is on.
-- **Safety Threshold**: slider value the input score is compared against (stricter = higher).
-- **Content Moderation**: Set thresholds for hate/violence categories.
-- **Custom Rules**: Whitelist/blacklist specific prompt patterns. Creating an active rule enforces it even if the master switch is off.
-- **Governance policies**: separate opt-in for output enforcement. Install a template in **Governance**, then request activation + teammate approval. Required if you need output PII blocking.
-
 ### Integrations
-Connect your project to external tools:
-- **Slack notifications** for security incidents.
-- **Webhook endpoints** for real-time events.
-- **Data warehouse exports** (Snowflake, BigQuery).
+- **Webhook endpoints** (**Settings → Webhooks**) for real-time events, including `security.violation` when PII protection blocks a request.
+- **CostGraph** (**Settings → Integrations**) for FinOps usage export.
 
 ## Team Collaboration
 
 Invite team members to your organization to grant them access to all projects within it.
 
-1. Go to **Organization Settings > Members**.
-2. Click **Invite Member**.
+1. Open **Organization settings** (from the user menu) and go to **Teams**.
+2. Click **Invite member**.
 3. Enter email and assign role:
 
 | Role | Description |
 | :--- | :--- |
-| **Owner** | Full access, including project deletion and billing. |
-| **Admin** | Can manage settings, keys, and team members. |
-| **Developer** | Can view logs and analytics, generate API keys. |
-| **Viewer** | Read-only access to logs and analytics. |
+| **Owner** | The organization's owner. Full access. |
+| **Admin** | Can invite members and change their roles. |
+| **Member** | Access to the organization's projects. |
+
+Inviting team members requires a paid plan (Pro, Team, or Enterprise).
 
 ## API Key Management
 
 API keys authenticate your application with Cencori. Each project can have multiple API keys for different purposes.
 
 ### Generating API Keys
-1. Navigate to **Settings > API Keys**.
+1. Open the project's **Settings → API** tab.
 2. Click **Generate New Key**.
 3. Give your key a descriptive name (e.g., "Production Web Server").
 4. Copy the key immediately - it won't be shown again.
