@@ -66,7 +66,7 @@ export function MobileNav({ projectSlug, user, avatar }: MobileNavProps) {
     const availableProjects = projects.filter((proj) => proj.orgSlug === orgSlug);
 
     return (
-        <div className="sticky top-12 z-50 lg:hidden border-b border-border/40 bg-background">
+        <div className="sticky top-[calc(3rem+var(--maintenance-banner-height,0px))] z-50 lg:hidden border-b border-border/40 bg-background">
             <div className="flex items-center gap-1 px-4 py-2 overflow-x-auto scrollbar-hide">
                 {/* Project selector dropdown */}
                 {resolvedProjectSlug && (

@@ -352,15 +352,17 @@ function LayoutContent({ user, avatar, name, children, initialAgentOpen, initial
   return (
     <div
       className={cn(
-        "dashboard-theme bg-background transition-colors font-inter",
+        // pt: room for the maintenance banner above the fixed header.
+        "dashboard-theme bg-background transition-colors font-inter pt-[var(--maintenance-banner-height,0px)]",
         isFixedWorkspace ? "flex h-svh flex-col overflow-hidden" : "min-h-screen",
         // Make room for the docked copilot so the dashboard shifts, not hides.
         agentOpen && "lg:pr-[520px]",
       )}
     >
+      <MaintenanceBanner />
       {!isOnboardingFlow && (
       <header className={cn(
-        "fixed top-0 left-0 right-0 z-50 h-12 border-b border-border/30 bg-background px-4 md:px-6 flex items-center justify-between font-mono",
+        "fixed top-[var(--maintenance-banner-height,0px)] left-0 right-0 z-50 h-12 border-b border-border/30 bg-background px-4 md:px-6 flex items-center justify-between font-mono",
         agentOpen && "lg:right-[520px]",
         hasDesktopSidebar && (isEmbeddedAgents ? "lg:left-[calc(16rem+250px)]" : "lg:left-64"),
       )}>
@@ -465,7 +467,6 @@ function LayoutContent({ user, avatar, name, children, initialAgentOpen, initial
               : "p-4 md:p-6 pt-20 lg:pt-14"
         )}
       >
-        <MaintenanceBanner />
         {children}
       </main>
       <CommandPalette
