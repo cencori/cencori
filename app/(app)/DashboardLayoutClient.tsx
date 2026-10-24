@@ -21,6 +21,7 @@ import { MobileSheetProvider, useMobileSheet } from "@/lib/contexts/MobileSheetC
 import { CommandPaletteProvider, useCommandPalette } from "@/lib/contexts/CommandPaletteContext";
 import { ThemeScope } from "@/components/theme-scope";
 import { MobileNav } from "@/components/dashboard/MobileNav";
+import { MaintenanceBanner } from "@/components/dashboard/MaintenanceBanner";
 import { CencoriAgentSidebar } from "@/components/dashboard/CencoriAgentSidebar";
 import { COPILOT_OPEN_COOKIE } from "@/lib/console/copilot";
 import { EnvironmentProvider, useEnvironment } from "@/lib/contexts/EnvironmentContext";
@@ -464,6 +465,7 @@ function LayoutContent({ user, avatar, name, children, initialAgentOpen, initial
               : "p-4 md:p-6 pt-20 lg:pt-14"
         )}
       >
+        <MaintenanceBanner />
         {children}
       </main>
       <CommandPalette
