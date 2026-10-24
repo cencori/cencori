@@ -6,5 +6,5 @@ interface PageProps {
 
 export default async function LegacyEndUserBillingPage({ params }: PageProps) {
   const { orgSlug, projectSlug } = await params;
-  redirect(`/${orgSlug}/${projectSlug}/monetization`);
+  redirect(`/${orgSlug}/${projectSlug}/revenue`);
 }

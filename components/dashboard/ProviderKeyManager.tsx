@@ -10,9 +10,9 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/components/ui/toast";
-import { AudioLines, Check, ChevronRight, Eye, EyeOff, Loader2, Plus, Trash2, X } from "lucide-react";
-import { OpenAI, Anthropic, Google, Mistral, Cohere, Cerebras, Perplexity, Groq, XAI, Together, Meta, HuggingFace, Qwen, DeepSeek, ZAI, Cloudflare, ElevenLabs, AssemblyAI } from "@lobehub/icons";
+import { Check, ChevronRight, Eye, EyeOff, Loader2, Plus, Trash2, X } from "lucide-react";
 import { SUPPORTED_PROVIDERS, type AIProviderConfig } from "@/lib/providers/config";
+import { getProviderLogoMark } from "@/components/dashboard/ProviderLogo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -21,40 +21,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import Image from "next/image";
 
-// Provider logo mapping
-const PROVIDER_LOGOS: Record<string, React.ReactNode> = {
-    openai: <OpenAI size={20} />,
-    anthropic: <Anthropic size={20} />,
-    google: <Google.Color size={20} />,
-    mistral: <Mistral.Color size={20} />,
-    cohere: <Cohere.Color size={20} />,
-    perplexity: <Perplexity.Color size={20} />,
-    groq: <Groq size={20} />,
-    together: <Together.Color size={20} />,
-    xai: <XAI size={20} />,
-    meta: <Meta.Color size={20} />,
-    huggingface: <HuggingFace.Color size={20} />,
-    qwen: <Qwen.Color size={20} />,
-    deepseek: <DeepSeek.Color size={20} />,
-    zai: <ZAI size={20} />,
-    cerebras: <Cerebras.Color size={20} />,
-    cloudflare: <Cloudflare.Color size={20} />,
-    maximo: <Image src="/partners/max.jpeg" alt="Maximo AI" width={20} height={20} className="rounded-sm object-cover" />,
-    helix: <Image src="/providers/helix.svg" alt="Helix" width={20} height={20} className="rounded-sm" />,
-    bai: <img src="/providers/bai.png" alt="B.AI" width={20} height={20} className="rounded-[5px] object-cover" style={{ width: 20, height: 20 }} />,
-    // Judgment provider (TypeSafe Jev) — decision models, no brand icon in the set
-    typesafe: <Image src="/providers/typesafe.png" alt="TypeSafe" width={18} height={18} className="rounded-[5px]" />,    // Voice providers (no brand icons in the icon set) — neutral voice glyph
-    deepgram: <AudioLines size={18} />,
-    cartesia: <AudioLines size={18} />,
-    spitch: <Image src="/providers/spitch.png" alt="Spitch" width={20} height={20} className="rounded-[5px] object-cover" />,
-    assemblyai: <AssemblyAI.Color size={20} />,
-    elevenlabs: <ElevenLabs size={20} />,
-};
+const PROVIDERS_PER_PAGE = 10;
 
 function getProviderLogo(providerId: string, size: 'sm' | 'md' = 'md') {
-    const logo = PROVIDER_LOGOS[providerId] ?? (
+    const logo = getProviderLogoMark(providerId) ?? (
         <span className="text-xs font-semibold uppercase text-muted-foreground">
             {providerId.slice(0, 1)}
         </span>
@@ -99,6 +70,7 @@ export function ProviderKeyManager({ projectId }: ProviderKeyManagerProps) {
     const [dialogOpen, setDialogOpen] = useState(false);
     const [existingKeyHint, setExistingKeyHint] = useState<string | null>(null);
     const [isProviderActive, setIsProviderActive] = useState(true);
+    const [page, setPage] = useState(1);
 
     // Fetch provider keys
     const { data, isLoading } = useQuery<ProviderKeysResponse>({
@@ -270,10 +242,17 @@ export function ProviderKeyManager({ projectId }: ProviderKeyManagerProps) {
     const configuredProviders = data?.providers.filter(p => p.hasKey) || [];
     const availableProviders = SUPPORTED_PROVIDERS.filter(p => !data?.providers.find(dp => dp.provider === p.id && dp.hasKey));
 
+    const totalPages = Math.max(1, Math.ceil(SUPPORTED_PROVIDERS.length / PROVIDERS_PER_PAGE));
+    const currentPage = Math.min(page, totalPages);
+    const pageProviders = SUPPORTED_PROVIDERS.slice(
+        (currentPage - 1) * PROVIDERS_PER_PAGE,
+        currentPage * PROVIDERS_PER_PAGE,
+    );
+
     return (
         <div className="space-y-1">
             {/* All Providers as a List */}
-            {SUPPORTED_PROVIDERS.map((provider) => {
+            {pageProviders.map((provider) => {
                 const keyData = data?.providers.find(p => p.provider === provider.id);
                 const hasKey = keyData?.hasKey ?? false;
                 const isActive = keyData?.isActive ?? false;
@@ -322,6 +301,34 @@ export function ProviderKeyManager({ projectId }: ProviderKeyManagerProps) {
                     </button>
                 );
             })}
+
+            {totalPages > 1 && (
+                <div className="flex items-center justify-between px-3 pt-3">
+                    <p className="text-xs text-muted-foreground">
+                        Page {currentPage} of {totalPages}
+                    </p>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs"
+                            onClick={() => setPage(Math.max(1, currentPage - 1))}
+                            disabled={currentPage === 1}
+                        >
+                            Previous
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs"
+                            onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
+                            disabled={currentPage === totalPages}
+                        >
+                            Next
+                        </Button>
+                    </div>
+                </div>
+            )}
 
             {/* Add/Edit Dialog - Cenpact Design */}
             <Dialog open={dialogOpen} onOpenChange={(open) => {

@@ -11,8 +11,7 @@ An organization is the top-level container in Cencori. It contains:
 - Multiple projects (your AI applications)
 - Team members with different roles
 - Billing and credit balance
-- Custom provider configurations
-- Shared security policies
+- An audit log of administrative changes
 
 ## Organization Structure
 
@@ -26,8 +25,8 @@ Organization (Acme Corp)
 ├── Owner (Full access)
 ├── Admins (Manage projects, view billing)
 └── Members (Access projects)
-├── Custom Providers
-└── Billing
+├── Billing
+└── Audit Log
 ```
 
 ## Creating an Organization
@@ -35,27 +34,28 @@ Organization (Acme Corp)
 When you first sign up to Cencori, a personal organization is automatically created for you. You can create additional organizations for different teams or companies.
 
 ### Steps to Create:
-1. Click your profile in the top-right corner
-2. Select "Create Organization"
-3. Enter organization name and description
-4. Click "Create"
+1. Open the user menu (your name, bottom-left of the sidebar)
+2. Select **New organization**
+3. Enter the organization name and create it
 
 ## User Roles
 
 | Role | Permissions |
 |------|-------------|
-| **Owner** | Full organization control, manage billing, delete org, manage all projects, invite/remove members |
-| **Admin** | Create/manage projects, view billing, invite members, manage custom providers. Cannot delete org |
-| **Member** | Access assigned projects, view logs, generate keys. Cannot view billing or manage team |
+| **Owner** | Full organization control, including deleting the organization |
+| **Admin** | Invite members and change their roles. Can view the audit log |
+| **Member** | Access the organization's projects |
 
 ## Inviting Team Members
 
-1. Go to your organization settings
-2. Click "Team" in the sidebar
-3. Click "Invite Member"
+1. Open **Organization settings** (from the user menu)
+2. Go to **Teams**
+3. Click **Invite member**
 4. Enter their email address
 5. Select their role (Admin or Member)
-6. Click "Send Invitation"
+6. Send the invitation
+
+Inviting members requires a paid plan (Pro, Team, or Enterprise).
 
 The invited user will receive an email with an invitation link. They must accept the invitation to join your organization.
 
@@ -78,31 +78,38 @@ Credits are not shared between organizations. If you create multiple organizatio
 
 ## Organization Settings
 
+Open **Organization settings** from the user menu. The settings sidebar has:
+
 ### General
 - Organization name
-- Description
-- Organization slug (URL identifier)
+- Organization URL (slug)
+- Organization ID
 
-### Team
-- View all members
-- Pending invitations
-- Manage roles
-- Remove members
+### Advanced
+- Identity & access (SSO)
+- Audit infrastructure
+- Usage export
+- Delete organization (owner only)
+
+### Teams
+- View members
+- Invite members and change their roles
+- Leave the organization
 
 ### Billing
-- Current balance
-- Add credits
-- Transaction history
-- Payment methods
+- Credit balance and top-ups
+- Plan and payment details
 
-### Danger Zone
-- Delete organization (owner only)
-- Transfer ownership
+### Usage
+- Usage across the organization's projects
+
+### Audit Log
+- Administrative changes across the organization. See [Audit Logs](/docs/platform/audit-logs).
 
 ## Best Practices
 
 - Create separate organizations for completely different businesses or clients
 - Use projects within an organization to separate environments (dev, staging, prod)
 - Assign the minimum required role to team members (principle of least privilege)
-- Regularly review team members and remove those who no longer need access
+- Regularly review team members and their roles
 - Set up billing alerts to avoid unexpected charges

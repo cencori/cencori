@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Copy, Check, Trash2, Globe, Clock, Webhook, Server, AlertTriangle, Plus, MoreHorizontal, RefreshCw, DollarSign, Bell, Loader2, ArrowUpRight } from "lucide-react";
+import { Copy, Check, Trash2, Globe, Clock, Webhook, Server, AlertTriangle, Plus, MoreHorizontal, RefreshCw, DollarSign, Bell, Loader2 } from "lucide-react";
 import { ArrowPathIcon } from "@heroicons/react/24/outline";
 import { toast } from "@/components/ui/toast";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -35,7 +35,6 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { useOrganizationProject } from "@/lib/contexts/OrganizationProjectContext";
-import Link from "next/link";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -53,6 +52,7 @@ import { onSettingsTab } from "@/lib/navigation-intent";
 import { CostGraphIntegration } from "@/components/finops/CostGraphIntegration";
 import { CardShell } from "@/components/integrations/CardShell";
 import { IntegrationGroup } from "@/components/integrations/IntegrationGroup";
+import { PiiProtectionSetting, ResponseCachingSetting } from "@/components/dashboard/ProjectRequestSettings";
 
 interface ProjectData {
   id: string;
@@ -752,14 +752,8 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                   disabled={isSaving}
                 />
               </div>
-              <div className="flex flex-col gap-3 border-b border-border/30 bg-background/25 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-[11px] text-muted-foreground">Maximum 48 characters.</p>
-                <Button size="sm" className="h-7 px-3 text-xs" onClick={handleSave} disabled={isSaving || !hasNameChanges}>
-                  {isSaving ? "Saving…" : "Save"}
-                </Button>
-              </div>
               {/* Project ID */}
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 gap-2 md:gap-0">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 gap-2 md:gap-0 border-b border-border/30">
                 <div className="space-y-0.5">
                   <p className="text-sm md:text-xs font-medium">Project ID</p>
                   <p className="text-xs md:text-[10px] text-muted-foreground">Reference used in APIs and URLs.</p>
@@ -774,49 +768,25 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                   </Button>
                 </div>
               </div>
-            </div>
-          </section>
-
-          {/* Project Observability */}
-          <section>
-            <div className="space-y-0.5">
-              <h2 className="text-sm font-medium">Project observability</h2>
-              <p className="text-xs md:text-[10px] text-muted-foreground">View usage and request statistics.</p>
-            </div>
-            <div className="overflow-hidden rounded-lg border border-border/35 bg-muted/30">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 gap-2 md:gap-0">
-                <div className="space-y-0.5">
-                  <p className="text-sm md:text-xs font-medium">Observability</p>
-                  <p className="text-xs md:text-[10px] text-muted-foreground">See requests, costs, and latency metrics.</p>
-                </div>
-                <Button size="sm" className="w-full md:w-auto h-10 md:h-7 text-sm md:text-xs" asChild>
-                  <Link href={`/${orgSlug}/${projectSlug}/observability`}>
-                    View
-                  </Link>
+              <div className="flex justify-end bg-background/25 px-4 py-3">
+                <Button size="sm" className="h-7 px-3 text-xs" onClick={handleSave} disabled={isSaving || !hasNameChanges}>
+                  {isSaving ? "Saving…" : "Save"}
                 </Button>
               </div>
             </div>
           </section>
 
-          {/* Organization */}
+          {/* Data protection */}
           <section>
             <div className="space-y-0.5">
-              <h2 className="text-sm font-medium">Organization</h2>
-              <p className="text-xs md:text-[10px] text-muted-foreground">Manage organization name, members, and billing.</p>
+              <h2 className="text-sm font-medium">Request handling</h2>
+              <p className="text-xs text-muted-foreground md:text-[10px]">Optional behaviour for requests sent through this project. Both are off by default.</p>
             </div>
             <div className="overflow-hidden rounded-lg border border-border/35 bg-muted/30">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 gap-2 md:gap-0">
-                <div className="space-y-0.5">
-                  <p className="text-sm md:text-xs font-medium">{organizations.find((item) => item.slug === orgSlug)?.name ?? "Organization"}</p>
-                  <p className="text-xs md:text-[10px] text-muted-foreground">Organization-level settings live outside this project.</p>
-                </div>
-                <Button size="sm" className="w-full md:w-auto h-10 md:h-7 text-sm md:text-xs gap-1.5" asChild>
-                  <Link href={`/${orgSlug}/~/settings`}>
-                    Open settings
-                    <ArrowUpRight className="h-3.5 w-3.5" />
-                  </Link>
-                </Button>
+              <div className="border-b border-border/30">
+                <ResponseCachingSetting projectId={project.id} />
               </div>
+              <PiiProtectionSetting projectId={project.id} />
             </div>
           </section>
 

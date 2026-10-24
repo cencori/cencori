@@ -16,6 +16,7 @@ import type { createAdminClient } from '@/lib/supabaseAdmin';
 import { evaluatePolicies } from '@/lib/governance/policy-engine';
 import type { EvalContext, PolicyAction, FiredRule, PolicyDirection, Policy } from '@/lib/governance/policy-types';
 import { listActivePolicies } from '@/lib/governance/policy-store';
+import { isGovernanceEnabled } from '@/lib/governance/flag';
 import { deliverAuditEntry } from '@/lib/governance/delivery';
 import { checkCustomRateLimit } from '@/lib/rate-limit';
 import { classifyContent, policiesNeedModelSignals } from '@/lib/governance/guardrail-classifier';
@@ -54,7 +55,7 @@ export async function orgHasOutputPolicies(
     orgId: string | null | undefined,
     projectId?: string | null,
 ): Promise<boolean> {
-    if (!orgId) return false;
+    if (!orgId || !isGovernanceEnabled()) return false;
     let policies: Policy[];
     try {
         policies = await getActivePoliciesCached(supabase, orgId);
@@ -145,6 +146,9 @@ export async function enforcePolicies(
         tier?: SubscriptionTier;
     },
 ): Promise<PolicyEnforcement> {
+    if (!isGovernanceEnabled()) {
+        return { decision: 'allow', fired: [], rationale: 'governance disabled', redactions: [] };
+    }
     let policies: Policy[];
     try {
         policies = await getActivePoliciesCached(supabase, params.orgId);

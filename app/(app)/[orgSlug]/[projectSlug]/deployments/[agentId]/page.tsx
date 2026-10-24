@@ -218,8 +218,8 @@ export default function AgentDetailPage({ params }: PageProps) {
 
                         {/* Related surfaces */}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                            <LinkCard title="Logs" desc="Runtime logs & errors" href={`/${orgSlug}/${projectSlug}/logs`} />
-                            <LinkCard title="Observability" desc="Health & performance" href={`/${orgSlug}/${projectSlug}/observability`} />
+                            <LinkCard title="Logs" desc="Runtime logs & errors" href={`/${orgSlug}/${projectSlug}/ai-gateway/logs`} />
+                            <LinkCard title="Usage" desc="Requests, spend & latency" href={`/${orgSlug}/${projectSlug}/ai-gateway`} />
                             <LinkCard title="Memory" desc="Agent memory" href={`/${orgSlug}/${projectSlug}/memory`} />
                             <LinkCard title="AI Gateway" desc="Models & spend" href={`/${orgSlug}/${projectSlug}/ai-gateway`} />
                         </div>

@@ -121,6 +121,34 @@ const nextConfig: NextConfig = {
         destination: "/ai-gateway/models",
         permanent: true,
       },
+      // Gateway security is now opt-in PII protection only (2026-10-24):
+      // content filtering, prompt-injection checks, the incidents page, and
+      // governance were retired.
+      ...[
+        "content-filtering",
+        "prompt-injection",
+        "incidents",
+      ].map((slug) => ({
+        source: `/docs/security/${slug}`,
+        destination: "/docs/security/pii-detection",
+        permanent: true,
+      })),
+      {
+        source: "/docs/security/governance",
+        destination: "/docs/platform/audit-logs",
+        permanent: true,
+      },
+      {
+        source: "/docs/platform/ai-gateway/semantic-caching",
+        destination: "/docs/platform/ai-gateway/caching",
+        permanent: true,
+      },
+      // Custom providers retired from the dashboard (2026-10-24).
+      ...[
+        "/docs/platform/ai-gateway/custom-providers",
+        "/docs/guides/custom-providers",
+        "/docs/api/custom-providers",
+      ].map((source) => ({ source, destination: "/docs/platform/byok", permanent: true })),
     ];
   },
   // Configure images to allow all local paths (Next.js 16 requirement)

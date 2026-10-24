@@ -1,50 +1,48 @@
 ---
-title: "Observability"
-description: "Gain complete visibility into your AI traffic. Analyze logs, traces, costs, and performance metrics."
+title: "Usage & Logs"
+description: "See your project's AI traffic: usage charts on the AI Gateway overview, and every request in Logs."
 section: "AI Gateway"
 order: 1
 ---
 
-Cencori provides a complete observability stack out-of-the-box, eliminating the need for external tools like LangSmith or Helicone for most use cases.
+Cencori records every request that goes through the gateway. You see it in two places: charts on the **AI Gateway** overview, and individual requests in **AI Gateway → Logs**.
 
-## Request Logs
+## AI Gateway overview
 
-Every request sent through the gateway is logged with granular detail.
+Open your project and go to **AI Gateway → Overview**. Pick a period at the top — **Last hour**, **24 hours**, **7 days**, **30 days**, or **All time** — and every chart and table on the page updates together.
 
-- **Inputs/Outputs**: Full prompt and completion text.
-- **Metadata**: Latency, TTFT (Time to First Token), Provider, Model.
-- **Cost**: Calculated based on provider pricing (automatically updated).
-- **Status**: Success, Failure, or Content Verification flags.
+**Usage**
 
-To view logs, navigate to **Dashboard > Logs**. You can filter by:
-- `status` (e.g., `error`, `success`)
-- `model` (e.g., `gpt-4o`)
-- `metadata.user_id`
+| Chart | Shows |
+| :--- | :--- |
+| **Requests** | Requests over time, with the number that succeeded |
+| **Success rate** | Share of successful requests over time, with the error count |
+| **Spend** | Cost over time, with the period total |
+| **Tokens** | Input and output tokens over time, with the total |
+| **Model usage** | Requests per model (top six, the rest grouped as Other) |
+| **Cost by provider** | Spend per provider |
+| **Latency** | P50, P95, and P99 response time over time |
+| **Errors** | Failed, filtered, and blocked requests over time, with the error rate |
 
-## Traces
+The Model usage, Cost by provider, Latency, and Errors charts show at most your plan's history: 7 days on Free, 30 days on Pro, 90 days on Team, and all time on Enterprise.
 
-For complex workflows (Agents, RAG), Cencori stitches individual requests into a **Trace**.
+**Requests**
 
-- **Root Span**: The initial user request.
-- **Child Spans**: Tool calls, embedding generation, or retrieval steps.
-- **Visualization**: A Gantt-chart view of the entire chain execution.
+Below the charts, the five most recent requests in the period are listed, in the same format as Logs. Click a row for its full details, or **View logs** for the full list.
 
-To enable tracing, simpy pass a `trace_id` header or use the `parent_id` parameter in our SDKs (auto-handled by LangChain integration).
+## Logs
 
-## Cost Tracking & Analytics
+Go to **AI Gateway → Logs** to see every request. Each entry includes:
 
-The **Dashboard > Analytics** tab provides high-level insights:
+- **Inputs and outputs**: the full request and response
+- **Metadata**: model, provider, latency, and status
+- **Usage and cost**: tokens and cost, calculated from provider pricing
 
-- **Total Spend**: Daily/Monthly breakdown.
-- **Volume**: Request count and token throughput.
-- **Latency P95/P99**: Identify slow providers or regions.
-- **Error Rate**: Monitor stability.
+Filter by status, model, time range, and API key, or search. Click any request to open its details. See [AI Request Logs](/docs/guides/audit-logs) for exporting and how far back you can view.
 
-## Web Telemetry
+## Web telemetry
 
-Track web traffic from your deployed application directly in Cencori. Logs appear under **Dashboard > Logs > HTTP Traffic** alongside API request traffic, with your app's real domain shown as the host.
-
-### SDK Integration
+You can report your application's own web requests to Cencori:
 
 ```typescript
 import { Cencori } from 'cencori';
@@ -62,21 +60,15 @@ await cencori.telemetry.reportWebRequest({
 });
 ```
 
-### Direct API
+Or call the endpoint directly:
 
 ```
 POST /api/v1/telemetry/web
 Headers: { "CENCORI_API_KEY": "csk_..." }
 ```
 
-The SDK method is fire-and-forget — it never throws and never blocks your application.
+The SDK method is fire-and-forget — it never throws and never blocks your application. Reported web requests are stored, but they are not currently shown in the dashboard.
 
-## Data Export (Enterprise)
+## Exporting usage
 
-You can export your raw log data to your own data warehouse.
-
-- **S3 Bucket**: JSONL files delivered hourly.
-- **Datadog**: Real-time log streaming.
-- **BigQuery / Snowflake**: Direct sync.
-
-Contact sales to enable Data Export.
+To send usage to a FinOps tool, see [Usage Export](/docs/platform/usage-export). To export request logs, see [AI Request Logs](/docs/guides/audit-logs#exporting-logs).

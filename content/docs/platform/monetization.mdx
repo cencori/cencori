@@ -1,14 +1,14 @@
 ---
-title: "Monetization"
-description: "Bill your end-users for AI usage with rate plans, quotas, and Stripe Connect payouts."
+title: "Revenue"
+description: "Bill your customers for AI usage with plans, quotas, and Stripe Connect payouts."
 section: "Platform"
 order: 3
 ---
 
-Monetization lets you charge your customers for AI usage. Set per-user rate plans with token/request limits, apply markup, and collect payments through Stripe Connect — all from the dashboard.
+Revenue lets you charge your customers for AI usage. Set per-customer plans with token/request limits, apply markup, and collect payments through Stripe Connect — all from **AI Gateway → Revenue** in the dashboard.
 
 > [!NOTE]
-> New to Monetization? Start with the [Setup Guide](/docs/guides/monetization-setup) — a step-by-step walkthrough for non-technical users. This page is the API reference for your engineering team.
+> New to Revenue? Start with the [Setup Guide](/docs/guides/monetization-setup) — a step-by-step walkthrough for non-technical users. This page is the API reference for your engineering team.
 
 ## How It Works
 
@@ -17,7 +17,7 @@ Monetization lets you charge your customers for AI usage. Set per-user rate plan
 3. If allowed, process the request.
 4. Report the usage back to Cencori.
 5. Cencori tracks everything — limits, costs, revenue.
-6. You view it all in the Monetization dashboard.
+6. You view it all under **AI Gateway → Revenue**.
 
 There are two ways to connect:
 
@@ -28,7 +28,7 @@ There are two ways to connect:
 
 ## Option 1: AI Gateway (Recommended)
 
-If you route AI requests through the Cencori gateway, Monetization works automatically. Just pass the user ID in your request:
+If you route AI requests through the Cencori gateway, Revenue metering works automatically. Just pass the user ID in your request:
 
 ```typescript
 const response = await fetch("https://api.cencori.com/v1/chat/completions", {
@@ -227,7 +227,7 @@ async function handleUserMessage(userId: string, message: string) {
 
 ## Rate Plans
 
-Rate plans define per-user limits and pricing. Create them in the dashboard under **Monetization > Rate Plans**.
+Rate plans (shown as **Plans** in the dashboard) define per-customer limits and pricing. Create them under **AI Gateway → Revenue → Plans**.
 
 Each plan can set:
 
@@ -433,8 +433,8 @@ Collect payments from your end-users using Stripe Connect. Cencori acts as the p
 
 Stripe Connect is **organization-scoped**, not project-scoped. You connect one Stripe account per organization, and every project in that organization reuses it.
 
-1. Open any project's **Monetization > Configuration** page.
-2. Click **Connect Stripe Account**.
+1. Open any project's **AI Gateway → Revenue** page, on the **Overview** tab.
+2. Under **Payment providers**, click **Connect** on the Stripe card.
 3. Complete the Stripe onboarding flow.
 4. Once connected, every project in that organization can generate invoices and collect payments.
 
@@ -464,12 +464,12 @@ Set the webhook URL in your Stripe dashboard to `https://your-domain.com/api/bil
 
 ## Dashboard
 
-The **Monetization** page has four tabs:
+The **Revenue** page (**AI Gateway → Revenue**) has four tabs:
 
-- **Configuration**: Enable/disable billing, set default markup, connect Stripe.
-- **End Users**: View all users, their plans, usage, and status. Block/unblock users.
-- **Rate Plans**: Create and manage rate plans with limits and pricing.
-- **Revenue**: Usage stats, cost breakdown, daily trends, and top users.
+- **Overview**: Revenue activity charts, the **Usage billing** settings (turn billing on/off, default markup, billing cycle, default plan), and payment providers (connect Stripe).
+- **Customers**: Customer charts and the customer directory — plans, usage, and status. Block/unblock customers and assign plans.
+- **Plans**: Create and manage plans with limits and pricing.
+- **Invoices**: Revenue, provider cost, and margin over time, top customers, invoices, and exports.
 
 ## Authentication
 
@@ -531,7 +531,7 @@ Possible `reason` values:
 
 ## SDK Support
 
-The TypeScript SDK (`cencori` on npm) currently covers the AI Gateway, which handles Monetization automatically when you pass `user: "user_123"` in your requests. Dedicated `cencori.billing.checkQuota()` and `cencori.billing.recordUsage()` methods for the Usage Events API path are not yet available — use the REST endpoints directly for now.
+The TypeScript SDK (`cencori` on npm) currently covers the AI Gateway, which handles Revenue metering automatically when you pass `user: "user_123"` in your requests. Dedicated `cencori.billing.checkQuota()` and `cencori.billing.recordUsage()` methods for the Usage Events API path are not yet available — use the REST endpoints directly for now.
 
 ## Limits
 

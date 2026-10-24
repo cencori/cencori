@@ -1,23 +1,24 @@
 'use client';
 
-import { use } from 'react';
-import { Activity03Icon } from '@hugeicons/core-free-icons';
-import { ProjectPickerLanding } from '@/components/dashboard/ProjectPickerLanding';
+import { use, useEffect } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { getConsoleRoute } from '@/lib/console/routing';
 
 interface PageProps {
     params: Promise<{ orgSlug: string }>;
 }
 
-export default function OrgLogsPickerPage({ params }: PageProps) {
+// Logs moved under AI Gateway; keep old links and bookmarks working.
+export default function LegacyOrgLogsRedirect({ params }: PageProps) {
     const { orgSlug } = use(params);
-    return (
-        <ProjectPickerLanding
-            orgSlug={orgSlug}
-            title="Logs"
-            subtitle="Select a project to view its request logs."
-            icon={Activity03Icon}
-            destinationSuffix="logs"
-            emptyStateBody="Logs live inside projects. Create a project to start capturing request logs."
-        />
-    );
+    const pathname = usePathname();
+    const router = useRouter();
+
+    useEffect(() => {
+        router.replace(
+            getConsoleRoute(pathname) ? '/organization/ai-gateway/logs' : `/${orgSlug}/~/ai-gateway/logs`,
+        );
+    }, [orgSlug, pathname, router]);
+
+    return null;
 }

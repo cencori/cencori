@@ -1,66 +1,51 @@
 ---
 title: "Analytics Overview"
-description: "Track usage, costs, performance, and security metrics across all your AI integrations."
+description: "Track usage, cost, latency, and errors for your AI traffic — in the dashboard or through the Metrics API."
 section: "Guides"
 order: 6
 ---
 
-## What Analytics Does Cencori Provide?
+## Where analytics live
 
-Cencori's analytics dashboard gives you complete visibility into your AI infrastructure:
+Your project's analytics are on the **AI Gateway** overview. Open your project, go to **AI Gateway → Overview**, and pick a period: **Last hour**, **24 hours**, **7 days**, **30 days**, or **All time**.
 
-- **Request Volume:** Track total requests and trends over time.
-- **Cost Analysis:** Detailed breakdown of spend by model and provider.
-- **Performance:** Monitor latency and success rates.
-- **Security:** Track and visualize security incidents (PII, injections).
-- **User Insights:** Analyze usage patterns by user ID or API key.
+The overview shows:
 
-## Key Metrics
+- **Requests** and **Success rate** over time
+- **Spend** over time
+- **Tokens**, split into input and output
+- **Model usage** — requests per model
+- **Cost by provider** — spend per provider
+- **Latency** — P50, P95, and P99 over time
+- **Errors** — failed, filtered, and blocked requests, with the error rate
+- The five most recent requests, with a link to the full **Logs**
+
+See [Usage & Logs](/docs/platform/ai-gateway/observability) for what each chart shows.
+
+## Key metrics
 
 | Metric | Description | Goal |
 |--------|-------------|------|
-| **Total Requests** | Number of AI requests processed. | Monitor growth |
-| **Success Rate** | Percentage of successful vs error responses. | > 99% |
-| **Total Cost** | Cumulative spend (Provider + Markup). | Stay within budget |
-| **Avg Latency** | Time from request to response. | < 2s for UI tasks |
-| **Security Incidents** | Count of blocked or flagged requests. | Minimize threats |
+| **Requests** | Number of AI requests processed. | Monitor growth |
+| **Success rate** | Share of successful requests. | > 99% |
+| **Spend** | Cost of AI usage in the period. | Stay within budget |
+| **Latency (P95)** | Response time that 95% of requests beat. | < 2s for UI tasks |
+| **Error rate** | Share of failed, filtered, or blocked requests. | As low as possible |
 
-## Charts and Visualizations
+## Common use cases
 
-### Requests Over Time
-Identify peak usage periods and long-term growth trends with our interactive line charts.
+### Performance debugging
+Watch the Latency chart for P95/P99 spikes, then open **AI Gateway → Logs** and filter by model to find the slow requests.
 
-### Cost Breakdown
-Pie and bar charts show you exactly where your budget is going. Compare costs across OpenAI, Anthropic, and Gemini models.
+### Cost control
+Use Cost by provider and Model usage to see where spend goes, and compare models before switching.
 
-### Model Distribution
-See which models are most popular in your application to help with model consolidation or migration decisions.
+### Capacity planning
+Use request trends to forecast usage and make sure your organization has enough credits.
 
-### Security Threat Map
-Monitor the distribution of security incidents over time to identify coordinated prompt injection attacks or PII leakage trends.
+## Accessing analytics via the API
 
-## Filtering and Segmentation
-
-Slice your data to find exactly what you're looking for:
-- **Time Range:** Filter by last 24h, 7 days, 30 days, or custom ranges.
-- **Model/Provider:** Compare performance and cost across different vendors.
-- **API Key:** Track usage per developer, environment (staging/prod), or application.
-- **User ID:** (Optional) If you pass user IDs, you can analyze behavior per user.
-
-## Common Use Cases
-
-### Performance Debugging
-Find slow requests by filtering for high latency. Identify if specific models or provider regions are causing bottlenecks.
-
-### Capacity Planning
-Use request trends to forecast future usage and ensure your organization has enough credits.
-
-### Security Auditing
-Review spikes in security incidents to determine if they correlate with new deployments or external traffic shifts.
-
-## Accessing Analytics via API
-
-Fetch metrics programmatically for your own internal dashboards using the Metrics API (`https://api.cencori.com/v1/metrics`):
+Fetch metrics for your own dashboards with the Metrics API (`https://api.cencori.com/v1/metrics`). `period` accepts `1h`, `24h` (default), `7d`, `30d`, or `mtd` (month to date):
 
 ```typescript
 // fetch-analytics.ts
@@ -73,12 +58,13 @@ const response = await fetch(
   }
 );
 
-const { data } = await response.json();
-// data includes request counts, cost, latency, and breakdowns by provider/model
+const metrics = await response.json();
+// metrics.requests, metrics.cost, metrics.tokens, metrics.latency,
+// metrics.providers, and metrics.models
 ```
 
-## Best Practices
-- **Review weekly:** Set a recurring task to check your cost and success rate trends.
-- **Set Alerts:** Configure low-balance and cost-threshold alerts to avoid surprises.
-- **Track versions:** Use different API keys for different versions of your app to compare their efficiency.
-- **Share reports:** Export analytics views to share with your security or finance teams.
+See the [Metrics API reference](/docs/api/metrics) for the full response.
+
+## Best practices
+- **Review weekly:** check your cost and success rate trends.
+- **Track versions:** use different API keys for different versions of your app, then filter Logs by API key to compare them.
