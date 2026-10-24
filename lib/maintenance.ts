@@ -20,9 +20,10 @@ const READ_TIMEOUT_MS = 1_500;
 const DEFAULT_MESSAGE =
   "Cencori is down for scheduled maintenance while we move to our new infrastructure. We'll be back shortly.";
 
+// The bypass token travels only in this cookie or in a POST body: Brimble's
+// request logs keep URLs and most headers in plain text but redact Cookie.
 export const MAINTENANCE_BYPASS_COOKIE = "cencori-maintenance-bypass";
-export const MAINTENANCE_BYPASS_HEADER = "x-cencori-maintenance-bypass";
-const BYPASS_PARAM = "maintenance_bypass";
+export const MAINTENANCE_BYPASS_PATH = "/__maintenance/bypass";
 
 let cached: { state: MaintenanceState; at: number } | null = null;
 let inflight: Promise<MaintenanceState> | null = null;
@@ -121,44 +122,54 @@ function maintenancePage(message: string): string {
   <p>${escapeHtml(message)}</p>
   <p>Follow progress on <a href="https://status.cencori.com">status.cencori.com</a>.</p>
 </main>
+<script>
+  // Bypass link: /#maintenance_bypass=<token>. The fragment never reaches a server.
+  (function () {
+    var m = location.hash.match(/maintenance_bypass=([^&]+)/);
+    if (!m) return;
+    history.replaceState(null, "", location.pathname + location.search);
+    fetch("${MAINTENANCE_BYPASS_PATH}", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: "token=" + m[1],
+    }).then(function (r) { if (r.ok) location.reload(); });
+  })();
+</script>
 </body>
 </html>`;
 }
 
+// POST token=<token> sets the bypass cookie (the maintenance page does this
+// for a /#maintenance_bypass=<token> link). Answers whether maintenance is on
+// or not, so the bypass can be set up before a window starts.
+async function bypassResponse(request: NextRequest): Promise<NextResponse> {
+  if (request.method !== "POST") return new NextResponse(null, { status: 405, headers: { Allow: "POST" } });
+  const offered = new URLSearchParams(await request.text()).get("token");
+  if (!tokenMatches(offered)) return new NextResponse(null, { status: 403 });
+  const response = new NextResponse(null, { status: 204 });
+  response.cookies.set(MAINTENANCE_BYPASS_COOKIE, offered!, {
+    httpOnly: true,
+    secure: request.nextUrl.protocol === "https:",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 12 * 60 * 60,
+  });
+  return response;
+}
+
 /**
  * The response for this request while maintenance is on, or null to carry on.
- * A `?maintenance_bypass=<token>` visit sets a bypass cookie and reloads
- * without the parameter; API clients send the token in a header instead.
+ * The bypass is the cookie only; curl sends it with -b.
  */
 export async function maintenanceResponse(request: NextRequest): Promise<NextResponse | null> {
-  const { pathname, searchParams } = request.nextUrl;
+  const { pathname } = request.nextUrl;
+  if (pathname === MAINTENANCE_BYPASS_PATH) return bypassResponse(request);
   if (isExemptPath(pathname)) return null;
 
   const state = await getMaintenanceState();
   if (!state.enabled) return null;
 
-  const offered = searchParams.get(BYPASS_PARAM);
-  if (offered !== null) {
-    const clean = request.nextUrl.clone();
-    clean.searchParams.delete(BYPASS_PARAM);
-    const response = NextResponse.redirect(clean);
-    if (tokenMatches(offered)) {
-      response.cookies.set(MAINTENANCE_BYPASS_COOKIE, offered, {
-        httpOnly: true,
-        secure: request.nextUrl.protocol === "https:",
-        sameSite: "lax",
-        path: "/",
-        maxAge: 12 * 60 * 60,
-      });
-    }
-    return response;
-  }
-  if (
-    tokenMatches(request.headers.get(MAINTENANCE_BYPASS_HEADER)) ||
-    tokenMatches(request.cookies.get(MAINTENANCE_BYPASS_COOKIE)?.value)
-  ) {
-    return null;
-  }
+  if (tokenMatches(request.cookies.get(MAINTENANCE_BYPASS_COOKIE)?.value)) return null;
 
   const message = state.message ?? DEFAULT_MESSAGE;
   const headers = {

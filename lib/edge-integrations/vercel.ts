@@ -248,7 +248,7 @@ export async function createVercelLogDrain(input: {
             deliveryFormat: 'json',
             url: input.endpoint,
             headers: {
-                'x-cencori-edge-secret': input.ingestSecret,
+                Authorization: `Bearer ${input.ingestSecret}`,
             },
         },
     });
