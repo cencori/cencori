@@ -7,7 +7,25 @@ export const dynamic = "force-dynamic";
 // announced schedule while it hasn't ended, and whether maintenance is on now
 // (only bypass-token holders get a page to show that on). Public; nothing in
 // the row is secret.
+// Local preview without touching the shared row: MAINTENANCE_PREVIEW=
+// scheduled | underway | on, ignored in production.
+function previewResponse(): NextResponse | null {
+  const preview = process.env.NODE_ENV === "production" ? undefined : process.env.MAINTENANCE_PREVIEW;
+  if (!preview) return null;
+  const at = (minutes: number) => new Date(Date.now() + minutes * 60_000).toISOString();
+  const body =
+    preview === "on"
+      ? { enabled: true, scheduled: null }
+      : preview === "underway"
+        ? { enabled: false, scheduled: { start: at(-5), end: at(25) } }
+        : { enabled: false, scheduled: { start: at(24 * 60), end: at(24 * 60 + 30) } };
+  return NextResponse.json(body, { headers: { "Cache-Control": "no-store" } });
+}
+
 export async function GET() {
+  const preview = previewResponse();
+  if (preview) return preview;
+
   const { data, error } = await createAdminClient()
     .from("platform_maintenance")
     .select("enabled, scheduled_start, scheduled_end")
