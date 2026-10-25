@@ -17,6 +17,7 @@ import { decryptApiKey } from '@/lib/encryption';
 import { mintClientToken } from '@/lib/embedded/client-tokens';
 import { ensureWidgetInstallation } from '@/lib/embedded/widget';
 import {
+    downloadMedia,
     markReadAndTyping,
     patchChannelMetadata,
     sendText,
@@ -35,7 +36,11 @@ const CONVERSATION_MAX_TURNS = 40;
 /** A chat quiet this long starts over (Meta's own customer-service window is 24 hours). */
 const CONVERSATION_IDLE_MS = 24 * 60 * 60_000;
 const FALLBACK_REPLY = 'Sorry, I couldn\'t answer that just now. Please try again in a moment.';
-const UNSUPPORTED_REPLY = 'Sorry, I can only read text messages for now. Could you type that out?';
+const UNSUPPORTED_REPLY = 'Sorry, I can only read text and voice notes for now. Could you type that out?';
+const UNHEARD_REPLY = 'Sorry, I couldn\'t catch that voice note. Could you send it again or type it?';
+/** Voice-note transcription models, in the order tried. */
+const VOICE_MODELS = ['nova-3', 'whisper-1'];
+const VOICE_ATTEMPT_TIMEOUT_MS = 15_000;
 
 let redis: RedisClient | null | undefined;
 function getRedis(): RedisClient | null {
@@ -57,7 +62,9 @@ async function firstDelivery(messageId: string): Promise<boolean> {
     }
 }
 
-interface Queued { id: string; text: string | null }
+interface Queued { id: string; text: string | null; audio?: string | null }
+
+const queued = (m: InboundMessage): Queued => ({ id: m.id, text: m.text, audio: m.audio?.id ?? null });
 
 export async function handleInboundMessages(db: Admin, channel: WhatsAppChannel, messages: InboundMessage[]): Promise<void> {
     const fresh: InboundMessage[] = [];
@@ -79,16 +86,16 @@ async function answerCustomer(db: Admin, channel: WhatsAppChannel, messages: Inb
     const name = messages.find((m) => m.name)?.name ?? null;
     const client = getRedis();
     if (!client) {
-        await answer(db, channel, customer, name, messages.map((m) => ({ id: m.id, text: m.text })));
+        await answer(db, channel, customer, name, messages.map(queued));
         return;
     }
     const queueKey = `wa_queue:${channel.id}:${customer}`;
     const lockKey = `wa_lock:${channel.id}:${customer}`;
     try {
-        await client.rpush(queueKey, ...messages.map((m) => JSON.stringify({ id: m.id, text: m.text } satisfies Queued)));
+        await client.rpush(queueKey, ...messages.map((m) => JSON.stringify(queued(m))));
         await client.expire(queueKey, 3_600);
     } catch {
-        await answer(db, channel, customer, name, messages.map((m) => ({ id: m.id, text: m.text })));
+        await answer(db, channel, customer, name, messages.map(queued));
         return;
     }
     // Hold the lock while anything is queued; a message that lands just as the
@@ -118,12 +125,26 @@ async function answer(db: Admin, channel: WhatsAppChannel, customer: string, nam
     const token = channel.accessTokenEncrypted ? safeDecrypt(channel.accessTokenEncrypted, await organizationOf(db, channel.projectId)) : null;
     if (!token) return;
     const last = batch[batch.length - 1];
-    const texts = batch.map((m) => m.text).filter((t): t is string => !!t);
+    if (batch.some((m) => m.text || m.audio)) void markReadAndTyping(channel, token, last.id);
+    // Voice notes become text first; the agent sees them marked as such.
+    const texts: string[] = [];
+    const billing: Array<Promise<unknown>> = [];
+    let unheard = 0;
+    for (const message of batch) {
+        if (message.text) texts.push(message.text);
+        else if (message.audio) {
+            const heard = await transcribeVoiceNote(db, channel, token, message.audio, billing).catch((error) => {
+                console.error('[whatsapp] voice note failed', error instanceof Error ? error.message : error);
+                return null;
+            });
+            if (heard) texts.push(`[Voice note] ${heard}`);
+            else unheard++;
+        }
+    }
     if (texts.length === 0) {
-        await sendText(channel, token, customer, UNSUPPORTED_REPLY, last.id).catch(() => undefined);
+        await Promise.all([sendText(channel, token, customer, unheard ? UNHEARD_REPLY : UNSUPPORTED_REPLY, last.id).catch(() => undefined), ...billing]);
         return;
     }
-    void markReadAndTyping(channel, token, last.id);
 
     let reply: string;
     try {
@@ -140,6 +161,7 @@ async function answer(db: Admin, channel: WhatsAppChannel, customer: string, nam
         console.error('[whatsapp] send failed', message);
         await db.from('tool_connections').update({ last_error: message.slice(0, 300) }).eq('id', channel.id);
     }
+    await Promise.all(billing);
 }
 
 const orgCache = new Map<string, string>();
@@ -158,6 +180,78 @@ function safeDecrypt(value: string, organizationId: string): string | null {
     } catch {
         return null;
     }
+}
+
+/**
+ * A voice note as text, billed to the business like a transcription call
+ * (per minute, from model_pricing). Null when it had no words.
+ */
+async function transcribeVoiceNote(db: Admin, channel: WhatsAppChannel, accessToken: string, mediaId: string, billing: Array<Promise<unknown>>): Promise<string | null> {
+    return transcribeMedia(db, channel, await downloadMedia(accessToken, mediaId), billing);
+}
+
+/**
+ * Billing goes on `billing` instead of being awaited, so the agent starts
+ * answering as soon as the words are known; the caller waits for it after.
+ */
+export async function transcribeMedia(db: Admin, channel: WhatsAppChannel, media: { bytes: ArrayBuffer; mimeType: string }, billing: Array<Promise<unknown>>): Promise<string | null> {
+    const organizationId = await organizationOf(db, channel.projectId);
+    const { transcribeAudio } = await import('@/lib/audio/transcribe');
+    const extension = media.mimeType.includes('mpeg') ? 'mp3' : media.mimeType.includes('mp4') || media.mimeType.includes('aac') ? 'm4a' : 'ogg';
+    const ctx = { supabase: db, projectId: channel.projectId, organizationId } as Parameters<typeof transcribeAudio>[0];
+    let lastError: unknown = null;
+    for (const model of VOICE_MODELS) {
+        try {
+            const started = Date.now();
+            // A stalled provider shouldn't keep a guest waiting: the next model gets a turn.
+            const result = await Promise.race([
+                transcribeAudio(ctx, { file: new File([media.bytes], `voice.${extension}`, { type: media.mimeType }), model }),
+                new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`${model} took too long`)), VOICE_ATTEMPT_TIMEOUT_MS)),
+            ]);
+            billing.push(meterTranscription(db, channel, organizationId, { ...result, latencyMs: Date.now() - started }).catch((error) => {
+                console.error('[whatsapp] transcription billing failed', error instanceof Error ? error.message : error);
+            }));
+            return result.text.trim() || null;
+        } catch (error) {
+            lastError = error;
+        }
+    }
+    throw lastError;
+}
+
+async function meterTranscription(db: Admin, channel: WhatsAppChannel, organizationId: string, result: { model: string; provider: string; durationSeconds: number; usesByok?: boolean; latencyMs: number }): Promise<void> {
+    const { getUsageUnitPricingFromDB } = await import('@/lib/providers/pricing');
+    const pricing = await getUsageUnitPricingFromDB(result.provider, result.model, 'minutes');
+    // Per minute, like the transcription endpoint; nothing to charge on the business's own key.
+    const use = { ...result, providerCostUsd: result.usesByok ? 0 : (result.durationSeconds / 60) * pricing.unitPriceUsd };
+    const requestId = crypto.randomUUID();
+    let charged = use.providerCostUsd <= 0;
+    if (!charged) {
+        const { data: org } = await db.from('organizations').select('subscription_tier').eq('id', organizationId).maybeSingle();
+        const { chargeProjectUsageCredits } = await import('@/lib/project-credit-billing');
+        charged = await chargeProjectUsageCredits(organizationId, (org?.subscription_tier as string | undefined) ?? 'free', use.providerCostUsd, 'audio/transcriptions', requestId).catch(() => false);
+    }
+    const charge = charged ? use.providerCostUsd : 0;
+    await db.from('ai_requests').insert({
+        project_id: channel.projectId,
+        environment: 'production',
+        endpoint: 'audio/transcriptions',
+        model: use.model,
+        provider: use.provider,
+        status: charged ? 'success' : 'error',
+        prompt_tokens: 0,
+        completion_tokens: 0,
+        total_tokens: 0,
+        latency_ms: use.latencyMs,
+        cost_usd: charge,
+        provider_cost_usd: use.providerCostUsd,
+        cencori_charge_usd: charge,
+        markup_percentage: 0,
+        agent_id: channel.metadata.agent_id,
+        request_id: requestId,
+        request_payload: {},
+        metadata: { source: 'whatsapp', channel_id: channel.id, duration_seconds: use.durationSeconds, ...(charged ? {} : { billing_reconciliation_required: true, reason: 'credit_deduction_failed' }) },
+    });
 }
 
 /** The customer's open conversation, or a new one. */
