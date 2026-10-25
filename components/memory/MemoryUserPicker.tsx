@@ -13,6 +13,7 @@ import {
     CommandList,
 } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { cn } from '@/lib/utils';
 
 /**
  * End-user picker for a project's memory.
@@ -107,7 +108,7 @@ export function MemoryUserPicker({
                     variant="outline"
                     role="combobox"
                     aria-expanded={open}
-                    className={`h-8 justify-between border-border/30 bg-transparent px-3 text-xs font-normal shadow-none ${className}`}
+                    className={cn('h-8 justify-between border-border/30 bg-transparent px-3 text-xs font-normal shadow-none', className)}
                 >
                     <span className={`truncate ${value ? 'font-mono' : 'text-muted-foreground'}`}>
                         {value || placeholder}

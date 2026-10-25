@@ -131,7 +131,7 @@ export async function POST(req: NextRequest) {
             providerCostUsd: embeddingUsage?.providerCostUsd ?? 0,
             cencoriChargeUsd: embeddingUsage?.cencoriChargeUsd ?? 0,
             markupPercentage: embeddingUsage?.markupPercentage ?? 0,
-            metadata: { scope: parsed.directive.scope, results: results.length },
+            metadata: { scope: parsed.directive.scope, scopeKey: parsed.directive.scopeKey, results: results.length },
             requestPayload: promptPayload(query, { scope: parsed.directive.scope }),
             responsePayload: {
                 content: results.map((m, i) => `${i + 1}. ${m.content}`).join('\n'),

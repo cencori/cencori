@@ -27,7 +27,7 @@ const PROVIDER_NAME_MAX = "Maximo AI".length;
 // Bars start under the header's value; longer model names truncate (full name on hover).
 const MODEL_LABEL_WIDTH = 120;
 
-type BarLabelKind = "provider" | "model";
+type BarLabelKind = "provider" | "model" | "plain";
 
 // Models no longer in the catalog (retired or renamed) still show up in usage
 // history. Recognise their family by id prefix so they keep a logo and a
@@ -76,7 +76,7 @@ function prettifyModelId(id: string): string {
 }
 
 function resolveBarLabel(kind: BarLabelKind, id: string): { name: string; logo: React.ReactNode | null } {
-  if (id === "Other") return { name: "Other", logo: null };
+  if (id === "Other" || kind === "plain") return { name: id, logo: null };
   if (kind === "provider") {
     return { name: PROVIDER_NAMES.get(id) ?? id, logo: getProviderLogoMark(id, 14) };
   }
@@ -216,13 +216,14 @@ export function useModelBreakdown(projectId: string | undefined, period: string,
   return { overview, trends };
 }
 
-function BarBreakdownChart({
+export function BarBreakdownChart({
   rows,
   color,
   label,
   formatValue,
   reduceMotion,
   labelKind,
+  onSelect,
 }: {
   rows: Array<{ name: string; value: number }>;
   color: string;
@@ -231,6 +232,8 @@ function BarBreakdownChart({
   reduceMotion: boolean | null;
   /** What the category axis lists; drives logos and display names. */
   labelKind: BarLabelKind;
+  /** Makes each bar clickable, called with the row's name. */
+  onSelect?: (name: string) => void;
 }) {
   const labelWidth = labelKind === "provider" ? PROVIDER_LABEL_WIDTH : MODEL_LABEL_WIDTH;
   const chartConfig = { value: { label, color } } satisfies ChartConfig;
@@ -296,6 +299,10 @@ function BarBreakdownChart({
             maxBarSize={18}
             isAnimationActive={!reduceMotion}
             animationDuration={260}
+            className={onSelect ? "cursor-pointer" : undefined}
+            onClick={onSelect ? (entry: { payload?: { name?: string } }) => {
+              if (entry.payload?.name && entry.payload.name !== "Other") onSelect(entry.payload.name);
+            } : undefined}
           />
         </BarChart>
       </ChartContainer>

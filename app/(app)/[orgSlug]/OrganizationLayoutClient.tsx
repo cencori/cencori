@@ -28,6 +28,7 @@ import { Book, ArrowUpRight, HelpCircle, Wrench, Activity, Mail, FileText, Check
 import DashboardCircleIcon from "@hugeicons/core-free-icons/DashboardCircleIcon";
 import DiscoverSquareIcon from "@hugeicons/core-free-icons/DiscoverSquareIcon";
 import BrainIcon from "@hugeicons/core-free-icons/BrainIcon";
+import ChartRelationshipIcon from "@hugeicons/core-free-icons/ChartRelationshipIcon";
 import ThreeDRotateIcon from "@hugeicons/core-free-icons/ThreeDRotateIcon";
 import Settings02Icon from "@hugeicons/core-free-icons/Settings02Icon";
 import Configuration02Icon from "@hugeicons/core-free-icons/Configuration02Icon";
@@ -120,6 +121,10 @@ function useOrganization(orgSlug: string) {
 }
 
 // Revenue (formerly Monetization) keeps its own URL but belongs to the AI Gateway sub-nav.
+function isMemoryPath(pathname: string): boolean {
+    return /\/memory(\/|$)/.test(pathname);
+}
+
 function isAiGatewayPath(pathname: string): boolean {
     return pathname.includes("/ai-gateway") || /\/(revenue|monetization|end-user-billing)(\/|$)/.test(pathname);
 }
@@ -204,7 +209,8 @@ export default function OrganizationLayoutClient({
     const isProjectCreation = pathname.includes("/projects/new") || pathname.includes("/projects/import");
     const isPlayground = pathname.includes("/ai-gateway/playground");
     const isEmbeddedAgents = pathname === "/agents" || pathname.endsWith("/agents");
-    const isFixedWorkspace = isPlayground || isEmbeddedAgents;
+    const isMemoryGraph = /\/memory\/graph\/?$/.test(pathname);
+    const isFixedWorkspace = isPlayground || isEmbeddedAgents || isMemoryGraph;
     const docsUrl = getMainSiteUrl("/docs");
     const scopedArea = segments[2];
     const isProjectSettingsView = isInsideProject && (
@@ -219,8 +225,9 @@ export default function OrganizationLayoutClient({
         : scopedArea;
     const isOrganizationSettingsView = !isInsideProject
         && ["settings", "teams", "billing", "usage", "audit-log"].includes(organizationSettingsArea ?? "");
-    const [activeView, setActiveView] = useState<"main" | "ai-gateway" | "project-settings" | "settings">(() => {
+    const [activeView, setActiveView] = useState<"main" | "ai-gateway" | "memory" | "project-settings" | "settings">(() => {
         if (isAiGatewayPath(pathname)) return "ai-gateway";
+        if (isMemoryPath(pathname)) return "memory";
         if (isProjectSettingsView) return "project-settings";
         if (isOrganizationSettingsView) return "settings";
         return "main";
@@ -274,6 +281,8 @@ export default function OrganizationLayoutClient({
     const orgProductHref = (subpath: string) =>
         consoleMode ? `/organization/${subpath}` : `${orgBase}/~/${subpath}`;
     const aiGatewayHref = scopeProjectSlug ? scopedProjectHref("ai-gateway") : orgProductHref("ai-gateway");
+    // Memory belongs to the selected project; without one there is no entry.
+    const memoryHref = scopeProjectSlug ? scopedProjectHref("memory") : null;
     // The sidebar Settings entry has one stable meaning: settings for the
     // selected project. Organization settings are entered deliberately from
     // the user menu instead of changing this destination based on the page the
@@ -308,7 +317,8 @@ export default function OrganizationLayoutClient({
             path === "/ai-gateway" ||
             path === "/organization/ai-gateway" ||
             path === `${basePath}/ai-gateway` ||
-            path === `${orgBase}/~/ai-gateway`;
+            path === `${orgBase}/~/ai-gateway` ||
+            path === memoryHref;
         if (exactMatchOnly) return pathname === path;
         if (pathname === path) return true;
         if (pathname.startsWith(path + "/")) return true;
@@ -354,6 +364,8 @@ export default function OrganizationLayoutClient({
         setPendingSettingsTab(null);
         if (isAiGatewayPath(pathname)) {
             setActiveView("ai-gateway");
+        } else if (isMemoryPath(pathname)) {
+            setActiveView("memory");
         } else if (isProjectSettingsView) {
             setActiveView("project-settings");
         } else if (isOrganizationSettingsView) {
@@ -429,12 +441,15 @@ export default function OrganizationLayoutClient({
     // Main sidebar groups. AI Gateway (a sub-menu toggle) leads BUILD.
     const buildItems = [
         { href: scopeProjectSlug ? scopedProjectHref("agents") : orgProductHref("agents"), icon: <HugeiconsIcon icon={ThreeDRotateIcon} className="!h-5 !w-5" />, label: "Agents" },
-        // Memory belongs to the selected project, so keep it available while an
-        // organization-level page is open instead of reshaping the sidebar.
-        ...(scopeProjectSlug
-            ? [{ href: consoleMode ? "/memory" : `${orgBase}/${scopeProjectSlug}/memory`, icon: <HugeiconsIcon icon={BrainIcon} className="!h-5 !w-5" />, label: "Memory" }]
-            : []),
     ];
+    const memorySubItems = memoryHref
+        ? [
+            { href: memoryHref, icon: <HugeiconsIcon icon={DashboardCircleIcon} className="!h-5 !w-5" />, label: "Overview" },
+            { href: `${memoryHref}/memories`, icon: <HugeiconsIcon icon={LeftToRightListDashIcon} className="!h-5 !w-5" />, label: "Memories" },
+            { href: `${memoryHref}/graph`, icon: <HugeiconsIcon icon={ChartRelationshipIcon} className="!h-5 !w-5" />, label: "Graph" },
+            { href: `${memoryHref}/controls`, icon: <HugeiconsIcon icon={Settings02Icon} className="!h-5 !w-5" />, label: "Controls" },
+        ]
+        : [];
     // Deployments stays attached to the selected project for the same stable
     // project → organization → project navigation model.
     const runItems = process.env.NODE_ENV !== "production"
@@ -635,7 +650,7 @@ export default function OrganizationLayoutClient({
                                         </span>
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
-                                {activeView === "ai-gateway" ? (
+                                {activeView === "ai-gateway" || (activeView === "memory" && memoryHref) ? (
                                     <>
                                         <SidebarMenuItem>
                                             <SidebarMenuButton
@@ -647,14 +662,14 @@ export default function OrganizationLayoutClient({
                                                 <span className="text-sm">Back</span>
                                             </SidebarMenuButton>
                                         </SidebarMenuItem>
-                                        {projectSubItems.map((item) => (
+                                        {(activeView === "memory" ? memorySubItems : projectSubItems).map((item) => (
                                             <SidebarMenuItem key={item.href}>
                                                 <SidebarMenuButton
                                                     asChild
                                                     tooltip={item.label}
                                                     isActive={isActive(item.href) || (
-                                                        pendingSubnavEntry === "ai-gateway"
-                                                        && item.href === aiGatewayHref
+                                                        pendingSubnavEntry === activeView
+                                                        && (item.href === aiGatewayHref || item.href === memoryHref)
                                                     )}
                                                     size="sm"
                                                 >
@@ -775,6 +790,31 @@ export default function OrganizationLayoutClient({
                                             </SidebarMenuButton>
                                         </SidebarMenuItem>
                                         {buildItems.map(renderMenuItem)}
+                                        {/* Memory toggle */}
+                                        {memoryHref && (
+                                            <SidebarMenuItem>
+                                                <SidebarMenuButton
+                                                    asChild
+                                                    isActive={isMemoryPath(pathname)}
+                                                    size="sm"
+                                                    className="gap-1"
+                                                >
+                                                    <Link
+                                                        href={memoryHref}
+                                                        prefetch={true}
+                                                        onClick={() => {
+                                                            setPendingSubnavEntry("memory");
+                                                            setActiveView("memory");
+                                                        }}
+                                                        onMouseEnter={() => prefetchRoute(memoryHref)}
+                                                    >
+                                                        <HugeiconsIcon icon={BrainIcon} className="!h-5 !w-5" />
+                                                        <span className="text-sm">Memory</span>
+                                                        <ChevronRight className="!h-3 !w-3 ml-auto text-muted-foreground/50" />
+                                                    </Link>
+                                                </SidebarMenuButton>
+                                            </SidebarMenuItem>
+                                        )}
                                         {runItems.map(renderMenuItem)}
                                         {renderBottomItems()}
                                     </>
