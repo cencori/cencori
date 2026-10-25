@@ -10,6 +10,7 @@ import { toast } from "@/components/ui/toast";
 import { ModelSelect } from "@/components/dashboard/embedded-agents/ModelSelect";
 import { STARTING_POINTS } from "@/components/agents/starting-points";
 import { AgentOrb } from "@/components/agents/AgentOrb";
+import { RestaurantSetup } from "@/components/agents/RestaurantSetup";
 import { emptyAgentForm, postStudioAction, studioQueryKey, useAgentStudio, useAgentsBasePath, type AgentForm } from "@/components/agents/studio";
 import { useProjectIdBySlug } from "@/lib/hooks/useQueries";
 import { cn } from "@/lib/utils";
@@ -109,6 +110,8 @@ export default function NewAgentPage({ params }: { params: Promise<{ orgSlug: st
                             ))}
                         </div>
                     </>
+                ) : template?.business === "restaurant" ? (
+                    <RestaurantSetup projectId={projectId} basePath={basePath} models={data?.models ?? []} onBack={() => setStep(1)} />
                 ) : (
                     <>
                         <h1 className="text-xl font-medium tracking-[-0.02em]">Complete your agent</h1>
