@@ -60,6 +60,7 @@ import type { SubscriptionTier } from "@/lib/entitlements";
 import type { UnifiedMessage } from "@/lib/providers/base";
 import { resolveAgentContext } from "@/lib/gateway/agent-context";
 import {
+    EDGE_STARTED_AT_HEADER,
     GatewayPerformanceTracker,
     buildServerTiming,
     parseProxyEdgeTimings,
@@ -269,6 +270,11 @@ export async function POST(req: NextRequest) {
     // (auth + billing lease). Logged as attribution metadata and echoed in
     // Server-Timing so client-measured TTFT decomposes fully.
     const proxyTimings = parseProxyEdgeTimings(req.headers);
+    // Time from proxy.ts first seeing the request to this handler starting (middleware + routing).
+    const edgeStartedAt = Number(req.headers.get(EDGE_STARTED_AT_HEADER));
+    const edgeMs = Number.isFinite(edgeStartedAt) && edgeStartedAt > 0 && startedAt >= edgeStartedAt
+        ? startedAt - edgeStartedAt
+        : null;
     let gatewayCtx: GatewayContext | null = null;
     let routingProfile: GatewayRoutingProfile = 'balanced';
     let fastLaneResponse = false;
@@ -318,10 +324,22 @@ export async function POST(req: NextRequest) {
             response.headers.set('X-Cencori-Fast-Lane', 'true');
         }
         const preflight = performance.snapshot().gatewayPreflightMs;
+        const breakdown = performance.breakdown();
         const serverTiming = buildServerTiming([
             { name: 'tensor_auth', durMs: proxyTimings.authMs },
             { name: 'tensor_lease', durMs: proxyTimings.leaseMs },
+            { name: 'edge', durMs: edgeMs },
             { name: 'cencori_preflight', durMs: preflight },
+            // Each preflight step (s_) and each timed call inside one (c_), so a slow request
+            // shows where the time went without reading logs.
+            ...Object.entries(breakdown.steps).map(([name, durMs]) => ({ name: `s_${name}`, durMs })),
+            ...Object.entries(breakdown.spans).map(([name, durMs]) => ({ name: `c_${name}`, durMs })),
+            {
+                name: 'routing',
+                durMs: breakdown.providerStartAt !== null && breakdown.preflightDoneAt !== null
+                    ? breakdown.providerStartAt - breakdown.preflightDoneAt
+                    : null,
+            },
         ]);
         if (serverTiming !== null) {
             response.headers.set('Server-Timing', serverTiming);
@@ -367,7 +385,8 @@ export async function POST(req: NextRequest) {
 
         if (isApiKeyAuth) {
             // ── Production Path: Full gateway validation (rate limit, spend cap, auth) ──
-            const validation = await validateGatewayRequest(req);
+            const validation = await validateGatewayRequest(req, performance);
+            performance.step('auth');
             if (!validation.success) {
                 return validation.response;
             }
@@ -413,8 +432,11 @@ export async function POST(req: NextRequest) {
             return respond(agentResult.response, agentResult.errorCode, agentResult.errorMessage);
         }
 
+        performance.step('agent');
+
         // ── Parse Request Body ──
         const body = await bodyPromise;
+        performance.step('body');
         const controls = parseRequestControls(body);
         if ('error' in controls) {
             return respondError(400, controls.error, 'invalid_request_controls');
@@ -519,6 +541,7 @@ export async function POST(req: NextRequest) {
 
         // ── End-User Billing: Quota Check ──
         const endUserId = body.user?.trim() || null;
+        performance.step('prompt');
         let endUserQuota: QuotaCheckResult | null = null;
 
         if (gatewayCtx?.endUserBillingEnabled && endUserId) {
@@ -601,6 +624,7 @@ export async function POST(req: NextRequest) {
 
         // ── Memory directive (API opt-in: presence of `memory` enables it) ──
         let memoryDirective: MemoryDirective | null = null;
+        performance.step('end_user_quota');
         let memorySettings: MemorySettings | null = null;
 
         if (body.memory !== undefined) {
@@ -634,9 +658,11 @@ export async function POST(req: NextRequest) {
         // config in one fetch so the input pipeline and provider resolution
         // below hit instance memory instead of fanning out serial DB reads.
         // Never throws — on failure the per-reader paths run as before.
+        performance.step('memory_knowledge_settings');
         if (gatewayCtx) {
             await warmGatewayProjectConfig(adminClient, gatewayCtx.projectId);
         }
+        performance.step('project_config');
 
         // Kick off memory retrieval in parallel with the input pipeline —
         // the embedding + RPC overlap the pipeline's own work, keeping added
@@ -742,7 +768,9 @@ export async function POST(req: NextRequest) {
         // After the input pipeline: stored facts were already redacted at
         // write time and must not be re-tokenized. Insert the facts block
         // after any leading system messages, before the first non-system turn.
+        performance.step('input_pipeline');
         const retrievedMemories = await memoryPromise;
+        performance.step('memory');
         if (retrievedMemories.length > 0) {
             const memoryMessage: UnifiedMessage = {
                 role: "system",
@@ -759,6 +787,7 @@ export async function POST(req: NextRequest) {
         // Same placement as memory: after the leading system messages (which
         // now include the memory block), before the first non-system turn.
         const knowledge = await knowledgePromise;
+        performance.step('knowledge');
         injectKnowledge(guardedMessages, knowledge);
         const knowledgeCitations = toKnowledgeCitations(knowledge);
         const knowledgeHeaderValue = JSON.stringify(knowledgeCitations);
@@ -881,13 +910,13 @@ export async function POST(req: NextRequest) {
         if (gatewayCtx && !tools && !skipCache && !memoryDirective?.retrieve && knowledgeBaseIds.length === 0 && !fastLane && !isAutoRouterModel(model)) {
             try {
                 // Try cache first - use cached config if available
-                const cachedConfig = await getCachedCacheConfig(gatewayCtx.projectId);
+                const cachedConfig = await performance.timed('cache_config', getCachedCacheConfig(gatewayCtx.projectId));
                 if (cachedConfig) {
                     cacheConfig = cachedConfig.data;
                 } else {
-                    cacheConfig = await getProjectCacheConfig(gatewayCtx.projectId);
+                    cacheConfig = await performance.timed('cache_config_db', getProjectCacheConfig(gatewayCtx.projectId));
                     // Cache the config for next time
-                    await setCachedCacheConfig(gatewayCtx.projectId, cacheConfig);
+                    await performance.timed('cache_config_set', setCachedCacheConfig(gatewayCtx.projectId, cacheConfig));
                 }
 
                 if (cacheConfig && cacheConfig.cacheEnabled && !cacheConfig.excludedModels.includes(model)) {
@@ -915,7 +944,7 @@ export async function POST(req: NextRequest) {
 
                         promptTextForCache = normalizedMsgs.map(m => `${m.role}: ${m.content}`).join('\n');
 
-                        cacheResult = await lookupCache({
+                        cacheResult = await performance.timed('cache_lookup', lookupCache({
                             projectId: gatewayCtx.projectId,
                             environment: gatewayCtx.environment,
                             cacheKey,
@@ -928,7 +957,7 @@ export async function POST(req: NextRequest) {
                             config: shouldStream
                                 ? { ...cacheConfig, semanticMatchEnabled: false }
                                 : cacheConfig,
-                        });
+                        }));
 
                         if (cacheResult.hit && cacheResult.response) {
                             // Track hit
@@ -1075,6 +1104,7 @@ export async function POST(req: NextRequest) {
             }
         };
 
+        performance.step('cache_and_routing');
         const execResult = await runV1ProviderExecution({
             supabase: adminClient,
             gatewayCtx: activeGatewayCtx,
@@ -1129,6 +1159,16 @@ export async function POST(req: NextRequest) {
                     activeGatewayCtx.requestId,
                     metrics
                 ));
+                // One line per request with the whole timeline (ms from the handler starting).
+                console.info('[GatewayTiming]', JSON.stringify({
+                    requestId: activeGatewayCtx.requestId,
+                    model,
+                    stream: shouldStream,
+                    edgeMs,
+                    ...performance.breakdown(),
+                    providerTtftMs: metrics.providerTtftMs,
+                    totalMs: metrics.totalCompletionMs,
+                }));
             },
             hedgeDelayMs,
             skipOutputGuard: fastLane,

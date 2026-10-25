@@ -27,6 +27,7 @@ import {
 } from "@/lib/status-host";
 import { sanitizeAuthRedirectTarget } from "@/lib/auth-redirect";
 import { maintenanceResponse } from "@/lib/maintenance";
+import { EDGE_STARTED_AT_HEADER } from "@/lib/gateway/performance";
 
 const LAST_ORG_COOKIE = "cencori:last-org";
 const LAST_ORG_MAX_AGE = 60 * 60 * 24 * 365; // 1 year
@@ -436,6 +437,7 @@ function isProxiedApiPath(pathname: string): boolean {
 }
 
 export async function proxy(request: NextRequest) {
+  const edgeStartedAt = Date.now();
   const hostname = request.headers.get("host") ?? "";
   const domain = hostname.split(":")[0].toLowerCase();
 
@@ -446,7 +448,10 @@ export async function proxy(request: NextRequest) {
     if (maintenance) return applySecurityHeaders(maintenance);
   }
   if (/^\/api/.test(request.nextUrl.pathname) && !isProxiedApiPath(request.nextUrl.pathname)) {
-    return NextResponse.next();
+    // Lets the gateway routes report how long they waited on this middleware (Server-Timing "edge").
+    const headers = new Headers(request.headers);
+    headers.set(EDGE_STARTED_AT_HEADER, String(edgeStartedAt));
+    return NextResponse.next({ request: { headers } });
   }
   const isConsoleSubdomain = isConsoleHostname(hostname);
   const isScanSubdomain =
