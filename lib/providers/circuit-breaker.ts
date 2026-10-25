@@ -1,3 +1,4 @@
+import type { RedisClient } from '@/lib/redis';
 /**
  * Circuit Breaker Pattern for Provider Failover
  * 
@@ -36,10 +37,7 @@ const DEFAULT_CONFIG: CircuitBreakerConfig = {
 const memoryCircuits: Map<string, CircuitState> = new Map();
 
 // Redis client (lazy loaded)
-let redisClient: {
-    get: (key: string) => Promise<string | null>;
-    set: (key: string, value: string, options?: { ex?: number }) => Promise<void>;
-} | null = null;
+let redisClient: RedisClient | null = null;
 let redisInitialized = false;
 
 /**
@@ -58,18 +56,8 @@ async function initRedis(): Promise<boolean> {
     }
 
     try {
-        // Dynamic import using a variable to avoid TypeScript module resolution
-        const moduleName = '@upstash/redis';
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const upstash: any = await import(/* webpackIgnore: true */ moduleName).catch(() => null);
-        if (!upstash || !upstash.Redis) {
-            console.warn('[CircuitBreaker] @upstash/redis not installed, using in-memory state');
-            return false;
-        }
-        redisClient = new upstash.Redis({
-            url: redisUrl,
-            token: redisToken,
-        });
+        const { createRedisClient } = await import('@/lib/redis');
+        redisClient = createRedisClient({ url: redisUrl, token: redisToken });
         console.log('[CircuitBreaker] Redis initialized');
         return true;
     } catch (error) {
@@ -251,8 +239,12 @@ export async function getAllCircuitStates(): Promise<Record<string, CircuitState
     if (redisClient) {
         const pipeline = knownProviders.map(async (provider) => {
             try {
-                const data = await redisClient!.get(`${CIRCUIT_PREFIX}${provider}`);
-                if (data) {
+                const data: unknown = await redisClient!.get(`${CIRCUIT_PREFIX}${provider}`);
+                // Already deserialized by the client, like getCircuitState's read above.
+                if (data && typeof data === 'object') {
+                    return { provider, state: data as CircuitState };
+                }
+                if (typeof data === 'string' && data) {
                     return { provider, state: JSON.parse(data) as CircuitState };
                 }
             } catch {

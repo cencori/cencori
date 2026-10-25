@@ -44,7 +44,7 @@ const nextConfig: NextConfig = {
   },
   // Transformers.js includes native ONNX binaries and runtime model loading.
   // Keep it out of Turbopack's module graph; API routes load it in Node only.
-  serverExternalPackages: ["@huggingface/transformers", "onnxruntime-node"],
+  serverExternalPackages: ["@huggingface/transformers", "onnxruntime-node", "ioredis"],
   experimental: {
     optimizePackageImports: ["lucide-react"],
     staleTimes: {

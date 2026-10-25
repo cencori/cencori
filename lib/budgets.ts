@@ -7,7 +7,7 @@
 
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { triggerCostThresholdWebhook } from '@/lib/webhooks/trigger';
-import { Redis } from '@upstash/redis';
+import { createRedisClient, type RedisClient as Redis } from '@/lib/redis';
 import { fetchAllRows } from '@/lib/supabase-paginate';
 
 let redis: Redis | null | undefined;
@@ -17,7 +17,7 @@ function getRedisClient(): Redis | null {
     const url = process.env.UPSTASH_REDIS_REST_URL;
     const token = process.env.UPSTASH_REDIS_REST_TOKEN;
     if (!url || !token) { redis = null; return null; }
-    redis = new Redis({ url, token });
+    redis = createRedisClient({ url, token });
     return redis;
 }
 

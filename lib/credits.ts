@@ -32,10 +32,36 @@ export async function getCreditsBalance(organizationId: string): Promise<number>
     }
 
     const balance = parseFloat(data.credits_balance) || 0;
-    
-    // 3. Seed cache for next time
-    await setCachedCreditsBalance(organizationId, balance);
-    
+
+    // 3. Seed cache for next time, without making this request wait on the write.
+    void setCachedCreditsBalance(organizationId, balance).catch(() => {});
+
+    return balance;
+}
+
+/**
+ * The balance as the gateway's credit gate reads it. Every charge clears the cached balance, so a
+ * busy org paid a Redis miss, a database read and a Redis write before each request. While the
+ * balance is comfortably positive the answer to "may this request run?" can't change in a few
+ * seconds, so the last read is reused briefly; near or below zero it is always read fresh. A
+ * request let through on a slightly stale balance is still charged in full (charges may go into
+ * debt, which blocks the next request).
+ */
+const GATE_REUSE_MS = 10_000;
+const GATE_REUSE_MIN_BALANCE_USD = 1;
+const gateBalances = new Map<string, { balance: number; at: number }>();
+
+export async function getCreditsBalanceForGate(organizationId: string): Promise<number> {
+    const recent = gateBalances.get(organizationId);
+    if (recent && recent.balance >= GATE_REUSE_MIN_BALANCE_USD && Date.now() - recent.at < GATE_REUSE_MS) {
+        return recent.balance;
+    }
+    const balance = await getCreditsBalance(organizationId);
+    gateBalances.set(organizationId, { balance, at: Date.now() });
+    if (gateBalances.size > 10_000) {
+        const oldest = gateBalances.keys().next().value;
+        if (oldest !== undefined) gateBalances.delete(oldest);
+    }
     return balance;
 }
 

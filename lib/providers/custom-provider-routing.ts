@@ -1,6 +1,6 @@
 import { decryptApiKey } from '@/lib/encryption';
 import type { createAdminClient } from '@/lib/supabaseAdmin';
-import { Redis } from '@upstash/redis';
+import { createRedisClient, type RedisClient as Redis } from '@/lib/redis';
 
 type AdminClient = ReturnType<typeof createAdminClient>;
 
@@ -12,7 +12,7 @@ function getRedisClient(): Redis | null {
     const url = process.env.UPSTASH_REDIS_REST_URL;
     const token = process.env.UPSTASH_REDIS_REST_TOKEN;
     if (!url || !token) { redis = null; return null; }
-    redis = new Redis({ url, token });
+    redis = createRedisClient({ url, token });
     return redis;
 }
 

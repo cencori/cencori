@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SendByte } from '@sendbyte/node';
-import { Redis } from '@upstash/redis';
+import { createRedisClient, type RedisClient as Redis } from '@/lib/redis';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import {
     generateToken,
@@ -27,7 +27,7 @@ function getRedis(): Redis | null {
         redisClient = null;
         return redisClient;
     }
-    redisClient = new Redis({ url, token });
+    redisClient = createRedisClient({ url, token });
     return redisClient;
 }
 

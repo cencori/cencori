@@ -33,7 +33,7 @@ import {
 } from '@/lib/config-cache';
 import { hedgedStream } from '@/lib/gateway/hedged-stream';
 import { streamWithTimeout } from '@/lib/gateway/stream-timeout';
-import { getCreditsBalance } from '@/lib/credits';
+import { getCreditsBalanceForGate } from '@/lib/credits';
 
 type SupabaseAdmin = ReturnType<typeof createAdminClient>;
 
@@ -63,7 +63,7 @@ async function assertManagedCreditsAvailable(
     tier: SubscriptionTier,
 ): Promise<void> {
     if (billingMode !== 'standard' || tier === 'enterprise') return;
-    if (await getCreditsBalance(organizationId) <= 0) {
+    if (await getCreditsBalanceForGate(organizationId) <= 0) {
         throw new CreditExhaustedError();
     }
 }

@@ -126,6 +126,7 @@
     "gray-matter": "^4.0.3",
     "html-to-image": "^1.11.13",
     "html2canvas": "^1.4.1",
+    "ioredis": "5.11.1",
     "js-yaml": "^4.2.0",
     "jspdf": "^4.2.1",
     "jszip": "^3.10.2",

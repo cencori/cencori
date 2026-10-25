@@ -16,6 +16,7 @@ const mockGetCreditsBalance = vi.fn();
 
 vi.mock('@/lib/credits', () => ({
     getCreditsBalance: (...args: unknown[]) => mockGetCreditsBalance(...args),
+    getCreditsBalanceForGate: (...args: unknown[]) => mockGetCreditsBalance(...args),
 }));
 
 vi.mock('@/lib/providers/circuit-breaker', () => ({

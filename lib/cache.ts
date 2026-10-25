@@ -1,4 +1,4 @@
-import { Redis } from '@upstash/redis';
+import { createRedisClient, type RedisClient as Redis } from '@/lib/redis';
 import crypto from 'crypto';
 
 let redis: Redis | null | undefined;
@@ -26,7 +26,7 @@ function getRedisClient(): Redis | null {
         return redis;
     }
 
-    redis = new Redis({ url, token });
+    redis = createRedisClient({ url, token });
     return redis;
 }
 

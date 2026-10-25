@@ -6,7 +6,7 @@
  * memory degrading to nothing must never affect a chat request.
  */
 
-import { Redis } from '@upstash/redis';
+import { createRedisClient, type RedisClient as Redis } from '@/lib/redis';
 import { MEMORY_CONTENT_MAX_CHARS, type RetrievedMemory } from './types';
 
 let redis: Redis | null | undefined;
@@ -15,7 +15,7 @@ function getRedis(): Redis | null {
     if (redis !== undefined) return redis;
     const url = process.env.UPSTASH_REDIS_REST_URL;
     const token = process.env.UPSTASH_REDIS_REST_TOKEN;
-    redis = url && token ? new Redis({ url, token }) : null;
+    redis = url && token ? createRedisClient({ url, token }) : null;
     return redis;
 }
 

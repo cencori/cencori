@@ -1,4 +1,4 @@
-import { Redis } from '@upstash/redis';
+import { createRedisClient, type RedisClient as Redis } from '@/lib/redis';
 import {
     getGatewayFeatureFlags,
     incrementGatewayCounter,
@@ -43,7 +43,7 @@ function getRedisClient(): Redis | null {
         return redis;
     }
 
-    redis = new Redis({ url, token });
+    redis = createRedisClient({ url, token });
     return redis;
 }
 
