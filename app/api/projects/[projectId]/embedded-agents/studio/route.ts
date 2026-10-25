@@ -9,6 +9,7 @@ import type { SubscriptionTier } from '@/lib/entitlements';
 import { invalidateAgentConfig } from '@/lib/config-cache';
 import { buildWebhookTools, publicWebhookTools, readWebhookTools, WEBHOOK_TOOL_MAX_ITERATIONS } from '@/lib/embedded/webhook-tools';
 import { agentClock, agentToolset, buildSystemTools, readSystemTools } from '@/lib/embedded/agent-tools';
+import { isBusinessTemplate, TEMPLATE_RECOMMENDED_TOOLS } from '@/lib/embedded/templates';
 import { AGENT_MCP_SERVERS_MAX, buildAgentMcpServers, connectAgentMcpServer, normalizeMcpServerUrl, publicAgentMcpServers, readAgentIntegrations, readAgentMcpServers, type AgentMcpServer } from '@/lib/embedded/agent-mcp';
 import { createConnectLink, deleteConnection, discoverIntegrationTools, listNangoIntegrations, listProjectConnections, nangoConfigured, NangoError } from '@/lib/integrations/nango';
 import { iconFrom } from '@/lib/embedded/mcp-icon';
@@ -163,6 +164,12 @@ export async function POST(request: Request, ctx: Context) {
             const instructions = cleanText(body.instructions, 20_000);
             if (!name) return fail('Give your agent a name.');
             const config: AgentVersionConfig = { ...(model ? { model } : {}), instructions };
+            // A business template marks the agent (for its setup checklist and app
+            // tools) and lets it close finished conversations.
+            if (isBusinessTemplate(body.template)) {
+                config.template = body.template;
+                config.system_tools = { end_conversation: {} };
+            }
             const { data: agent, error: agentError } = await db.from('agents').insert({
                 project_id: projectId, name, description: description || null,
                 blueprint: 'custom', is_active: true, shadow_mode: true,
@@ -421,10 +428,14 @@ export async function POST(request: Request, ctx: Context) {
                 if (tools.length === 0) return fail(`${app.name} is connected, but it has no tools the agent can use yet.`, 422);
                 const previous = stored.find((server) => server.nango?.integration === integration);
                 const icon = previous?.icon ?? (app.logo ? await iconFrom(app.logo).catch(() => null) : null);
+                // A template's agent starts with just the tools its job needs.
+                const recommended = isBusinessTemplate(existing.template) ? TEMPLATE_RECOMMENDED_TOOLS[existing.template][integration] : undefined;
                 const enabled = previous
                     ? tools.filter((tool) => previous.enabled.includes(tool.name) || (!previous.tools.some((t) => t.name === tool.name) && !tool.destructive)).map((tool) => tool.name)
-                    // A first attach starts with the safe tools on, up to a manageable number.
-                    : tools.filter((tool) => !tool.destructive).slice(0, 20).map((tool) => tool.name);
+                    : recommended
+                        ? tools.filter((tool) => recommended.includes(tool.name)).map((tool) => tool.name)
+                        // A first attach starts with the safe tools on, up to a manageable number.
+                        : tools.filter((tool) => !tool.destructive).slice(0, 20).map((tool) => tool.name);
                 const server: AgentMcpServer = {
                     id: previous?.id ?? `int_${integration}`,
                     name: app.name,
