@@ -14,6 +14,7 @@ import { checksumConfig } from './agents';
 import { validateInstallationGrants } from './installation-grants';
 import { dePrefixId } from './http';
 import type { SubscriptionTier } from '@/lib/entitlements';
+import { withoutWebhookTools } from './webhook-tools';
 
 type Admin = {
     from: (table: string) => any;
@@ -92,6 +93,7 @@ export async function installMarketplaceVersion(supabase: Admin, input: Marketpl
     const agentId = (agent as { id: string }).id;
     const removeFork = () => supabase.from('agents').delete().eq('id', agentId);
 
+    const forkedConfig = withoutWebhookTools((src.config_json ?? {}) as Record<string, unknown>);
     const { data: version, error: versionError } = await supabase
         .from('agent_versions')
         .insert({
@@ -100,9 +102,9 @@ export async function installMarketplaceVersion(supabase: Admin, input: Marketpl
             version: src.version as string,
             status: 'published',
             visibility: 'private',
-            config_json: (src.config_json ?? {}) as Record<string, unknown>,
+            config_json: forkedConfig,
             requirements_json: (src.requirements_json ?? {}) as Record<string, unknown>,
-            checksum: checksumConfig(((src.config_json ?? {}) as Record<string, unknown>) as never),
+            checksum: checksumConfig(forkedConfig as never),
             published_at: new Date().toISOString(),
         })
         .select('id')

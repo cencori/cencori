@@ -68,6 +68,8 @@ const nextConfig: NextConfig = {
         // /llm.txt. Serve the same content at /llms.txt with a 200 (a rewrite, not
         // a redirect, so fetchers that don't follow 3xx still get the guide).
         { source: "/llms.txt", destination: "/llm.txt" },
+        // An agent's shareable link (the full-page widget chat).
+        { source: "/talk/:token", destination: "/api/widget/share/:token" },
         // "View as Markdown" and agents fetch `<docs page>.md`. Rewrites run
         // before dynamic routes, so these win over app/docs/[[...slug]].
         { source: "/docs/:path+.md", destination: "/api/docs/markdown/:path+" },
@@ -187,9 +189,24 @@ const nextConfig: NextConfig = {
 
     return [
       {
-        // Apply security headers to ALL routes
-        source: "/:path*",
+        // Apply security headers to ALL routes except the website widget
+        // frame, which is built to be framed: its route sends its own
+        // frame-ancestors allowlist instead of X-Frame-Options: DENY.
+        source: "/:path((?!api/widget/frame/).*)",
         headers: securityHeaders,
+      },
+      {
+        source: "/api/widget/frame/:path*",
+        headers: securityHeaders.filter((header) => header.key !== "X-Frame-Options"),
+      },
+      {
+        // The widget scripts change with releases; keep caches short.
+        source: "/(widget|widget-frame).js",
+        headers: [
+          ...securityHeaders,
+          { key: "Cache-Control", value: "public, max-age=300" },
+          { key: "Access-Control-Allow-Origin", value: "*" },
+        ],
       },
       {
         // Cache OG image for 1 year (immutable since we version via filename)

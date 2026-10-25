@@ -57,3 +57,7 @@ export function copilotVisionModel(model: CopilotModelId): string {
 export function resolveCopilotModel(value: unknown): CopilotModelId {
     return COPILOT_MODELS.some((model) => model.id === value) ? (value as CopilotModelId) : COPILOT_DEFAULT_MODEL;
 }
+
+// Top-bar slot an agent's pages fill with their Test / Publish buttons, so
+// agent pages keep the one shared navbar.
+export const AGENT_HEADER_ACTIONS_SLOT_ID = "agent-header-actions";

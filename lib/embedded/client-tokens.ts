@@ -7,7 +7,7 @@ function base64url(input: Buffer | string): string {
     return Buffer.from(input).toString('base64url');
 }
 
-function tokenSecret(): string {
+export function tokenSecret(): string {
     const secret = process.env.EMBEDDED_CLIENT_TOKEN_SECRET || process.env.ENCRYPTION_SECRET;
     if (secret) return secret;
     // Fail closed in production: a hardcoded fallback would let anyone forge

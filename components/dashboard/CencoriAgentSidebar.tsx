@@ -1,5 +1,6 @@
 "use client";
 
+import { ThinkingState } from "@/components/chat/ThinkingState";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -186,14 +187,6 @@ function timeAgo(iso: string): string {
     const days = Math.round(hours / 24);
     if (days < 30) return `${days}d`;
     return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
-
-function ThinkingState({ label = "Thinking" }: { label?: string }) {
-    return (
-        <div className="py-3 text-[15px]" role="status" aria-live="polite">
-            <span key={label} className="agent-thinking-shimmer" data-text={label}>{label}</span>
-        </div>
-    );
 }
 
 export function CencoriAgentSidebar({

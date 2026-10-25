@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { CLIENT_TOKEN_PREFIX } from './embedded/types';
 
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 const DEFAULT_CEN_PREFIX = 'cen_';
@@ -116,6 +117,10 @@ export function extractCencoriApiKeyFromHeaders(headers: Pick<Headers, 'get'>): 
 
     const bearerToken = extractBearerToken(headers.get('Authorization'));
     if (!bearerToken) return null;
+
+    // Browser client tokens (ect_<jwt>) have their own auth path; the prefix
+    // hides the JWT shape, so they must be excluded before the fallback below.
+    if (bearerToken.startsWith(CLIENT_TOKEN_PREFIX)) return null;
 
     if (isCencoriApiKey(bearerToken)) {
         return bearerToken;

@@ -13,6 +13,7 @@
  * (The semantic cache uses a separate Gemini 768-dim stack — not shared.)
  */
 
+import { createHash } from 'crypto';
 import OpenAI from 'openai';
 import { GoogleGenerativeAI, type EmbedContentRequest } from '@google/generative-ai';
 import type { createAdminClient } from '@/lib/supabaseAdmin';
@@ -46,7 +47,31 @@ interface MemoryEmbeddingConfig {
     encryptedOpenAIKey?: string;
 }
 
+/**
+ * A project's embedding space is pinned on first use and never changes, so
+ * the resolved config is reused instead of costing two database calls on
+ * every embed (each chat turn with knowledge embeds once). The OpenAI path
+ * carries a key that can be rotated or turned off, so it's kept briefly.
+ */
+const CONFIG_TTL_MS = { google: 10 * 60_000, openai: 60_000 } as const;
+const configCache = new Map<string, { config: MemoryEmbeddingConfig; expiresAt: number }>();
+
 async function resolveMemoryEmbeddingConfig(
+    supabase: SupabaseAdmin,
+    projectId: string
+): Promise<MemoryEmbeddingConfig> {
+    const cached = configCache.get(projectId);
+    if (cached && cached.expiresAt > Date.now()) return cached.config;
+    const config = await loadMemoryEmbeddingConfig(supabase, projectId);
+    configCache.set(projectId, { config, expiresAt: Date.now() + CONFIG_TTL_MS[config.provider] });
+    if (configCache.size > 5_000) {
+        const oldest = configCache.keys().next().value;
+        if (oldest !== undefined) configCache.delete(oldest);
+    }
+    return config;
+}
+
+async function loadMemoryEmbeddingConfig(
     supabase: SupabaseAdmin,
     projectId: string
 ): Promise<MemoryEmbeddingConfig> {
@@ -114,12 +139,40 @@ export async function embedForMemory(
     const inputs = Array.isArray(input) ? input : [input];
 
     const config = await resolveMemoryEmbeddingConfig(supabase, projectId);
-    if (config.provider === 'openai' && config.encryptedOpenAIKey) {
-        const openaiKey = decryptApiKey(config.encryptedOpenAIKey, organizationId);
-        return embedWithOpenAI(openaiKey, inputs);
+    // Searches embed one string, and people ask the same things: a repeat
+    // reuses the vector instead of waiting on the provider again, at no cost.
+    const cacheKey = inputs.length === 1 ? queryCacheKey(projectId, config, inputs[0]) : null;
+    const hit = cacheKey ? queryCache.get(cacheKey) : undefined;
+    if (cacheKey && hit && hit.expiresAt > Date.now()) {
+        return { embeddings: [hit.vector], totalTokens: 0, providerCostUsd: 0, cencoriChargeUsd: 0, markupPercentage: 0, model: config.model, provider: config.provider };
     }
 
-    return embedWithGemini(inputs);
+    const result = config.provider === 'openai' && config.encryptedOpenAIKey
+        ? await embedWithOpenAI(decryptApiKey(config.encryptedOpenAIKey, organizationId), inputs)
+        : await embedWithGemini(inputs);
+    if (cacheKey && result.embeddings[0]) {
+        queryCache.set(cacheKey, { vector: result.embeddings[0], expiresAt: Date.now() + QUERY_CACHE_TTL_MS });
+        if (queryCache.size > QUERY_CACHE_MAX) {
+            const oldest = queryCache.keys().next().value;
+            if (oldest !== undefined) queryCache.delete(oldest);
+        }
+    }
+    return result;
+}
+
+const QUERY_CACHE_TTL_MS = 60 * 60_000;
+const QUERY_CACHE_MAX = 2_000;
+const queryCache = new Map<string, { vector: number[]; expiresAt: number }>();
+
+export function clearEmbeddingCachesForTests(): void {
+    queryCache.clear();
+    configCache.clear();
+}
+
+/** Per project and embedding space, on the normalized text (case and spacing don't change the answer). */
+function queryCacheKey(projectId: string, config: MemoryEmbeddingConfig, text: string): string {
+    const normalized = text.toLowerCase().replace(/\s+/g, ' ').trim();
+    return `${projectId}:${config.provider}:${config.model}:${createHash('sha256').update(normalized).digest('base64url')}`;
 }
 
 /** How many times a single managed embedding call is attempted. */

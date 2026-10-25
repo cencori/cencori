@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { requireProjectAccess } from '@/lib/require-project-access';
-import { checksumConfig, validateVersionConfig, type AgentVersionConfig } from '@/lib/embedded/agents';
+import { checksumConfig, promoteStableInstallations, validateVersionConfig, type AgentVersionConfig } from '@/lib/embedded/agents';
 import { buildUnifiedModelRegistry } from '@/lib/embedded/model-registry';
 import { normalizeManifest, validateManifest } from '@/lib/embedded/manifest';
 import { checkInstallationCap, checkTenantCap } from '@/lib/embedded/limits';
 import type { SubscriptionTier } from '@/lib/entitlements';
+import { invalidateAgentConfig } from '@/lib/config-cache';
+import { buildWebhookTools, executeWebhookTool, publicWebhookTools, readWebhookTools, webhookToolDefinitions, WEBHOOK_TOOL_MAX_ITERATIONS } from '@/lib/embedded/webhook-tools';
+import type { UnifiedMessage } from '@/lib/providers/base';
 
 type Admin = ReturnType<typeof createAdminClient>;
 type Context = { params: Promise<{ projectId: string }> };
@@ -46,6 +49,13 @@ function simpleManifest(config: AgentVersionConfig) {
     return { ok: true as const, manifest };
 }
 
+/** Webhook header values stay server-side: the console sees header names only. */
+function withoutToolSecrets<T extends { config_json?: unknown }>(version: T): T {
+    const config = (version.config_json ?? null) as Record<string, unknown> | null;
+    if (!config || !Array.isArray(config.webhook_tools)) return version;
+    return { ...version, config_json: { ...config, webhook_tools: publicWebhookTools(readWebhookTools(config)) } };
+}
+
 export async function GET(_request: Request, ctx: Context) {
     const { projectId } = await ctx.params;
     const access = await requireProjectAccess(projectId);
@@ -75,7 +85,7 @@ export async function GET(_request: Request, ctx: Context) {
         return NextResponse.json({
             can_manage: canManage,
             studio_ready: !schemaProbe.error,
-            agents: agents.data ?? [], versions: versions.data ?? [], tenants: tenants.data ?? [],
+            agents: agents.data ?? [], versions: (versions.data ?? []).map(withoutToolSecrets), tenants: tenants.data ?? [],
             installations: installations.data ?? [], runs: runs.data ?? [],
             models: registry.models.filter((model) => model.available && model.types.includes('chat')).slice(0, 100).map((model) => ({ id: model.id, name: model.name, provider: model.provider })),
         });
@@ -125,6 +135,21 @@ export async function POST(request: Request, ctx: Context) {
             return NextResponse.json({ agent_id: agent.id, version_id: version.id }, { status: 201 });
         }
 
+        // Deleting cascades to versions, customer installs and runs; gateway
+        // request logs keep their rows with the agent link cleared.
+        if (body.action === 'delete_agent') {
+            const agentId = cleanText(body.agent_id, 100);
+            if (!agentId || !await scopedAgent(db, projectId, agentId)) return fail('Agent not found in this project.', 404);
+            const { error } = await db.from('agents').delete().eq('project_id', projectId).eq('id', agentId);
+            if (error) {
+                return error.code === '23503'
+                    ? fail('Another agent uses this one as a sub-agent. Remove it there first.', 409)
+                    : fail('Could not delete the agent. Try again.', 502);
+            }
+            await invalidateAgentConfig(agentId).catch(() => undefined);
+            return NextResponse.json({ deleted: agentId });
+        }
+
         if (body.action === 'create_tenant') {
             const name = cleanText(body.name, 120);
             const externalId = cleanText(body.external_id, 160);
@@ -147,7 +172,7 @@ export async function POST(request: Request, ctx: Context) {
             const { data: existingDraft, error: draftError } = await db.from('agent_versions').select('id').eq('project_id', projectId).eq('agent_id', agentId).in('status', ['draft', 'validating', 'ready_for_review']).order('created_at', { ascending: false }).limit(1).maybeSingle();
             if (draftError) return fail('Could not check agent drafts.', 502);
             if (existingDraft) return NextResponse.json({ version_id: existingDraft.id });
-            const { data: rows, error: rowsError } = await db.from('agent_versions').select('version,config_json,requirements_json').eq('project_id', projectId).eq('agent_id', agentId).order('created_at', { ascending: false }).limit(100);
+            const { data: rows, error: rowsError } = await db.from('agent_versions').select('version,config_json,requirements_json,visibility').eq('project_id', projectId).eq('agent_id', agentId).order('created_at', { ascending: false }).limit(100);
             if (rowsError) return fail('Could not load agent versions.', 502);
             const taken = new Set((rows ?? []).map((row) => row.version as string));
             let highest = [1, 0, -1];
@@ -165,7 +190,7 @@ export async function POST(request: Request, ctx: Context) {
             const { data, error } = await db.from('agent_versions').insert({
                 agent_id: agentId, project_id: projectId, version: `${highest[0]}.${highest[1]}.${number}`, status: 'draft',
                 config_json: config, requirements_json: source?.requirements_json ?? {},
-                checksum: checksumConfig(config), visibility: 'private', created_by: access.userId,
+                checksum: checksumConfig(config), visibility: (source?.visibility as string | undefined) ?? 'private', created_by: access.userId,
             }).select('id').single();
             if (error || !data) return fail(error?.code === '23505' ? 'Another draft was just created. Refresh and try again.' : 'Could not create a new draft.', error?.code === '23505' ? 409 : 502);
             return NextResponse.json({ version_id: data.id }, { status: 201 });
@@ -173,7 +198,7 @@ export async function POST(request: Request, ctx: Context) {
 
         const versionId = cleanText(body.version_id, 100);
         const version = versionId ? await scopedVersion(db, projectId, agentId, versionId) : null;
-        if (['save_draft', 'test_version', 'publish_version', 'set_visibility'].includes(body.action) && !version) return fail('Version not found in this project.', 404);
+        if (['save_draft', 'save_tools', 'test_version', 'publish_version', 'set_visibility'].includes(body.action) && !version) return fail('Version not found in this project.', 404);
 
         // Marketplace publishing: flip a version's visibility. Public
         // versions appear in anonymous discovery; anything else stays hidden.
@@ -218,78 +243,257 @@ export async function POST(request: Request, ctx: Context) {
             return NextResponse.json({ version_id: versionId });
         }
 
+        // The agent's webhook tools. Saved like any edit: the draft goes back
+        // to untested, so publishing runs a fresh test.
+        if (body.action === 'save_tools' && version) {
+            if (['published', 'deprecated', 'retired'].includes(version.status as string)) return fail('Published versions cannot be edited. Create a new draft.', 409);
+            const existing = (version.config_json ?? {}) as AgentVersionConfig;
+            const built = buildWebhookTools(body.webhook_tools, readWebhookTools(existing), access.organizationId);
+            if (!built.ok) return fail(built.message);
+            const config: AgentVersionConfig = { ...existing, webhook_tools: built.tools };
+            if (built.tools.length === 0) delete config.webhook_tools;
+            const { data: saved, error: saveError } = await db.from('agent_versions').update({
+                config_json: config, checksum: checksumConfig(config), status: 'draft',
+                last_tested_at: null, last_test_passed: false,
+            }).eq('project_id', projectId).eq('agent_id', agentId).eq('id', versionId)
+                .in('status', ['draft', 'ready_for_review']).select('id').maybeSingle();
+            if (saveError || !saved) return fail('Draft changed while you were editing. Refresh and try again.', 409);
+            return NextResponse.json({ version_id: versionId, webhook_tools: publicWebhookTools(built.tools) });
+        }
+
         if (body.action === 'test_version' && version) {
-            if (['published', 'deprecated', 'retired'].includes(version.status as string)) return fail('Create a new draft to test changes.', 409);
+            // Published versions can be chatted with too; only drafts collect
+            // the passing test that publishing requires.
+            const locked = ['published', 'deprecated', 'retired'].includes(version.status as string);
             const input = cleanText(body.input, 2000) || 'Introduce yourself in one sentence.';
             const config = (version.config_json ?? {}) as AgentVersionConfig;
             const simple = simpleManifest(config);
             if (!simple.ok) return fail(simple.message, 422);
             const checked = validateVersionConfig(config);
             if (!checked.ok) return fail(checked.message, 422);
+            const organizationId = access.organizationId;
+            // The agent's own knowledge is live, so the test uses it too. It only
+            // needs the input, so the lookup runs while the checks below do.
+            const knowledgePromise = import('@/lib/embedded/turn-knowledge')
+                .then(({ retrieveTurnKnowledge }) => retrieveTurnKnowledge(db as never, { projectId, organizationId, installationId: null, agentId, queryText: input }))
+                .catch(() => ({ block: null, citations: [] as unknown[] }));
             const manifestCheck = await validateManifest(db, { projectId, agentId, manifest: simple.manifest });
             if (!manifestCheck.valid) return fail(manifestCheck.errors.join(' '), 422);
-            const { data: validating, error: statusError } = await db.from('agent_versions').update({ status: 'validating', last_test_passed: false }).eq('project_id', projectId).eq('agent_id', agentId).eq('id', versionId).eq('checksum', version.checksum as string).in('status', ['draft', 'ready_for_review']).select('id').maybeSingle();
-            if (statusError || !validating) return fail('Version changed while testing. Refresh and try again.', 409);
-            try {
-                const { executeGatewayChat } = await import('@/lib/gateway/chat-executor');
-                // Pure UUID: credit_transactions.reference_id is UUID-typed,
-                // so a prefixed id fails the debit and blocks the test.
-                const testRequestId = crypto.randomUUID();
-                const gatewayStartedAt = Date.now();
-                const agentName = typeof (agent as { name?: unknown } | null)?.name === 'string'
-                    ? ((agent as { name: string }).name.trim().slice(0, 120))
-                    : '';
-                const testInstructions = simple.manifest.instructions?.trim() ?? '';
-                const testSystemParts = [
-                    '[SANDBOX TEST — no tools, knowledge, or connections]',
-                    agentName ? `Your name is "${agentName}". Always introduce yourself as ${agentName} when asked who you are.` : null,
-                    testInstructions || null,
-                ].filter(Boolean) as string[];
-                const result = await executeGatewayChat({
-                    supabase: db as never, projectId, organizationId: access.organizationId, tier,
-                    request: {
-                        messages: [
-                            { role: 'system' as const, content: testSystemParts.join('\n\n') },
-                            { role: 'user' as const, content: input },
-                        ],
-                        model: simple.manifest.model!, maxTokens: 500,
-                    },
-                    requestId: testRequestId,
-                });
-                if (!result.content?.trim()) {
-                    throw new Error('The model returned no response. Try again.');
+            if (!locked) {
+                const { data: validating, error: statusError } = await db.from('agent_versions').update({ status: 'validating', last_test_passed: false }).eq('project_id', projectId).eq('agent_id', agentId).eq('id', versionId).eq('checksum', version.checksum as string).in('status', ['draft', 'ready_for_review']).select('id').maybeSingle();
+                if (statusError || !validating) return fail('Version changed while testing. Refresh and try again.', 409);
+            }
+            const backToDraft = async () => {
+                if (locked) return;
+                await db.from('agent_versions').update({ status: 'draft', last_tested_at: new Date().toISOString(), last_test_passed: false }).eq('project_id', projectId).eq('agent_id', agentId).eq('id', versionId).eq('status', 'validating').eq('checksum', version.checksum as string);
+            };
+
+            const agentName = typeof (agent as { name?: unknown } | null)?.name === 'string'
+                ? ((agent as { name: string }).name.trim().slice(0, 120))
+                : '';
+            const testInstructions = simple.manifest.instructions?.trim() ?? '';
+            const testKnowledge = await knowledgePromise;
+            const testSystemParts = [
+                '[SANDBOX TEST — no customer knowledge or connections]',
+                agentName ? `Your name is "${agentName}". Always introduce yourself as ${agentName} when asked who you are.` : null,
+                testInstructions || null,
+                testKnowledge.block,
+            ].filter(Boolean) as string[];
+            // The Preview chat sends its earlier turns so the test is a conversation.
+            const history = (Array.isArray(body.history) ? body.history : [])
+                .filter((m: unknown): m is { role: 'user' | 'assistant'; content: string } => !!m && typeof m === 'object'
+                    && ((m as { role?: unknown }).role === 'user' || (m as { role?: unknown }).role === 'assistant')
+                    && typeof (m as { content?: unknown }).content === 'string')
+                .slice(-20)
+                .map((m: { role: 'user' | 'assistant'; content: string }) => ({ role: m.role, content: m.content.slice(0, 4000) }));
+            const messages = [
+                { role: 'system' as const, content: testSystemParts.join('\n\n') },
+                ...history,
+                { role: 'user' as const, content: input },
+            ];
+            // Pure UUID: credit_transactions.reference_id is UUID-typed,
+            // so a prefixed id fails the debit and blocks the test.
+            const testRequestId = crypto.randomUUID();
+            const gatewayStartedAt = Date.now();
+
+            // Meter the model call before treating the test as successful:
+            // idempotent wallet debit + ai_requests usage row. A failed
+            // charge/metre leaves last_test_passed=false so the test cannot
+            // become a free pass.
+            const settle = async (outcome: {
+                content: string; model: string; provider: string;
+                usage: { promptTokens: number; completionTokens: number; totalTokens: number };
+                cost: { providerCostUsd: number; cencoriChargeUsd: number; markupPercentage: number };
+            }): Promise<{ ok: true } | { ok: false; status: number; message: string }> => {
+                if (!outcome.content.trim()) {
+                    await backToDraft();
+                    return { ok: false, status: 502, message: 'The model returned no response. Try again.' };
                 }
-                // Meter the managed model call before treating the test as
-                // successful: idempotent wallet debit + ai_requests usage row.
-                // A failed charge/metre leaves last_test_passed=false so the
-                // test cannot become a free pass.
                 const { meterAgentTestUsage } = await import('@/lib/embedded/test-metering');
                 const metered = await meterAgentTestUsage({
-                    supabase: db as never,
-                    projectId,
-                    organizationId: access.organizationId,
-                    tier,
-                    endpoint: 'agents.studio_test',
+                    supabase: db as never, projectId, organizationId, tier,
+                    endpoint: 'agents.studio_test', requestId: testRequestId, agentId,
+                    model: outcome.model, provider: outcome.provider,
+                    usage: outcome.usage, cost: outcome.cost,
+                    latencyMs: Date.now() - gatewayStartedAt,
+                });
+                if (!metered.ok) {
+                    await backToDraft();
+                    return { ok: false, status: metered.code === 'insufficient_credits' ? 402 : 502, message: metered.message };
+                }
+                if (locked) return { ok: true };
+                const { data: evidence, error: evidenceError } = await db.from('agent_versions').update({ status: 'ready_for_review', last_tested_at: new Date().toISOString(), last_test_passed: true }).eq('project_id', projectId).eq('agent_id', agentId).eq('id', versionId).eq('status', 'validating').eq('checksum', version.checksum as string).select('id').maybeSingle();
+                if (evidenceError || !evidence) {
+                    await db.from('agent_versions').update({ status: 'draft', last_test_passed: false }).eq('project_id', projectId).eq('agent_id', agentId).eq('id', versionId).eq('status', 'validating').eq('checksum', version.checksum as string);
+                    return { ok: false, status: 502, message: 'Test ran, but passing evidence could not be saved. Try again.' };
+                }
+                return { ok: true };
+            };
+
+            // The Preview chat streams the reply as it's written; the result is
+            // settled once it ends. Events: delta, then done or error.
+            if (body.stream === true) {
+                const encoder = new TextEncoder();
+                const stream = new ReadableStream<Uint8Array>({
+                    async start(controller) {
+                        // The tab can close mid-reply; the result still settles, nothing is sent.
+                        const send = (event: string, data: unknown) => {
+                            try { controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)); } catch { /* closed */ }
+                        };
+                        try {
+                            const [{ resolveGatewayProvider }, { streamGatewayChat }, { settleStreamUsage }, { calculateGatewayCharge }] = await Promise.all([
+                                import('@/lib/gateway/providers-setup'),
+                                import('@/lib/gateway/chat-executor'),
+                                import('@/lib/gateway/stream-usage'),
+                                import('@/lib/gateway/model-access'),
+                            ]);
+                            const resolved = await resolveGatewayProvider({
+                                supabase: db as never, projectId, organizationId,
+                                requestedModel: simple.manifest.model!,
+                                autoRouterInput: { text: input, tools: null, hasImage: false },
+                            });
+                            const pricing = await resolved.provider.getPricing(resolved.model);
+                            // Webhook tools run for real here: Cencori calls the endpoint and the
+                            // agent answers from the result, up to a few rounds per reply.
+                            const webhookTools = readWebhookTools(config as Record<string, unknown>);
+                            const toolDefinitions = webhookToolDefinitions(webhookTools);
+                            let conversation: UnifiedMessage[] = messages;
+                            let content = '';
+                            let chunkModel = resolved.model;
+                            let chunkProvider = resolved.providerName;
+                            const totals = { promptTokens: 0, completionTokens: 0, providerCostUsd: 0, cencoriChargeUsd: 0, markupPercentage: 0 };
+                            for (let round = 0; ; round++) {
+                                let roundText = '';
+                                let reported: import('@/lib/providers/base').TokenUsage | undefined;
+                                const calls = new Map<string, { id: string; name: string; args: string }>();
+                                // Text from an earlier round stays; the next starts on its own line.
+                                let separated = content === '';
+                                const offerTools = toolDefinitions.length > 0 && round < WEBHOOK_TOOL_MAX_ITERATIONS;
+                                for await (const chunk of streamGatewayChat({
+                                    supabase: db as never, projectId, organizationId, tier,
+                                    request: { messages: conversation, model: resolved.model, maxTokens: 500, stream: true, ...(offerTools ? { tools: toolDefinitions as never } : {}) },
+                                    resolved: resolved as never,
+                                    requestId: testRequestId,
+                                })) {
+                                    if (chunk.error) throw new Error(chunk.error);
+                                    if (chunk.delta) {
+                                        if (!separated) {
+                                            separated = true;
+                                            content += '\n\n';
+                                            send('delta', { delta: '\n\n' });
+                                        }
+                                        roundText += chunk.delta;
+                                        content += chunk.delta;
+                                        send('delta', { delta: chunk.delta });
+                                    }
+                                    for (const call of chunk.toolCalls ?? []) {
+                                        const key = call.id || `call_${calls.size}`;
+                                        const entry = calls.get(key) ?? { id: key, name: '', args: '' };
+                                        if (call.function?.name) entry.name += call.function.name;
+                                        if (call.function?.arguments) entry.args += call.function.arguments;
+                                        calls.set(key, entry);
+                                    }
+                                    if (chunk.usage) reported = chunk.usage;
+                                    if (chunk.actualModel) chunkModel = chunk.actualModel;
+                                    if (chunk.actualProvider) chunkProvider = chunk.actualProvider;
+                                }
+                                const settled = await settleStreamUsage({
+                                    reported,
+                                    pricing,
+                                    estimate: async () => {
+                                        const promptText = conversation.map((m) => m.content).join(' ');
+                                        try {
+                                            return {
+                                                promptTokens: await resolved.provider.countTokens(promptText, chunkModel),
+                                                completionTokens: await resolved.provider.countTokens(roundText, chunkModel),
+                                            };
+                                        } catch {
+                                            return { promptTokens: Math.max(1, Math.ceil(promptText.length / 4)), completionTokens: Math.max(1, Math.ceil(roundText.length / 4)) };
+                                        }
+                                    },
+                                });
+                                const charge = calculateGatewayCharge(settled.providerCostUsd, pricing, resolved.billingMode);
+                                totals.promptTokens += settled.promptTokens;
+                                totals.completionTokens += settled.completionTokens;
+                                totals.providerCostUsd += settled.providerCostUsd;
+                                totals.cencoriChargeUsd += charge.cencoriChargeUsd;
+                                totals.markupPercentage = charge.markupPercentage;
+
+                                const toolCalls = [...calls.values()].filter((call) => call.name);
+                                if (toolCalls.length === 0 || !offerTools) break;
+                                conversation = [...conversation, {
+                                    role: 'assistant',
+                                    content: roundText,
+                                    tool_calls: toolCalls.map((call) => ({ id: call.id, type: 'function' as const, function: { name: call.name, arguments: call.args } })),
+                                }];
+                                for (const call of toolCalls) {
+                                    const tool = webhookTools.find((t) => t.name === call.name);
+                                    send('tool', { id: call.id, name: call.name, status: 'running' });
+                                    const outcome = tool
+                                        ? await executeWebhookTool(tool, call.args, { organizationId })
+                                        : { ok: false, output: `There's no tool named ${call.name}.` };
+                                    send('tool', { id: call.id, name: call.name, status: outcome.ok ? 'done' : 'failed' });
+                                    conversation = [...conversation, { role: 'tool', content: outcome.output, toolCallId: call.id }];
+                                }
+                            }
+                            const done = await settle({
+                                content, model: chunkModel, provider: chunkProvider,
+                                usage: { promptTokens: totals.promptTokens, completionTokens: totals.completionTokens, totalTokens: totals.promptTokens + totals.completionTokens },
+                                cost: { providerCostUsd: totals.providerCostUsd, cencoriChargeUsd: totals.cencoriChargeUsd, markupPercentage: totals.markupPercentage },
+                            });
+                            if (done.ok) send('done', { model: chunkModel, knowledge_passages: testKnowledge.citations.length });
+                            else send('error', { message: done.message });
+                        } catch (error) {
+                            await backToDraft().catch(() => {});
+                            send('error', { message: error instanceof Error ? error.message : 'Test failed. Try again.' });
+                        } finally {
+                            try { controller.close(); } catch { /* closed */ }
+                        }
+                    },
+                });
+                return new Response(stream, {
+                    headers: { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-store, no-transform', 'X-Accel-Buffering': 'no' },
+                });
+            }
+
+            try {
+                const { executeGatewayChat } = await import('@/lib/gateway/chat-executor');
+                const result = await executeGatewayChat({
+                    supabase: db as never, projectId, organizationId, tier,
+                    request: { messages, model: simple.manifest.model!, maxTokens: 500 },
                     requestId: testRequestId,
-                    agentId,
+                });
+                const done = await settle({
+                    content: result.content ?? '',
                     model: (result as { actualModel?: string }).actualModel ?? result.model,
                     provider: (result as { actualProvider?: string }).actualProvider ?? result.provider,
                     usage: result.usage,
                     cost: result.cost,
-                    latencyMs: Date.now() - gatewayStartedAt,
                 });
-                if (!metered.ok) {
-                    await db.from('agent_versions').update({ status: 'draft', last_tested_at: new Date().toISOString(), last_test_passed: false }).eq('project_id', projectId).eq('agent_id', agentId).eq('id', versionId).eq('status', 'validating').eq('checksum', version.checksum as string);
-                    return fail(metered.message, metered.code === 'insufficient_credits' ? 402 : 502);
-                }
-                const { data: evidence, error: evidenceError } = await db.from('agent_versions').update({ status: 'ready_for_review', last_tested_at: new Date().toISOString(), last_test_passed: true }).eq('project_id', projectId).eq('agent_id', agentId).eq('id', versionId).eq('status', 'validating').eq('checksum', version.checksum as string).select('id').maybeSingle();
-                if (evidenceError || !evidence) {
-                    await db.from('agent_versions').update({ status: 'draft', last_test_passed: false }).eq('project_id', projectId).eq('agent_id', agentId).eq('id', versionId).eq('status', 'validating').eq('checksum', version.checksum as string);
-                    return fail('Test ran, but passing evidence could not be saved. Try again.', 502);
-                }
-                return NextResponse.json({ output: result.content, model: result.model, usage: result.usage });
+                if (!done.ok) return fail(done.message, done.status);
+                return NextResponse.json({ output: result.content, model: result.model, usage: result.usage, knowledge_passages: testKnowledge.citations.length });
             } catch (error) {
-                await db.from('agent_versions').update({ status: 'draft', last_tested_at: new Date().toISOString(), last_test_passed: false }).eq('project_id', projectId).eq('agent_id', agentId).eq('id', versionId).eq('status', 'validating').eq('checksum', version.checksum as string);
+                await backToDraft();
                 return fail(error instanceof Error ? error.message : 'Test failed. Try again.', 502);
             }
         }
@@ -306,6 +510,19 @@ export async function POST(request: Request, ctx: Context) {
                 p_set_stable: true, p_skill_version_ids: [], p_subagents: [],
             });
             if (error) return fail(/untested_version|invalid_status/.test(error.message) ? 'This draft changed. Test it again before publishing.' : 'Could not publish this version.', /untested_version|invalid_status/.test(error.message) ? 409 : 502);
+            // Customers on the stable channel follow the release.
+            await promoteStableInstallations(db as never, { projectId, agentId, versionId });
+            // The note from Review changes. Best-effort: the version is already
+            // published, and the column arrives by a hand-applied migration
+            // (20261025_020000_agent_version_release_notes).
+            const releaseNotes = cleanText(body.release_notes, 500);
+            if (releaseNotes) {
+                const { error: notesError } = await db.from('agent_versions')
+                    .update({ release_notes: releaseNotes })
+                    .eq('project_id', projectId)
+                    .eq('id', versionId);
+                if (notesError) console.warn('[Agent studio] Release notes not saved:', notesError.message);
+            }
             return NextResponse.json({ published: data });
         }
 

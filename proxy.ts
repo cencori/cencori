@@ -151,7 +151,8 @@ const securityHeaders: Record<string, string> = {
     "img-src 'self' data: https: blob:",
     "font-src 'self' data:",
     "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.stripe.com https://checkout.stripe.com https://r.stripe.com https://api.bachs.io https://sandbox-api.bachs.io https://checkout.bachs.io https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://*.i.posthog.com https://vercel.live wss://vercel.live https://status.outray.app",
-    "frame-src 'self' https://js.stripe.com https://hooks.stripe.com https://checkout.stripe.com https://checkout.bachs.io https://www.youtube.com https://youtube.com",
+    // cencori.com: the console previews the website widget, which is served from the main site.
+    `frame-src 'self' https://cencori.com https://js.stripe.com https://hooks.stripe.com https://checkout.stripe.com https://checkout.bachs.io https://www.youtube.com https://youtube.com${process.env.NODE_ENV === "production" ? "" : " http://localhost:*"}`,
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "form-action 'self'",

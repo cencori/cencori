@@ -1,7 +1,8 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { EmbeddedAgentsDashboard } from "./EmbeddedAgentsDashboard";
+import { AgentWorkspaceProvider, useAgentWorkspace } from "@/components/agents/AgentWorkspace";
+import { AgentTestPanel } from "@/components/agents/AgentTestPanel";
 
 const harness = vi.hoisted(() => ({
     workspace: null as unknown,
@@ -13,13 +14,8 @@ vi.mock("@tanstack/react-query", () => ({
     useQuery: () => ({ data: harness.workspace, isLoading: false, isError: false }),
     useQueryClient: () => ({ invalidateQueries: harness.invalidate }),
 }));
-vi.mock("@/lib/hooks/useQueries", () => ({
-    useProjectIdBySlug: () => ({ data: "project-1", isLoading: false }),
-}));
+vi.mock("next/navigation", () => ({ usePathname: () => "/acme/app/agents/agent-1" }));
 vi.mock("@/components/ui/toast", () => ({ toast: { success: harness.toastSuccess } }));
-vi.mock("./ModelSelect", () => ({
-    ModelSelect: ({ value }: { value: string }) => <span>{value}</span>,
-}));
 vi.mock("@/components/chat/MarkdownRenderer", () => ({
     MarkdownRenderer: ({ content }: { content: string }) => <div>{content}</div>,
 }));
@@ -35,17 +31,22 @@ function workspace(lastTestPassed = false) {
         versions: [{
             id: "version-1", agent_id: "agent-1", version: "1.0.0",
             status: lastTestPassed ? "ready_for_review" : "draft",
-            config_json: { model: "maximo-atlas-1.2", instructions: "Be helpful." },
+            config_json: { model: "maximo-atlas-1.3", instructions: "Be helpful." },
             last_tested_at: lastTestPassed ? "2026-09-25T00:00:00.000Z" : null,
             last_test_passed: lastTestPassed, published_at: null,
             created_at: "2026-09-25T00:00:00.000Z",
         }],
         tenants: [], installations: [], runs: [],
-        models: [{ id: "maximo-atlas-1.2", name: "Maximo Atlas 1.2", provider: "maximo" }],
+        models: [{ id: "maximo-atlas-1.3", name: "Maximo Atlas 1.3", provider: "maximo" }],
     };
 }
 
-describe("EmbeddedAgentsDashboard test conversation", () => {
+function PublishState() {
+    const { version } = useAgentWorkspace();
+    return <span data-testid="passed">{String(version?.last_test_passed)}</span>;
+}
+
+describe("agent test panel", () => {
     beforeEach(() => {
         Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
         harness.workspace = workspace();
@@ -54,19 +55,26 @@ describe("EmbeddedAgentsDashboard test conversation", () => {
         harness.invalidate.mockImplementation(async () => {
             harness.workspace = workspace(true);
         });
-        Object.defineProperty(HTMLElement.prototype, "scrollTo", {
-            configurable: true, value: vi.fn(),
-        });
+        Object.defineProperty(HTMLElement.prototype, "scrollTo", { configurable: true, value: vi.fn() });
     });
 
     afterEach(() => {
         vi.unstubAllGlobals();
     });
 
-    it("keeps the AI reply visible when the test status refetches, without a success toast", async () => {
+    it("keeps the reply visible when the test status refetches, without a success toast", async () => {
+        // The route streams the reply: delta events, then done.
+        const frames = ["Your trial ends ", "on October 8."]
+            .map((delta) => `event: delta\ndata: ${JSON.stringify({ delta })}\n\n`)
+            .concat("event: done\ndata: {}\n\n");
         vi.stubGlobal("fetch", vi.fn(async () => ({
             ok: true,
-            json: async () => ({ output: "Your trial ends on October 8." }),
+            body: new ReadableStream<Uint8Array>({
+                start(controller) {
+                    for (const frame of frames) controller.enqueue(new TextEncoder().encode(frame));
+                    controller.close();
+                },
+            }),
         })));
 
         const container = document.createElement("div");
@@ -74,7 +82,12 @@ describe("EmbeddedAgentsDashboard test conversation", () => {
         const root = createRoot(container);
         try {
             await act(async () => {
-                root.render(<EmbeddedAgentsDashboard orgSlug="arcie" projectSlug="test" />);
+                root.render(
+                    <AgentWorkspaceProvider projectId="project-1" agentId="agent-1" fallback={() => null}>
+                        <AgentTestPanel onClose={() => {}} />
+                        <PublishState />
+                    </AgentWorkspaceProvider>,
+                );
             });
             const composer = container.querySelector<HTMLTextAreaElement>('textarea[placeholder="Ask this agent to do something its customers would ask..."]');
             expect(composer).not.toBeNull();
@@ -90,7 +103,6 @@ describe("EmbeddedAgentsDashboard test conversation", () => {
             });
 
             expect(harness.invalidate).toHaveBeenCalled();
-            expect([...container.querySelectorAll("button")].some((button) => button.textContent?.includes("Publish"))).toBe(true);
             expect(container.textContent).toContain("When does my trial end?");
             expect(container.textContent).toContain("Your trial ends on October 8.");
             expect(harness.toastSuccess).not.toHaveBeenCalledWith("Test passed", expect.anything());

@@ -240,11 +240,21 @@ async function prepareRunExecution(args: {
             .then(({ retrieveTurnSkills }) => retrieveTurnSkills(supabase as never, { installationId: run.installation_id, tenantId: run.tenant_id, versionId: run.agent_version_id }))
             .catch(() => ({ block: null, skill_version_ids: [] as string[], failed: true }))
         : Promise.resolve({ block: null, skill_version_ids: [] as string[] });
-    if (run.installation_id) {
-        const { data: bindings } = await supabase.from('installation_knowledge_bases').select('knowledge_base_id').eq('installation_id', run.installation_id);
+    {
+        // The agent's own knowledge base, then whatever the installation binds.
+        const { agentKnowledgeBaseId } = await import('@/lib/embedded/agent-knowledge');
+        const [agentKbId, bound] = await Promise.all([
+            agentKnowledgeBaseId(supabase as never, run.agent_id),
+            run.installation_id
+                ? supabase.from('installation_knowledge_bases').select('knowledge_base_id').eq('installation_id', run.installation_id).then(({ data }) => (data ?? []) as Array<{ knowledge_base_id: string }>)
+                : Promise.resolve([] as Array<{ knowledge_base_id: string }>),
+        ]);
+        const bindings = agentKbId && !bound.some((b) => b.knowledge_base_id === agentKbId)
+            ? [{ knowledge_base_id: agentKbId }, ...bound]
+            : bound;
         // Skip the embedding call entirely when nothing is bound — it is
         // billed work with no retrieval to serve.
-        if (!bindings || (bindings as Array<{ knowledge_base_id: string }>).length === 0) {
+        if (bindings.length === 0) {
             // No knowledge bound; citations stay empty.
         } else try {
             const { embedForMemory } = await import('@/lib/memory/embeddings');

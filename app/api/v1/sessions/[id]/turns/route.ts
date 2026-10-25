@@ -70,6 +70,10 @@ export async function POST(
 ) {
     const endpoint = '/v1/sessions/:id/turns';
     const startedAt = Date.now();
+    // Per-step durations for this turn, sent as Server-Timing with the stream.
+    const steps: [string, number][] = [];
+    let stepAt = startedAt;
+    const step = (name: string) => { const now = Date.now(); steps.push([name, now - stepAt]); stepAt = now; };
     const callerIdentity = extractGatewayCallerIdentity(req.headers);
     let gatewayCtx: GatewayContext | null = null;
     const { id: sessionId } = await params;
@@ -159,6 +163,7 @@ export async function POST(
             console.error('[Sessions] Opportunistic expiry failed:', error);
         });
 
+        step('auth');
         // Fetch session first
         const { data: session, error: sessionError } = await adminClient
             .from('sessions')
@@ -178,6 +183,14 @@ export async function POST(
             return respondError(409, `Session is ${session.status}, not active`, "session_not_active");
         }
 
+        // Website widget conversations come from anonymous visitors: cap their length and pace.
+        if ((session.metadata as { source?: string } | null)?.source === 'widget') {
+            const { checkWidgetTurn } = await import('@/lib/embedded/widget');
+            const blocked = await checkWidgetTurn(sessionId, (session.last_turn_number as number | null) ?? 0);
+            if (blocked) return respondError(429, blocked.message, blocked.code);
+        }
+
+        step('session');
         const agentResult = await resolveAgentContext({
             supabase: adminClient,
             req,
@@ -195,7 +208,13 @@ export async function POST(
             agentId = agentResult.agent.agentId;
             agentConfig = agentResult.agent.agentConfig;
             gatewayCtx = agentResult.agent.gatewayCtx;
-        } else if (agentResult.errorCode === 'agent_not_found') {
+        } else if (
+            agentResult.errorCode === 'agent_not_found'
+            // Console-built agents have versions but no legacy agent_configs
+            // row; an installed session takes its config from the published
+            // version below, which also checks the agent is active.
+            || (agentResult.errorCode === 'agent_config_not_found' && (session as { installation_id?: string | null }).installation_id)
+        ) {
             // No agent — allowed
         } else if (agentResult.response) {
             return respond(agentResult.response, agentResult.errorCode, agentResult.errorMessage);
@@ -212,6 +231,7 @@ export async function POST(
             };
         }
 
+        step('agent');
         // ── Parse Request Body ──
         let body: TurnRequestBody & { input: ResponsesRequest['input'] };
         try {
@@ -225,6 +245,8 @@ export async function POST(
         // carries an installation — model, instructions, temperature, the
         // tool allowlist, and the (default-deny) browser policy.
         let installedManifest: CapabilityManifest | null = null;
+        // The published version's webhook tools, run by the engine on the server.
+        let installedWebhookTools: import('@/lib/embedded/webhook-tools').WebhookTool[] = [];
         let effectiveNetworkPolicy: NetworkPolicy | undefined;
         let effectiveBrowserEnabled = false;
         {
@@ -272,6 +294,7 @@ export async function POST(
                         }
                     } else return respondError(409, 'Installed agent has no published model', 'version_unavailable');
                     installedManifest = manifest;
+                    installedWebhookTools = (await import('@/lib/embedded/webhook-tools')).readWebhookTools(config);
                     effectiveNetworkPolicy = intersectNetworkPolicy(manifest.policy, (ins as { overlay_config?: unknown }).overlay_config);
                     effectiveBrowserEnabled = intersectBrowserEnabled(manifest.policy, (ins as { overlay_config?: unknown }).overlay_config);
                 }
@@ -304,6 +327,7 @@ export async function POST(
             return respondError(400, "Missing input. Provide a string or array of input items.", 'missing_input');
         }
 
+        step('installation');
         // ── End-User Billing ──
         const endUserId = body.user?.trim() || null;
         let endUserQuota: QuotaCheckResult | null = null;
@@ -410,6 +434,7 @@ export async function POST(
         // user-scoped facts and persist new ones — the same memory that
         // powers /v1/chat/completions, now on the Sessions (and Arcie) path.
         let memoryDirective: MemoryDirective | null = null;
+        step('quota_budget');
         let memorySettings: MemorySettings | null = null;
 
         if (body.memory !== undefined) {
@@ -460,6 +485,7 @@ export async function POST(
                 })
                 : Promise.resolve([]);
 
+        step('memory_setup');
         const inputPipeline = await runGatewayInputPipeline({
             supabase: adminClient,
             projectId: gatewayCtx.projectId,
@@ -481,8 +507,22 @@ export async function POST(
         // Stored facts were redacted at write time; insert them as a system
         // block ahead of the current turn's input (after any leading system
         // messages) so the engine positions them right before the user turn.
+        step('input_pipeline');
         const guardedInput = inputPipeline.messages;
+
+        // Knowledge only needs the (masked) input, so its embedding and search
+        // run while the remaining checks do. Fail-open: no knowledge, no block.
+        const knowledgePromise = (session as { installation_id?: string | null }).installation_id || agentId
+            ? import('@/lib/embedded/turn-knowledge').then(({ retrieveTurnKnowledge }) => retrieveTurnKnowledge(adminClient as never, {
+                projectId: (gatewayCtx as GatewayContext).projectId,
+                organizationId: (gatewayCtx as GatewayContext).organizationId,
+                installationId: (session as { installation_id?: string | null }).installation_id ?? null,
+                agentId,
+                queryText: inputPipeline.inputText,
+            })).catch(() => null)
+            : Promise.resolve(null);
         const retrievedMemories = await memoryPromise;
+        step('memory_wait');
         if (retrievedMemories.length > 0) {
             const memoryMessage: UnifiedMessage = {
                 role: "system",
@@ -558,6 +598,14 @@ export async function POST(
             }
         }
 
+        if (installedManifest && installedWebhookTools.length > 0) {
+            const { webhookToolDefinitions } = await import('@/lib/embedded/webhook-tools');
+            const taken = new Set(tools.map((t) => (t as { function?: { name?: string } }).function?.name).filter(Boolean));
+            for (const definition of webhookToolDefinitions(installedWebhookTools)) {
+                if (!taken.has(definition.function.name)) tools.push(definition as never);
+            }
+        }
+
         const forcedToolName = typeof body.tool_choice === 'object' && body.tool_choice?.type === 'function' ? body.tool_choice.name : null;
         // (Forced-tool membership is checked after allowlist filtering below,
         // so a declared-but-revoked tool still fails closed.)
@@ -596,10 +644,15 @@ export async function POST(
             }
         }
 
+        // Only webhook tools that survived the installation's allowlist run.
+        const offeredNames = new Set(tools.map((t) => (t as { function?: { name?: string } }).function?.name).filter(Boolean));
+        const runnableWebhookTools = installedWebhookTools.filter((tool) => offeredNames.has(tool.name));
+
         if (installedManifest && forcedToolName && !tools.some((t) => t.type === 'function' && t.function.name === forcedToolName)) {
             return respondError(403, 'Requested tool is not available on this installation', 'tool_not_allowed');
         }
 
+        step('tools');
         // Reserve a turn only after authentication, validation, quota, memory,
         // and security checks have succeeded. Invalid requests must not burn a
         // turn number or create gaps in replay history.
@@ -620,22 +673,23 @@ export async function POST(
 
         const newTurnNumber = locked.last_turn_number;
 
-        // ── Installation knowledge + skills: best-effort retrieval for citations ──
+        // ── Agent + installation knowledge, installation skills: best-effort retrieval for citations ──
         let knowledgeContext: { block: string | null; citations: Array<{ chunk_id: string; source_id: string; ord?: number | null; score: number }> } | undefined;
         let skillsBlock: string | null = null;
         {
+            step('turn_lock');
             const installationId = (session as { installation_id?: string | null }).installation_id;
             const tenantId = (session as { tenant_id?: string | null }).tenant_id ?? null;
-            if (installationId) {
+            // The agent's own knowledge applies with or without an installation.
+            if (installationId || agentId) {
                 try {
-                    const { retrieveTurnKnowledge, retrieveTurnSkills } = await import('@/lib/embedded/turn-knowledge');
-                    knowledgeContext = await retrieveTurnKnowledge(adminClient as never, {
-                        projectId: (gatewayCtx as GatewayContext).projectId,
-                        organizationId: (gatewayCtx as GatewayContext).organizationId,
-                        installationId,
-                        queryText: inputPipeline.inputText,
-                    });
-                    skillsBlock = (await retrieveTurnSkills(adminClient as never, { installationId, tenantId })).block;
+                    const { retrieveTurnSkills } = await import('@/lib/embedded/turn-knowledge');
+                    const [knowledge, skills] = await Promise.all([
+                        knowledgePromise,
+                        installationId ? retrieveTurnSkills(adminClient as never, { installationId, tenantId }) : Promise.resolve(null),
+                    ]);
+                    knowledgeContext = knowledge ?? undefined;
+                    skillsBlock = skills?.block ?? null;
                 } catch {
                     knowledgeContext = undefined;
                     skillsBlock = null;
@@ -643,6 +697,7 @@ export async function POST(
             }
         }
 
+        step('knowledge');
         // ── Execute turn ──
         const execResult = await executeSessionTurn({
             supabase: adminClient,
@@ -652,6 +707,7 @@ export async function POST(
             model,
             instructions: instructions || undefined,
             tools: tools as ResponsesRequest['tools'],
+            webhookTools: runnableWebhookTools,
             networkPolicy: effectiveNetworkPolicy,
             tool_choice: body.tool_choice,
             temperature: body.temperature,
@@ -731,6 +787,9 @@ export async function POST(
                 (execResult.body as { error?: { message?: string } }).error?.message || "Turn execution failed",
             );
         }
+
+        step('model_start');
+        execResult.response.headers.set('Server-Timing', [...steps.map(([name, ms]) => `${name};dur=${ms}`), `total;dur=${Date.now() - startedAt}`].join(', '));
 
         if (memoryDirective) {
             execResult.response.headers.set(

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { NextResponse } from 'next/server';
 
 // Mock modules that trigger the supabase chain import
@@ -10,6 +10,14 @@ vi.mock('@/lib/gateway/providers-setup', () => ({
 }));
 vi.mock('@/lib/gateway/v1-responses-tools', () => ({
     preProcessBuiltInTools: vi.fn(),
+}));
+vi.mock('@/lib/embedded/webhook-tools', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('@/lib/embedded/webhook-tools')>()),
+    executeWebhookTool: vi.fn(),
+}));
+vi.mock('@/lib/governance/policy-enforcement', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('@/lib/governance/policy-enforcement')>()),
+    orgHasOutputPolicies: vi.fn().mockResolvedValue(false),
 }));
 
 import {
@@ -23,10 +31,14 @@ import {
 import * as chatExecutor from '@/lib/gateway/chat-executor';
 import * as providersSetup from '@/lib/gateway/providers-setup';
 import * as responsesTools from '@/lib/gateway/v1-responses-tools';
+import * as policyEnforcement from '@/lib/governance/policy-enforcement';
+import * as webhookToolsModule from '@/lib/embedded/webhook-tools';
 
 const mockStreamGatewayChat = vi.mocked(chatExecutor.streamGatewayChat);
 const mockResolveGatewayProvider = vi.mocked(providersSetup.resolveGatewayProvider);
 const mockPreProcessBuiltInTools = vi.mocked(responsesTools.preProcessBuiltInTools);
+const mockOrgHasOutputPolicies = vi.mocked(policyEnforcement.orgHasOutputPolicies);
+const mockExecuteWebhookTool = vi.mocked(webhookToolsModule.executeWebhookTool);
 
 function makeProvider() {
     return {
@@ -85,6 +97,7 @@ describe('executeSessionTurn', () => {
             provider: makeProvider(),
         });
         mockPreProcessBuiltInTools.mockResolvedValue({ systemContext: '', toolOutputs: [] });
+        mockOrgHasOutputPolicies.mockResolvedValue(false);
     });
 
     it('should complete a turn with text output and emit SSE events', async () => {
@@ -126,11 +139,99 @@ describe('executeSessionTurn', () => {
         expect(allData).toContain('event: turn.started');
         expect(allData).toContain('event: output_text.delta');
         expect(allData).toContain('event: turn.completed');
-        // Session output is buffered until the output guard approves the
-        // complete response, so no unsafe prefix is emitted early.
-        expect(allData).toContain('"delta":"Hello world"');
+        // No output policy can change the reply, so it streams as written:
+        // live deltas that add up to the whole reply, sent once each.
+        const deltas = [...allData.matchAll(/event: output_text\.delta\ndata: (.+)/g)].map((m) => JSON.parse(m[1]).delta);
+        expect(deltas.length).toBeGreaterThan(1);
+        expect(deltas.join('')).toBe('Hello world');
+        // Stored once, whole, so history and replay are unchanged.
+        const inserts = (supabase.from as ReturnType<typeof vi.fn>).mock.results
+            .flatMap((r) => (r.value.insert as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[0]));
+        const storedDeltas = inserts.filter((row) => row.event_type === 'output_text.delta');
+        expect(storedDeltas).toHaveLength(1);
+        expect(storedDeltas[0].payload).toEqual({ delta: 'Hello world' });
         expect(allData).not.toContain('turn.paused');
         expect(allData).not.toContain('turn.failed');
+    });
+
+    it('runs webhook tools on the server and continues the reply', async () => {
+        const rounds = [
+            [
+                { toolCalls: [{ id: 'call_1', function: { name: 'book_meeting', arguments: '{"time":"3pm"}' } }], usage: { promptTokens: 40, completionTokens: 5, totalTokens: 45 }, actualModel: 'gpt-4o', actualProvider: 'openai' },
+                { finishReason: 'tool_calls', actualModel: 'gpt-4o', actualProvider: 'openai' },
+            ],
+            [
+                { delta: 'Booked ', actualModel: 'gpt-4o', actualProvider: 'openai' },
+                { delta: 'for 3pm.', usage: { promptTokens: 60, completionTokens: 4, totalTokens: 64 }, actualModel: 'gpt-4o', actualProvider: 'openai' },
+                { finishReason: 'stop', actualModel: 'gpt-4o', actualProvider: 'openai' },
+            ],
+        ];
+        let call = 0;
+        mockStreamGatewayChat.mockImplementation((() => makeStreamChunks(rounds[call++])()) as never);
+        mockExecuteWebhookTool.mockResolvedValue({ ok: true, status: 200, output: '{"confirmed":true}' });
+
+        const { supabase, gatewayCtx, logSuccess, incrementUsage } = makeGateways();
+        const webhook = { name: 'book_meeting', description: 'Book a meeting', method: 'POST' as const, url: 'https://example.com/book', headers: [], parameters: [{ name: 'time', type: 'string' as const, description: '', required: true }] };
+        const result = await executeSessionTurn({
+            supabase: supabase as never,
+            gatewayCtx: gatewayCtx as never,
+            sessionId: 'sid_1',
+            turnNumber: 1,
+            model: 'gpt-4o',
+            tools: webhookToolsModule.webhookToolDefinitions([webhook]) as never,
+            webhookTools: [webhook],
+            inputMessages: [{ role: 'user', content: 'Book me at 3pm' }],
+            inputText: 'Book me at 3pm',
+            pauseOnToolCalls: false,
+            endUserId: null,
+            tier: 'free' as never,
+            logSuccess,
+            incrementUsage,
+        });
+        const allData = await (result as { ok: true; response: NextResponse }).response.text();
+
+        expect(mockExecuteWebhookTool).toHaveBeenCalledWith(webhook, '{"time":"3pm"}', { organizationId: 'org_1' });
+        expect(allData).toContain('event: tool_call.started');
+        expect(allData).toContain('event: tool_call.completed');
+        const deltas = [...allData.matchAll(/event: output_text\.delta\ndata: (.+)/g)].map((m) => JSON.parse(m[1]).delta);
+        expect(deltas.join('')).toBe('Booked for 3pm.');
+        expect(allData).toContain('event: turn.completed');
+        // The second model call sees the tool's result.
+        const second = mockStreamGatewayChat.mock.calls[1][0] as { request: { messages: Array<{ role: string; content: string }> } };
+        expect(second.request.messages.at(-1)).toMatchObject({ role: 'tool', content: '{"confirmed":true}' });
+        // One log row and one charge for the whole reply, both rounds included.
+        expect(logSuccess).toHaveBeenCalledTimes(1);
+        expect(logSuccess.mock.calls[0][0]).toMatchObject({ promptTokens: 100, completionTokens: 9 });
+        expect(incrementUsage).toHaveBeenCalledTimes(1);
+    });
+
+    it('buffers the whole reply when an output policy could block or redact it', async () => {
+        mockOrgHasOutputPolicies.mockResolvedValue(true);
+        mockStreamGatewayChat.mockImplementation(makeStreamChunks([
+            { delta: 'Hello ', actualModel: 'gpt-4o', actualProvider: 'openai' },
+            { delta: 'world', actualModel: 'gpt-4o', actualProvider: 'openai' },
+            { finishReason: 'stop', actualModel: 'gpt-4o', actualProvider: 'openai' },
+        ]));
+
+        const { supabase, gatewayCtx, logSuccess, incrementUsage } = makeGateways();
+        const result = await executeSessionTurn({
+            supabase: supabase as never,
+            gatewayCtx: gatewayCtx as never,
+            sessionId: 'sid_1',
+            turnNumber: 1,
+            model: 'gpt-4o',
+            inputMessages: [{ role: 'user', content: 'hello' }],
+            inputText: 'hello',
+            pauseOnToolCalls: false,
+            endUserId: null,
+            tier: 'free' as never,
+            logSuccess,
+            incrementUsage,
+        });
+        const response = (result as { ok: true; response: NextResponse }).response;
+        const allData = await response.text();
+        const deltas = [...allData.matchAll(/event: output_text\.delta\ndata: (.+)/g)].map((m) => JSON.parse(m[1]).delta);
+        expect(deltas).toEqual(['Hello world']);
     });
 
     it('should pause on tool calls when pauseOnToolCalls is true', async () => {

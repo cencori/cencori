@@ -31,7 +31,7 @@ vi.mock('@/lib/providers/base', () => ({
     calculateProviderTokenCost: vi.fn(() => 0),
 }));
 
-import { embedForMemory, isEmbedRetryable } from '../embeddings';
+import { clearEmbeddingCachesForTests, embedForMemory, isEmbedRetryable } from '../embeddings';
 
 const googleError = (status: number, label: string) =>
     new Error(
@@ -81,6 +81,7 @@ describe('embedForMemory retry behavior (managed Gemini path)', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         process.env = { ...OLD_ENV, MEMORY_GEMINI_API_KEY: 'test-memory-key' };
+        clearEmbeddingCachesForTests();
     });
 
     afterEach(() => {
