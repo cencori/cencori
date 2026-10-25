@@ -1,15 +1,18 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import TestTube01Icon from "@hugeicons/core-free-icons/TestTube01Icon";
 import PencilEdit02Icon from "@hugeicons/core-free-icons/PencilEdit02Icon";
-import { ArrowUp, Check, CircleAlert, Copy, Loader2, X } from "lucide-react";
+import ToolsIcon from "@hugeicons/core-free-icons/ToolsIcon";
+import ArrowRight01Icon from "@hugeicons/core-free-icons/ArrowRight01Icon";
+import ArrowDown01Icon from "@hugeicons/core-free-icons/ArrowDown01Icon";
+import { ArrowUp, CircleAlert, Copy, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
 import { ThinkingState } from "@/components/chat/ThinkingState";
-import { useAgentWorkspace } from "@/components/agents/AgentWorkspace";
+import { useAgentWorkspace, type TestMessage, type TestStep, type ToolActivity } from "@/components/agents/AgentWorkspace";
 import { WidgetPreview, useWidgetPreview, type TestPanelMode } from "@/components/agents/widget-preview";
 import { cn } from "@/lib/utils";
 
@@ -32,11 +35,18 @@ export function AgentTestPanel({ onClose }: { onClose: () => void }) {
     // "Thinking" until the reply's first words arrive, then the reply itself.
     const last = test.messages[test.messages.length - 1];
     // MCP tools reach the model as "<server>__<tool>": show the tool with its server's logo.
-    const mcpServers = ((version?.config_json.mcp_servers ?? []) as Array<{ name?: string; icon?: string }>).filter((server) => typeof server?.name === "string");
+    // Connected apps' tools are named "<app id>__<action>" the same way.
+    const mcpServers = [
+        ...((version?.config_json.mcp_servers ?? []) as Array<{ name?: string; icon?: string }>)
+            .filter((server) => typeof server?.name === "string")
+            .map((server) => ({ prefix: `${server.name!.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 20)}__`, icon: server.icon })),
+        ...((version?.config_json.integrations ?? []) as Array<{ icon?: string; nango?: { integration?: string } }>)
+            .filter((app) => typeof app?.nango?.integration === "string")
+            .map((app) => ({ prefix: `${app.nango!.integration}__`, icon: app.icon })),
+    ];
     const mcpToolLabel = (name: string): { tool: string; icon?: string } | null => {
         for (const server of mcpServers) {
-            const prefix = `${server.name!.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 20)}__`;
-            if (name.startsWith(prefix)) return { tool: name.slice(prefix.length), icon: server.icon };
+            if (name.startsWith(server.prefix)) return { tool: name.slice(server.prefix.length), icon: server.icon };
         }
         return null;
     };
@@ -108,34 +118,28 @@ export function AgentTestPanel({ onClose }: { onClose: () => void }) {
                             </div>
                         ) : (
                             <div key={message.id} className="min-w-0 space-y-1.5">
-                                {message.tools && message.tools.length > 0 && (
-                                    <div className="flex flex-wrap gap-1.5">
-                                        {message.tools.map((tool) => {
-                                            const mcp = mcpToolLabel(tool.name);
-                                            const logo = mcp?.icon
-                                                // eslint-disable-next-line @next/next/no-img-element -- a stored data URL
-                                                ? <img src={mcp.icon} alt="" className="h-3.5 w-3.5 shrink-0 rounded-sm object-contain" />
-                                                : null;
-                                            return tool.status === "running" ? (
-                                                <span key={tool.id} className="inline-flex items-center gap-1.5">
-                                                    {logo}
-                                                    <ThinkingState label={`Calling ${mcp?.tool ?? tool.name}`} className="py-0.5 text-xs" />
-                                                </span>
-                                            ) : (
-                                                <span key={tool.id} title={tool.name} className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-mono text-[10px]", tool.status === "done" ? "border-border/50 text-muted-foreground" : "border-destructive/30 text-destructive")}>
-                                                    {tool.status === "done" ? (logo ?? <Check className="h-3 w-3" />) : <CircleAlert className="h-3 w-3" />}
-                                                    {mcp?.tool ?? tool.name}
-                                                </span>
-                                            );
-                                        })}
-                                    </div>
-                                )}
-                                {message.error ? (
-                                    <p role="alert" className="flex items-start gap-2 whitespace-pre-wrap text-sm leading-6 text-destructive"><CircleAlert className="mt-1 h-4 w-4 shrink-0" />{message.content}</p>
-                                ) : message.content ? (
-                                    <MarkdownRenderer content={message.content} />
-                                ) : null}
-                                {message.content && <Button type="button" variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground/60 hover:text-foreground" onClick={() => { void navigator.clipboard.writeText(message.content); toast.success("Message copied"); }} title="Copy to clipboard">
+                                {(() => {
+                                    if (message.error) {
+                                        return <p role="alert" className="flex items-start gap-2 whitespace-pre-wrap text-xs leading-relaxed text-destructive"><CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />{message.content}</p>;
+                                    }
+                                    const { trace, answer } = splitReply(message);
+                                    return (
+                                        <>
+                                            {trace.length > 0 && (
+                                                <WorkTrace
+                                                    steps={trace}
+                                                    tools={message.tools ?? []}
+                                                    live={testing && message.id === last?.id}
+                                                    startedAt={message.startedAt}
+                                                    durationMs={message.durationMs}
+                                                    toolLabel={mcpToolLabel}
+                                                />
+                                            )}
+                                            {answer && <MarkdownRenderer content={answer} className={REPLY_TEXT} />}
+                                        </>
+                                    );
+                                })()}
+                                {message.content && <Button type="button" variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground/60 hover:text-foreground" onClick={() => { void navigator.clipboard.writeText(splitReply(message).answer || message.content); toast.success("Message copied"); }} title="Copy to clipboard">
                                     <Copy className="h-3 w-3" />
                                 </Button>}
                                 {message.ended && (
@@ -173,5 +177,101 @@ export function AgentTestPanel({ onClose }: { onClose: () => void }) {
                 </div>
             )}
         </aside>
+    );
+}
+
+// Replies match the user's bubble: the renderer's prose defaults are 16px.
+const REPLY_TEXT = "text-xs font-medium leading-relaxed [&_h1]:text-sm [&_h2]:text-sm [&_h3]:text-xs [&_li]:my-0.5 [&_ol]:my-2 [&_p]:my-2 [&_ul]:my-2";
+
+/**
+ * The reply's last run of text is the answer; everything before it (tool
+ * calls and what the agent said between them) is the work that led there.
+ */
+function splitReply(message: TestMessage): { trace: TestStep[]; answer: string } {
+    const steps: TestStep[] = message.steps
+        ?? [...(message.tools ?? []).map((tool): TestStep => ({ type: "tool", id: tool.id })), ...(message.content ? [{ type: "text", text: message.content } as TestStep] : [])];
+    if (!steps.some((step) => step.type === "tool")) return { trace: [], answer: message.content };
+    const tail = steps[steps.length - 1];
+    return tail?.type === "text"
+        ? { trace: steps.slice(0, -1), answer: tail.text.trim() }
+        : { trace: steps, answer: "" };
+}
+
+function formatDuration(ms: number): string {
+    const seconds = Math.max(1, Math.round(ms / 1000));
+    if (seconds < 60) return `${seconds}s`;
+    const minutes = Math.floor(seconds / 60);
+    return seconds % 60 ? `${minutes}m ${seconds % 60}s` : `${minutes}m`;
+}
+
+/**
+ * The agent's steps in the order it took them, after Tensor's work trace:
+ * open and ticking while the turn runs, then folded into "Worked for 4s"
+ * once the answer lands. A failed call keeps it open so the failure shows.
+ */
+function WorkTrace({ steps, tools, live, startedAt, durationMs, toolLabel }: {
+    steps: TestStep[];
+    tools: ToolActivity[];
+    live: boolean;
+    startedAt?: number;
+    durationMs?: number;
+    toolLabel: (name: string) => { tool: string; icon?: string } | null;
+}) {
+    const failed = tools.some((tool) => tool.status === "failed");
+    const [expanded, setExpanded] = useState(live || failed);
+    const [now, setNow] = useState(() => Date.now());
+    useEffect(() => {
+        setExpanded(live || failed);
+    }, [live, failed]);
+    useEffect(() => {
+        if (!live) return;
+        const timer = window.setInterval(() => setNow(Date.now()), 1000);
+        return () => window.clearInterval(timer);
+    }, [live]);
+
+    const elapsed = durationMs ?? (startedAt ? now - startedAt : null);
+    const toolsById = new Map(tools.map((tool) => [tool.id, tool]));
+
+    return (
+        <section className="text-xs">
+            {live ? (
+                <p className="py-0.5 text-muted-foreground">Working{elapsed !== null ? ` for ${formatDuration(elapsed)}` : ""}</p>
+            ) : (
+                <button type="button" aria-expanded={expanded} onClick={() => setExpanded((value) => !value)} className="group inline-flex items-center gap-1 py-0.5 text-muted-foreground transition-colors hover:text-foreground">
+                    <span>{elapsed !== null ? `Worked for ${formatDuration(elapsed)}` : "Work details"}</span>
+                    <HugeiconsIcon icon={expanded ? ArrowDown01Icon : ArrowRight01Icon} size={12} strokeWidth={1.75} aria-hidden />
+                </button>
+            )}
+            {expanded && (
+                <ol className="mt-1.5 space-y-1.5 border-l border-border/60 pl-3">
+                    {steps.map((step, index) => {
+                        if (step.type === "text") {
+                            if (!step.text.trim()) return null;
+                            return (
+                                <li key={`text-${index}`} className="text-muted-foreground">
+                                    <MarkdownRenderer content={step.text.trim()} className={cn(REPLY_TEXT, "font-normal text-muted-foreground [&_p]:my-0")} />
+                                </li>
+                            );
+                        }
+                        const tool = toolsById.get(step.id);
+                        if (!tool) return null;
+                        const label = toolLabel(tool.name);
+                        const name = label?.tool ?? tool.name;
+                        const icon = label?.icon
+                            // eslint-disable-next-line @next/next/no-img-element -- a stored data URL
+                            ? <img src={label.icon} alt="" className="h-3.5 w-3.5 shrink-0 rounded-sm object-contain" />
+                            : <HugeiconsIcon icon={ToolsIcon} size={14} strokeWidth={1.5} className="shrink-0" aria-hidden />;
+                        return (
+                            <li key={tool.id} title={tool.name} className={cn("flex items-center gap-1.5", tool.status === "failed" ? "text-destructive" : "text-muted-foreground")}>
+                                {tool.status === "failed" ? <CircleAlert className="h-3.5 w-3.5 shrink-0" /> : icon}
+                                {tool.status === "running"
+                                    ? <ThinkingState label={`Using ${name}`} className="text-xs" />
+                                    : <span>{tool.status === "failed" ? `${name} failed` : `Used ${name}`}</span>}
+                            </li>
+                        );
+                    })}
+                </ol>
+            )}
+        </section>
     );
 }

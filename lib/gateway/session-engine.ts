@@ -388,6 +388,7 @@ function makeStream(params: {
                                     await el('tool_call.started', { tool: call.name, arguments: parsedArgs, action_id: call.id });
                                     const outcome = await agentTools!.toolset.run({ id: call.id, name: call.name, args }, {
                                         organizationId: gatewayCtx.organizationId,
+                                        projectId: gatewayCtx.projectId,
                                         agentId: agentTools!.agentId,
                                         agentName: agentTools!.agentName,
                                         surface: 'conversation',

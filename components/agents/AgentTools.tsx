@@ -16,6 +16,7 @@ import { toast } from "@/components/ui/toast";
 import { useAgentWorkspace } from "@/components/agents/AgentWorkspace";
 import { DockedPanel } from "@/components/agents/DockedPanel";
 import { AgentMcp } from "@/components/agents/AgentMcp";
+import { AgentIntegrations } from "@/components/agents/AgentIntegrations";
 import { postStudioAction, studioQueryKey } from "@/components/agents/studio";
 import { cn } from "@/lib/utils";
 import { END_CONVERSATION_TOOL, SYSTEM_TOOL_DEFAULT_DESCRIPTIONS, TRANSFER_TO_HUMAN_TOOL } from "@/lib/embedded/system-tool-defaults";
@@ -69,8 +70,10 @@ export function AgentTools() {
     // Cohere models don't take tools through the gateway yet; say so rather than let tools sit unused.
     const modelProvider = data.models.find((model) => model.id === form.model)?.provider;
     const hasAnyTools = tools.length > 0 || Object.keys((version?.config_json.system_tools ?? {}) as object).length > 0 || ((version?.config_json.mcp_servers ?? []) as unknown[]).length > 0;
-    const [tab, setTab] = useState<"tools" | "mcp">("tools");
+    const [tab, setTab] = useState<"tools" | "integrations" | "mcp">("tools");
     const [mcpAdding, setMcpAdding] = useState(false);
+    const [appsAdding, setAppsAdding] = useState(false);
+    const appCount = Array.isArray(version?.config_json.integrations) ? (version.config_json.integrations as unknown[]).length : 0;
     const mcpServerCount = Array.isArray(version?.config_json.mcp_servers) ? (version.config_json.mcp_servers as unknown[]).length : 0;
     const [editing, setEditing] = useState<{ index: number | null; draft: Draft } | null>(null);
     const [saving, setSaving] = useState(false);
@@ -112,14 +115,20 @@ export function AgentTools() {
             <header className="mb-6 flex items-start justify-between gap-4">
                 <div>
                     <h1 className="text-base font-medium">Tools</h1>
-                    <div role="tablist" aria-label="Tool type" className="mt-3 grid grid-cols-2 rounded-md bg-muted/60 p-0.5 text-xs">
-                        {(["tools", "mcp"] as const).map((value) => (
-                            <button key={value} type="button" role="tab" aria-selected={tab === value} onClick={() => { setTab(value); setMcpAdding(false); }} className={cn("rounded px-3 py-1 transition-colors", tab === value ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
-                                {value === "tools" ? "Tools" : "MCP"}
+                    <div role="tablist" aria-label="Tool type" className="mt-3 grid grid-cols-3 rounded-md bg-muted/60 p-0.5 text-xs">
+                        {(["tools", "integrations", "mcp"] as const).map((value) => (
+                            <button key={value} type="button" role="tab" aria-selected={tab === value} onClick={() => { setTab(value); setMcpAdding(false); setAppsAdding(false); }} className={cn("rounded px-3 py-1 transition-colors", tab === value ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
+                                {value === "tools" ? "Tools" : value === "integrations" ? "Integrations" : "MCP"}
                             </button>
                         ))}
                     </div>
                 </div>
+                {tab === "integrations" && canManage && editable && appCount > 0 && (
+                    <Button size="sm" className="h-7 shrink-0 gap-1.5 text-xs" onClick={() => setAppsAdding(true)} disabled={!!busy || appsAdding}>
+                        <Plus className="h-3.5 w-3.5" />
+                        Add integration
+                    </Button>
+                )}
                 {tab === "mcp" && canManage && editable && mcpServerCount > 0 && (
                     <Button size="sm" className="h-7 shrink-0 gap-1.5 text-xs" onClick={() => setMcpAdding(true)} disabled={!!busy || mcpAdding}>
                         <Plus className="h-3.5 w-3.5" />
@@ -134,7 +143,9 @@ export function AgentTools() {
                 )}
             </header>
 
-            {tab === "mcp" ? (
+            {tab === "integrations" ? (
+                <AgentIntegrations key={version?.id ?? "none"} adding={appsAdding} onAddingChange={setAppsAdding} />
+            ) : tab === "mcp" ? (
                 <AgentMcp key={version?.id ?? "none"} adding={mcpAdding} onAddingChange={setMcpAdding} />
             ) : (
                 <>
