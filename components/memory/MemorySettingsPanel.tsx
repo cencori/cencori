@@ -33,7 +33,7 @@ interface SettingsResponse {
 
 function Row({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
     return (
-        <div className="flex flex-col gap-3 border-b border-border/30 px-6 py-5 last:border-b-0 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex flex-col gap-3 border-b border-border/40 px-5 py-4 last:border-b-0 sm:flex-row sm:items-start sm:justify-between">
             <div className="max-w-[52ch]">
                 <p className="text-xs font-medium text-foreground/90">{title}</p>
                 <p className="mt-1 text-[11px] leading-4 text-muted-foreground">{description}</p>
@@ -88,7 +88,7 @@ export function MemorySettingsPanel({ projectId }: MemorySettingsPanelProps) {
     });
 
     if (isLoading || !draft) {
-        return <Skeleton className="h-96 w-full rounded-xl" />;
+        return <Skeleton className="h-96 w-full rounded-lg" />;
     }
 
     if (error) {
@@ -105,16 +105,8 @@ export function MemorySettingsPanel({ projectId }: MemorySettingsPanelProps) {
 
     return (
         <div className="space-y-5">
-            <div>
-                <h2 className="text-sm font-medium tracking-[-0.01em]">Controls</h2>
-                <p className="mt-1 max-w-[64ch] text-[11px] leading-4 text-muted-foreground">
-                    Memory is opt-in per request — a call only remembers when it carries a{' '}
-                    <span className="font-mono">memory</span> field. These settings govern what happens
-                    when it does.
-                </p>
-            </div>
 
-            <div className="overflow-hidden rounded-xl border border-border/30">
+            <div className="overflow-hidden rounded-lg border border-border/40 bg-muted/30">
                 <Row
                     title="Memory enabled"
                     description="The kill switch. Off rejects every memory request for this project — stored memories are kept, not deleted."
@@ -134,7 +126,7 @@ export function MemorySettingsPanel({ projectId }: MemorySettingsPanelProps) {
                     description="Runs on Cencori's managed keys, never your provider keys — a memory call must not cascade into a paid provider you didn't budget for."
                 >
                     <Select value={draft.extractionModel} onValueChange={(value) => patch({ extractionModel: value })}>
-                        <SelectTrigger className="h-8 w-[200px] gap-2 border-border/30 bg-transparent px-3 text-xs shadow-none">
+                        <SelectTrigger className="h-7 w-[200px] text-xs shadow-none dark:shadow-xs">
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -179,7 +171,7 @@ export function MemorySettingsPanel({ projectId }: MemorySettingsPanelProps) {
                         value={String(draft.sessionTtlSeconds)}
                         onValueChange={(value) => patch({ sessionTtlSeconds: Number(value) })}
                     >
-                        <SelectTrigger className="h-8 w-[132px] gap-2 border-border/30 bg-transparent px-3 text-xs shadow-none">
+                        <SelectTrigger className="h-7 w-[132px] text-xs shadow-none dark:shadow-xs">
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -222,7 +214,7 @@ export function MemorySettingsPanel({ projectId }: MemorySettingsPanelProps) {
                 </Row>
             </div>
 
-            <div className="overflow-hidden rounded-xl border border-border/30 px-6 py-5">
+            <div className="overflow-hidden rounded-lg border border-border/40 bg-muted/30 px-5 py-4">
                 <Label htmlFor="extraction-prompt" className="text-xs font-medium text-foreground/90">
                     Extraction prompt
                 </Label>

@@ -282,7 +282,9 @@ function LayoutContent({ user, avatar, name, children, initialAgentOpen, initial
   );
   const isPlayground = pathname.includes("/playground");
   const isEmbeddedAgents = pathname === "/agents" || pathname.endsWith("/agents");
-  const isFixedWorkspace = isPlayground || isEmbeddedAgents;
+  // The memory graph is a canvas: it fills the workspace edge to edge.
+  const isMemoryGraph = /\/memory\/graph\/?$/.test(pathname);
+  const isFixedWorkspace = isPlayground || isEmbeddedAgents || isMemoryGraph;
   const isOnboardingFlow = pathname.includes("/onboarding");
   // Project settings (every tab) swaps the header's credits + Copilot buttons
   // for a single way out to organization settings.
@@ -498,7 +500,7 @@ function LayoutContent({ user, avatar, name, children, initialAgentOpen, initial
 
       <main
         className={cn(
-          isPlayground
+          isPlayground || isMemoryGraph
             ? "flex min-h-0 flex-1 flex-col overflow-hidden pt-0 lg:pt-12 pb-0"
             : isEmbeddedAgents
               ? "flex min-h-0 flex-1 flex-col overflow-hidden pt-12 pb-0 lg:pt-0"
