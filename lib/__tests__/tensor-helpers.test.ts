@@ -18,8 +18,8 @@ describe("helper calls", () => {
     });
   });
 
-  it("keeps a shorter answer when one is asked for", () => {
-    expect(JSON.parse(helperBody(ask({ max_tokens: 40 }), "u") ?? "{}").max_tokens).toBe(40);
+  it("keeps the whole budget even when less is asked for, so thinking cannot leave no answer", () => {
+    expect(JSON.parse(helperBody(ask({ max_tokens: 40 }), "u") ?? "{}").max_tokens).toBe(HELPER_MAX_TOKENS);
   });
 
   it("drops tools, tool choice and anything else a turn would carry", () => {
