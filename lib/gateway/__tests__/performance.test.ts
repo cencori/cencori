@@ -66,3 +66,30 @@ describe('buildServerTiming', () => {
         expect(buildServerTiming([{ name: 'tensor_lease', durMs: null }])).toBeNull();
     });
 });
+
+describe('GatewayPerformanceTracker.breakdown', () => {
+    it('reports steps, timed calls and phase offsets from the start', async () => {
+        const tracker = new GatewayPerformanceTracker(1_000);
+        tracker.step('auth', 1_040);
+        tracker.step('body', 1_045);
+        await tracker.timed('lookup', Promise.resolve('x'));
+        await tracker.timed('plain', 'not a promise');
+        tracker.markPreflightComplete(1_100);
+        tracker.markProviderStart(1_130);
+        tracker.markProviderFirstToken(1_900);
+
+        const breakdown = tracker.breakdown();
+        expect(breakdown.steps).toEqual({ auth: 40, body: 5 });
+        expect(Object.keys(breakdown.spans)).toEqual(['lookup', 'plain']);
+        expect(breakdown.preflightDoneAt).toBe(100);
+        expect(breakdown.providerStartAt).toBe(130);
+        expect(breakdown.providerFirstTokenAt).toBe(900);
+        expect(breakdown.completedAt).toBeNull();
+    });
+
+    it('records a timed call that rejects', async () => {
+        const tracker = new GatewayPerformanceTracker(1_000);
+        await expect(tracker.timed('fails', Promise.reject(new Error('down')))).rejects.toThrow('down');
+        expect(Object.keys(tracker.breakdown().spans)).toEqual(['fails']);
+    });
+});

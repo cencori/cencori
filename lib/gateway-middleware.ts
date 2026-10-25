@@ -22,6 +22,7 @@ import { processUsageQueue } from '@/lib/queue';
 import { recordGatewayGovernanceDecision } from '@/lib/governance/record-decision';
 import { isFullySponsoredApiKey } from '@/lib/gateway/model-access';
 import { isMeteredGatewayRequest, isProvenByokRequest } from '@/lib/gateway/credit-policy';
+import type { GatewayPerformanceTracker } from '@/lib/gateway/performance';
 import {
     isProjectIngressAllowed,
     loadProjectNetworkPolicy,
@@ -257,7 +258,12 @@ export async function loadApiKeyConfig(supabase: ReturnType<typeof createAdminCl
     return { data: result.data, error: result.error };
 }
 
-export async function validateGatewayRequest(req: NextRequest): Promise<GatewayValidationResult> {
+export async function validateGatewayRequest(
+    req: NextRequest,
+    performance?: GatewayPerformanceTracker,
+): Promise<GatewayValidationResult> {
+    const timed = <T,>(name: string, promise: Promise<T>): Promise<T> =>
+        performance ? performance.timed(name, promise) : promise;
     const startTime = Date.now();
     const requestId = crypto.randomUUID();
     const supabase = createAdminClient();
@@ -528,7 +534,7 @@ return {
     // ── Look up key (with Redis cache) ──
     const keyHash = crypto.createHash('sha256').update(apiKey).digest('hex');
 
-    const loaded = await loadApiKeyConfig(supabase, keyHash);
+    const loaded = await timed('auth_key', loadApiKeyConfig(supabase, keyHash));
     const keyData = loaded.data;
     const keyError = loaded.error;
 
@@ -730,16 +736,16 @@ return {
                     : undefined,
             );
     const [networkDenial, creditsBalance, rateLimitResult, spendCapResult, tensorAccess] = await Promise.all([
-        enforceProjectIngressPolicy({
+        timed('auth_ingress', enforceProjectIngressPolicy({
             supabase,
             projectId: project.id,
             sourceIp: requestSourceIp,
             requestId,
-        }),
-        creditsBalancePromise,
-        rateLimitPromise,
-        checkSpendCap(project.id),
-        tensorAccessPromise,
+        })),
+        timed('auth_credits', creditsBalancePromise),
+        timed('auth_rate_limit', rateLimitPromise),
+        timed('auth_spend_cap', checkSpendCap(project.id)),
+        timed('auth_tensor', tensorAccessPromise),
     ]);
 
     if (networkDenial) return { success: false, response: networkDenial };
@@ -806,14 +812,14 @@ return {
     }
 
     const zeroBalanceByok = shouldEnforceCredits && isCreditBalanceExhausted(creditsBalance)
-        ? await isProvenByokRequest({
+        ? await timed('auth_byok', isProvenByokRequest({
             req,
             supabase,
             projectId: project.id,
             organizationId,
             defaultModel: project.default_model,
             agentId: keyData.agent_id,
-        })
+        }))
         : false;
 
     if (shouldEnforceCredits && isCreditBalanceExhausted(creditsBalance) && !zeroBalanceByok && isMeteredGatewayRequest(req.method, route)) {

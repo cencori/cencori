@@ -43,6 +43,13 @@ export function parseProxyEdgeTimings(headers: Headers): ProxyEdgeTimings {
     };
 }
 
+/**
+ * Set by proxy.ts (ours, not the Tensor proxy) when it first sees a request, so a route can tell
+ * how long middleware and routing took before its handler ran. proxy.ts overwrites any value a
+ * client sends.
+ */
+export const EDGE_STARTED_AT_HEADER = 'x-cencori-edge-started-at';
+
 /** Milliseconds from the proxy's handler starting to this point, or null when not proxied. */
 export function proxyHandoffMs(headers: Headers, now: number = Date.now()): number | null {
     const startedAt = Number(headers.get(PROXY_STARTED_AT_HEADER));
@@ -73,6 +80,7 @@ export class GatewayPerformanceTracker {
     private completedAt: number | null = null;
     private completionTokens: number | null = null;
     private readonly steps: Array<[string, number]> = [];
+    private readonly spans: Array<[string, number]> = [];
     private lastStepAt: number;
 
     constructor(requestStartedAt: number = Date.now()) {
@@ -92,6 +100,42 @@ export class GatewayPerformanceTracker {
     /** Each preflight step's duration, in the order they ran. */
     preflightSteps(): Record<string, number> {
         return Object.fromEntries(this.steps);
+    }
+
+    /**
+     * Times one call inside a step, including calls that run side by side, so a slow step can be
+     * traced to the call that held it up. Spans don't move the step clock.
+     */
+    timed<T>(name: string, promise: Promise<T> | T): Promise<T> {
+        const startedAt = Date.now();
+        return Promise.resolve(promise).finally(() => {
+            this.spans.push([name, Date.now() - startedAt]);
+        });
+    }
+
+    /**
+     * Everything measured so far, for the per-request timing log and Server-Timing: steps, spans,
+     * and when routing, the provider call and its first token happened, as offsets from the start.
+     */
+    breakdown(): {
+        steps: Record<string, number>;
+        spans: Record<string, number>;
+        preflightDoneAt: number | null;
+        providerStartAt: number | null;
+        providerFirstTokenAt: number | null;
+        clientFirstByteAt: number | null;
+        completedAt: number | null;
+    } {
+        const offset = (at: number | null) => (at === null ? null : Math.max(0, at - this.requestStartedAt));
+        return {
+            steps: Object.fromEntries(this.steps),
+            spans: Object.fromEntries(this.spans),
+            preflightDoneAt: offset(this.preflightCompletedAt),
+            providerStartAt: offset(this.providerStartedAt),
+            providerFirstTokenAt: offset(this.providerFirstTokenAt),
+            clientFirstByteAt: offset(this.clientFirstByteAt),
+            completedAt: offset(this.completedAt),
+        };
     }
 
     markPreflightComplete(at: number = Date.now()): void {
