@@ -11,6 +11,7 @@ import { toast } from "@/components/ui/toast";
 import { useAgentWorkspace } from "@/components/agents/AgentWorkspace";
 import { readJson } from "@/components/agents/widget-preview";
 import { cn } from "@/lib/utils";
+import { useWhatsAppSignup, type SignupConfig } from "@/components/agents/whatsapp-signup";
 
 const inputClass = "w-full rounded-md bg-[#f3f3f1] px-3 py-2 text-sm outline-none transition-colors placeholder:text-muted-foreground/60 focus:bg-[#ececea] dark:bg-[#181818] dark:focus:bg-[#1f1f1f] disabled:opacity-60";
 
@@ -20,14 +21,17 @@ interface Channel {
     display_phone_number: string | null;
     verified_name: string | null;
     enabled: boolean;
-    webhook_url: string;
-    verify_token: string;
+    /** Connected through Cencori's Meta app (Connect WhatsApp): no webhook to set up. */
+    managed: boolean;
+    coexistence: boolean;
+    webhook_url: string | null;
+    verify_token: string | null;
     webhook_verified: boolean;
     last_message_at: string | null;
     daily_session_cap: number;
 }
 
-type Payload = { channel: Channel | null; can_manage: boolean };
+type Payload = { channel: Channel | null; can_manage: boolean; signup: SignupConfig | null };
 type Form = { phoneNumberId: string; accessToken: string; appSecret: string; cap: string };
 
 function Field({ label, hint, children }: { label: string; hint?: React.ReactNode; children: React.ReactNode }) {
@@ -93,6 +97,11 @@ export function AgentWhatsApp() {
     const [busy, setBusy] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [editing, setEditing] = useState(false);
+    // Embedded Signup ("Connect WhatsApp") when Cencori's Meta app is set up; the
+    // business's own Meta app (the form) otherwise, or when they choose it.
+    const signup = useWhatsAppSignup(query.data?.signup ?? null);
+    const [ownApp, setOwnApp] = useState(false);
+    const [coexistence, setCoexistence] = useState(true);
 
     useEffect(() => {
         setForm(formFrom(channel));
@@ -124,6 +133,33 @@ export function AgentWhatsApp() {
         }
     };
 
+    const connectWithMeta = async () => {
+        setError(null);
+        let result;
+        try {
+            // Opens Meta's popup straight from the click.
+            result = await signup.start({ coexistence });
+        } catch (cause) {
+            setError(cause instanceof Error ? cause.message : "Connecting WhatsApp didn't finish.");
+            return;
+        }
+        setBusy("signup");
+        try {
+            const saved = await readJson<Payload>(await fetch(endpoint, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ code: result.code, phone_number_id: result.phoneNumberId, waba_id: result.wabaId, coexistence: result.coexistence }),
+            }));
+            queryClient.setQueryData<Payload>(queryKey, saved);
+            setEditing(false);
+            toast.success(`Connected ${saved.channel?.display_phone_number ?? "WhatsApp"}`, { description: `${agent.name} now answers messages to this number.` });
+        } catch (cause) {
+            setError(cause instanceof Error ? cause.message : "That didn't work. Try again.");
+        } finally {
+            setBusy(null);
+        }
+    };
+
     const connect = async () => {
         const result = await request("PUT", {
             phone_number_id: form.phoneNumberId.trim(),
@@ -145,7 +181,10 @@ export function AgentWhatsApp() {
     }
 
     const disabled = !canManage || !!busy;
-    const showForm = !channel || editing;
+    const signupAvailable = !!query.data?.signup;
+    // The form is for a business's own Meta app: shown when signup isn't available, chosen, or editing such a number.
+    const showForm = (!channel && (!signupAvailable || ownApp)) || (editing && !channel?.managed);
+    const showSignup = signupAvailable && !ownApp && (!channel || (editing && !!channel.managed));
     const canSubmit = form.phoneNumberId.trim() && (channel || (form.accessToken.trim() && form.appSecret.trim()));
 
     return (
@@ -189,10 +228,35 @@ export function AgentWhatsApp() {
                             </p>
                         </div>
                         <div className="flex shrink-0 gap-2">
-                            <Button variant="outline" size="sm" className="h-7 text-xs" disabled={disabled} onClick={() => { setEditing(true); setError(null); }}>Edit</Button>
+                            <Button variant="outline" size="sm" className="h-7 text-xs" disabled={disabled} onClick={() => { setEditing(true); setError(null); }}>{channel.managed ? "Change number" : "Edit"}</Button>
                             <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs text-destructive hover:text-destructive" disabled={disabled} onClick={async () => { if (await request("DELETE", null, "delete")) toast.success("WhatsApp disconnected"); }}>
                                 {busy === "delete" && <HugeiconsIcon icon={Loading03Icon} className="h-3.5 w-3.5 animate-spin" />}
                                 Disconnect
+                            </Button>
+                        </div>
+                    </div>
+                </Section>
+            )}
+
+            {showSignup && (
+                <Section title={channel ? "Connect another number" : "Connect your number"} description="Log in with Facebook, pick your business and confirm your number with the code WhatsApp sends. About two minutes.">
+                    <label className="flex items-start gap-2.5 text-xs">
+                        <input type="checkbox" checked={coexistence} onChange={(event) => setCoexistence(event.target.checked)} disabled={disabled} className="mt-0.5" />
+                        <span>
+                            <span className="block font-medium">I use the WhatsApp Business app on this number</span>
+                            <span className="mt-0.5 block text-muted-foreground">Keep using the app on your phone; {agent.name} answers alongside you and you see every chat. Untick for a new number that isn&apos;t on WhatsApp yet.</span>
+                        </span>
+                    </label>
+                    {(error || signup.error) && <p role="alert" className="text-xs text-destructive">{error ?? signup.error}</p>}
+                    <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <button type="button" className="text-left text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline" onClick={() => { setOwnApp(true); setError(null); }}>
+                            Use my own Meta app instead
+                        </button>
+                        <div className="flex justify-end gap-3">
+                            {channel && <Button variant="outline" size="sm" className="h-7 text-xs" disabled={!!busy} onClick={() => { setEditing(false); setError(null); }}>Cancel</Button>}
+                            <Button size="sm" className="h-7 gap-1.5 text-xs" disabled={disabled || !published || !signup.ready} onClick={() => void connectWithMeta()}>
+                                {(busy === "signup" || (!signup.ready && !signup.error)) && <HugeiconsIcon icon={Loading03Icon} className="h-3.5 w-3.5 animate-spin" />}
+                                Connect WhatsApp
                             </Button>
                         </div>
                     </div>
@@ -215,6 +279,7 @@ export function AgentWhatsApp() {
                     </Field>
                     {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
                     <div className="flex justify-end gap-3">
+                        {!channel && signupAvailable && <Button variant="outline" size="sm" className="mr-auto h-7 text-xs" disabled={!!busy} onClick={() => { setOwnApp(false); setError(null); }}>Back</Button>}
                         {channel && <Button variant="outline" size="sm" className="h-7 text-xs" disabled={!!busy} onClick={() => { setEditing(false); setForm(formFrom(channel)); setError(null); }}>Cancel</Button>}
                         <Button size="sm" className="h-7 gap-1.5 text-xs" disabled={disabled || !published || !canSubmit} onClick={() => void connect()}>
                             {busy === "save" && <HugeiconsIcon icon={Loading03Icon} className="h-3.5 w-3.5 animate-spin" />}
@@ -223,9 +288,9 @@ export function AgentWhatsApp() {
                     </div>
                 </Section>
             )}
-            {!showForm && error && <p role="alert" className="text-xs text-destructive">{error}</p>}
+            {!showForm && !showSignup && error && <p role="alert" className="text-xs text-destructive">{error}</p>}
 
-            {channel && (
+            {channel && !channel.managed && channel.webhook_url && channel.verify_token && (
                 <Section title="Webhook" description="In your Meta app: WhatsApp → Configuration → Webhook → Edit. Paste these, verify, then subscribe to the messages field.">
                     <CopyRow label="Callback URL" value={channel.webhook_url} />
                     <CopyRow label="Verify token" value={channel.verify_token} />

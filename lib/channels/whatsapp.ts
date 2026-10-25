@@ -23,7 +23,9 @@ import { safeOutboundFetch } from '@/lib/security/outbound-url';
 type Admin = ReturnType<typeof createAdminClient>;
 
 export const WHATSAPP_CHANNEL_SLUG = 'whatsapp-channel';
-const GRAPH = 'https://graph.facebook.com/v21.0';
+/** Meta retires a Graph API version two years after release; bump with the SDK version in the console. */
+export const META_GRAPH_VERSION = process.env.META_GRAPH_VERSION || 'v23.0';
+const GRAPH = `https://graph.facebook.com/${META_GRAPH_VERSION}`;
 const GRAPH_TIMEOUT_MS = 15_000;
 /** WhatsApp's text message limit; longer replies go out in parts. */
 const WHATSAPP_TEXT_MAX = 4096;
@@ -34,8 +36,17 @@ export interface WhatsAppChannelMetadata {
     phone_number_id: string;
     display_phone_number: string | null;
     verified_name: string | null;
-    app_secret_encrypted: string;
+    /** The business's own Meta app secret; null for a number connected through Cencori's app (Embedded Signup). */
+    app_secret_encrypted: string | null;
     verify_token: string;
+    /**
+     * Connected through Embedded Signup: messages arrive on Cencori's shared
+     * webhook, signed with Cencori's app secret, and are routed by phone number id.
+     */
+    managed?: boolean;
+    waba_id?: string | null;
+    /** The number also stays on the WhatsApp Business app (coexistence). */
+    coexistence?: boolean;
     enabled: boolean;
     /** When Meta last completed the webhook check against our URL. */
     webhook_verified_at: string | null;
@@ -66,6 +77,15 @@ export async function getChannelById(db: Admin, channelId: string): Promise<What
     return toChannel(data as Record<string, unknown> | null);
 }
 
+/** A number connected through Embedded Signup, found by the id Meta puts on each delivery. */
+export async function getManagedChannelByPhoneNumberId(db: Admin, phoneNumberId: string): Promise<WhatsAppChannel | null> {
+    if (!/^\d{5,25}$/.test(phoneNumberId)) return null;
+    const { data } = await db.from('tool_connections').select(COLUMNS)
+        .eq('connector_slug', WHATSAPP_CHANNEL_SLUG).eq('metadata->>phone_number_id', phoneNumberId).eq('metadata->>managed', 'true')
+        .order('updated_at', { ascending: false }).limit(1).maybeSingle();
+    return toChannel(data as Record<string, unknown> | null);
+}
+
 export async function getAgentChannel(db: Admin, projectId: string, agentId: string): Promise<WhatsAppChannel | null> {
     const { data } = await db.from('tool_connections').select(COLUMNS)
         .eq('project_id', projectId).eq('connector_slug', WHATSAPP_CHANNEL_SLUG).eq('metadata->>agent_id', agentId)
@@ -82,9 +102,12 @@ export function publicChannel(channel: WhatsAppChannel, webhookUrl: string) {
         display_phone_number: m.display_phone_number,
         verified_name: m.verified_name,
         enabled: m.enabled,
-        webhook_url: webhookUrl,
-        verify_token: m.verify_token,
-        webhook_verified: !!m.webhook_verified_at,
+        managed: !!m.managed,
+        coexistence: !!m.coexistence,
+        // Numbers connected through Cencori's app need no webhook set-up of their own.
+        webhook_url: m.managed ? null : webhookUrl,
+        verify_token: m.managed ? null : m.verify_token,
+        webhook_verified: !!m.managed || !!m.webhook_verified_at,
         last_message_at: m.last_message_at,
         daily_session_cap: m.daily_session_cap,
     };
@@ -173,6 +196,75 @@ export async function saveChannel(
     const channel = toChannel(data as Record<string, unknown> | null);
     if (error || !channel) return { ok: false, status: 502, message: 'Couldn\'t save the WhatsApp channel. Try again.' };
     return { ok: true, channel };
+}
+
+/**
+ * Save a number connected through Embedded Signup: the business token from
+ * the signup, the number and its WhatsApp Business Account. Replaces whatever
+ * the agent had (including a number on the business's own Meta app).
+ */
+export async function saveSignupChannel(
+    db: Admin,
+    opts: { projectId: string; organizationId: string; agentId: string; existing: WhatsAppChannel | null; phoneNumberId: string; wabaId: string; accessToken: string; coexistence: boolean },
+): Promise<{ ok: true; channel: WhatsAppChannel } | { ok: false; status: number; message: string }> {
+    const details = await lookupPhoneNumber(opts.phoneNumberId, opts.accessToken).catch(() => ({ displayPhoneNumber: null, verifiedName: null }));
+    const metadata: WhatsAppChannelMetadata = {
+        kind: 'whatsapp_channel',
+        agent_id: opts.agentId,
+        phone_number_id: opts.phoneNumberId,
+        display_phone_number: details.displayPhoneNumber,
+        verified_name: details.verifiedName,
+        app_secret_encrypted: null,
+        verify_token: opts.existing?.metadata.verify_token ?? `cencori_${randomBytes(16).toString('hex')}`,
+        managed: true,
+        waba_id: opts.wabaId,
+        coexistence: opts.coexistence,
+        enabled: opts.existing?.metadata.enabled ?? true,
+        webhook_verified_at: new Date().toISOString(),
+        last_message_at: opts.existing?.metadata.last_message_at ?? null,
+        daily_session_cap: opts.existing?.metadata.daily_session_cap ?? 500,
+    };
+    const row = {
+        project_id: opts.projectId,
+        connector_slug: WHATSAPP_CHANNEL_SLUG,
+        owner_type: 'platform',
+        status: 'active',
+        encrypted_access_ref: encryptApiKey(opts.accessToken, opts.organizationId),
+        key_hint: details.displayPhoneNumber ?? opts.phoneNumberId,
+        metadata,
+        last_error: null,
+    };
+    // One agent per number: a number moved here from another agent leaves it.
+    await db.from('tool_connections').delete().eq('connector_slug', WHATSAPP_CHANNEL_SLUG).eq('metadata->>phone_number_id', opts.phoneNumberId).neq('metadata->>agent_id', opts.agentId);
+    const write = opts.existing
+        ? db.from('tool_connections').update(row).eq('id', opts.existing.id).select(COLUMNS).single()
+        : db.from('tool_connections').insert(row).select(COLUMNS).single();
+    const { data, error } = await write;
+    const channel = toChannel(data as Record<string, unknown> | null);
+    if (error || !channel) return { ok: false, status: 502, message: 'Couldn\'t save the WhatsApp channel. Try again.' };
+    return { ok: true, channel };
+}
+
+/** Subscribe Cencori's app to a WhatsApp Business Account, so its messages reach the shared webhook. */
+export async function subscribeAppToWaba(wabaId: string, accessToken: string): Promise<void> {
+    await graph('POST', `/${encodeURIComponent(wabaId)}/subscribed_apps`, accessToken, {});
+}
+
+/**
+ * Turn a newly added number on for the Cloud API. Numbers that stay on the
+ * WhatsApp Business app (coexistence) are already registered and skip this.
+ */
+export async function registerPhoneNumber(phoneNumberId: string, accessToken: string, pin: string): Promise<void> {
+    await graph('POST', `/${encodeURIComponent(phoneNumberId)}/register`, accessToken, { messaging_product: 'whatsapp', pin });
+}
+
+/** Swap the code from Embedded Signup for a business token (needs Cencori's app secret, so server-side only). */
+export async function exchangeSignupCode(code: string, appId: string, appSecret: string): Promise<string> {
+    const params = new URLSearchParams({ client_id: appId, client_secret: appSecret, code });
+    const response = await safeOutboundFetch(`${GRAPH}/oauth/access_token?${params}`, { signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS) });
+    const json = await response.json().catch(() => null) as { access_token?: string; error?: { message?: string } } | null;
+    if (!response.ok || !json?.access_token) throw new Error(json?.error?.message ?? `Meta didn't accept the sign-up (${response.status})`);
+    return json.access_token;
 }
 
 export async function patchChannelMetadata(db: Admin, channel: WhatsAppChannel, patch: Partial<WhatsAppChannelMetadata>): Promise<void> {

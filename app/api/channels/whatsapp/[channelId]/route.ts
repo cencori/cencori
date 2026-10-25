@@ -38,7 +38,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ cha
 
     const db = createAdminClient();
     const channel = await getChannelById(db, channelId);
-    if (!channel) return new NextResponse(null, { status: 404 });
+    // Numbers connected through Cencori's app arrive on /api/channels/whatsapp instead.
+    if (!channel || !channel.metadata.app_secret_encrypted) return new NextResponse(null, { status: 404 });
 
     const { data: project } = await db.from('projects').select('organization_id').eq('id', channel.projectId).maybeSingle();
     let secret: string;
