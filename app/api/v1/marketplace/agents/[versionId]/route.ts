@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabaseAdmin';
 import { addGatewayHeaders, handleCorsPreFlight } from '@/lib/gateway-middleware';
 import { embeddedError, dePrefixId } from '@/lib/embedded/http';
 import crypto from 'crypto';
+import { withoutWebhookEndpoints } from '@/lib/embedded/webhook-tools';
 
 export async function OPTIONS() {
     return handleCorsPreFlight();
@@ -35,7 +36,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ versionId: 
             visibility: v.visibility,
             name: (agentRow.name as string | null) ?? null,
             description: (agentRow.description as string | null) ?? null,
-            config: v.config_json ?? {},
+            config: withoutWebhookEndpoints((v.config_json ?? {}) as Record<string, unknown>),
             requirements: v.requirements_json ?? {},
             published_at: v.published_at ?? null,
         }),

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { validateGatewayRequest, addGatewayHeaders, handleCorsPreFlight } from '@/lib/gateway-middleware';
 import { embeddedError } from '@/lib/embedded/http';
-import { validateVersionConfig } from '@/lib/embedded/agents';
+import { promoteStableInstallations, validateVersionConfig } from '@/lib/embedded/agents';
 import crypto from 'crypto';
 
 export async function OPTIONS() {
@@ -70,6 +70,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ agentId: s
     if (error) {
         return addGatewayHeaders(mapReviewError(error.message, requestId), { requestId });
     }
+    // Customers on the stable channel follow the release.
+    await promoteStableInstallations(supabase as never, { projectId: validation.context.projectId, agentId, versionId: target.id as string });
     return addGatewayHeaders(NextResponse.json(data), { requestId });
 }
 

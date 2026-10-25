@@ -1,7 +1,8 @@
 "use client";
 
 import { use } from "react";
-import { EmbeddedAgentsDashboard } from "@/components/dashboard/embedded-agents/EmbeddedAgentsDashboard";
+import { AgentsList, AgentsListSkeleton } from "@/components/agents/AgentsList";
+import { useProjectIdBySlug } from "@/lib/hooks/useQueries";
 
 interface PageProps {
     params: Promise<{
@@ -12,10 +13,11 @@ interface PageProps {
 
 export default function AgentsPage({ params }: PageProps) {
     const { orgSlug, projectSlug } = use(params);
+    const { data: projectId, isLoading } = useProjectIdBySlug(orgSlug, projectSlug);
 
     return (
-        <div className="h-full min-h-0 w-full overflow-hidden">
-            <EmbeddedAgentsDashboard orgSlug={orgSlug} projectSlug={projectSlug} />
-        </div>
+        <main className="mx-auto w-full max-w-[1360px] px-4 pb-6 pt-2 sm:px-6 sm:pt-4 lg:px-8 lg:pt-6">
+            {isLoading ? <AgentsListSkeleton /> : projectId ? <AgentsList projectId={projectId} /> : <p className="text-sm text-muted-foreground">Project not found.</p>}
+        </main>
     );
 }

@@ -57,3 +57,12 @@ describe('embedded client tokens', () => {
         }
     });
 });
+
+describe('client tokens on the API key path', () => {
+    it('are never mistaken for an API key, so the client-token auth path runs', async () => {
+        const { extractCencoriApiKeyFromHeaders } = await import('@/lib/api-keys');
+        const { token } = mintClientToken({ projectId: 'p', environment: 'production', tenantId: 't', externalUserId: 'u', permissions: ['sessions:turn'] });
+        expect(extractCencoriApiKeyFromHeaders(new Headers({ Authorization: `Bearer ${token}` }))).toBeNull();
+        expect(extractCencoriApiKeyFromHeaders(new Headers({ Authorization: 'Bearer cen_live_abc123' }))).toBe('cen_live_abc123');
+    });
+});

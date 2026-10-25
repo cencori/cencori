@@ -22,6 +22,8 @@ import {
 import { settleStreamUsage } from '@/lib/gateway/stream-usage';
 import type { SessionEventType, SessionEventPayloadMap } from '@/lib/gateway/session-types';
 import { runGatewayOutputGuard } from '@/lib/gateway/output-guard';
+import { orgHasOutputPolicies } from '@/lib/governance/policy-enforcement';
+import { executeWebhookTool, WEBHOOK_TOOL_MAX_ITERATIONS, type WebhookTool } from '@/lib/embedded/webhook-tools';
 import { runGatewayInputPipeline } from '@/lib/gateway/input-guard';
 import { recordSessionApprovalRequested } from '@/lib/governance/record-session';
 import { applyPolicyRedactions } from '@/lib/governance/policy-enforcement';
@@ -61,6 +63,8 @@ export type TurnExecuteParams = {
     pinnedConnectionId?: string | null;
     /** Reasoning effort from the installed manifest (OpenAI family only). */
     reasoningEffort?: 'low' | 'medium' | 'high';
+    /** Webhook tools from the installed version: the engine calls them itself and continues the reply. */
+    webhookTools?: WebhookTool[];
     logSuccess: (meta: {
         provider: string; model: string; status: 'success' | 'success_fallback' | 'error';
         promptTokens: number; completionTokens: number; totalTokens: number;
@@ -170,6 +174,7 @@ function makeStream(params: {
     reasoningEffort?: 'low' | 'medium' | 'high';
     /** Exact provider-connection pin (frozen into turn.started for resume). */
     pinnedConnectionId?: string | null;
+    webhookTools?: WebhookTool[];
     instructions?: string;
     inputText?: string;
     inputSecurity?: SecurityCheckResult;
@@ -188,8 +193,15 @@ function makeStream(params: {
         temperature, max_output_tokens, pauseOnToolCalls, needsApprovalToolNames, collectedBuiltinToolOutputs,
         instructions, inputText, inputSecurity, tokenMap, endUserId,
         tier, logSuccess, incrementUsage, recordEndUserUsage, onCompletion, knowledgeContext, reasoningEffort,
-        pinnedConnectionId,
+        pinnedConnectionId, webhookTools = [],
     } = params;
+
+    // Output can only be blocked or redacted by a governance output policy.
+    // Without one, nothing can change the reply after the fact, so its text
+    // streams as it's generated; with one, the turn buffers the full reply
+    // for the output check as before (shown text can't be redacted).
+    const outputPoliciesPromise = orgHasOutputPolicies(supabase, gatewayCtx.organizationId, gatewayCtx.projectId)
+        .catch(() => true);
 
     const stream = new ReadableStream({
         async start(controller) {
@@ -199,6 +211,47 @@ function makeStream(params: {
             // Real usage from the provider when the adapter reports it.
             let reportedUsage: TokenUsage | undefined;
             const toolCalls: Record<string, { id: string; name: string; args: string }> = {};
+
+            // Structured output replaces the text with the schema tool's
+            // arguments at the end, so there's no prefix to stream early.
+            const streamsLive = !(forceSchemaResult && schemaToolName) && !(await outputPoliciesPromise);
+            /** How much raw text has gone out live, and the detokenized text it became. */
+            let releasedRawLength = 0;
+            let emittedText = '';
+            /**
+             * Sends approved text the client doesn't have yet, as a true delta. Live
+             * deltas aren't stored one by one: the whole reply is stored once at the
+             * end, so history and event replay read exactly what they did before.
+             */
+            const releaseLive = () => {
+                let end = fullText.length;
+                // Never split a tokenization placeholder ("[EMAIL_1]"): a partial one
+                // can't be detokenized and would show the internal marker.
+                if (tokenMap && tokenMap.size > 0) {
+                    for (const placeholder of tokenMap.keys()) {
+                        for (let partial = Math.min(placeholder.length - 1, end); partial > 0; partial--) {
+                            if (fullText.slice(0, end).endsWith(placeholder.slice(0, partial))) {
+                                end -= partial;
+                                break;
+                            }
+                        }
+                    }
+                }
+                // Nor half of a UTF-16 surrogate pair.
+                if (end > 0) {
+                    const last = fullText.charCodeAt(end - 1);
+                    if (last >= 0xd800 && last <= 0xdbff) end -= 1;
+                }
+                if (end <= releasedRawLength) return;
+                const approved = tokenMap ? deTokenize(fullText.slice(0, end), tokenMap) : fullText.slice(0, end);
+                // Detokenizing a longer prefix must not rewrite what's already shown.
+                if (!approved.startsWith(emittedText)) return;
+                const delta = approved.slice(emittedText.length);
+                releasedRawLength = end;
+                if (!delta) return;
+                emittedText = approved;
+                controller.enqueue(encoder.encode(buildSSE('output_text.delta', { delta })));
+            };
 
             const el = async (eventType: SessionEventType, data: SessionEventPayloadMap[typeof eventType]) => {
                 seq++;
@@ -241,216 +294,289 @@ function makeStream(params: {
                     ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
                 });
 
-                for await (const chunk of streamGatewayChat({
-                    supabase, projectId: gatewayCtx.projectId,
-                    organizationId: gatewayCtx.organizationId,
-                    allowedModels: gatewayCtx.allowedModels, sponsoredModels: gatewayCtx.sponsoredModels, tier,
-                    request: {
-                        messages, model: resolved.model,
-                        temperature, maxTokens: max_output_tokens, stream: true,
-                        tools: functionTools.length > 0 ? functionTools : undefined,
-                        toolChoice: resolveToolChoice(forceSchemaResult, schemaToolName, tool_choice),
-                        ...(reasoningEffort ? { reasoningEffort } : {}),
-                    },
-                    resolved: resolved as never,
-                    requestId: gatewayCtx.requestId,
-                    })) {
-                        if (chunk.usage) {
-                            reportedUsage = chunk.usage;
-                        }
-                        if (chunk.delta) {
-                            fullText += chunk.delta;
-                        }
-                    if (chunk.toolCalls) {
-                        for (const tc of chunk.toolCalls) {
-                            const k = tc.id || 'unknown';
-                            if (!toolCalls[k]) toolCalls[k] = { id: k, name: '', args: '' };
-                            if (tc.function?.name) toolCalls[k].name = tc.function.name;
-                            if (tc.function?.arguments) toolCalls[k].args += tc.function.arguments;
-                        }
-                    }
-                    if (chunk.finishReason) {
-                        if (forceSchemaResult && schemaToolName) {
-                            const sc = Object.values(toolCalls).find(t => t.name === schemaToolName);
-                            if (sc?.args) fullText = sc.args;
-                        }
-
-                        const callValues = Object.values(toolCalls).filter(
-                            t => !(forceSchemaResult && schemaToolName && t.name === schemaToolName),
-                        );
-
-                        fullText = tokenMap ? deTokenize(fullText, tokenMap) : fullText;
-                        for (const toolCall of callValues) {
-                            if (tokenMap) toolCall.args = deTokenize(toolCall.args, tokenMap);
-                        }
-
-                        const safeInputSecurity = inputSecurity ?? {
-                            safe: true,
-                            reasons: [],
-                            layer: 'input',
-                            riskScore: 0,
-                            confidence: 1,
-                        };
-                        const outputCheck = await runGatewayOutputGuard({
-                            supabase,
-                            projectId: gatewayCtx.projectId,
-                            apiKeyId: gatewayCtx.apiKeyId,
-                            environment: gatewayCtx.environment,
-                            outputText: [fullText, ...callValues.map(tc => tc.args)].filter(Boolean).join('\n'),
-                            inputText: inputText ?? '',
-                            inputSecurity: safeInputSecurity,
-                            conversationHistory: messages,
-                            endUserId,
-                            organizationId: gatewayCtx.organizationId,
-                            model: resolved.model,
-                            region: gatewayCtx.countryCode,
-                        });
-
-                        const streamProvider =
-                            chunk.actualProvider !== resolved.providerName
-                            && resolved.router?.hasProvider(chunk.actualProvider)
-                                ? resolved.router.getProvider(chunk.actualProvider)
-                                : resolved.provider;
-                        const pricing = await streamProvider.getPricing(chunk.actualModel);
-                        const settled = await settleStreamUsage({
-                            reported: reportedUsage,
-                            pricing,
-                            estimate: async () => {
-                                const promptText = messages.map(m => m.content || '').join(' ');
-                                try {
-                                    return {
-                                        promptTokens: await streamProvider.countTokens(promptText, chunk.actualModel),
-                                        completionTokens: await streamProvider.countTokens(fullText, chunk.actualModel),
-                                    };
-                                } catch {
-                                    return {
-                                        promptTokens: Math.max(1, Math.ceil(promptText.length / 4)),
-                                        completionTokens: Math.max(1, Math.ceil(fullText.length / 4)),
-                                    };
+                // Webhook tools run here: when every call the model makes is one,
+                // Cencori calls the endpoints, records the calls, hands back the
+                // results and the reply continues. Usage adds up across rounds and
+                // is logged and charged once, at the end.
+                const webhookByName = new Map(webhookTools.map((tool) => [tool.name, tool]));
+                let conversation = messages;
+                const prior = { promptTokens: 0, completionTokens: 0, providerCostUsd: 0, cencoriChargeUsd: 0 };
+                rounds: for (let round = 0; ; round++) {
+                    let roundText = '';
+                    let roundStarted = fullText.length;
+                    for (const key of Object.keys(toolCalls)) delete toolCalls[key];
+                    reportedUsage = undefined;
+                    for await (const chunk of streamGatewayChat({
+                        supabase, projectId: gatewayCtx.projectId,
+                        organizationId: gatewayCtx.organizationId,
+                        allowedModels: gatewayCtx.allowedModels, sponsoredModels: gatewayCtx.sponsoredModels, tier,
+                        request: {
+                            messages: conversation, model: resolved.model,
+                            temperature, maxTokens: max_output_tokens, stream: true,
+                            tools: functionTools.length > 0 ? functionTools : undefined,
+                            toolChoice: resolveToolChoice(forceSchemaResult, schemaToolName, tool_choice),
+                            ...(reasoningEffort ? { reasoningEffort } : {}),
+                        },
+                        resolved: resolved as never,
+                        requestId: gatewayCtx.requestId,
+                        })) {
+                            if (chunk.usage) {
+                                reportedUsage = chunk.usage;
+                            }
+                            if (chunk.delta) {
+                                // A reply that resumes after a tool call starts on its own line.
+                                if (fullText.length > 0 && fullText.length === roundStarted && round > 0) {
+                                    fullText += '\n\n';
+                                    roundStarted = fullText.length;
                                 }
-                            },
-                        });
-                        const pt = settled.promptTokens;
-                        const ct = settled.completionTokens;
-                        const tt = settled.totalTokens;
-                        const pc = settled.providerCostUsd;
-                        const { cencoriChargeUsd: cc, markupPercentage } = calculateGatewayCharge(
-                            pc,
-                            pricing,
-                            chunk.billingMode,
-                        );
-                        const pn = resolved.customProviderTag || chunk.actualProvider;
-
-                        if (!outputCheck.ok) {
-                            await terminal('turn.failed', {
-                                turn_number: turnNumber,
-                                output: { error: outputCheck.message },
-                                usage: { input_tokens: pt, output_tokens: ct, total_tokens: tt },
-                            }, 'active', cc);
-                            logSuccess({
-                                provider: pn,
-                                model: chunk.actualModel,
-                                status: 'error',
-                                promptTokens: pt,
-                                completionTokens: ct,
-                                totalTokens: tt,
-                                cacheReadTokens: settled.cacheReadTokens,
-                                cacheWriteTokens: settled.cacheWriteTokens,
-                                uncachedPromptTokens: settled.uncachedPromptTokens,
-                                providerCostUsd: pc,
-                                cencoriChargeUsd: cc,
-                                markupPercentage,
-                                errorMessage: outputCheck.message,
-                            });
-                            incrementUsage(cc);
-                            if (recordEndUserUsage) recordEndUserUsage({ promptTokens: pt, completionTokens: ct, totalTokens: tt, providerCostUsd: pc, cencoriChargeUsd: cc, markupPercentage });
-                            controller.close();
-                            return;
+                                fullText += chunk.delta;
+                                roundText += chunk.delta;
+                                if (streamsLive && !chunk.finishReason) releaseLive();
+                            }
+                        if (chunk.toolCalls) {
+                            for (const tc of chunk.toolCalls) {
+                                const k = tc.id || 'unknown';
+                                if (!toolCalls[k]) toolCalls[k] = { id: k, name: '', args: '' };
+                                if (tc.function?.name) toolCalls[k].name = tc.function.name;
+                                if (tc.function?.arguments) toolCalls[k].args += tc.function.arguments;
+                            }
                         }
-
-                        // Apply policy output redactions before the (buffered) emit.
-                        if (outputCheck.redactions?.length) {
-                            fullText = applyPolicyRedactions(fullText, outputCheck.redactions).text;
-                        }
-
-                        if (fullText) {
-                            await el('output_text.delta', { delta: fullText });
-                        }
-
-                        for (const tc of callValues) {
-                            let args: Record<string, unknown> = {};
-                            try { args = JSON.parse(tc.args); } catch {}
-                            await el('tool_call.started', { tool: tc.name, arguments: args, action_id: tc.id });
-                        }
-
-                        for (const to of collectedBuiltinToolOutputs) {
-                            await el('tool_call.completed', {
-                                tool: to.type, output: to.output || to.error || {}, action_id: to.id,
-                            });
-                        }
-
-                        // Pause if tool calls present and pause is enabled
-                        if (pauseOnToolCalls && callValues.length > 0) {
-                            const shouldPause = needsApprovalToolNames.size === 0
-                                || callValues.some(tc => needsApprovalToolNames.has(tc.name));
-                            if (shouldPause) {
-                                await terminal('turn.paused', {
-                                    reason: 'approval_required',
-                                    action_id: callValues[0].id,
-                                    tool: callValues[0].name,
-                                    arguments: Object.fromEntries(callValues.map(tc => [tc.name, tc.args])),
-                                    actions: callValues.map(tc => ({
-                                        action_id: tc.id,
-                                        tool: tc.name,
-                                        arguments: tc.args,
-                                    })),
-                                }, 'paused', cc);
-                                // Governance: an autonomous tool call is now gated on human approval.
-                                void recordSessionApprovalRequested(supabase, {
-                                    orgId: gatewayCtx.organizationId,
-                                    projectId: gatewayCtx.projectId,
-                                    sessionId,
-                                    turnNumber,
-                                    tool: callValues[0].name,
-                                    actionIds: callValues.map(tc => tc.id),
-                                    model: resolved.model,
+                        if (chunk.finishReason) {
+                            const requested = Object.values(toolCalls).filter((t) => t.name);
+                            if (
+                                requested.length > 0
+                                && round < WEBHOOK_TOOL_MAX_ITERATIONS
+                                && !(forceSchemaResult && schemaToolName)
+                                && requested.every((t) => webhookByName.has(t.name))
+                            ) {
+                                const streamProvider =
+                                    chunk.actualProvider !== resolved.providerName && resolved.router?.hasProvider(chunk.actualProvider)
+                                        ? resolved.router.getProvider(chunk.actualProvider)
+                                        : resolved.provider;
+                                const roundPricing = await streamProvider.getPricing(chunk.actualModel);
+                                const roundUsage = await settleStreamUsage({
+                                    reported: reportedUsage,
+                                    pricing: roundPricing,
+                                    estimate: async () => ({
+                                        promptTokens: Math.max(1, Math.ceil(conversation.map((m) => m.content || '').join(' ').length / 4)),
+                                        completionTokens: Math.max(1, Math.ceil((roundText + requested.map((t) => t.args).join('')).length / 4)),
+                                    }),
                                 });
-                                logSuccess({ provider: pn, model: chunk.actualModel, status: chunk.usedFallback ? 'success_fallback' : 'success', promptTokens: pt, completionTokens: ct, totalTokens: tt, cacheReadTokens: settled.cacheReadTokens, cacheWriteTokens: settled.cacheWriteTokens, uncachedPromptTokens: settled.uncachedPromptTokens, providerCostUsd: pc, cencoriChargeUsd: cc, markupPercentage, responseText: fullText });
+                                prior.promptTokens += roundUsage.promptTokens;
+                                prior.completionTokens += roundUsage.completionTokens;
+                                prior.providerCostUsd += roundUsage.providerCostUsd;
+                                prior.cencoriChargeUsd += calculateGatewayCharge(roundUsage.providerCostUsd, roundPricing, chunk.billingMode).cencoriChargeUsd;
+
+                                conversation = [...conversation, {
+                                    role: 'assistant',
+                                    content: roundText,
+                                    tool_calls: requested.map((t) => ({ id: t.id, type: 'function' as const, function: { name: t.name, arguments: t.args } })),
+                                }];
+                                for (const call of requested) {
+                                    // Arguments may carry masked placeholders; the endpoint gets the real values.
+                                    const args = tokenMap ? deTokenize(call.args, tokenMap) : call.args;
+                                    let parsedArgs: Record<string, unknown> = {};
+                                    try { parsedArgs = JSON.parse(args || '{}'); } catch { /* sent as-is below */ }
+                                    await el('tool_call.started', { tool: call.name, arguments: parsedArgs, action_id: call.id });
+                                    const outcome = await executeWebhookTool(webhookByName.get(call.name)!, args, { organizationId: gatewayCtx.organizationId });
+                                    await el('tool_call.completed', { tool: call.name, output: { ok: outcome.ok, status: outcome.status ?? null, result: outcome.output }, action_id: call.id });
+                                    conversation = [...conversation, { role: 'tool', content: outcome.output, toolCallId: call.id }];
+                                }
+                                continue rounds;
+                            }
+
+                            if (forceSchemaResult && schemaToolName) {
+                                const sc = Object.values(toolCalls).find(t => t.name === schemaToolName);
+                                if (sc?.args) fullText = sc.args;
+                            }
+
+                            const callValues = Object.values(toolCalls).filter(
+                                t => !(forceSchemaResult && schemaToolName && t.name === schemaToolName),
+                            );
+
+                            fullText = tokenMap ? deTokenize(fullText, tokenMap) : fullText;
+                            for (const toolCall of callValues) {
+                                if (tokenMap) toolCall.args = deTokenize(toolCall.args, tokenMap);
+                            }
+
+                            const safeInputSecurity = inputSecurity ?? {
+                                safe: true,
+                                reasons: [],
+                                layer: 'input',
+                                riskScore: 0,
+                                confidence: 1,
+                            };
+                            const outputCheck = await runGatewayOutputGuard({
+                                supabase,
+                                projectId: gatewayCtx.projectId,
+                                apiKeyId: gatewayCtx.apiKeyId,
+                                environment: gatewayCtx.environment,
+                                outputText: [fullText, ...callValues.map(tc => tc.args)].filter(Boolean).join('\n'),
+                                inputText: inputText ?? '',
+                                inputSecurity: safeInputSecurity,
+                                conversationHistory: messages,
+                                endUserId,
+                                organizationId: gatewayCtx.organizationId,
+                                model: resolved.model,
+                                region: gatewayCtx.countryCode,
+                            });
+
+                            const streamProvider =
+                                chunk.actualProvider !== resolved.providerName
+                                && resolved.router?.hasProvider(chunk.actualProvider)
+                                    ? resolved.router.getProvider(chunk.actualProvider)
+                                    : resolved.provider;
+                            const pricing = await streamProvider.getPricing(chunk.actualModel);
+                            const settled = await settleStreamUsage({
+                                reported: reportedUsage,
+                                pricing,
+                                estimate: async () => {
+                                    const promptText = messages.map(m => m.content || '').join(' ');
+                                    try {
+                                        return {
+                                            promptTokens: await streamProvider.countTokens(promptText, chunk.actualModel),
+                                            completionTokens: await streamProvider.countTokens(fullText, chunk.actualModel),
+                                        };
+                                    } catch {
+                                        return {
+                                            promptTokens: Math.max(1, Math.ceil(promptText.length / 4)),
+                                            completionTokens: Math.max(1, Math.ceil(fullText.length / 4)),
+                                        };
+                                    }
+                                },
+                            });
+                            // This round plus any tool rounds before it.
+                            const pt = settled.promptTokens + prior.promptTokens;
+                            const ct = settled.completionTokens + prior.completionTokens;
+                            const tt = pt + ct;
+                            const pc = settled.providerCostUsd + prior.providerCostUsd;
+                            const { cencoriChargeUsd: roundCharge, markupPercentage } = calculateGatewayCharge(
+                                settled.providerCostUsd,
+                                pricing,
+                                chunk.billingMode,
+                            );
+                            const cc = roundCharge + prior.cencoriChargeUsd;
+                            const pn = resolved.customProviderTag || chunk.actualProvider;
+
+                            if (!outputCheck.ok) {
+                                await terminal('turn.failed', {
+                                    turn_number: turnNumber,
+                                    output: { error: outputCheck.message },
+                                    usage: { input_tokens: pt, output_tokens: ct, total_tokens: tt },
+                                }, 'active', cc);
+                                logSuccess({
+                                    provider: pn,
+                                    model: chunk.actualModel,
+                                    status: 'error',
+                                    promptTokens: pt,
+                                    completionTokens: ct,
+                                    totalTokens: tt,
+                                    cacheReadTokens: settled.cacheReadTokens,
+                                    cacheWriteTokens: settled.cacheWriteTokens,
+                                    uncachedPromptTokens: settled.uncachedPromptTokens,
+                                    providerCostUsd: pc,
+                                    cencoriChargeUsd: cc,
+                                    markupPercentage,
+                                    errorMessage: outputCheck.message,
+                                });
                                 incrementUsage(cc);
                                 if (recordEndUserUsage) recordEndUserUsage({ promptTokens: pt, completionTokens: ct, totalTokens: tt, providerCostUsd: pc, cencoriChargeUsd: cc, markupPercentage });
                                 controller.close();
                                 return;
                             }
+
+                            // Apply policy output redactions before the (buffered) emit.
+                            if (outputCheck.redactions?.length) {
+                                fullText = applyPolicyRedactions(fullText, outputCheck.redactions).text;
+                            }
+
+                            if (fullText && emittedText) {
+                                // Store the whole reply once for history and replay; send
+                                // only what hasn't gone out live.
+                                seq++;
+                                await appendSessionEvent(supabase, sessionId, turnNumber, seq, 'output_text.delta', { delta: fullText });
+                                const remainder = fullText.startsWith(emittedText) ? fullText.slice(emittedText.length) : '';
+                                if (remainder) controller.enqueue(encoder.encode(buildSSE('output_text.delta', { delta: remainder })));
+                            } else if (fullText) {
+                                await el('output_text.delta', { delta: fullText });
+                            }
+
+                            for (const tc of callValues) {
+                                let args: Record<string, unknown> = {};
+                                try { args = JSON.parse(tc.args); } catch {}
+                                await el('tool_call.started', { tool: tc.name, arguments: args, action_id: tc.id });
+                            }
+
+                            for (const to of collectedBuiltinToolOutputs) {
+                                await el('tool_call.completed', {
+                                    tool: to.type, output: to.output || to.error || {}, action_id: to.id,
+                                });
+                            }
+
+                            // Pause if tool calls present and pause is enabled
+                            if (pauseOnToolCalls && callValues.length > 0) {
+                                const shouldPause = needsApprovalToolNames.size === 0
+                                    || callValues.some(tc => needsApprovalToolNames.has(tc.name));
+                                if (shouldPause) {
+                                    await terminal('turn.paused', {
+                                        reason: 'approval_required',
+                                        action_id: callValues[0].id,
+                                        tool: callValues[0].name,
+                                        arguments: Object.fromEntries(callValues.map(tc => [tc.name, tc.args])),
+                                        actions: callValues.map(tc => ({
+                                            action_id: tc.id,
+                                            tool: tc.name,
+                                            arguments: tc.args,
+                                        })),
+                                    }, 'paused', cc);
+                                    // Governance: an autonomous tool call is now gated on human approval.
+                                    void recordSessionApprovalRequested(supabase, {
+                                        orgId: gatewayCtx.organizationId,
+                                        projectId: gatewayCtx.projectId,
+                                        sessionId,
+                                        turnNumber,
+                                        tool: callValues[0].name,
+                                        actionIds: callValues.map(tc => tc.id),
+                                        model: resolved.model,
+                                    });
+                                    logSuccess({ provider: pn, model: chunk.actualModel, status: chunk.usedFallback ? 'success_fallback' : 'success', promptTokens: pt, completionTokens: ct, totalTokens: tt, cacheReadTokens: settled.cacheReadTokens, cacheWriteTokens: settled.cacheWriteTokens, uncachedPromptTokens: settled.uncachedPromptTokens, providerCostUsd: pc, cencoriChargeUsd: cc, markupPercentage, responseText: fullText });
+                                    incrementUsage(cc);
+                                    if (recordEndUserUsage) recordEndUserUsage({ promptTokens: pt, completionTokens: ct, totalTokens: tt, providerCostUsd: pc, cencoriChargeUsd: cc, markupPercentage });
+                                    controller.close();
+                                    return;
+                                }
+                            }
+
+                            // Complete
+                            const output = buildOutput(fullText, callValues, collectedBuiltinToolOutputs);
+                            await terminal(
+                                'turn.completed',
+                                {
+                                    turn_number: turnNumber,
+                                    output,
+                                    usage: { input_tokens: pt, output_tokens: ct, total_tokens: tt },
+                                    ...(knowledgeContext && knowledgeContext.citations.length > 0
+                                        ? { knowledge_citations: knowledgeContext.citations }
+                                        : {}),
+                                },
+                                'active',
+                                cc,
+                            );
+
+                            logSuccess({ provider: pn, model: chunk.actualModel, status: chunk.usedFallback ? 'success_fallback' : 'success', promptTokens: pt, completionTokens: ct, totalTokens: tt, cacheReadTokens: settled.cacheReadTokens, cacheWriteTokens: settled.cacheWriteTokens, uncachedPromptTokens: settled.uncachedPromptTokens, providerCostUsd: pc, cencoriChargeUsd: cc, markupPercentage, responseText: fullText });
+                            incrementUsage(cc);
+                            if (recordEndUserUsage) recordEndUserUsage({ promptTokens: pt, completionTokens: ct, totalTokens: tt, providerCostUsd: pc, cencoriChargeUsd: cc, markupPercentage });
+
+                            void maybeCreateCheckpoint(supabase, sessionId, turnNumber, messages, fullText);
+
+                            // Gateway memory writeback (async, post-redaction) — the
+                            // turns route wires this to runChatMemoryWriteback.
+                            onCompletion?.(fullText);
+
+                            controller.close();
                         }
-
-                        // Complete
-                        const output = buildOutput(fullText, callValues, collectedBuiltinToolOutputs);
-                        await terminal(
-                            'turn.completed',
-                            {
-                                turn_number: turnNumber,
-                                output,
-                                usage: { input_tokens: pt, output_tokens: ct, total_tokens: tt },
-                                ...(knowledgeContext && knowledgeContext.citations.length > 0
-                                    ? { knowledge_citations: knowledgeContext.citations }
-                                    : {}),
-                            },
-                            'active',
-                            cc,
-                        );
-
-                        logSuccess({ provider: pn, model: chunk.actualModel, status: chunk.usedFallback ? 'success_fallback' : 'success', promptTokens: pt, completionTokens: ct, totalTokens: tt, cacheReadTokens: settled.cacheReadTokens, cacheWriteTokens: settled.cacheWriteTokens, uncachedPromptTokens: settled.uncachedPromptTokens, providerCostUsd: pc, cencoriChargeUsd: cc, markupPercentage, responseText: fullText });
-                        incrementUsage(cc);
-                        if (recordEndUserUsage) recordEndUserUsage({ promptTokens: pt, completionTokens: ct, totalTokens: tt, providerCostUsd: pc, cencoriChargeUsd: cc, markupPercentage });
-
-                        void maybeCreateCheckpoint(supabase, sessionId, turnNumber, messages, fullText);
-
-                        // Gateway memory writeback (async, post-redaction) — the
-                        // turns route wires this to runChatMemoryWriteback.
-                        onCompletion?.(fullText);
-
-                        controller.close();
                     }
+                    break rounds;
                 }
             } catch (error) {
                 const msg = error instanceof Error ? error.message : 'Turn execution failed';
@@ -631,6 +757,7 @@ export async function executeSessionTurn(params: TurnExecuteParams): Promise<Tur
             knowledgeContext,
             reasoningEffort: params.reasoningEffort,
             pinnedConnectionId: params.pinnedConnectionId ?? null,
+            webhookTools: params.webhookTools,
         });
 
         return { ok: true, response };

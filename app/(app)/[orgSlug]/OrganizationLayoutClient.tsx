@@ -30,6 +30,7 @@ import DiscoverSquareIcon from "@hugeicons/core-free-icons/DiscoverSquareIcon";
 import BrainIcon from "@hugeicons/core-free-icons/BrainIcon";
 import AirdropIcon from "@hugeicons/core-free-icons/AirdropIcon";
 import { CopilotRecentChats } from "@/components/copilot/CopilotRecentChats";
+import { AgentSubnav } from "@/components/agents/AgentSubnav";
 import PlusSignIcon from "@hugeicons/core-free-icons/PlusSignIcon";
 import { COPILOT_CONVERSATION_COOKIE, COPILOT_NEW_CHAT_EVENT } from "@/lib/console/copilot";
 import ChartRelationshipIcon from "@hugeicons/core-free-icons/ChartRelationshipIcon";
@@ -125,6 +126,10 @@ function useOrganization(orgSlug: string) {
 }
 
 // Revenue (formerly Monetization) keeps its own URL but belongs to the AI Gateway sub-nav.
+function isAgentPath(pathname: string): boolean {
+    return /\/agents\/(?!new(?:\/|$))[^/]+/.test(pathname);
+}
+
 function isCopilotPath(pathname: string): boolean {
     return /\/copilot(\/|$)/.test(pathname);
 }
@@ -216,10 +221,11 @@ export default function OrganizationLayoutClient({
     const headerProjectLabel = selectedProject?.name || projectSlug || "Select project";
     const isProjectCreation = pathname.includes("/projects/new") || pathname.includes("/projects/import");
     const isPlayground = pathname.includes("/ai-gateway/playground");
-    const isEmbeddedAgents = pathname === "/agents" || pathname.endsWith("/agents");
+    // One agent's pages are a full-height workspace with their own sub-menu.
+    const isAgentWorkspace = isAgentPath(pathname);
     const isMemoryGraph = /\/memory\/graph\/?$/.test(pathname);
     const isCopilotPage = /\/copilot\/?$/.test(pathname);
-    const isFixedWorkspace = isPlayground || isEmbeddedAgents || isMemoryGraph || isCopilotPage;
+    const isFixedWorkspace = isPlayground || isAgentWorkspace || isMemoryGraph || isCopilotPage;
     const docsUrl = getMainSiteUrl("/docs");
     const scopedArea = segments[2];
     const isProjectSettingsView = isInsideProject && (
@@ -234,8 +240,9 @@ export default function OrganizationLayoutClient({
         : scopedArea;
     const isOrganizationSettingsView = !isInsideProject
         && ["settings", "teams", "billing", "usage", "audit-log"].includes(organizationSettingsArea ?? "");
-    const [activeView, setActiveView] = useState<"main" | "ai-gateway" | "memory" | "copilot" | "project-settings" | "settings">(() => {
+    const [activeView, setActiveView] = useState<"main" | "ai-gateway" | "memory" | "copilot" | "agent" | "project-settings" | "settings">(() => {
         if (isAiGatewayPath(pathname)) return "ai-gateway";
+        if (isAgentPath(pathname)) return "agent";
         if (isMemoryPath(pathname)) return "memory";
         if (isCopilotPath(pathname)) return "copilot";
         if (isProjectSettingsView) return "project-settings";
@@ -377,6 +384,8 @@ export default function OrganizationLayoutClient({
         setPendingSettingsTab(null);
         if (isAiGatewayPath(pathname)) {
             setActiveView("ai-gateway");
+        } else if (isAgentPath(pathname)) {
+            setActiveView("agent");
         } else if (isMemoryPath(pathname)) {
             setActiveView("memory");
         } else if (isCopilotPath(pathname)) {
@@ -671,7 +680,9 @@ export default function OrganizationLayoutClient({
                                         </span>
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
-                                {activeView === "ai-gateway" || (activeView === "memory" && memoryHref) || (activeView === "copilot" && copilotHref) ? (
+                                {activeView === "agent" ? (
+                                    <AgentSubnav />
+                                ) : activeView === "ai-gateway" || (activeView === "memory" && memoryHref) || (activeView === "copilot" && copilotHref) ? (
                                     <>
                                         <SidebarMenuItem>
                                             <SidebarMenuButton

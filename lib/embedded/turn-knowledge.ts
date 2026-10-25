@@ -3,6 +3,7 @@ import type { MemoryEmbeddingResult } from '@/lib/memory/embeddings';
 // Passages go to the model whole. Cutting them shorter than they were
 // chunked drops facts the search matched on (it used to keep 500 of 1000).
 import { KNOWLEDGE_CHUNK_SIZE } from './knowledge';
+import { agentKnowledgeBaseId } from './agent-knowledge';
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -138,12 +139,6 @@ export async function retrieveTurnSkills(
 }
 
 /**
- * Retrieve installation-bound knowledge for a session turn. Best-effort:
- * returns empty citations on any failure so retrieval never blocks the turn.
- * Tenant isolation holds because chunks are filtered by knowledge_base_id,
- * and bindings are installation-scoped (verified at session creation).
- */
-/**
  * Retrieve cited chunks from caller-named knowledge bases (chat completions'
  * `knowledge_bases` field). The caller has already checked the ids belong to
  * the project. All bases are searched in parallel and the best hits overall
@@ -160,8 +155,22 @@ export async function retrieveKnowledge(
         onEmbeddingUsage?: (usage: MemoryEmbeddingResult) => void;
     },
 ): Promise<TurnKnowledge> {
+    return searchKnowledgeBases(supabase, { ...opts, knowledgeBaseIds: opts.knowledgeBaseIds.slice(0, TURN_KNOWLEDGE_MAX_KBS) });
+}
+
+/** Search every base in parallel and keep the best hits overall. Fail-open. */
+async function searchKnowledgeBases(
+    supabase: Admin,
+    opts: {
+        projectId: string;
+        organizationId: string;
+        knowledgeBaseIds: string[];
+        queryText: string;
+        onEmbeddingUsage?: (usage: MemoryEmbeddingResult) => void;
+    },
+): Promise<TurnKnowledge> {
     const empty: TurnKnowledge = { block: null, citations: [] };
-    const kbIds = opts.knowledgeBaseIds.slice(0, TURN_KNOWLEDGE_MAX_KBS);
+    const kbIds = opts.knowledgeBaseIds;
     if (kbIds.length === 0 || !opts.queryText.trim()) return empty;
     try {
         const { embedForMemory } = await import('@/lib/memory/embeddings');
@@ -196,42 +205,70 @@ export async function retrieveKnowledge(
     }
 }
 
+/**
+ * Knowledge for one agent turn: the agent's own knowledge base (shared by all
+ * its customers) plus whatever is bound to the customer's installation.
+ * Best-effort: any failure yields an empty result so retrieval never blocks
+ * the turn. Tenant isolation holds because installation bindings are
+ * installation-scoped (verified at session creation) and the agent's base
+ * holds no customer data.
+ */
+/**
+ * Messages that are only a greeting, thanks or a one-word acknowledgement.
+ * Nothing in a knowledge base answers them, so the turn skips the lookup and
+ * its embedding call. Only a whole-message match counts: "hi, what does it
+ * cost?" still searches.
+ */
+const SMALL_TALK = /^(hi+|hello+|hey+|hiya|howdy|yo|sup|what'?s up|good (morning|afternoon|evening|day)|how are you( doing)?|thanks?( you)?( so much| a lot)?|thx|ty|ok(ay)?|k|cool|great|nice|awesome|perfect|got it|sounds good|bye|goodbye|see you|cheers|yes|yeah|yep|no|nope|sure)( there| again| team| all| everyone)?$/;
+
+export function isSmallTalk(text: string): boolean {
+    const normalized = text.toLowerCase().replace(/[^\p{L}\p{N}' ]+/gu, ' ').replace(/\s+/g, ' ').trim();
+    return normalized.length > 0 && SMALL_TALK.test(normalized);
+}
+
+/**
+ * Which knowledge bases a turn searches barely changes, so it's reused for a
+ * short while instead of costing database calls on every turn. A base added
+ * or removed shows up within the TTL.
+ */
+const KB_IDS_TTL_MS = 30_000;
+const kbIdsCache = new Map<string, { ids: string[]; expiresAt: number }>();
+
+export function clearKnowledgeBaseIdsCacheForTests(): void {
+    kbIdsCache.clear();
+}
+
+async function turnKnowledgeBaseIds(supabase: Admin, agentId: string | null | undefined, installationId: string | null): Promise<string[]> {
+    const key = `${agentId ?? ''}:${installationId ?? ''}`;
+    const cached = kbIdsCache.get(key);
+    if (cached && cached.expiresAt > Date.now()) return cached.ids;
+    const [agentKbId, bindings] = await Promise.all([
+        agentKnowledgeBaseId(supabase, agentId),
+        installationId
+            ? supabase.from('installation_knowledge_bases').select('knowledge_base_id').eq('installation_id', installationId).limit(TURN_KNOWLEDGE_MAX_KBS)
+            : Promise.resolve({ data: [] as Array<{ knowledge_base_id: string }> }),
+    ]);
+    const bound = ((bindings.data ?? []) as Array<{ knowledge_base_id: string }>).map((b) => b.knowledge_base_id);
+    const ids = [...new Set([...(agentKbId ? [agentKbId] : []), ...bound])];
+    kbIdsCache.set(key, { ids, expiresAt: Date.now() + KB_IDS_TTL_MS });
+    if (kbIdsCache.size > 5_000) {
+        const oldest = kbIdsCache.keys().next().value;
+        if (oldest !== undefined) kbIdsCache.delete(oldest);
+    }
+    return ids;
+}
+
 export async function retrieveTurnKnowledge(
     supabase: Admin,
-    opts: { projectId: string; organizationId: string; installationId: string | null; queryText: string },
+    opts: { projectId: string; organizationId: string; installationId: string | null; agentId?: string | null; queryText: string },
 ): Promise<TurnKnowledge> {
     const empty: TurnKnowledge = { block: null, citations: [] };
-    if (!opts.installationId || !opts.queryText.trim()) return empty;
+    if ((!opts.installationId && !opts.agentId) || !opts.queryText.trim() || isSmallTalk(opts.queryText)) return empty;
     try {
-        const { data: bindings } = await supabase
-            .from('installation_knowledge_bases')
-            .select('knowledge_base_id')
-            .eq('installation_id', opts.installationId)
-            .limit(TURN_KNOWLEDGE_MAX_KBS);
-        const kbIds = ((bindings ?? []) as Array<{ knowledge_base_id: string }>).map((b) => b.knowledge_base_id);
+        const kbIds = await turnKnowledgeBaseIds(supabase, opts.agentId, opts.installationId);
+        // Nothing to search: skip the embedding call, which is billed work.
         if (kbIds.length === 0) return empty;
-
-        const { embedForMemory } = await import('@/lib/memory/embeddings');
-        const embedded = await embedForMemory(supabase as never, opts.projectId, opts.organizationId, opts.queryText.slice(0, 2000));
-        const vector = `[${embedded.embeddings[0].join(',')}]`;
-
-        const citations: TurnCitation[] = [];
-        const snippets: string[] = [];
-        for (const kbId of kbIds) {
-            const { data: hits, error } = await supabase.rpc('match_knowledge_chunks', {
-                p_knowledge_base_id: kbId,
-                p_query_embedding: vector,
-                p_match_count: TURN_KNOWLEDGE_TOP_K,
-            });
-            if (error) continue;
-            for (const h of (hits ?? []) as Array<{ id: string; source_id: string; ord?: number | null; content: string; similarity: number }>) {
-                citations.push({ chunk_id: h.id, source_id: h.source_id, ord: h.ord ?? null, score: h.similarity });
-                snippets.push(h.content.slice(0, KNOWLEDGE_CHUNK_SIZE));
-                if (citations.length >= TURN_KNOWLEDGE_MAX_CITATIONS) break;
-            }
-            if (citations.length >= TURN_KNOWLEDGE_MAX_CITATIONS) break;
-        }
-        return { block: buildKnowledgeBlock(snippets), citations };
+        return await searchKnowledgeBases(supabase, { ...opts, knowledgeBaseIds: kbIds });
     } catch {
         return empty;
     }

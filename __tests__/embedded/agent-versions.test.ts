@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checksumConfig, validateVersionConfig } from '@/lib/embedded/agents';
+import { checksumConfig, promoteStableInstallations, validateVersionConfig } from '@/lib/embedded/agents';
 import { canTransition, RUN_TERMINAL } from '@/lib/embedded/runs';
 
 describe('agent versions', () => {
@@ -16,6 +16,32 @@ describe('agent versions', () => {
         const c = checksumConfig({ model: 'gpt-5' });
         expect(a).toBe(b);
         expect(a).not.toBe(c);
+    });
+});
+
+describe('promoteStableInstallations', () => {
+    function fakeDb(result: { data: unknown; error: unknown }) {
+        const calls: { table?: string; update?: unknown; filters: Array<[string, unknown]> } = { filters: [] };
+        const chain = {
+            update(patch: unknown) { calls.update = patch; return chain; },
+            eq(column: string, value: unknown) { calls.filters.push([column, value]); return chain; },
+            select: async () => result,
+        };
+        return { calls, db: { from(table: string) { calls.table = table; return chain; } } };
+    }
+
+    it('moves only stable-channel installs of the agent onto the new version', async () => {
+        const { calls, db } = fakeDb({ data: [{ id: 'a' }, { id: 'b' }], error: null });
+        const moved = await promoteStableInstallations(db as never, { projectId: 'p1', agentId: 'ag1', versionId: 'v2' });
+        expect(moved).toBe(2);
+        expect(calls.table).toBe('agent_installations');
+        expect(calls.update).toEqual({ agent_version_id: 'v2' });
+        expect(calls.filters).toEqual([['project_id', 'p1'], ['agent_id', 'ag1'], ['update_channel', 'stable']]);
+    });
+
+    it('reports a failed update as null instead of throwing', async () => {
+        const { db } = fakeDb({ data: null, error: { message: 'boom' } });
+        await expect(promoteStableInstallations(db as never, { projectId: 'p1', agentId: 'ag1', versionId: 'v2' })).resolves.toBeNull();
     });
 });
 

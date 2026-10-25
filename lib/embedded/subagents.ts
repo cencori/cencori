@@ -223,14 +223,15 @@ export async function delegateSubagent(
         attemptedModel = config.model;
 
         let contextBlock: string | null = null;
-        // Only explicitly bound child bindings load knowledge — never the
-        // parent's installation context.
-        if (childInstallationId) {
+        // The child's own agent knowledge, plus explicitly bound child
+        // bindings — never the parent's installation context.
+        {
             const { retrieveTurnKnowledge } = await import('./turn-knowledge');
             const kb = await retrieveTurnKnowledge(supabase, {
                 projectId: opts.projectId,
                 organizationId: opts.organizationId,
-                installationId: childInstallationId,
+                installationId: childInstallationId ?? null,
+                agentId: childVersion.agent_id as string,
                 queryText: JSON.stringify(opts.input ?? {}).slice(0, 2000),
             });
             contextBlock = kb.block;

@@ -25,7 +25,7 @@ import { ThemeScope } from "@/components/theme-scope";
 import { MobileNav } from "@/components/dashboard/MobileNav";
 import { MaintenanceBanner } from "@/components/dashboard/MaintenanceBanner";
 import { CencoriAgentSidebar } from "@/components/dashboard/CencoriAgentSidebar";
-import { COPILOT_HEADER_ACTIONS_SLOT_ID, COPILOT_OPEN_COOKIE } from "@/lib/console/copilot";
+import { AGENT_HEADER_ACTIONS_SLOT_ID, COPILOT_HEADER_ACTIONS_SLOT_ID, COPILOT_OPEN_COOKIE } from "@/lib/console/copilot";
 import { EnvironmentProvider, useEnvironment } from "@/lib/contexts/EnvironmentContext";
 import { ReactQueryProvider } from "@/lib/providers/ReactQueryProvider";
 import { SessionProvider } from "@/lib/contexts/SessionContext";
@@ -284,10 +284,11 @@ function LayoutContent({ user, avatar, name, children, initialAgentOpen, initial
   const isPlayground = pathname.includes("/playground");
   // The full-screen Copilot page replaces the docked panel while it's open.
   const isCopilotPage = /\/copilot\/?$/.test(pathname);
-  const isEmbeddedAgents = pathname === "/agents" || pathname.endsWith("/agents");
+  // One agent's pages (/agents/<id>/…) are a full-height workspace with a docked test panel.
+  const isAgentWorkspace = /\/agents\/(?!new(?:\/|$))[^/]+/.test(pathname);
   // The memory graph is a canvas: it fills the workspace edge to edge.
   const isMemoryGraph = /\/memory\/graph\/?$/.test(pathname);
-  const isFixedWorkspace = isPlayground || isEmbeddedAgents || isMemoryGraph || isCopilotPage;
+  const isFixedWorkspace = isPlayground || isAgentWorkspace || isMemoryGraph || isCopilotPage;
   const isOnboardingFlow = pathname.includes("/onboarding");
   // Project settings (every tab) swaps the header's credits + Copilot buttons
   // for a single way out to organization settings.
@@ -407,7 +408,7 @@ function LayoutContent({ user, avatar, name, children, initialAgentOpen, initial
       <header className={cn(
         "fixed top-[var(--maintenance-banner-height,0px)] left-0 right-0 z-50 h-12 border-b border-border/30 bg-background px-4 md:px-6 flex items-center justify-between font-mono",
         agentOpen && !isCopilotPage && "lg:right-[520px]",
-        hasDesktopSidebar && (isEmbeddedAgents ? "lg:left-[calc(16rem+250px)]" : "lg:left-64"),
+        hasDesktopSidebar && "lg:left-64",
       )}>
         <div className="flex items-center gap-2">
           {/* Breadcrumbs - hidden on mobile */}
@@ -442,6 +443,8 @@ function LayoutContent({ user, avatar, name, children, initialAgentOpen, initial
         <div className="flex items-center gap-2">
           {/* Filled by the full-screen Copilot page (new chat, exit full screen). */}
           {isCopilotPage && <div id={COPILOT_HEADER_ACTIONS_SLOT_ID} className="flex items-center gap-1 font-sans" />}
+          {/* Filled by an agent's pages: Test, Save, Publish. */}
+          {isAgentWorkspace && <div id={AGENT_HEADER_ACTIONS_SLOT_ID} className="flex items-center gap-2 font-sans" />}
           {orgSlug && isProjectSettingsPage && (
             <Link
               href={isCanonicalConsoleRoute ? "/organization/settings" : `/${orgSlug}/~/settings`}
@@ -520,10 +523,8 @@ function LayoutContent({ user, avatar, name, children, initialAgentOpen, initial
 
       <main
         className={cn(
-          isPlayground || isMemoryGraph || isCopilotPage
+          isPlayground || isMemoryGraph || isCopilotPage || isAgentWorkspace
             ? "flex min-h-0 flex-1 flex-col overflow-hidden pt-0 lg:pt-12 pb-0"
-            : isEmbeddedAgents
-              ? "flex min-h-0 flex-1 flex-col overflow-hidden pt-12 pb-0 lg:pt-0"
             : isOnboardingFlow
               ? "p-4 md:p-6"
               : "p-4 md:p-6 pt-20 lg:pt-14"

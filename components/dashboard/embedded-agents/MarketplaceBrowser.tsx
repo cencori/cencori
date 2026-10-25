@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
-import { Loader2, Plus, Store } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
 
 type MarketplaceAgent = {
     version_id: string;
@@ -21,7 +21,7 @@ type Tenant = { id: string; name: string; external_id: string; status: string };
 async function fetchMarketplace(cursor: string | null): Promise<{ data: MarketplaceAgent[]; next_cursor: string | null }> {
     const params = new URLSearchParams({ limit: "20" });
     if (cursor) params.set("cursor", cursor);
-    const response = await fetch(`/v1/marketplace/agents?${params.toString()}`);
+    const response = await fetch(`/api/v1/marketplace/agents?${params.toString()}`);
     if (!response.ok) throw new Error("We couldn't load the marketplace.");
     return response.json() as Promise<{ data: MarketplaceAgent[]; next_cursor: string | null }>;
 }
@@ -80,20 +80,11 @@ export function MarketplaceBrowser({ projectId, tenants, canManage }: { projectI
 
     return (
         <div className="max-w-4xl">
-            <div className="flex items-start justify-between gap-4">
-                <div>
-                    <h3 className="text-lg font-semibold">Marketplace</h3>
-                    <p className="mt-1 max-w-lg text-xs leading-5 text-muted-foreground">
-                        Browse public agents built by others. Installing one forks a private copy into your project — later edits by the publisher never move it, and spend bills to you.
-                    </p>
-                </div>
-                <Store className="h-5 w-5 text-muted-foreground" />
-            </div>
             {!started && !loading && (
                 <button
                     type="button"
                     onClick={() => void loadMore(null)}
-                    className="mt-6 rounded-md border border-border px-3.5 py-2 text-xs font-medium hover:bg-accent"
+                    className="rounded-md border border-border px-3.5 py-2 text-xs font-medium hover:bg-accent"
                 >
                     Browse public agents
                 </button>

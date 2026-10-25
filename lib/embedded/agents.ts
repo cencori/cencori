@@ -180,6 +180,38 @@ export function validateVersionConfig(config: AgentVersionConfig): { ok: true } 
     return { ok: true };
 }
 
+/**
+ * Move every stable-channel installation of an agent onto a newly published
+ * stable version. Installations record the version they run (sessions, runs
+ * and skills all read it), so without this a "stable" install stays on the
+ * version it was installed at. Pinned installations are left alone. Queued
+ * runs keep the version they were submitted with. Best-effort: the version
+ * is already published, so a failure is logged and reported as null, never
+ * thrown; the next publish catches the installations up.
+ */
+export async function promoteStableInstallations(
+    supabase: Admin,
+    opts: { projectId: string; agentId: string; versionId: string },
+): Promise<number | null> {
+    try {
+        const { data, error } = await supabase
+            .from('agent_installations')
+            .update({ agent_version_id: opts.versionId })
+            .eq('project_id', opts.projectId)
+            .eq('agent_id', opts.agentId)
+            .eq('update_channel', 'stable')
+            .select('id');
+        if (error) {
+            console.warn('[Agents] Stable installations not promoted:', error.message);
+            return null;
+        }
+        return (data ?? []).length;
+    } catch (e) {
+        console.warn('[Agents] Stable installations not promoted:', e instanceof Error ? e.message : e);
+        return null;
+    }
+}
+
 /** Resolve runtime config: installation pin → stable → latest published → legacy agent_configs. */
 export interface ExecutionVersionInputs {
     /** Version pinned on the run row at submission time (may be null for legacy rows). */
