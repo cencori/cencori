@@ -36,8 +36,9 @@ export function AgentSetupChecklist() {
     });
     if (!enabled || knowledge.isLoading || whatsapp.isLoading) return null;
 
-    const apps = (version?.config_json.integrations ?? []) as Array<{ tools?: string[] }>;
-    const calendar = apps.some((app) => app.tools?.some((tool) => tool.startsWith("google-calendar__")));
+    // Connected apps as stored: each names its app (`nango.integration`) and its switched-on tools.
+    const apps = Array.isArray(version?.config_json.integrations) ? version.config_json.integrations as Array<{ nango?: { integration?: unknown }; enabled?: unknown }> : [];
+    const calendar = apps.some((app) => app?.nango?.integration === "google-calendar" && Array.isArray(app.enabled) && app.enabled.length > 0);
     const published = !!agent.stable_version_id;
     const link = (href: string, label: string) => <Button asChild size="sm" variant="outline" className="h-7 text-xs"><Link href={href}>{label}</Link></Button>;
 
