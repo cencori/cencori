@@ -576,6 +576,27 @@ export async function invalidateTensorAccess(userId: string): Promise<void> {
 }
 
 /**
+ * Counts one Tensor helper call (a prompt suggestion, a task title) against the user's day.
+ *
+ * Returns the count including this call, or null when it cannot be counted: Redis is not
+ * configured or did not answer. Callers let an uncounted call through, because a helper call is
+ * already capped in model, size and output, and refusing every suggestion during a Redis blip
+ * costs users more than a few uncounted calls cost Tensor.
+ */
+export async function countTensorHelperCall(userId: string, now = new Date()): Promise<number | null> {
+    if (!redisConfigured) return null;
+    const key = `${CONFIG_PREFIX}tensor-helper:${userId}:${now.toISOString().slice(0, 10)}`;
+    try {
+        const count = await redis.incr(key);
+        // Two days rather than one, so a key made just before midnight UTC outlives its own day.
+        if (count === 1) await redis.expire(key, 2 * 24 * 60 * 60);
+        return count;
+    } catch {
+        return null;
+    }
+}
+
+/**
  * A Tensor access token Supabase has already verified, and the user it named.
  *
  * Every Tensor model call and every turn reservation re-verified the caller's token with a round
