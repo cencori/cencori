@@ -11,7 +11,7 @@
 
 import { safeOutboundFetch } from '@/lib/security/outbound-url';
 import { executeWebhookTool, readWebhookTools, webhookToolDefinitions, type WebhookTool } from './webhook-tools';
-import { agentMcpBindings, readAgentMcpServers, runAgentMcpTool } from './agent-mcp';
+import { agentMcpBindings, readAgentIntegrations, readAgentMcpServers, runAgentMcpTool, warmAgentMcpSessions } from './agent-mcp';
 import {
     END_CONVERSATION_TOOL,
     SYSTEM_TOOL_DEFAULT_DESCRIPTIONS,
@@ -26,6 +26,20 @@ export { END_CONVERSATION_TOOL, TRANSFER_TO_HUMAN_TOOL };
 export const SYSTEM_TOOL_NAMES = [END_CONVERSATION_TOOL, TRANSFER_TO_HUMAN_TOOL] as const;
 
 const TRANSFER_TIMEOUT_MS = 10_000;
+
+/**
+ * Today's date for the agent's instructions. Models don't know it, so without
+ * it "what's on my calendar" lists from the start of time and dates in tool
+ * calls get guessed (Google rejects a bare `2026-10-01` as a time bound).
+ */
+export function agentClock(now = new Date()): string {
+    const day = now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+    const iso = `${now.toISOString().slice(0, 16)}:00Z`;
+    return [
+        `Current date and time: ${day}, ${iso.slice(11, 16)} UTC (${iso}).`,
+        `When a tool takes dates or times, send full RFC 3339 timestamps such as ${iso.slice(0, 10)}T00:00:00Z. For questions about upcoming, recent or "today's" things, set a time range from the current date instead of listing everything.`,
+    ].join('\n');
+}
 const TRANSCRIPT_MAX_MESSAGES = 20;
 
 /**
@@ -44,6 +58,8 @@ export type AgentToolCall = { id: string; name: string; args: string };
 /** Where the call happens, for the outcome and what a hand-off carries. */
 export interface AgentToolContext {
     organizationId: string;
+    /** The agent's project: connected apps (integrations) are looked up by it. */
+    projectId: string;
     agentId: string;
     agentName?: string;
     surface: 'preview' | 'conversation' | 'run';
@@ -160,6 +176,11 @@ export interface AgentToolset {
     definitions: FunctionToolDefinition[];
     has(name: string): boolean;
     run(call: AgentToolCall, context: AgentToolContext): Promise<AgentToolOutcome>;
+    /**
+     * Start what a tool call will need (a connected app's session) while the
+     * model is still deciding, so the call doesn't wait for it. Never throws.
+     */
+    warm(projectId: string): void;
 }
 
 /** The version's tools: its webhook tools, the MCP tools switched on, and the system tools switched on. */
@@ -171,8 +192,8 @@ export function agentToolset(config: Record<string, unknown> | null | undefined)
         ...(system.end_conversation ? [systemDefinition(END_CONVERSATION_TOOL, system)] : []),
         ...(system.transfer_to_human ? [systemDefinition(TRANSFER_TO_HUMAN_TOOL, system)] : []),
     ];
-    // MCP tool names never shadow the agent's own tools.
-    const mcp = agentMcpBindings(readAgentMcpServers(config), new Set(local.map((d) => d.function.name)));
+    // MCP and connected-app tool names never shadow the agent's own tools.
+    const mcp = agentMcpBindings([...readAgentMcpServers(config), ...readAgentIntegrations(config)], new Set(local.map((d) => d.function.name)));
     const definitions = [...local, ...mcp.map((binding) => binding.definition)];
     const byName = new Map<string, WebhookTool>(webhooks.map((tool) => [tool.name, tool]));
     const mcpByName = new Map(mcp.map((binding) => [binding.definition.function.name, binding]));
@@ -181,6 +202,9 @@ export function agentToolset(config: Record<string, unknown> | null | undefined)
     return {
         definitions,
         has: (name) => names.has(name),
+        warm(projectId) {
+            warmAgentMcpSessions(mcp, projectId);
+        },
         async run(call, context) {
             if (call.name === END_CONVERSATION_TOOL && system.end_conversation) {
                 return { ok: true, output: 'The conversation will close after your reply. Say a short goodbye.', endsConversation: true };
@@ -191,7 +215,7 @@ export function agentToolset(config: Record<string, unknown> | null | undefined)
             const webhook = byName.get(call.name);
             if (webhook) return executeWebhookTool(webhook, call.args, { organizationId: context.organizationId, signal: context.signal });
             const binding = mcpByName.get(call.name);
-            if (binding) return runAgentMcpTool(binding, call.args, context.organizationId);
+            if (binding) return runAgentMcpTool(binding, call.args, context.organizationId, context.projectId);
             return { ok: false, output: `There's no tool named ${call.name}.` };
         },
     };

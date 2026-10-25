@@ -309,6 +309,7 @@ async function prepareRunExecution(args: {
             ? `Company knowledge (cite source IDs [src] in your answer):\n${contextSnippets.map((s, i) => `[${i + 1}] ${s}`).join('\n')}`
             : null,
         runSkillsBlock ? runSkillsBlock : null,
+        (await import('@/lib/embedded/agent-tools')).agentClock(),
         wantsJson ? `Respond with JSON only, matching this schema: ${JSON.stringify(responseFormat?.json_schema?.schema ?? {})}` : null,
     ].filter(Boolean) as string[];
 
@@ -351,6 +352,7 @@ async function prepareRunExecution(args: {
         toolset: agentToolset((runtime.config ?? {}) as Record<string, unknown>),
         agentName: typeof (agentRow as { name?: unknown } | null)?.name === 'string' ? (agentRow as { name: string }).name.trim() : undefined,
     };
+    runAgentTools.toolset.warm(run.project_id);
     const { resolveActionNetworkPolicy } = await import('@/lib/embedded/net-policy');
     const runNetPolicy = await resolveActionNetworkPolicy(supabase as never, { project_id: run.project_id, run_id: runId, approval_policy: {} });
 
@@ -464,7 +466,7 @@ async function runModelLoop(
                 const outcome = await ctx.runAgentTools.toolset.run(
                     { id: tc.id, name: tc.function.name, args: tc.function.arguments || '{}' },
                     {
-                        organizationId, agentId: run.agent_id, agentName: ctx.runAgentTools.agentName, surface: 'run', conversationId: runId,
+                        organizationId, projectId: run.project_id, agentId: run.agent_id, agentName: ctx.runAgentTools.agentName, surface: 'run', conversationId: runId,
                         transcript: loopMessages.map((m) => ({ role: m.role, content: m.content ?? '' })),
                         signal: abortController.signal,
                     },

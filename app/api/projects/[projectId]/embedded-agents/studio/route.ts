@@ -8,10 +8,15 @@ import { checkInstallationCap, checkTenantCap } from '@/lib/embedded/limits';
 import type { SubscriptionTier } from '@/lib/entitlements';
 import { invalidateAgentConfig } from '@/lib/config-cache';
 import { buildWebhookTools, publicWebhookTools, readWebhookTools, WEBHOOK_TOOL_MAX_ITERATIONS } from '@/lib/embedded/webhook-tools';
-import { agentToolset, buildSystemTools, readSystemTools } from '@/lib/embedded/agent-tools';
-import { AGENT_MCP_SERVERS_MAX, buildAgentMcpServers, connectAgentMcpServer, normalizeMcpServerUrl, publicAgentMcpServers, readAgentMcpServers } from '@/lib/embedded/agent-mcp';
+import { agentClock, agentToolset, buildSystemTools, readSystemTools } from '@/lib/embedded/agent-tools';
+import { AGENT_MCP_SERVERS_MAX, buildAgentMcpServers, connectAgentMcpServer, normalizeMcpServerUrl, publicAgentMcpServers, readAgentIntegrations, readAgentMcpServers, type AgentMcpServer } from '@/lib/embedded/agent-mcp';
+import { createConnectLink, deleteConnection, discoverIntegrationTools, listNangoIntegrations, listProjectConnections, nangoConfigured, NangoError } from '@/lib/integrations/nango';
+import { iconFrom } from '@/lib/embedded/mcp-icon';
 import { discoverMcpAuth, mcpAuthorizeUrl, mcpRedirectFor, pkcePair, registerMcpClient, revokeMcpConnections, sealMcpOAuthState } from '@/lib/embedded/mcp-oauth';
 import type { UnifiedMessage } from '@/lib/providers/base';
+
+/** Room for a full answer in Preview; 500 cut lists of results off mid-sentence. */
+const TEST_MAX_TOKENS = 2_048;
 
 type Admin = ReturnType<typeof createAdminClient>;
 type Context = { params: Promise<{ projectId: string }> };
@@ -126,6 +131,31 @@ export async function POST(request: Request, ctx: Context) {
         const body = await request.json().catch(() => null) as Record<string, unknown> | null;
         if (!body || typeof body.action !== 'string') return fail('Choose an action.');
 
+        // Connected apps (integrations) are project-level: what's on offer, and
+        // what this project has connected.
+        if (body.action === 'integrations_list') {
+            if (!nangoConfigured()) return NextResponse.json({ configured: false, catalog: [], connections: [] });
+            try {
+                const [catalog, connections] = await Promise.all([listNangoIntegrations(), listProjectConnections(projectId)]);
+                return NextResponse.json({ configured: true, catalog, connections });
+            } catch (error) {
+                return fail(error instanceof NangoError ? error.message : 'Could not load integrations.', 502);
+            }
+        }
+
+        // A sign-in link for one app; the connection it makes belongs to this project.
+        if (body.action === 'integration_connect') {
+            const integration = cleanText(body.integration, 64);
+            try {
+                const catalog = await listNangoIntegrations();
+                if (!catalog.some((item) => item.id === integration)) return fail('That app isn\'t available.', 404);
+                const link = await createConnectLink(projectId, integration);
+                return NextResponse.json({ url: link.url, expires_at: link.expiresAt });
+            } catch (error) {
+                return fail(error instanceof NangoError ? error.message : 'Could not start connecting that app.', 502);
+            }
+        }
+
         if (body.action === 'create_agent') {
             const name = cleanText(body.name, 120);
             const description = cleanText(body.description, 500);
@@ -213,7 +243,7 @@ export async function POST(request: Request, ctx: Context) {
 
         const versionId = cleanText(body.version_id, 100);
         const version = versionId ? await scopedVersion(db, projectId, agentId, versionId) : null;
-        if (['save_draft', 'save_tools', 'mcp_connect', 'mcp_oauth_start', 'test_version', 'publish_version', 'set_visibility'].includes(body.action) && !version) return fail('Version not found in this project.', 404);
+        if (['save_draft', 'save_tools', 'mcp_connect', 'mcp_oauth_start', 'integration_attach', 'test_version', 'publish_version', 'set_visibility'].includes(body.action) && !version) return fail('Version not found in this project.', 404);
 
         // Marketplace publishing: flip a version's visibility. Public
         // versions appear in anonymous discovery; anything else stays hidden.
@@ -316,7 +346,11 @@ export async function POST(request: Request, ctx: Context) {
             const storedMcp = readAgentMcpServers(existing);
             const mcp = body.mcp_servers === undefined ? { ok: true as const, servers: storedMcp } : buildAgentMcpServers(body.mcp_servers, storedMcp, []);
             if (!mcp.ok) return fail(mcp.message);
-            const config: AgentVersionConfig = { ...existing, webhook_tools: built.tools, system_tools: system.tools, mcp_servers: mcp.servers };
+            const storedApps = readAgentIntegrations(existing);
+            const apps = body.integrations === undefined ? { ok: true as const, servers: storedApps } : buildAgentMcpServers(body.integrations, storedApps, []);
+            if (!apps.ok) return fail(apps.message);
+            const config: AgentVersionConfig = { ...existing, webhook_tools: built.tools, system_tools: system.tools, mcp_servers: mcp.servers, integrations: apps.servers };
+            if (apps.servers.length === 0) delete config.integrations;
             if (built.tools.length === 0) delete config.webhook_tools;
             if (Object.keys(system.tools).length === 0) delete config.system_tools;
             if (mcp.servers.length === 0) delete config.mcp_servers;
@@ -329,7 +363,7 @@ export async function POST(request: Request, ctx: Context) {
                 const stillUsed = new Set(((others ?? []) as Array<{ config_json: Record<string, unknown> | null }>).flatMap((other) => readAgentMcpServers(other.config_json).map((server) => server.oauth?.connection_id)).filter(Boolean));
                 await revokeMcpConnections(db, projectId, dropped.filter((id) => !stillUsed.has(id))).catch(() => undefined);
             }
-            return NextResponse.json({ version_id: versionId, webhook_tools: publicWebhookTools(built.tools), system_tools: system.tools, mcp_servers: publicAgentMcpServers(mcp.servers) });
+            return NextResponse.json({ version_id: versionId, webhook_tools: publicWebhookTools(built.tools), system_tools: system.tools, mcp_servers: publicAgentMcpServers(mcp.servers), integrations: publicAgentMcpServers(apps.servers) });
         }
 
         // Paste a server URL: connect, list its tools and add it to the draft in
@@ -368,6 +402,50 @@ export async function POST(request: Request, ctx: Context) {
         // Sign in to an OAuth MCP server: register Cencori with it and return
         // where to send the owner. The callback (/api/mcp/oauth/callback)
         // finishes the sign-in and adds the server to the draft.
+        // Give the agent a connected app: find its tools and add it to the draft
+        // (refreshing its tool list, and keeping the choices, if it's already there).
+        if (body.action === 'integration_attach' && version) {
+            if (lockedVersion) return fail('Published versions cannot be edited. Create a new draft.', 409);
+            const integration = cleanText(body.integration, 64);
+            const existing = (version.config_json ?? {}) as AgentVersionConfig;
+            const stored = readAgentIntegrations(existing);
+            try {
+                const [catalog, connections] = await Promise.all([listNangoIntegrations(), listProjectConnections(projectId)]);
+                const app = catalog.find((item) => item.id === integration);
+                if (!app) return fail('That app isn\'t available.', 404);
+                const mine = connections.filter((connection) => connection.integration === integration).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+                if (mine.length === 0) return fail(`Connect ${app.name} first.`, 409);
+                // One account per app per project: a reconnect replaces the earlier one.
+                await Promise.all(mine.slice(1).map((old) => deleteConnection(integration, old.connectionId).catch(() => undefined)));
+                const tools = await discoverIntegrationTools(projectId, integration);
+                if (tools.length === 0) return fail(`${app.name} is connected, but it has no tools the agent can use yet.`, 422);
+                const previous = stored.find((server) => server.nango?.integration === integration);
+                const icon = previous?.icon ?? (app.logo ? await iconFrom(app.logo).catch(() => null) : null);
+                const enabled = previous
+                    ? tools.filter((tool) => previous.enabled.includes(tool.name) || (!previous.tools.some((t) => t.name === tool.name) && !tool.destructive)).map((tool) => tool.name)
+                    // A first attach starts with the safe tools on, up to a manageable number.
+                    : tools.filter((tool) => !tool.destructive).slice(0, 20).map((tool) => tool.name);
+                const server: AgentMcpServer = {
+                    id: previous?.id ?? `int_${integration}`,
+                    name: app.name,
+                    url: `nango:${integration}`,
+                    headers: [],
+                    tools: tools.map((tool) => ({ name: tool.name, description: tool.description, inputSchema: tool.inputSchema, readOnly: tool.readOnly, destructive: tool.destructive })),
+                    enabled,
+                    discovered_at: new Date().toISOString(),
+                    ...(icon ? { icon } : {}),
+                    nango: { integration },
+                };
+                const next = previous ? stored.map((item) => (item.id === previous.id ? server : item)) : [...stored, server];
+                const checked = buildAgentMcpServers(next.map(({ id, name, enabled: on }) => ({ id, name, enabled: on })), stored, [server]);
+                if (!checked.ok) return fail(checked.message);
+                if (!(await saveDraftConfig({ ...existing, integrations: checked.servers }))) return fail('Draft changed while you were editing. Refresh and try again.', 409);
+                return NextResponse.json({ integration: publicAgentMcpServers([server])[0] });
+            } catch (error) {
+                return fail(error instanceof NangoError ? error.message : 'Could not add that app.', 502);
+            }
+        }
+
         if (body.action === 'mcp_oauth_start' && version) {
             if (lockedVersion) return fail('Published versions cannot be edited. Create a new draft.', 409);
             const stored = readAgentMcpServers((version.config_json ?? {}) as Record<string, unknown>);
@@ -412,18 +490,22 @@ export async function POST(request: Request, ctx: Context) {
             const testInstructions = simple.manifest.instructions?.trim() ?? '';
             const testKnowledge = await knowledgePromise;
             const testSystemParts = [
-                '[SANDBOX TEST — no customer knowledge or connections]',
                 agentName ? `Your name is "${agentName}". Always introduce yourself as ${agentName} when asked who you are.` : null,
                 testInstructions || null,
                 testKnowledge.block,
+                agentClock(),
             ].filter(Boolean) as string[];
             // The Preview chat sends its earlier turns so the test is a conversation.
+            // A reply notes the tools it used, so the agent knows it really looked them up.
             const history = (Array.isArray(body.history) ? body.history : [])
-                .filter((m: unknown): m is { role: 'user' | 'assistant'; content: string } => !!m && typeof m === 'object'
+                .filter((m: unknown): m is { role: 'user' | 'assistant'; content: string; tools?: unknown } => !!m && typeof m === 'object'
                     && ((m as { role?: unknown }).role === 'user' || (m as { role?: unknown }).role === 'assistant')
                     && typeof (m as { content?: unknown }).content === 'string')
                 .slice(-20)
-                .map((m: { role: 'user' | 'assistant'; content: string }) => ({ role: m.role, content: m.content.slice(0, 4000) }));
+                .map((m: { role: 'user' | 'assistant'; content: string; tools?: unknown }) => {
+                    const used = m.role === 'assistant' && Array.isArray(m.tools) ? m.tools.filter((t): t is string => typeof t === 'string').slice(0, 10) : [];
+                    return { role: m.role, content: `${used.length ? `[Called tools: ${used.join(', ')}]\n` : ''}${m.content.slice(0, 4000)}` };
+                });
             const messages = [
                 { role: 'system' as const, content: testSystemParts.join('\n\n') },
                 ...history,
@@ -494,6 +576,7 @@ export async function POST(request: Request, ctx: Context) {
                             // Tools run for real here: Cencori calls the endpoint (or the system
                             // action) and the agent answers from the result, a few rounds at most.
                             const toolset = agentToolset(config as Record<string, unknown>);
+                            toolset.warm(projectId);
                             let conversationEnded = false;
                             let conversation: UnifiedMessage[] = messages;
                             let content = '';
@@ -510,7 +593,7 @@ export async function POST(request: Request, ctx: Context) {
                                 const offerTools = toolset.definitions.length > 0 && round < WEBHOOK_TOOL_MAX_ITERATIONS && !conversationEnded;
                                 for await (const chunk of streamGatewayChat({
                                     supabase: db as never, projectId, organizationId, tier,
-                                    request: { messages: conversation, model: resolved.model, maxTokens: 500, stream: true, ...(offerTools ? { tools: toolset.definitions as never } : {}) },
+                                    request: { messages: conversation, model: resolved.model, maxTokens: TEST_MAX_TOKENS, stream: true, ...(offerTools ? { tools: toolset.definitions as never } : {}) },
                                     resolved: resolved as never,
                                     requestId: testRequestId,
                                 })) {
@@ -568,7 +651,7 @@ export async function POST(request: Request, ctx: Context) {
                                 for (const call of toolCalls) {
                                     send('tool', { id: call.id, name: call.name, status: 'running' });
                                     const outcome = await toolset.run(call, {
-                                        organizationId, agentId, agentName, surface: 'preview',
+                                        organizationId, projectId, agentId, agentName, surface: 'preview',
                                         transcript: conversation.map((m) => ({ role: m.role, content: m.content })),
                                     });
                                     if (outcome.endsConversation) conversationEnded = true;
@@ -600,7 +683,7 @@ export async function POST(request: Request, ctx: Context) {
                 const { executeGatewayChat } = await import('@/lib/gateway/chat-executor');
                 const result = await executeGatewayChat({
                     supabase: db as never, projectId, organizationId, tier,
-                    request: { messages, model: simple.manifest.model!, maxTokens: 500 },
+                    request: { messages, model: simple.manifest.model!, maxTokens: TEST_MAX_TOKENS },
                     requestId: testRequestId,
                 });
                 const done = await settle({

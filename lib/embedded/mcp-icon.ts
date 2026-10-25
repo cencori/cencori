@@ -90,7 +90,8 @@ async function toStoredIcon(body: Buffer, type: string): Promise<string | null> 
     return `data:${type};base64,${body.toString('base64')}`;
 }
 
-async function iconFrom(url: string): Promise<string | null> {
+/** An image URL (or data URL) as a stored icon: fetched, shrunk, and capped. */
+export async function iconFrom(url: string): Promise<string | null> {
     if (url.startsWith('data:image/')) return url.length <= ICON_STORE_MAX * 1.4 ? url : null;
     const image = await fetchCapped(url, IMAGE_READ_MAX, 'image/*');
     return image ? toStoredIcon(image.body, image.type || (url.endsWith('.ico') ? 'image/x-icon' : '')) : null;
