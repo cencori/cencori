@@ -691,7 +691,7 @@ return {
     // overlapping the I/O removes two network round trips from warm TTFT.
     const route = req.nextUrl.pathname;
     const creditsBalancePromise = shouldEnforceCredits
-        ? import('@/lib/credits').then(({ getCreditsBalance }) => getCreditsBalance(organizationId))
+        ? import('@/lib/credits').then(({ getCreditsBalanceForGate }) => getCreditsBalanceForGate(organizationId))
         : Promise.resolve(Number(organization.credits_balance ?? 0));
     // The Tensor proxy and the turn reservation keep a short-lived allowed answer for this user;
     // it is the same RPC's answer, so a hit saves the round trip and a miss asks as before.

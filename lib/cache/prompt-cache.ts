@@ -1,11 +1,11 @@
-import { Redis } from '@upstash/redis';
+import { createRedisClient } from '@/lib/redis';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { generateEmbedding } from './embeddings';
 import { DEFAULT_CACHE_CONFIG } from './types';
 import type { CacheConfig, CacheLookupResult, CacheStoreParams } from './types';
 import crypto from 'crypto';
 
-const redis = new Redis({
+const redis = createRedisClient({
     url: process.env.UPSTASH_REDIS_REST_URL!,
     token: process.env.UPSTASH_REDIS_REST_TOKEN!,
 });
