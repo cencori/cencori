@@ -114,6 +114,7 @@ type ChatRequestBody = {
     tool_choice?: UnifiedChatRequest["toolChoice"];
     reasoning_effort?: unknown;
     stream?: boolean;
+    stream_options?: { include_usage?: boolean };
     temperature?: number;
     max_tokens?: number;
     frequency_penalty?: number;
@@ -812,6 +813,7 @@ export async function POST(req: NextRequest) {
                 requestedModel: visionModel,
                 maxTokens: effectiveMaxTokens,
                 temperature: body.temperature,
+                reasoningEffort: parseReasoningEffort(body.reasoning_effort),
                 stream: shouldStream,
                 guardedPrompt,
                 inputText: inputPipeline.inputText,
@@ -1086,6 +1088,7 @@ export async function POST(req: NextRequest) {
             frequencyPenalty: body.frequency_penalty ?? body.frequencyPenalty,
             presencePenalty: body.presence_penalty ?? body.presencePenalty,
             stream: shouldStream,
+            includeUsage: body.stream_options?.include_usage === true,
             tools: tools as Tool[] | undefined,
             toolChoice: tool_choice,
             reasoningEffort: parseReasoningEffort(body.reasoning_effort),

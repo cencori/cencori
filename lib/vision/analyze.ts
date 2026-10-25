@@ -128,6 +128,12 @@ export interface VisionAnalyzeRequest {
     temperature?: number;
     responseFormat?: 'text' | 'json';
     stream?: boolean;
+    /**
+     * Reasoning effort for models that think before answering (e.g. Maximo
+     * Atlas). Their thinking counts against `maxTokens`, so without a low
+     * effort a description can run out of room partway through.
+     */
+    reasoningEffort?: string;
 }
 
 export interface VisionAnalyzeResult {
@@ -178,6 +184,9 @@ const VISION_MODELS: Record<string, ModelInfo> = {
     'gemini-2.5-flash-lite': { provider: 'google', apiModel: 'gemini-2.5-flash-lite', description: 'Fastest Gemini' },
     // Maximo (OpenAI wire format)
     'maximo-atlas-1.2': { provider: 'maximo', apiModel: 'maximo-atlas-1.2', description: 'Atlas 1.2 — agentic coding with visual understanding, 1M context' },
+    // Maximo is retiring Atlas 1.2 (2026-10); 1.5 is the priced successor with
+    // image input, and what Copilot uses to read attached images.
+    'maximo-atlas-1.5': { provider: 'maximo', apiModel: 'maximo-atlas-1.5', description: 'Atlas 1.5 — agentic coding with text and image input, 1M context' },
     // OpenRouter `:free` vision entries were removed 2026-09-23 with the
     // free-tier retirement (nemotron-3-nano-omni, ling-3.0-flash-vl,
     // nex-n2.5-pro/mini, dots-3-note-preview). They have no pricing rows, so
@@ -402,13 +411,14 @@ async function analyzeOpenAI(
     model: string,
     prompt: string,
     imgs: NormalizedImage[],
-    opts: { maxTokens?: number; temperature?: number; jsonMode?: boolean },
+    opts: { maxTokens?: number; temperature?: number; jsonMode?: boolean; reasoningEffort?: string },
     client: OpenAI = new OpenAI({ apiKey, timeout: 55_000, maxRetries: 0 })
 ): Promise<{ analysis: string; promptTokens: number; completionTokens: number }> {
     const response = await client.chat.completions.create({
         model,
         max_tokens: opts.maxTokens ?? 1024,
         temperature: opts.temperature,
+        ...(opts.reasoningEffort ? { reasoning_effort: opts.reasoningEffort as OpenAI.ReasoningEffort } : {}),
         response_format: opts.jsonMode ? { type: 'json_object' } : undefined,
         messages: [
             {
@@ -530,13 +540,14 @@ async function* streamOpenAI(
     model: string,
     prompt: string,
     imgs: NormalizedImage[],
-    opts: { maxTokens?: number; temperature?: number },
+    opts: { maxTokens?: number; temperature?: number; reasoningEffort?: string },
     client: OpenAI = new OpenAI({ apiKey, timeout: 55_000, maxRetries: 0 })
 ): AsyncGenerator<{ delta: string } | { done: true; promptTokens: number; completionTokens: number }> {
     const stream = await client.chat.completions.create({
         model,
         max_tokens: opts.maxTokens ?? 1024,
         temperature: opts.temperature,
+        ...(opts.reasoningEffort ? { reasoning_effort: opts.reasoningEffort as OpenAI.ReasoningEffort } : {}),
         stream: true,
         stream_options: { include_usage: true },
         messages: [
@@ -637,7 +648,7 @@ function makeVisionStreamGenerator(
     apiModel: string,
     prompt: string,
     imgs: NormalizedImage[],
-    opts: { maxTokens?: number; temperature?: number }
+    opts: { maxTokens?: number; temperature?: number; reasoningEffort?: string }
 ) {
     // Explicit per-provider dispatch, not a trailing else: this used to fall
     // through to Google for anything that wasn't OpenAI or Anthropic, which
@@ -664,7 +675,7 @@ export async function* streamVision(
     const imgs = await normalizeImages(resolveImageList(request));
     for (const img of imgs) validateImageForProvider(img, model.provider);
     const prompt = request.prompt ?? (imgs.length > 1 ? 'Analyze these images together.' : 'Describe this image in detail.');
-    const opts = { maxTokens: request.maxTokens, temperature: request.temperature };
+    const opts = { maxTokens: request.maxTokens, temperature: request.temperature, reasoningEffort: request.reasoningEffort };
     let pricing = await getPricingFromDB(model.provider, model.apiModel);
 
     // Failover window: only before the first chunk is emitted. Once bytes
@@ -795,7 +806,7 @@ function isFailoverWorthy(error: unknown, provider: string): boolean {
     );
 }
 
-type VisionCallOpts = { maxTokens?: number; temperature?: number; jsonMode?: boolean };
+type VisionCallOpts = { maxTokens?: number; temperature?: number; jsonMode?: boolean; reasoningEffort?: string };
 type VisionCallResult = { analysis: string; promptTokens: number; completionTokens: number };
 
 async function callVisionProvider(
@@ -830,6 +841,7 @@ export async function analyzeVision(
         maxTokens: request.maxTokens,
         temperature: request.temperature,
         jsonMode: request.responseFormat === 'json',
+        reasoningEffort: request.reasoningEffort,
     };
     let pricing = await getPricingFromDB(model.provider, model.apiModel);
 

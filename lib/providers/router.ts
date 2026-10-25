@@ -77,6 +77,8 @@ const MODEL_PROVIDER_OVERRIDES: Record<string, string> = {
     'gemma-4-31b-it': 'google',
     'gemma-4-26b-a4b-it': 'google',
     // Maximo AI (defaults to openai)
+    'maximo-atlas-1.5': 'maximo',
+    'maximo-atlas-1.4': 'maximo',
     'maximo-atlas-1.3': 'maximo',
     'maximo-atlas-1.2': 'maximo',
     'maximo-atlas-1.1': 'maximo',

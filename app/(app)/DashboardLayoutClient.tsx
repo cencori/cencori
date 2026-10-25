@@ -9,6 +9,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import AirdropIcon from "@hugeicons/core-free-icons/AirdropIcon";
+import { CopilotContext } from "@/lib/contexts/CopilotContext";
 import { CreditCard, Menu, Search } from "lucide-react";
 import { formatCurrency } from "@/lib/currency";
 import {
@@ -24,7 +25,7 @@ import { ThemeScope } from "@/components/theme-scope";
 import { MobileNav } from "@/components/dashboard/MobileNav";
 import { MaintenanceBanner } from "@/components/dashboard/MaintenanceBanner";
 import { CencoriAgentSidebar } from "@/components/dashboard/CencoriAgentSidebar";
-import { COPILOT_OPEN_COOKIE } from "@/lib/console/copilot";
+import { COPILOT_HEADER_ACTIONS_SLOT_ID, COPILOT_OPEN_COOKIE } from "@/lib/console/copilot";
 import { EnvironmentProvider, useEnvironment } from "@/lib/contexts/EnvironmentContext";
 import { ReactQueryProvider } from "@/lib/providers/ReactQueryProvider";
 import { SessionProvider } from "@/lib/contexts/SessionContext";
@@ -281,10 +282,12 @@ function LayoutContent({ user, avatar, name, children, initialAgentOpen, initial
     consoleRoute?.scope === "project" ? activeProject?.slug ?? null : null
   );
   const isPlayground = pathname.includes("/playground");
+  // The full-screen Copilot page replaces the docked panel while it's open.
+  const isCopilotPage = /\/copilot\/?$/.test(pathname);
   const isEmbeddedAgents = pathname === "/agents" || pathname.endsWith("/agents");
   // The memory graph is a canvas: it fills the workspace edge to edge.
   const isMemoryGraph = /\/memory\/graph\/?$/.test(pathname);
-  const isFixedWorkspace = isPlayground || isEmbeddedAgents || isMemoryGraph;
+  const isFixedWorkspace = isPlayground || isEmbeddedAgents || isMemoryGraph || isCopilotPage;
   const isOnboardingFlow = pathname.includes("/onboarding");
   // Project settings (every tab) swaps the header's credits + Copilot buttons
   // for a single way out to organization settings.
@@ -373,6 +376,22 @@ function LayoutContent({ user, avatar, name, children, initialAgentOpen, initial
       ? "Credits..."
       : formatCurrency(creditsBalance, 'USD', { maximumFractionDigits: 2, minimumFractionDigits: 2 });
 
+  const agentProps = {
+    project: currentProject ? { id: currentProject.id, name: currentProject.name, slug: currentProject.slug } : null,
+    organization: currentOrg ? { id: currentOrg.id, name: currentOrg.name, slug: currentOrg.slug } : null,
+    environment: (isTestMode ? "test" : "production") as "test" | "production",
+    userName: name,
+  };
+  const copilotFullPageHref = isCanonicalConsoleRoute
+    ? "/copilot"
+    : orgSlug && projectSlug ? `/${orgSlug}/${projectSlug}/copilot` : null;
+  const copilotContext = {
+    open: agentOpen,
+    setOpen: setAgentOpen,
+    fullPageHref: copilotFullPageHref,
+    agent: agentProps,
+  };
+
   return (
     <div
       className={cn(
@@ -380,14 +399,14 @@ function LayoutContent({ user, avatar, name, children, initialAgentOpen, initial
         "dashboard-theme bg-background transition-colors font-inter pt-[var(--maintenance-banner-height,0px)]",
         isFixedWorkspace ? "flex h-svh flex-col overflow-hidden" : "min-h-screen",
         // Make room for the docked copilot so the dashboard shifts, not hides.
-        agentOpen && "lg:pr-[520px]",
+        agentOpen && !isCopilotPage && "lg:pr-[520px]",
       )}
     >
       <MaintenanceBanner />
       {!isOnboardingFlow && (
       <header className={cn(
         "fixed top-[var(--maintenance-banner-height,0px)] left-0 right-0 z-50 h-12 border-b border-border/30 bg-background px-4 md:px-6 flex items-center justify-between font-mono",
-        agentOpen && "lg:right-[520px]",
+        agentOpen && !isCopilotPage && "lg:right-[520px]",
         hasDesktopSidebar && (isEmbeddedAgents ? "lg:left-[calc(16rem+250px)]" : "lg:left-64"),
       )}>
         <div className="flex items-center gap-2">
@@ -419,9 +438,10 @@ function LayoutContent({ user, avatar, name, children, initialAgentOpen, initial
               )}
             </BreadcrumbList>
           </Breadcrumb>
-
         </div>
         <div className="flex items-center gap-2">
+          {/* Filled by the full-screen Copilot page (new chat, exit full screen). */}
+          {isCopilotPage && <div id={COPILOT_HEADER_ACTIONS_SLOT_ID} className="flex items-center gap-1 font-sans" />}
           {orgSlug && isProjectSettingsPage && (
             <Link
               href={isCanonicalConsoleRoute ? "/organization/settings" : `/${orgSlug}/~/settings`}
@@ -453,7 +473,7 @@ function LayoutContent({ user, avatar, name, children, initialAgentOpen, initial
           )}
 
           {/* Hidden while Copilot is open: the panel has its own close. */}
-          {!agentOpen && !isSettingsPage && (
+          {!agentOpen && !isSettingsPage && !isCopilotPage && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
@@ -500,7 +520,7 @@ function LayoutContent({ user, avatar, name, children, initialAgentOpen, initial
 
       <main
         className={cn(
-          isPlayground || isMemoryGraph
+          isPlayground || isMemoryGraph || isCopilotPage
             ? "flex min-h-0 flex-1 flex-col overflow-hidden pt-0 lg:pt-12 pb-0"
             : isEmbeddedAgents
               ? "flex min-h-0 flex-1 flex-col overflow-hidden pt-12 pb-0 lg:pt-0"
@@ -509,7 +529,9 @@ function LayoutContent({ user, avatar, name, children, initialAgentOpen, initial
               : "p-4 md:p-6 pt-20 lg:pt-14"
         )}
       >
-        {children}
+        <CopilotContext.Provider value={copilotContext}>
+          {children}
+        </CopilotContext.Provider>
       </main>
       <CommandPalette
         open={commandPaletteOpen}
@@ -519,21 +541,14 @@ function LayoutContent({ user, avatar, name, children, initialAgentOpen, initial
         consoleMode={isCanonicalConsoleRoute}
       />
       <CencoriAgentSidebar
-        open={agentOpen}
+        open={agentOpen && !isCopilotPage}
         initialConversationId={initialConversationId}
         onOpenChange={setAgentOpen}
-        project={currentProject ? {
-          id: currentProject.id,
-          name: currentProject.name,
-          slug: currentProject.slug,
-        } : null}
-        organization={currentOrg ? {
-          id: currentOrg.id,
-          name: currentOrg.name,
-          slug: currentOrg.slug,
-        } : null}
-        environment={isTestMode ? "test" : "production"}
-        userName={name}
+        onFullScreen={copilotFullPageHref ? () => {
+          setAgentOpen(false);
+          router.push(copilotFullPageHref);
+        } : undefined}
+        {...agentProps}
       />
     </div>
   );

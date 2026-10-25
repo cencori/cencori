@@ -307,6 +307,33 @@ describe('cencori wire format — stream', () => {
         expect(c.some((chunk) => chunk.choices?.[0]?.finish_reason === 'stop')).toBe(true);
     });
 
+    it('ends with an OpenAI usage chunk only when include_usage is asked for', async () => {
+        const run = async (includeUsage: boolean) => {
+            streamChunks([
+                { delta: 'hello' },
+                { delta: '', finishReason: 'stop' },
+            ]);
+            const result = await runV1ProviderExecution(
+                baseParams({ stream: true, wireFormat: undefined, includeUsage })
+            );
+            if (!result.ok) throw new Error('expected ok');
+            return (await readSSE(result.response)).chunks as Array<{
+                choices?: unknown[];
+                usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
+                cost_usd?: number;
+            }>;
+        };
+
+        const withUsage = await run(true);
+        const last = withUsage[withUsage.length - 1];
+        expect(last.choices).toEqual([]);
+        expect(last.usage?.total_tokens).toBeGreaterThan(0);
+        expect(typeof last.cost_usd).toBe('number');
+
+        const withoutUsage = await run(false);
+        expect(withoutUsage.some((chunk) => chunk.usage)).toBe(false);
+    });
+
     it('adds fallback metadata on the first content chunk only', async () => {
         streamChunks([
             { delta: 'A', usedFallback: true, originalProvider: 'anthropic', originalModel: 'claude-sonnet-4' },

@@ -1,4 +1,5 @@
 import { getAuthUser } from "@/lib/auth/get-auth-user";
+import { waitUntil } from "@vercel/functions";
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import type { ChatCompletionMessageFunctionToolCall, ChatCompletionMessageParam } from "openai/resources/chat/completions";
@@ -8,10 +9,15 @@ import { createAdminClient } from "@/lib/supabaseAdmin";
 import { createServerClient } from "@/lib/supabaseServer";
 import { runCopilotTool, toolsFor, TOOL_STATUS, type CopilotToolContext } from "@/lib/copilot/tools";
 import { ACTION_NAMES, ACTION_STATUS, COPILOT_ACTIONS, prepareCopilotAction } from "@/lib/copilot/actions";
+import { verifyOrganizationAccess } from "@/lib/copilot/access";
+import { COPILOT_FILES_REQUEST_BUDGET, sanitizeFiles, sanitizeImages, withFiles, type CopilotFile } from "@/lib/copilot/files";
+import { COPILOT_DAILY_LIMITS, COPILOT_TOKEN_RATE_USD_PER_MILLION, PLAN_NAMES, copilotVisionModel, resolveCopilotModel } from "@/lib/console/copilot";
+import { deductCredits, getCreditsBalance, isCreditBalanceExhausted } from "@/lib/credits";
 
 type ChatMessage = {
     role: "user" | "assistant";
     content: string;
+    files?: unknown;
 };
 
 const SYSTEM_PROMPT = `You are Cencori Copilot, a conversational AI partner embedded throughout the Cencori application.
@@ -41,20 +47,12 @@ Rules:
 // logged in ai_requests, billed to the owning project's credits, and get the
 // gateway's fallbacks, rate limits and security filters. DeepSeek V4 Flash is
 // served by B.AI; it's off the public catalog but routed and priced.
-const AGENT_MODEL = "deepseek-v4-flash";
 const GATEWAY_BASE_URL = process.env.CENCORI_GATEWAY_URL || "https://api.cencori.com/v1";
 // Tool rounds per answer before the model must reply, and the most of one
 // tool's JSON the model sees.
 const MAX_TOOL_ROUNDS = 5;
 
 // Copilot is free, capped per organization per UTC day by plan (0 = no cap).
-const COPILOT_DAILY_LIMITS: Record<string, number> = {
-    free: 10,
-    pro: 50,
-    team: 100,
-    enterprise: 0,
-};
-const PLAN_NAMES: Record<string, string> = { free: "Free", pro: "Pro", team: "Team", enterprise: "Enterprise" };
 const MAX_TOOL_OUTPUT_CHARS = 12_000;
 
 function isChatMessage(value: unknown): value is ChatMessage {
@@ -75,28 +73,42 @@ function isLightweightConversation(content: string) {
     return /^(hi|hello|hey|thanks|thank you|thank you so much|ok|okay|alright|got it|understood|makes sense|cool|great|nice|perfect|awesome|sounds good|no problem|all good)( thanks| thank you)?$/.test(normalized);
 }
 
-async function verifyOrganizationAccess(
-    organizationId: string,
-    userId: string,
-    admin: ReturnType<typeof createAdminClient>,
-) {
-    const { data: organization } = await admin
-        .from("organizations")
-        .select("id, name, slug, owner_id, subscription_tier")
-        .eq("id", organizationId)
-        .maybeSingle();
+const IMAGE_DESCRIPTION_PROMPT = "Describe this image for an assistant that will answer the user's question about it. Transcribe all visible text, numbers, error messages, code, table cells and chart values exactly. Then say what the image shows (a dashboard, an error dialog, a chart, a log...). Be factual and complete; don't speculate beyond what is visible.";
 
-    if (!organization) return null;
-    if (organization.owner_id === userId) return organization;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-    const { data: membership } = await admin
-        .from("organization_members")
+/** One answered question: log it, and charge it when it's past the free allowance. */
+async function recordCopilotUsage(usage: {
+    admin: ReturnType<typeof createAdminClient>;
+    organizationId: string;
+    userId: string;
+    conversationId: string | null;
+    inputTokens: number;
+    outputTokens: number;
+    modelCostUsd: number;
+    billed: boolean;
+}) {
+    const tokens = usage.inputTokens + usage.outputTokens;
+    const costUsd = usage.modelCostUsd + (tokens / 1_000_000) * COPILOT_TOKEN_RATE_USD_PER_MILLION;
+    const { data: event, error } = await usage.admin
+        .from("copilot_usage_events")
+        .insert({
+            organization_id: usage.organizationId,
+            user_id: usage.userId,
+            conversation_id: usage.conversationId,
+            input_tokens: usage.inputTokens,
+            output_tokens: usage.outputTokens,
+            model_cost_usd: usage.modelCostUsd,
+            cost_usd: costUsd,
+            billed: usage.billed,
+        })
         .select("id")
-        .eq("organization_id", organizationId)
-        .eq("user_id", userId)
-        .maybeSingle();
-
-    return membership ? organization : null;
+        .single();
+    if (error) console.error("[Cencori Agent] Usage not recorded:", error.message);
+    if (!usage.billed || !(costUsd > 0)) return;
+    // The event id makes the charge traceable; without it, still charge.
+    const charged = await deductCredits(usage.organizationId, costUsd, "Usage charge: Copilot", event?.id);
+    if (!charged) console.error(`[Cencori Agent] Credit deduction failed. org=${usage.organizationId} amount=${costUsd}`);
 }
 
 export async function POST(request: NextRequest) {
@@ -106,25 +118,52 @@ export async function POST(request: NextRequest) {
         if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
         const body = await request.json();
-        const messages = Array.isArray(body.messages)
+        const parsedMessages: { role: "user" | "assistant"; text: string; files: CopilotFile[] }[] = Array.isArray(body.messages)
             ? body.messages.filter(isChatMessage).slice(-12).map((message: ChatMessage) => ({
                 role: message.role,
-                content: message.content.slice(0, 4000),
+                text: message.content.slice(0, 4000),
+                files: message.role === "user" ? sanitizeFiles(message.files) : [],
             }))
             : [];
+        // Attached files share one budget per request, newest first; older ones
+        // past it are replaced with a note.
+        let fileBudget = COPILOT_FILES_REQUEST_BUDGET;
+        const messages = parsedMessages.slice().reverse().map((message) => {
+            const kept: CopilotFile[] = [];
+            const omitted: string[] = [];
+            for (const file of message.files) {
+                if (file.content.length <= fileBudget) {
+                    kept.push(file);
+                    fileBudget -= file.content.length;
+                } else {
+                    omitted.push(file.name);
+                }
+            }
+            return { role: message.role, content: withFiles(message.text, kept, omitted), hasFiles: message.files.length > 0 };
+        }).reverse();
+        // Images still to describe: only ever on the message being sent now.
+        const rawMessages = Array.isArray(body.messages) ? body.messages.filter(isChatMessage) : [];
+        const pendingImages = sanitizeImages(rawMessages[rawMessages.length - 1]?.files);
 
         if (messages.length === 0 || messages[messages.length - 1].role !== "user") {
             return NextResponse.json({ error: "A user message is required." }, { status: 400 });
         }
 
         const projectId = typeof body.projectId === "string" ? body.projectId : null;
+        // Only models on Copilot's list; anything else falls back to the default.
+        const agentModel = resolveCopilotModel(body.model);
+        const conversationId = typeof body.conversationId === "string" && UUID_PATTERN.test(body.conversationId)
+            ? body.conversationId
+            : null;
         const organizationId = typeof body.organizationId === "string" ? body.organizationId : null;
         const environment = body.environment === "test" ? "test" : "production";
         const currentSurface = typeof body.currentSurface === "string" ? body.currentSurface.slice(0, 120) : "Dashboard";
         const currentPath = typeof body.currentPath === "string" ? body.currentPath.slice(0, 300) : "";
         const userName = typeof body.userName === "string" ? body.userName.slice(0, 80) : null;
         const latestQuestion = messages[messages.length - 1].content;
-        const lightweightConversation = isLightweightConversation(latestQuestion);
+        const lightweightConversation = !messages[messages.length - 1].hasFiles
+            && pendingImages.length === 0
+            && isLightweightConversation(latestQuestion);
         const admin = createAdminClient();
 
         let organization: { id: string; name: string; slug: string; owner_id: string; subscription_tier: string | null } | null = null;
@@ -146,24 +185,35 @@ export async function POST(request: NextRequest) {
             if (!organization) return NextResponse.json({ error: "You do not have access to this organization." }, { status: 403 });
         }
 
-        // Fair-use cap. Small talk doesn't count. Fails open: if the counter is
-        // unavailable, Copilot keeps answering rather than blocking everyone.
+        // Who Copilot usage is counted against: the organization, or the user
+        // when no organization is in context (so leaving it out can't dodge the cap).
+        const usageSubject = organization ? `org:${organization.id}` : `user:${user.id}`;
+
+        // Free questions per day by plan; small talk doesn't count. Past the
+        // allowance the answer is billed to the organization's credits. Fails
+        // open: if the counter is unavailable, Copilot answers for free rather
+        // than blocking everyone.
+        let billed = false;
         if (!lightweightConversation) {
             const tier = organization?.subscription_tier && organization.subscription_tier in COPILOT_DAILY_LIMITS
                 ? organization.subscription_tier
                 : "free";
             const limit = COPILOT_DAILY_LIMITS[tier];
             const { data: usage, error: usageError } = await admin.rpc("copilot_consume", {
-                p_subject: organization ? `org:${organization.id}` : `user:${user.id}`,
+                p_subject: usageSubject,
                 p_limit: limit,
             });
             if (usageError) {
                 console.error("[Cencori Agent] Usage cap unavailable:", usageError.message);
             } else if (usage && (usage as { allowed?: boolean }).allowed === false) {
-                return NextResponse.json({
-                    error: `You've used today's ${limit} Copilot questions on the ${PLAN_NAMES[tier]} plan. It resets at midnight UTC, or upgrade for more.`,
-                    code: "copilot_daily_limit",
-                }, { status: 429 });
+                const canPay = organization ? !isCreditBalanceExhausted(await getCreditsBalance(organization.id)) : false;
+                if (!canPay) {
+                    return NextResponse.json({
+                        error: `You've used today's ${limit} free Copilot questions on the ${PLAN_NAMES[tier]} plan. Add credits to keep going, or wait for the reset at midnight UTC.`,
+                        code: "copilot_daily_limit",
+                    }, { status: 429 });
+                }
+                billed = true;
             }
         }
 
@@ -177,10 +227,6 @@ export async function POST(request: NextRequest) {
             now_utc: new Date().toISOString(),
         };
 
-        const prompt = lightweightConversation
-            ? `CURRENT DASHBOARD CONTEXT\n${JSON.stringify(pageContext, null, 2)}\n\nLATEST USER MESSAGE\n${latestQuestion}\n\nThis is a conversational turn. Reply naturally and do not restate or re-analyze earlier workspace findings.`
-            : `CURRENT DASHBOARD CONTEXT\n${JSON.stringify(pageContext, null, 2)}\n\nLATEST USER MESSAGE\n${latestQuestion}`;
-
         const copilotApiKey = process.env.CENCORI_COPILOT_API_KEY;
         if (!copilotApiKey) {
             return NextResponse.json({ error: "The agent is not configured." }, { status: 503 });
@@ -193,16 +239,62 @@ export async function POST(request: NextRequest) {
             timeout: 55_000,
             maxRetries: 0,
         });
-        const agentMessages: ChatCompletionMessageParam[] = [
-            { role: "system", content: SYSTEM_PROMPT },
-            ...(lightweightConversation
-                ? []
-                : messages.slice(0, -1).map((message: ChatMessage): ChatCompletionMessageParam => ({
-                    role: message.role,
-                    content: message.content,
-                }))),
-            { role: "user", content: prompt },
-        ];
+
+        // Images become text first: the gateway won't take images alongside the
+        // tool calls Copilot needs, so a vision model (the chosen one if it can
+        // see, otherwise the fallback) describes each one, and the description
+        // is what Copilot reasons over. Runs inside the stream (so the panel can
+        // say what's happening) and in parallel across images.
+        const describeImage = async (image: { name: string; dataUrl: string }) => {
+            try {
+                const described = await gateway.chat.completions.create({
+                    model: copilotVisionModel(agentModel),
+                    messages: [{
+                        role: "user",
+                        content: [
+                            { type: "text", text: IMAGE_DESCRIPTION_PROMPT },
+                            { type: "image_url", image_url: { url: image.dataUrl } },
+                        ],
+                    }],
+                    // Vision models here can be reasoning models: keep thinking
+                    // short and leave room for a full description after it.
+                    max_tokens: 4000,
+                    reasoning_effort: "low",
+                    temperature: 0,
+                }, { signal: request.signal });
+                const text = described.choices[0]?.message?.content?.trim();
+                return {
+                    file: { name: image.name, kind: "image" as const, content: text || "The image could not be read." },
+                    inputTokens: described.usage?.prompt_tokens ?? 0,
+                    outputTokens: described.usage?.completion_tokens ?? 0,
+                    costUsd: Number((described as { cost_usd?: number }).cost_usd) || 0,
+                };
+            } catch (imageError) {
+                console.error("[Cencori Agent] Image description failed:", imageError);
+                return {
+                    file: { name: image.name, kind: "image" as const, content: "The image could not be read." },
+                    inputTokens: 0,
+                    outputTokens: 0,
+                    costUsd: 0,
+                };
+            }
+        };
+
+        const buildAgentMessages = (question: string): ChatCompletionMessageParam[] => {
+            const prompt = lightweightConversation
+                ? `CURRENT DASHBOARD CONTEXT\n${JSON.stringify(pageContext, null, 2)}\n\nLATEST USER MESSAGE\n${question}\n\nThis is a conversational turn. Reply naturally and do not restate or re-analyze earlier workspace findings.`
+                : `CURRENT DASHBOARD CONTEXT\n${JSON.stringify(pageContext, null, 2)}\n\nLATEST USER MESSAGE\n${question}`;
+            return [
+                { role: "system", content: SYSTEM_PROMPT },
+                ...(lightweightConversation
+                    ? []
+                    : messages.slice(0, -1).map((message): ChatCompletionMessageParam => ({
+                        role: message.role,
+                        content: message.content,
+                    }))),
+                { role: "user", content: prompt },
+            ];
+        };
 
         // Tools only for real questions inside a workspace the user can see.
         const toolContext: CopilotToolContext | null = organization
@@ -222,24 +314,56 @@ export async function POST(request: NextRequest) {
             async start(controller) {
                 const send = (payload: Record<string, unknown>) =>
                     controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`));
+                // Summed across describing images and every tool round.
+                let inputTokens = 0;
+                let outputTokens = 0;
+                let modelCostUsd = 0;
                 try {
+                    let agentMessages: ChatCompletionMessageParam[];
+                    if (pendingImages.length) {
+                        send({ status: pendingImages.length > 1 ? "Reading the images" : "Reading the image" });
+                        const described = await Promise.all(pendingImages.map(describeImage));
+                        for (const item of described) {
+                            inputTokens += item.inputTokens;
+                            outputTokens += item.outputTokens;
+                            modelCostUsd += item.costUsd;
+                        }
+                        const imageDescriptions: CopilotFile[] = described.map((item) => item.file);
+                        // The panel swaps its image data for these descriptions.
+                        send({ imageDescriptions });
+                        send({ status: "Thinking" });
+                        agentMessages = buildAgentMessages(
+                            withFiles(latestQuestion, imageDescriptions)
+                            + "\n\nThe user attached the image(s) above; their message is about them. Answer from the image description first, and use dashboard context or tools only where the image or question calls for it.",
+                        );
+                    } else {
+                        agentMessages = buildAgentMessages(latestQuestion);
+                    }
                     // Tool loop: stream each round; when the model asks for
                     // tools, drop any preamble it streamed, run them, and go
                     // again. A round without tool calls is the answer.
                     for (let round = 0; round < MAX_TOOL_ROUNDS + 1; round++) {
                         const finalRound = round === MAX_TOOL_ROUNDS;
                         const result = await gateway.chat.completions.create({
-                            model: AGENT_MODEL,
+                            model: agentModel,
                             messages: agentMessages,
                             max_tokens: lightweightConversation ? 80 : 1400,
                             temperature: 0.25,
                             stream: true,
+                            // Ask for token counts so Copilot → Usage can show them.
+                            stream_options: { include_usage: true },
                             ...(tools && !finalRound ? { tools } : {}),
                         }, { signal: request.signal });
 
                         let content = "";
                         const calls = new Map<number, { id: string; name: string; args: string }>();
                         for await (const chunk of result) {
+                            if (chunk.usage) {
+                                inputTokens += chunk.usage.prompt_tokens ?? 0;
+                                outputTokens += chunk.usage.completion_tokens ?? 0;
+                                // Cencori's extension on the usage chunk.
+                                modelCostUsd += Number((chunk as { cost_usd?: number }).cost_usd) || 0;
+                            }
                             const delta = chunk.choices[0]?.delta;
                             if (delta?.content) {
                                 content += delta.content;
@@ -305,6 +429,21 @@ export async function POST(request: NextRequest) {
                     console.error("[Cencori Agent] Stream error:", error);
                     send({ error: "The agent could not finish this response." });
                     controller.close();
+                } finally {
+                    // Record the answer's usage and, past the free allowance, charge
+                    // it. After the response, so it never delays or breaks it.
+                    if (organization && inputTokens + outputTokens > 0) {
+                        waitUntil(recordCopilotUsage({
+                            admin,
+                            organizationId: organization.id,
+                            userId: user.id,
+                            conversationId,
+                            inputTokens,
+                            outputTokens,
+                            modelCostUsd,
+                            billed,
+                        }));
+                    }
                 }
             },
         });
