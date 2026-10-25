@@ -2,11 +2,21 @@
 
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
-import { ChevronDown } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ChevronDown, Trash2 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
-import { SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
-import { COPILOT_CONVERSATION_COOKIE, COPILOT_CONVERSATION_EVENT } from '@/lib/console/copilot';
+import { SidebarMenuAction, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { COPILOT_CONVERSATION_COOKIE, COPILOT_CONVERSATION_EVENT, COPILOT_NEW_CHAT_EVENT } from '@/lib/console/copilot';
 import { cn } from '@/lib/utils';
 
 const COLLAPSED_KEY = 'cencori:copilot-recent-collapsed';
@@ -39,6 +49,8 @@ export function CopilotRecentChats({ organizationId, chatHref }: { organizationI
     const pathname = usePathname();
     const [collapsed, setCollapsed] = useState(false);
     const [activeId, setActiveId] = useState<string | null>(null);
+    const [pendingDelete, setPendingDelete] = useState<{ id: string; title: string } | null>(null);
+    const queryClient = useQueryClient();
 
     useEffect(() => {
         try { setCollapsed(localStorage.getItem(COLLAPSED_KEY) === '1'); } catch { /* storage unavailable */ }
@@ -80,6 +92,25 @@ export function CopilotRecentChats({ organizationId, chatHref }: { organizationI
         else router.push(chatHref);
     };
 
+    // Your own conversations only: the table's RLS allows deleting just those.
+    const remove = useMutation({
+        mutationFn: async (id: string) => {
+            const { error } = await supabase.from('copilot_conversations').delete().eq('id', id);
+            if (error) throw new Error('We could not delete that chat.');
+            return id;
+        },
+        onSuccess: (id) => {
+            if (id === activeId) {
+                // Deleting the open chat starts a fresh one instead of reopening it.
+                document.cookie = `${COPILOT_CONVERSATION_COOKIE}=; path=/; max-age=0; samesite=lax`;
+                setActiveId(null);
+                if (pathname === chatHref) window.dispatchEvent(new Event(COPILOT_NEW_CHAT_EVENT));
+            }
+            void queryClient.invalidateQueries({ queryKey: ['copilotHistory', organizationId] });
+            setPendingDelete(null);
+        },
+    });
+
     if (chats.length === 0) return null;
 
     return (
@@ -102,12 +133,57 @@ export function CopilotRecentChats({ organizationId, chatHref }: { organizationI
                         isActive={pathname === chatHref && chat.id === activeId}
                         onClick={() => open(chat.id)}
                         tooltip={chat.title || 'Untitled'}
+                        // The age and the delete button share the right edge, so
+                        // don't reserve extra room for the button.
+                        className="group-has-data-[sidebar=menu-action]/menu-item:pr-2"
                     >
                         <span className="min-w-0 flex-1 truncate text-sm">{chat.title || 'Untitled'}</span>
-                        <span className="shrink-0 text-xs text-muted-foreground">{timeAgo(chat.updated_at)}</span>
+                        {/* Swaps with the delete button on hover. */}
+                        <span className="min-w-5 shrink-0 whitespace-nowrap text-right text-xs text-muted-foreground group-hover/menu-item:invisible group-focus-within/menu-item:invisible">
+                            {timeAgo(chat.updated_at)}
+                        </span>
                     </SidebarMenuButton>
+                    <SidebarMenuAction
+                        showOnHover
+                        aria-label={`Delete ${chat.title || 'chat'}`}
+                        onClick={() => setPendingDelete({ id: chat.id, title: chat.title || 'Untitled' })}
+                        // Same right edge as the age (the button's pr-2), so the
+                        // icon takes the age's place instead of sitting past it.
+                        className="right-2 text-muted-foreground hover:text-red-500"
+                    >
+                        <Trash2 />
+                    </SidebarMenuAction>
                 </SidebarMenuItem>
             ))}
+
+            <AlertDialog open={pendingDelete != null} onOpenChange={(open) => { if (!open) setPendingDelete(null); }}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="text-sm">Delete this chat?</AlertDialogTitle>
+                        <AlertDialogDescription className="text-xs">
+                            “{pendingDelete?.title}” will be deleted. This cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    {remove.error && (
+                        <p className="text-xs text-red-500">
+                            {remove.error instanceof Error ? remove.error.message : 'Could not delete that chat.'}
+                        </p>
+                    )}
+                    <AlertDialogFooter>
+                        <AlertDialogCancel className="h-8 text-xs">Keep it</AlertDialogCancel>
+                        <AlertDialogAction
+                            className="h-8 bg-red-600 text-xs hover:bg-red-600/90"
+                            disabled={remove.isPending}
+                            onClick={(event) => {
+                                event.preventDefault();
+                                if (pendingDelete) remove.mutate(pendingDelete.id);
+                            }}
+                        >
+                            {remove.isPending ? 'Deleting…' : 'Delete'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </>
     );
 }
