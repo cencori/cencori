@@ -19,8 +19,8 @@ import { getProjectMemorySettings, resolveMemoryModel } from '@/lib/memory';
 // Managed models memory is allowed to run on (see resolveMemoryModel). Not
 // exported — a Next.js route module may only export handlers.
 const MEMORY_MODEL_CHOICES = [
-    { value: 'gpt-oss-120b', label: 'GPT-OSS 120B (Cerebras)', hint: 'Default. Paid quota, deterministic.' },
-    { value: 'vercel/openai/gpt-oss-20b', label: 'GPT-OSS 20B (Vercel AI Gateway)', hint: 'Zero-markup routed overflow.' },
+    { value: 'gpt-oss-120b', label: 'GPT-OSS 120B', hint: 'Default. Paid quota, deterministic.' },
+    { value: 'vercel/openai/gpt-oss-20b', label: 'GPT-OSS 20B', hint: 'Zero-markup routed overflow.' },
 ];
 
 /**
