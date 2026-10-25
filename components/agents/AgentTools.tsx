@@ -6,15 +6,19 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import Wrench01Icon from "@hugeicons/core-free-icons/Wrench01Icon";
 import WebhookIcon from "@hugeicons/core-free-icons/WebhookIcon";
 import Loading03Icon from "@hugeicons/core-free-icons/Loading03Icon";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Settings, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/components/ui/toast";
 import { useAgentWorkspace } from "@/components/agents/AgentWorkspace";
+import { DockedPanel } from "@/components/agents/DockedPanel";
+import { AgentMcp } from "@/components/agents/AgentMcp";
 import { postStudioAction, studioQueryKey } from "@/components/agents/studio";
 import { cn } from "@/lib/utils";
+import { END_CONVERSATION_TOOL, SYSTEM_TOOL_DEFAULT_DESCRIPTIONS, TRANSFER_TO_HUMAN_TOOL } from "@/lib/embedded/system-tool-defaults";
 
 const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
 const PARAM_TYPES = ["string", "number", "boolean"] as const;
@@ -59,9 +63,15 @@ function hostOf(url: string) {
 
 /** The agent's tools: webhooks it can call mid-conversation. */
 export function AgentTools() {
-    const { projectId, agent, version, editable, canManage, busy } = useAgentWorkspace();
+    const { projectId, agent, version, editable, canManage, busy, data, form } = useAgentWorkspace();
     const queryClient = useQueryClient();
     const tools = ((version?.config_json.webhook_tools ?? []) as SavedTool[]).filter((tool) => tool && typeof tool.name === "string");
+    // Cohere models don't take tools through the gateway yet; say so rather than let tools sit unused.
+    const modelProvider = data.models.find((model) => model.id === form.model)?.provider;
+    const hasAnyTools = tools.length > 0 || Object.keys((version?.config_json.system_tools ?? {}) as object).length > 0 || ((version?.config_json.mcp_servers ?? []) as unknown[]).length > 0;
+    const [tab, setTab] = useState<"tools" | "mcp">("tools");
+    const [mcpAdding, setMcpAdding] = useState(false);
+    const mcpServerCount = Array.isArray(version?.config_json.mcp_servers) ? (version.config_json.mcp_servers as unknown[]).length : 0;
     const [editing, setEditing] = useState<{ index: number | null; draft: Draft } | null>(null);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -98,15 +108,25 @@ export function AgentTools() {
     };
 
     return (
-        <div className="max-w-3xl">
+        <div>
             <header className="mb-6 flex items-start justify-between gap-4">
                 <div>
                     <h1 className="text-base font-medium">Tools</h1>
-                    <p className="mt-0.5 max-w-lg text-xs text-muted-foreground">
-                        Endpoints {agent.name} can call during a conversation, like checking availability or booking a slot. Cencori makes the request and the agent answers from the result.
-                    </p>
+                    <div role="tablist" aria-label="Tool type" className="mt-3 grid grid-cols-2 rounded-md bg-muted/60 p-0.5 text-xs">
+                        {(["tools", "mcp"] as const).map((value) => (
+                            <button key={value} type="button" role="tab" aria-selected={tab === value} onClick={() => { setTab(value); setMcpAdding(false); }} className={cn("rounded px-3 py-1 transition-colors", tab === value ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
+                                {value === "tools" ? "Tools" : "MCP"}
+                            </button>
+                        ))}
+                    </div>
                 </div>
-                {canManage && editable && tools.length > 0 && (
+                {tab === "mcp" && canManage && editable && mcpServerCount > 0 && (
+                    <Button size="sm" className="h-7 shrink-0 gap-1.5 text-xs" onClick={() => setMcpAdding(true)} disabled={!!busy || mcpAdding}>
+                        <Plus className="h-3.5 w-3.5" />
+                        Add server
+                    </Button>
+                )}
+                {tab === "tools" && canManage && editable && tools.length > 0 && (
                     <Button size="sm" className="h-7 shrink-0 gap-1.5 text-xs" onClick={() => { setError(null); setEditing({ index: null, draft: emptyDraft() }); }} disabled={locked}>
                         <Plus className="h-3.5 w-3.5" />
                         Add tool
@@ -114,42 +134,50 @@ export function AgentTools() {
                 )}
             </header>
 
-            {!editable && (
-                <p className="mb-6 rounded-md border border-border/40 bg-muted/30 px-4 py-3 text-xs text-muted-foreground">
-                    Version {version?.version} is published and locked. Create a new draft to change its tools.
+            {tab === "mcp" ? (
+                <AgentMcp key={version?.id ?? "none"} adding={mcpAdding} onAddingChange={setMcpAdding} />
+            ) : (
+                <>
+                {modelProvider === "cohere" && hasAnyTools && (
+                <p className="mb-4 rounded-md border border-amber-500/25 px-4 py-3 text-xs leading-5 text-amber-600 dark:text-amber-400">
+                    Cohere models can&apos;t use tools yet, so {agent.name} answers without them. Pick another model on the Agent page to use these tools.
                 </p>
             )}
             {error && !editing && <p role="alert" className="mb-4 text-xs text-destructive">{error}</p>}
 
-            {tools.length === 0 ? (
-                <div className="flex flex-col items-center rounded-lg border border-border/60 px-6 py-14 text-center">
-                    <span className="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-muted/70 text-foreground"><HugeiconsIcon icon={Wrench01Icon} className="h-5 w-5" /></span>
-                    <p className="text-sm font-medium">No tools yet</p>
-                    <p className="mt-1 max-w-[40ch] text-xs leading-5 text-muted-foreground">Give {agent.name} an endpoint to call, and it can act on what people ask instead of only answering.</p>
-                    {canManage && editable && (
-                        <Button size="sm" className="mt-4 h-7 gap-1.5 text-xs" onClick={() => { setError(null); setEditing({ index: null, draft: emptyDraft() }); }} disabled={locked}>
-                            <Plus className="h-3.5 w-3.5" />
-                            Add tool
-                        </Button>
-                    )}
-                </div>
-            ) : (
-                <ul className="divide-y divide-border/60 overflow-hidden rounded-lg border border-border/60">
-                    {tools.map((tool, index) => (
-                        <li key={tool.name} className="flex items-center gap-3 px-4 py-3">
-                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted/70"><HugeiconsIcon icon={WebhookIcon} className="h-4 w-4" /></span>
-                            <button type="button" className="min-w-0 flex-1 text-left disabled:cursor-default" onClick={() => { setError(null); setEditing({ index, draft: toDraft(tool) }); }} disabled={!canManage}>
-                                <p className="truncate font-mono text-[13px] font-medium">{tool.name}</p>
-                                <p className="truncate text-xs text-muted-foreground"><span className="font-mono">{tool.method}</span> {hostOf(tool.url)} · {tool.description}</p>
-                            </button>
-                            {canManage && editable && (
-                                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => void remove(index)} disabled={locked || saving} aria-label={`Remove ${tool.name}`} title="Remove">
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                </Button>
-                            )}
-                        </li>
-                    ))}
-                </ul>
+                {tools.length === 0 ? (
+                    <div className="flex flex-col items-center rounded-lg border border-border/60 px-6 py-14 text-center">
+                        <span className="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-muted/70 text-foreground"><HugeiconsIcon icon={Wrench01Icon} className="h-5 w-5" /></span>
+                        <p className="text-sm font-medium">No tools yet</p>
+                        <p className="mt-1 max-w-[40ch] text-xs leading-5 text-muted-foreground">Give {agent.name} an endpoint to call, and it can act on what people ask instead of only answering.</p>
+                        {canManage && editable && (
+                            <Button size="sm" className="mt-4 h-7 gap-1.5 text-xs" onClick={() => { setError(null); setEditing({ index: null, draft: emptyDraft() }); }} disabled={locked}>
+                                <Plus className="h-3.5 w-3.5" />
+                                Add tool
+                            </Button>
+                        )}
+                    </div>
+                ) : (
+                    <ul className="divide-y divide-border/60 overflow-hidden rounded-lg border border-border/60">
+                        {tools.map((tool, index) => (
+                            <li key={tool.name} className="flex items-center gap-3 px-4 py-3">
+                                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted/70"><HugeiconsIcon icon={WebhookIcon} className="h-4 w-4" /></span>
+                                <button type="button" className="min-w-0 flex-1 text-left disabled:cursor-default" onClick={() => { setError(null); setEditing({ index, draft: toDraft(tool) }); }} disabled={!canManage}>
+                                    <p className="truncate font-mono text-[13px] font-medium">{tool.name}</p>
+                                    <p className="truncate text-xs text-muted-foreground"><span className="font-mono">{tool.method}</span> {hostOf(tool.url)} · {tool.description}</p>
+                                </button>
+                                {canManage && editable && (
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => void remove(index)} disabled={locked || saving} aria-label={`Remove ${tool.name}`} title="Remove">
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                )}
+                            </li>
+                        ))}
+                    </ul>
+                )}
+
+                <SystemTools key={version?.id ?? "none"} />
+                </>
             )}
 
             <Dialog open={!!editing} onOpenChange={(open) => { if (!open && !saving) setEditing(null); }}>
@@ -287,5 +315,224 @@ function ToolForm({ draft, onChange, disabled }: { draft: Draft; onChange: (draf
                 )}
             </div>
         </div>
+    );
+}
+
+type SystemToolsConfig = {
+    end_conversation?: { description?: string } | true;
+    transfer_to_human?: { url: string; description?: string; rules?: string[] } | null;
+};
+type SystemToolKey = "end_conversation" | "transfer_to_human";
+type SystemToolDraft = { description: string; url: string; rules: string[] };
+
+const SYSTEM_TOOLS: Array<{ key: SystemToolKey; label: string; summary: string }> = [
+    { key: END_CONVERSATION_TOOL, label: "End conversation", summary: "Closes the chat once the person is done, so the next message starts fresh." },
+    { key: TRANSFER_TO_HUMAN_TOOL, label: "Transfer to a person", summary: "Takes their contact details and a summary, and sends them to your team's URL with the conversation so far." },
+];
+
+/** The saved settings as the server expects them back. */
+function systemPayload(saved: SystemToolsConfig): Record<SystemToolKey, unknown> {
+    const end = saved.end_conversation;
+    return {
+        end_conversation: end ? (end === true ? {} : end) : null,
+        transfer_to_human: saved.transfer_to_human ?? null,
+    };
+}
+
+/** Built-in actions the agent can take, switched on per version, each with its own settings. */
+function SystemTools() {
+    const { projectId, agent, version, editable, canManage, busy } = useAgentWorkspace();
+    const queryClient = useQueryClient();
+    const saved = (version?.config_json.system_tools ?? {}) as SystemToolsConfig;
+    const [editing, setEditing] = useState<{ key: SystemToolKey; draft: SystemToolDraft } | null>(null);
+    const [saving, setSaving] = useState<SystemToolKey | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const locked = !editable || !canManage || !!busy || !!saving;
+    const isOn = (key: SystemToolKey) => !!saved[key];
+    
+    const save = async (key: SystemToolKey, value: unknown, message: string) => {
+        if (!version) return false;
+        setSaving(key);
+        setError(null);
+        try {
+            await postStudioAction(projectId, "save_tools", { agent_id: agent.id, version_id: version.id, system_tools: { ...systemPayload(saved), [key]: value } });
+            await queryClient.invalidateQueries({ queryKey: studioQueryKey(projectId) });
+            toast.success(message);
+            return true;
+        } catch (cause) {
+            setError(cause instanceof Error ? cause.message : "Couldn't save. Try again.");
+            return false;
+        } finally {
+            setSaving(null);
+        }
+    };
+
+    const open = (key: SystemToolKey) => {
+        const current = saved[key];
+        const settings = current && current !== true ? current : {};
+        setError(null);
+        setEditing({
+            key,
+            draft: {
+                description: (settings as { description?: string }).description ?? "",
+                url: (settings as { url?: string }).url ?? "",
+                rules: [...((settings as { rules?: string[] }).rules ?? [])],
+            },
+        });
+    };
+
+    const toggle = (key: SystemToolKey, checked: boolean) => {
+        const label = SYSTEM_TOOLS.find((tool) => tool.key === key)?.label ?? key;
+        // A hand-off needs somewhere to go: turning it on asks for the URL first.
+        if (checked && key === TRANSFER_TO_HUMAN_TOOL) return open(key);
+        void save(key, checked ? (systemPayload(saved)[key] ?? {}) : null, `${label} is ${checked ? "on" : "off"}`);
+    };
+
+    const submit = async () => {
+        if (!editing) return;
+        const { key, draft } = editing;
+        const label = SYSTEM_TOOLS.find((tool) => tool.key === key)?.label ?? key;
+        const value = key === TRANSFER_TO_HUMAN_TOOL
+            ? { url: draft.url.trim(), description: draft.description.trim(), rules: draft.rules.map((rule) => rule.trim()).filter(Boolean) }
+            : { description: draft.description.trim() };
+        if (await save(key, value, `${label} saved`)) setEditing(null);
+    };
+
+    return (
+        <section className="mt-8">
+            <h2 className="text-sm font-medium">System tools</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">Built-in actions {agent.name} can take on its own.</p>
+            <ul className="mt-3 divide-y divide-border/60 overflow-hidden rounded-lg border border-border/60">
+                {SYSTEM_TOOLS.map((tool) => (
+                    <li key={tool.key} className="flex items-start justify-between gap-4 px-4 py-3">
+                        <div>
+                            <p className="text-sm">{tool.label}</p>
+                            <p className="mt-0.5 text-xs text-muted-foreground">{tool.summary}</p>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1.5">
+                            {isOn(tool.key) && (
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={() => open(tool.key)} aria-label={`${tool.label} settings`} title="Settings">
+                                    {saving === tool.key ? <HugeiconsIcon icon={Loading03Icon} className="h-3.5 w-3.5 animate-spin" /> : <Settings className="h-3.5 w-3.5" />}
+                                </Button>
+                            )}
+                            <Switch checked={isOn(tool.key)} disabled={locked} aria-label={tool.label} onCheckedChange={(checked) => toggle(tool.key, checked)} />
+                        </div>
+                    </li>
+                ))}
+            </ul>
+            {error && !editing && <p role="alert" className="mt-2 text-xs text-destructive">{error}</p>}
+
+            <DockedPanel open={!!editing} onOpenChange={(next) => { if (!next && !saving) setEditing(null); }}>
+                {editing && (
+                    <SystemToolForm
+                        toolKey={editing.key}
+                        draft={editing.draft}
+                        onChange={(draft) => setEditing({ ...editing, draft })}
+                        disabled={locked}
+                        error={error}
+                        saving={saving === editing.key}
+                        onCancel={() => setEditing(null)}
+                        onSave={() => void submit()}
+                        canSave={canManage && editable && (editing.key !== TRANSFER_TO_HUMAN_TOOL || !!editing.draft.url.trim())}
+                    />
+                )}
+            </DockedPanel>
+        </section>
+    );
+}
+
+function SystemToolForm({ toolKey, draft, onChange, disabled, error, saving, onCancel, onSave, canSave }: {
+    toolKey: SystemToolKey;
+    draft: SystemToolDraft;
+    onChange: (draft: SystemToolDraft) => void;
+    disabled: boolean;
+    error: string | null;
+    saving: boolean;
+    onCancel: () => void;
+    onSave: () => void;
+    canSave: boolean;
+}) {
+    const [showDefault, setShowDefault] = useState(false);
+    const set = (patch: Partial<SystemToolDraft>) => onChange({ ...draft, ...patch });
+    const isTransfer = toolKey === TRANSFER_TO_HUMAN_TOOL;
+    const label = SYSTEM_TOOLS.find((tool) => tool.key === toolKey)?.label ?? toolKey;
+
+    return (
+        <>
+            <SheetHeader className="border-b border-border/60 px-5 py-4">
+                <SheetTitle className="text-base font-medium">{label}</SheetTitle>
+                <SheetDescription className="text-xs">Tell the agent how and when to use it.</SheetDescription>
+            </SheetHeader>
+            <div className="flex-1 space-y-6 overflow-y-auto px-5 py-5">
+                <Field label="Name">
+                    <input value={toolKey} readOnly disabled className={cn(inputClass, "font-mono text-[13px]")} />
+                </Field>
+                <div>
+                    <div className="mb-1.5 flex items-center justify-between">
+                        <span className="text-xs font-medium">Description <span className="font-normal text-muted-foreground">(optional)</span></span>
+                        <button type="button" className="rounded text-[11px] text-muted-foreground outline-none hover:text-foreground focus-visible:text-foreground focus-visible:underline" onClick={() => setShowDefault((value) => !value)}>
+                            {showDefault ? "Hide default" : "Show default"}
+                        </button>
+                    </div>
+                    <textarea
+                        value={draft.description}
+                        onChange={(event) => set({ description: event.target.value })}
+                        disabled={disabled}
+                        rows={4}
+                        placeholder="Leave blank to use the default."
+                        className={cn(inputClass, "resize-y")}
+                    />
+                    {showDefault && (
+                        <p className="mt-2 rounded-md bg-muted/40 px-3 py-2 text-[11px] leading-5 text-muted-foreground">{SYSTEM_TOOL_DEFAULT_DESCRIPTIONS[toolKey]}</p>
+                    )}
+                </div>
+
+                {isTransfer && (
+                    <>
+                        <Field label="Hand-off URL" hint="We POST the person's contact details, a summary and the conversation here as JSON.">
+                            <input value={draft.url} onChange={(event) => set({ url: event.target.value })} disabled={disabled} placeholder="https://hooks.example.com/handoff" className={cn(inputClass, "font-mono text-[13px]")} />
+                        </Field>
+                        <div>
+                            <div className="mb-1.5 flex items-center justify-between">
+                                <div>
+                                    <span className="text-xs font-medium">Transfer rules</span>
+                                    <p className="text-[11px] text-muted-foreground">When else the agent should hand off, besides being asked.</p>
+                                </div>
+                                <Button type="button" variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={() => set({ rules: [...draft.rules, ""] })} disabled={disabled || draft.rules.length >= 10}>
+                                    <Plus className="h-3 w-3" /> Add rule
+                                </Button>
+                            </div>
+                            {draft.rules.length > 0 && (
+                                <div className="space-y-2">
+                                    {draft.rules.map((rule, index) => (
+                                        <div key={index} className="flex gap-2">
+                                            <input
+                                                value={rule}
+                                                onChange={(event) => set({ rules: draft.rules.map((r, i) => (i === index ? event.target.value : r)) })}
+                                                disabled={disabled}
+                                                placeholder="They ask about a contract or invoice"
+                                                aria-label={`Rule ${index + 1}`}
+                                                className={cn(inputClass, "py-1.5 text-xs")}
+                                            />
+                                            <Button type="button" variant="ghost" size="icon" className="h-[30px] w-[30px] shrink-0 text-muted-foreground hover:text-destructive" onClick={() => set({ rules: draft.rules.filter((_, i) => i !== index) })} disabled={disabled} aria-label="Remove rule">
+                                                <Trash2 className="h-3.5 w-3.5" />
+                                            </Button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </>
+                )}
+                {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
+            </div>
+            <SheetFooter className="flex-row justify-end gap-2 border-t border-border/60 px-5 py-3">
+                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={onCancel} disabled={saving}>Cancel</Button>
+                <Button size="sm" className="h-7 gap-1.5 text-xs" onClick={onSave} disabled={disabled || !canSave}>
+                    {saving && <HugeiconsIcon icon={Loading03Icon} className="h-3.5 w-3.5 animate-spin" />}
+                    Save
+                </Button>
+            </SheetFooter>
+        </>
     );
 }

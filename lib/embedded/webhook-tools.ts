@@ -29,6 +29,8 @@ const RESULT_MAX_CHARS = 8_000;
 export const WEBHOOK_TOOL_MAX_ITERATIONS = 5;
 
 const NAME_RE = /^[a-zA-Z][a-zA-Z0-9_]{0,47}$/;
+/** System tools' names (see ./agent-tools); a webhook can't shadow one. */
+const RESERVED_TOOL_NAMES = new Set(['end_conversation', 'transfer_to_human']);
 const HEADER_NAME_RE = /^[A-Za-z0-9-]{1,64}$/;
 /** Headers the request sets itself, or that would let a tool spoof its origin. */
 const RESERVED_HEADERS = new Set(['host', 'content-length', 'content-type', 'connection', 'transfer-encoding', 'cookie']);
@@ -102,15 +104,33 @@ export function publicWebhookTools(tools: WebhookTool[]) {
  * for, not where it points. Endpoints can be private and aren't theirs.
  */
 export function withoutWebhookEndpoints(config: Record<string, unknown>): Record<string, unknown> {
-    if (!Array.isArray(config.webhook_tools)) return config;
-    return { ...config, webhook_tools: readWebhookTools(config).map((t) => ({ name: t.name, description: t.description })) };
+    const out = { ...config };
+    if (Array.isArray(config.webhook_tools)) out.webhook_tools = readWebhookTools(config).map((t) => ({ name: t.name, description: t.description }));
+    const system = config.system_tools as { transfer_to_human?: unknown } | undefined;
+    if (system && typeof system === 'object' && system.transfer_to_human) out.system_tools = { ...system, transfer_to_human: { enabled: true } };
+    // MCP servers: which tools the agent has, not where they live or their keys.
+    if (Array.isArray(config.mcp_servers)) {
+        out.mcp_servers = (config.mcp_servers as Array<{ name?: unknown; enabled?: unknown }>).map((server) => ({
+            name: typeof server?.name === 'string' ? server.name : 'MCP server',
+            tools: Array.isArray(server?.enabled) ? server.enabled.filter((n) => typeof n === 'string') : [],
+        }));
+    }
+    return out;
 }
 
-/** A fork is someone else's copy: tools that call the original owner's endpoints don't come with it. */
+/** A fork is someone else's copy: tools that call the original owner's endpoints (webhooks, MCP servers, the hand-off) don't come with it. */
 export function withoutWebhookTools(config: Record<string, unknown>): Record<string, unknown> {
-    if (!('webhook_tools' in config)) return config;
-    const { webhook_tools: _dropped, ...rest } = config;
+    // MCP servers are the owner's too: their URL and key don't travel either.
+    const { webhook_tools: _dropped, mcp_servers: _servers, ...rest } = config;
     void _dropped;
+    void _servers;
+    // The hand-off goes to the original owner's endpoint too; End conversation is harmless and stays.
+    const system = rest.system_tools as Record<string, unknown> | undefined;
+    if (system && typeof system === 'object' && 'transfer_to_human' in system) {
+        const { transfer_to_human: _handoff, ...keep } = system;
+        void _handoff;
+        rest.system_tools = keep;
+    }
     return rest;
 }
 
@@ -131,6 +151,7 @@ export function buildWebhookTools(
         const name = text(raw?.name, 48);
         if (!NAME_RE.test(name)) return { ok: false, message: `"${name || 'Unnamed'}" isn't a valid tool name. Use letters, numbers and underscores, starting with a letter.` };
         if (names.has(name.toLowerCase())) return { ok: false, message: `Two tools are named "${name}".` };
+        if (RESERVED_TOOL_NAMES.has(name.toLowerCase())) return { ok: false, message: `"${name}" is a system tool's name. Pick another.` };
         names.add(name.toLowerCase());
         const description = text(raw.description, 1000);
         if (!description) return { ok: false, message: `Describe what "${name}" does, so the agent knows when to use it.` };

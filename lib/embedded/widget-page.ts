@@ -103,6 +103,7 @@ html,body{margin:0;height:100%;background:transparent;font:14px/1.5 -apple-syste
 .bot{align-self:flex-start;max-width:100%;padding-left:0;padding-right:0}
 .user{align-self:flex-end;background:var(--accent);color:var(--accent-fg,#fff);border-bottom-right-radius:4px;white-space:pre-wrap}
 .error{align-self:flex-start;color:#c0392b;font-size:13px;padding:2px 4px}
+.note{align-self:center;color:var(--muted);font-size:12px;padding:4px 0;text-align:center}
 .sources{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .source{display:inline-flex;max-width:100%;align-items:center;gap:4px;padding:2px 8px;border:1px solid var(--line);border-radius:999px;font-size:11px;color:var(--muted);text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 a.source:hover{color:var(--fg)}

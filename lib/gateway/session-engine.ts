@@ -23,7 +23,8 @@ import { settleStreamUsage } from '@/lib/gateway/stream-usage';
 import type { SessionEventType, SessionEventPayloadMap } from '@/lib/gateway/session-types';
 import { runGatewayOutputGuard } from '@/lib/gateway/output-guard';
 import { orgHasOutputPolicies } from '@/lib/governance/policy-enforcement';
-import { executeWebhookTool, WEBHOOK_TOOL_MAX_ITERATIONS, type WebhookTool } from '@/lib/embedded/webhook-tools';
+import { WEBHOOK_TOOL_MAX_ITERATIONS } from '@/lib/embedded/webhook-tools';
+import type { AgentToolset } from '@/lib/embedded/agent-tools';
 import { runGatewayInputPipeline } from '@/lib/gateway/input-guard';
 import { recordSessionApprovalRequested } from '@/lib/governance/record-session';
 import { applyPolicyRedactions } from '@/lib/governance/policy-enforcement';
@@ -63,8 +64,12 @@ export type TurnExecuteParams = {
     pinnedConnectionId?: string | null;
     /** Reasoning effort from the installed manifest (OpenAI family only). */
     reasoningEffort?: 'low' | 'medium' | 'high';
-    /** Webhook tools from the installed version: the engine calls them itself and continues the reply. */
-    webhookTools?: WebhookTool[];
+    /**
+     * The installed version's own tools (webhook and system): the engine runs
+     * them itself and continues the reply. `agentId` and `agentName` go with a
+     * hand-off.
+     */
+    agentTools?: { toolset: AgentToolset; agentId: string; agentName?: string };
     logSuccess: (meta: {
         provider: string; model: string; status: 'success' | 'success_fallback' | 'error';
         promptTokens: number; completionTokens: number; totalTokens: number;
@@ -174,7 +179,7 @@ function makeStream(params: {
     reasoningEffort?: 'low' | 'medium' | 'high';
     /** Exact provider-connection pin (frozen into turn.started for resume). */
     pinnedConnectionId?: string | null;
-    webhookTools?: WebhookTool[];
+    agentTools?: { toolset: AgentToolset; agentId: string; agentName?: string };
     instructions?: string;
     inputText?: string;
     inputSecurity?: SecurityCheckResult;
@@ -193,7 +198,7 @@ function makeStream(params: {
         temperature, max_output_tokens, pauseOnToolCalls, needsApprovalToolNames, collectedBuiltinToolOutputs,
         instructions, inputText, inputSecurity, tokenMap, endUserId,
         tier, logSuccess, incrementUsage, recordEndUserUsage, onCompletion, knowledgeContext, reasoningEffort,
-        pinnedConnectionId, webhookTools = [],
+        pinnedConnectionId, agentTools,
     } = params;
 
     // Output can only be blocked or redacted by a governance output policy.
@@ -294,12 +299,13 @@ function makeStream(params: {
                     ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
                 });
 
-                // Webhook tools run here: when every call the model makes is one,
-                // Cencori calls the endpoints, records the calls, hands back the
-                // results and the reply continues. Usage adds up across rounds and
-                // is logged and charged once, at the end.
-                const webhookByName = new Map(webhookTools.map((tool) => [tool.name, tool]));
+                // The agent's own tools run here: when every call the model makes is
+                // one, Cencori runs them, records the calls, hands back the results
+                // and the reply continues. Usage adds up across rounds and is logged
+                // and charged once, at the end.
                 let conversation = messages;
+                /** Set by end_conversation: the session closes once this reply is done. */
+                let conversationEnded = false;
                 const prior = { promptTokens: 0, completionTokens: 0, providerCostUsd: 0, cencoriChargeUsd: 0 };
                 rounds: for (let round = 0; ; round++) {
                     let roundText = '';
@@ -313,7 +319,8 @@ function makeStream(params: {
                         request: {
                             messages: conversation, model: resolved.model,
                             temperature, maxTokens: max_output_tokens, stream: true,
-                            tools: functionTools.length > 0 ? functionTools : undefined,
+                            // After ending the conversation the agent only says goodbye.
+                            tools: functionTools.length > 0 && !conversationEnded ? functionTools : undefined,
                             toolChoice: resolveToolChoice(forceSchemaResult, schemaToolName, tool_choice),
                             ...(reasoningEffort ? { reasoningEffort } : {}),
                         },
@@ -347,7 +354,8 @@ function makeStream(params: {
                                 requested.length > 0
                                 && round < WEBHOOK_TOOL_MAX_ITERATIONS
                                 && !(forceSchemaResult && schemaToolName)
-                                && requested.every((t) => webhookByName.has(t.name))
+                                && !!agentTools
+                                && requested.every((t) => agentTools.toolset.has(t.name))
                             ) {
                                 const streamProvider =
                                     chunk.actualProvider !== resolved.providerName && resolved.router?.hasProvider(chunk.actualProvider)
@@ -378,7 +386,15 @@ function makeStream(params: {
                                     let parsedArgs: Record<string, unknown> = {};
                                     try { parsedArgs = JSON.parse(args || '{}'); } catch { /* sent as-is below */ }
                                     await el('tool_call.started', { tool: call.name, arguments: parsedArgs, action_id: call.id });
-                                    const outcome = await executeWebhookTool(webhookByName.get(call.name)!, args, { organizationId: gatewayCtx.organizationId });
+                                    const outcome = await agentTools!.toolset.run({ id: call.id, name: call.name, args }, {
+                                        organizationId: gatewayCtx.organizationId,
+                                        agentId: agentTools!.agentId,
+                                        agentName: agentTools!.agentName,
+                                        surface: 'conversation',
+                                        conversationId: sessionId,
+                                        transcript: conversation.map((m) => ({ role: m.role, content: m.content ?? '' })),
+                                    });
+                                    if (outcome.endsConversation) conversationEnded = true;
                                     await el('tool_call.completed', { tool: call.name, output: { ok: outcome.ok, status: outcome.status ?? null, result: outcome.output }, action_id: call.id });
                                     conversation = [...conversation, { role: 'tool', content: outcome.output, toolCallId: call.id }];
                                 }
@@ -558,8 +574,10 @@ function makeStream(params: {
                                     ...(knowledgeContext && knowledgeContext.citations.length > 0
                                         ? { knowledge_citations: knowledgeContext.citations }
                                         : {}),
+                                    ...(conversationEnded ? { conversation_ended: true } : {}),
                                 },
-                                'active',
+                                // The agent ended it: the session closes, and the next message starts a new one.
+                                conversationEnded ? 'completed' : 'active',
                                 cc,
                             );
 
@@ -757,7 +775,7 @@ export async function executeSessionTurn(params: TurnExecuteParams): Promise<Tur
             knowledgeContext,
             reasoningEffort: params.reasoningEffort,
             pinnedConnectionId: params.pinnedConnectionId ?? null,
-            webhookTools: params.webhookTools,
+            agentTools: params.agentTools,
         });
 
         return { ok: true, response };

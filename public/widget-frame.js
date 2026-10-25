@@ -113,9 +113,9 @@
     }
 
     function bubble(message) {
-        if (message.role === "error") {
+        if (message.role === "error" || message.role === "note") {
             var err = document.createElement("div");
-            err.className = "error";
+            err.className = message.role;
             err.textContent = message.text;
             return err;
         }
@@ -217,7 +217,7 @@
         }
         var reader = res.body.getReader();
         var decoder = new TextDecoder();
-        var buffer = "", reply = "", citations = [], failure = null;
+        var buffer = "", reply = "", citations = [], failure = null, ended = false;
         for (;;) {
             var step = await reader.read();
             if (step.done) break;
@@ -227,13 +227,16 @@
                     reply += data.delta;
                     if (onText) onText(reply);
                 }
-                else if (type === "turn.completed") citations = data.knowledge_citations || [];
+                else if (type === "turn.completed") {
+                    citations = data.knowledge_citations || [];
+                    ended = data.conversation_ended === true;
+                }
                 else if (type === "turn.failed") failure = (data.output && data.output.error) || "Something went wrong. Try again.";
                 else if (type === "turn.paused") failure = "This request needs a person to approve it, which isn't available in this chat.";
             });
         }
         if (failure && !reply) throw new ApiError(500, "turn_failed", failure);
-        return { reply: reply, citations: citations };
+        return { reply: reply, citations: citations, ended: ended };
     }
 
     async function lookupSources(citations) {
@@ -280,6 +283,12 @@
             }
             var sources = await lookupSources(result.citations);
             state.messages.push({ role: "assistant", text: result.reply || "…", sources: sources });
+            // The agent closed the conversation: the next message opens a new one.
+            if (result.ended) {
+                state.messages.push({ role: "note", text: "Conversation ended. Send a message to start a new one." });
+                state.sessionId = null;
+                state.token = null;
+            }
         } catch (err) {
             state.messages.push({ role: "error", text: friendly(err) });
         } finally {

@@ -22,6 +22,7 @@ import {
 } from './base';
 import { getPricingFromDB } from './pricing';
 import { toGeminiMessages } from './utils';
+import { geminiToolCalls, toGeminiToolConfig, toGeminiTools } from './gemini-tools';
 import type { UnifiedMessage } from './base';
 import { InvalidRequestError, normalizeProviderError, ServiceUnavailableError } from './errors';
 import { getGoogleApiKey } from './google-env';
@@ -120,7 +121,7 @@ export class GeminiProvider extends AIProvider {
         const { signal, timedOut } = attemptSignal(request.signal, transport.timeoutMs);
 
         try {
-            const model = this.client.getGenerativeModel({ model: request.model });
+            const model = this.client.getGenerativeModel(this.modelParams(request));
 
             // Convert unified format to Gemini format
             const { history, prompt } = toGeminiMessages(await resolveMessageImages(request.messages));
@@ -136,7 +137,11 @@ export class GeminiProvider extends AIProvider {
             // Send the message
             const result = await chat.sendMessage(prompt, { signal });
             const response = result.response;
-            const text = response.text();
+            const parts = response.candidates?.[0]?.content?.parts as Parameters<typeof geminiToolCalls>[0];
+            // Visible text only: thought parts aren't part of the answer. A reply
+            // with no parts (blocked, say) goes through text(), which reports why.
+            const text = parts ? parts.filter((part) => typeof part.text === 'string' && !part.thought).map((part) => part.text).join('') : response.text();
+            const toolCalls = geminiToolCalls(parts);
 
             // Prefer the usage the provider actually billed. countTokens() only
             // sees the prompt string, so it misses history, system instructions
@@ -184,6 +189,7 @@ export class GeminiProvider extends AIProvider {
                 content: text,
                 model: request.model,
                 provider: this.providerName,
+                ...(toolCalls.length > 0 ? { toolCalls, finishReason: 'tool_calls' as const } : {}),
                 usage: {
                     promptTokens,
                     completionTokens,
@@ -210,7 +216,7 @@ export class GeminiProvider extends AIProvider {
         // Streams never retry: a partially-yielded stream cannot be replayed.
         const transport = resolveProviderTransport(this.transport, request);
         try {
-            const model = this.client.getGenerativeModel({ model: request.model });
+            const model = this.client.getGenerativeModel(this.modelParams(request));
 
             const { history, prompt } = toGeminiMessages(await resolveMessageImages(request.messages));
 
@@ -226,10 +232,14 @@ export class GeminiProvider extends AIProvider {
                 signal: transportSignal(request.signal, transport.timeoutMs),
             });
 
+            let calledTools = false;
             for await (const chunk of result.stream) {
-                yield {
-                    delta: chunk.text(),
-                };
+                const parts = chunk.candidates?.[0]?.content?.parts as Parameters<typeof geminiToolCalls>[0];
+                const delta = parts ? parts.filter((part) => typeof part.text === 'string' && !part.thought).map((part) => part.text).join('') : chunk.text();
+                // Gemini sends each function call whole, in one chunk.
+                const toolCalls = geminiToolCalls(parts);
+                if (toolCalls.length > 0) calledTools = true;
+                if (delta || toolCalls.length > 0) yield { delta, ...(toolCalls.length > 0 ? { toolCalls } : {}) };
             }
 
             // The aggregated response resolves once the stream drains and is
@@ -259,12 +269,23 @@ export class GeminiProvider extends AIProvider {
             // Stream complete
             yield {
                 delta: '',
-                finishReason: 'stop',
+                finishReason: calledTools ? 'tool_calls' : 'stop',
                 ...(usage ? { usage } : {}),
             };
         } catch (error) {
             throw normalizeProviderError(this.providerName, error);
         }
+    }
+
+    /** The model with the request's tools (Gemini function declarations), when it has any. */
+    private modelParams(request: UnifiedChatRequest) {
+        const tools = toGeminiTools(request.tools);
+        const toolConfig = toGeminiToolConfig(request.toolChoice, !!tools);
+        return {
+            model: request.model,
+            ...(tools ? { tools: tools as never } : {}),
+            ...(toolConfig ? { toolConfig: toolConfig as never } : {}),
+        };
     }
 
     async countTokens(text: string, model?: string): Promise<number> {

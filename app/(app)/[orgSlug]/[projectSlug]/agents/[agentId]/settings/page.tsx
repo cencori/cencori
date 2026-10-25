@@ -48,7 +48,7 @@ export default function AgentSettingsPage() {
     };
 
     return (
-        <div className="max-w-3xl space-y-8">
+        <div className="space-y-8">
             <header>
                 <h1 className="text-base font-medium">Settings</h1>
                 <p className="mt-0.5 text-xs text-muted-foreground">Manage this agent.</p>

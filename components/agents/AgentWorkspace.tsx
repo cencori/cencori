@@ -18,7 +18,8 @@ import {
 } from "@/components/agents/studio";
 
 export type ToolActivity = { id: string; name: string; status: "running" | "done" | "failed" };
-export type TestMessage = { id: string; role: "user" | "assistant"; content: string; error?: boolean; tools?: ToolActivity[] };
+/** `ended`: the agent closed the conversation with this reply; what follows starts fresh. */
+export type TestMessage = { id: string; role: "user" | "assistant"; content: string; error?: boolean; tools?: ToolActivity[]; ended?: boolean };
 
 interface AgentWorkspaceValue {
     projectId: string;
@@ -182,7 +183,9 @@ export function AgentWorkspaceProvider({
             if (!saved) return;
         }
         // Earlier turns go with the message, so the test is a conversation.
-        const history = messages.filter((message) => !message.error && message.content.trim()).map(({ role, content }) => ({ role, content }));
+        // Only what came after the agent last ended the conversation.
+        const lastEnded = messages.map((message) => !!message.ended).lastIndexOf(true);
+        const history = messages.slice(lastEnded + 1).filter((message) => !message.error && message.content.trim()).map(({ role, content }) => ({ role, content }));
         setMessages((current) => [...current, { id: `user-${Date.now()}`, role: "user", content: text }]);
         setInput("");
         setBusy("test_version");
@@ -212,7 +215,7 @@ export function AgentWorkspaceProvider({
                     const frame = buffer.slice(0, boundary);
                     buffer = buffer.slice(boundary + 2);
                     const event = /^event: (.+)$/m.exec(frame)?.[1];
-                    const data = JSON.parse(/^data: (.*)$/m.exec(frame)?.[1] ?? "{}") as { delta?: string; message?: string } & Partial<ToolActivity>;
+                    const data = JSON.parse(/^data: (.*)$/m.exec(frame)?.[1] ?? "{}") as { delta?: string; message?: string; conversation_ended?: boolean } & Partial<ToolActivity>;
                     // The reply is created by its first words or its first tool call, whichever comes first.
                     const upsertReply = (change: (message: TestMessage) => TestMessage) => setMessages((current) => current.some((message) => message.id === replyId)
                         ? current.map((message) => message.id === replyId ? change(message) : message)
@@ -229,6 +232,8 @@ export function AgentWorkspaceProvider({
                                 ? message.tools.map((tool) => tool.id === activity.id ? activity : tool)
                                 : [...(message.tools ?? []), activity],
                         }));
+                    } else if (event === "done" && data.conversation_ended) {
+                        upsertReply((message) => ({ ...message, ended: true }));
                     } else if (event === "error") {
                         failure = data.message ?? "That didn't work. Try again.";
                     }

@@ -245,8 +245,8 @@ export async function POST(
         // carries an installation — model, instructions, temperature, the
         // tool allowlist, and the (default-deny) browser policy.
         let installedManifest: CapabilityManifest | null = null;
-        // The published version's webhook tools, run by the engine on the server.
-        let installedWebhookTools: import('@/lib/embedded/webhook-tools').WebhookTool[] = [];
+        // The published version's own tools (webhook and system), run by the engine on the server.
+        let installedToolset: import('@/lib/embedded/agent-tools').AgentToolset | null = null;
         let effectiveNetworkPolicy: NetworkPolicy | undefined;
         let effectiveBrowserEnabled = false;
         {
@@ -294,7 +294,7 @@ export async function POST(
                         }
                     } else return respondError(409, 'Installed agent has no published model', 'version_unavailable');
                     installedManifest = manifest;
-                    installedWebhookTools = (await import('@/lib/embedded/webhook-tools')).readWebhookTools(config);
+                    installedToolset = (await import('@/lib/embedded/agent-tools')).agentToolset(config);
                     effectiveNetworkPolicy = intersectNetworkPolicy(manifest.policy, (ins as { overlay_config?: unknown }).overlay_config);
                     effectiveBrowserEnabled = intersectBrowserEnabled(manifest.policy, (ins as { overlay_config?: unknown }).overlay_config);
                 }
@@ -598,10 +598,9 @@ export async function POST(
             }
         }
 
-        if (installedManifest && installedWebhookTools.length > 0) {
-            const { webhookToolDefinitions } = await import('@/lib/embedded/webhook-tools');
+        if (installedManifest && installedToolset && installedToolset.definitions.length > 0) {
             const taken = new Set(tools.map((t) => (t as { function?: { name?: string } }).function?.name).filter(Boolean));
-            for (const definition of webhookToolDefinitions(installedWebhookTools)) {
+            for (const definition of installedToolset.definitions) {
                 if (!taken.has(definition.function.name)) tools.push(definition as never);
             }
         }
@@ -644,9 +643,11 @@ export async function POST(
             }
         }
 
-        // Only webhook tools that survived the installation's allowlist run.
+        // Only the agent's tools that survived the installation's allowlist run.
         const offeredNames = new Set(tools.map((t) => (t as { function?: { name?: string } }).function?.name).filter(Boolean));
-        const runnableWebhookTools = installedWebhookTools.filter((tool) => offeredNames.has(tool.name));
+        const runnableToolset = installedToolset && agentId
+            ? { ...installedToolset, has: (name: string) => offeredNames.has(name) && installedToolset!.has(name) }
+            : null;
 
         if (installedManifest && forcedToolName && !tools.some((t) => t.type === 'function' && t.function.name === forcedToolName)) {
             return respondError(403, 'Requested tool is not available on this installation', 'tool_not_allowed');
@@ -707,7 +708,7 @@ export async function POST(
             model,
             instructions: instructions || undefined,
             tools: tools as ResponsesRequest['tools'],
-            webhookTools: runnableWebhookTools,
+            agentTools: runnableToolset && agentId ? { toolset: runnableToolset, agentId } : undefined,
             networkPolicy: effectiveNetworkPolicy,
             tool_choice: body.tool_choice,
             temperature: body.temperature,
