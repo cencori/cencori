@@ -194,6 +194,8 @@ export interface InboundMessage {
     name: string | null;
     /** The text, or null for a message type the agent can't read yet. */
     text: string | null;
+    /** A voice note or audio file, transcribed before the agent answers. */
+    audio: { id: string; mimeType: string | null } | null;
     type: string;
     phoneNumberId: string;
 }
@@ -208,7 +210,7 @@ export function parseInbound(payload: unknown): InboundMessage[] {
             const value = change.value as {
                 metadata?: { phone_number_id?: string };
                 contacts?: Array<{ wa_id?: string; profile?: { name?: string } }>;
-                messages?: Array<{ id?: string; from?: string; type?: string; text?: { body?: string }; button?: { text?: string }; interactive?: { button_reply?: { title?: string }; list_reply?: { title?: string } } }>;
+                messages?: Array<{ id?: string; from?: string; type?: string; text?: { body?: string }; button?: { text?: string }; interactive?: { button_reply?: { title?: string }; list_reply?: { title?: string } }; audio?: { id?: string; mime_type?: string } }>;
             };
             for (const message of value.messages ?? []) {
                 if (!message.id || !message.from) continue;
@@ -221,6 +223,7 @@ export function parseInbound(payload: unknown): InboundMessage[] {
                     from: message.from,
                     name: value.contacts?.find((c) => c.wa_id === message.from)?.profile?.name ?? null,
                     text: text?.trim() ? text.trim().slice(0, 4000) : null,
+                    audio: message.type === 'audio' && message.audio?.id ? { id: message.audio.id, mimeType: message.audio.mime_type ?? null } : null,
                     type: message.type ?? 'unknown',
                     phoneNumberId: value.metadata?.phone_number_id ?? '',
                 });
@@ -256,6 +259,24 @@ export function splitForWhatsApp(text: string, max = WHATSAPP_TEXT_MAX): string[
     }
     if (rest) parts.push(rest);
     return parts;
+}
+
+/** Voice notes this size or larger aren't fetched (about 15 minutes of WhatsApp voice). */
+export const MAX_VOICE_NOTE_BYTES = 8 * 1024 * 1024;
+
+/**
+ * A media file a customer sent: Meta gives a short-lived URL for the media id,
+ * which is fetched with the same token.
+ */
+export async function downloadMedia(accessToken: string, mediaId: string): Promise<{ bytes: ArrayBuffer; mimeType: string }> {
+    const info = await graph<{ url?: string; mime_type?: string; file_size?: number }>('GET', `/${encodeURIComponent(mediaId)}`, accessToken);
+    if (!info.url) throw new Error('WhatsApp gave no address for that file');
+    if ((info.file_size ?? 0) > MAX_VOICE_NOTE_BYTES) throw Object.assign(new Error('Voice note too long'), { code: 'too_large' });
+    const response = await safeOutboundFetch(info.url, { headers: { Authorization: `Bearer ${accessToken}` }, signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS) });
+    if (!response.ok) throw new Error(`Couldn't download the file (${response.status})`);
+    const bytes = await response.arrayBuffer();
+    if (bytes.byteLength > MAX_VOICE_NOTE_BYTES) throw Object.assign(new Error('Voice note too long'), { code: 'too_large' });
+    return { bytes, mimeType: (info.mime_type ?? 'audio/ogg').split(';')[0].trim() };
 }
 
 /** Mark the customer's message read and show "typing…" while the agent works (best-effort). */

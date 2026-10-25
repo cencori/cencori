@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const fetchMock = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/security/outbound-url', () => ({ safeOutboundFetch: fetchMock }));
 
-import { parseInbound, sendText, splitForWhatsApp, toWhatsAppText, verifyWhatsAppSignature, type WhatsAppChannel } from '@/lib/channels/whatsapp';
+import { downloadMedia, parseInbound, sendText, splitForWhatsApp, toWhatsAppText, verifyWhatsAppSignature, type WhatsAppChannel } from '@/lib/channels/whatsapp';
 import { readReply } from '@/lib/channels/whatsapp-runner';
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -39,11 +39,13 @@ describe('WhatsApp channel', () => {
             { id: 'wamid.1', from: '2348011112222', type: 'text', text: { body: ' Do you have a table for 4? ' } },
             { id: 'wamid.2', from: '2348011112222', type: 'interactive', interactive: { button_reply: { id: 'b', title: 'Saturday' } } },
             { id: 'wamid.3', from: '2348011112222', type: 'image', image: { id: 'img' } },
+            { id: 'wamid.4', from: '2348011112222', type: 'audio', audio: { id: 'media.9', mime_type: 'audio/ogg; codecs=opus', voice: true } },
         ]));
         expect(parsed).toEqual([
-            { id: 'wamid.1', from: '2348011112222', name: 'Ada', text: 'Do you have a table for 4?', type: 'text', phoneNumberId: '1065' },
-            { id: 'wamid.2', from: '2348011112222', name: 'Ada', text: 'Saturday', type: 'interactive', phoneNumberId: '1065' },
-            { id: 'wamid.3', from: '2348011112222', name: 'Ada', text: null, type: 'image', phoneNumberId: '1065' },
+            { id: 'wamid.1', from: '2348011112222', name: 'Ada', text: 'Do you have a table for 4?', audio: null, type: 'text', phoneNumberId: '1065' },
+            { id: 'wamid.2', from: '2348011112222', name: 'Ada', text: 'Saturday', audio: null, type: 'interactive', phoneNumberId: '1065' },
+            { id: 'wamid.3', from: '2348011112222', name: 'Ada', text: null, audio: null, type: 'image', phoneNumberId: '1065' },
+            { id: 'wamid.4', from: '2348011112222', name: 'Ada', text: null, audio: { id: 'media.9', mimeType: 'audio/ogg; codecs=opus' }, type: 'audio', phoneNumberId: '1065' },
         ]);
         const statuses = { entry: [{ changes: [{ field: 'messages', value: { statuses: [{ id: 'wamid.1', status: 'read' }] } }] }] };
         expect(parseInbound(statuses)).toEqual([]);
@@ -69,6 +71,21 @@ describe('WhatsApp channel', () => {
         expect(url).toBe('https://graph.facebook.com/v21.0/1065/messages');
         expect((init.headers as Record<string, string>).Authorization).toBe('Bearer token');
         expect(JSON.parse(String(init.body))).toMatchObject({ to: '2348011112222', type: 'text', text: { body: '*Yes*, we do.' }, context: { message_id: 'wamid.1' } });
+    });
+
+    it('downloads a voice note through its media id', async () => {
+        fetchMock
+            .mockResolvedValueOnce(json({ url: 'https://lookaside.fbsbx.com/whatsapp/media/9', mime_type: 'audio/ogg; codecs=opus', file_size: 4 }))
+            .mockResolvedValueOnce(new Response(new Uint8Array([1, 2, 3, 4])));
+        const media = await downloadMedia('token', 'media.9');
+        expect(fetchMock.mock.calls[0][0]).toBe('https://graph.facebook.com/v21.0/media.9');
+        expect(fetchMock.mock.calls[1][0]).toBe('https://lookaside.fbsbx.com/whatsapp/media/9');
+        expect((fetchMock.mock.calls[1][1] as RequestInit).headers).toEqual({ Authorization: 'Bearer token' });
+        expect(media).toMatchObject({ mimeType: 'audio/ogg' });
+        expect(media.bytes.byteLength).toBe(4);
+
+        fetchMock.mockResolvedValueOnce(json({ url: 'https://lookaside.fbsbx.com/x', file_size: 50 * 1024 * 1024 }));
+        await expect(downloadMedia('token', 'media.10')).rejects.toThrow('Voice note too long');
     });
 
     it('reads the reply off the turn event stream', async () => {
