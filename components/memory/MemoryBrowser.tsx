@@ -2,7 +2,9 @@
 
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Brain, ChevronLeft, ChevronRight, Search, Trash2, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, Trash2, X } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import BrainIcon from '@hugeicons/core-free-icons/BrainIcon';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -11,7 +13,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { MemoryUserPicker } from '@/components/memory/MemoryUserPicker';
 import { MemoryForgetSuggestions } from '@/components/memory/MemoryForgetSuggestions';
-import { MemorySetup } from '@/components/memory/MemorySetup';
 import { cn } from '@/lib/utils';
 import {
     AlertDialog,
@@ -225,14 +226,19 @@ export function MemoryBrowser({ projectId, initialUserId = '' }: MemoryBrowserPr
                     </p>
                 ) : !data || data.memories.length === 0 ? (
                     !appliedSearch && !userId && status === 'active' ? (
-                        <MemorySetup
-                            title="No memories stored yet"
-                            description="Add a memory field to any chat request and its facts land here."
-                        />
+                        <div className="flex flex-col items-center px-5 py-16 text-center">
+                            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-md bg-secondary">
+                                <HugeiconsIcon icon={BrainIcon} className="h-6 w-6 text-muted-foreground" />
+                            </div>
+                            <p className="text-sm font-medium">No memories stored yet</p>
+                            <p className="mt-0.5 max-w-[42ch] text-xs text-muted-foreground">
+                                Add a memory field to any chat request and its facts land here.
+                            </p>
+                        </div>
                     ) : (
                         <div className="flex flex-col items-center px-5 py-16 text-center">
-                            <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-md bg-secondary">
-                                <Brain className="h-5 w-5 text-muted-foreground" />
+                            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-md bg-secondary">
+                                <HugeiconsIcon icon={BrainIcon} className="h-6 w-6 text-muted-foreground" />
                             </div>
                             <p className="text-sm font-medium">{appliedSearch ? 'Nothing matches that' : 'No memories match these filters'}</p>
                             <p className="mt-0.5 max-w-[42ch] text-xs text-muted-foreground">

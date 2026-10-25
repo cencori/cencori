@@ -16,6 +16,15 @@ export function useMemoryBasePath(): string {
 }
 
 /**
+ * The one loading block for Memory pages. Pages render this same block while
+ * their own data loads, so resolving the project and then fetching the page
+ * reads as a single load rather than two different skeletons in a row.
+ */
+export function MemoryPageSkeleton() {
+    return <Skeleton className="h-[420px] w-full rounded-lg" />;
+}
+
+/**
  * The frame every Memory sub-page shares: resolves the project, then renders a
  * compact header (like Logs) and the page body.
  */
@@ -25,6 +34,7 @@ export function MemoryRoute({
     title,
     description,
     fullWidth = false,
+    wide = false,
     children,
 }: {
     orgSlug: string;
@@ -34,19 +44,28 @@ export function MemoryRoute({
     description?: string;
     /** Edge to edge: no width cap and no padding, for canvas pages (Graph). */
     fullWidth?: boolean;
+    /** The console home's 1360px width instead of the 1180px reading width. */
+    wide?: boolean;
     children: (projectId: string) => ReactNode;
 }) {
     const { data: projectId, isLoading } = useProjectIdBySlug(orgSlug, projectSlug);
-    const pageClass = fullWidth ? 'flex min-h-0 w-full flex-1 flex-col overflow-hidden' : `${PAGE_CLASS} max-w-[1180px]`;
+    const pageClass = fullWidth
+        ? 'flex min-h-0 w-full flex-1 flex-col overflow-hidden'
+        : `${PAGE_CLASS} ${wide ? 'max-w-[1360px]' : 'max-w-[1180px]'}`;
+
+    // The header is static, so it renders immediately; only the body waits.
+    const header = title ? (
+        <header className="mb-6">
+            <h1 className="text-base font-medium">{title}</h1>
+            {description && <p className="mt-0.5 max-w-[60ch] text-xs text-muted-foreground">{description}</p>}
+        </header>
+    ) : null;
 
     if (isLoading) {
         return (
             <main className={pageClass}>
-                <div className="mb-6">
-                    <Skeleton className="h-5 w-24" />
-                    <Skeleton className="mt-1.5 h-3 w-72 max-w-full" />
-                </div>
-                <Skeleton className="h-[420px] w-full rounded-lg" />
+                {header}
+                <MemoryPageSkeleton />
             </main>
         );
     }
@@ -67,12 +86,7 @@ export function MemoryRoute({
 
     return (
         <main className={pageClass}>
-            {title && (
-                <header className="mb-6">
-                    <h1 className="text-base font-medium">{title}</h1>
-                    {description && <p className="mt-0.5 max-w-[60ch] text-xs text-muted-foreground">{description}</p>}
-                </header>
-            )}
+            {header}
             {children(projectId)}
         </main>
     );

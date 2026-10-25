@@ -21,6 +21,7 @@ export default function MemoryPage({ params }: PageProps) {
         <MemoryRoute
             orgSlug={orgSlug}
             projectSlug={projectSlug}
+            wide
             title="Memory"
             description="What your app remembers about each end-user, and what gets recalled."
         >

@@ -97,7 +97,7 @@ function useProjectId(orgSlug: string, projectSlug: string, known: string | unde
     return known ?? data;
 }
 
-function useApiKeyCount(projectId: string | undefined) {
+export function useApiKeyCount(projectId: string | undefined) {
     // Dedicated cache key — the settings page stores the raw keys array under
     // queryKeys.apiKeys(projectId), which poisoned this count with an object.
     return useQuery({

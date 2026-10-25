@@ -13,7 +13,8 @@ import {
     type MetricCardConfig,
 } from '@/components/dashboard/project-overview/ProjectOverviewDashboard';
 import { BarBreakdownChart } from '@/components/dashboard/project-overview/ModelBreakdown';
-import { MemorySetup } from '@/components/memory/MemorySetup';
+import { MemoryGetStarted } from '@/components/memory/MemoryGetStarted';
+import { MemoryPageSkeleton } from '@/components/memory/MemoryRoute';
 import { cn } from '@/lib/utils';
 
 interface MemoryOverviewProps {
@@ -99,8 +100,8 @@ function formatDay(day: string): string {
     return new Date(`${day}T00:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
 }
 
-function RecentMemories({ projectId, onViewMemories }: MemoryOverviewProps) {
-    const { data, isLoading, isError } = useQuery({
+function useRecentMemories(projectId: string) {
+    return useQuery({
         queryKey: ['memoryEntries', projectId, 'overview-recent'],
         queryFn: async (): Promise<{ memories: RecentMemory[] }> => {
             const params = new URLSearchParams({ status: 'active', sort: 'recent', limit: String(RECENT_LIMIT), offset: '0' });
@@ -110,6 +111,16 @@ function RecentMemories({ projectId, onViewMemories }: MemoryOverviewProps) {
         },
         staleTime: 15_000,
     });
+}
+
+function RecentMemories({
+    query,
+    onViewMemories,
+}: {
+    query: ReturnType<typeof useRecentMemories>;
+    onViewMemories: MemoryOverviewProps['onViewMemories'];
+}) {
+    const { data, isLoading, isError } = query;
     const memories = data?.memories ?? [];
 
     return (
@@ -235,6 +246,9 @@ function LatestSearches({ searches }: { searches: NonNullable<OverviewResponse['
 export function MemoryOverview({ projectId, onViewMemories }: MemoryOverviewProps) {
     const reduceMotion = useReducedMotion();
     const { data, isLoading, error } = useMemoryOverview(projectId);
+    // Fetched alongside the stats, so the page appears in one go instead of
+    // the table loading after everything else.
+    const recent = useRecentMemories(projectId);
 
     // Writes and searches on one day spine: the searches series always carries
     // every day of the window, the stats series may skip empty days.
@@ -266,7 +280,7 @@ export function MemoryOverview({ projectId, onViewMemories }: MemoryOverviewProp
         );
     }
 
-    const loading = isLoading || !data;
+    const loading = isLoading || !data || recent.isLoading;
     const quota = data?.quota;
     const memories = data?.memories;
     const graph = data?.graph;
@@ -330,6 +344,13 @@ export function MemoryOverview({ projectId, onViewMemories }: MemoryOverviewProp
         },
     ];
 
+    // Same single block as the page frame's loader: one continuous load, then
+    // either the overview or Get started, with nothing flashing in between.
+    if (loading) return <MemoryPageSkeleton />;
+
+    // A project that has never stored or searched a memory gets setup, not a wall of zeros.
+    if (isEmpty) return <MemoryGetStarted projectId={projectId} />;
+
     return (
         <div>
             <MetricCardFrame config={storedConfig} loading={loading}>
@@ -365,15 +386,7 @@ export function MemoryOverview({ projectId, onViewMemories }: MemoryOverviewProp
                 </div>
             </MetricCardFrame>
 
-            {isEmpty ? (
-                <div className="mt-4 rounded-lg border border-border/40 bg-muted/30">
-                    <MemorySetup
-                        title="No memories yet"
-                        description="Add a memory field to any chat request and Cencori remembers that user from then on."
-                    />
-                </div>
-            ) : (
-                <>
+            <>
                     <div className="mt-4 grid gap-4 lg:grid-cols-2">
                         <MetricCard
                             config={activityConfig}
@@ -395,10 +408,11 @@ export function MemoryOverview({ projectId, onViewMemories }: MemoryOverviewProp
                         </MetricCardFrame>
                     </div>
 
-                    <RecentMemories projectId={projectId} onViewMemories={onViewMemories} />
+                    {/* Not while the stats load: an empty project resolves to Get started, and the
+                        table would flash "No memories yet" before that swap. */}
+                    {!loading && <RecentMemories query={recent} onViewMemories={onViewMemories} />}
                     {data?.searches && <LatestSearches searches={data.searches.recent} />}
-                </>
-            )}
+            </>
         </div>
     );
 }
