@@ -1,9 +1,12 @@
 import type { AgentForm } from "@/components/agents/studio";
+import type { BusinessTemplateId } from "@/lib/embedded/templates";
 
-export type StartingPoint = { id: string; title: string; detail: string; category: string; form: AgentForm };
+/** `business`: set up from the business's details (a guided form) instead of a prompt. */
+export type StartingPoint = { id: string; title: string; detail: string; category: string; form: AgentForm; business?: BusinessTemplateId };
 
 /** Ready-made first drafts for a new agent. Ids are stable: `/agents/new?start=<id>` links to them. */
 export const STARTING_POINTS: StartingPoint[] = [
+    { id: "restaurant", title: "Restaurant & lounge host", detail: "Answer menu questions and book tables on WhatsApp", category: "Hospitality", business: "restaurant", form: { name: "", description: "Answers guests and books tables.", model: "", instructions: "" } },
     { id: "support", title: "Customer support", detail: "Answer product questions and draft helpful replies", category: "Support", form: { name: "Customer support", description: "Answer customer questions and draft clear replies.", model: "", instructions: "You help customers with questions about our product. Be concise and friendly, acknowledge when you are unsure, and never invent facts about features, pricing or policies. If the customer needs a refund, account change or anything you cannot verify, tell them a teammate will follow up." } },
     { id: "help-desk", title: "IT help desk", detail: "Walk staff through passwords, VPN and software", category: "Support", form: { name: "IT help desk", description: "Answer common internal IT questions.", model: "", instructions: "Help employees with common IT issues such as passwords, VPN access, email and software installs. Give one clear step at a time, ask for the exact error message when it matters, and tell them to contact the IT team for anything involving security, hardware or account access you cannot verify." } },
     { id: "lead-qualifier", title: "Inbound lead qualifier", detail: "Score leads on need, budget and timeline", category: "Sales", form: { name: "Lead qualifier", description: "Qualify inbound leads and suggest a next step.", model: "", instructions: "Read the lead's message and any details provided. Identify their company size, need, timeline and budget where stated; do not guess missing details. Summarize the lead in three lines, rate the fit as high, medium or low with one reason, and suggest the next step." } },

@@ -1,5 +1,6 @@
 "use client";
 
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -70,7 +71,9 @@ export function AgentTools() {
     // Cohere models don't take tools through the gateway yet; say so rather than let tools sit unused.
     const modelProvider = data.models.find((model) => model.id === form.model)?.provider;
     const hasAnyTools = tools.length > 0 || Object.keys((version?.config_json.system_tools ?? {}) as object).length > 0 || ((version?.config_json.mcp_servers ?? []) as unknown[]).length > 0;
-    const [tab, setTab] = useState<"tools" | "integrations" | "mcp">("tools");
+    // `?tab=integrations` opens on that tab (the setup checklist links there).
+    const initialTab = useSearchParams().get("tab");
+    const [tab, setTab] = useState<"tools" | "integrations" | "mcp">(initialTab === "integrations" || initialTab === "mcp" ? initialTab : "tools");
     const [mcpAdding, setMcpAdding] = useState(false);
     const [appsAdding, setAppsAdding] = useState(false);
     const appCount = Array.isArray(version?.config_json.integrations) ? (version.config_json.integrations as unknown[]).length : 0;

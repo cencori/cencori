@@ -6,6 +6,7 @@ import { useReducedMotion } from "framer-motion";
 import { useAgentWorkspace } from "@/components/agents/AgentWorkspace";
 import { useAgentRuns, useAgentStats } from "@/components/agents/useAgentStats";
 import { RunsTable } from "@/components/agents/RunsTable";
+import { AgentSetupChecklist } from "@/components/agents/AgentSetupChecklist";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -118,6 +119,8 @@ export default function AgentOverviewPage() {
                     </SelectContent>
                 </Select>
             </header>
+
+            <AgentSetupChecklist />
 
             <dl className="grid grid-cols-2 overflow-hidden rounded-lg border border-border/40 bg-muted/30 md:grid-cols-4">
                 {summary.map((stat, index) => (
