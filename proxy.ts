@@ -898,6 +898,13 @@ export async function proxy(request: NextRequest) {
       rewriteUrl = url;
       response = NextResponse.rewrite(url);
     }
+    // Handle links subdomain (event link-in-bio page)
+    else if (domain === "links.cencori.com" || domain === "links.localhost") {
+      const url = request.nextUrl.clone();
+      url.pathname = `/links${url.pathname === "/" ? "" : url.pathname}`;
+      rewriteUrl = url;
+      response = NextResponse.rewrite(url);
+    }
     // Handle design subdomain
     else if (domain === "design.cencori.com" || domain === "design.localhost") {
       const url = request.nextUrl.clone();
