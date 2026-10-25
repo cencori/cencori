@@ -23,7 +23,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { waitUntil } from "@vercel/functions";
 import { authenticateTensorDataRequest } from "@/lib/tensor-data";
 import { noStoreHeaders } from "@/lib/tensor-auth";
-import { getCachedTensorAccess, setCachedTensorAccess } from "@/lib/config-cache";
+import {
+  countTensorHelperCall,
+  getCachedTensorAccess,
+  setCachedTensorAccess,
+} from "@/lib/config-cache";
+import { HELPER_DAILY_LIMIT, helperBody } from "@/lib/tensor-helpers";
 import { warmTensorGateway } from "@/lib/gateway/tensor-warm";
 import { TENSOR_MODEL_POLICY_HEADER, TENSOR_USER_HEADER } from "@/lib/tensor-entitlement";
 import {
@@ -62,6 +67,8 @@ const ROUTES: Record<
     handler: () => Promise<GatewayHandler>;
     /** A tighter body limit than a turn's, for a route that has no business carrying much. */
     maxBodyBytes?: number;
+    /** The gateway path it forwards to, when that is not its own name. */
+    upstreamPath?: string;
   }
 > = {
   "chat/completions": {
@@ -77,6 +84,17 @@ const ROUTES: Record<
     methods: ["POST"],
     handler: async () => (await import("@/app/api/v1/judgments/route")).POST,
     maxBodyBytes: 64 * 1024,
+  },
+  // Small calls the app makes around a task rather than in one: the prompt it suggests next, the
+  // task's title. There is no reservation between turns, so the plan check would refuse every one.
+  // Instead the call is held to one cheap model, a short answer and a daily count (see
+  // `helperBody`), which keeps it to a fraction of a cent and never spends a task.
+  helpers: {
+    generates: false,
+    methods: ["POST"],
+    handler: async () => (await import("@/app/api/v1/chat/completions/route")).POST,
+    maxBodyBytes: 24 * 1024,
+    upstreamPath: "chat/completions",
   },
   models: {
     generates: false,
@@ -131,6 +149,22 @@ async function forward(req: NextRequest, path: string[]): Promise<Response> {
     body = await req.text();
     if (body.length > (route.maxBodyBytes ?? MAX_BODY_BYTES)) {
       return json({ error: "This request is too large to send.", code: "request_too_large" }, 413);
+    }
+  }
+
+  if (route === ROUTES.helpers) {
+    const rewritten = helperBody(body ?? "", session.user.id);
+    if (!rewritten) {
+      return json({ error: "The helper request is invalid.", code: "tensor_helper_invalid" }, 400);
+    }
+    body = rewritten;
+    // An uncounted call (no Redis) goes through: it is already capped in model, size and length.
+    const count = await countTensorHelperCall(session.user.id);
+    if (count !== null && count > HELPER_DAILY_LIMIT) {
+      return json(
+        { error: "Tensor's suggestions are paused until tomorrow.", code: "tensor_helper_limit" },
+        429,
+      );
     }
   }
 
@@ -219,10 +253,11 @@ async function forward(req: NextRequest, path: string[]): Promise<Response> {
         }
       : {}),
   };
+  const upstreamPath = route.upstreamPath ?? path.join("/");
   const remote = remoteGatewayBase();
   let upstream: Response;
   if (remote) {
-    upstream = await fetch(`${remote}/${path.join("/")}`, {
+    upstream = await fetch(`${remote}/${upstreamPath}`, {
       method: req.method,
       headers,
       ...(body === undefined ? {} : { body }),
@@ -234,7 +269,7 @@ async function forward(req: NextRequest, path: string[]): Promise<Response> {
       const value = req.headers.get(name);
       if (value) headers[name] = value;
     }
-    const gatewayRequest = new NextRequest(`${new URL(req.url).origin}/api/v1/${path.join("/")}`, {
+    const gatewayRequest = new NextRequest(`${new URL(req.url).origin}/api/v1/${upstreamPath}`, {
       method: req.method,
       headers,
       signal: req.signal,
