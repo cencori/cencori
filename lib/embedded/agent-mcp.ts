@@ -16,6 +16,7 @@ import { assertSafeOutboundUrl } from '@/lib/security/outbound-url';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { callMcpTool, discoverMcpTools, type DiscoveredTool } from './mcp';
 import { mcpAccessToken } from './mcp-oauth';
+import { agentToolSession } from '@/lib/integrations/nango';
 import { fetchMcpServerIcon, readStoredIcon } from './mcp-icon';
 
 export const AGENT_MCP_SERVERS_MAX = 5;
@@ -23,7 +24,8 @@ export const AGENT_MCP_SERVERS_MAX = 5;
 const SERVER_TOOLS_MAX = 100;
 export const AGENT_MCP_ENABLED_MAX = 64;
 const HEADERS_MAX = 5;
-const RESULT_MAX_CHARS = 8_000;
+/** Tool output the model reads; longer output is cut with a note saying so. */
+const RESULT_MAX_CHARS = 24_000;
 const HEADER_NAME_RE = /^[A-Za-z0-9-]{1,64}$/;
 const TOOL_NAME_RE = /^[A-Za-z0-9_.\-/]{1,128}$/;
 const RESERVED_HEADERS = new Set(['host', 'content-length', 'content-type', 'connection', 'transfer-encoding', 'cookie', 'accept', 'mcp-protocol-version', 'mcp-session-id', 'mcp-method', 'mcp-name']);
@@ -51,6 +53,11 @@ export interface AgentMcpServer {
     icon?: string;
     /** Signed in with OAuth instead of a key: tokens live in this project connection. */
     oauth?: { connection_id: string; issuer: string };
+    /**
+     * A connected app (integration) rather than a pasted server: its tools run
+     * through an integration session for the project, opened at call time.
+     */
+    nango?: { integration: string };
 }
 
 /** A header from the console: a new value, or `keep` to reuse the stored one. */
@@ -74,7 +81,15 @@ function sanitizeTool(raw: unknown): AgentMcpTool | null {
 
 /** The stored list, defensively read. */
 export function readAgentMcpServers(config: Record<string, unknown> | null | undefined): AgentMcpServer[] {
-    const raw = config?.mcp_servers;
+    return readServerList(config?.mcp_servers).filter((server) => !server.nango);
+}
+
+/** The agent's connected apps (stored as `integrations`), read the same way. */
+export function readAgentIntegrations(config: Record<string, unknown> | null | undefined): AgentMcpServer[] {
+    return readServerList(config?.integrations).filter((server) => !!server.nango);
+}
+
+function readServerList(raw: unknown): AgentMcpServer[] {
     if (!Array.isArray(raw)) return [];
     return raw.flatMap((entry): AgentMcpServer[] => {
         const s = entry as Partial<AgentMcpServer> | null;
@@ -91,6 +106,7 @@ export function readAgentMcpServers(config: Record<string, unknown> | null | und
             discovered_at: typeof s.discovered_at === 'string' ? s.discovered_at : '',
             ...(readStoredIcon(s.icon) ? { icon: readStoredIcon(s.icon)! } : {}),
             ...(s.oauth && typeof s.oauth.connection_id === 'string' ? { oauth: { connection_id: s.oauth.connection_id, issuer: typeof s.oauth.issuer === 'string' ? s.oauth.issuer : '' } } : {}),
+            ...(s.nango && typeof s.nango.integration === 'string' && /^[a-z0-9][a-z0-9_-]{0,63}$/.test(s.nango.integration) ? { nango: { integration: s.nango.integration } } : {}),
         }];
     });
 }
@@ -298,8 +314,10 @@ export function agentMcpBindings(servers: AgentMcpServer[], taken: Set<string>):
     const out: AgentMcpBinding[] = [];
     for (const server of servers) {
         for (const tool of server.tools.filter((t) => server.enabled.includes(t.name))) {
-            let name = agentMcpToolName(server, tool.name);
-            for (let n = 2; taken.has(name); n++) name = `${agentMcpToolName(server, tool.name).slice(0, 60)}_${n}`;
+            // An app's tools already carry their app in the name (google-calendar__create-event).
+            const base = server.nango ? tool.name.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 64) : agentMcpToolName(server, tool.name);
+            let name = base;
+            for (let n = 2; taken.has(name); n++) name = `${base.slice(0, 60)}_${n}`;
             taken.add(name);
             out.push({
                 definition: {
@@ -323,6 +341,7 @@ export async function runAgentMcpTool(
     binding: AgentMcpBinding,
     argumentsJson: string,
     organizationId: string,
+    projectId?: string,
 ): Promise<{ ok: boolean; output: string }> {
     let args: Record<string, unknown>;
     try {
@@ -333,6 +352,12 @@ export async function runAgentMcpTool(
     }
     const unavailable = { ok: false, output: `${binding.server.name} isn't connected right now (its sign-in or key needs renewing). Tell the user it's unavailable.` };
     const call = async (force: boolean) => {
+        if (binding.server.nango) {
+            // A connected app: the project's integration session, limited to this agent's switched-on tools.
+            if (!projectId) throw new Error('signed_out');
+            const session = await agentToolSession(projectId, { [binding.server.nango.integration]: binding.server.enabled }, { force });
+            return callMcpTool({ url: session.mcpUrl, headers: { Authorization: `Bearer ${session.token}` }, tool: binding.tool, args });
+        }
         const headers = await serverHeaders(binding.server, organizationId, { force });
         return callMcpTool({ url: binding.server.url, headers, tool: binding.tool, args });
     };
@@ -341,9 +366,9 @@ export async function runAgentMcpTool(
         try {
             result = await call(false);
         } catch (error) {
-            // A rejected token gets one refresh and retry before giving up.
+            // A rejected token (or ended session) gets one refresh and retry before giving up.
             const status = (error as { httpStatus?: number }).httpStatus;
-            if (!binding.server.oauth || (status !== 401 && status !== 403)) throw error;
+            if ((!binding.server.oauth && !binding.server.nango) || (status !== 401 && status !== 403)) throw error;
             result = await call(true);
         }
         return { ok: true, output: mcpResultText(result) };
@@ -356,18 +381,45 @@ export async function runAgentMcpTool(
 }
 
 /** MCP results are content parts; the model gets their text. */
+/** Create the connected apps' sessions ahead of the first call (cached, so calls reuse them). */
+export function warmAgentMcpSessions(bindings: AgentMcpBinding[], projectId: string): void {
+    const seen = new Set<string>();
+    for (const binding of bindings) {
+        const nango = binding.server.nango;
+        if (!nango || seen.has(nango.integration)) continue;
+        seen.add(nango.integration);
+        void agentToolSession(projectId, { [nango.integration]: binding.server.enabled }).catch(() => undefined);
+    }
+}
+
 export function mcpResultText(result: unknown): string {
     const content = (result as { content?: unknown } | null)?.content;
     if (Array.isArray(content)) {
         const parts = content.map((part) => {
             const p = part as { type?: string; text?: unknown; resource?: { text?: unknown; uri?: unknown } };
-            if (p.type === 'text' && typeof p.text === 'string') return p.text;
-            if (p.type === 'resource' && typeof p.resource?.text === 'string') return p.resource.text;
+            if (p.type === 'text' && typeof p.text === 'string') return compactJson(p.text);
+            if (p.type === 'resource' && typeof p.resource?.text === 'string') return compactJson(p.resource.text);
             if (p.type === 'image') return '[image]';
             return '';
         }).filter(Boolean);
-        if (parts.length > 0) return parts.join('\n').slice(0, RESULT_MAX_CHARS);
+        if (parts.length > 0) return capResult(parts.join('\n'));
     }
     const structured = (result as { structuredContent?: unknown } | null)?.structuredContent;
-    return JSON.stringify(structured ?? result ?? null).slice(0, RESULT_MAX_CHARS);
+    return capResult(JSON.stringify(structured ?? result ?? null));
+}
+
+/** Pretty-printed JSON costs a third more of the limit in indentation alone. */
+function compactJson(text: string): string {
+    const trimmed = text.trim();
+    if (!/^[[{]/.test(trimmed)) return text;
+    try {
+        return JSON.stringify(JSON.parse(trimmed));
+    } catch {
+        return text;
+    }
+}
+
+function capResult(text: string): string {
+    if (text.length <= RESULT_MAX_CHARS) return text;
+    return `${text.slice(0, RESULT_MAX_CHARS)}\n[Result cut off: ${text.length - RESULT_MAX_CHARS} more characters not shown. Narrow the request (a time range, a search term, fewer results) to see the rest.]`;
 }

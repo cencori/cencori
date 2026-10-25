@@ -7,6 +7,8 @@ vi.mock('@/lib/supabaseAdmin', () => ({ createAdminClient: () => ({}) }));
 vi.mock('@/lib/embedded/mcp-icon', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/embedded/mcp-icon')>()), fetchMcpServerIcon: async () => 'data:image/png;base64,AAAA' }));
 const tokens = vi.hoisted(() => ({ get: vi.fn() }));
 vi.mock('@/lib/embedded/mcp-oauth', () => ({ mcpAccessToken: tokens.get }));
+const nangoSession = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/integrations/nango', () => ({ agentToolSession: nangoSession }));
 
 import { agentMcpBindings, buildAgentMcpServers, connectAgentMcpServer, defaultServerName, mcpResultText, readAgentMcpServers, runAgentMcpTool } from '@/lib/embedded/agent-mcp';
 import { agentToolset } from '@/lib/embedded/agent-tools';
@@ -124,5 +126,28 @@ describe('agent MCP servers', () => {
         // Signed out for good: the agent is told the server is unavailable.
         tokens.get.mockRejectedValue(new Error('signed_out'));
         expect((await runAgentMcpTool(binding, '{}', ORG)).output).toContain("isn't connected");
+    });
+
+    it('runs a connected app\'s tools through the project\'s integration session', async () => {
+        const app = {
+            id: 'int_google-calendar', name: 'Google Calendar', url: 'nango:google-calendar', headers: [], discovered_at: '',
+            tools: [
+                { name: 'google-calendar__list-events', description: 'List events', inputSchema: { type: 'object' }, readOnly: true, destructive: false },
+                { name: 'google-calendar__delete-event', description: 'Delete', inputSchema: { type: 'object' }, readOnly: false, destructive: true },
+            ],
+            enabled: ['google-calendar__list-events'], nango: { integration: 'google-calendar' },
+        };
+        const config = { integrations: [app] };
+        const toolset = agentToolset(config);
+        // The app's own names, no server prefix; only switched-on tools.
+        expect(toolset.definitions.map((d) => d.function.name)).toEqual(['google-calendar__list-events']);
+        nangoSession.mockResolvedValue({ mcpUrl: 'https://api.nango.dev/session/s1/mcp', token: 'nango_agent_session_1' });
+        mcp.call.mockResolvedValueOnce({ content: [{ type: 'text', text: '3 events' }] });
+        const outcome = await toolset.run({ id: 'c1', name: 'google-calendar__list-events', args: '{"calendarId":"primary"}' }, { organizationId: ORG, projectId: 'proj_1', agentId: 'a1', surface: 'preview' });
+        expect(outcome).toEqual({ ok: true, output: '3 events' });
+        expect(nangoSession).toHaveBeenCalledWith('proj_1', { 'google-calendar': ['google-calendar__list-events'] }, { force: false });
+        expect(mcp.call).toHaveBeenCalledWith(expect.objectContaining({ url: 'https://api.nango.dev/session/s1/mcp', headers: { Authorization: 'Bearer nango_agent_session_1' }, tool: 'google-calendar__list-events', args: { calendarId: 'primary' } }));
+        // Pasted MCP servers and connected apps are kept apart.
+        expect(readAgentMcpServers(config)).toEqual([]);
     });
 });

@@ -19,7 +19,9 @@ import {
 
 export type ToolActivity = { id: string; name: string; status: "running" | "done" | "failed" };
 /** `ended`: the agent closed the conversation with this reply; what follows starts fresh. */
-export type TestMessage = { id: string; role: "user" | "assistant"; content: string; error?: boolean; tools?: ToolActivity[]; ended?: boolean };
+/** The reply in the order it happened: runs of text between tool calls. */
+export type TestStep = { type: "text"; text: string } | { type: "tool"; id: string };
+export type TestMessage = { id: string; role: "user" | "assistant"; content: string; error?: boolean; tools?: ToolActivity[]; steps?: TestStep[]; ended?: boolean; startedAt?: number; durationMs?: number };
 
 interface AgentWorkspaceValue {
     projectId: string;
@@ -185,11 +187,12 @@ export function AgentWorkspaceProvider({
         // Earlier turns go with the message, so the test is a conversation.
         // Only what came after the agent last ended the conversation.
         const lastEnded = messages.map((message) => !!message.ended).lastIndexOf(true);
-        const history = messages.slice(lastEnded + 1).filter((message) => !message.error && message.content.trim()).map(({ role, content }) => ({ role, content }));
+        const history = messages.slice(lastEnded + 1).filter((message) => !message.error && message.content.trim()).map(({ role, content, tools }) => ({ role, content, ...(tools?.length ? { tools: tools.map((tool) => tool.name) } : {}) }));
         setMessages((current) => [...current, { id: `user-${Date.now()}`, role: "user", content: text }]);
         setInput("");
         setBusy("test_version");
-        const replyId = `assistant-${Date.now()}`;
+        const startedAt = Date.now();
+        const replyId = `assistant-${startedAt}`;
         let reply = "";
         try {
             // The reply streams in as it's written: delta events, then done or error.
@@ -219,19 +222,34 @@ export function AgentWorkspaceProvider({
                     // The reply is created by its first words or its first tool call, whichever comes first.
                     const upsertReply = (change: (message: TestMessage) => TestMessage) => setMessages((current) => current.some((message) => message.id === replyId)
                         ? current.map((message) => message.id === replyId ? change(message) : message)
-                        : [...current, change({ id: replyId, role: "assistant", content: "" })]);
+                        : [...current, change({ id: replyId, role: "assistant", content: "", startedAt })]);
                     if (event === "delta" && data.delta) {
                         reply += data.delta;
                         const content = reply;
-                        upsertReply((message) => ({ ...message, content }));
+                        const delta = data.delta;
+                        upsertReply((message) => {
+                            const steps = message.steps ?? [];
+                            const tail = steps[steps.length - 1];
+                            return {
+                                ...message,
+                                content,
+                                steps: tail?.type === "text"
+                                    ? [...steps.slice(0, -1), { type: "text", text: tail.text + delta }]
+                                    : [...steps, { type: "text", text: delta }],
+                            };
+                        });
                     } else if (event === "tool" && data.id && data.name && data.status) {
                         const activity: ToolActivity = { id: data.id, name: data.name, status: data.status };
-                        upsertReply((message) => ({
-                            ...message,
-                            tools: message.tools?.some((tool) => tool.id === activity.id)
-                                ? message.tools.map((tool) => tool.id === activity.id ? activity : tool)
-                                : [...(message.tools ?? []), activity],
-                        }));
+                        upsertReply((message) => {
+                            const known = message.tools?.some((tool) => tool.id === activity.id);
+                            return {
+                                ...message,
+                                tools: known
+                                    ? message.tools!.map((tool) => tool.id === activity.id ? activity : tool)
+                                    : [...(message.tools ?? []), activity],
+                                steps: known ? message.steps : [...(message.steps ?? []), { type: "tool", id: activity.id }],
+                            };
+                        });
                     } else if (event === "done" && data.conversation_ended) {
                         upsertReply((message) => ({ ...message, ended: true }));
                     } else if (event === "error") {
@@ -245,6 +263,13 @@ export function AgentWorkspaceProvider({
             const content = cause instanceof Error ? cause.message : "That didn't work. Try again.";
             setMessages((current) => [...current, { id: `assistant-error-${Date.now()}`, role: "assistant", content, error: true }]);
         } finally {
+            // The turn is over: stamp how long it took, and a call the stream never
+            // settled didn't finish, so it can't keep shimmering as if it might.
+            setMessages((current) => current.map((message) => message.id === replyId ? {
+                ...message,
+                durationMs: Date.now() - startedAt,
+                tools: message.tools?.map((tool) => tool.status === "running" ? { ...tool, status: "failed" } : tool),
+            } : message));
             setBusy(null);
             void queryClient.invalidateQueries({ queryKey });
         }

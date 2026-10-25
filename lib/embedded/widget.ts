@@ -189,11 +189,14 @@ export function verifyWidgetShareToken(token: unknown, widget: { id: string; pub
  */
 export async function ensureWidgetInstallation(
     db: Admin,
-    opts: { projectId: string; agentId: string; agentName: string; tier: SubscriptionTier },
+    opts: { projectId: string; agentId: string; agentName: string; tier: SubscriptionTier; audience?: 'widget' | 'whatsapp' },
 ): Promise<{ ok: true; tenantId: string; installationId: string } | { ok: false; status: number; message: string }> {
+    // Website visitors and WhatsApp customers are each one customer (tenant) of the project.
+    const audience = opts.audience ?? 'widget';
+    const audienceName = audience === 'whatsapp' ? 'WhatsApp customers' : 'website visitors';
     const { data: agent } = await db.from('agents').select('stable_version_id').eq('project_id', opts.projectId).eq('id', opts.agentId).maybeSingle();
     const stableId = (agent?.stable_version_id as string | null) ?? null;
-    if (!stableId) return { ok: false, status: 409, message: 'Publish this agent before putting it on a website.' };
+    if (!stableId) return { ok: false, status: 409, message: `Publish this agent before putting it on ${audience === 'whatsapp' ? 'WhatsApp' : 'a website'}.` };
     const { data: version } = await db.from('agent_versions').select('id, status, config_json, requirements_json').eq('project_id', opts.projectId).eq('id', stableId).maybeSingle();
     if (!version || version.status !== 'published') return { ok: false, status: 409, message: 'Published agent version not found.' };
 
@@ -203,10 +206,10 @@ export async function ensureWidgetInstallation(
     const { normalizeManifest } = await import('./manifest');
     const manifest = normalizeManifest(config);
     if (requirements.connections?.length || requirements.knowledge?.length || manifest.connection_requirements.length || manifest.mcp_tools.length || (Array.isArray(config.knowledge_refs) && config.knowledge_refs.length)) {
-        return { ok: false, status: 422, message: 'This agent needs customer connections or knowledge, which website visitors don’t have.' };
+        return { ok: false, status: 422, message: `This agent needs customer connections or knowledge, which ${audienceName} don’t have.` };
     }
 
-    const externalId = `widget:${opts.agentId}`;
+    const externalId = `${audience}:${opts.agentId}`;
     const { data: existingTenant, error: tenantLookupError } = await db.from('platform_tenants').select('id, status').eq('project_id', opts.projectId).eq('external_id', externalId).maybeSingle();
     if (tenantLookupError) return { ok: false, status: 502, message: 'Could not check the website visitors customer.' };
     let tenantId = (existingTenant?.id as string | undefined) ?? null;
@@ -217,9 +220,9 @@ export async function ensureWidgetInstallation(
     if (!tenantId) {
         const { checkTenantCap } = await import('./limits');
         const cap = await checkTenantCap(db, opts.projectId, opts.tier);
-        if (!cap.ok) return { ok: false, status: 402, message: `${cap.message}. The website widget counts as one customer.` };
+        if (!cap.ok) return { ok: false, status: 402, message: `${cap.message}. ${audience === 'whatsapp' ? 'WhatsApp' : 'The website widget'} counts as one customer.` };
         const { data, error } = await db.from('platform_tenants')
-            .insert({ project_id: opts.projectId, name: `${opts.agentName} · website visitors`.slice(0, 120), external_id: externalId, status: 'active' })
+            .insert({ project_id: opts.projectId, name: `${opts.agentName} · ${audienceName}`.slice(0, 120), external_id: externalId, status: 'active' })
             .select('id').single();
         if (error || !data) {
             const { data: raced } = await db.from('platform_tenants').select('id').eq('project_id', opts.projectId).eq('external_id', externalId).maybeSingle();

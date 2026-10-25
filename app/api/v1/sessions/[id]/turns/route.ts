@@ -184,9 +184,11 @@ export async function POST(
         }
 
         // Website widget conversations come from anonymous visitors: cap their length and pace.
-        if ((session.metadata as { source?: string } | null)?.source === 'widget') {
+        // WhatsApp customers get the pace cap; their long conversations roll over to new sessions instead.
+        const source = (session.metadata as { source?: string } | null)?.source;
+        if (source === 'widget' || source === 'whatsapp') {
             const { checkWidgetTurn } = await import('@/lib/embedded/widget');
-            const blocked = await checkWidgetTurn(sessionId, (session.last_turn_number as number | null) ?? 0);
+            const blocked = await checkWidgetTurn(sessionId, source === 'widget' ? (session.last_turn_number as number | null) ?? 0 : 0);
             if (blocked) return respondError(429, blocked.message, blocked.code);
         }
 
@@ -295,6 +297,7 @@ export async function POST(
                     } else return respondError(409, 'Installed agent has no published model', 'version_unavailable');
                     installedManifest = manifest;
                     installedToolset = (await import('@/lib/embedded/agent-tools')).agentToolset(config);
+                    installedToolset.warm(session.project_id as string);
                     effectiveNetworkPolicy = intersectNetworkPolicy(manifest.policy, (ins as { overlay_config?: unknown }).overlay_config);
                     effectiveBrowserEnabled = intersectBrowserEnabled(manifest.policy, (ins as { overlay_config?: unknown }).overlay_config);
                 }
@@ -321,7 +324,10 @@ export async function POST(
         const model = normalizeGatewayModelId(configuredModel.trim());
 
         const input = body.input;
-        const instructions = installedManifest ? (installedManifest.instructions ?? '') : (agentConfig?.system_prompt || body.instructions);
+        // Installed agents get today's date: they look things up by date through their tools.
+        const instructions = installedManifest
+            ? [installedManifest.instructions ?? '', (await import('@/lib/embedded/agent-tools')).agentClock()].filter(Boolean).join('\n\n')
+            : (agentConfig?.system_prompt || body.instructions);
 
         if (!input || (Array.isArray(input) && input.length === 0)) {
             return respondError(400, "Missing input. Provide a string or array of input items.", 'missing_input');

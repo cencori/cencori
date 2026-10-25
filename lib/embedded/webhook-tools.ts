@@ -108,9 +108,10 @@ export function withoutWebhookEndpoints(config: Record<string, unknown>): Record
     if (Array.isArray(config.webhook_tools)) out.webhook_tools = readWebhookTools(config).map((t) => ({ name: t.name, description: t.description }));
     const system = config.system_tools as { transfer_to_human?: unknown } | undefined;
     if (system && typeof system === 'object' && system.transfer_to_human) out.system_tools = { ...system, transfer_to_human: { enabled: true } };
-    // MCP servers: which tools the agent has, not where they live or their keys.
-    if (Array.isArray(config.mcp_servers)) {
-        out.mcp_servers = (config.mcp_servers as Array<{ name?: unknown; enabled?: unknown }>).map((server) => ({
+    // MCP servers and connected apps: which tools the agent has, not where they live or their keys.
+    for (const key of ['mcp_servers', 'integrations'] as const) {
+        if (!Array.isArray(config[key])) continue;
+        out[key] = (config[key] as Array<{ name?: unknown; enabled?: unknown }>).map((server) => ({
             name: typeof server?.name === 'string' ? server.name : 'MCP server',
             tools: Array.isArray(server?.enabled) ? server.enabled.filter((n) => typeof n === 'string') : [],
         }));
@@ -121,9 +122,11 @@ export function withoutWebhookEndpoints(config: Record<string, unknown>): Record
 /** A fork is someone else's copy: tools that call the original owner's endpoints (webhooks, MCP servers, the hand-off) don't come with it. */
 export function withoutWebhookTools(config: Record<string, unknown>): Record<string, unknown> {
     // MCP servers are the owner's too: their URL and key don't travel either.
-    const { webhook_tools: _dropped, mcp_servers: _servers, ...rest } = config;
+    // Connected apps use the original project's accounts, so they stay behind too.
+    const { webhook_tools: _dropped, mcp_servers: _servers, integrations: _apps, ...rest } = config;
     void _dropped;
     void _servers;
+    void _apps;
     // The hand-off goes to the original owner's endpoint too; End conversation is harmless and stays.
     const system = rest.system_tools as Record<string, unknown> | undefined;
     if (system && typeof system === 'object' && 'transfer_to_human' in system) {
