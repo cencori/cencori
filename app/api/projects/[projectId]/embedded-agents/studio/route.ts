@@ -7,7 +7,10 @@ import { normalizeManifest, validateManifest } from '@/lib/embedded/manifest';
 import { checkInstallationCap, checkTenantCap } from '@/lib/embedded/limits';
 import type { SubscriptionTier } from '@/lib/entitlements';
 import { invalidateAgentConfig } from '@/lib/config-cache';
-import { buildWebhookTools, executeWebhookTool, publicWebhookTools, readWebhookTools, webhookToolDefinitions, WEBHOOK_TOOL_MAX_ITERATIONS } from '@/lib/embedded/webhook-tools';
+import { buildWebhookTools, publicWebhookTools, readWebhookTools, WEBHOOK_TOOL_MAX_ITERATIONS } from '@/lib/embedded/webhook-tools';
+import { agentToolset, buildSystemTools, readSystemTools } from '@/lib/embedded/agent-tools';
+import { AGENT_MCP_SERVERS_MAX, buildAgentMcpServers, connectAgentMcpServer, normalizeMcpServerUrl, publicAgentMcpServers, readAgentMcpServers } from '@/lib/embedded/agent-mcp';
+import { discoverMcpAuth, mcpAuthorizeUrl, mcpRedirectFor, pkcePair, registerMcpClient, revokeMcpConnections, sealMcpOAuthState } from '@/lib/embedded/mcp-oauth';
 import type { UnifiedMessage } from '@/lib/providers/base';
 
 type Admin = ReturnType<typeof createAdminClient>;
@@ -49,11 +52,23 @@ function simpleManifest(config: AgentVersionConfig) {
     return { ok: true as const, manifest };
 }
 
-/** Webhook header values stay server-side: the console sees header names only. */
+/** The stored webhook tools re-sent as-is (every header kept), when only system tools change. */
+function publicWebhookToolsAsInput(config: Record<string, unknown>) {
+    return readWebhookTools(config).map((tool) => ({ ...tool, headers: tool.headers.map((h) => ({ name: h.name, keep: true })) }));
+}
+
+/** Webhook and MCP header values stay server-side: the console sees header names only. */
 function withoutToolSecrets<T extends { config_json?: unknown }>(version: T): T {
     const config = (version.config_json ?? null) as Record<string, unknown> | null;
-    if (!config || !Array.isArray(config.webhook_tools)) return version;
-    return { ...version, config_json: { ...config, webhook_tools: publicWebhookTools(readWebhookTools(config)) } };
+    if (!config || (!Array.isArray(config.webhook_tools) && !Array.isArray(config.mcp_servers))) return version;
+    return {
+        ...version,
+        config_json: {
+            ...config,
+            ...(Array.isArray(config.webhook_tools) ? { webhook_tools: publicWebhookTools(readWebhookTools(config)) } : {}),
+            ...(Array.isArray(config.mcp_servers) ? { mcp_servers: publicAgentMcpServers(readAgentMcpServers(config)) } : {}),
+        },
+    };
 }
 
 export async function GET(_request: Request, ctx: Context) {
@@ -198,7 +213,7 @@ export async function POST(request: Request, ctx: Context) {
 
         const versionId = cleanText(body.version_id, 100);
         const version = versionId ? await scopedVersion(db, projectId, agentId, versionId) : null;
-        if (['save_draft', 'save_tools', 'test_version', 'publish_version', 'set_visibility'].includes(body.action) && !version) return fail('Version not found in this project.', 404);
+        if (['save_draft', 'save_tools', 'mcp_connect', 'mcp_oauth_start', 'test_version', 'publish_version', 'set_visibility'].includes(body.action) && !version) return fail('Version not found in this project.', 404);
 
         // Marketplace publishing: flip a version's visibility. Public
         // versions appear in anonymous discovery; anything else stays hidden.
@@ -243,22 +258,125 @@ export async function POST(request: Request, ctx: Context) {
             return NextResponse.json({ version_id: versionId });
         }
 
-        // The agent's webhook tools. Saved like any edit: the draft goes back
+        // The agent's tools (webhook and system). Either list may be sent alone. Saved like any edit: the draft goes back
         // to untested, so publishing runs a fresh test.
-        if (body.action === 'save_tools' && version) {
-            if (['published', 'deprecated', 'retired'].includes(version.status as string)) return fail('Published versions cannot be edited. Create a new draft.', 409);
-            const existing = (version.config_json ?? {}) as AgentVersionConfig;
-            const built = buildWebhookTools(body.webhook_tools, readWebhookTools(existing), access.organizationId);
-            if (!built.ok) return fail(built.message);
-            const config: AgentVersionConfig = { ...existing, webhook_tools: built.tools };
-            if (built.tools.length === 0) delete config.webhook_tools;
+        // Writes a draft's new config: saved like any edit, so the draft goes
+        // back to untested and publishing runs a fresh test.
+        const saveDraftConfig = async (config: AgentVersionConfig) => {
             const { data: saved, error: saveError } = await db.from('agent_versions').update({
                 config_json: config, checksum: checksumConfig(config), status: 'draft',
                 last_tested_at: null, last_test_passed: false,
             }).eq('project_id', projectId).eq('agent_id', agentId).eq('id', versionId)
                 .in('status', ['draft', 'ready_for_review']).select('id').maybeSingle();
-            if (saveError || !saved) return fail('Draft changed while you were editing. Refresh and try again.', 409);
-            return NextResponse.json({ version_id: versionId, webhook_tools: publicWebhookTools(built.tools) });
+            return !saveError && !!saved;
+        };
+        const lockedVersion = version && ['published', 'deprecated', 'retired'].includes(version.status as string);
+
+        /**
+         * Begin signing in to an OAuth MCP server: find its sign-in, register
+         * Cencori with it and seal what the callback needs into `state`.
+         */
+        const startMcpSignIn = async (rawUrl: unknown, serverId: string | null): Promise<{ ok: true; authorizeUrl: string; issuer: string } | { ok: false; message: string }> => {
+            const normalized = await normalizeMcpServerUrl(rawUrl);
+            if (!normalized.ok) return normalized;
+            const discovery = await discoverMcpAuth(normalized.url.toString()).catch(() => null);
+            if (!discovery) return { ok: false, message: 'This server doesn\'t offer sign-in. Paste a key instead.' };
+            const forwardedHost = request.headers.get('x-forwarded-host');
+            const consoleOrigin = forwardedHost ? `${request.headers.get('x-forwarded-proto') ?? 'https'}://${forwardedHost}` : new URL(request.url).origin;
+            const { redirectUri, returnOrigin } = mcpRedirectFor(consoleOrigin);
+            let client: { clientId: string; clientSecret: string | null };
+            try {
+                client = await registerMcpClient(discovery.server, redirectUri);
+            } catch (error) {
+                return { ok: false, message: error instanceof Error ? error.message : 'The server refused to register Cencori.' };
+            }
+            const pkce = pkcePair();
+            const state = sealMcpOAuthState({
+                projectId, organizationId: access.organizationId, userId: access.userId,
+                agentId, versionId: versionId as string, serverId,
+                url: normalized.url.toString(), resource: discovery.resource, issuer: discovery.server.issuer,
+                tokenEndpoint: discovery.server.tokenEndpoint, clientId: client.clientId, clientSecret: client.clientSecret,
+                verifier: pkce.verifier, redirectUri, returnOrigin,
+            });
+            return {
+                ok: true,
+                authorizeUrl: mcpAuthorizeUrl(discovery, { clientId: client.clientId, redirectUri, challenge: pkce.challenge, state }),
+                issuer: new URL(discovery.server.issuer).host,
+            };
+        };
+
+        // The agent's tools: webhook, system and MCP. Any list may be sent alone.
+        if (body.action === 'save_tools' && version) {
+            if (lockedVersion) return fail('Published versions cannot be edited. Create a new draft.', 409);
+            const existing = (version.config_json ?? {}) as AgentVersionConfig;
+            const built = buildWebhookTools(body.webhook_tools ?? publicWebhookToolsAsInput(existing), readWebhookTools(existing), access.organizationId);
+            if (!built.ok) return fail(built.message);
+            const system = body.system_tools === undefined ? { ok: true as const, tools: readSystemTools(existing) } : buildSystemTools(body.system_tools);
+            if (!system.ok) return fail(system.message);
+            const storedMcp = readAgentMcpServers(existing);
+            const mcp = body.mcp_servers === undefined ? { ok: true as const, servers: storedMcp } : buildAgentMcpServers(body.mcp_servers, storedMcp, []);
+            if (!mcp.ok) return fail(mcp.message);
+            const config: AgentVersionConfig = { ...existing, webhook_tools: built.tools, system_tools: system.tools, mcp_servers: mcp.servers };
+            if (built.tools.length === 0) delete config.webhook_tools;
+            if (Object.keys(system.tools).length === 0) delete config.system_tools;
+            if (mcp.servers.length === 0) delete config.mcp_servers;
+            if (!(await saveDraftConfig(config))) return fail('Draft changed while you were editing. Refresh and try again.', 409);
+            // Sign-ins for servers taken off this draft are wiped, unless another
+            // version of the agent (the live one, say) still uses them.
+            const dropped = storedMcp.filter((server) => server.oauth && !mcp.servers.some((kept) => kept.oauth?.connection_id === server.oauth!.connection_id)).map((server) => server.oauth!.connection_id);
+            if (dropped.length > 0) {
+                const { data: others } = await db.from('agent_versions').select('id, config_json').eq('project_id', projectId).eq('agent_id', agentId).neq('id', versionId);
+                const stillUsed = new Set(((others ?? []) as Array<{ config_json: Record<string, unknown> | null }>).flatMap((other) => readAgentMcpServers(other.config_json).map((server) => server.oauth?.connection_id)).filter(Boolean));
+                await revokeMcpConnections(db, projectId, dropped.filter((id) => !stillUsed.has(id))).catch(() => undefined);
+            }
+            return NextResponse.json({ version_id: versionId, webhook_tools: publicWebhookTools(built.tools), system_tools: system.tools, mcp_servers: publicAgentMcpServers(mcp.servers) });
+        }
+
+        // Paste a server URL: connect, list its tools and add it to the draft in
+        // one step. With server_id, refreshes that server's tools (or its key).
+        // A server that wants a key answers needs_auth, and nothing is saved.
+        if (body.action === 'mcp_connect' && version) {
+            if (lockedVersion) return fail('Published versions cannot be edited. Create a new draft.', 409);
+            const existing = (version.config_json ?? {}) as AgentVersionConfig;
+            const stored = readAgentMcpServers(existing);
+            const previous = typeof body.server_id === 'string' ? stored.find((server) => server.id === body.server_id) ?? null : null;
+            if (body.server_id && !previous) return fail('That server is no longer on this draft. Refresh and try again.', 404);
+            if (!previous && stored.length >= AGENT_MCP_SERVERS_MAX) return fail(`Add up to ${AGENT_MCP_SERVERS_MAX} MCP servers.`);
+            const connected = await connectAgentMcpServer({ url: body.url ?? previous?.url, headers: body.headers, organizationId: access.organizationId, previous });
+            if (!connected.ok) {
+                // A server that wants auth may offer sign-in: the console then shows "Sign in" before "paste a key".
+                // A server that wants auth may offer sign-in. The console already has
+                // a window open for it, so the sign-in link comes back right here.
+                const signIn = connected.needsAuth && body.headers === undefined
+                    ? await startMcpSignIn(body.url ?? previous?.url, previous?.id ?? null)
+                    : null;
+                return NextResponse.json({
+                    ok: false,
+                    needs_auth: connected.needsAuth,
+                    ...(signIn?.ok ? { sign_in: { issuer: signIn.issuer, authorize_url: signIn.authorizeUrl } } : {}),
+                    error: signIn?.ok ? 'This server uses sign-in.' : signIn && /refused to register/.test(signIn.message) ? signIn.message : connected.message,
+                }, { status: connected.needsAuth ? 401 : 422 });
+            }
+            if (!previous && stored.some((server) => server.url === connected.server.url)) return fail('That server is already connected to this agent.', 409);
+            const servers = previous ? stored.map((server) => (server.id === previous.id ? connected.server : server)) : [...stored, connected.server];
+            const mcp = buildAgentMcpServers(servers.map(({ id, name, enabled }) => ({ id, name, enabled })), stored, [connected.server]);
+            if (!mcp.ok) return fail(mcp.message);
+            if (!(await saveDraftConfig({ ...existing, mcp_servers: mcp.servers }))) return fail('Draft changed while you were editing. Refresh and try again.', 409);
+            return NextResponse.json({ ok: true, server: publicAgentMcpServers([connected.server])[0] });
+        }
+
+        // Sign in to an OAuth MCP server: register Cencori with it and return
+        // where to send the owner. The callback (/api/mcp/oauth/callback)
+        // finishes the sign-in and adds the server to the draft.
+        if (body.action === 'mcp_oauth_start' && version) {
+            if (lockedVersion) return fail('Published versions cannot be edited. Create a new draft.', 409);
+            const stored = readAgentMcpServers((version.config_json ?? {}) as Record<string, unknown>);
+            const previous = typeof body.server_id === 'string' ? stored.find((server) => server.id === body.server_id) ?? null : null;
+            if (body.server_id && !previous) return fail('That server is no longer on this draft. Refresh and try again.', 404);
+            if (!previous && stored.length >= AGENT_MCP_SERVERS_MAX) return fail(`Add up to ${AGENT_MCP_SERVERS_MAX} MCP servers.`);
+            const started = await startMcpSignIn(body.url ?? previous?.url, previous?.id ?? null);
+            if (!started.ok) return fail(started.message, 422);
+            return NextResponse.json({ authorize_url: started.authorizeUrl });
         }
 
         if (body.action === 'test_version' && version) {
@@ -373,10 +491,10 @@ export async function POST(request: Request, ctx: Context) {
                                 autoRouterInput: { text: input, tools: null, hasImage: false },
                             });
                             const pricing = await resolved.provider.getPricing(resolved.model);
-                            // Webhook tools run for real here: Cencori calls the endpoint and the
-                            // agent answers from the result, up to a few rounds per reply.
-                            const webhookTools = readWebhookTools(config as Record<string, unknown>);
-                            const toolDefinitions = webhookToolDefinitions(webhookTools);
+                            // Tools run for real here: Cencori calls the endpoint (or the system
+                            // action) and the agent answers from the result, a few rounds at most.
+                            const toolset = agentToolset(config as Record<string, unknown>);
+                            let conversationEnded = false;
                             let conversation: UnifiedMessage[] = messages;
                             let content = '';
                             let chunkModel = resolved.model;
@@ -388,10 +506,11 @@ export async function POST(request: Request, ctx: Context) {
                                 const calls = new Map<string, { id: string; name: string; args: string }>();
                                 // Text from an earlier round stays; the next starts on its own line.
                                 let separated = content === '';
-                                const offerTools = toolDefinitions.length > 0 && round < WEBHOOK_TOOL_MAX_ITERATIONS;
+                                // Once the agent has ended the conversation it only says goodbye.
+                                const offerTools = toolset.definitions.length > 0 && round < WEBHOOK_TOOL_MAX_ITERATIONS && !conversationEnded;
                                 for await (const chunk of streamGatewayChat({
                                     supabase: db as never, projectId, organizationId, tier,
-                                    request: { messages: conversation, model: resolved.model, maxTokens: 500, stream: true, ...(offerTools ? { tools: toolDefinitions as never } : {}) },
+                                    request: { messages: conversation, model: resolved.model, maxTokens: 500, stream: true, ...(offerTools ? { tools: toolset.definitions as never } : {}) },
                                     resolved: resolved as never,
                                     requestId: testRequestId,
                                 })) {
@@ -447,11 +566,12 @@ export async function POST(request: Request, ctx: Context) {
                                     tool_calls: toolCalls.map((call) => ({ id: call.id, type: 'function' as const, function: { name: call.name, arguments: call.args } })),
                                 }];
                                 for (const call of toolCalls) {
-                                    const tool = webhookTools.find((t) => t.name === call.name);
                                     send('tool', { id: call.id, name: call.name, status: 'running' });
-                                    const outcome = tool
-                                        ? await executeWebhookTool(tool, call.args, { organizationId })
-                                        : { ok: false, output: `There's no tool named ${call.name}.` };
+                                    const outcome = await toolset.run(call, {
+                                        organizationId, agentId, agentName, surface: 'preview',
+                                        transcript: conversation.map((m) => ({ role: m.role, content: m.content })),
+                                    });
+                                    if (outcome.endsConversation) conversationEnded = true;
                                     send('tool', { id: call.id, name: call.name, status: outcome.ok ? 'done' : 'failed' });
                                     conversation = [...conversation, { role: 'tool', content: outcome.output, toolCallId: call.id }];
                                 }
@@ -461,7 +581,7 @@ export async function POST(request: Request, ctx: Context) {
                                 usage: { promptTokens: totals.promptTokens, completionTokens: totals.completionTokens, totalTokens: totals.promptTokens + totals.completionTokens },
                                 cost: { providerCostUsd: totals.providerCostUsd, cencoriChargeUsd: totals.cencoriChargeUsd, markupPercentage: totals.markupPercentage },
                             });
-                            if (done.ok) send('done', { model: chunkModel, knowledge_passages: testKnowledge.citations.length });
+                            if (done.ok) send('done', { model: chunkModel, knowledge_passages: testKnowledge.citations.length, conversation_ended: conversationEnded });
                             else send('error', { message: done.message });
                         } catch (error) {
                             await backToDraft().catch(() => {});

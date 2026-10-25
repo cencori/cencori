@@ -124,6 +124,8 @@ type PreparedRun = {
     runManifest: import('@/lib/embedded/manifest').CapabilityManifest;
     runSnapshots: Map<string, import('@/lib/embedded/mcp').McpServerSnapshot>;
     runMcpTools: ResponsesTool[];
+    /** The version's own tools (webhook and system), run in the loop below. */
+    runAgentTools: { toolset: import('@/lib/embedded/agent-tools').AgentToolset; agentName?: string };
     runConnector: RunnerConnectorContext;
     runNetPolicy: import('@/lib/embedded/net-policy').NetworkPolicy;
     systemParts: string[];
@@ -344,6 +346,11 @@ async function prepareRunExecution(args: {
             }
         }
     }
+    const { agentToolset } = await import('@/lib/embedded/agent-tools');
+    const runAgentTools = {
+        toolset: agentToolset((runtime.config ?? {}) as Record<string, unknown>),
+        agentName: typeof (agentRow as { name?: unknown } | null)?.name === 'string' ? (agentRow as { name: string }).name.trim() : undefined,
+    };
     const { resolveActionNetworkPolicy } = await import('@/lib/embedded/net-policy');
     const runNetPolicy = await resolveActionNetworkPolicy(supabase as never, { project_id: run.project_id, run_id: runId, approval_policy: {} });
 
@@ -357,7 +364,7 @@ async function prepareRunExecution(args: {
             config, model, reasoningEffort, pinnedConnectionId,
             input, inputText, responseFormat, wantsJson,
             citations, skillsFailed: (skills as { failed?: boolean }).failed === true, runSkillsBlock, runSkillIds,
-            runManifest, runSnapshots, runMcpTools, runNetPolicy,
+            runManifest, runSnapshots, runMcpTools, runAgentTools, runNetPolicy,
             runConnector: { tools: runConnectorTools, snapshots: runConnectorSnapshots, rows: runConnectorRows, configs: runConnectorConfigs },
             systemParts, baseMessages,
             preGatewayMs: Date.now() - executorStartedAt,
@@ -371,6 +378,7 @@ type LoopContext = {
     runId: string;
     baseMessages: UnifiedMessage[];
     runMcpTools: ResponsesTool[];
+    runAgentTools: PreparedRun['runAgentTools'];
     runSnapshots: Map<string, import('@/lib/embedded/mcp').McpServerSnapshot>;
     runConnector: RunnerConnectorContext;
     runNetPolicy: import('@/lib/embedded/net-policy').NetworkPolicy;
@@ -451,6 +459,23 @@ async function runModelLoop(
 
         let progressed = false;
         for (const tc of calls) {
+            // The version's own tools (webhook and system) run directly, no approval step.
+            if (ctx.runAgentTools.toolset.has(tc.function.name)) {
+                const outcome = await ctx.runAgentTools.toolset.run(
+                    { id: tc.id, name: tc.function.name, args: tc.function.arguments || '{}' },
+                    {
+                        organizationId, agentId: run.agent_id, agentName: ctx.runAgentTools.agentName, surface: 'run', conversationId: runId,
+                        transcript: loopMessages.map((m) => ({ role: m.role, content: m.content ?? '' })),
+                        signal: abortController.signal,
+                    },
+                );
+                loopMessages = [...loopMessages, { role: 'tool' as const, content: outcome.output, toolCallId: tc.id }];
+                executedToolCalls.push({ tool: tc.function.name, status: outcome.ok ? 'executed' : 'failed', action_id: tc.id });
+                await appendRunEvent(supabase as never, runId, 'tool_call.completed', { run_id: runId, tool: tc.function.name, action_id: tc.id, executed_by: 'host' });
+                hooks?.onToolCompleted?.({ tool: tc.function.name, status: outcome.ok ? 'executed' : 'failed', action_id: tc.id });
+                progressed = true;
+                continue;
+            }
             const parsed = parseMcpHostedToolName(tc.function.name);
             const parsedConn = parsed ? null : parseConnectorHostedToolName(tc.function.name);
             if (parsedConn) {
@@ -865,7 +890,7 @@ async function executeRun(runId: string): Promise<void> {
                     maxTokens: config.max_output_tokens ?? undefined,
                     signal: abortController.signal,
                     ...(reasoningEffort ? { reasoningEffort } : {}),
-                    ...(prep.runMcpTools.length + prep.runConnector.tools.length > 0 ? { tools: [...prep.runMcpTools, ...prep.runConnector.tools] as never } : {}),
+                    ...(prep.runMcpTools.length + prep.runConnector.tools.length + prep.runAgentTools.toolset.definitions.length > 0 ? { tools: [...prep.runMcpTools, ...prep.runConnector.tools, ...prep.runAgentTools.toolset.definitions] as never } : {}),
                 },
                 requestId: `run_${runId}`,
                 ...(pinnedConnectionId ? { pinnedConnectionId } : {}),
@@ -884,6 +909,7 @@ async function executeRun(runId: string): Promise<void> {
                 supabase, run, runId,
                 baseMessages: prep.baseMessages,
                 runMcpTools: prep.runMcpTools,
+                runAgentTools: prep.runAgentTools,
                 runSnapshots: prep.runSnapshots,
                 runConnector: prep.runConnector,
                 runNetPolicy: prep.runNetPolicy,
@@ -967,7 +993,7 @@ async function executeRunStream(runId: string, emit: StreamEmit): Promise<void> 
             pinnedConnectionId: prep.pinnedConnectionId,
             autoRouterInput: {
                 text: prep.baseMessages?.map((m) => m.content ?? '').join('\n') ?? null,
-                tools: [...prep.runMcpTools, ...prep.runConnector.tools],
+                tools: [...prep.runMcpTools, ...prep.runConnector.tools, ...prep.runAgentTools.toolset.definitions],
                 hasImage: false,
             },
         });
@@ -992,7 +1018,7 @@ async function executeRunStream(runId: string, emit: StreamEmit): Promise<void> 
                     stream: true,
                     signal: abortController.signal,
                     ...(prep.reasoningEffort ? { reasoningEffort: prep.reasoningEffort } : {}),
-                    ...(prep.runMcpTools.length + prep.runConnector.tools.length > 0 ? { tools: [...prep.runMcpTools, ...prep.runConnector.tools] as never } : {}),
+                    ...(prep.runMcpTools.length + prep.runConnector.tools.length + prep.runAgentTools.toolset.definitions.length > 0 ? { tools: [...prep.runMcpTools, ...prep.runConnector.tools, ...prep.runAgentTools.toolset.definitions] as never } : {}),
                 },
                 resolved: resolved as never,
                 requestId: `run_${runId}`,
@@ -1049,6 +1075,7 @@ async function executeRunStream(runId: string, emit: StreamEmit): Promise<void> 
                 supabase, run, runId,
                 baseMessages: prep.baseMessages,
                 runMcpTools: prep.runMcpTools,
+                runAgentTools: prep.runAgentTools,
                 runSnapshots: prep.runSnapshots,
                 runConnector: prep.runConnector,
                 runNetPolicy: prep.runNetPolicy,

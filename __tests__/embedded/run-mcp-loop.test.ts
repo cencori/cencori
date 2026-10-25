@@ -85,6 +85,15 @@ vi.mock('@/lib/embedded/mcp', async (importOriginal) => ({
 
 vi.mock('@/lib/embedded/dispatch-webhook', () => ({ scheduleEmbeddedWebhook: () => undefined }));
 
+const outboundCalls: Array<{ url: string; body: Record<string, unknown> }> = [];
+vi.mock('@/lib/security/outbound-url', async (importOriginal) => ({
+    ...(await importOriginal<Record<string, unknown>>()),
+    safeOutboundFetch: async (url: string | URL, init: RequestInit) => {
+        outboundCalls.push({ url: String(url), body: JSON.parse(String(init.body ?? '{}')) });
+        return new Response('{}', { status: 200 });
+    },
+}));
+
 vi.mock('@/lib/embedded/runs', async (importOriginal) => ({
     ...(await importOriginal<Record<string, unknown>>()),
     emitEmbeddedEvent: async () => undefined,
@@ -332,5 +341,53 @@ describe('direct-run hosted MCP loop', () => {
         expect(tables.embedded_runs[0].status).toBe('completed');
         expect(tables.ai_requests).toHaveLength(1);
         expect(mcpCalls).toHaveLength(1);
+    });
+});
+
+describe('direct-run agent tools', () => {
+    it('runs the version\'s own tools (here, a hand-off) and feeds the result back', async () => {
+        const { POST } = await import('@/app/api/v1/agents/[agentId]/runs/route');
+        const { db, tables } = makeDb({
+            agents: [{ id: 'agent-1', project_id: 'proj-1', is_active: true, name: 'Setter' }],
+            projects: [{ id: 'proj-1', organization_id: 'org-1', organizations: { subscription_tier: 'free' } }],
+            agent_versions: [{
+                id: 'v1', agent_id: 'agent-1', project_id: 'proj-1', version: '1', status: 'published',
+                config_json: { model: 'gpt-4o', system_tools: { transfer_to_human: { url: 'https://hooks.example.com/handoff' } } },
+            }],
+            mcp_servers: [], embedded_runs: [], embedded_run_events: [], ai_requests: [], actions: [], agent_installations: [],
+        });
+        (globalThis as Record<string, unknown>).__fakeDb = db;
+        outboundCalls.length = 0;
+
+        const calls: Array<Record<string, unknown>> = [];
+        (globalThis as Record<string, unknown>).__gatewayScript = async (params: { request: Record<string, unknown> }) => {
+            calls.push(params.request);
+            if (calls.length === 1) {
+                return {
+                    content: '', model: 'gpt-4o', provider: 'openai', usage, cost,
+                    toolCalls: [{ id: 'h1', type: 'function', function: { name: 'transfer_to_human', arguments: '{"contact":"ada@example.com","summary":"Wants a custom plan"}' } }],
+                };
+            }
+            return { content: 'Someone will email you.', model: 'gpt-4o', provider: 'openai', usage, cost };
+        };
+
+        const res = (await POST(
+            req('http://x/v1/agents/agent-1/runs', { input: { task: 'talk to sales' }, mode: 'sync' }),
+            { params: Promise.resolve({ agentId: 'agent-1' }) },
+        )) as { status: number; __body: { output: { output: unknown } } };
+
+        expect(res.status).toBe(201);
+        expect(res.__body.output.output).toBe('Someone will email you.');
+        // Offered to the model alongside nothing else…
+        const offered = (calls[0].tools as Array<{ function: { name: string } }>).map((t) => t.function.name);
+        expect(offered).toEqual(['transfer_to_human']);
+        // …POSTed to the owner's URL with the person and summary…
+        expect(outboundCalls).toHaveLength(1);
+        expect(outboundCalls[0].url).toBe('https://hooks.example.com/handoff');
+        expect(outboundCalls[0].body).toMatchObject({ type: 'agent.transfer_to_human', agent: { id: 'agent-1', name: 'Setter' }, surface: 'run', person: { contact: 'ada@example.com' }, summary: 'Wants a custom plan' });
+        // …and the second model turn saw the result, with the call audited.
+        const second = calls[1].messages as Array<{ role: string; toolCallId?: string }>;
+        expect(second.some((m) => m.role === 'tool' && m.toolCallId === 'h1')).toBe(true);
+        expect(tables.embedded_run_events.filter((e) => e.event_type === 'tool_call.completed')).toHaveLength(1);
     });
 });

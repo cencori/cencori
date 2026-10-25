@@ -33,6 +33,7 @@ import * as providersSetup from '@/lib/gateway/providers-setup';
 import * as responsesTools from '@/lib/gateway/v1-responses-tools';
 import * as policyEnforcement from '@/lib/governance/policy-enforcement';
 import * as webhookToolsModule from '@/lib/embedded/webhook-tools';
+import { agentToolset } from '@/lib/embedded/agent-tools';
 
 const mockStreamGatewayChat = vi.mocked(chatExecutor.streamGatewayChat);
 const mockResolveGatewayProvider = vi.mocked(providersSetup.resolveGatewayProvider);
@@ -179,7 +180,7 @@ describe('executeSessionTurn', () => {
             turnNumber: 1,
             model: 'gpt-4o',
             tools: webhookToolsModule.webhookToolDefinitions([webhook]) as never,
-            webhookTools: [webhook],
+            agentTools: { toolset: agentToolset({ webhook_tools: [webhook] }), agentId: 'agent_1' },
             inputMessages: [{ role: 'user', content: 'Book me at 3pm' }],
             inputText: 'Book me at 3pm',
             pauseOnToolCalls: false,
@@ -203,6 +204,48 @@ describe('executeSessionTurn', () => {
         expect(logSuccess).toHaveBeenCalledTimes(1);
         expect(logSuccess.mock.calls[0][0]).toMatchObject({ promptTokens: 100, completionTokens: 9 });
         expect(incrementUsage).toHaveBeenCalledTimes(1);
+    });
+
+    it('closes the session when the agent ends the conversation', async () => {
+        const rounds = [
+            [
+                { toolCalls: [{ id: 'call_end', function: { name: 'end_conversation', arguments: '{"reason":"done"}' } }], actualModel: 'gpt-4o', actualProvider: 'openai' },
+                { finishReason: 'tool_calls', actualModel: 'gpt-4o', actualProvider: 'openai' },
+            ],
+            [
+                { delta: 'Goodbye!', actualModel: 'gpt-4o', actualProvider: 'openai' },
+                { finishReason: 'stop', actualModel: 'gpt-4o', actualProvider: 'openai' },
+            ],
+        ];
+        let call = 0;
+        mockStreamGatewayChat.mockImplementation((() => makeStreamChunks(rounds[call++])()) as never);
+        const toolset = agentToolset({ system_tools: { end_conversation: true } });
+
+        const { supabase, gatewayCtx, logSuccess, incrementUsage } = makeGateways();
+        const result = await executeSessionTurn({
+            supabase: supabase as never,
+            gatewayCtx: gatewayCtx as never,
+            sessionId: 'sid_1',
+            turnNumber: 1,
+            model: 'gpt-4o',
+            tools: toolset.definitions as never,
+            agentTools: { toolset, agentId: 'agent_1' },
+            inputMessages: [{ role: 'user', content: 'thanks, bye' }],
+            inputText: 'thanks, bye',
+            pauseOnToolCalls: false,
+            endUserId: null,
+            tier: 'free' as never,
+            logSuccess,
+            incrementUsage,
+        });
+        const allData = await (result as { ok: true; response: NextResponse }).response.text();
+
+        expect(allData).toContain('"conversation_ended":true');
+        // The goodbye round is offered no tools, so the agent can't loop.
+        const second = mockStreamGatewayChat.mock.calls[1][0] as { request: { tools?: unknown } };
+        expect(second.request.tools).toBeUndefined();
+        const finalize = (supabase.rpc as ReturnType<typeof vi.fn>).mock.calls.find((c) => c[0] === 'finalize_session_turn' && (c[1] as { p_event_type: string }).p_event_type === 'turn.completed');
+        expect((finalize?.[1] as { p_status: string }).p_status).toBe('completed');
     });
 
     it('buffers the whole reply when an output policy could block or redact it', async () => {

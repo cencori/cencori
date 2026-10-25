@@ -24,13 +24,22 @@ const MODES: Array<{ value: TestPanelMode; label: string }> = [
  * runs the real website widget, which serves the published version.
  */
 export function AgentTestPanel({ onClose }: { onClose: () => void }) {
-    const { test, busy, canManage, simpleVersion, dirty, form } = useAgentWorkspace();
+    const { test, busy, canManage, simpleVersion, dirty, form, version } = useAgentWorkspace();
     const { mode, setMode } = useWidgetPreview();
     const composerRef = useRef<HTMLTextAreaElement>(null);
     const threadRef = useRef<HTMLDivElement>(null);
     const testing = busy === "test_version";
     // "Thinking" until the reply's first words arrive, then the reply itself.
     const last = test.messages[test.messages.length - 1];
+    // MCP tools reach the model as "<server>__<tool>": show the tool with its server's logo.
+    const mcpServers = ((version?.config_json.mcp_servers ?? []) as Array<{ name?: string; icon?: string }>).filter((server) => typeof server?.name === "string");
+    const mcpToolLabel = (name: string): { tool: string; icon?: string } | null => {
+        for (const server of mcpServers) {
+            const prefix = `${server.name!.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 20)}__`;
+            if (name.startsWith(prefix)) return { tool: name.slice(prefix.length), icon: server.icon };
+        }
+        return null;
+    };
     // Also between a finished tool call and the words that follow it.
     const waiting = testing && (last?.role === "user" || (!last?.content && !last?.tools?.some((tool) => tool.status === "running")));
     const canSend = canManage && !busy && !!form.model && !!test.input.trim();
@@ -101,14 +110,24 @@ export function AgentTestPanel({ onClose }: { onClose: () => void }) {
                             <div key={message.id} className="min-w-0 space-y-1.5">
                                 {message.tools && message.tools.length > 0 && (
                                     <div className="flex flex-wrap gap-1.5">
-                                        {message.tools.map((tool) => tool.status === "running" ? (
-                                            <ThinkingState key={tool.id} label={`Calling ${tool.name}`} className="py-0.5 text-xs" />
-                                        ) : (
-                                            <span key={tool.id} className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-mono text-[10px]", tool.status === "done" ? "border-border/50 text-muted-foreground" : "border-destructive/30 text-destructive")}>
-                                                {tool.status === "done" ? <Check className="h-3 w-3" /> : <CircleAlert className="h-3 w-3" />}
-                                                {tool.name}
-                                            </span>
-                                        ))}
+                                        {message.tools.map((tool) => {
+                                            const mcp = mcpToolLabel(tool.name);
+                                            const logo = mcp?.icon
+                                                // eslint-disable-next-line @next/next/no-img-element -- a stored data URL
+                                                ? <img src={mcp.icon} alt="" className="h-3.5 w-3.5 shrink-0 rounded-sm object-contain" />
+                                                : null;
+                                            return tool.status === "running" ? (
+                                                <span key={tool.id} className="inline-flex items-center gap-1.5">
+                                                    {logo}
+                                                    <ThinkingState label={`Calling ${mcp?.tool ?? tool.name}`} className="py-0.5 text-xs" />
+                                                </span>
+                                            ) : (
+                                                <span key={tool.id} title={tool.name} className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-mono text-[10px]", tool.status === "done" ? "border-border/50 text-muted-foreground" : "border-destructive/30 text-destructive")}>
+                                                    {tool.status === "done" ? (logo ?? <Check className="h-3 w-3" />) : <CircleAlert className="h-3 w-3" />}
+                                                    {mcp?.tool ?? tool.name}
+                                                </span>
+                                            );
+                                        })}
                                     </div>
                                 )}
                                 {message.error ? (
@@ -119,6 +138,13 @@ export function AgentTestPanel({ onClose }: { onClose: () => void }) {
                                 {message.content && <Button type="button" variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground/60 hover:text-foreground" onClick={() => { void navigator.clipboard.writeText(message.content); toast.success("Message copied"); }} title="Copy to clipboard">
                                     <Copy className="h-3 w-3" />
                                 </Button>}
+                                {message.ended && (
+                                    <div className="flex items-center gap-3 pt-2 text-[11px] text-muted-foreground">
+                                        <span className="h-px flex-1 bg-border/60" />
+                                        Conversation ended · your next message starts a new one
+                                        <span className="h-px flex-1 bg-border/60" />
+                                    </div>
+                                )}
                             </div>
                         ))}
                         {waiting && <ThinkingState className="py-1 text-sm" />}

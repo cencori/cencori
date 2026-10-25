@@ -6,6 +6,7 @@
 
 import { UnifiedMessage, ToolCall } from './base';
 import { InvalidRequestError } from './errors';
+import { geminiCallSignature } from './gemini-tools';
 
 /**
  * Image formats and per-image byte caps per provider. This mirrors
@@ -163,10 +164,13 @@ function parseToolArguments(args: string): Record<string, unknown> {
  */
 export type GeminiPart =
     | { text: string }
-    | { inlineData: { mimeType: string; data: string } };
+    | { inlineData: { mimeType: string; data: string } }
+    | { functionCall: { name: string; args: Record<string, unknown> }; thoughtSignature?: string }
+    | { functionResponse: { name: string; response: Record<string, unknown> } };
 
 export interface GeminiMessage {
-    role: 'user' | 'model';
+    /** `function` carries tool results back after a `model` turn that called tools. */
+    role: 'user' | 'model' | 'function';
     parts: GeminiPart[];
 }
 
@@ -352,13 +356,41 @@ export function toGeminiMessages(messages: UnifiedMessage[]): {
     history: GeminiMessage[];
     prompt: string | GeminiPart[];
 } {
-    const history = messages.slice(0, -1).map(msg => ({
-        role: msg.role === 'assistant' ? 'model' as const : 'user' as const,
-        parts: toGeminiParts(msg),
-    }));
+    // Tool turns: an assistant turn's calls become functionCall parts (with
+    // their thought signatures), and the tool results after it one `function`
+    // turn of functionResponse parts, named after the call they answer.
+    const callNames = new Map<string, string>();
+    const contents: GeminiMessage[] = [];
+    for (const msg of messages) {
+        if (msg.role === 'assistant' && msg.tool_calls?.length) {
+            const parts: GeminiPart[] = msg.content ? [{ text: msg.content }] : [];
+            for (const call of msg.tool_calls) {
+                callNames.set(call.id, call.function.name);
+                let args: Record<string, unknown> = {};
+                try {
+                    const parsed = JSON.parse(call.function.arguments || '{}') as unknown;
+                    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) args = parsed as Record<string, unknown>;
+                } catch {
+                    // Malformed arguments go back empty rather than failing the turn.
+                }
+                const signature = geminiCallSignature(call.id);
+                parts.push({ functionCall: { name: call.function.name, args }, ...(signature ? { thoughtSignature: signature } : {}) });
+            }
+            contents.push({ role: 'model', parts });
+            continue;
+        }
+        if (msg.role === 'tool' && msg.toolCallId && callNames.has(msg.toolCallId)) {
+            const part: GeminiPart = { functionResponse: { name: callNames.get(msg.toolCallId)!, response: { content: msg.content } } };
+            const previous = contents[contents.length - 1];
+            if (previous?.role === 'function') previous.parts.push(part);
+            else contents.push({ role: 'function', parts: [part] });
+            continue;
+        }
+        contents.push({ role: msg.role === 'assistant' ? 'model' : 'user', parts: toGeminiParts(msg) });
+    }
 
-    const lastMessage = messages[messages.length - 1];
-    const lastParts = toGeminiParts(lastMessage);
+    const history = contents.slice(0, -1);
+    const lastParts = contents[contents.length - 1]?.parts ?? [{ text: '' }];
 
     return {
         history,
