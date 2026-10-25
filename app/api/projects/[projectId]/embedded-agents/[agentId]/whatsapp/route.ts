@@ -8,6 +8,10 @@
  *           Checks the credentials with Meta and saves them. A blank token or
  *           secret keeps the stored one. Turning it on sets up the WhatsApp
  *           customers installation of the published agent.
+ *   POST    { code, phone_number_id, waba_id, coexistence? }
+ *           Finish Embedded Signup ("Connect WhatsApp"): swap the code for the
+ *           business's token, subscribe Cencori's app to their WhatsApp
+ *           account, turn the number on for the Cloud API and save it.
  *   DELETE  disconnect
  */
 
@@ -18,12 +22,31 @@ import type { SubscriptionTier } from '@/lib/entitlements';
 import { ensureWidgetInstallation } from '@/lib/embedded/widget';
 import { getMainSiteUrl } from '@/lib/main-site-url';
 import { resolvePublicOrigin } from '@/lib/public-origin';
-import { getAgentChannel, publicChannel, saveChannel, type WhatsAppChannel } from '@/lib/channels/whatsapp';
+import { randomInt } from 'crypto';
+import { encryptApiKey } from '@/lib/encryption';
+import {
+    META_GRAPH_VERSION,
+    exchangeSignupCode,
+    getAgentChannel,
+    publicChannel,
+    registerPhoneNumber,
+    saveChannel,
+    saveSignupChannel,
+    subscribeAppToWaba,
+    type WhatsAppChannel,
+} from '@/lib/channels/whatsapp';
 
 type Admin = ReturnType<typeof createAdminClient>;
 type Context = { params: Promise<{ projectId: string; agentId: string }> };
 
 const fail = (message: string, status = 400) => NextResponse.json({ error: message }, { status });
+
+/** What the console needs to open Meta's sign-up popup; null until Cencori's Meta app is configured. */
+function signupConfig() {
+    const appId = process.env.META_APP_ID;
+    const configId = process.env.META_EMBEDDED_SIGNUP_CONFIG_ID;
+    return appId && configId && process.env.META_APP_SECRET ? { app_id: appId, config_id: configId, graph_version: META_GRAPH_VERSION } : null;
+}
 
 async function role(db: Admin, organizationId: string, userId: string) {
     const { data: organization } = await db.from('organizations').select('owner_id,subscription_tier').eq('id', organizationId).maybeSingle();
@@ -51,7 +74,7 @@ export async function GET(req: NextRequest, ctx: Context) {
     const db = createAdminClient();
     if (!await scopedAgent(db, projectId, agentId)) return fail('Agent not found in this project.', 404);
     const [channel, { canManage }] = await Promise.all([getAgentChannel(db, projectId, agentId), role(db, access.organizationId, access.userId)]);
-    return NextResponse.json({ channel: serialize(req, channel), can_manage: canManage }, { headers: { 'Cache-Control': 'no-store' } });
+    return NextResponse.json({ channel: serialize(req, channel), can_manage: canManage, signup: signupConfig() }, { headers: { 'Cache-Control': 'no-store' } });
 }
 
 export async function PUT(req: NextRequest, ctx: Context) {
@@ -87,7 +110,57 @@ export async function PUT(req: NextRequest, ctx: Context) {
         dailySessionCap: typeof body.daily_session_cap === 'number' ? body.daily_session_cap : undefined,
     });
     if (!saved.ok) return fail(saved.message, saved.status);
-    return NextResponse.json({ channel: serialize(req, saved.channel), can_manage: true });
+    return NextResponse.json({ channel: serialize(req, saved.channel), can_manage: true, signup: signupConfig() });
+}
+
+export async function POST(req: NextRequest, ctx: Context) {
+    const { projectId, agentId } = await ctx.params;
+    const access = await requireProjectAccess(projectId);
+    if (!access.ok) return access.response;
+    const config = signupConfig();
+    if (!config) return fail('Connecting WhatsApp isn\'t set up on this server yet.', 503);
+    const db = createAdminClient();
+    const agent = await scopedAgent(db, projectId, agentId);
+    if (!agent) return fail('Agent not found in this project.', 404);
+    const { canManage, tier } = await role(db, access.organizationId, access.userId);
+    if (!canManage) return fail('Only owners and admins can connect WhatsApp.', 403);
+
+    const body = await req.json().catch(() => null) as Record<string, unknown> | null;
+    const code = typeof body?.code === 'string' ? body.code.trim() : '';
+    const phoneNumberId = typeof body?.phone_number_id === 'string' ? body.phone_number_id.trim() : '';
+    const wabaId = typeof body?.waba_id === 'string' ? body.waba_id.trim() : '';
+    const coexistence = body?.coexistence === true;
+    if (!code || !/^\d{5,25}$/.test(phoneNumberId) || !/^\d{5,25}$/.test(wabaId)) return fail('The WhatsApp sign-up didn\'t finish. Try again.');
+
+    const installed = await ensureWidgetInstallation(db, { projectId, agentId, agentName: agent.name, tier, audience: 'whatsapp' });
+    if (!installed.ok) return fail(installed.message, installed.status);
+
+    let token: string;
+    try {
+        token = await exchangeSignupCode(code, config.app_id, process.env.META_APP_SECRET!);
+        await subscribeAppToWaba(wabaId, token);
+    } catch (error) {
+        return fail(`Meta didn't finish connecting the number: ${error instanceof Error ? error.message : 'unknown error'}`, 502);
+    }
+    // A new number has to be turned on for the Cloud API, with a two-step PIN we keep.
+    let pinEncrypted: string | null = null;
+    if (!coexistence) {
+        const pin = String(randomInt(0, 1_000_000)).padStart(6, '0');
+        try {
+            await registerPhoneNumber(phoneNumberId, token, pin);
+            pinEncrypted = encryptApiKey(pin, access.organizationId);
+        } catch (error) {
+            // Already registered (a reconnect) is fine; anything else is surfaced.
+            const message = error instanceof Error ? error.message : 'unknown error';
+            if (!/already registered|registered/i.test(message)) return fail(`Meta didn't turn the number on: ${message}`, 502);
+        }
+    }
+
+    const existing = await getAgentChannel(db, projectId, agentId);
+    const saved = await saveSignupChannel(db, { projectId, organizationId: access.organizationId, agentId, existing, phoneNumberId, wabaId, accessToken: token, coexistence });
+    if (!saved.ok) return fail(saved.message, saved.status);
+    if (pinEncrypted) await db.from('tool_connections').update({ metadata: { ...saved.channel.metadata, registration_pin_encrypted: pinEncrypted } }).eq('id', saved.channel.id);
+    return NextResponse.json({ channel: serialize(req, saved.channel), can_manage: true, signup: config });
 }
 
 export async function DELETE(_req: NextRequest, ctx: Context) {
@@ -99,5 +172,5 @@ export async function DELETE(_req: NextRequest, ctx: Context) {
     if (!canManage) return fail('Only owners and admins can disconnect WhatsApp.', 403);
     const existing = await getAgentChannel(db, projectId, agentId);
     if (existing) await db.from('tool_connections').delete().eq('id', existing.id).eq('project_id', projectId);
-    return NextResponse.json({ channel: null, can_manage: true });
+    return NextResponse.json({ channel: null, can_manage: true, signup: signupConfig() });
 }

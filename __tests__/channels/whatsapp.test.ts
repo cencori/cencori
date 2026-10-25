@@ -68,7 +68,7 @@ describe('WhatsApp channel', () => {
         fetchMock.mockImplementation(async () => json({ messages: [{ id: 'wamid.out' }] }));
         await sendText(channel, 'token', '2348011112222', '**Yes**, we do.', 'wamid.1');
         const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-        expect(url).toBe('https://graph.facebook.com/v21.0/1065/messages');
+        expect(url).toBe('https://graph.facebook.com/v23.0/1065/messages');
         expect((init.headers as Record<string, string>).Authorization).toBe('Bearer token');
         expect(JSON.parse(String(init.body))).toMatchObject({ to: '2348011112222', type: 'text', text: { body: '*Yes*, we do.' }, context: { message_id: 'wamid.1' } });
     });
@@ -78,7 +78,7 @@ describe('WhatsApp channel', () => {
             .mockResolvedValueOnce(json({ url: 'https://lookaside.fbsbx.com/whatsapp/media/9', mime_type: 'audio/ogg; codecs=opus', file_size: 4 }))
             .mockResolvedValueOnce(new Response(new Uint8Array([1, 2, 3, 4])));
         const media = await downloadMedia('token', 'media.9');
-        expect(fetchMock.mock.calls[0][0]).toBe('https://graph.facebook.com/v21.0/media.9');
+        expect(fetchMock.mock.calls[0][0]).toBe('https://graph.facebook.com/v23.0/media.9');
         expect(fetchMock.mock.calls[1][0]).toBe('https://lookaside.fbsbx.com/whatsapp/media/9');
         expect((fetchMock.mock.calls[1][1] as RequestInit).headers).toEqual({ Authorization: 'Bearer token' });
         expect(media).toMatchObject({ mimeType: 'audio/ogg' });
