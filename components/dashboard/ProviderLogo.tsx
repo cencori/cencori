@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { AudioLines } from "lucide-react";
-import { OpenAI, Anthropic, Google, Mistral, Cohere, Cerebras, Perplexity, Groq, XAI, Together, Meta, HuggingFace, Qwen, DeepSeek, ZAI, Cloudflare, ElevenLabs, AssemblyAI } from "@lobehub/icons";
+import { OpenAI, Anthropic, Google, Mistral, Cohere, Cerebras, Perplexity, Groq, XAI, Together, Meta, HuggingFace, Qwen, DeepSeek, ZAI, Cloudflare, ElevenLabs, AssemblyAI, Kimi } from "@lobehub/icons";
 
 /**
  * Brand mark for a provider id (as stored on ai_requests.provider and in
@@ -26,6 +26,8 @@ export function getProviderLogoMark(providerId: string, size = 20): React.ReactN
         case "huggingface": return <HuggingFace.Color size={size} />;
         case "qwen": return <Qwen.Color size={size} />;
         case "deepseek": return <DeepSeek.Color size={size} />;
+        case "moonshot":
+        case "kimi": return <Kimi size={size} />;
         case "zai": return <ZAI size={size} />;
         case "cerebras": return <Cerebras.Color size={size} />;
         case "cloudflare": return <Cloudflare.Color size={size} />;

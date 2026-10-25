@@ -28,6 +28,10 @@ import { Book, ArrowUpRight, HelpCircle, Wrench, Activity, Mail, FileText, Check
 import DashboardCircleIcon from "@hugeicons/core-free-icons/DashboardCircleIcon";
 import DiscoverSquareIcon from "@hugeicons/core-free-icons/DiscoverSquareIcon";
 import BrainIcon from "@hugeicons/core-free-icons/BrainIcon";
+import AirdropIcon from "@hugeicons/core-free-icons/AirdropIcon";
+import { CopilotRecentChats } from "@/components/copilot/CopilotRecentChats";
+import PlusSignIcon from "@hugeicons/core-free-icons/PlusSignIcon";
+import { COPILOT_CONVERSATION_COOKIE, COPILOT_NEW_CHAT_EVENT } from "@/lib/console/copilot";
 import ChartRelationshipIcon from "@hugeicons/core-free-icons/ChartRelationshipIcon";
 import ThreeDRotateIcon from "@hugeicons/core-free-icons/ThreeDRotateIcon";
 import Settings02Icon from "@hugeicons/core-free-icons/Settings02Icon";
@@ -121,6 +125,10 @@ function useOrganization(orgSlug: string) {
 }
 
 // Revenue (formerly Monetization) keeps its own URL but belongs to the AI Gateway sub-nav.
+function isCopilotPath(pathname: string): boolean {
+    return /\/copilot(\/|$)/.test(pathname);
+}
+
 function isMemoryPath(pathname: string): boolean {
     return /\/memory(\/|$)/.test(pathname);
 }
@@ -210,7 +218,8 @@ export default function OrganizationLayoutClient({
     const isPlayground = pathname.includes("/ai-gateway/playground");
     const isEmbeddedAgents = pathname === "/agents" || pathname.endsWith("/agents");
     const isMemoryGraph = /\/memory\/graph\/?$/.test(pathname);
-    const isFixedWorkspace = isPlayground || isEmbeddedAgents || isMemoryGraph;
+    const isCopilotPage = /\/copilot\/?$/.test(pathname);
+    const isFixedWorkspace = isPlayground || isEmbeddedAgents || isMemoryGraph || isCopilotPage;
     const docsUrl = getMainSiteUrl("/docs");
     const scopedArea = segments[2];
     const isProjectSettingsView = isInsideProject && (
@@ -225,9 +234,10 @@ export default function OrganizationLayoutClient({
         : scopedArea;
     const isOrganizationSettingsView = !isInsideProject
         && ["settings", "teams", "billing", "usage", "audit-log"].includes(organizationSettingsArea ?? "");
-    const [activeView, setActiveView] = useState<"main" | "ai-gateway" | "memory" | "project-settings" | "settings">(() => {
+    const [activeView, setActiveView] = useState<"main" | "ai-gateway" | "memory" | "copilot" | "project-settings" | "settings">(() => {
         if (isAiGatewayPath(pathname)) return "ai-gateway";
         if (isMemoryPath(pathname)) return "memory";
+        if (isCopilotPath(pathname)) return "copilot";
         if (isProjectSettingsView) return "project-settings";
         if (isOrganizationSettingsView) return "settings";
         return "main";
@@ -283,6 +293,8 @@ export default function OrganizationLayoutClient({
     const aiGatewayHref = scopeProjectSlug ? scopedProjectHref("ai-gateway") : orgProductHref("ai-gateway");
     // Memory belongs to the selected project; without one there is no entry.
     const memoryHref = scopeProjectSlug ? scopedProjectHref("memory") : null;
+    // Copilot's pages live under the selected project's address, like Memory.
+    const copilotHref = scopeProjectSlug ? scopedProjectHref("copilot") : null;
     // The sidebar Settings entry has one stable meaning: settings for the
     // selected project. Organization settings are entered deliberately from
     // the user menu instead of changing this destination based on the page the
@@ -318,7 +330,8 @@ export default function OrganizationLayoutClient({
             path === "/organization/ai-gateway" ||
             path === `${basePath}/ai-gateway` ||
             path === `${orgBase}/~/ai-gateway` ||
-            path === memoryHref;
+            path === memoryHref ||
+            path === copilotHref;
         if (exactMatchOnly) return pathname === path;
         if (pathname === path) return true;
         if (pathname.startsWith(path + "/")) return true;
@@ -366,6 +379,8 @@ export default function OrganizationLayoutClient({
             setActiveView("ai-gateway");
         } else if (isMemoryPath(pathname)) {
             setActiveView("memory");
+        } else if (isCopilotPath(pathname)) {
+            setActiveView("copilot");
         } else if (isProjectSettingsView) {
             setActiveView("project-settings");
         } else if (isOrganizationSettingsView) {
@@ -442,6 +457,12 @@ export default function OrganizationLayoutClient({
     const buildItems = [
         { href: scopeProjectSlug ? scopedProjectHref("agents") : orgProductHref("agents"), icon: <HugeiconsIcon icon={ThreeDRotateIcon} className="!h-5 !w-5" />, label: "Agents" },
     ];
+    const copilotSubItems = copilotHref
+        ? [
+            { href: copilotHref, icon: <HugeiconsIcon icon={PlusSignIcon} className="!h-5 !w-5" />, label: "New chat" },
+            { href: `${copilotHref}/usage`, icon: <HugeiconsIcon icon={Chart01Icon} className="!h-5 !w-5" />, label: "Usage" },
+        ]
+        : [];
     const memorySubItems = memoryHref
         ? [
             { href: memoryHref, icon: <HugeiconsIcon icon={DashboardCircleIcon} className="!h-5 !w-5" />, label: "Overview" },
@@ -650,7 +671,7 @@ export default function OrganizationLayoutClient({
                                         </span>
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
-                                {activeView === "ai-gateway" || (activeView === "memory" && memoryHref) ? (
+                                {activeView === "ai-gateway" || (activeView === "memory" && memoryHref) || (activeView === "copilot" && copilotHref) ? (
                                     <>
                                         <SidebarMenuItem>
                                             <SidebarMenuButton
@@ -662,24 +683,42 @@ export default function OrganizationLayoutClient({
                                                 <span className="text-sm">Back</span>
                                             </SidebarMenuButton>
                                         </SidebarMenuItem>
-                                        {(activeView === "memory" ? memorySubItems : projectSubItems).map((item) => (
+                                        {(activeView === "memory" ? memorySubItems : activeView === "copilot" ? copilotSubItems : projectSubItems).map((item) => (
                                             <SidebarMenuItem key={item.href}>
                                                 <SidebarMenuButton
                                                     asChild
                                                     tooltip={item.label}
-                                                    isActive={isActive(item.href) || (
+                                                    // New chat is an action, not a place: the open conversation
+                                                    // is highlighted under Recent chats instead.
+                                                    isActive={item.href !== copilotHref && (isActive(item.href) || (
                                                         pendingSubnavEntry === activeView
                                                         && (item.href === aiGatewayHref || item.href === memoryHref)
-                                                    )}
+                                                    ))}
                                                     size="sm"
                                                 >
-                                                    <Link href={item.href} prefetch={true} onMouseEnter={() => prefetchRoute(item.href)}>
+                                                    <Link
+                                                        href={item.href}
+                                                        prefetch={true}
+                                                        onMouseEnter={() => prefetchRoute(item.href)}
+                                                        onClick={item.href === copilotHref ? (event) => {
+                                                            // Chat opens whatever conversation the cookie names, so
+                                                            // clear it; if Chat is already open, reset it in place.
+                                                            document.cookie = `${COPILOT_CONVERSATION_COOKIE}=; path=/; max-age=0; samesite=lax`;
+                                                            if (pathname === copilotHref) {
+                                                                event.preventDefault();
+                                                                window.dispatchEvent(new Event(COPILOT_NEW_CHAT_EVENT));
+                                                            }
+                                                        } : undefined}
+                                                    >
                                                         {item.icon}
                                                         <span className="text-sm">{item.label}</span>
                                                     </Link>
                                                 </SidebarMenuButton>
                                             </SidebarMenuItem>
                                         ))}
+                                        {activeView === "copilot" && copilotHref && organization?.id && (
+                                            <CopilotRecentChats organizationId={organization.id} chatHref={copilotHref} />
+                                        )}
                                     </>
                                 ) : activeView === "project-settings" ? (
                                     <>
@@ -816,6 +855,31 @@ export default function OrganizationLayoutClient({
                                             </SidebarMenuItem>
                                         )}
                                         {runItems.map(renderMenuItem)}
+                                        {/* Copilot toggle */}
+                                        {copilotHref && (
+                                            <SidebarMenuItem>
+                                                <SidebarMenuButton
+                                                    asChild
+                                                    isActive={isCopilotPath(pathname)}
+                                                    size="sm"
+                                                    className="gap-1"
+                                                >
+                                                    <Link
+                                                        href={copilotHref}
+                                                        prefetch={true}
+                                                        onClick={() => {
+                                                            setPendingSubnavEntry("copilot");
+                                                            setActiveView("copilot");
+                                                        }}
+                                                        onMouseEnter={() => prefetchRoute(copilotHref)}
+                                                    >
+                                                        <HugeiconsIcon icon={AirdropIcon} className="!h-5 !w-5" />
+                                                        <span className="text-sm">Copilot</span>
+                                                        <ChevronRight className="!h-3 !w-3 ml-auto text-muted-foreground/50" />
+                                                    </Link>
+                                                </SidebarMenuButton>
+                                            </SidebarMenuItem>
+                                        )}
                                         {renderBottomItems()}
                                     </>
                                 )}

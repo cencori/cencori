@@ -408,6 +408,8 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         docsUrl: 'https://maximoai.co/platform',
         keyPrefix: '',
         models: [
+            { id: 'maximo-atlas-1.5', name: 'Maximo Atlas 1.5', type: ['chat', 'reasoning', 'code', 'vision'], contextWindow: 1000000, description: 'Agentic coding and reasoning with text and image input, 1M context / 128K max output, prompt caching, reasoning low→max. $0.20/$0.03 cached/$1.00 per 1M', capabilities: { tools: true }, addedAt: '2026-10-25' },
+            { id: 'maximo-atlas-1.4', name: 'Maximo Atlas 1.4', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'Agentic coding across large codebases, 1M context / 128K max output, prompt caching, reasoning low→max. $0.20/$0.03 cached/$1.00 per 1M', capabilities: { tools: true }, addedAt: '2026-10-25' },
             { id: 'maximo-atlas-1.3', name: 'Maximo Atlas 1.3', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'Full-stack frontier agent for terminal, code, and web work at max reasoning effort, $0.20/$0.02 cached/$0.50 per 1M', capabilities: { tools: true }, addedAt: '2026-09-23' },
             { id: 'maximo-atlas-1.2', name: 'Maximo Atlas 1.2', type: ['chat', 'reasoning', 'code', 'vision'], contextWindow: 1000000, description: 'Agentic coding & debugging across large codebases, image input, 1M context / 128K max output, prompt caching, reasoning low→max. $0.11/$0.01 cached/$0.30 per 1M through 2026-08-31 UTC, then $0.55/$0.05/$1.50', capabilities: { tools: true }, addedAt: '2026-08-17' },
             // maximo-atlas-1.1 retired 2026-09-23: gone from Maximo's live

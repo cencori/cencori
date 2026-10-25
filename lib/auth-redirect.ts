@@ -292,6 +292,7 @@ export function getConsoleAwareNavigationTarget(
         "/deployments",
         "/monetization",
         "/revenue",
+        "/copilot",
         "/webhooks",
         "/settings",
         "/projects",

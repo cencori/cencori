@@ -191,7 +191,7 @@ interface ExtractedVision {
 export function extractVisionRequest(
     messages: RawMessage[],
     model: string,
-    opts: { maxTokens?: number; temperature?: number; stream?: boolean }
+    opts: { maxTokens?: number; temperature?: number; stream?: boolean; reasoningEffort?: string }
 ): ExtractedVision {
     const textParts: string[] = [];
     let image: { url?: string; base64?: string; mimeType?: string } | null = null;
@@ -243,6 +243,7 @@ export function extractVisionRequest(
             prompt: textParts.join('\n\n') || 'Describe this image in detail.',
             model,
             maxTokens: opts.maxTokens,
+            reasoningEffort: opts.reasoningEffort,
             temperature: opts.temperature,
             stream: opts.stream,
         },
@@ -300,6 +301,8 @@ export interface RunVisionChatArgs {
     maxTokens?: number;
     temperature?: number;
     stream?: boolean;
+    /** Passed to reasoning vision models; their thinking counts against maxTokens. */
+    reasoningEffort?: string;
     guardedPrompt: string;
     inputText: string;
     inputSecurity: SecurityCheckResult;
@@ -326,6 +329,7 @@ export async function runVisionChat(args: RunVisionChatArgs): Promise<Response> 
         maxTokens,
         temperature,
         stream,
+        reasoningEffort,
         guardedPrompt,
         inputText,
         inputSecurity,
@@ -342,6 +346,7 @@ export async function runVisionChat(args: RunVisionChatArgs): Promise<Response> 
         maxTokens,
         temperature,
         stream,
+        reasoningEffort,
     });
     visionRequest.prompt = guardedPrompt || 'Describe this image in detail.';
 

@@ -61,6 +61,13 @@ export type V1ExecuteParams = {
      */
     wireFormat?: 'openai' | 'cencori';
     /**
+     * OpenAI `stream_options.include_usage`: on the 'openai' wire, end the
+     * stream with one extra chunk carrying `usage` and empty `choices`, as
+     * OpenAI does, plus Cencori's `cost_usd`. Off by default, so existing
+     * clients see no change.
+     */
+    includeUsage?: boolean;
+    /**
      * Server-side max_tokens enforcement: some providers ignore max_tokens,
      * so the stream is cut off with finish_reason "length" (and non-stream
      * content sliced) once the estimate crosses the limit.
@@ -793,6 +800,18 @@ export async function runV1ProviderExecution(
                         controller.enqueue(
                             sse(buildOpenAiStreamChunk(meta.actualModel, {}, meta.finishReason))
                         );
+                        if (params.includeUsage) {
+                            controller.enqueue(
+                                sse({
+                                    ...buildOpenAiStreamChunk(meta.actualModel, {}, null),
+                                    choices: [],
+                                    usage: toOpenAiUsage(figures),
+                                    // Cencori extension: what this request was charged.
+                                    // Extra fields are ignored by OpenAI clients.
+                                    cost_usd: figures.cencoriChargeUsd,
+                                })
+                            );
+                        }
                     }
                     controller.enqueue(encoder.encode('data: [DONE]\n\n'));
                     params.performance?.markComplete(figures.completionTokens);

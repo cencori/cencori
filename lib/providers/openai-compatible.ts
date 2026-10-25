@@ -190,7 +190,7 @@ export function openAICompatibleReasoningEffort(
     providerName: string,
     request: Pick<UnifiedChatRequest, 'model' | 'reasoningEffort'>,
 ): OpenAI.ReasoningEffort | undefined {
-    if (providerName === 'maximo' && /^maximo-atlas-1\.[23]$/.test(request.model)) {
+    if (providerName === 'maximo' && /^maximo-atlas-1\.[2-5]$/.test(request.model)) {
         // Maximo supports Low through Max; max extends the OpenAI SDK's enum.
         const effort = request.reasoningEffort;
         return effort && ['low', 'medium', 'high', 'xhigh', 'max'].includes(effort)

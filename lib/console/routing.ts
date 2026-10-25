@@ -34,6 +34,7 @@ const PROJECT_ROOTS = new Set([
   "monetization",
   "revenue",
   "agents",
+  "copilot",
   "webhooks",
   "settings",
 ]);
