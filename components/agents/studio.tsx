@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, type QueryClient } from "@tanstack/react-query";
 
 /*
  * Shared data for the Agents section. Every agents page reads the same studio
@@ -15,7 +15,23 @@ export type Tenant = { id: string; name: string; external_id: string; status: st
 export type Installation = { id: string; agent_id: string; tenant_id: string; agent_version_id: string | null; status: string };
 export type Run = { id: string; agent_id: string; tenant_id: string | null; status: string; error: string | null; created_at: string };
 export type Model = { id: string; name: string; provider: string; locked?: boolean };
-export type Workspace = { can_manage: boolean; studio_ready: boolean; agents: Agent[]; versions: Version[]; tenants: Tenant[]; installations: Installation[]; runs: Run[]; models: Model[]; default_model?: string; model_locked?: boolean };
+export type Workspace = { can_manage: boolean; studio_ready: boolean; agents: Agent[]; versions: Version[]; tenants: Tenant[]; installations: Installation[]; runs: Run[] };
+export type AgentModels = { models: Model[]; default_model: string; model_locked: boolean };
+
+/** The models agents can use, for the model pickers. Separate from the workspace: it's slow to build and rarely changes. */
+export function useAgentModels(projectId: string | null | undefined) {
+    return useQuery<AgentModels>({
+        queryKey: ["agentModels", projectId ?? null],
+        enabled: !!projectId,
+        staleTime: 5 * 60_000,
+        refetchOnWindowFocus: false,
+        queryFn: async () => {
+            const response = await fetch(`/api/projects/${projectId}/embedded-agents/studio?part=models`);
+            if (!response.ok) throw new Error("Couldn't load the models.");
+            return response.json() as Promise<AgentModels>;
+        },
+    });
+}
 
 /** The models this organization's agents can use (below the Business plan, just the default). */
 export function usableModels(models: Model[]): Model[] {
@@ -45,6 +61,28 @@ export function useAgentStudio(projectId: string | undefined) {
             return response.json() as Promise<Workspace>;
         },
     });
+}
+
+/**
+ * After a change: show the saved version straight away (the server returns
+ * it), then refresh everything in the background. Nobody waits for the
+ * whole workspace to reload just to see their own edit.
+ */
+export function applyStudioResult(
+    queryClient: QueryClient,
+    projectId: string,
+    result: Record<string, unknown> | null | undefined,
+    agentPatch?: { id: string; name?: string; description?: string | null },
+) {
+    const version = result?.version as Version | null | undefined;
+    if (version?.id || agentPatch) {
+        queryClient.setQueryData<Workspace>(studioQueryKey(projectId), (workspace) => workspace && {
+            ...workspace,
+            versions: version?.id ? workspace.versions.map((item) => (item.id === version.id ? { ...item, ...version } : item)) : workspace.versions,
+            agents: agentPatch ? workspace.agents.map((item) => (item.id === agentPatch.id ? { ...item, ...agentPatch } : item)) : workspace.agents,
+        });
+    }
+    void queryClient.invalidateQueries({ queryKey: studioQueryKey(projectId) });
 }
 
 /** POST an action to the studio endpoint; throws with the server's message. */

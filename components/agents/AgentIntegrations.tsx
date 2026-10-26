@@ -14,7 +14,7 @@ import { useAgentWorkspace } from "@/components/agents/AgentWorkspace";
 import { DockedPanel } from "@/components/agents/DockedPanel";
 import { ServerIcon } from "@/components/agents/AgentMcp";
 import { AgentCatalog, catalogQueryKey, startCatalog, useCatalog } from "@/components/agents/AgentCatalog";
-import { postStudioAction, studioQueryKey } from "@/components/agents/studio";
+import { applyStudioResult, postStudioAction } from "@/components/agents/studio";
 import { readJson } from "@/components/agents/widget-preview";
 import { cn } from "@/lib/utils";
 
@@ -145,13 +145,14 @@ export function AgentIntegrations({ adding, onAddingChange }: { adding: boolean;
     }, [adding]);
     useEffect(() => () => { cancelled.current = true; }, []);
 
-    const refetchAgent = () => queryClient.invalidateQueries({ queryKey: studioQueryKey(projectId) });
+    // Show the saved draft from the response; the full reload runs in the background.
+    const refetchAgent = (result?: Record<string, unknown> | null) => applyStudioResult(queryClient, projectId, result);
 
     /** Add (or refresh) the app on this agent's draft, once the project has it connected. */
     const attach = async (integration: string, name: string, refreshing = false) => {
         if (!version) return;
         const result = await postStudioAction(projectId, "integration_attach", { agent_id: agent.id, version_id: version.id, integration }) as { integration?: AgentApp };
-        await refetchAgent();
+        refetchAgent(result as Record<string, unknown>);
         const app = result.integration;
         toast.success(refreshing ? `${name} refreshed` : `${name} added`, app ? { description: `${app.enabled.length} of ${app.tools.length} tools on.` } : undefined);
     };
@@ -244,8 +245,7 @@ export function AgentIntegrations({ adding, onAddingChange }: { adding: boolean;
         setWorking(server.id);
         setError(null);
         try {
-            await postStudioAction(projectId, "save_tools", { agent_id: agent.id, version_id: version.id, mcp_servers: servers.filter((s) => s.id !== server.id).map(({ id, name: serverName, enabled }) => ({ id, name: serverName, enabled })) });
-            await refetchAgent();
+            refetchAgent(await postStudioAction(projectId, "save_tools", { agent_id: agent.id, version_id: version.id, mcp_servers: servers.filter((s) => s.id !== server.id).map(({ id, name: serverName, enabled }) => ({ id, name: serverName, enabled })) }));
             toast.success(`${name} removed`);
         } catch (cause) {
             setError(cause instanceof Error ? cause.message : "Couldn't remove it. Try again.");
@@ -259,8 +259,7 @@ export function AgentIntegrations({ adding, onAddingChange }: { adding: boolean;
         setWorking("save");
         setError(null);
         try {
-            await postStudioAction(projectId, "save_tools", { agent_id: agent.id, version_id: version.id, integrations: next.map(({ id, name, enabled }) => ({ id, name, enabled })) });
-            await refetchAgent();
+            refetchAgent(await postStudioAction(projectId, "save_tools", { agent_id: agent.id, version_id: version.id, integrations: next.map(({ id, name, enabled }) => ({ id, name, enabled })) }));
             if (message) toast.success(message);
         } catch (cause) {
             setError(cause instanceof Error ? cause.message : "Couldn't save. Try again.");
@@ -296,8 +295,7 @@ export function AgentIntegrations({ adding, onAddingChange }: { adding: boolean;
             let note = takePaymentsOn ? `${agent.name} can take payments.` : "";
             if (!takePaymentsOn && version && editable) {
                 const current = (version.config_json.system_tools ?? {}) as Record<string, unknown>;
-                await postStudioAction(projectId, "save_tools", { agent_id: agent.id, version_id: version.id, system_tools: { ...current, take_payments: {} } });
-                await refetchAgent();
+                refetchAgent(await postStudioAction(projectId, "save_tools", { agent_id: agent.id, version_id: version.id, system_tools: { ...current, take_payments: {} } }));
                 note = "Take payments is on in this draft. Publish to make it live.";
             } else if (!takePaymentsOn) {
                 note = "Turn on Take payments under Tools in a new draft.";
@@ -333,7 +331,7 @@ export function AgentIntegrations({ adding, onAddingChange }: { adding: boolean;
         try {
             const { payload, note } = await startCatalog(projectId, agent.id, version ?? null, editable);
             queryClient.setQueryData(catalogQueryKey(projectId), payload);
-            await refetchAgent();
+            refetchAgent();
             toast.success("Products added", { description: note || "Add your products, or import a spreadsheet." });
             onAddingChange(false);
         } catch (cause) {

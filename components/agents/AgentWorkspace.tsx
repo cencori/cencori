@@ -7,6 +7,7 @@ import {
     emptyAgentForm,
     isLockedVersion,
     isSimpleVersion,
+    applyStudioResult,
     postStudioAction,
     studioQueryKey,
     useAgentStudio,
@@ -153,7 +154,11 @@ export function AgentWorkspaceProvider({
         setError(null);
         try {
             const result = await postStudioAction(projectId, action, payload);
-            await queryClient.invalidateQueries({ queryKey });
+            const agentId = typeof payload.agent_id === "string" ? payload.agent_id : null;
+            // A saved draft renames the agent too: show both without waiting for a reload.
+            applyStudioResult(queryClient, projectId, result, action === "save_draft" && agentId
+                ? { id: agentId, name: String(payload.name ?? ""), description: (payload.description as string) || null }
+                : undefined);
             return result;
         } catch (cause) {
             setError(cause instanceof Error ? cause.message : "That didn't work. Try again.");

@@ -3,7 +3,7 @@
 import { ModelSelect } from "@/components/dashboard/embedded-agents/ModelSelect";
 import { Button } from "@/components/ui/button";
 import { useAgentWorkspace } from "@/components/agents/AgentWorkspace";
-import { MODEL_LOCK_NOTE, usableModels } from "@/components/agents/studio";
+import { MODEL_LOCK_NOTE, usableModels, useAgentModels } from "@/components/agents/studio";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const VISIBILITY = [
@@ -26,7 +26,8 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 /** The agent itself: name, instructions, model and who can use it. */
 export default function AgentConfigurePage() {
-    const { data, form, updateForm, version, visualEditable, editable, simpleVersion, canManage, setVisibility, busy, dirty, saveDraft, discardChanges, publishedVersion } = useAgentWorkspace();
+    const { projectId, form, updateForm, version, visualEditable, editable, simpleVersion, canManage, setVisibility, busy, dirty, saveDraft, discardChanges, publishedVersion } = useAgentWorkspace();
+    const models = useAgentModels(projectId).data;
     const locked = !visualEditable || !canManage;
     // What customers and the marketplace see comes from the live version.
     const visibility = (publishedVersion ?? version)?.visibility ?? "private";
@@ -82,8 +83,8 @@ export default function AgentConfigurePage() {
 
                 <div className="space-y-7">
                     <Section title="Model">
-                        <ModelSelect value={form.model} onChange={(value) => updateForm("model", value)} models={usableModels(data.models)} disabled={locked} placeholder="Choose a model" />
-                        {data.model_locked && <p className="mt-2 text-xs text-muted-foreground">{MODEL_LOCK_NOTE}</p>}
+                        <ModelSelect value={form.model} onChange={(value) => updateForm("model", value)} models={usableModels(models?.models ?? [])} disabled={locked} placeholder="Choose a model" />
+                        {models?.model_locked && <p className="mt-2 text-xs text-muted-foreground">{MODEL_LOCK_NOTE}</p>}
                     </Section>
                     {version && (
                         <Section title="Visibility">
