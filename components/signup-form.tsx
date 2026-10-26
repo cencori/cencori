@@ -1,5 +1,6 @@
 "use client";
 
+import { rememberSignupTrack } from "@/lib/signup-track";
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
@@ -52,6 +53,12 @@ export function SignupForm({ className, ...props }: SignupFormProps) {
   const [success, setSuccess] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const signupFor = searchParams.get("for");
+
+  // business.cencori.com sends ?for=business: onboarding starts them on a business plan.
+  useEffect(() => {
+    rememberSignupTrack(signupFor);
+  }, [signupFor]);
 
   // Already signed in (e.g. in another tab) → skip the form entirely.
   // getSession() returns null when the session is expired, so expired

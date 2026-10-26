@@ -12,6 +12,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { formatCurrency } from "@/lib/currency";
 import { DitherCanvas, type DitherVariant } from "./DitherCanvas";
 import { HomeUsageStats } from "./HomeUsageStats";
+import { BusinessHomeLoading, useBusinessHome } from "./BusinessHomeRedirect";
 import memoryArt from "@/public/console/explore-memory.webp";
 import multimodalArt from "@/public/console/explore-multimodal.webp";
 
@@ -180,6 +181,8 @@ export function ConsoleHomeOverview({
 
     const greeting = greetingForHour(new Date().getHours());
     const billingHref = consoleMode ? "/billing" : `/${orgSlug}/~/billing`;
+    const businessHome = useBusinessHome(orgSlug, projectSlug, projectId);
+    if (businessHome) return <BusinessHomeLoading />;
 
     return (
         <section className="mx-auto w-full max-w-[1360px] px-6 py-8">

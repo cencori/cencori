@@ -38,6 +38,10 @@ const CONVERSATION_MAX_TURNS = 40;
 const CONVERSATION_IDLE_MS = 24 * 60 * 60_000;
 const FALLBACK_REPLY = 'Sorry, I couldn\'t answer that just now. Please try again in a moment.';
 const UNSUPPORTED_REPLY = 'Sorry, I can only read text and voice notes for now. Could you type that out?';
+/** When the business's plan has no conversations left (or isn't active). */
+const PLAN_CLOSED_REPLY = 'Sorry, we can\'t chat here right now. Please call or visit us directly.';
+class PlanClosedError extends Error {}
+
 const UNHEARD_REPLY = 'Sorry, I couldn\'t catch that voice note. Could you send it again or type it?';
 /** Voice-note transcription models, in the order tried. */
 const VOICE_MODELS = ['nova-3', 'whisper-1'];
@@ -153,7 +157,7 @@ async function answer(db: Admin, channel: WhatsAppChannel, customer: string, nam
         reply = await runTurn(db, channel, customer, name, texts.join('\n'));
     } catch (error) {
         console.error('[whatsapp] turn failed', error instanceof Error ? error.message : error);
-        reply = FALLBACK_REPLY;
+        reply = error instanceof PlanClosedError ? PLAN_CLOSED_REPLY : FALLBACK_REPLY;
     }
     if (!reply.trim()) return;
     try {
@@ -228,12 +232,16 @@ async function meterTranscription(db: Admin, channel: WhatsAppChannel, organizat
     const use = { ...result, providerCostUsd: result.usesByok ? 0 : (result.durationSeconds / 60) * pricing.unitPriceUsd };
     const requestId = crypto.randomUUID();
     let charged = use.providerCostUsd <= 0;
+    // A business plan's price covers its voice notes too: nothing to take from credits.
+    const { getOrganizationPlan } = await import('@/lib/business/plans');
+    const planCovered = !charged && (await getOrganizationPlan(db as never, organizationId)).accountType === 'business';
+    if (planCovered) charged = true;
     if (!charged) {
         const { data: org } = await db.from('organizations').select('subscription_tier').eq('id', organizationId).maybeSingle();
         const { chargeProjectUsageCredits } = await import('@/lib/project-credit-billing');
         charged = await chargeProjectUsageCredits(organizationId, (org?.subscription_tier as string | undefined) ?? 'free', use.providerCostUsd, 'audio/transcriptions', requestId).catch(() => false);
     }
-    const charge = charged ? use.providerCostUsd : 0;
+    const charge = charged && !planCovered ? use.providerCostUsd : 0;
     await db.from('ai_requests').insert({
         project_id: channel.projectId,
         environment: 'production',
@@ -286,6 +294,10 @@ async function customerSession(db: Admin, channel: WhatsAppChannel, customer: st
     const { checkCustomRateLimit } = await import('@/lib/rate-limit');
     const perDay = await checkCustomRateLimit(`wa_day:${channel.id}`, channel.metadata.daily_session_cap, 86_400);
     if (!perDay.allowed) throw new Error('Daily conversation cap reached');
+    // A business plan pays per conversation: count this one before it starts.
+    const { consumeConversation } = await import('@/lib/business/plans');
+    const counted = await consumeConversation(db as never, organizationId);
+    if (!counted.ok) throw new PlanClosedError(counted.message);
     const { data: created, error } = await db.from('sessions').insert({
         project_id: projectId,
         organization_id: organizationId || null,

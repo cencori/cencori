@@ -11,6 +11,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
     const corePages = [
         { url: baseUrl, priority: 1.0, changeFrequency: 'daily' as const },
         { url: `${baseUrl}/pricing`, priority: 0.9, changeFrequency: 'weekly' as const },
+        // The two front doors, on their own subdomains.
+        { url: 'https://business.cencori.com', priority: 0.9, changeFrequency: 'weekly' as const },
+        { url: 'https://developers.cencori.com', priority: 0.9, changeFrequency: 'weekly' as const },
         { url: `${baseUrl}/docs`, priority: 0.9, changeFrequency: 'weekly' as const },
     ];
 
@@ -43,7 +46,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
         { url: `${baseUrl}/newsroom/developers`, priority: 0.7, changeFrequency: 'weekly' as const },
         { url: `${baseUrl}/newsroom/community`, priority: 0.6, changeFrequency: 'weekly' as const },
         { url: `${baseUrl}/newsroom/customers`, priority: 0.6, changeFrequency: 'weekly' as const },
-        { url: `${baseUrl}/developers/blog`, priority: 0.7, changeFrequency: 'weekly' as const },
         { url: `${baseUrl}/careers`, priority: 0.6, changeFrequency: 'weekly' as const },
         { url: `${baseUrl}/changelog`, priority: 0.7, changeFrequency: 'weekly' as const },
         { url: `${baseUrl}/contact`, priority: 0.6, changeFrequency: 'monthly' as const },

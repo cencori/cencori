@@ -42,6 +42,7 @@ export const RESERVED_ORG_SLUGS: ReadonlySet<string> = new Set([
     "contact",
     "customers",
     "developers",
+    "business",
     "enterprise",
     "events",
     "examples",
