@@ -5,8 +5,7 @@ import { createServerClient } from "@/lib/supabaseServer";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { adjustCredits } from "@/lib/credits";
 import { revalidatePath } from "next/cache";
-import { listPayins } from "@/lib/bachsClient";
-import type { BachsPayin } from "@/lib/bachsClient";
+import { listBachsTopups, toInvoiceSummary } from "@/lib/billing/bachs-invoices";
 import { getStripeBillingClient } from "@/lib/stripe-billing";
 import {
     upsertStripeCustomerProfile,
@@ -211,70 +210,54 @@ async function writeBillingAuditEvent(params: {
 }
 
 export async function getInvoices(orgSlug: string) {
+    const orgResult = await getAuthorizedOrgBillingDetails(orgSlug);
+    if ('error' in orgResult) {
+        return [];
+    }
+    const { org } = orgResult;
+
+    const [stripeInvoices, bachsInvoices] = await Promise.all([
+        getStripeInvoices(org.stripe_customer_id),
+        listBachsTopups(createAdminClient(), org.id)
+            .then((topups) => topups.map((topup): BillingInvoice => toInvoiceSummary(org.slug, topup)))
+            .catch((error) => {
+                console.error("Error fetching Bachs invoices:", error);
+                return [];
+            }),
+    ]);
+
+    return [...stripeInvoices, ...bachsInvoices].sort((a, b) => b.date.localeCompare(a.date));
+}
+
+async function getStripeInvoices(customerId: string | null): Promise<BillingInvoice[]> {
+    if (!customerId) return [];
     try {
-        const orgResult = await getAuthorizedOrgBillingDetails(orgSlug);
-        if ('error' in orgResult) {
-            return [];
-        }
+        const stripe = getStripeBillingClient();
+        const invoices = await stripe.invoices.list({
+            customer: customerId,
+            limit: 20,
+        });
 
-        const stripeCustomerId = orgResult.org.stripe_customer_id;
-        if (stripeCustomerId) {
-            try {
-                const stripe = getStripeBillingClient();
-                const invoices = await stripe.invoices.list({
-                    customer: stripeCustomerId,
-                    limit: 20,
-                });
-
-                return invoices.data.map((invoice): BillingInvoice => {
-                    const status: BillingInvoice['status'] = invoice.status === 'paid'
-                        ? 'paid'
-                        : invoice.status === 'open' || invoice.status === 'draft'
-                            ? 'pending'
-                            : invoice.status === 'void'
-                                ? 'refunded'
-                                : 'failed';
-
-                    return {
-                        id: invoice.number || invoice.id,
-                        orderId: invoice.id,
-                        date: new Date(invoice.created * 1000).toISOString(),
-                        amount: (invoice.amount_paid || invoice.amount_due) / 100,
-                        status,
-                        pdfUrl: invoice.invoice_pdf || invoice.hosted_invoice_url || null,
-                    };
-                });
-            } catch (stripeError) {
-                console.error("Error fetching Stripe invoices:", stripeError);
-            }
-        }
-
-        const customerId = orgResult.org.bachs_customer_id;
-        if (!customerId) return [];
-
-        const response = await listPayins({ customer_id: customerId, per_page: 20 });
-
-        const payins = response.payins || [];
-
-        return payins.map((payin: BachsPayin): BillingInvoice => {
-            const status: BillingInvoice['status'] =
-                payin.status === 'SUCCEEDED' || payin.status === 'SETTLED'
-                    ? 'paid'
-                    : payin.status === 'PENDING'
-                        ? 'pending'
-                        : 'refunded';
+        return invoices.data.map((invoice): BillingInvoice => {
+            const status: BillingInvoice['status'] = invoice.status === 'paid'
+                ? 'paid'
+                : invoice.status === 'open' || invoice.status === 'draft'
+                    ? 'pending'
+                    : invoice.status === 'void'
+                        ? 'refunded'
+                        : 'failed';
 
             return {
-                id: payin.id,
-                orderId: payin.charge_id || payin.id,
-                date: payin.created_at,
-                amount: Math.round(parseFloat(payin.amount) * 100) / 100,
+                id: invoice.number || invoice.id,
+                orderId: invoice.id,
+                date: new Date(invoice.created * 1000).toISOString(),
+                amount: (invoice.amount_paid || invoice.amount_due) / 100,
                 status,
-                pdfUrl: null,
+                pdfUrl: invoice.invoice_pdf || invoice.hosted_invoice_url || null,
             };
         });
-    } catch (error) {
-        console.error("Error fetching invoices:", error);
+    } catch (stripeError) {
+        console.error("Error fetching Stripe invoices:", stripeError);
         return [];
     }
 }

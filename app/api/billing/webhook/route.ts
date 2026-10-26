@@ -192,7 +192,12 @@ async function handleCollectionSucceeded(
         paymentReference: data.charge_id,
         organizationId: orgId,
         amountUsd: netCreditsAfterFee(grossCredits),
-        metadata: { product_id: productId, gross_credits_usd: grossCredits },
+        // charged_usd is the card total with Bachs's fee; invoices show it.
+        metadata: {
+          product_id: productId,
+          gross_credits_usd: grossCredits,
+          ...(charge.currency === 'USD' ? { charged_usd: Number(charge.amount) } : {}),
+        },
       });
 
       await supabase
