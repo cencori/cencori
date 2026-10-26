@@ -3,6 +3,7 @@
 import { ModelSelect } from "@/components/dashboard/embedded-agents/ModelSelect";
 import { Button } from "@/components/ui/button";
 import { useAgentWorkspace } from "@/components/agents/AgentWorkspace";
+import { MODEL_LOCK_NOTE, usableModels } from "@/components/agents/studio";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const VISIBILITY = [
@@ -81,7 +82,8 @@ export default function AgentConfigurePage() {
 
                 <div className="space-y-7">
                     <Section title="Model">
-                        <ModelSelect value={form.model} onChange={(value) => updateForm("model", value)} models={data.models} disabled={locked} placeholder="Choose a model" />
+                        <ModelSelect value={form.model} onChange={(value) => updateForm("model", value)} models={usableModels(data.models)} disabled={locked} placeholder="Choose a model" />
+                        {data.model_locked && <p className="mt-2 text-xs text-muted-foreground">{MODEL_LOCK_NOTE}</p>}
                     </Section>
                     {version && (
                         <Section title="Visibility">

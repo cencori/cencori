@@ -6,6 +6,7 @@ import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { RESERVED_ORG_SLUGS, isReservedSlug } from "@/lib/reserved-slugs";
+import { mainSiteSubdomainRedirect, marketingSubdomainFor, routeMarketingSubdomain } from "@/lib/marketing/subdomains";
 import {
   ACTIVE_ORG_COOKIE,
   ACTIVE_PROJECT_COOKIE,
@@ -571,6 +572,36 @@ export async function proxy(request: NextRequest) {
   // Skip rewriting for static files (images, etc)
   // If it has a dot and isn't just a hidden file/folder (like .well-known), assume it's a file
   const isFile = pathname.includes(".") && !pathname.startsWith("/.well-known");
+
+  // The two front doors: cencori.com/developers and /business moved to their own
+  // subdomains, which serve their own pages and send everything else to cencori.com.
+  const mainSiteMove = isFile ? null : mainSiteSubdomainRedirect(domain, pathname);
+  if (mainSiteMove) {
+    const movedUrl = request.nextUrl.clone();
+    movedUrl.host = mainSiteMove.host;
+    movedUrl.port = "";
+    movedUrl.protocol = "https:";
+    movedUrl.pathname = mainSiteMove.pathname;
+    return applySecurityHeaders(NextResponse.redirect(movedUrl, 308));
+  }
+  const frontDoor = isFile ? null : marketingSubdomainFor(domain);
+  if (frontDoor) {
+    const route = routeMarketingSubdomain(frontDoor, pathname);
+    if (route.kind === "rewrite") {
+      const url = request.nextUrl.clone();
+      url.pathname = route.pathname;
+      return applySecurityHeaders(NextResponse.rewrite(url));
+    }
+    const target = request.nextUrl.clone();
+    target.pathname = route.pathname;
+    if (route.host === "main") {
+      // developers.localhost:3000 → localhost:3000; developers.cencori.com → cencori.com.
+      target.hostname = domain.endsWith(".localhost") ? "localhost" : "cencori.com";
+    } else {
+      target.host = hostname;
+    }
+    return applySecurityHeaders(NextResponse.redirect(target, route.host === "main" ? 307 : 308));
+  }
 
   if (isConsoleSubdomain && !isFile && (pathname === "/" || pathname === "")) {
     const homeUrl = request.nextUrl.clone();

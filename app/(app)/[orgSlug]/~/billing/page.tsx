@@ -20,6 +20,7 @@ import { InvoiceHistory } from "@/components/dashboard/billing/InvoiceHistory";
 import { BillingCommunication } from "@/components/dashboard/billing/BillingCommunication";
 import { PaymentMethods } from "@/components/dashboard/billing/PaymentMethods";
 import { OperationalControls } from "./OperationalControls";
+import { BusinessPlan, useBusinessPlan } from "@/components/dashboard/billing/BusinessPlan";
 
 interface Organization {
     id: string;
@@ -146,6 +147,7 @@ export default function BillingPage({ params }: PageProps) {
     const [checkoutNotice, setCheckoutNotice] = useState<CheckoutNotice>(null);
     const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
     const { org, projects, transactions, invoices, paymentMethods, isLoading, error, refetchOrg } = useBillingData(orgSlug);
+    const businessPlan = useBusinessPlan(org?.id);
     const checkoutId = searchParams.get('checkout_session_id') || searchParams.get('checkout_id');
     const checkoutCancelled = searchParams.get('checkout') === 'cancelled';
     const checkoutConfirmed = checkoutNotice?.kind === 'confirming'
@@ -267,6 +269,25 @@ export default function BillingPage({ params }: PageProps) {
                         Try again
                     </Button>
                 </div>
+            ) : businessPlan.data?.account_type === "business" ? (
+            <div>
+                <BusinessPlan orgId={org.id} data={businessPlan.data} />
+                <BillingCommunication
+                    orgSlug={orgSlug}
+                    email={org.billing_email || ''}
+                    address={{
+                        name: org.name,
+                        line1: org.billing_address_line1 || '',
+                        line2: org.billing_address_line2 || '',
+                        city: org.billing_city || '',
+                        state: org.billing_state || '',
+                        zip: org.billing_zip || '',
+                        country: org.billing_country || '',
+                        taxId: org.billing_tax_id || ''
+                    }}
+                />
+                <InvoiceHistory invoices={invoices} />
+            </div>
             ) : (
             <div>
                 <PlanDetails

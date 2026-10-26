@@ -151,7 +151,7 @@ export function RestaurantSetup({ projectId, basePath, models, onBack }: { proje
 
                 <div>
                     <span className="mb-2 block text-xs font-medium">Model</span>
-                    <ModelSelect value={model} onChange={setModel} models={models} placeholder="Choose a model later" />
+                    <ModelSelect value={model} onChange={setModel} models={models} placeholder="DeepSeek V4 Flash" />
                 </div>
 
                 {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
