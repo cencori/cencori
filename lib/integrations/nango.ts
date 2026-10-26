@@ -62,26 +62,49 @@ export interface NangoIntegration {
     categories: string[];
 }
 
-/** Nango's provider catalog changes rarely: categories are cached for a day. */
-let providerCategories: { at: number; byProvider: Map<string, string[]> } | null = null;
-async function categoriesByProvider(): Promise<Map<string, string[]>> {
-    if (providerCategories && Date.now() - providerCategories.at < 24 * 3_600_000) return providerCategories.byProvider;
-    try {
-        const { data } = await nango<{ data: Array<{ name: string; categories?: string[] }> }>('GET', '/providers');
-        providerCategories = { at: Date.now(), byProvider: new Map(data.map((p) => [p.name, p.categories ?? []])) };
-    } catch {
-        providerCategories = { at: Date.now() - 23 * 3_600_000, byProvider: providerCategories?.byProvider ?? new Map() };
+/**
+ * The catalog changes only when we switch an app on or off, so it's cached:
+ * in this instance's memory, and in Redis so a fresh instance doesn't wait on
+ * Nango. Categories come from each app's own provider entry (small), never
+ * from the full provider list, which takes many seconds to download.
+ */
+const CATALOG_TTL_SECONDS = 300;
+const CATEGORIES_TTL_SECONDS = 24 * 3600;
+const memory = new Map<string, { value: unknown; expiresAt: number }>();
+
+async function cached<T>(key: string, ttlSeconds: number, load: () => Promise<T>): Promise<T> {
+    const local = memory.get(key);
+    if (local && local.expiresAt > Date.now()) return local.value as T;
+    const { cacheGet, cacheSet } = await import('@/lib/integrations/shared-cache');
+    const shared = await cacheGet<T>(key);
+    if (shared !== null) {
+        memory.set(key, { value: shared, expiresAt: Date.now() + Math.min(ttlSeconds, 60) * 1000 });
+        return shared;
     }
-    return providerCategories.byProvider;
+    const value = await load();
+    memory.set(key, { value, expiresAt: Date.now() + Math.min(ttlSeconds, 60) * 1000 });
+    await cacheSet(key, value, ttlSeconds);
+    return value;
+}
+
+async function providerCategories(provider: string): Promise<string[]> {
+    return cached(`nango:categories:${provider}`, CATEGORIES_TTL_SECONDS, async () => {
+        try {
+            const result = await nango<{ data?: { categories?: string[] }; categories?: string[] }>('GET', `/providers/${encodeURIComponent(provider)}`);
+            return result.data?.categories ?? result.categories ?? [];
+        } catch {
+            return [];
+        }
+    });
 }
 
 /** The apps switched on in our Nango environment: what businesses can connect. */
 export async function listNangoIntegrations(): Promise<NangoIntegration[]> {
-    const [{ data }, categories] = await Promise.all([
-        nango<{ data: Array<{ unique_key: string; display_name: string; provider: string; logo?: string }> }>('GET', '/integrations'),
-        categoriesByProvider(),
-    ]);
-    return data.map((i) => ({ id: i.unique_key, name: i.display_name, provider: i.provider, logo: i.logo ?? null, categories: categories.get(i.provider) ?? [] }));
+    return cached('nango:integrations', CATALOG_TTL_SECONDS, async () => {
+        const { data } = await nango<{ data: Array<{ unique_key: string; display_name: string; provider: string; logo?: string }> }>('GET', '/integrations');
+        const categories = await Promise.all(data.map((i) => providerCategories(i.provider)));
+        return data.map((i, index) => ({ id: i.unique_key, name: i.display_name, provider: i.provider, logo: i.logo ?? null, categories: categories[index] }));
+    });
 }
 
 export interface NangoConnection {

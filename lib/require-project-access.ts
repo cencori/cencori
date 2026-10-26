@@ -21,7 +21,15 @@ import { createAdminClient } from '@/lib/supabaseAdmin';
  *   // access.userId / access.organizationId are now safe to use
  */
 export type ProjectAccessResult =
-    | { ok: true; userId: string; organizationId: string }
+    | {
+        ok: true;
+        userId: string;
+        organizationId: string;
+        /** The caller's role in the organization ('owner' for its owner). */
+        role: string;
+        /** The organization's developer plan. */
+        subscriptionTier: string;
+    }
     | { ok: false; response: NextResponse };
 
 export async function requireProjectAccess(projectId: string): Promise<ProjectAccessResult> {
@@ -35,7 +43,7 @@ export async function requireProjectAccess(projectId: string): Promise<ProjectAc
     const supabaseAdmin = createAdminClient();
     const { data: project, error: projectError } = await supabaseAdmin
         .from('projects')
-        .select('id, organization_id, organizations!inner(owner_id)')
+        .select('id, organization_id, organizations!inner(owner_id, subscription_tier)')
         .eq('id', projectId)
         .single();
 
@@ -44,7 +52,10 @@ export async function requireProjectAccess(projectId: string): Promise<ProjectAc
     }
 
     const organizationId = project.organization_id as string;
-    const ownerId = (project.organizations as { owner_id?: string } | null)?.owner_id || null;
+    const organization = project.organizations as { owner_id?: string; subscription_tier?: string } | null;
+    const ownerId = organization?.owner_id || null;
+    const subscriptionTier = organization?.subscription_tier || 'free';
+    let role = 'owner';
 
     if (ownerId !== user.id) {
         const { data: membership } = await supabaseAdmin
@@ -57,7 +68,8 @@ export async function requireProjectAccess(projectId: string): Promise<ProjectAc
         if (!membership) {
             return { ok: false, response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
         }
+        role = (membership.role as string | null) ?? 'member';
     }
 
-    return { ok: true, userId: user.id, organizationId };
+    return { ok: true, userId: user.id, organizationId, role, subscriptionTier };
 }

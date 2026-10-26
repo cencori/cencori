@@ -27,13 +27,23 @@ const fail = (message: string, status = 400) => NextResponse.json({ error: messa
 const cleanText = (value: unknown, max: number) => typeof value === 'string' ? value.trim().slice(0, max) : '';
 const missingVersionTestFields = (error: { code?: string; message?: string } | null) => Boolean(error && (error.code === '42703' || /(?:last_tested_at|last_test_passed).*does not exist/i.test(error.message ?? '')));
 
-async function projectRole(db: Admin, projectId: string, organizationId: string, userId: string) {
-    const { data: organization, error: organizationError } = await db.from('organizations').select('owner_id,subscription_tier').eq('id', organizationId).maybeSingle();
-    if (organizationError || !organization) throw new Error('Could not load project permissions');
-    if (organization.owner_id === userId) return { canManage: true, tier: ((organization.subscription_tier as string) || 'free') as SubscriptionTier };
-    const { data: membership, error: membershipError } = await db.from('organization_members').select('role').eq('organization_id', organizationId).eq('user_id', userId).maybeSingle();
-    if (membershipError) throw new Error('Could not load project permissions');
-    return { canManage: ['owner', 'admin'].includes((membership?.role as string) ?? ''), tier: ((organization.subscription_tier as string) || 'free') as SubscriptionTier };
+/** What the access check already learned: no extra queries. */
+function accessRole(access: { role: string; subscriptionTier: string }) {
+    return { canManage: ['owner', 'admin'].includes(access.role), tier: (access.subscriptionTier || 'free') as SubscriptionTier };
+}
+
+/**
+ * Whether this database has the version-test columns. A one-off check per
+ * server instance (the migration is long applied), not a query on every save.
+ */
+let versionTestFields: Promise<{ ok: true } | { ok: false; missing: boolean }> | null = null;
+function checkVersionTestFields(db: Admin) {
+    versionTestFields ??= Promise.resolve(db.from('agent_versions').select('last_tested_at,last_test_passed').limit(1)).then(({ error }) => {
+        if (!error) return { ok: true as const };
+        versionTestFields = null;
+        return { ok: false as const, missing: missingVersionTestFields(error) };
+    });
+    return versionTestFields;
 }
 
 async function scopedAgent(db: Admin, projectId: string, agentId: string) {
@@ -64,37 +74,79 @@ function publicWebhookToolsAsInput(config: Record<string, unknown>) {
     return readWebhookTools(config).map((tool) => ({ ...tool, headers: tool.headers.map((h) => ({ name: h.name, keep: true })) }));
 }
 
-/** Webhook and MCP header values stay server-side: the console sees header names only. */
-function withoutToolSecrets<T extends { config_json?: unknown }>(version: T): T {
+/**
+ * MCP servers and connected apps as the console shows them: header names
+ * only (values stay server-side), and each tool's name and description
+ * without its input schema. The schemas are most of a version's size (a
+ * calendar app alone is ~100 KB) and only the server uses them.
+ */
+function consoleServers(servers: AgentMcpServer[]) {
+    return publicAgentMcpServers(servers).map((server) => ({
+        ...server,
+        tools: server.tools.map(({ name, description, readOnly, destructive }) => ({ name, description: description.slice(0, 300), readOnly, destructive })),
+    }));
+}
+
+/** A version as the console needs it: no secrets, no tool schemas. */
+function forConsole<T extends { config_json?: unknown }>(version: T): T {
     const config = (version.config_json ?? null) as Record<string, unknown> | null;
-    if (!config || (!Array.isArray(config.webhook_tools) && !Array.isArray(config.mcp_servers))) return version;
+    if (!config || (!Array.isArray(config.webhook_tools) && !Array.isArray(config.mcp_servers) && !Array.isArray(config.integrations))) return version;
     return {
         ...version,
         config_json: {
             ...config,
             ...(Array.isArray(config.webhook_tools) ? { webhook_tools: publicWebhookTools(readWebhookTools(config)) } : {}),
-            ...(Array.isArray(config.mcp_servers) ? { mcp_servers: publicAgentMcpServers(readAgentMcpServers(config)) } : {}),
+            ...(Array.isArray(config.mcp_servers) ? { mcp_servers: consoleServers(readAgentMcpServers(config)) } : {}),
+            ...(Array.isArray(config.integrations) ? { integrations: consoleServers(readAgentIntegrations(config)) } : {}),
         },
     };
 }
 
-export async function GET(_request: Request, ctx: Context) {
+/**
+ * The models an agent can use, with the plan's lock. Building the registry
+ * takes a second or more, so it's its own request (only the model pickers
+ * ask for it) and kept for a minute per project and organization.
+ */
+const modelsCache = new Map<string, { at: number; body: unknown }>();
+const MODELS_TTL_MS = 60_000;
+
+async function agentModels(db: ReturnType<typeof createAdminClient>, projectId: string, organizationId: string) {
+    const key = `${organizationId}:${projectId}`;
+    const hit = modelsCache.get(key);
+    if (hit && Date.now() - hit.at < MODELS_TTL_MS) return hit.body;
+    const { BUSINESS_DEFAULT_MODEL, getOrganizationPlan, modelAllowed } = await import('@/lib/business/plans');
+    const [registry, plan] = await Promise.all([
+        buildUnifiedModelRegistry(db, { projectId, query: { available: true } }),
+        getOrganizationPlan(db as never, organizationId),
+    ]);
+    const body = {
+        models: registry.models.filter((model) => model.available && model.types.includes('chat')).slice(0, 100).map((model) => ({ id: model.id, name: model.name, provider: model.provider, locked: !modelAllowed(plan, model.id) })),
+        default_model: BUSINESS_DEFAULT_MODEL,
+        // Below the Business plan, agents use the default model only.
+        model_locked: plan.accountType === 'business' && !(plan.plan?.allModels && plan.active),
+    };
+    if (modelsCache.size > 500) modelsCache.clear();
+    modelsCache.set(key, { at: Date.now(), body });
+    return body;
+}
+
+export async function GET(request: Request, ctx: Context) {
     const { projectId } = await ctx.params;
     const access = await requireProjectAccess(projectId);
     if (!access.ok) return access.response;
     const db = createAdminClient();
     try {
-        const { BUSINESS_DEFAULT_MODEL, getOrganizationPlan, modelAllowed } = await import('@/lib/business/plans');
-        const [{ canManage }, agents, versions, tenants, installations, runs, schemaProbe, registry, plan] = await Promise.all([
-            projectRole(db, projectId, access.organizationId, access.userId),
+        if (new URL(request.url).searchParams.get('part') === 'models') {
+            return NextResponse.json(await agentModels(db, projectId, access.organizationId), { headers: { 'Cache-Control': 'private, max-age=60' } });
+        }
+        const [{ canManage }, agents, versions, tenants, installations, runs, schemaProbe] = await Promise.all([
+            Promise.resolve(accessRole(access)),
             db.from('agents').select('id,name,description,is_active,stable_version_id,created_at').eq('project_id', projectId).order('created_at', { ascending: false }).limit(100),
             db.from('agent_versions').select('*').eq('project_id', projectId).order('created_at', { ascending: false }).limit(300),
             db.from('platform_tenants').select('id,name,external_id,status,created_at').eq('project_id', projectId).order('created_at', { ascending: false }).limit(100),
             db.from('agent_installations').select('id,agent_id,tenant_id,agent_version_id,status,created_at').eq('project_id', projectId).order('created_at', { ascending: false }).limit(200),
             db.from('embedded_runs').select('id,agent_id,tenant_id,status,error,created_at').eq('project_id', projectId).order('created_at', { ascending: false }).limit(30),
             db.from('agent_versions').select('last_tested_at,last_test_passed').eq('project_id', projectId).limit(1),
-            buildUnifiedModelRegistry(db, { projectId, query: { available: true } }),
-            getOrganizationPlan(db as never, access.organizationId),
         ]);
         const queries = { agents, versions, tenants, installations, runs };
         const failed = Object.entries(queries).find(([, result]) => result.error);
@@ -109,12 +161,8 @@ export async function GET(_request: Request, ctx: Context) {
         return NextResponse.json({
             can_manage: canManage,
             studio_ready: !schemaProbe.error,
-            agents: agents.data ?? [], versions: (versions.data ?? []).map(withoutToolSecrets), tenants: tenants.data ?? [],
+            agents: agents.data ?? [], versions: (versions.data ?? []).map(forConsole), tenants: tenants.data ?? [],
             installations: installations.data ?? [], runs: runs.data ?? [],
-            models: registry.models.filter((model) => model.available && model.types.includes('chat')).slice(0, 100).map((model) => ({ id: model.id, name: model.name, provider: model.provider, locked: !modelAllowed(plan, model.id) })),
-            default_model: BUSINESS_DEFAULT_MODEL,
-            // Below the Business plan, agents use the default model only.
-            model_locked: plan.accountType === 'business' && !(plan.plan?.allModels && plan.active),
         });
     } catch (error) {
         console.error('[Embedded Agents studio] GET failed:', error);
@@ -128,14 +176,15 @@ export async function POST(request: Request, ctx: Context) {
     if (!access.ok) return access.response;
     const db = createAdminClient();
     try {
-        const { canManage, tier } = await projectRole(db, projectId, access.organizationId, access.userId);
+        const { canManage, tier } = accessRole(access);
         if (!canManage) return fail('Only project admins can manage agents and customer installations.', 403);
-        const { error: schemaError } = await db.from('agent_versions').select('last_tested_at,last_test_passed').eq('project_id', projectId).limit(1);
-        if (schemaError) {
-            const missingFields = missingVersionTestFields(schemaError);
-            return fail(missingFields ? 'Agent editing is unavailable because this database is missing the version test migration.' : 'Could not verify agent editing readiness. Try again.', missingFields ? 503 : 502);
+        const [schema, body] = await Promise.all([
+            checkVersionTestFields(db),
+            request.json().catch(() => null) as Promise<Record<string, unknown> | null>,
+        ]);
+        if (!schema.ok) {
+            return fail(schema.missing ? 'Agent editing is unavailable because this database is missing the version test migration.' : 'Could not verify agent editing readiness. Try again.', schema.missing ? 503 : 502);
         }
-        const body = await request.json().catch(() => null) as Record<string, unknown> | null;
         if (!body || typeof body.action !== 'string') return fail('Choose an action.');
 
         // Connected apps (integrations) are project-level: what's on offer, and
@@ -310,23 +359,26 @@ export async function POST(request: Request, ctx: Context) {
                 config_json: config, checksum: checksumConfig(config), status: 'draft',
                 last_tested_at: null, last_test_passed: false,
             }).eq('project_id', projectId).eq('agent_id', agentId).eq('id', versionId)
-                .in('status', ['draft', 'ready_for_review']).select('id').maybeSingle();
+                .in('status', ['draft', 'ready_for_review']).select('*').maybeSingle();
             if (saveError || !saved) return fail('Draft changed while you were editing. Refresh and try again.', 409);
             const { error: nameError } = await db.from('agents').update({ name, description: description || null }).eq('project_id', projectId).eq('id', agentId);
             if (nameError) return fail('Draft saved, but the agent name could not be updated. Refresh and try again.', 502);
-            return NextResponse.json({ version_id: versionId });
+            // The saved version, so the console shows it without reloading everything.
+            return NextResponse.json({ version_id: versionId, version: forConsole(saved as { config_json?: unknown }) });
         }
 
         // The agent's tools (webhook and system). Either list may be sent alone. Saved like any edit: the draft goes back
         // to untested, so publishing runs a fresh test.
         // Writes a draft's new config: saved like any edit, so the draft goes
         // back to untested and publishing runs a fresh test.
+        let savedVersion: Record<string, unknown> | null = null;
         const saveDraftConfig = async (config: AgentVersionConfig) => {
             const { data: saved, error: saveError } = await db.from('agent_versions').update({
                 config_json: config, checksum: checksumConfig(config), status: 'draft',
                 last_tested_at: null, last_test_passed: false,
             }).eq('project_id', projectId).eq('agent_id', agentId).eq('id', versionId)
-                .in('status', ['draft', 'ready_for_review']).select('id').maybeSingle();
+                .in('status', ['draft', 'ready_for_review']).select('*').maybeSingle();
+            if (saved) savedVersion = saved as Record<string, unknown>;
             return !saveError && !!saved;
         };
         const lockedVersion = version && ['published', 'deprecated', 'retired'].includes(version.status as string);
@@ -392,7 +444,7 @@ export async function POST(request: Request, ctx: Context) {
                 const stillUsed = new Set(((others ?? []) as Array<{ config_json: Record<string, unknown> | null }>).flatMap((other) => readAgentMcpServers(other.config_json).map((server) => server.oauth?.connection_id)).filter(Boolean));
                 await revokeMcpConnections(db, projectId, dropped.filter((id) => !stillUsed.has(id))).catch(() => undefined);
             }
-            return NextResponse.json({ version_id: versionId, webhook_tools: publicWebhookTools(built.tools), system_tools: system.tools, mcp_servers: publicAgentMcpServers(mcp.servers), integrations: publicAgentMcpServers(apps.servers) });
+            return NextResponse.json({ version_id: versionId, version: savedVersion ? forConsole(savedVersion) : null, webhook_tools: publicWebhookTools(built.tools), system_tools: system.tools, mcp_servers: consoleServers(mcp.servers), integrations: consoleServers(apps.servers) });
         }
 
         // Paste a server URL: connect, list its tools and add it to the draft in
@@ -425,7 +477,7 @@ export async function POST(request: Request, ctx: Context) {
             const mcp = buildAgentMcpServers(servers.map(({ id, name, enabled }) => ({ id, name, enabled })), stored, [connected.server]);
             if (!mcp.ok) return fail(mcp.message);
             if (!(await saveDraftConfig({ ...existing, mcp_servers: mcp.servers }))) return fail('Draft changed while you were editing. Refresh and try again.', 409);
-            return NextResponse.json({ ok: true, server: publicAgentMcpServers([connected.server])[0] });
+            return NextResponse.json({ ok: true, server: consoleServers([connected.server])[0], version: savedVersion ? forConsole(savedVersion) : null });
         }
 
         // Sign in to an OAuth MCP server: register Cencori with it and return
@@ -473,7 +525,7 @@ export async function POST(request: Request, ctx: Context) {
                 const checked = buildAgentMcpServers(next.map(({ id, name, enabled: on }) => ({ id, name, enabled: on })), stored, [server]);
                 if (!checked.ok) return fail(checked.message);
                 if (!(await saveDraftConfig({ ...existing, integrations: checked.servers }))) return fail('Draft changed while you were editing. Refresh and try again.', 409);
-                return NextResponse.json({ integration: publicAgentMcpServers([server])[0] });
+                return NextResponse.json({ integration: consoleServers([server])[0], version: savedVersion ? forConsole(savedVersion) : null });
             } catch (error) {
                 return fail(error instanceof NangoError ? error.message : 'Could not add that app.', 502);
             }
