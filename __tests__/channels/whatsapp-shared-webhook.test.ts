@@ -43,6 +43,7 @@ describe('shared WhatsApp webhook (Embedded Signup numbers)', () => {
         channels.set('111111', { id: 'c1', status: 'active', metadata: { enabled: true } });
         channels.set('222222', { id: 'c2', status: 'active', metadata: { enabled: false } });
         for (const id of ['111111', '222222', '333333']) expect((await POST(signed(delivery(id)))).status).toBe(200);
+        await vi.waitFor(() => expect(handled).toHaveBeenCalledTimes(1));
         await flush();
         expect(handled).toHaveBeenCalledTimes(1);
         expect((handled.mock.calls[0] as unknown[])[1]).toMatchObject({ id: 'c1' });
