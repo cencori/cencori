@@ -1,0 +1,88 @@
+---
+title: "Find your way around the console"
+description: "Where everything lives in the Cencori console: projects, the sidebar, settings, your organization and your account."
+section: "Getting Started"
+order: 2
+---
+
+The console is where you set up and run everything on Cencori. It's organized in three levels:
+
+- **Organization:** your company or team. It holds the credit balance, billing, members and projects.
+- **Project:** one app or environment, like "Production API" or "Staging". Keys, logs, agents, memory and settings all belong to a project.
+- **Account:** you. Your profile, sign-in methods and sessions.
+
+## The sidebar
+
+The sidebar always shows the project you're in.
+
+### Switching projects
+
+Click the project name at the top of the sidebar. From there you can search your projects, switch to another one, **Create project**, or **Manage projects** to see them all. Switching keeps you on the same page in the new project, so if you're on Logs you land on the new project's Logs.
+
+### Search
+
+**Search** (or <kbd>⌘</kbd> <kbd>K</kbd>, <kbd>Ctrl</kbd> <kbd>K</kbd> on Windows) jumps to a page, a project or the docs, or starts an action like creating a project.
+
+### Main menu
+
+| Item | What's there |
+| --- | --- |
+| **Overview** | The project's home: setup steps, usage at a glance and links to the APIs. |
+| **AI Gateway** | Opens the gateway menu (below). |
+| **Agents** | Your agents. Click one to open its own menu. See [Agents](/docs/agents/overview). |
+| **Memory** | Opens the memory menu: Overview, Memories, Graph and Controls. See [Memory dashboard](/docs/memory/dashboard). |
+| **Copilot** | Opens the Copilot menu: New chat, Usage and your recent chats. See [Copilot](/docs/platform/copilot). |
+| **Settings** | The project's settings. See [Project settings](/docs/platform/project-settings). |
+
+Items with their own menu (AI Gateway, Memory, Copilot, an agent) swap the sidebar for that menu. Click **Back** at the top to return to the main menu.
+
+### AI Gateway menu
+
+| Item | What's there |
+| --- | --- |
+| **Overview** | Requests, cost, latency and errors over time. See [Observability](/docs/platform/ai-gateway/observability). |
+| **Logs** | Every request, searchable, with full details. See [Usage and logs](/docs/platform/ai-gateway/observability#logs). |
+| **BYOK** | Your own provider keys. See [Bring your own key](/docs/platform/byok). |
+| **Models** | Every model you can call, with prices. See [Models and Playground](/docs/platform/ai-gateway/playground). |
+| **Playground** | Try models side by side without writing code. See [Models and Playground](/docs/platform/ai-gateway/playground). |
+| **Revenue** | Charge your own customers for AI usage. See [Monetization](/docs/platform/monetization). |
+
+### An agent's menu
+
+Opening an agent shows its pages: **Overview**, **Agent**, **Knowledge**, **Tools**, **Runs**, **Customers**, **Marketplace** and **Settings**. See [Agents](/docs/agents/overview).
+
+## The top bar
+
+- **Breadcrumbs** show where you are. Click any part to go back up.
+- **Credit balance** shows your organization's balance. Click it to open Billing and top up.
+- **Copilot** opens the assistant beside the page you're on.
+
+## Your menu
+
+Click your name at the bottom of the sidebar:
+
+| Item | What it does |
+| --- | --- |
+| **Organization** and **Organizations** | The organization you're in, and the others you belong to. Click one to switch. |
+| **New organization** | Create another organization. |
+| **Organization settings** | General, Advanced, Teams, Billing, Usage and Audit Log. See [Organizations](/docs/platform/organizations). |
+| **Profile** and **Settings** | Your account. See [Account](/docs/platform/account). |
+| **Theme** | Light, dark or match your system. |
+| **Log out** | Sign out of Cencori. |
+
+## Where to find things
+
+| I want to… | Go to |
+| --- | --- |
+| Create an API key | Project **Settings → API** |
+| Add my OpenAI or Anthropic key | **AI Gateway → BYOK** |
+| See why a request failed | **AI Gateway → Logs**, then click the request |
+| Set a spending limit | Project **Settings → Budget** |
+| Set up fallback to another provider | Project **Settings → Providers** |
+| Turn on PII protection or caching | Project **Settings → General** |
+| Get notified about events | Project **Settings → Webhooks** |
+| Top up credits | The credit balance in the top bar, or **Organization settings → Billing** |
+| Invite a teammate | **Organization settings → Teams** |
+| See who changed what | **Organization settings → Audit Log** |
+| Build a chatbot for my business | **Agents → Create agent** |
+| Sign out of other devices | Your menu → **Settings → Security** |

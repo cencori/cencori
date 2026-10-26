@@ -314,7 +314,7 @@ Users are created automatically when usage is recorded for the first time, eithe
 You can also manage users explicitly through the dashboard.
 
 > [!NOTE]
-> Project management routes such as `/api/projects/{projectId}/end-users` are currently dashboard management endpoints backed by the authenticated Supabase session cookie. They do not yet support bearer-token auth for external automation.
+> Managing users from your own code isn't available yet: use the dashboard, or the End-User API below for usage and quotas.
 
 ### End-User API
 
@@ -481,7 +481,7 @@ Both billing endpoints (`https://api.cencori.com/v1/billing/*`) use the same API
 > [!CAUTION]
 > Only secret keys (`csk_*`) can report usage and check quotas. Publishable keys (`cpk_*`) are rejected.
 
-Dashboard management endpoints (`/api/projects/*`) use the authenticated Supabase session cookie and are not accessible via API key.
+Dashboard management actions aren't available with an API key.
 
 ## Environment Scoping
 

@@ -1,0 +1,70 @@
+---
+title: "Project settings"
+description: "Every tab in a project's Settings: name and request handling, budget, providers and failover, networking, integrations, API keys and webhooks."
+section: "Platform"
+order: 4
+---
+
+Open a project and click **Settings** at the bottom of the sidebar. The settings menu has eight tabs.
+
+## General
+
+- **Project name:** shown throughout the console.
+- **Project ID:** the stable identifier used in the API and in URLs. Click **Copy** to copy it.
+- **Request handling:** two optional switches, both off by default:
+  - **Response caching:** reuse stored responses for repeated requests instead of calling the model again. See [Caching](/docs/platform/ai-gateway/caching).
+  - **PII protection:** block requests that contain emails, phone numbers, SSNs or card numbers. Blocked requests appear in Logs. Paid plans. See [PII protection](/docs/security/pii-detection).
+- **Delete project:** permanently removes the project and its data. This can't be undone.
+
+## Budget
+
+- **Current month spend:** what this project's AI usage has cost so far this billing period.
+- **Monthly budget:** the amount you expect to spend. You get alerts as you approach it.
+- **Spend cap:** a hard limit. Turn on **Enforce spend cap** and requests are blocked once the project reaches it.
+- **Budget alerts:** emails at 50%, 80% and 100% of the budget.
+
+## Providers
+
+- **Default provider** and **default model:** used when a request doesn't name a model.
+- **Rate limiting:** requests per minute, tokens per day and concurrent requests for this project. See [Rate limiting](/docs/platform/ai-gateway/rate-limiting).
+- **Fallback:** turn on **automatic fallback** to send a request to a backup provider when the first one fails. Pick the **fallback provider** and **model** (leave the model empty to match the original model automatically), and how many **retries** to try first. See [Routing and failover](/docs/platform/ai-gateway/routing-failover).
+- **Circuit breaker:** stop sending traffic to a provider that keeps failing. Set the **failure threshold** (failures in a row before it trips) and the **recovery timeout** (seconds before trying the provider again).
+- **Requests by geography:** where this project's requests come from, by country.
+
+## Infrastructure
+
+A read-only view of how this project is served: its endpoint, live availability and latency for each configured provider (click refresh to check), and the request limits and defaults in effect. Change limits and defaults on the **Providers** tab.
+
+## Networking
+
+- **API base URL** and **region:** where your app sends requests.
+- **Access mode:**
+  - **Public ingress** (default): requests are accepted from anywhere, with a valid API key.
+  - **Restricted ingress:** only requests from the IP addresses or ranges you list are accepted. Add one address or CIDR range per line. Everything else is refused before it reaches a model, so it costs nothing.
+
+## Integrations
+
+Connect outside services to the project. Under **FinOps**, connect **CostGraph** to send usage and cost data. See [CostGraph](/docs/integrations/costgraph). Missing a tool? Use **Suggest an integration**.
+
+Agents have their own integrations (calendars, stores, payments), set up on each agent's Tools page. See [Agent tools](/docs/agents/tools).
+
+## API
+
+Keys that let your app call Cencori.
+
+- **Secret keys** (`csk_…`): for your server. Keep them private: never put one in browser code, a mobile app or source control.
+- **Publishable keys** (`cpk_…`): safe for browser code, but only work from the **allowed domains** you set when creating the key, for example `localhost, *.myapp.com`.
+
+Click **New secret key** or **New publishable key**, give it a name, and copy it from **Key created**: it's shown once. To replace a key, create a new one, update your app, then **revoke** the old one. If a key leaks, revoke it straight away.
+
+## Webhooks
+
+Send events to your own endpoint as they happen. **Create webhook**, give it a name and an endpoint URL, and choose events:
+
+| Event | When |
+| --- | --- |
+| **Request completed** | An AI request completes successfully. |
+| **Request failed** | An AI request fails. |
+| **Security incident** | A security incident is detected. |
+| **Quota warning** | Usage reaches 80% of the quota. |
+| **Quota exceeded** | Usage passes the monthly quota. |

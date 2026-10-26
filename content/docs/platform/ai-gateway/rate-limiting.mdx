@@ -19,32 +19,21 @@ Cencori enforces a per-project rate limit (per-minute). There is no monthly requ
 | Control-plane reads (run status, run events) | Per project | **300 requests** (fixed 60s window, separate bucket) |
 | Run cancellation | Per project | **Exempt** — never rate limited |
 
-Reads draw from their own bucket (`rate_limit:<projectId>:read`), so status polling can never starve the write budget that run creation uses. Cancellation is always admitted: the corrective action for overload must never itself be blocked by overload. `X-RateLimit-Limit` on each response tells you which tier applied. Need more write throughput? Add a second project.
+Reads have their own allowance, so status polling never uses up the budget for creating runs. Cancellation is always admitted: the corrective action for overload must never itself be blocked by overload. `X-RateLimit-Limit` on each response tells you which tier applied. Need more write throughput? Add a second project.
 
-> Warning: to know, write limits are enforced project-wide across **all** AI endpoints (chat, vision, audio, embeddings), not per endpoint.
+> Note: write limits are enforced project-wide across **all** AI endpoints (chat, vision, audio, embeddings), not per endpoint.
 
 ## Polling guidance
 
 Poll run status no faster than **once every 2 seconds**, always honor the `Retry-After` header on `429`, and back off rather than retrying aggressively. For fleets of concurrent runs, prefer webhooks (`run.completed` delivery) or `mode: 'sync'` over per-run poll loops.
 
-## Architecture & Performance
+## How the window works
 
-Cencori uses **Redis-backed fixed-window** counters keyed by project id (`rate_limit:<projectId>`, reads under `rate_limit:<projectId>:read`). Checks run in a single Redis pipeline (INCR + TTL, expiry set once per window):
-
-- **Sub-millisecond check:** a single round-trip keeps overhead small.
-- **Fixed window:** the expiry is set once when the window opens and is never refreshed — rejected requests do not extend the block, so the window always ends on schedule.
-- **Fail-closed by default:** if the Redis backend is unavailable the request is rejected with `503 rate_limit_unavailable` unless fail-open mode is enabled for the deployment.
+Each limit counts requests in a fixed 60-second window. Rejected requests don't count against you or extend the wait: when the window ends, your full allowance is back.
 
 ## Monthly Requests
 
-There is no monthly request ceiling on any plan — free included. The
-organization's `monthly_requests_used` counter still increments once per
-successful request and resets on the monthly cycle (see `cron/reset-usage`), but
-it is a reporting figure only and nothing is refused when it grows.
-
-What does bound usage is spend, not request count: an organization out of
-credits gets `402 insufficient_credits`, a frozen account gets `403
-billing_frozen`, and per-key spend caps apply where configured.
+There is no monthly request ceiling on any plan. What bounds usage is spend, not request count: an organization out of credits gets `402 insufficient_credits`, a frozen account gets `403 billing_frozen`, and spend caps apply where you've set them (project **Settings → Budget**).
 
 ## Rate Limit Headers
 
@@ -143,7 +132,7 @@ async function makeSmartRequest(messages: any[]) {
 3. **Use Request Queues:** Queue requests and process them at a controlled rate to stay under limits.
 4. **Cache Responses:** Turn on [Response caching](/docs/platform/ai-gateway/caching) so repeated identical requests are served from cache.
 5. **Distribute Load:** If hitting limits, consider using multiple projects (each has its own 60/min window).
-6. **Audio calls count too:** transcriptions and speech each consume one request per minute window; multiplier projects for heavy audio workloads.
+6. **Audio calls count too:** transcriptions and speech each count as one request; spread heavy audio workloads across projects.
 
 ## Request Queue Implementation
 
@@ -198,7 +187,6 @@ const queue = new RequestQueue(60); // 60 requests per minute
 If you consistently hit limits:
 
 - Create **additional projects** — each project gets its own 60/min window.
-- Raise the **monthly cap** by upgrading the organization's plan.
 - Contact sales for custom Enterprise limits.
 - Optimize usage patterns (batching, caching, queues).
 

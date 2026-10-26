@@ -5,7 +5,7 @@ import type { NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { RESERVED_ORG_SLUGS } from "@/lib/reserved-slugs";
+import { RESERVED_ORG_SLUGS, isReservedSlug } from "@/lib/reserved-slugs";
 import {
   ACTIVE_ORG_COOKIE,
   ACTIVE_PROJECT_COOKIE,
@@ -869,7 +869,9 @@ export async function proxy(request: NextRequest) {
     // slug-based URLs continue to work as compatibility aliases.
     if (consoleRoute) {
       const url = request.nextUrl.clone();
-      const organizationSlug = request.cookies.get(ACTIVE_ORG_COOKIE)?.value ?? null;
+      // A reserved word is never a workspace (an older redirect could save one).
+      const savedOrganization = request.cookies.get(ACTIVE_ORG_COOKIE)?.value ?? null;
+      const organizationSlug = savedOrganization && !isReservedSlug(savedOrganization) ? savedOrganization : null;
       const projectSlug = request.cookies.get(ACTIVE_PROJECT_COOKIE)?.value ?? null;
       const scopedPath = organizationSlug
         ? buildScopedConsolePath(consoleRoute, organizationSlug, projectSlug)
