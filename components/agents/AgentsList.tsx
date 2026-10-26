@@ -90,6 +90,9 @@ export function AgentsList({ projectId }: { projectId: string }) {
                                                 key={agent.id}
                                                 className="cursor-pointer border-b border-border/40 last:border-b-0 hover:bg-muted/50"
                                                 onClick={() => router.push(`${basePath}/${encodeURIComponent(agent.id)}`)}
+                                                // Load the agent's page while the pointer is on its row, so the click opens it instantly.
+                                                onMouseEnter={() => router.prefetch(`${basePath}/${encodeURIComponent(agent.id)}`)}
+                                                onTouchStart={() => router.prefetch(`${basePath}/${encodeURIComponent(agent.id)}`)}
                                             >
                                                 <TableCell className="w-full max-w-0 px-3 py-2.5">
                                                     <div className="flex items-center gap-2.5">

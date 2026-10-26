@@ -18,7 +18,7 @@ import { useAgentWorkspace } from "@/components/agents/AgentWorkspace";
 import { DockedPanel } from "@/components/agents/DockedPanel";
 import { AgentMcp } from "@/components/agents/AgentMcp";
 import { AgentIntegrations } from "@/components/agents/AgentIntegrations";
-import { postStudioAction, studioQueryKey } from "@/components/agents/studio";
+import { applyStudioResult, postStudioAction, useAgentModels } from "@/components/agents/studio";
 import { cn } from "@/lib/utils";
 import { END_CONVERSATION_TOOL, REQUEST_CALLBACK_TOOL, SELL_PRODUCTS_TOOL, SYSTEM_TOOL_DEFAULT_DESCRIPTIONS, TAKE_PAYMENTS_TOOL, TRANSFER_TO_HUMAN_TOOL } from "@/lib/embedded/system-tool-defaults";
 
@@ -65,11 +65,12 @@ function hostOf(url: string) {
 
 /** The agent's tools: webhooks it can call mid-conversation. */
 export function AgentTools() {
-    const { projectId, agent, version, editable, canManage, busy, data, form } = useAgentWorkspace();
+    const { projectId, agent, version, editable, canManage, busy, form } = useAgentWorkspace();
+    const models = useAgentModels(projectId).data;
     const queryClient = useQueryClient();
     const tools = ((version?.config_json.webhook_tools ?? []) as SavedTool[]).filter((tool) => tool && typeof tool.name === "string");
     // Cohere models don't take tools through the gateway yet; say so rather than let tools sit unused.
-    const modelProvider = data.models.find((model) => model.id === form.model)?.provider;
+    const modelProvider = models?.models.find((model) => model.id === form.model)?.provider;
     const hasAnyTools = tools.length > 0 || Object.keys((version?.config_json.system_tools ?? {}) as object).length > 0 || ((version?.config_json.mcp_servers ?? []) as unknown[]).length > 0;
     // `?tab=integrations` opens on that tab (the setup checklist links there).
     const initialTab = useSearchParams().get("tab");
@@ -88,8 +89,7 @@ export function AgentTools() {
         setSaving(true);
         setError(null);
         try {
-            await postStudioAction(projectId, "save_tools", { agent_id: agent.id, version_id: version.id, webhook_tools: next.map(toPayload) });
-            await queryClient.invalidateQueries({ queryKey: studioQueryKey(projectId) });
+            applyStudioResult(queryClient, projectId, await postStudioAction(projectId, "save_tools", { agent_id: agent.id, version_id: version.id, webhook_tools: next.map(toPayload) }));
             toast.success(message);
             return true;
         } catch (cause) {
@@ -376,8 +376,7 @@ function SystemTools() {
         setSaving(key);
         setError(null);
         try {
-            await postStudioAction(projectId, "save_tools", { agent_id: agent.id, version_id: version.id, system_tools: { ...systemPayload(saved), [key]: value } });
-            await queryClient.invalidateQueries({ queryKey: studioQueryKey(projectId) });
+            applyStudioResult(queryClient, projectId, await postStudioAction(projectId, "save_tools", { agent_id: agent.id, version_id: version.id, system_tools: { ...systemPayload(saved), [key]: value } }));
             toast.success(message);
             return true;
         } catch (cause) {
