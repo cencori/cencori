@@ -9,11 +9,14 @@
  *   version as `system_tools`.
  */
 
+import { waitUntil } from '@vercel/functions';
 import { safeOutboundFetch } from '@/lib/security/outbound-url';
+import { isBookingTool } from './owner-alerts';
 import { executeWebhookTool, readWebhookTools, webhookToolDefinitions, type WebhookTool } from './webhook-tools';
 import { agentMcpBindings, readAgentIntegrations, readAgentMcpServers, runAgentMcpTool, warmAgentMcpSessions } from './agent-mcp';
 import {
     END_CONVERSATION_TOOL,
+    REQUEST_CALLBACK_TOOL,
     SYSTEM_TOOL_DEFAULT_DESCRIPTIONS,
     SYSTEM_TOOL_DESCRIPTION_MAX,
     TRANSFER_RULES_MAX,
@@ -21,9 +24,9 @@ import {
     TRANSFER_TO_HUMAN_TOOL,
 } from './system-tool-defaults';
 
-export { END_CONVERSATION_TOOL, TRANSFER_TO_HUMAN_TOOL };
+export { END_CONVERSATION_TOOL, REQUEST_CALLBACK_TOOL, TRANSFER_TO_HUMAN_TOOL };
 /** Names webhook tools can't take: the model would see two tools with one name. */
-export const SYSTEM_TOOL_NAMES = [END_CONVERSATION_TOOL, TRANSFER_TO_HUMAN_TOOL] as const;
+export const SYSTEM_TOOL_NAMES = [END_CONVERSATION_TOOL, TRANSFER_TO_HUMAN_TOOL, REQUEST_CALLBACK_TOOL] as const;
 
 const TRANSFER_TIMEOUT_MS = 10_000;
 
@@ -51,6 +54,8 @@ export interface SystemTools {
     end_conversation?: { description?: string };
     /** The agent may hand the person to a human; details are POSTed to this URL. */
     transfer_to_human?: { url: string; description?: string; rules?: string[] };
+    /** The agent may ask the team to call someone back; the owner is emailed (owner alerts). */
+    request_callback?: { description?: string };
 }
 
 export type AgentToolCall = { id: string; name: string; args: string };
@@ -105,6 +110,11 @@ export function readSystemTools(config: Record<string, unknown> | null | undefin
         const rules = cleanRules(transfer.rules);
         tools.transfer_to_human = { url: transfer.url, ...(description ? { description } : {}), ...(rules.length ? { rules } : {}) };
     }
+    const callback = raw.request_callback as { description?: unknown } | boolean | null | undefined;
+    if (callback === true || (callback && typeof callback === 'object')) {
+        const description = typeof callback === 'object' ? cleanDescription(callback.description) : '';
+        tools.request_callback = description ? { description } : {};
+    }
     return tools;
 }
 
@@ -133,11 +143,34 @@ export function buildSystemTools(input: unknown): { ok: true; tools: SystemTools
         const rules = cleanRules(transfer.rules);
         tools.transfer_to_human = { url: parsed.toString(), ...(description ? { description } : {}), ...(rules.length ? { rules } : {}) };
     }
+    const callback = raw.request_callback as { description?: unknown } | boolean | null | undefined;
+    if (callback === true || (callback && typeof callback === 'object')) {
+        const description = typeof callback === 'object' ? cleanDescription(callback.description) : '';
+        tools.request_callback = description ? { description } : {};
+    }
     return { ok: true, tools };
 }
 
 /** A system tool as the model sees it: the owner's description or the default, plus transfer rules. */
-function systemDefinition(name: typeof END_CONVERSATION_TOOL | typeof TRANSFER_TO_HUMAN_TOOL, system: SystemTools): FunctionToolDefinition {
+function systemDefinition(name: typeof END_CONVERSATION_TOOL | typeof TRANSFER_TO_HUMAN_TOOL | typeof REQUEST_CALLBACK_TOOL, system: SystemTools): FunctionToolDefinition {
+    if (name === REQUEST_CALLBACK_TOOL) {
+        return {
+            type: 'function',
+            function: {
+                name,
+                description: system.request_callback?.description || SYSTEM_TOOL_DEFAULT_DESCRIPTIONS[REQUEST_CALLBACK_TOOL],
+                parameters: {
+                    type: 'object',
+                    properties: {
+                        name: { type: 'string', description: 'The person\'s name.' },
+                        phone: { type: 'string', description: 'The number to call them on.' },
+                        reason: { type: 'string', description: 'What they need, in a sentence or two, so the team can call prepared.' },
+                    },
+                    required: ['phone', 'reason'],
+                },
+            },
+        };
+    }
     if (name === END_CONVERSATION_TOOL) {
         return {
             type: 'function',
@@ -191,6 +224,7 @@ export function agentToolset(config: Record<string, unknown> | null | undefined)
         ...webhookToolDefinitions(webhooks),
         ...(system.end_conversation ? [systemDefinition(END_CONVERSATION_TOOL, system)] : []),
         ...(system.transfer_to_human ? [systemDefinition(TRANSFER_TO_HUMAN_TOOL, system)] : []),
+        ...(system.request_callback ? [systemDefinition(REQUEST_CALLBACK_TOOL, system)] : []),
     ];
     // MCP and connected-app tool names never shadow the agent's own tools.
     const mcp = agentMcpBindings([...readAgentMcpServers(config), ...readAgentIntegrations(config)], new Set(local.map((d) => d.function.name)));
@@ -212,13 +246,49 @@ export function agentToolset(config: Record<string, unknown> | null | undefined)
             if (call.name === TRANSFER_TO_HUMAN_TOOL && system.transfer_to_human) {
                 return transferToHuman(system.transfer_to_human.url, call.args, context);
             }
+            if (call.name === REQUEST_CALLBACK_TOOL && system.request_callback) {
+                return requestCallback(call.args, context);
+            }
             const webhook = byName.get(call.name);
             if (webhook) return executeWebhookTool(webhook, call.args, { organizationId: context.organizationId, signal: context.signal });
             const binding = mcpByName.get(call.name);
-            if (binding) return runAgentMcpTool(binding, call.args, context.organizationId, context.projectId);
+            if (binding) {
+                const outcome = await runAgentMcpTool(binding, call.args, context.organizationId, context.projectId);
+                // The owner hears about each booking the agent makes (owner alerts), without holding up the reply.
+                if (outcome.ok && isBookingTool(binding.tool)) {
+                    waitUntil(import('./owner-alerts').then(async ({ notifyBooking }) => {
+                        const { createAdminClient } = await import('@/lib/supabaseAdmin');
+                        await notifyBooking({ db: createAdminClient(), projectId: context.projectId, agentId: context.agentId, agentName: context.agentName, surface: context.surface, conversationId: context.conversationId }, call.args);
+                    }).catch(() => undefined));
+                }
+                return outcome;
+            }
             return { ok: false, output: `There's no tool named ${call.name}.` };
         },
     };
+}
+
+/** Email the owner to call someone back. The outcome tells the agent whether a callback was really arranged. */
+async function requestCallback(argumentsJson: string, context: AgentToolContext): Promise<AgentToolOutcome> {
+    let args: { name?: unknown; phone?: unknown; reason?: unknown };
+    try {
+        args = JSON.parse(argumentsJson || '{}') as typeof args;
+    } catch {
+        return { ok: false, output: 'The callback details weren\'t valid JSON.' };
+    }
+    const phone = typeof args.phone === 'string' ? args.phone.trim().slice(0, 60) : '';
+    const reason = typeof args.reason === 'string' ? args.reason.trim().slice(0, 1000) : '';
+    if (!phone) return { ok: false, output: 'Ask for the number to call them on first.' };
+    if (!reason) return { ok: false, output: 'Include what they need, in a sentence or two.' };
+    const name = typeof args.name === 'string' && args.name.trim() ? args.name.trim().slice(0, 200) : null;
+    try {
+        const [{ notifyCallback }, { createAdminClient }] = await Promise.all([import('./owner-alerts'), import('@/lib/supabaseAdmin')]);
+        const sent = await notifyCallback({ db: createAdminClient(), projectId: context.projectId, agentId: context.agentId, agentName: context.agentName, surface: context.surface, conversationId: context.conversationId }, { name, contact: phone, reason });
+        if (sent) return { ok: true, output: `Done: the team has the request and will call ${phone}.` };
+    } catch {
+        // fall through
+    }
+    return { ok: false, output: 'The callback request couldn\'t be passed on right now. Don\'t promise a callback; give them the business\'s phone number if you know it.' };
 }
 
 /**

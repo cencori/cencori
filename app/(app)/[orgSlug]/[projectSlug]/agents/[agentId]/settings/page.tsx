@@ -12,8 +12,9 @@ import { useAgentWorkspace } from "@/components/agents/AgentWorkspace";
 import { postStudioAction, studioQueryKey, useAgentsBasePath } from "@/components/agents/studio";
 import { AgentWidget } from "@/components/agents/AgentWidget";
 import { AgentWhatsApp } from "@/components/agents/AgentWhatsApp";
+import { AgentOwnerAlerts } from "@/components/agents/AgentOwnerAlerts";
 
-/** Agent settings: the website widget, WhatsApp, and deleting the agent. */
+/** Agent settings: the website widget, WhatsApp, owner alerts, and deleting the agent. */
 export default function AgentSettingsPage() {
     const { projectId, agent, versions, data, canManage } = useAgentWorkspace();
     const router = useRouter();
@@ -58,6 +59,8 @@ export default function AgentSettingsPage() {
             <AgentWidget />
 
             <AgentWhatsApp />
+
+            <AgentOwnerAlerts />
 
             <section className="rounded-lg border border-destructive/30">
                 <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
