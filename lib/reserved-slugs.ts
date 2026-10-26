@@ -112,6 +112,7 @@ export const RESERVED_ORG_SLUGS: ReadonlySet<string> = new Set([
     "monetization",
     "revenue",
     "copilot",
+    "studio",
     "webhooks",
     "governance",
     "organization",

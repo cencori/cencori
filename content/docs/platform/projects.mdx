@@ -10,13 +10,13 @@ Projects are the top-level containers for your AI integration. They map one-to-o
 - **Isolation:** Each project has its own API keys and configuration
 - **Organization:** Group related AI features into a single project
 - **Analytics:** Track usage and costs per project
-- **Collaboration:** Invite team members to specific projects
+- **Collaboration:** Everyone in the organization can work in its projects
 
 ## Creating a Project
 
-1. Go to your **Organization Dashboard**.
-2. Click **New Project**.
-3. Enter a name and select a region (US-East by default).
+1. Click the project name at the top of the sidebar.
+2. Click **Create project**.
+3. Enter a name, an optional description, and pick a region.
 
 > [!TIP]
 > We recommend creating separate projects for **Development** and **Production** environments to ensure isolation.
@@ -46,22 +46,7 @@ CENCORI_API_KEY=csk_...
 
 ## Project Settings
 
-### General
-- **Project name** and **Project ID**: the name shown in the dashboard and the stable ID used in APIs and URLs.
-- **Request handling**: two optional switches, both off by default:
-  - **Response caching** — reuse stored responses for repeated requests instead of calling the model again.
-  - **PII protection** — block requests that contain emails, phone numbers, SSNs, or card numbers (paid plans). See [PII Protection](/docs/security/pii-detection).
-- **Delete project**: permanently remove the project and its data.
-
-### AI Configuration
-Set project-wide defaults for your AI integration:
-- **Default Provider**: The fallback provider (e.g., OpenAI) if none is specified in the SDK.
-- **Rate Limits**: Set custom RPM (Requests Per Minute) protection.
-- **Spend Cap**: Enforce a hard limit on monthly spending.
-
-### Integrations
-- **Webhook endpoints** (**Settings → Webhooks**) for real-time events, including `security.violation` when PII protection blocks a request.
-- **CostGraph** (**Settings → Integrations**) for FinOps usage export.
+Each project has its own settings: name and request handling, budget and spend cap, providers and failover, networking, integrations, API keys and webhooks. See [Project settings](/docs/platform/project-settings) for every tab.
 
 ## Team Collaboration
 
@@ -85,7 +70,7 @@ API keys authenticate your application with Cencori. Each project can have multi
 
 ### Generating API Keys
 1. Open the project's **Settings → API** tab.
-2. Click **Generate New Key**.
+2. Click **New secret key** (for your server) or **New publishable key** (for browser code, limited to the domains you list).
 3. Give your key a descriptive name (e.g., "Production Web Server").
 4. Copy the key immediately - it won't be shown again.
 
