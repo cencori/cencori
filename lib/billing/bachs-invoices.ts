@@ -8,6 +8,7 @@
  * PDF is rendered on request from the row plus the charge Bachs holds.
  */
 
+import { jsPDF } from 'jspdf';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { getCharge, type BachsCharge } from '@/lib/bachsClient';
 
@@ -50,10 +51,12 @@ export interface BachsInvoiceDocument {
     paidAt: string;
     chargeId: string;
     org: InvoiceOrg;
-    lines: { title: string; detail: string; amountUsd: number }[];
+    lines: { description: string; detail?: string; amountUsd: number }[];
     totalUsd: number;
     netCreditsUsd: number;
 }
+
+const ISSUER = ['Cencori, Inc.', 'San Francisco, CA, United States', 'support@cencori.com'];
 
 /** Stable per charge, so a re-download carries the number the customer already filed. */
 export function bachsInvoiceNumber(chargeId: string, paidAt: string): string {
@@ -152,12 +155,12 @@ export function composeBachsInvoice(
     const paidAt = charge?.created_at ?? record.createdAt;
 
     const lines: BachsInvoiceDocument['lines'] = [{
-        title: 'API Credits',
-        detail: `${usd(record.grossUsd)} of prepaid usage credits for the ${org.slug} organization`,
+        description: `Cencori prepaid API credits: ${usd(record.grossUsd)} pack`,
+        detail: `Organization: ${org.slug}`,
         amountUsd: record.grossUsd,
     }];
     if (feeUsd > 0) {
-        lines.push({ title: 'Card Processing Fee', detail: 'Charged by our payment processor', amountUsd: feeUsd });
+        lines.push({ description: 'Card payment processing fee', amountUsd: feeUsd });
     }
 
     return {
@@ -171,6 +174,148 @@ export function composeBachsInvoice(
     };
 }
 
+// ── PDF ─────────────────────────────────────────────────────────
+
+const MARGIN = 56;
+const MUTED: [number, number, number] = [110, 110, 110];
+const INK: [number, number, number] = [17, 17, 17];
+
+export function renderBachsInvoicePdf(invoice: BachsInvoiceDocument): ArrayBuffer {
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    const width = doc.internal.pageSize.getWidth();
+    const right = width - MARGIN;
+    doc.setProperties({ title: `Invoice ${invoice.number}`, author: 'Cencori, Inc.' });
+
+    // Header
+    doc.setFont('helvetica', 'bold').setFontSize(20).setTextColor(...INK);
+    doc.text('Cencori', MARGIN, 72);
+    doc.setFont('helvetica', 'normal').setFontSize(9).setTextColor(...MUTED);
+    doc.text(ISSUER, MARGIN, 90, { lineHeightFactor: 1.5 });
+
+    doc.setFont('helvetica', 'bold').setFontSize(24).setTextColor(...INK);
+    doc.text('Invoice', right, 72, { align: 'right' });
+    doc.setFont('helvetica', 'normal').setFontSize(9).setTextColor(...MUTED);
+    doc.text(invoice.number, right, 90, { align: 'right' });
+    doc.setDrawColor(21, 128, 61).setTextColor(21, 128, 61).setFont('helvetica', 'bold').setFontSize(8);
+    doc.roundedRect(right - 38, 98, 38, 15, 2, 2);
+    doc.text('PAID', right - 19, 108.5, { align: 'center' });
+
+    // Parties and dates
+    const top = 160;
+    const col2 = MARGIN + 180;
+    const col3 = MARGIN + 330;
+    label(doc, 'Billed to', MARGIN, top);
+    doc.setFont('helvetica', 'bold').setFontSize(9.5).setTextColor(...INK);
+    doc.text(invoice.org.name, MARGIN, top + 16);
+    doc.setFont('helvetica', 'normal');
+    doc.text(billedToLines(invoice.org), MARGIN, top + 30, { lineHeightFactor: 1.5, maxWidth: 170 });
+
+    label(doc, 'Invoice date', col2, top);
+    value(doc, longDate(invoice.paidAt), col2, top + 16);
+    label(doc, 'Payment date', col2, top + 40);
+    value(doc, longDate(invoice.paidAt), col2, top + 56);
+
+    label(doc, 'Payment method', col3, top);
+    value(doc, 'Card (via Bachs)', col3, top + 16);
+    label(doc, 'Payment reference', col3, top + 40);
+    doc.setFont('courier', 'normal').setFontSize(7.5).setTextColor(...INK);
+    doc.text(invoice.chargeId, col3, top + 56);
+
+    // Line items
+    let y = 320;
+    doc.setDrawColor(220, 220, 220).setLineWidth(0.75);
+    label(doc, 'Description', MARGIN, y);
+    label(doc, 'Amount', right, y, 'right');
+    y += 8;
+    doc.line(MARGIN, y, right, y);
+    for (const line of invoice.lines) {
+        y += 20;
+        value(doc, line.description, MARGIN, y);
+        doc.text(usd(line.amountUsd), right, y, { align: 'right' });
+        if (line.detail) {
+            y += 13;
+            doc.setFontSize(8.5).setTextColor(...MUTED);
+            doc.text(line.detail, MARGIN, y);
+        }
+        y += 10;
+        doc.setDrawColor(235, 235, 235);
+        doc.line(MARGIN, y, right, y);
+    }
+
+    // Totals
+    const totalsX = right - 220;
+    y += 24;
+    const row = (name: string, amount: string, bold = false) => {
+        doc.setFont('helvetica', bold ? 'bold' : 'normal').setFontSize(bold ? 11 : 9.5);
+        doc.setTextColor(...(bold ? INK : MUTED));
+        doc.text(name, totalsX, y);
+        doc.setTextColor(...INK);
+        doc.text(amount, right, y, { align: 'right' });
+        y += bold ? 22 : 18;
+    };
+    row('Subtotal', usd(invoice.totalUsd));
+    row('Tax', usd(0));
+    doc.setDrawColor(...INK).line(totalsX, y - 8, right, y - 8);
+    y += 6;
+    row('Total (USD)', usd(invoice.totalUsd), true);
+    row(`Amount paid (${shortDate(invoice.paidAt)})`, usd(invoice.totalUsd));
+    row('Balance due', usd(0), true);
+
+    // Notes
+    y += 24;
+    doc.setDrawColor(235, 235, 235).line(MARGIN, y, right, y);
+    y += 20;
+    doc.setFont('helvetica', 'normal').setFontSize(9).setTextColor(70, 70, 70);
+    doc.text([
+        'This invoice covers a payment already received in full. No further payment is due.',
+        `${usd(invoice.netCreditsUsd)} in API credits was applied to the ${invoice.org.name} organization, net of the card top-up fee.`,
+        'Questions about this invoice: support@cencori.com',
+    ], MARGIN, y, { lineHeightFactor: 1.8, maxWidth: right - MARGIN });
+
+    return doc.output('arraybuffer');
+}
+
+function label(doc: jsPDF, text: string, x: number, y: number, align: 'left' | 'right' = 'left') {
+    doc.setFont('helvetica', 'normal').setFontSize(7.5).setTextColor(...MUTED);
+    doc.text(text.toUpperCase(), x, y, { align, charSpace: 0.6 });
+}
+
+function value(doc: jsPDF, text: string, x: number, y: number) {
+    doc.setFont('helvetica', 'normal').setFontSize(9.5).setTextColor(...INK);
+    doc.text(text, x, y);
+}
+
+function billedToLines(org: InvoiceOrg): string[] {
+    const cityLine = [org.billing_city, [org.billing_state, org.billing_zip].filter(Boolean).join(' ')]
+        .filter(Boolean)
+        .join(', ');
+    return [
+        org.billing_address_line1,
+        org.billing_address_line2,
+        cityLine,
+        countryName(org.billing_country),
+        org.billing_tax_id ? `Tax ID: ${org.billing_tax_id}` : null,
+        org.billing_email,
+    ].filter((line): line is string => Boolean(line));
+}
+
+function countryName(code: string | null): string | null {
+    if (!code) return null;
+    try {
+        return new Intl.DisplayNames(['en'], { type: 'region' }).of(code) ?? code;
+    } catch {
+        return code;
+    }
+}
+
+function longDate(iso: string): string {
+    return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+}
+
+function shortDate(iso: string): string {
+    return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+}
+
 function usd(amount: number): string {
     return `$${amount.toFixed(2)}`;
 }
@@ -178,5 +323,3 @@ function usd(amount: number): string {
 function round2(n: number): number {
     return Math.round(n * 100) / 100;
 }
-
-export { renderBachsInvoicePdf } from './invoice-pdf';
