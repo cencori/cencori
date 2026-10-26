@@ -1,0 +1,48 @@
+---
+title: "Memory dashboard"
+description: "See what your product remembers about its users, explore it as a graph, and control how memory behaves."
+section: "Product"
+order: 2
+---
+
+Open **Memory** in a project's sidebar. It has four pages: **Overview**, **Memories**, **Graph** and **Controls**.
+
+## Overview
+
+- **Stored:** how many memories you have against your plan's quota.
+- **Activity:** memories written and searches run over time.
+- **Top users:** the end users with the most memories. Click one to see theirs.
+- **Recent memories** and **latest searches.**
+
+A project with no memories yet shows **Get started** instead. **Copy prompt** gives you a setup prompt to paste into a coding agent (Claude Code, Cursor and others), which adds memory to your app for you. **Set up manually** walks through it step by step: install the SDK, create an API key, and turn memory on through Cencori or alongside any provider. See [Cencori Memory](/docs/memory) for the code.
+
+## Memories
+
+Every stored memory in a table, filtered by end user and status. Click a row for its details: the fact, its status, scope, namespace and importance, and how often and when it was last recalled. **Forget memory** deletes one.
+
+Statuses:
+
+- **Active:** in use, and recalled when relevant.
+- **Superseded:** replaced by a newer fact about the same thing, for example a changed address.
+- **Suggested to forget:** memories Cencori thinks are stale or low value. Review them and forget the ones you agree with.
+
+## Graph
+
+Pick an end user to see their memory as a map: memories, the people, places and things they mention, how facts were updated, and how entities relate. Drag nodes to rearrange, hover for a preview, and click to pin a card open.
+
+Entities and relations come from **Entity graph**, under Controls.
+
+## Controls
+
+| Setting | What it does |
+| --- | --- |
+| **Memory enabled** | The kill switch. Off rejects every memory request for this project. Stored memories are kept, not deleted. |
+| **Entity graph** | Extracts entities and relations when memories are written, so recall can follow connections. Costs a second extraction call per exchange. |
+| **Extraction model** | The model that turns conversations into memories. Runs on Cencori's managed keys, never your provider keys. |
+| **Minimum importance** | Facts scoring below this are dropped instead of stored. Higher means a smaller, sharper store. |
+| **Max memories per exchange** | The most facts one turn can produce, so a long message can't flood the store. |
+| **Session memory lifetime** | How long session memories live. User memories aren't affected: those survive new chats and new devices. |
+| **Monthly search allowance** | A custom cap on searches per month, for pilot or enterprise contracts. Past it, chats still work but skip memory. |
+| **Monthly write allowance** | A custom cap on writes per month. Past it, writes are refused with an upgrade prompt. |
+
+Leave the allowances empty to use your plan's limits.

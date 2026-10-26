@@ -1,0 +1,60 @@
+---
+title: "Copilot"
+description: "The assistant in the Cencori console: ask about your projects, usage and logs, and have it make changes for you."
+section: "Platform"
+order: 20
+---
+
+Copilot is the assistant built into the console. It can see your projects and make changes for you, so you can ask instead of clicking through pages.
+
+Open it from the panel on the right of any page, or go full screen at **Copilot** in the sidebar. The sidebar's Copilot menu has **New chat**, **Usage** and **Recent chats**. Hover a recent chat to delete it.
+
+## What it can do
+
+**Look things up**
+- Projects, project settings and API keys.
+- Usage, cost and billing.
+- Requests: search your logs, or open one request by ID.
+- Security incidents.
+- Memory: stats, and searching what's stored for a user.
+
+**Make changes**
+- Create or revoke API keys, rename one, or limit which models it may call.
+- Change the monthly budget, spend cap and budget alerts.
+- Turn failover on or off, and choose the provider and model to fall back to.
+- Mark a security incident as reviewed, with a note.
+- Delete a memory.
+- Build and set up agents. See [Build agents with Copilot](/docs/agents/copilot).
+
+Copilot asks before every change. The change shows above the composer with what it will do, and nothing happens until you confirm.
+
+## Models
+
+Pick the model from the composer:
+
+| Model | Notes |
+| --- | --- |
+| **DeepSeek V4 Flash** | The default. Fast and cheap. |
+| **Claude Opus 5.5** | Strongest reasoning. Reads images directly. |
+| **GPT-6** | Reads images directly. |
+| **Kimi K2.6** | |
+
+## Files and images
+
+Attach with the paperclip, or drag and drop onto the chat.
+
+- **Text files:** up to 5 per message, 100,000 characters each. Logs, CSVs, configs, code and docs all work.
+- **Images:** up to 3 per message (PNG, JPEG, WebP or GIF). Screenshots of an error or a dashboard work well. If the chosen model can't read images, another model describes the image first and Copilot answers from that description. Saved chats keep the description and a small thumbnail, never the image itself.
+
+## Pricing
+
+Each organization gets free Copilot questions every day (UTC). Small talk like "thanks" doesn't count.
+
+| Plan | Free questions per day |
+| --- | --- |
+| Free | 10 |
+| Pro | 50 |
+| Team | 100 |
+| Enterprise | Unlimited |
+
+Past the free questions, each answer is billed to your credits at the model's cost plus $0.25 per million tokens. **Copilot → Usage** shows cost and messages per day over 7, 30 or 90 days.

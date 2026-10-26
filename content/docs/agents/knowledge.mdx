@@ -1,0 +1,29 @@
+---
+title: "Knowledge"
+description: "Give an agent your documents and website so it answers from your facts, not guesses."
+section: "Agents"
+order: 2
+---
+
+Knowledge is what the agent answers from: your menu, price list, policies, FAQs, product docs. The agent searches it on each question and answers from what it finds, instead of guessing.
+
+Open the agent's **Knowledge** page to add sources.
+
+## Documents
+
+Upload PDF, Word (`.docx`), Markdown, text or HTML files. A scanned menu or a price list exported to PDF works fine.
+
+## Websites
+
+Add a URL and Cencori crawls it:
+
+- **Max pages:** up to 500.
+- **Pattern:** only crawl paths that match, for example `/help/*`.
+- **Exclude:** paths to skip, like `/blog/*` or `/careers`.
+- **Auto refresh:** re-crawl on a schedule so the agent keeps up when your site changes.
+
+## Tips
+
+- Put facts in knowledge and behaviour in instructions. "Our deposit is ₦20,000 per table" is knowledge. "Always confirm the date back to the guest" is an instruction.
+- When something changes (prices, opening hours), update the source, or switch on auto refresh for a website.
+- If the agent says it doesn't know something it should, check the source is there and that the fact is written plainly in it.

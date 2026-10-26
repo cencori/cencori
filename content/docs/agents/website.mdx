@@ -1,0 +1,62 @@
+---
+title: "Website chat and share links"
+description: "Put the agent on your website with one script tag, on any site builder, or share it as a link."
+section: "Agents"
+order: 3
+---
+
+Open the agent's **Settings → Website**, switch on **Website chat**, and add the sites it may appear on. Visitors always talk to the published version.
+
+## Install
+
+Paste this into your site's HTML, just before `</body>`. Copy the real snippet from **Settings → Install**: it carries your widget's key.
+
+```html
+<script src="https://cencori.com/widget.js" data-key="YOUR_WIDGET_KEY" async></script>
+```
+
+That adds a launcher in the corner of the page. To put the chat inside the page instead, for example on a contact or help page, use inline mode:
+
+```html
+<div id="cencori-chat"></div>
+<script src="https://cencori.com/widget.js" data-key="YOUR_WIDGET_KEY" data-mode="inline" data-target="#cencori-chat" async></script>
+```
+
+| Attribute | Meaning |
+| --- | --- |
+| `data-key` | Your widget's public key. Required. |
+| `data-mode` | `inline` renders the chat inside `data-target` instead of a floating launcher. |
+| `data-target` | A CSS selector for the inline container. |
+| `data-height` | The inline chat's height. |
+
+The key is public and safe to put in your HTML: the chat only loads on the sites you've listed.
+
+## Site builders
+
+The script works on any site that lets you add custom code.
+
+**WordPress.** Install a header and footer code plugin (WPCode, or Insert Headers and Footers), open its settings, and paste the snippet into the **Footer** box. If your theme has a "custom code" or "footer scripts" setting, that works too.
+
+**Webflow.** Go to **Site settings → Custom code**, paste the snippet into **Footer code**, save and publish the site. For inline mode on one page, add an **Embed** element where the chat should go and paste the inline snippet into it. Custom code needs a paid Webflow site plan.
+
+**Framer.** Go to **Site settings → General → Custom code**, paste the snippet into **End of `<body>` tag**, and publish. For inline mode, add an **Embed** component to the page and paste the inline snippet into it.
+
+**Wix, Squarespace, Shopify and others.** Look for a custom code, code injection or theme footer setting, and paste the snippet there.
+
+Then add your site's domain under **Websites** in the agent's settings. Use `*.example.com` to include subdomains. If the chat doesn't appear, the domain list is the first thing to check.
+
+## Appearance
+
+- **Launcher:** a card with the agent's orb and a heading, or a pill with an icon and text.
+- **Title:** shown at the top of the chat.
+- **Greeting:** the first message visitors see.
+- **Colour:** the launcher, the visitor's messages and buttons.
+- **Position:** which corner of the page.
+
+## Limits
+
+**Conversations per day** protects your balance from abuse. Each conversation is also capped at 40 messages, and each connection at 20 new conversations an hour.
+
+## Share link
+
+You don't need a website. **Copy link** gives you a page with just the chat, at `https://cencori.com/talk/…`. Put it in your Instagram bio, a QR code on the table, an email signature or a WhatsApp status.

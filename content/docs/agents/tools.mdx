@@ -1,0 +1,64 @@
+---
+title: "Tools"
+description: "What an agent can do beyond answering: built-in system tools, your own webhooks, connected apps and MCP servers."
+section: "Agents"
+order: 5
+---
+
+Tools let the agent act: take a booking, send a payment link, place an order, hand a customer to your team. Open the agent's **Tools** page. It has three tabs: **Configure**, **Integrations** and **MCP**.
+
+## System tools
+
+Built in. Switch them on under **Configure**:
+
+| Tool | What it does |
+| --- | --- |
+| **End conversation** | Closes the chat once the person is done, so the next message starts fresh. |
+| **Transfer to a person** | Takes their contact details and a summary, and sends them to your team's URL with the conversation so far. |
+| **Take payments** | Sends payment links for deposits, event tables and orders, and confirms when they're paid. See [Payments and products](/docs/agents/payments-and-products). |
+| **Sell products** | Answers about your products, prices and stock, and takes orders. See [Payments and products](/docs/agents/payments-and-products). |
+| **Request a callback** | Takes a name, number and what they need, and emails your team to call back. See [Owner alerts](/docs/agents/owner-alerts). |
+
+Each system tool has a description you can edit to tell the agent when to use it, for example "Only take payments for event tables, not regular bookings."
+
+### Transfer to a person
+
+You give a **hand-off URL** and, optionally, rules for when to hand off. When it triggers, Cencori sends a `POST` to your URL:
+
+```json
+{
+  "type": "agent.transfer_to_human",
+  "created_at": "2026-10-26T14:03:11.000Z",
+  "agent": { "id": "…", "name": "Host" },
+  "surface": "whatsapp",
+  "conversation_id": "…",
+  "person": { "name": "Ada", "contact": "+2348012345678" },
+  "summary": "Wants to book the terrace for 30 people on Saturday.",
+  "transcript": [{ "role": "user", "content": "…" }, { "role": "assistant", "content": "…" }]
+}
+```
+
+Point it at Slack, Zapier, Make or your own endpoint.
+
+## Webhook tools
+
+Your own HTTPS endpoints, called mid-conversation. Under **Configure → Add tool**, give it:
+
+- A **name** and a **description** of when to use it and what it returns. The agent decides from the description, so be specific.
+- A **method**: `GET`, `POST`, `PUT`, `PATCH` or `DELETE`.
+- The **URL**, and any **headers** (for an API key). Header values are encrypted, and copies of the agent made from the marketplace can't read them.
+- **Inputs**: name, type (string, number or boolean), description, and whether it's required.
+
+`GET` and `DELETE` send the inputs as a query string; the others send them as a JSON body. The agent reads the response and answers from it.
+
+Limits: 20 tools per agent, 20 inputs and 10 headers per tool, 10 seconds per call, and the first 8,000 characters of the response go to the agent.
+
+## Integrations
+
+Connect apps your business already uses, and the agent can work with them: **Google Calendar** for bookings, **WooCommerce** for your store's products and orders, and more. Click **Add integration**, pick the app and sign in.
+
+The **Integrations** tab is also where you connect a payment provider and add your products.
+
+## MCP servers
+
+Add any remote MCP server by URL. If the server needs you to sign in, Cencori opens its sign-in page and keeps the agent connected; otherwise add headers (for an API key). Cencori discovers the server's tools, and you switch on the ones the agent may use. Use **Refresh tools** when the server adds new ones.
