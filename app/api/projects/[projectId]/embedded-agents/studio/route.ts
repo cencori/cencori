@@ -12,6 +12,7 @@ import { agentClock, agentToolset, buildSystemTools, readSystemTools } from '@/l
 import { isBusinessTemplate, TEMPLATE_RECOMMENDED_TOOLS } from '@/lib/embedded/templates';
 import { AGENT_MCP_SERVERS_MAX, buildAgentMcpServers, connectAgentMcpServer, normalizeMcpServerUrl, publicAgentMcpServers, readAgentIntegrations, readAgentMcpServers, type AgentMcpServer } from '@/lib/embedded/agent-mcp';
 import { createConnectLink, deleteConnection, discoverIntegrationTools, listNangoIntegrations, listProjectConnections, nangoConfigured, NangoError } from '@/lib/integrations/nango';
+import { listMcpApps, mcpAppUrl } from '@/lib/integrations/mcp-apps';
 import { iconFrom } from '@/lib/embedded/mcp-icon';
 import { discoverMcpAuth, mcpAuthorizeUrl, mcpRedirectFor, pkcePair, registerMcpClient, revokeMcpConnections, sealMcpOAuthState } from '@/lib/embedded/mcp-oauth';
 import type { UnifiedMessage } from '@/lib/providers/base';
@@ -135,10 +136,12 @@ export async function POST(request: Request, ctx: Context) {
         // Connected apps (integrations) are project-level: what's on offer, and
         // what this project has connected.
         if (body.action === 'integrations_list') {
-            if (!nangoConfigured()) return NextResponse.json({ configured: false, catalog: [], connections: [] });
+            // Apps signed in to through their own MCP server, available or coming soon.
+            const mcpApps = listMcpApps().map(({ id, name, domain, category, url }) => ({ id, name, domain, category, url, available: !!url }));
+            if (!nangoConfigured()) return NextResponse.json({ configured: false, catalog: [], connections: [], mcp_apps: mcpApps });
             try {
                 const [catalog, connections] = await Promise.all([listNangoIntegrations(), listProjectConnections(projectId)]);
-                return NextResponse.json({ configured: true, catalog, connections });
+                return NextResponse.json({ configured: true, catalog, connections, mcp_apps: mcpApps });
             } catch (error) {
                 return fail(error instanceof NangoError ? error.message : 'Could not load integrations.', 502);
             }
@@ -168,7 +171,7 @@ export async function POST(request: Request, ctx: Context) {
             // tools) and lets it close finished conversations.
             if (isBusinessTemplate(body.template)) {
                 config.template = body.template;
-                config.system_tools = { end_conversation: {}, request_callback: {} };
+                config.system_tools = { end_conversation: {}, request_callback: {}, take_payments: {} };
             }
             const { data: agent, error: agentError } = await db.from('agents').insert({
                 project_id: projectId, name, description: description || null,
@@ -463,7 +466,10 @@ export async function POST(request: Request, ctx: Context) {
             const previous = typeof body.server_id === 'string' ? stored.find((server) => server.id === body.server_id) ?? null : null;
             if (body.server_id && !previous) return fail('That server is no longer on this draft. Refresh and try again.', 404);
             if (!previous && stored.length >= AGENT_MCP_SERVERS_MAX) return fail(`Add up to ${AGENT_MCP_SERVERS_MAX} MCP servers.`);
-            const started = await startMcpSignIn(body.url ?? previous?.url, previous?.id ?? null);
+            // A catalog app (Bumpa…) signs in to its own server, by the address we hold for it.
+            const appUrl = body.app !== undefined ? mcpAppUrl(body.app) : null;
+            if (body.app !== undefined && !appUrl) return fail('That app isn\'t available yet.', 404);
+            const started = await startMcpSignIn(appUrl ?? body.url ?? previous?.url, previous?.id ?? null);
             if (!started.ok) return fail(started.message, 422);
             return NextResponse.json({ authorize_url: started.authorizeUrl });
         }

@@ -93,7 +93,9 @@ export function restaurantInstructions(input: RestaurantDetails): string {
         `4. Book it as a calendar event on the primary calendar: title "Reservation: <name> (<guests> guests)", starting at the requested time and ending ${d.slotMinutes} minutes later, with the phone number, number of guests and any notes (occasion, allergies, seating) in the description. Use full timestamps with the offset, like ${example}.`,
         '5. Only after the event is created, confirm: day and date, time, number of guests and name. If booking failed, say so and give the phone number; never say a table is booked when it is not.',
         '- Don\'t cancel or move reservations yourself, and don\'t argue with complaints: apologise, take their name and number, and request a callback from the team.',
-        d.deposit.trim() ? `- Deposits: ${d.deposit.trim()}` : '- No deposit is needed to book.',
+        d.deposit.trim()
+            ? `- Deposits: ${d.deposit.trim()}. When a deposit applies, book the table first, then send the deposit link with request_payment (amount in naira, and a description like "Deposit: table for 4, Sat 2 Nov 8pm"). Say the table is held once it's paid; they get a confirmation in the chat automatically. If they say they've paid, check with check_payment. If payment links aren't available, ask them to call to pay.`
+            : '- No deposit is needed to book.',
         '',
         '## How you talk',
         '- Warm and brief, like a good host texting: short messages, no long lists unless asked.',

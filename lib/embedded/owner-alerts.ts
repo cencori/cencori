@@ -24,7 +24,7 @@ const LOG_KEEP_HOURS = 48;
 const LOG_MAX = 300;
 
 export interface OwnerAlertEntry {
-    type: 'booking' | 'callback';
+    type: 'booking' | 'callback' | 'payment' | 'order';
     at: string;
     title: string;
     when?: string | null;
@@ -238,6 +238,46 @@ export async function notifyCallback(ctx: AlertContext, request: { name: string 
     return sent;
 }
 
+/** Email the owner that a customer paid (a deposit, a table, an order). Best-effort. */
+export async function notifyPayment(ctx: AlertContext, payment: { amount: string; description: string; customer: string | null; reference: string }): Promise<void> {
+    try {
+        const alerts = await getOwnerAlerts(ctx.db, ctx.projectId, ctx.agentId);
+        if (!alerts) return;
+        const source = await conversationSource(ctx.db, ctx.surface, ctx.conversationId);
+        await appendLog(ctx.db, alerts, { type: 'payment', at: new Date().toISOString(), title: payment.description, when: payment.amount, contact: payment.customer, source });
+        if (!alerts.settings.bookings || alerts.settings.emails.length === 0) return;
+        await sendEmail({
+            to: alerts.settings.emails,
+            subject: `Paid ${payment.amount}: ${payment.description}${payment.customer ? ` (${payment.customer})` : ''}`,
+            html: emailLayout(`${ctx.agentName || 'Your agent'} took a payment`, [['Amount', payment.amount], ['For', payment.description], ['Customer', payment.customer], ['From', source], ['Payment reference', payment.reference]], 'The money is in your payment provider account. You get this because owner alerts are on for this agent in Cencori.'),
+        });
+    } catch (error) {
+        console.error('[owner-alerts] payment alert failed', error instanceof Error ? error.message : error);
+    }
+}
+
+/**
+ * Email the owner a new order to fulfil: once it's paid, or straight away when
+ * the business doesn't take payments through Cencori. Best-effort.
+ */
+export async function notifyOrder(ctx: AlertContext, order: { id: string; summary: string; total: string; customer: string | null; delivery: string | null; note: string | null }, paid: boolean): Promise<void> {
+    try {
+        const alerts = await getOwnerAlerts(ctx.db, ctx.projectId, ctx.agentId);
+        if (!alerts) return;
+        const source = await conversationSource(ctx.db, ctx.surface, ctx.conversationId);
+        await appendLog(ctx.db, alerts, { type: 'order', at: new Date().toISOString(), title: `${order.id}: ${order.summary}`.slice(0, 200), when: order.total, contact: order.customer, detail: paid ? 'paid' : 'not paid', source });
+        if (!alerts.settings.bookings || alerts.settings.emails.length === 0) return;
+        const test = ctx.surface === 'preview' ? '[Preview] ' : '';
+        await sendEmail({
+            to: alerts.settings.emails,
+            subject: `${test}${paid ? 'Paid order' : 'New order'} ${order.id}: ${order.total}${order.customer ? ` (${order.customer})` : ''}`,
+            html: emailLayout(`${ctx.agentName || 'Your agent'} took an order`, [['Order', order.id], ['Items', order.summary], ['Total', `${order.total}${paid ? ', paid' : ', not paid yet: arrange payment with the customer'}`], ['Customer', order.customer], ['Delivery', order.delivery], ['Note', order.note], ['From', source]], 'Mark it done under the agent\'s Integrations → Products in Cencori. You get this because owner alerts are on for this agent.'),
+        });
+    } catch (error) {
+        console.error('[owner-alerts] order alert failed', error instanceof Error ? error.message : error);
+    }
+}
+
 /** A test email, so the owner knows alerts reach them. */
 export async function sendTestAlert(alerts: OwnerAlerts, agentName: string): Promise<boolean> {
     return sendEmail({
@@ -282,15 +322,21 @@ export async function sendDueSummaries(db: Admin, now = new Date()): Promise<{ s
         const agentName = (agent?.name as string | undefined) ?? 'Your agent';
         const bookings = entries.filter((e) => e.type === 'booking');
         const callbacks = entries.filter((e) => e.type === 'callback');
+        const payments = entries.filter((e) => e.type === 'payment');
+        const orders = entries.filter((e) => e.type === 'order');
         const line = (e: OwnerAlertEntry) => e.type === 'booking'
             ? `${e.title}${e.when ? `, ${e.when}` : ''}${e.source ? ` (via ${e.source})` : ''}`
-            : `${e.detail ? `${e.detail}, ` : ''}${e.contact}: ${e.title}`;
+            : e.type === 'payment' || e.type === 'order'
+                ? `${e.when}: ${e.title}${e.contact ? ` (${e.contact})` : ''}`
+                : `${e.detail ? `${e.detail}, ` : ''}${e.contact}: ${e.title}`;
         const ok = await sendEmail({
             to: alerts.settings.emails,
             subject: `${agentName} yesterday: ${bookings.length} booking${bookings.length === 1 ? '' : 's'}${callbacks.length ? `, ${callbacks.length} to call back` : ''}`,
             html: emailLayout(`What ${agentName} did yesterday`, [
                 [`Bookings (${bookings.length})`, bookings.map(line).join('\n') || 'None'],
                 [`Call back (${callbacks.length})`, callbacks.map(line).join('\n') || 'None'],
+                ...(orders.length ? [[`Orders (${orders.length})`, orders.map(line).join('\n')] as [string, string]] : []),
+                ...(payments.length ? [[`Payments (${payments.length})`, payments.map(line).join('\n')] as [string, string]] : []),
             ], 'Sent each morning by Cencori owner alerts. Turn it off in the agent\'s settings.'),
         });
         if (ok) sent++;
