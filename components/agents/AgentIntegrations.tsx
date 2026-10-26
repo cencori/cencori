@@ -17,6 +17,7 @@ import { AgentCatalog, catalogQueryKey, startCatalog, useCatalog } from "@/compo
 import { applyStudioResult, postStudioAction } from "@/components/agents/studio";
 import { readJson } from "@/components/agents/widget-preview";
 import { cn } from "@/lib/utils";
+import { AppTilesSkeleton } from "@/components/agents/AgentSkeletons";
 
 type AppTool = { name: string; description: string; readOnly: boolean; destructive: boolean };
 /** A connected app as stored on the agent. */
@@ -574,7 +575,7 @@ export function AgentIntegrations({ adding, onAddingChange }: { adding: boolean;
                                 </section>
                             )}
                             {appsQuery.isLoading ? (
-                                <div className="flex justify-center py-10 text-muted-foreground"><HugeiconsIcon icon={Loading03Icon} className="h-4 w-4 animate-spin" /></div>
+                                <AppTilesSkeleton />
                             ) : groups.length === 0 && visibleProviders.length === 0 ? (
                                 <p className="py-8 text-center text-xs text-muted-foreground">{catalog.length === 0 && paymentProviders.length === 0 ? "No apps are available yet." : "No apps match."}</p>
                             ) : (

@@ -4,7 +4,6 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { HugeiconsIcon } from "@hugeicons/react";
-import Loading03Icon from "@hugeicons/core-free-icons/Loading03Icon";
 import Globe02Icon from "@hugeicons/core-free-icons/Globe02Icon";
 import { MessageCircle, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,6 +13,7 @@ import { useAgentWorkspace } from "@/components/agents/AgentWorkspace";
 import { useAgentsBasePath } from "@/components/agents/studio";
 import { getMainSiteUrl } from "@/lib/main-site-url";
 import { cn } from "@/lib/utils";
+import { WidgetPreviewSkeleton } from "@/components/agents/AgentSkeletons";
 
 export type WidgetAppearance = {
     title: string;
@@ -252,7 +252,7 @@ export function WidgetPreview() {
     }, [siteOrigin, pushLook]);
 
     if (!published) return <Notice>Publish the agent to see what website visitors get.</Notice>;
-    if (query.isLoading) return <div className="my-auto flex justify-center text-muted-foreground"><HugeiconsIcon icon={Loading03Icon} className="h-4 w-4 animate-spin" /></div>;
+    if (query.isLoading) return <WidgetPreviewSkeleton />;
     if (query.isError || !query.data) return <Notice>{query.error instanceof Error ? query.error.message : "Could not load the widget."}</Notice>;
     if (!query.data.ready) return <Notice>{query.data.message}</Notice>;
     if (!widget || !src || !appearance) {

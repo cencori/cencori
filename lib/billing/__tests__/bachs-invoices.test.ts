@@ -63,3 +63,13 @@ describe('Bachs invoices', () => {
         expect(new TextDecoder().decode(pdf.slice(0, 5))).toBe('%PDF-');
     });
 });
+
+describe('amountInWords', () => {
+    it('spells dollars and cents', async () => {
+        const { amountInWords } = await import('@/lib/billing/invoice-pdf');
+        expect(amountInWords(52.9)).toBe('Fifty-Two Dollars and Ninety Cents');
+        expect(amountInWords(210.4)).toBe('Two Hundred Ten Dollars and Forty Cents');
+        expect(amountInWords(1)).toBe('One Dollar');
+        expect(amountInWords(7632.5)).toBe('Seven Thousand Six Hundred Thirty-Two Dollars and Fifty Cents');
+    });
+});
