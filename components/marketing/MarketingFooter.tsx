@@ -1,11 +1,11 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { useMarketingPath } from "@/components/marketing/useMarketingPath";
 import { SiteFooter } from "@/components/marketing/SiteFooter";
 import { DevelopersFooterGlow } from "@/components/developers/DevelopersFooterGlow";
 
 export function MarketingFooter() {
-  const pathname = usePathname();
+  const pathname = useMarketingPath();
   const isDevelopers =
     pathname?.startsWith("/developers") ||
     pathname === "/ai-gateway" ||

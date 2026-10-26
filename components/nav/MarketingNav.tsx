@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
-import { usePathname } from "next/navigation";
+import { useMarketingPath } from "@/components/marketing/useMarketingPath";
 import { SiteNav } from "./SiteNav";
 
 const TRANSPARENT_ROUTES = ["/about"];
@@ -33,19 +33,20 @@ function TransparentAboutNav() {
   );
 }
 
-const SCROLL_SOLID_ROUTES = ["/thesis", "/contact", "/developers", "/ai-gateway", "/newsroom", "/models", "/brand"];
+const SCROLL_SOLID_ROUTES = ["/thesis", "/contact", "/developers", "/business", "/ai-gateway", "/newsroom", "/models", "/brand"];
 
 export function MarketingNav() {
-  const pathname = usePathname();
+  const pathname = useMarketingPath();
   const developersNav =
     pathname === "/models" || pathname?.startsWith("/models/") ||
-    pathname === "/ai-gateway/models";
+    pathname === "/ai-gateway/models" ||
+    pathname === "/developers" || pathname.startsWith("/developers/");
   if (
     SCROLL_SOLID_ROUTES.some(
       (route) => pathname === route || pathname.startsWith(`${route}/`),
     )
   ) {
-    return <ThesisScrollNav developers={developersNav} />;
+    return <ThesisScrollNav developers={developersNav} business={pathname === "/business" || pathname.startsWith("/business/")} />;
   }
   const transparent = TRANSPARENT_ROUTES.some(
     (route) => pathname === route || pathname.startsWith(`${route}/`),
@@ -59,7 +60,7 @@ export function MarketingNav() {
 // reuse the same nav behavior outside the marketing shell. `developers`
 // forces the developers variant (menus, wordmark, actions) on routes where
 // the pathname check would not trigger it.
-export function ThesisScrollNav({ developers = false }: { developers?: boolean }) {
+export function ThesisScrollNav({ developers = false, business = false }: { developers?: boolean; business?: boolean }) {
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -75,7 +76,7 @@ export function ThesisScrollNav({ developers = false }: { developers?: boolean }
         scrolled ? "bg-background" : "bg-transparent"
       }`}
     >
-      <SiteNav developers={developers} />
+      <SiteNav developers={developers} business={business} />
     </div>
   );
 }

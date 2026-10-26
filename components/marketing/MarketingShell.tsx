@@ -1,12 +1,12 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { usePathname } from "next/navigation";
+import { useMarketingPath } from "@/components/marketing/useMarketingPath";
 import { MarketingFooter } from "@/components/marketing/MarketingFooter";
 import { MarketingNav } from "@/components/nav/MarketingNav";
 
 export function MarketingShell({ children }: { children: ReactNode }) {
-  const pathname = usePathname();
+  const pathname = useMarketingPath();
   const isDevelopers =
     pathname === "/developers" ||
     pathname?.startsWith("/developers/") ||

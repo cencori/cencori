@@ -17,12 +17,12 @@ const DESCRIPTIONS: Record<(typeof PAID_BUSINESS_PLANS)[number], string> = {
  * Pricing for businesses that run agents (restaurants, shops): a flat naira
  * price per month for a number of conversations. No tokens, no credits.
  */
-export function BusinessPricing({ signupHref }: { signupHref?: string } = {}) {
+export function BusinessPricing({ signupHref, title = "For your business" }: { signupHref?: string; title?: string } = {}) {
     const trial = BUSINESS_PLANS.trial;
     return (
         <div className="mb-16">
             <div className="mx-auto mb-8 max-w-2xl text-center">
-                <h2 className="text-2xl font-semibold tracking-tight md:text-3xl">For your business</h2>
+                <h2 className="text-2xl font-semibold tracking-tight md:text-3xl">{title}</h2>
                 <p className="mt-3 text-sm text-muted-foreground">
                     An agent that answers your customers on WhatsApp and your website, takes bookings and orders. One monthly price,
                     counted in conversations. Free for {BUSINESS_TRIAL_DAYS} days or {trial.conversations} conversations, no card needed.
