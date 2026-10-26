@@ -58,7 +58,7 @@ console.log(response.memory?.retrieved); // facts injected into this reply
 |-------|------|---------|-------------|
 | `userId` | string | — | End-user this memory belongs to. Scope defaults to `user`. |
 | `sessionId` | string | — | Pass with `scope: "session"` for ephemeral, per-chat memory. |
-| `scope` | `"session" \| "user" \| "workspace" \| "org"` | `"user"` | `session` clears on session end (Redis); `user` persists across sessions, devices, and new chats (Postgres + pgvector); `workspace` partitions a caller-supplied `workspaceId` (team memory); `org` keys the authenticated organization (company playbook, defaults automatically). |
+| `scope` | `"session" \| "user" \| "workspace" \| "org"` | `"user"` | `session` clears on session end; `user` persists across sessions, devices, and new chats (Postgres + pgvector); `workspace` partitions a caller-supplied `workspaceId` (team memory); `org` keys the authenticated organization (company playbook, defaults automatically). |
 | `retrieve` | boolean | `true` | Pull top-K relevant memories and inject them ahead of the user turn. |
 | `write` | boolean | `true` | After the reply, extract facts from the exchange and persist them. |
 | `topK` | number | `5` | How many memories to inject. |

@@ -11,7 +11,7 @@ Everything here is done in the console under **Agents**. If you're building agen
 
 ## Create an agent
 
-Go to **Agents → New agent** and pick a starting point, or start blank. Starting points fill in a name, a description and instructions you can edit:
+Open **Agents** and pick a starting point, or start blank. Once you have agents, **Create agent** adds another. Starting points fill in a name, a description and instructions you can edit:
 
 | Category | Starting points |
 | --- | --- |
@@ -63,4 +63,6 @@ Agents know today's date and time, so "tomorrow at 7" means what the customer th
 
 ## Billing
 
-Conversations are billed to your project's balance like any other model usage. Each channel has a daily conversation limit you set, so a spike in traffic can't drain your balance.
+You don't need an API key to build or run agents here: you're signed in to the console, and each channel (website, share link, WhatsApp) carries its own access. API keys are only for calling agents from your own code, with [Embedded Agents](/docs/embedded-agents/overview).
+
+Conversations are billed to your organization's credits like any other model usage. With an empty balance, agents can't reply on any channel, and the agent's overview shows **Add credits** until you top up. Each channel has a daily conversation limit you set, so a spike in traffic can't drain your balance.
