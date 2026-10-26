@@ -27,7 +27,7 @@ import Loading03Icon from "@hugeicons/core-free-icons/Loading03Icon";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
 import { cn } from "@/lib/utils";
 import { DitherCanvas } from "@/components/dashboard/project-overview/DitherCanvas";
-import { CopilotActionCard, type CopilotAction } from "@/components/dashboard/CopilotActionCard";
+import { CopilotActionConfirm, CopilotActionStep, CopilotSecret, isOpenAction, type CopilotAction } from "@/components/dashboard/CopilotActionCard";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -57,7 +57,17 @@ type AgentMessage = {
     actions?: CopilotAction[];
     // Text files the user attached to this message.
     files?: CopilotFile[];
+    // Sent to the model but not shown: the outcome of an action, so Copilot
+    // carries on and reports what happened.
+    hidden?: boolean;
 };
+
+/** What Copilot is told after an action settles, so it reports back and carries on. */
+function actionOutcomeNote(action: CopilotAction): string {
+    if (action.state === "done") return `[The user confirmed "${action.title}" and it succeeded: ${action.result ?? action.doneMessage}] Tell the user in one or two plain sentences what changed and what it means for them, then offer the next step if there is a natural one. Don't propose the same change again.`;
+    if (action.state === "failed") return `[The user confirmed "${action.title}" but it failed: ${action.result ?? "unknown error"}] Explain briefly what went wrong and what they can do about it.`;
+    return `[The user cancelled "${action.title}". Nothing was changed.] Acknowledge it in one short sentence and ask if they want something different.`;
+}
 
 // Cards left unconfirmed in an earlier session can't be confirmed later:
 // what they'd change may have moved on since.
@@ -148,8 +158,11 @@ const AGENT_MARKDOWN_STYLES = cn(
     "[&_h1]:mb-2 [&_h1]:mt-5 [&_h1]:text-base [&_h1]:font-semibold [&_h1]:leading-6",
     "[&_h2]:mb-2 [&_h2]:mt-5 [&_h2]:text-base [&_h2]:font-semibold [&_h2]:leading-6",
     "[&_h3]:mb-1.5 [&_h3]:mt-4 [&_h3]:text-[15px] [&_h3]:font-semibold [&_h3]:leading-6",
-    "[&_ul]:my-3 [&_ul]:space-y-1.5 [&_ul]:pl-5 [&_ol]:my-3 [&_ol]:space-y-1.5 [&_ol]:pl-5",
-    "[&_li]:my-0 [&_li]:pl-0.5 [&_li]:text-[15px] [&_li]:leading-6 [&_li>p]:my-0 [&_li::marker]:text-muted-foreground/70",
+    // Bullets and numbers flush with the paragraph edge; the text hangs after them.
+    "[&_ul]:my-3 [&_ul]:list-none [&_ul]:space-y-1.5 [&_ul]:pl-0 [&_ol]:my-3 [&_ol]:list-none [&_ol]:space-y-1.5 [&_ol]:pl-0 [&_ol]:[counter-reset:item]",
+    "[&_li]:my-0 [&_li]:text-[15px] [&_li]:leading-6 [&_li>p]:my-0",
+    "[&_ul>li]:relative [&_ul>li]:pl-4 [&_ul>li]:before:absolute [&_ul>li]:before:left-0 [&_ul>li]:before:text-muted-foreground/70 [&_ul>li]:before:content-['•']",
+    "[&_ol>li]:relative [&_ol>li]:pl-5 [&_ol>li]:[counter-increment:item] [&_ol>li]:before:absolute [&_ol>li]:before:left-0 [&_ol>li]:before:text-muted-foreground/70 [&_ol>li]:before:content-[counter(item)_'.']",
     "[&_strong]:font-semibold [&_blockquote]:my-3 [&_hr]:my-4 [&_.not-prose]:my-2",
     // Tables: no outer border or padded box (prose's table margin), header as a
     // small muted caps strip, row dividers only, no column lines, aligned digits.
@@ -474,22 +487,11 @@ export function CencoriAgentSidebar({
         setConversationId(null);
     }, [project?.id]);
 
-    const sendMessage = useCallback(async (rawContent: string) => {
-        const content = rawContent.trim();
-        if ((!content && attachments.length === 0) || isLoading) return;
-
-        const userMessage: AgentMessage = {
-            id: crypto.randomUUID(),
-            role: "user",
-            content,
-            ...(attachments.length ? { files: attachments } : {}),
-        };
-        setAttachments([]);
-        setFileError(null);
-        const nextMessages = [...messages, userMessage];
-
+    // One answer from Copilot for the conversation so far (ending in a user
+    // message, shown or hidden).
+    const runTurn = useCallback(async (nextMessages: AgentMessage[]) => {
+        const userMessage = nextMessages[nextMessages.length - 1];
         setMessages(nextMessages);
-        setInput("");
         setIsLoading(true);
         setStreamingContent("");
         setToolStatus("Thinking");
@@ -625,7 +627,23 @@ export function CencoriAgentSidebar({
             setIsLoading(false);
             abortControllerRef.current = null;
         }
-    }, [attachments, environment, firstName, isLoading, messages, model, organization?.id, pathname, project?.id, saveConversation, searchParams, surface]);
+    }, [environment, firstName, model, organization?.id, pathname, project?.id, saveConversation, searchParams, surface]);
+
+    const sendMessage = useCallback(async (rawContent: string) => {
+        const content = rawContent.trim();
+        if ((!content && attachments.length === 0) || isLoading) return;
+        const userMessage: AgentMessage = {
+            id: crypto.randomUUID(),
+            role: "user",
+            content,
+            ...(attachments.length ? { files: attachments } : {}),
+        };
+        setAttachments([]);
+        setFileError(null);
+        setInput("");
+        // Moving on without answering a confirmation leaves it unconfirmed.
+        await runTurn([...expireStaleActions(messages), userMessage]);
+    }, [attachments, isLoading, messages, runTurn]);
 
     const stopGeneration = () => {
         abortControllerRef.current?.abort();
@@ -653,7 +671,21 @@ export function CencoriAgentSidebar({
         setMessages(next);
         if (patch.state && patch.state !== "running") void saveConversation(next);
         if (patch.state === "done") void queryClient.invalidateQueries();
+        // Settled: Copilot hears how it went and reports back, like a step in a task.
+        if (patch.state === "done" || patch.state === "failed" || patch.state === "cancelled") {
+            const action = next.find((m) => m.id === messageId)?.actions?.find((a) => a.id === actionId);
+            if (action) void runTurn([...next, { id: crypto.randomUUID(), role: "user", content: actionOutcomeNote(action), hidden: true }]);
+        }
     };
+    const [revealedSecret, setRevealedSecret] = useState<{ title: string; secret: string } | null>(null);
+    // The confirmation Copilot is waiting on, docked above the composer.
+    const openAction = (() => {
+        for (let i = messages.length - 1; i >= 0; i--) {
+            const found = messages[i].actions?.find(isOpenAction);
+            if (found) return { messageId: messages[i].id, action: found };
+        }
+        return null;
+    })();
 
     const loadConversation = async (id: string) => {
         if (id === conversationIdRef.current) return;
@@ -872,8 +904,8 @@ export function CencoriAgentSidebar({
                         </div>
                     </div>
                 ) : (
-                    <div className={cn("space-y-4", column)}>
-                        {messages.map((message) => (
+                    <div className={cn("space-y-4", column, isPage && "px-4")}>
+                        {messages.filter((message) => !message.hidden).map((message) => (
                             <article key={message.id} className={cn(message.role === "user" && "flex justify-end")}>
                                 {message.role === "user" ? (
                                     <div className="flex max-w-[88%] flex-col items-end gap-1.5">
@@ -903,13 +935,7 @@ export function CencoriAgentSidebar({
                                         {message.content && (
                                             <MarkdownRenderer content={message.content} className={AGENT_MARKDOWN_STYLES} />
                                         )}
-                                        {message.actions?.map((action) => (
-                                            <CopilotActionCard
-                                                key={action.id}
-                                                action={action}
-                                                onUpdate={(patch) => updateAction(message.id, action.id, patch)}
-                                            />
-                                        ))}
+                                        {message.actions?.map((action) => <CopilotActionStep key={action.id} action={action} />)}
                                     </div>
                                 )}
                             </article>
@@ -930,6 +956,15 @@ export function CencoriAgentSidebar({
                 {/* Same shade as the dashboard cards (bg-muted/60 over the page
                     background); the solid layer underneath keeps the dither
                     from tinting it. */}
+                {revealedSecret && <CopilotSecret title={revealedSecret.title} secret={revealedSecret.secret} onDismiss={() => setRevealedSecret(null)} />}
+                {openAction && (
+                    <CopilotActionConfirm
+                        key={openAction.action.id}
+                        action={openAction.action}
+                        onUpdate={(patch) => updateAction(openAction.messageId, openAction.action.id, patch)}
+                        onSecret={(secret) => setRevealedSecret({ title: openAction.action.title, secret })}
+                    />
+                )}
                 <div className="rounded-[28px] bg-background">
                     <div
                         className={cn(

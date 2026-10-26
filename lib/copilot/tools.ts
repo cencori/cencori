@@ -1,5 +1,6 @@
 import type { ChatCompletionFunctionTool } from "openai/resources/chat/completions";
 import type { createAdminClient } from "@/lib/supabaseAdmin";
+import { AGENT_READ_NAMES, AGENT_READ_TOOLS, AGENT_TOOL_STATUS, runAgentReadTool } from "@/lib/copilot/agent-tools";
 
 /**
  * Read-only tools for Cencori Copilot (app/api/agent).
@@ -73,6 +74,7 @@ const PROJECT_TOOLS = new Set([
     "list_api_keys",
     "get_memory_stats",
     "search_memories",
+    ...AGENT_READ_NAMES,
 ]);
 
 export const COPILOT_TOOLS: ChatCompletionFunctionTool[] = [
@@ -204,6 +206,8 @@ export const COPILOT_TOOLS: ChatCompletionFunctionTool[] = [
     },
 ];
 
+COPILOT_TOOLS.push(...AGENT_READ_TOOLS);
+
 /** The tools available for this context (project-only tools need a project). */
 export function toolsFor(ctx: CopilotToolContext): ChatCompletionFunctionTool[] {
     return ctx.project ? COPILOT_TOOLS : COPILOT_TOOLS.filter((t) => !PROJECT_TOOLS.has(t.function.name));
@@ -221,6 +225,7 @@ export const TOOL_STATUS: Record<string, string> = {
     list_projects: "Listing projects",
     get_memory_stats: "Checking memory",
     search_memories: "Searching memories",
+    ...AGENT_TOOL_STATUS,
 };
 
 type Args = Record<string, unknown>;
@@ -230,6 +235,8 @@ export async function runCopilotTool(name: string, args: Args, ctx: CopilotToolC
     if (PROJECT_TOOLS.has(name) && !project) {
         return { error: "No project is selected, so project data isn't available." };
     }
+
+    if (AGENT_READ_NAMES.has(name)) return runAgentReadTool(name, args, ctx);
 
     switch (name) {
         case "get_usage_summary": {

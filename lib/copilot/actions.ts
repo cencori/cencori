@@ -1,5 +1,6 @@
 import type { ChatCompletionFunctionTool } from "openai/resources/chat/completions";
 import type { CopilotToolContext } from "@/lib/copilot/tools";
+import { AGENT_ACTIONS, AGENT_ACTION_NAMES, AGENT_TOOL_STATUS, prepareAgentAction } from "@/lib/copilot/agent-tools";
 
 /**
  * Write actions for Cencori Copilot.
@@ -25,10 +26,19 @@ export type CopilotActionProposal = {
     // Destructive actions: the user types this to enable Confirm.
     confirmPhrase?: string;
     // The dashboard endpoint Confirm calls. Built here, never by the model.
-    request: { method: "POST" | "PATCH" | "PUT" | "DELETE"; path: string; body?: Record<string, unknown> };
+    request: CopilotActionRequest;
+    // Several requests in a row, when one change needs more than one call
+    // (create an agent, then add its knowledge). "{{agent_id}}"-style
+    // placeholders in a path or body take values the earlier responses returned.
+    steps?: CopilotActionRequest[];
+    // Not a write: Confirm opens this console page, for things that need the
+    // user's own sign-in (connecting WhatsApp, Google Calendar).
+    link?: { href: string; label: string };
     // Past-tense line shown once it succeeds.
     doneMessage: string;
 };
+
+export type CopilotActionRequest = { method: "POST" | "PATCH" | "PUT" | "DELETE"; path: string; body?: Record<string, unknown> };
 
 export type PrepareResult =
     | { proposal: CopilotActionProposal }
@@ -147,6 +157,8 @@ export const COPILOT_ACTIONS: ChatCompletionFunctionTool[] = [
     },
 ];
 
+COPILOT_ACTIONS.push(...AGENT_ACTIONS);
+
 export const ACTION_NAMES = new Set(COPILOT_ACTIONS.map((a) => a.function.name));
 
 export const ACTION_STATUS: Record<string, string> = {
@@ -157,6 +169,7 @@ export const ACTION_STATUS: Record<string, string> = {
     set_budget: "Preparing budget change",
     review_security_incident: "Preparing review",
     delete_memory: "Preparing to delete",
+    ...AGENT_TOOL_STATUS,
 };
 
 type Args = Record<string, unknown>;
@@ -186,6 +199,7 @@ async function findKey(ctx: CopilotToolContext, ref: unknown) {
 }
 
 export async function prepareCopilotAction(name: string, args: Args, ctx: CopilotToolContext): Promise<PrepareResult> {
+    if (AGENT_ACTION_NAMES.has(name)) return prepareAgentAction(name, args, ctx);
     const project = ctx.project;
     if (!project) return { error: "Select a project first; actions apply to a project." };
     const base = `/api/projects/${project.id}`;

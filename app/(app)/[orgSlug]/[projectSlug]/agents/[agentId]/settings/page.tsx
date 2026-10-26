@@ -13,6 +13,7 @@ import { postStudioAction, studioQueryKey, useAgentsBasePath } from "@/component
 import { AgentWidget } from "@/components/agents/AgentWidget";
 import { AgentWhatsApp } from "@/components/agents/AgentWhatsApp";
 import { AgentOwnerAlerts } from "@/components/agents/AgentOwnerAlerts";
+import { SettingsCard, SettingsPageLabel, SettingsRow, SettingsSection } from "@/components/agents/settings-layout";
 
 /** Agent settings: the website widget, WhatsApp, owner alerts, and deleting the agent. */
 export default function AgentSettingsPage() {
@@ -50,11 +51,8 @@ export default function AgentSettingsPage() {
     };
 
     return (
-        <div className="space-y-8">
-            <header>
-                <h1 className="text-base font-medium">Settings</h1>
-                <p className="mt-0.5 text-xs text-muted-foreground">Manage this agent.</p>
-            </header>
+        <div>
+            <SettingsPageLabel title="Settings" description={`Where ${agent.name} is available, who hears about what it does, and deleting it.`} />
 
             <AgentWidget />
 
@@ -62,21 +60,19 @@ export default function AgentSettingsPage() {
 
             <AgentOwnerAlerts />
 
-            <section className="rounded-lg border border-destructive/30">
-                <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                        <h2 className="text-sm font-medium">Delete agent</h2>
-                        <p className="mt-0.5 max-w-lg text-xs leading-5 text-muted-foreground">
-                            Permanently deletes {agent.name}, its {versions.length} {versions.length === 1 ? "version" : "versions"}
-                            {installs > 0 ? `, ${installs} customer ${installs === 1 ? "install" : "installs"}` : ""}, its documents and its run history. It comes off the marketplace. This can&apos;t be undone.
-                        </p>
-                    </div>
-                    <Button size="sm" className="h-7 shrink-0 text-xs bg-red-600 text-white hover:bg-red-600/90 disabled:opacity-50" onClick={() => setOpen(true)} disabled={!canManage}>
-                        Delete agent
-                    </Button>
-                </div>
-                {!canManage && <p className="border-t border-destructive/20 px-4 py-2.5 text-[11px] text-muted-foreground">Only project admins can delete agents.</p>}
-            </section>
+            <SettingsSection id="delete" title="Delete agent" description="Permanently remove this agent and everything it holds.">
+                <SettingsCard danger>
+                    <SettingsRow
+                        label={`Delete ${agent.name}`}
+                        description={<>Removes its {versions.length} {versions.length === 1 ? "version" : "versions"}{installs > 0 ? `, ${installs} customer ${installs === 1 ? "install" : "installs"}` : ""}, its documents and its run history, and takes it off the marketplace. This can&apos;t be undone.</>}
+                    >
+                        <Button size="sm" className="h-7 shrink-0 bg-red-600 text-xs text-white hover:bg-red-600/90 disabled:opacity-50" onClick={() => setOpen(true)} disabled={!canManage}>
+                            Delete agent
+                        </Button>
+                    </SettingsRow>
+                    {!canManage && <p className="border-t border-red-500/20 px-4 py-2.5 text-[11px] text-muted-foreground">Only project admins can delete agents.</p>}
+                </SettingsCard>
+            </SettingsSection>
 
             <Dialog open={open} onOpenChange={close}>
                 <DialogContent className="sm:max-w-[440px]">
