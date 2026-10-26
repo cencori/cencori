@@ -732,3 +732,17 @@ tspan {
 html[data-toast-preview="true"] [data-cookie-consent] {
     display: none !important;
 }
+
+/*
+ * iOS Safari zooms the page into any text field under 16px when it's tapped,
+ * and leaves it zoomed. Fields are 16px on phones (desktop keeps its sizes);
+ * !important because utility classes like text-sm set the size directly.
+ */
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]),
+  textarea,
+  select,
+  [contenteditable="true"] {
+    font-size: 16px !important;
+  }
+}

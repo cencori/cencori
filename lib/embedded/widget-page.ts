@@ -112,6 +112,8 @@ html,body{margin:0;height:100%;background:transparent;font:14px/1.5 -apple-syste
 .composer{display:flex;align-items:flex-end;gap:8px;margin:0 12px 8px;padding:6px 6px 6px 12px;border:1px solid var(--line);border-radius:14px;background:var(--bg)}
 .composer:focus-within{border-color:var(--muted)}
 textarea{flex:1;resize:none;border:0;outline:0;background:transparent;color:inherit;font:inherit;max-height:120px;padding:6px 0}
+/* Phones zoom into fields under 16px when tapped (iOS Safari); 16px stops it. */
+@media (max-width:767px){textarea,input{font-size:16px}}
 .send{width:32px;height:32px;border:0;border-radius:10px;background:var(--accent);color:var(--accent-fg,#fff);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex:none}
 .send:disabled{opacity:.4;cursor:default}
 .send svg{width:16px;height:16px}
