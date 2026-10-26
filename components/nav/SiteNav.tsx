@@ -321,9 +321,13 @@ export function SiteNav({
   className = "",
   solid = false,
   developers = false,
+  business = false,
 }: {
   className?: string;
   solid?: boolean;
+  // The business.cencori.com variant: the main menus with a "Business"
+  // wordmark, and Log in / Sign up into a business trial.
+  business?: boolean;
   // Force the developers variant (developer menus, "Developers" wordmark,
   // Log in / Sign up actions) on routes outside /developers* — e.g. the
   // models pages. When absent, the variant is derived from the pathname.
@@ -338,7 +342,10 @@ export function SiteNav({
     pathname === "/developers" ||
     pathname?.startsWith("/developers/") ||
     pathname === "/ai-gateway";
+  const isBusiness = !isDevelopers && business;
+  const isFrontDoor = isDevelopers || isBusiness;
   const menus = isDevelopers ? developerNavigationMenus : navigationMenus;
+  const signupPath = isBusiness ? "/signup?for=business" : "/signup";
   const activeMenuData = menus.find((menu) => menu.id === activeMenu);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
@@ -402,9 +409,9 @@ export function SiteNav({
       <header className={solid ? styles.navSolid : styles.nav}>
         <Link className={styles.brand} href="/" aria-label="Cencori home">
           <CencoriLogo className={styles.brandLogo} />
-          {isDevelopers ? (
+          {isFrontDoor ? (
             <span className="font-inter text-lg font-medium normal-case tracking-tight">
-              Developers
+              {isBusiness ? "Business" : "Developers"}
             </span>
           ) : null}
         </Link>
@@ -412,7 +419,7 @@ export function SiteNav({
         <div
           aria-label="Primary navigation"
           className={
-            isDevelopers
+            isFrontDoor
               ? `${styles.desktopNav} ${styles.desktopNavBare}`
               : styles.desktopNav
           }
@@ -449,7 +456,7 @@ export function SiteNav({
         </div>
 
         <div className={styles.navActions}>
-          {isDevelopers ? (
+          {isFrontDoor ? (
             isAuthenticated ? (
               <Link className={styles.navCta} href={getConsoleUrl("/home")}>
                 Dashboard
@@ -459,7 +466,7 @@ export function SiteNav({
                 <Link className={styles.navLogin} href={getConsoleUrl("/login")}>
                   Log in
                 </Link>
-                <Link className={styles.navCta} href={getConsoleUrl("/signup")}>
+                <Link className={styles.navCta} href={getConsoleUrl(signupPath)}>
                   Sign up
                 </Link>
               </>
@@ -511,6 +518,7 @@ export function SiteNav({
 
       <MobileMenu
         developers={isDevelopers}
+        business={isBusiness}
         menus={menus}
         onNavigate={closeMobile}
         onSelectSub={setMobileSub}
