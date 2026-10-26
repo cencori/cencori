@@ -104,9 +104,6 @@ html,body{margin:0;height:100%;background:transparent;font:14px/1.5 -apple-syste
 .user{align-self:flex-end;background:var(--accent);color:var(--accent-fg,#fff);border-bottom-right-radius:4px;white-space:pre-wrap}
 .error{align-self:flex-start;color:#c0392b;font-size:13px;padding:2px 4px}
 .note{align-self:center;color:var(--muted);font-size:12px;padding:4px 0;text-align:center}
-.sources{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
-.source{display:inline-flex;max-width:100%;align-items:center;gap:4px;padding:2px 8px;border:1px solid var(--line);border-radius:999px;font-size:11px;color:var(--muted);text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-a.source:hover{color:var(--fg)}
 .typing{padding:9px 0}
 .shimmer{position:relative;display:inline-block;color:var(--muted)}
 .shimmer::after{content:attr(data-text);position:absolute;inset:0;color:transparent;background-image:linear-gradient(100deg,transparent 30%,var(--fg) 48%,transparent 66%);background-position:180% 50%;background-repeat:no-repeat;background-size:240% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;animation:shimmer 1.9s linear infinite;pointer-events:none}
