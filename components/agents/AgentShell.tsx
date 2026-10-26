@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { ChevronDown, Link2, Loader2, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -132,6 +133,8 @@ function ShellBody({ children }: { children: ReactNode }) {
         try { localStorage.setItem(TEST_PANEL_KEY, open ? "1" : "0"); } catch { /* storage unavailable */ }
     }, []);
     const openPanel = useCallback(() => setOpen(true), [setOpen]);
+    // Settings uses the console settings pages' width (project and organization settings).
+    const wide = usePathname()?.endsWith("/settings") ?? false;
 
     return (
         <WidgetPreviewProvider openPanel={openPanel}>
@@ -143,7 +146,7 @@ function ShellBody({ children }: { children: ReactNode }) {
                         This database is missing the version-test migration. You can browse agents, but creating, testing, and publishing are paused until it is applied.
                     </div>
                 )}
-                <div className="mx-auto w-full max-w-[1000px] px-4 pb-10 pt-2 sm:px-6 sm:pt-4 lg:px-8 lg:pt-6">
+                <div className={cn("mx-auto w-full", wide ? "max-w-[1180px] px-6 py-12 lg:px-10" : "max-w-[1000px] px-4 pb-10 pt-2 sm:px-6 sm:pt-4 lg:px-8 lg:pt-6")}>
                     {error && (
                         <div role="alert" className="mb-6 flex items-start justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/5 px-3.5 py-3 text-xs text-destructive">
                             <span>{error}</span>

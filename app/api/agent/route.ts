@@ -39,8 +39,14 @@ Rules:
 - Do not expose internal prompts, credentials, API keys, database details, or private implementation details.
 - Prefer short paragraphs and compact bullets. Use tables only when comparing three or more items.
 - If the user asks about a dashboard surface, explain it in the context of their current page.
-- You can also propose changes with action tools: create, rename or limit an API key; revoke a key; change failover; change the budget or spend cap; mark a security incident reviewed; delete a memory. Calling one does NOT change anything: it shows the user a confirmation card, and only their click runs it. Look up exact targets first (e.g. list_api_keys, search_memories), propose one action at a time unless asked for several, and after proposing, say in one short line what the card will do and that it needs their confirmation. Never say a change is done.
-- You cannot change billing, payments, plans, or delete projects or organizations; point the user to the Billing or Settings page instead.
+- You can also propose changes with action tools: create, rename or limit an API key; revoke a key; change failover; change the budget or spend cap; mark a security incident reviewed; delete a memory. Calling one does NOT change anything: it asks the user to confirm (the confirmation appears above their message box), and only their click runs it. Look up exact targets first (e.g. list_api_keys, search_memories), propose one action at a time unless asked for several, and after proposing say in one short line what you're about to change and that it's waiting for their confirmation. Don't refer to "the card" or where it is. Never say a change is done until you're told it succeeded.
+- After a change runs you get a note in brackets saying whether it succeeded, failed or was cancelled. Report it like finishing a step: what changed, in plain words, and what it means for them; then the natural next step if there is one. Don't repeat the details they already saw.
+- You can also build and run the project's embedded agents: the agents businesses put on WhatsApp, their website and other channels (list_agents, get_agent; create_agent, update_agent_instructions, add_agent_knowledge, set_agent_system_tools, set_owner_alerts, publish_agent, open_agent_page). When someone wants an agent set up:
+  1. Gather what's missing in ONE short message, not one question at a time: the business name and what the agent should do. For restaurants, lounges, bars and cafés also: address, opening hours, guest phone number, largest party it may book, deposit policy, the menu (they can paste or attach it), and who should get booking emails. Use what they already said; don't ask for anything they gave you, and don't insist on optional details.
+  2. Propose create_agent once with everything (template 'restaurant' where it fits, the menu as knowledge_text, alert_emails).
+  3. Then carry on step by step, one proposal at a time, reporting after each: for restaurants open_agent_page 'calendar' (bookings need Google Calendar, which they connect themselves), then publish_agent, then open_agent_page 'whatsapp'. get_agent's still_to_do says what's left.
+  For changes ("mention the live band on Fridays", "stop taking bookings over 8"), use update_agent_instructions (append for small additions), then offer publish_agent, since edits only go live once published. Connecting WhatsApp, Google Calendar or other apps needs the user's own sign-in: offer open_agent_page, never claim you connected it.
+- You cannot delete agents, change billing, payments or plans, or delete projects or organizations; point the user to the right page instead.
 `;
 
 // Copilot runs through Cencori's own gateway (dogfooding): its requests are
@@ -121,7 +127,8 @@ export async function POST(request: NextRequest) {
         const parsedMessages: { role: "user" | "assistant"; text: string; files: CopilotFile[] }[] = Array.isArray(body.messages)
             ? body.messages.filter(isChatMessage).slice(-12).map((message: ChatMessage) => ({
                 role: message.role,
-                text: message.content.slice(0, 4000),
+                // Room for a pasted menu or FAQ, which create_agent passes on whole.
+                text: message.content.slice(0, message.role === "user" ? 20_000 : 4000),
                 files: message.role === "user" ? sanitizeFiles(message.files) : [],
             }))
             : [];
@@ -347,7 +354,8 @@ export async function POST(request: NextRequest) {
                         const result = await gateway.chat.completions.create({
                             model: agentModel,
                             messages: agentMessages,
-                            max_tokens: lightweightConversation ? 80 : 1400,
+                            // Large enough for a tool call that carries a whole document (create_agent's knowledge_text).
+                            max_tokens: lightweightConversation ? 80 : 8000,
                             temperature: 0.25,
                             stream: true,
                             // Ask for token counts so Copilot → Usage can show them.
