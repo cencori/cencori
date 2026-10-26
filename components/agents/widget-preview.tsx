@@ -140,21 +140,65 @@ export function useWidgetPreview(): WidgetPreviewValue {
 
 // ── Launcher, drawn the way public/widget.js draws it ─────────────────────
 
-export function WidgetLauncher({ appearance, orbSeed, onOpen }: { appearance: WidgetAppearance; orbSeed: string; onOpen: () => void }) {
+/**
+ * The launcher and the close button as one button that morphs between them,
+ * as public/widget.js does: closed it's the card or the pill, open it shrinks
+ * into a round close button.
+ */
+export function WidgetLauncher({ appearance, orbSeed, open, onToggle }: { appearance: WidgetAppearance; orbSeed: string; open: boolean; onToggle: () => void }) {
     const accentFg = readableOn(appearance.accent);
-    if (appearance.launcher_style === "pill") {
-        return (
-            <button type="button" onClick={onOpen} className="inline-flex h-11 items-center gap-2 rounded-full pl-3.5 pr-4 text-sm font-semibold shadow-[0_6px_24px_rgba(0,0,0,.18)]" style={{ background: appearance.accent, color: accentFg }}>
-                <MessageCircle className="h-[18px] w-[18px]" />
-                <span className="max-w-[220px] truncate">{appearance.launcher_text}</span>
-            </button>
-        );
-    }
+    const pill = appearance.launcher_style === "pill";
     const dark = appearance.theme === "dark" || (appearance.theme === "auto" && typeof window !== "undefined" && window.matchMedia?.("(prefers-color-scheme: dark)").matches);
+    const closedBg = pill ? appearance.accent : dark ? "#141414" : "#ffffff";
+    const closedFg = pill ? accentFg : dark ? "#f2f2f2" : "#111111";
+    const ref = useRef<HTMLButtonElement>(null);
+    const closedWidth = useRef(0);
+    // Width can't animate from "auto": pinned to a number while it morphs, released after.
+    const [width, setWidth] = useState<number | undefined>(undefined);
+    const first = useRef(true);
+    useEffect(() => {
+        if (first.current) {
+            first.current = false;
+            return;
+        }
+        const el = ref.current;
+        if (!el) return;
+        const from = el.getBoundingClientRect().width;
+        if (open) closedWidth.current = from;
+        setWidth(from);
+        const frame = requestAnimationFrame(() => setWidth(open ? 40 : closedWidth.current || from));
+        const settle = open ? undefined : window.setTimeout(() => setWidth(undefined), 320);
+        return () => {
+            cancelAnimationFrame(frame);
+            if (settle) window.clearTimeout(settle);
+        };
+    }, [open]);
+
     return (
-        <button type="button" onClick={onOpen} className={cn("inline-flex max-w-full items-center gap-2.5 rounded-full py-2 pl-2 pr-4 shadow-[0_8px_32px_rgba(0,0,0,.16)] ring-1 transition-transform hover:-translate-y-px", dark ? "bg-[#141414] text-[#f2f2f2] ring-white/10" : "bg-white text-[#111] ring-black/5")}>
-            <AgentOrb seed={orbSeed} className="h-6 w-6" />
-            <span className="truncate text-sm font-medium">{appearance.launcher_text}</span>
+        <button
+            ref={ref}
+            type="button"
+            onClick={onToggle}
+            aria-expanded={open}
+            aria-label={open ? "Close chat" : appearance.launcher_text}
+            className={cn(
+                "relative inline-flex h-10 max-w-full shrink-0 items-center overflow-hidden whitespace-nowrap rounded-full transition-[width,padding,background-color,color] duration-[280ms] ease-[cubic-bezier(.2,.8,.2,1)] motion-reduce:transition-none",
+                pill ? "shadow-[0_6px_24px_rgba(0,0,0,.18)]" : cn("shadow-[0_8px_32px_rgba(0,0,0,.16)] ring-1", dark ? "ring-white/10" : "ring-black/5"),
+                open ? "px-0" : pill ? "pl-3.5 pr-4" : "pl-2 pr-4",
+            )}
+            style={{ width, background: open ? appearance.accent : closedBg, color: open ? accentFg : closedFg }}
+        >
+            <span className={cn("inline-flex min-w-0 items-center transition-opacity duration-150 motion-reduce:transition-none", pill ? "gap-2" : "gap-2.5", open ? "opacity-0" : "opacity-100")}>
+                {pill ? <MessageCircle className="h-[18px] w-[18px] shrink-0" /> : <AgentOrb seed={orbSeed} className="h-6 w-6 shrink-0" />}
+                <span className={cn("max-w-[220px] truncate text-sm", pill ? "font-semibold" : "font-medium")}>{appearance.launcher_text}</span>
+            </span>
+            <span
+                aria-hidden
+                className={cn("pointer-events-none absolute inset-0 flex items-center justify-center transition-[opacity,transform] duration-[280ms] ease-[cubic-bezier(.2,.8,.2,1)] motion-reduce:transition-none", open ? "rotate-0 scale-100 opacity-100" : "-rotate-90 scale-50 opacity-0")}
+                style={{ color: accentFg }}
+            >
+                <X className="h-[18px] w-[18px]" />
+            </span>
         </button>
     );
 }
@@ -226,16 +270,16 @@ export function WidgetPreview() {
         <div className="relative min-h-0 flex-1 overflow-hidden bg-[repeating-linear-gradient(135deg,transparent,transparent_12px,rgba(127,127,127,.06)_12px,rgba(127,127,127,.06)_24px)]">
             <div className={cn("absolute bottom-4 top-4 flex flex-col justify-end gap-3", left ? "left-4 right-4 items-start" : "left-4 right-4 items-end")}>
                 {/* Kept mounted while closed so the conversation survives closing the chat. */}
-                <div className={cn("max-h-[560px] min-h-0 w-full max-w-[400px] flex-1 overflow-hidden rounded-2xl shadow-[0_12px_48px_rgba(0,0,0,.18)] ring-1 ring-black/10 dark:ring-white/10", !open && "hidden")}>
+                <div
+                    className={cn(
+                        "max-h-[560px] min-h-0 w-full max-w-[400px] flex-1 overflow-hidden rounded-2xl shadow-[0_12px_48px_rgba(0,0,0,.18)] ring-1 ring-black/10 transition-[opacity,transform,visibility] duration-[280ms] ease-[cubic-bezier(.2,.8,.2,1)] motion-reduce:transition-none dark:ring-white/10",
+                        left ? "origin-bottom-left" : "origin-bottom-right",
+                        open ? "visible translate-y-0 scale-100 opacity-100" : "pointer-events-none invisible translate-y-2 scale-[.97] opacity-0",
+                    )}
+                >
                     {frame}
                 </div>
-                {open ? (
-                    <button type="button" onClick={() => setOpen(false)} aria-label="Close chat" className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full shadow-[0_6px_24px_rgba(0,0,0,.18)]" style={{ background: appearance.accent, color: readableOn(appearance.accent) }}>
-                        <X className="h-5 w-5" />
-                    </button>
-                ) : (
-                    <WidgetLauncher appearance={appearance} orbSeed={agent.id} onOpen={() => setOpen(true)} />
-                )}
+                <WidgetLauncher appearance={appearance} orbSeed={agent.id} open={open} onToggle={() => setOpen((value) => !value)} />
             </div>
         </div>
     );

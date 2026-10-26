@@ -4,7 +4,9 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronDown, Link2, Loader2, Settings } from "lucide-react";
+import { ChevronDown, Link2, Settings } from "lucide-react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import Loading03Icon from "@hugeicons/core-free-icons/Loading03Icon";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AgentWorkspaceProvider, useAgentWorkspace } from "@/components/agents/AgentWorkspace";
@@ -80,7 +82,7 @@ function HeaderContent({ testOpen, onToggleTest }: { testOpen: boolean; onToggle
                                     onClick={() => void publish()}
                                     disabled={!canPublish || !!busy}
                                 >
-                                    {busy === "publish_version" && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                                    {busy === "publish_version" && <HugeiconsIcon icon={Loading03Icon} className="h-3.5 w-3.5 animate-spin" />}
                                     Publish
                                 </Button>
                             ) : (
@@ -92,7 +94,7 @@ function HeaderContent({ testOpen, onToggleTest }: { testOpen: boolean; onToggle
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                     <Button size="sm" className={cn(SPLIT_PART, "w-6 px-0")} aria-label="More publishing options">
-                                        {share.copying ? <Loader2 className="h-3 w-3 animate-spin" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                                        {share.copying ? <HugeiconsIcon icon={Loading03Icon} className="h-3 w-3 animate-spin" /> : <ChevronDown className="h-3.5 w-3.5" />}
                                     </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="min-w-44">
