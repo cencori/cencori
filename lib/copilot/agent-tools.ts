@@ -5,6 +5,8 @@ import { readSystemTools } from "@/lib/embedded/agent-tools";
 import { readAgentIntegrations, readAgentMcpServers } from "@/lib/embedded/agent-mcp";
 import { RESTAURANT_DEFAULTS, restaurantInstructions, type RestaurantDetails } from "@/lib/embedded/templates";
 import { getOwnerAlerts } from "@/lib/embedded/owner-alerts";
+import { getCatalog } from "@/lib/embedded/catalog";
+import { cleanProducts, PRODUCTS_MAX } from "@/lib/embedded/catalog-format";
 
 /**
  * Copilot as an agent builder: read the project's embedded agents, and
@@ -109,11 +111,39 @@ export const AGENT_ACTIONS: ChatCompletionFunctionTool[] = [
         type: "function",
         function: {
             name: "set_agent_system_tools",
-            description: "Propose switching an agent's built-in actions on or off: end_conversation (closes the chat when the person is done) and request_callback (takes a name, number and reason and emails the owner to call back). Goes into a draft.",
+            description: "Propose switching an agent's built-in actions on or off: end_conversation (closes the chat when the person is done), request_callback (takes a name, number and reason and emails the owner to call back) take_payments (sends payment links for deposits, tables and orders; needs a payment provider (Paystack, Flutterwave or Stripe) connected under the agent's Integrations) and sell_products (answers about the business's products, prices and stock, and takes orders; needs products added with add_products). Goes into a draft.",
             parameters: {
                 type: "object",
-                properties: { agent: agentRef, end_conversation: { type: "boolean" }, request_callback: { type: "boolean" } },
+                properties: { agent: agentRef, end_conversation: { type: "boolean" }, request_callback: { type: "boolean" }, take_payments: { type: "boolean" }, sell_products: { type: "boolean" } },
                 required: ["agent"],
+            },
+        },
+    },
+    {
+        type: "function",
+        function: {
+            name: "add_products",
+            description: "Propose adding products to the project's catalog (shared by its agents), from a price list the user gave or attached. Products with the same name are updated. Agents sell from it once sell_products is on.",
+            parameters: {
+                type: "object",
+                properties: {
+                    products: {
+                        type: "array",
+                        items: {
+                            type: "object",
+                            properties: {
+                                name: { type: "string" },
+                                price: { type: "number", description: "In the main unit, e.g. 25000 for ₦25,000." },
+                                options: { type: "string", description: "Sizes, colours…, e.g. \"S, M, L\"." },
+                                stock: { type: "integer", description: "Units in stock; omit when they don't track stock." },
+                                description: { type: "string" },
+                            },
+                            required: ["name", "price"],
+                        },
+                    },
+                    currency: { type: "string", description: "Three-letter code; only when it isn't the catalog's current one (NGN by default)." },
+                },
+                required: ["products"],
             },
         },
     },
@@ -148,10 +178,10 @@ export const AGENT_ACTIONS: ChatCompletionFunctionTool[] = [
         type: "function",
         function: {
             name: "open_agent_page",
-            description: "Offer a button that opens the page where the user connects something themselves, because it needs their own sign-in: 'calendar' (connect Google Calendar and other apps), 'whatsapp' (Connect WhatsApp), 'website' (the website chat and its install snippet), 'preview' (try the agent). Use after creating an agent for the steps you can't do for them.",
+            description: "Offer a button that opens the page where the user connects something themselves, because it needs their own sign-in: 'calendar' (connect Google Calendar and other apps), 'whatsapp' (Connect WhatsApp), 'website' (the website chat and its install snippet), 'payments' (connect Paystack, Flutterwave or Stripe with their secret key, under Integrations), 'products' (the product list, to import a spreadsheet), 'preview' (try the agent). Use after creating an agent for the steps you can't do for them.",
             parameters: {
                 type: "object",
-                properties: { agent: agentRef, page: { type: "string", enum: ["calendar", "whatsapp", "website", "preview"] } },
+                properties: { agent: agentRef, page: { type: "string", enum: ["calendar", "whatsapp", "website", "payments", "products", "preview"] } },
                 required: ["agent", "page"],
             },
         },
@@ -165,6 +195,7 @@ export const AGENT_TOOL_STATUS: Record<string, string> = {
     update_agent_instructions: "Preparing instruction changes",
     add_agent_knowledge: "Preparing the document",
     set_agent_system_tools: "Preparing tool changes",
+    add_products: "Preparing the products",
     set_owner_alerts: "Preparing alerts",
     publish_agent: "Preparing to publish",
     open_agent_page: "Finding the page",
@@ -235,6 +266,8 @@ export async function runAgentReadTool(name: string, args: Args, ctx: CopilotToo
         const versions = await versionsOf(ctx, found.agent.id);
         const working = workingVersion(versions);
         const config = working?.config_json ?? {};
+        const { data: paystack } = await ctx.admin.from("tool_connections").select("metadata").eq("project_id", ctx.project.id).eq("connector_slug", "payments").eq("status", "active").limit(1).maybeSingle();
+        const catalog = await getCatalog(ctx.admin, ctx.project.id);
         const [{ data: kb }, channels] = await Promise.all([
             ctx.admin.from("knowledge_bases").select("id").eq("project_id", ctx.project.id).eq("agent_id", found.agent.id).is("tenant_id", null).maybeSingle(),
             channelState(ctx, found.agent.id),
@@ -252,6 +285,9 @@ export async function runAgentReadTool(name: string, args: Args, ctx: CopilotToo
             !published && "publish",
             !channels.whatsapp && "connect WhatsApp (user signs in: open_agent_page whatsapp)",
             !channels.owner_alerts?.emails.length && "set owner alerts",
+            readSystemTools(config).take_payments && !paystack && "connect a payment provider (Paystack, Flutterwave or Stripe) so it can take payments (user pastes their key: open_agent_page payments)",
+            readSystemTools(config).sell_products && !catalog?.metadata.products.length && "add products (add_products from a price list they give, or they import a spreadsheet: open_agent_page products)",
+            readSystemTools(config).sell_products && !paystack && "optional: connect payments so orders are paid by link (open_agent_page payments)",
         ].filter(Boolean);
         return {
             id: found.agent.id,
@@ -264,6 +300,8 @@ export async function runAgentReadTool(name: string, args: Args, ctx: CopilotToo
             instructions: instructions.length > 3000 ? `${instructions.slice(0, 3000)}… (${instructions.length} characters)` : instructions,
             system_tools: Object.keys(readSystemTools(config)),
             connected_apps: apps,
+            payments: paystack ? { provider: (paystack.metadata as { provider?: string } | null)?.provider ?? null, mode: (paystack.metadata as { mode?: string } | null)?.mode ?? null, currency: (paystack.metadata as { currency?: string } | null)?.currency ?? null } : null,
+            products: catalog ? { count: catalog.metadata.products.length, currency: catalog.metadata.currency, orders_to_fulfil: catalog.metadata.orders.filter((o) => o.status === "paid" || o.status === "new").length } : null,
             mcp_servers: readAgentMcpServers(config).map((s) => s.name),
             knowledge: (sources ?? []).map((s) => ({ name: s.name, status: s.status })),
             ...channels,
@@ -354,6 +392,40 @@ export async function prepareAgentAction(name: string, args: Args, ctx: CopilotT
         };
     }
 
+    if (name === "add_products") {
+        const catalog = await getCatalog(ctx.admin, project.id);
+        const currency = text(args.currency, 3).toUpperCase();
+        if (currency && !/^[A-Z]{3}$/.test(currency)) return { error: "currency is a three-letter code, like NGN." };
+        const incoming = cleanProducts(args.products);
+        if (!incoming.ok) return { error: incoming.message };
+        if (incoming.products.length === 0) return { error: "Give at least one product." };
+        // Same name updates the product (keeping its id, so past orders still point at it).
+        const byName = new Map((catalog?.metadata.products ?? []).map((p) => [p.name.toLowerCase(), p]));
+        let updated = 0;
+        for (const product of incoming.products) {
+            const existing = byName.get(product.name.toLowerCase());
+            if (existing) updated++;
+            byName.set(product.name.toLowerCase(), existing ? { ...product, id: existing.id, available: existing.available } : product);
+        }
+        if (byName.size > PRODUCTS_MAX) return { error: `A catalog holds up to ${PRODUCTS_MAX} products.` };
+        const shownCurrency = currency || catalog?.metadata.currency || "NGN";
+        const sample = incoming.products.slice(0, 4).map((p) => `${p.name} (${shownCurrency} ${p.price.toLocaleString("en-NG")})`).join(", ");
+        return {
+            proposal: {
+                id, kind: name, tier: "normal",
+                title: `Add ${incoming.products.length} product${incoming.products.length === 1 ? "" : "s"}`,
+                details: [
+                    { label: "New", value: String(incoming.products.length - updated) },
+                    ...(updated ? [{ label: "Updated", value: String(updated) }] : []),
+                    { label: "Products", value: `${sample}${incoming.products.length > 4 ? `, and ${incoming.products.length - 4} more` : ""}` },
+                    ...(currency && currency !== catalog?.metadata.currency ? [{ label: "Currency", value: currency }] : []),
+                ],
+                request: { method: "PUT", path: `/api/projects/${encodeURIComponent(project.id)}/catalog`, body: { products: [...byName.values()], ...(currency ? { currency } : {}) } },
+                doneMessage: `Added ${incoming.products.length} product${incoming.products.length === 1 ? "" : "s"} to the catalog (${byName.size} in total). Agents with sell_products on sell from it straight away.`,
+            },
+        };
+    }
+
     if (name === "open_agent_page") {
         const found = await findAgent(ctx, args.agent);
         if ("error" in found) return found;
@@ -361,10 +433,12 @@ export async function prepareAgentAction(name: string, args: Args, ctx: CopilotT
             calendar: { path: "tools?tab=integrations", label: "Open Integrations", title: "Connect Google Calendar" },
             whatsapp: { path: "settings#whatsapp", label: "Open WhatsApp settings", title: "Connect WhatsApp" },
             website: { path: "settings#website", label: "Open website chat", title: "Set up the website chat" },
+            payments: { path: "tools?tab=integrations", label: "Open Integrations", title: "Connect payments" },
+            products: { path: "tools?tab=integrations", label: "Open Integrations", title: "Add products" },
             preview: { path: "", label: "Open the agent", title: "Try the agent" },
         };
         const page = pages[String(args.page)];
-        if (!page) return { error: "page must be calendar, whatsapp, website or preview." };
+        if (!page) return { error: "page must be calendar, whatsapp, website, payments, products or preview." };
         return {
             proposal: {
                 id, kind: name, tier: "normal",
@@ -431,12 +505,13 @@ export async function prepareAgentAction(name: string, args: Args, ctx: CopilotT
         const current = readSystemTools(config) as Record<string, unknown>;
         const next: Record<string, unknown> = { ...current };
         const details: Array<{ label: string; value: string }> = [];
-        for (const key of ["end_conversation", "request_callback"] as const) {
+        const labels = { end_conversation: "End conversation", request_callback: "Request a callback", take_payments: "Take payments", sell_products: "Sell products" } as const;
+        for (const key of ["end_conversation", "request_callback", "take_payments", "sell_products"] as const) {
             if (typeof args[key] !== "boolean") continue;
             next[key] = args[key] ? (current[key] ?? {}) : null;
-            details.push({ label: key === "end_conversation" ? "End conversation" : "Request a callback", value: args[key] ? "On" : "Off" });
+            details.push({ label: labels[key], value: args[key] ? "On" : "Off" });
         }
-        if (details.length === 0) return { error: "Say which tools to switch: end_conversation and/or request_callback." };
+        if (details.length === 0) return { error: "Say which tools to switch: end_conversation, request_callback, take_payments and/or sell_products." };
         return {
             proposal: {
                 id, kind: name, tier: "normal",

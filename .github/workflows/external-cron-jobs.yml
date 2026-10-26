@@ -22,6 +22,7 @@ on:
           - cache-cleanup
           - expire-sessions
           - owner-alerts
+          - payments
           - knowledge-refresh
           - finops-push
           - costgraph-marketplace
@@ -224,6 +225,56 @@ jobs:
             echo "### Owner Alerts"
             echo
             echo "- URL: \`$BASE_URL/api/cron/owner-alerts\`"
+            echo "- Triggered at: \`$(date -u +"%Y-%m-%dT%H:%M:%SZ")\`"
+            echo
+            echo '```json'
+            cat "$RESPONSE_FILE"
+            echo
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  payments:
+    name: Confirm agent payments
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: >
+      (github.event_name == 'workflow_dispatch' &&
+      (github.event.inputs.target == 'all' || github.event.inputs.target == 'payments')) ||
+      (github.event_name == 'schedule' && github.event.schedule == '7,37 * * * *')
+    env:
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      CENCORI_CRON_BASE_URL: ${{ vars.CENCORI_CRON_BASE_URL }}
+    steps:
+      - name: Validate configuration
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "Missing required GitHub secret: CRON_SECRET" >&2
+            exit 1
+          fi
+
+      - name: Invoke payments cron
+        run: |
+          BASE_URL="${CENCORI_CRON_BASE_URL:-https://cencori.com}"
+          BASE_URL="${BASE_URL%/}"
+          RESPONSE_FILE="$(mktemp)"
+
+          curl --fail-with-body --silent --show-error \
+            --max-time 60 \
+            --retry 3 \
+            --retry-delay 5 \
+            --request POST \
+            --header "Authorization: Bearer $CRON_SECRET" \
+            --header "Content-Type: application/json" \
+            "$BASE_URL/api/cron/payments" \
+            --output "$RESPONSE_FILE"
+
+          echo "Triggered $BASE_URL/api/cron/payments"
+          cat "$RESPONSE_FILE"
+
+          {
+            echo "### Payments"
+            echo
+            echo "- URL: \`$BASE_URL/api/cron/payments\`"
             echo "- Triggered at: \`$(date -u +"%Y-%m-%dT%H:%M:%SZ")\`"
             echo
             echo '```json'

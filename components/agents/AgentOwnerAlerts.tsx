@@ -14,7 +14,7 @@ import { SettingsCard, SettingsFooter, SettingsRow, SettingsSection, settingsInp
 import { cn } from "@/lib/utils";
 const TIME_ZONES = ["Africa/Lagos", "Africa/Accra", "Africa/Nairobi", "Africa/Johannesburg", "Africa/Cairo", "Europe/London", "America/New_York", "UTC"];
 
-type Entry = { type: "booking" | "callback"; at: string; title: string; when?: string | null; contact?: string | null; source?: string | null };
+type Entry = { type: "booking" | "callback" | "payment" | "order"; at: string; title: string; when?: string | null; contact?: string | null; source?: string | null };
 type Alerts = { emails: string[]; bookings: boolean; callbacks: boolean; daily_summary: boolean; time_zone: string; recent: Entry[] };
 type Payload = { alerts: Alerts; configured: boolean; can_manage: boolean };
 type Form = Omit<Alerts, "recent">;
@@ -160,7 +160,7 @@ export function AgentOwnerAlerts() {
                     {payload.alerts.recent.map((entry) => (
                         <div key={`${entry.at}-${entry.title}`} className="flex items-start justify-between gap-4 border-b border-border/30 px-4 py-2.5 text-xs last:border-b-0">
                             <span>
-                                <span className="font-medium">{entry.type === "booking" ? "Booking" : "Call back"}:</span> {entry.title}
+                                <span className="font-medium">{{ booking: "Booking", callback: "Call back", payment: "Payment", order: "Order" }[entry.type] ?? entry.type}:</span> {entry.title}
                                 {entry.when ? `, ${entry.when}` : ""}{entry.contact ? `, ${entry.contact}` : ""}
                                 {entry.source && <span className="block text-[11px] text-muted-foreground">via {entry.source}</span>}
                             </span>

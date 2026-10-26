@@ -58,12 +58,30 @@ export interface NangoIntegration {
     name: string;
     provider: string;
     logo: string | null;
+    /** Nango's categories for the provider (e.g. productivity, social, payment), for grouping. */
+    categories: string[];
+}
+
+/** Nango's provider catalog changes rarely: categories are cached for a day. */
+let providerCategories: { at: number; byProvider: Map<string, string[]> } | null = null;
+async function categoriesByProvider(): Promise<Map<string, string[]>> {
+    if (providerCategories && Date.now() - providerCategories.at < 24 * 3_600_000) return providerCategories.byProvider;
+    try {
+        const { data } = await nango<{ data: Array<{ name: string; categories?: string[] }> }>('GET', '/providers');
+        providerCategories = { at: Date.now(), byProvider: new Map(data.map((p) => [p.name, p.categories ?? []])) };
+    } catch {
+        providerCategories = { at: Date.now() - 23 * 3_600_000, byProvider: providerCategories?.byProvider ?? new Map() };
+    }
+    return providerCategories.byProvider;
 }
 
 /** The apps switched on in our Nango environment: what businesses can connect. */
 export async function listNangoIntegrations(): Promise<NangoIntegration[]> {
-    const { data } = await nango<{ data: Array<{ unique_key: string; display_name: string; provider: string; logo?: string }> }>('GET', '/integrations');
-    return data.map((i) => ({ id: i.unique_key, name: i.display_name, provider: i.provider, logo: i.logo ?? null }));
+    const [{ data }, categories] = await Promise.all([
+        nango<{ data: Array<{ unique_key: string; display_name: string; provider: string; logo?: string }> }>('GET', '/integrations'),
+        categoriesByProvider(),
+    ]);
+    return data.map((i) => ({ id: i.unique_key, name: i.display_name, provider: i.provider, logo: i.logo ?? null, categories: categories.get(i.provider) ?? [] }));
 }
 
 export interface NangoConnection {
