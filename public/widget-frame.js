@@ -49,7 +49,8 @@
     // ── Rendering ─────────────────────────────────────────────────────────
     var ICONS = {
         close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>',
-        reset: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>',
+        // The close X turned 45°, so the two header icons are the same mark.
+        reset: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="transform:rotate(45deg)"><path d="M18 6 6 18M6 6l12 12"/></svg>',
         send: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>',
     };
 
@@ -123,18 +124,6 @@
         el.className = "msg " + (message.role === "user" ? "user" : "bot");
         if (message.role === "user") el.textContent = message.text;
         else el.innerHTML = markdown(message.text);
-        if (message.sources && message.sources.length) {
-            var wrap = document.createElement("div");
-            wrap.className = "sources";
-            message.sources.forEach(function (source, i) {
-                var chip = document.createElement(source.url ? "a" : "span");
-                chip.className = "source";
-                chip.textContent = (i + 1) + ". " + source.name;
-                if (source.url) { chip.href = source.url; chip.target = "_blank"; chip.rel = "noopener noreferrer"; chip.title = source.url; }
-                wrap.appendChild(chip);
-            });
-            el.appendChild(wrap);
-        }
         return el;
     }
 
@@ -239,24 +228,8 @@
         return { reply: reply, citations: citations, ended: ended };
     }
 
-    async function lookupSources(citations) {
-        var ids = [];
-        citations.forEach(function (c) { if (c.source_id && ids.indexOf(c.source_id) === -1) ids.push(c.source_id); });
-        if (!ids.length) return [];
-        try {
-            var res = await fetch("/api/widget/sources?ids=" + ids.join(","), { headers: { Authorization: "Bearer " + state.token } });
-            if (!res.ok) return [];
-            var body = await res.json();
-            var byId = {};
-            (body.sources || []).forEach(function (s) { byId[s.id] = s; });
-            return ids.map(function (id) { return byId[id]; }).filter(Boolean);
-        } catch (e) {
-            return [];
-        }
-    }
-
     function friendly(err) {
-        if (err && err.code === "widget_conversation_limit") return err.message + " Use the ↻ button above.";
+        if (err && err.code === "widget_conversation_limit") return err.message + " Use the + button above.";
         if (err && err.message) return err.message;
         return "Couldn't reach the chat. Check your connection and try again.";
     }
@@ -281,8 +254,7 @@
                     throw err;
                 }
             }
-            var sources = await lookupSources(result.citations);
-            state.messages.push({ role: "assistant", text: result.reply || "…", sources: sources });
+            state.messages.push({ role: "assistant", text: result.reply || "…" });
             // The agent closed the conversation: the next message opens a new one.
             if (result.ended) {
                 state.messages.push({ role: "note", text: "Conversation ended. Send a message to start a new one." });

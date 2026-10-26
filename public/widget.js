@@ -81,7 +81,7 @@
         root.style.cssText = "position:fixed;bottom:20px;" + side + ":20px;z-index:2147483000;font:14px/1.3 " + FONT + ";display:flex;flex-direction:column;align-items:" + (side === "left" ? "flex-start" : "flex-end");
 
         var panel = document.createElement("div");
-        panel.style.cssText = "margin-bottom:12px;width:380px;height:min(640px,calc(100vh - 110px));border-radius:16px;overflow:hidden;box-shadow:0 12px 48px rgba(0,0,0,.18),0 0 0 1px " + (dark ? "rgba(255,255,255,.08)" : "rgba(0,0,0,.06)") + ";display:none;background:transparent";
+        panel.style.cssText = "margin-bottom:12px;width:400px;height:min(560px,calc(100vh - 110px));border-radius:16px;overflow:hidden;box-shadow:0 12px 48px rgba(0,0,0,.18),0 0 0 1px " + (dark ? "rgba(255,255,255,.08)" : "rgba(0,0,0,.06)") + ";display:none;background:transparent";
 
         // Closed: the card or the pill. Open: a round close button.
         var launcher;
@@ -119,8 +119,8 @@
             var small = window.innerWidth < 520;
             panel.style.position = small && open ? "fixed" : "static";
             panel.style.inset = small && open ? "0" : "";
-            panel.style.width = small ? "100%" : "380px";
-            panel.style.height = small ? "100%" : "min(640px,calc(100vh - 110px))";
+            panel.style.width = small ? "100%" : "400px";
+            panel.style.height = small ? "100%" : "min(560px,calc(100vh - 110px))";
             panel.style.borderRadius = small ? "0" : "16px";
             panel.style.marginBottom = small ? "0" : "12px";
             close.style.display = open && !small ? "inline-flex" : "none";

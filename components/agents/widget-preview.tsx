@@ -226,7 +226,7 @@ export function WidgetPreview() {
         <div className="relative min-h-0 flex-1 overflow-hidden bg-[repeating-linear-gradient(135deg,transparent,transparent_12px,rgba(127,127,127,.06)_12px,rgba(127,127,127,.06)_24px)]">
             <div className={cn("absolute bottom-4 top-4 flex flex-col justify-end gap-3", left ? "left-4 right-4 items-start" : "left-4 right-4 items-end")}>
                 {/* Kept mounted while closed so the conversation survives closing the chat. */}
-                <div className={cn("min-h-0 w-full max-w-[360px] flex-1 overflow-hidden rounded-2xl shadow-[0_12px_48px_rgba(0,0,0,.18)] ring-1 ring-black/10 dark:ring-white/10", !open && "hidden")}>
+                <div className={cn("max-h-[560px] min-h-0 w-full max-w-[400px] flex-1 overflow-hidden rounded-2xl shadow-[0_12px_48px_rgba(0,0,0,.18)] ring-1 ring-black/10 dark:ring-white/10", !open && "hidden")}>
                     {frame}
                 </div>
                 {open ? (
