@@ -1,0 +1,57 @@
+---
+title: "Payments and products"
+description: "Let the agent send payment links, sell from your product list and take orders, paid straight into your own account."
+section: "Agents"
+order: 6
+---
+
+An agent can take payments and sell your products in the chat. Money goes straight to your own Paystack, Flutterwave or Stripe account: Cencori never holds it.
+
+## Connect payments
+
+On the agent's **Tools → Integrations** tab, click **Add integration** and pick your provider under **Payments**:
+
+| Provider | Where to find the secret key |
+| --- | --- |
+| **Paystack** | Settings → API Keys & Webhooks |
+| **Flutterwave** | Settings → API Keys |
+| **Stripe** | Developers → API keys (or a restricted key allowed to write Checkout Sessions) |
+
+Paste your **secret key**. Cencori checks it and works out the currency you take payments in. A test key puts the connection in test mode, so you can try the whole flow with the provider's test cards before going live.
+
+Then switch on **Take payments** under **Tools → Configure**.
+
+### How a payment works
+
+1. The customer agrees to pay, for a deposit, an event table or an order.
+2. The agent sends a payment link from your provider, for the amount you set in its instructions or the order total.
+3. The customer pays on your provider's page and is brought back.
+4. Cencori confirms the payment with your provider, the agent tells the customer, and you get an email.
+
+Recent payments and their status (pending, paid, expired) show under the payments connection on the Integrations tab.
+
+## Products
+
+On the **Integrations** tab, open **Your products**:
+
+- **Add** products one at a time: name, price, description, options (sizes, colours, flavours) and stock. Leave stock blank if you don't track it. Switch a product off to hide it without deleting it.
+- **Import** a CSV. Exports from Bumpa, Selar, Shopify and WooCommerce work as they are, and so does a sheet you made yourself. Cencori finds the columns by name: Name or Title, Price or Selling price, Stock or Quantity, Description, and Options or Sizes. Other columns are ignored, and rows repeating a product (one per size, like Shopify's) are folded into one product with options. You can also paste straight from a spreadsheet.
+
+A catalog holds up to 500 products.
+
+Then switch on **Sell products** under **Tools → Configure**.
+
+## How an order works
+
+The agent finds products from what the customer asks for ("the ankara dress in medium"), answers about price and stock, and places the order with the customer's name, delivery details and any note. Prices always come from your product list, never from the chat.
+
+- **With payments connected** (in the same currency as your products): the customer gets a payment link. When they pay, the stock comes off, the order is marked paid, and you get an email.
+- **Without payments:** the order goes straight to you by email, and its stock is held.
+
+See orders on the **Orders** tab of Your products, and mark each one **done** or **cancelled**.
+
+## Selling on Bumpa, Selar or WooCommerce
+
+- **WooCommerce:** connect it under Integrations, and the agent can read your store's products and orders directly.
+- **Bumpa:** sign in with your Bumpa account from Integrations. Coming soon.
+- **Selar:** export your products as CSV and import them.
