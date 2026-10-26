@@ -24,7 +24,7 @@
     var FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,sans-serif";
     var HIGHLIGHT = "radial-gradient(circle at 32% 26%,rgba(255,255,255,.85) 0%,rgba(255,255,255,.25) 22%,transparent 48%)";
     var CHAT_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>';
-    var CLOSE_ICON = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+    var CLOSE_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>';
 
     function readableOn(hex) {
         var n = parseInt(String(hex).slice(1), 16);
@@ -83,37 +83,48 @@
         var panel = document.createElement("div");
         panel.style.cssText = "margin-bottom:12px;width:400px;height:min(560px,calc(100vh - 110px));border-radius:16px;overflow:hidden;box-shadow:0 12px 48px rgba(0,0,0,.18),0 0 0 1px " + (dark ? "rgba(255,255,255,.08)" : "rgba(0,0,0,.06)") + ";display:none;background:transparent";
 
-        // Closed: the card or the pill. Open: a round close button.
-        var launcher;
-        if (look.launcher_style === "pill") {
-            launcher = document.createElement("button");
-            launcher.type = "button";
-            launcher.setAttribute("aria-label", look.launcher_text);
-            launcher.style.cssText = "display:inline-flex;align-items:center;gap:8px;height:48px;padding:0 18px 0 14px;border:0;border-radius:999px;cursor:pointer;box-shadow:0 6px 24px rgba(0,0,0,.18);background:" + look.accent + ";color:" + accentFg + ";font:inherit;font-weight:600";
-            launcher.innerHTML = CHAT_ICON;
+        // One button that morphs: closed it's the card (orb + heading) or the
+        // pill (icon + text); open it shrinks into a round close button.
+        var reduce = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+        var DURATION = reduce ? 0 : 280;
+        var EASE = "cubic-bezier(.2,.8,.2,1)";
+        var pill = look.launcher_style === "pill";
+        var closedBg = pill ? look.accent : (dark ? "#141414" : "#fff");
+        var closedFg = pill ? accentFg : (dark ? "#f2f2f2" : "#111");
+        var closedPadding = pill ? "0 16px 0 14px" : "0 16px 0 8px";
+        var shadow = pill ? "0 6px 24px rgba(0,0,0,.18)" : "0 8px 32px rgba(0,0,0,.16),0 0 0 1px " + (dark ? "rgba(255,255,255,.08)" : "rgba(0,0,0,.06)");
+
+        var button = document.createElement("button");
+        button.type = "button";
+        button.setAttribute("aria-label", look.launcher_text);
+        button.setAttribute("aria-expanded", "false");
+        button.style.cssText = "position:relative;display:inline-flex;align-items:center;height:40px;max-width:calc(100vw - 40px);padding:" + closedPadding + ";border:0;border-radius:999px;cursor:pointer;overflow:hidden;white-space:nowrap;font:inherit;box-shadow:" + shadow + ";background:" + closedBg + ";color:" + closedFg + ";transition:width " + DURATION + "ms " + EASE + ",padding " + DURATION + "ms " + EASE + ",background-color " + DURATION + "ms " + EASE + ",color " + DURATION + "ms " + EASE;
+
+        var face = document.createElement("span");
+        face.style.cssText = "display:inline-flex;align-items:center;min-width:0;gap:" + (pill ? "8px" : "10px") + ";transition:opacity " + Math.round(DURATION * 0.5) + "ms ease";
+        if (pill) {
+            face.innerHTML = CHAT_ICON;
             var pillLabel = document.createElement("span");
             pillLabel.textContent = look.launcher_text;
-            launcher.appendChild(pillLabel);
+            pillLabel.style.cssText = "font-weight:600;overflow:hidden;text-overflow:ellipsis";
+            face.appendChild(pillLabel);
         } else {
-            // Card: the orb and heading in one button.
-            launcher = document.createElement("button");
-            launcher.type = "button";
-            launcher.style.cssText = "display:inline-flex;align-items:center;gap:10px;max-width:calc(100vw - 40px);padding:8px 16px 8px 8px;border:0;border-radius:999px;cursor:pointer;font:inherit;box-shadow:0 8px 32px rgba(0,0,0,.16),0 0 0 1px " + (dark ? "rgba(255,255,255,.08)" : "rgba(0,0,0,.06)") + ";background:" + (dark ? "#141414" : "#fff") + ";color:" + (dark ? "#f2f2f2" : "#111");
-            launcher.appendChild(orb(orbBackground || look.accent, 24));
+            face.appendChild(orb(orbBackground || look.accent, 24));
             var heading = document.createElement("span");
             heading.textContent = look.launcher_text;
-            heading.style.cssText = "font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap";
-            launcher.appendChild(heading);
+            heading.style.cssText = "font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis";
+            face.appendChild(heading);
         }
-
-        var close = document.createElement("button");
-        close.type = "button";
-        close.setAttribute("aria-label", "Close chat");
-        close.innerHTML = CLOSE_ICON;
-        close.style.cssText = "display:none;width:48px;height:48px;align-items:center;justify-content:center;border:0;border-radius:50%;cursor:pointer;box-shadow:0 6px 24px rgba(0,0,0,.18);background:" + look.accent + ";color:" + accentFg;
+        var cross = document.createElement("span");
+        cross.innerHTML = CLOSE_ICON;
+        cross.style.cssText = "position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:" + accentFg + ";opacity:0;transform:rotate(-90deg) scale(.5);transition:opacity " + DURATION + "ms " + EASE + ",transform " + DURATION + "ms " + EASE + ";pointer-events:none";
+        button.appendChild(face);
+        button.appendChild(cross);
 
         var frame = null;
         var open = false;
+        var closedWidth = 0;
+        var settle = null;
 
         function fit() {
             var small = window.innerWidth < 520;
@@ -123,22 +134,72 @@
             panel.style.height = small ? "100%" : "min(560px,calc(100vh - 110px))";
             panel.style.borderRadius = small ? "0" : "16px";
             panel.style.marginBottom = small ? "0" : "12px";
-            close.style.display = open && !small ? "inline-flex" : "none";
+            // Full screen on phones: the chat's own header closes it.
+            button.style.display = open && small ? "none" : "inline-flex";
         }
+
+        function morph(toOpen) {
+            clearTimeout(settle);
+            // Width can't animate from "auto": pin the current width first.
+            var from = button.getBoundingClientRect().width;
+            if (toOpen) closedWidth = from;
+            button.style.width = from + "px";
+            void button.offsetWidth;
+            if (toOpen) {
+                button.style.width = "40px";
+                button.style.padding = "0";
+                button.style.backgroundColor = look.accent;
+                button.style.color = accentFg;
+                face.style.opacity = "0";
+                cross.style.opacity = "1";
+                cross.style.transform = "none";
+            } else {
+                button.style.width = (closedWidth || from) + "px";
+                button.style.padding = closedPadding;
+                button.style.backgroundColor = closedBg;
+                button.style.color = closedFg;
+                face.style.opacity = "1";
+                cross.style.opacity = "0";
+                cross.style.transform = "rotate(-90deg) scale(.5)";
+                // Back to its natural width once settled, so the text can reflow.
+                settle = setTimeout(function () { if (!open) button.style.width = ""; }, DURATION + 40);
+            }
+            button.setAttribute("aria-expanded", toOpen ? "true" : "false");
+            button.setAttribute("aria-label", toOpen ? "Close chat" : look.launcher_text);
+        }
+
+        function showPanel(show) {
+            panel.style.transformOrigin = "bottom " + side;
+            panel.style.transition = "opacity " + DURATION + "ms " + EASE + ",transform " + DURATION + "ms " + EASE;
+            if (show) {
+                panel.style.display = "block";
+                panel.style.opacity = "0";
+                panel.style.transform = "translateY(8px) scale(.97)";
+                void panel.offsetWidth;
+                panel.style.opacity = "1";
+                panel.style.transform = "none";
+            } else {
+                panel.style.opacity = "0";
+                panel.style.transform = "translateY(8px) scale(.97)";
+                setTimeout(function () { if (!open) panel.style.display = "none"; }, DURATION);
+            }
+        }
+
         function toggle(next) {
-            open = typeof next === "boolean" ? next : !open;
+            var target = typeof next === "boolean" ? next : !open;
+            if (target === open) return;
+            open = target;
             if (open && !frame) {
                 frame = makeFrame(look.title);
                 panel.appendChild(frame);
             }
-            panel.style.display = open ? "block" : "none";
-            launcher.style.display = open ? "none" : "inline-flex";
+            morph(open);
+            showPanel(open);
             fit();
             if (open && frame && frame.contentWindow) frame.contentWindow.postMessage({ type: "cencori:focus" }, base);
         }
 
-        launcher.addEventListener("click", function () { toggle(true); });
-        close.addEventListener("click", function () { toggle(false); });
+        button.addEventListener("click", function () { toggle(); });
         window.addEventListener("resize", fit);
         window.addEventListener("keydown", function (e) { if (open && e.key === "Escape") toggle(false); });
         window.addEventListener("message", function (e) {
@@ -147,8 +208,7 @@
         });
 
         root.appendChild(panel);
-        root.appendChild(launcher);
-        root.appendChild(close);
+        root.appendChild(button);
         document.body.appendChild(root);
     }
 
