@@ -5,6 +5,7 @@ import { CookieConsent } from "@/components/CookieConsent";
 import { Analytics } from "@vercel/analytics/react";
 import { Toaster } from "@/components/ui/sileo";
 import { ConnectivityWatcher } from "@/components/ConnectivityWatcher";
+import { SiteChat } from "@/components/SiteChat";
 import { PostHogProvider } from "@/components/PostHogProvider";
 import { SignupWelcomeEmailBridge } from "@/components/auth/SignupWelcomeEmailBridge";
 import Script from "next/script";
@@ -283,6 +284,7 @@ export default function RootLayout({
             <CookieConsent />
             <Toaster />
             <ConnectivityWatcher />
+            <SiteChat />
           </PostHogProvider>
         </ThemeProvider>
         <Analytics />
