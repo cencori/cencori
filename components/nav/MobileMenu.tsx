@@ -39,6 +39,7 @@ function mobileLabel(label: string): string {
 
 export function MobileMenu({
   developers = false,
+  business = false,
   menus,
   open,
   sub,
@@ -48,6 +49,7 @@ export function MobileMenu({
   // Mirrors SiteNav's developers override so the mobile actions match the
   // desktop variant when it is forced on a non-developers route.
   developers?: boolean;
+  business?: boolean;
   menus:
     | typeof navigationMenus
     | typeof developerNavigationMenus;
@@ -63,6 +65,8 @@ export function MobileMenu({
     pathname === "/developers" ||
     pathname?.startsWith("/developers/") ||
     pathname === "/ai-gateway";
+  const isFrontDoor = isDevelopers || business;
+  const signupPath = business && !isDevelopers ? "/signup?for=business" : "/signup";
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
@@ -207,12 +211,12 @@ export function MobileMenu({
         </ul>
         <Link
           className={styles.mobileMenuCta}
-          href={isDevelopers ? getConsoleUrl(isAuthenticated ? "/home" : "/signup") : "/contact"}
+          href={isFrontDoor ? getConsoleUrl(isAuthenticated ? "/home" : signupPath) : "/contact"}
           onClick={onNavigate}
         >
-          {isDevelopers ? (isAuthenticated ? "Dashboard" : "Sign up") : "Talk to us"}
+          {isFrontDoor ? (isAuthenticated ? "Dashboard" : "Sign up") : "Talk to us"}
         </Link>
-        {isDevelopers && !isAuthenticated ? (
+        {isFrontDoor && !isAuthenticated ? (
           <Link
             className={styles.mobileMenuLogin}
             href={getConsoleUrl("/login")}
@@ -221,7 +225,7 @@ export function MobileMenu({
             Log in
           </Link>
         ) : null}
-        {!isDevelopers ? (
+        {!isFrontDoor ? (
           <Link
             className={styles.mobileMenuConsole}
             href={getConsoleUrl(isAuthenticated ? "/home" : "/signup")}
