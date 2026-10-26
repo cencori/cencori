@@ -41,10 +41,10 @@ Do **not** have an isolated call write into a shared, fixed agent memory bucket 
 
 ## Delegation, briefly
 
-`POST /v1/agents/:id/runs/delegate` spawns child runs under the **submitting** tenant with fresh sessions and no installation rent. If a child run needs end-user memory, the delegate request must carry `external_user_id` explicitly — isolation never assumes it from a parent context.
+`POST /v1/runs/:id/delegate` spawns child runs under the **submitting** tenant with fresh sessions and no installation rent. If a child run needs end-user memory, the delegate request must carry `external_user_id` explicitly — isolation never assumes it from a parent context.
 
 ## Backstops
 
-- `GET /v1/tenants/:id/export` walks the tenant's data for portability; deletion is real deletion.
+- `POST /v1/tenants/:id/export` walks the tenant's data for portability; deletion is real deletion.
 - Memory quota errors surface `memory_quota_exceeded` with upgrade URLs; a tenant's spend gate cannot be bypassed by child runs.
 - Governance data-control notes: secrets stay write-only (connections, identity secrets), and memory PII is redacted before persisting — the store never becomes the side channel that undoes isolation.

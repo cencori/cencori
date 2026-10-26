@@ -29,6 +29,12 @@ import {
   Lightbulb,
   Wand2,
   ArrowLeft,
+  Bot,
+  Brain,
+  Sparkles,
+  KeyRound,
+  Boxes,
+  BadgeDollarSign,
 } from "lucide-react";
 
 // Official GitHub Logo SVG
@@ -95,24 +101,6 @@ const ShieldCheckIcon = ({ className }: { className?: string }) => (
       strokeLinecap="round"
       strokeLinejoin="round"
       d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z"
-    />
-  </svg>
-);
-
-// Heroicons - Globe Alt
-const GlobeAltIcon = ({ className }: { className?: string }) => (
-  <svg
-    className={className}
-    xmlns="http://www.w3.org/2000/svg"
-    fill="none"
-    viewBox="0 0 24 24"
-    strokeWidth={1.5}
-    stroke="currentColor"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 0 1 7.843 4.582M12 3a8.997 8.997 0 0 0-7.843 4.582m15.686 0A11.953 11.953 0 0 1 12 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0 1 21 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0 1 12 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 0 1 3 12c0-1.605.42-3.113 1.157-4.418"
     />
   </svg>
 );
@@ -364,6 +352,59 @@ export function CommandPalette({
             keywords: ["history", "requests", "debug", "trace"],
           },
           {
+            id: "byok",
+            label: "BYOK provider keys",
+            icon: <KeyRound className="h-3.5 w-3.5" />,
+            action: () => navigate(
+              consoleMode ? "/ai-gateway/providers" : `/${orgSlug}/${projectSlug}/ai-gateway/providers`,
+            ),
+            keywords: ["openai", "anthropic", "google", "provider", "own key", "bring your own key"],
+          },
+          {
+            id: "models",
+            label: "Models",
+            icon: <Boxes className="h-3.5 w-3.5" />,
+            action: () => navigate(
+              consoleMode ? "/ai-gateway/models" : `/${orgSlug}/${projectSlug}/ai-gateway/models`,
+            ),
+            keywords: ["catalog", "pricing", "llm", "gpt", "claude", "gemini"],
+          },
+          {
+            id: "revenue",
+            label: "Revenue",
+            icon: <BadgeDollarSign className="h-3.5 w-3.5" />,
+            action: () => navigate(consoleMode ? "/revenue" : `/${orgSlug}/${projectSlug}/revenue`),
+            keywords: ["monetization", "billing", "customers", "plans", "markup", "charge"],
+          },
+          {
+            id: "agents",
+            label: "Agents",
+            icon: <Bot className="h-3.5 w-3.5" />,
+            action: () => navigate(consoleMode ? "/agents" : `/${orgSlug}/${projectSlug}/agents`),
+            keywords: ["chatbot", "assistant", "whatsapp", "widget", "build", "studio"],
+          },
+          {
+            id: "new-agent",
+            label: "New agent",
+            icon: <Plus className="h-3.5 w-3.5" />,
+            action: () => navigate(consoleMode ? "/agents/new" : `/${orgSlug}/${projectSlug}/agents/new`),
+            keywords: ["create agent", "chatbot", "template"],
+          },
+          {
+            id: "memory",
+            label: "Memory",
+            icon: <Brain className="h-3.5 w-3.5" />,
+            action: () => navigate(consoleMode ? "/memory" : `/${orgSlug}/${projectSlug}/memory`),
+            keywords: ["memories", "graph", "recall", "remember"],
+          },
+          {
+            id: "copilot",
+            label: "Copilot",
+            icon: <Sparkles className="h-3.5 w-3.5" />,
+            action: () => navigate(consoleMode ? "/copilot" : `/${orgSlug}/${projectSlug}/copilot`),
+            keywords: ["assistant", "ask", "chat", "ai"],
+          },
+          {
             id: "pii-protection",
             label: "PII protection",
             icon: <ShieldCheckIcon className="h-3.5 w-3.5" />,
@@ -516,63 +557,6 @@ export function CommandPalette({
           icon: <Lock className="h-3.5 w-3.5" />,
           action: () => openExternal(getMainSiteUrl("/docs/security")),
           keywords: ["protection", "encryption", "compliance"],
-        },
-      ],
-    });
-
-    // ============ PRODUCTS ============
-    groups.push({
-      id: "products",
-      label: "PRODUCTS",
-      items: [
-        {
-          id: "product-ai",
-          label: "Cencori AI",
-          icon: <Wand2 className="h-3.5 w-3.5" />,
-          action: () => navigate("/ai"),
-          keywords: ["gateway", "proxy", "models"],
-        },
-        {
-          id: "product-edge",
-          label: "Cencori Edge",
-          icon: <GlobeAltIcon className="h-3.5 w-3.5" />,
-          action: () => navigate("/edge"),
-          keywords: ["cdn", "fast", "global", "low latency"],
-        },
-        {
-          id: "product-knight",
-          label: "Cencori Knight",
-          icon: <ShieldCheckIcon className="h-3.5 w-3.5" />,
-          action: () => navigate("/product-knight"),
-          keywords: ["firewall", "protection", "moderation"],
-        },
-        {
-          id: "product-sandbox",
-          label: "Cencori Sandbox",
-          icon: <Play className="h-3.5 w-3.5" />,
-          action: () => navigate("/product-sandbox"),
-          keywords: ["test", "experiment", "playground"],
-        },
-        {
-          id: "product-insights",
-          label: "Cencori Insights",
-          icon: <ChartBarIcon className="h-3.5 w-3.5" />,
-          action: () => navigate("/insights"),
-          keywords: ["analytics", "metrics", "monitoring"],
-        },
-        {
-          id: "product-audit",
-          label: "Cencori Audit",
-          icon: <ScrollText className="h-3.5 w-3.5" />,
-          action: () => navigate("/audit"),
-          keywords: ["logs", "compliance", "trace"],
-        },
-        {
-          id: "product-enterprise",
-          label: "Enterprise",
-          icon: <Building2 className="h-3.5 w-3.5" />,
-          action: () => navigate("/solutions/enterprise"),
-          keywords: ["business", "scale", "custom"],
         },
       ],
     });

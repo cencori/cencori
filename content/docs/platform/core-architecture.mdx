@@ -1,6 +1,6 @@
 ---
-title: "Architecture"
-description: "Understand the fundamental concepts behind the Cencori platform: CIP, Data Residency, and Global Infrastructure."
+title: "How Cencori works"
+description: "What happens to a request, what's kept, platform limits and keys."
 section: "Platform"
 order: 1
 ---
@@ -12,34 +12,20 @@ Cencori is not just an "AI Proxy." We are a **Cloud Intelligence Provider (CIP)*
 - **AI Proxy**: A simple pass-through layer that forwards requests (e.g., Cloudflare AI Gateway).
 - **CIP**: A fully managed infrastructure layer that provides unified request routing (AI Gateway) and end-user billing (Revenue).
 
-## Request Lifecycle
+## What happens to a request
 
-Understanding the flow of a single request helps clarify where value is added:
+1.  **Your app** calls Cencori with the SDK or the HTTP API.
+2.  **Your key is checked**, along with the project's limits, budget and network rules.
+3.  **PII protection (opt-in, off by default)**: if turned on in the project's **Settings → General**, the input is checked for personal data and blocked with `403` if any is found.
+4.  **Routing**: Cencori sends the request to the right provider for the model, following your project's defaults and fallback rules.
+5.  **The provider answers**, and the response streams back to your app.
+6.  **Logging and billing**: the request is logged with its tokens, cost and latency, and billed to your credits (or to your provider account with BYOK).
 
-1.  **Application**: Your code calls the Cencori SDK.
-2.  **Edge Network**: Request hits the nearest Cencori Edge node (deployed globally across 35+ regions).
-3.  **PII Protection (opt-in, off by default)**: If turned on in the project's **Settings → General**, the input is checked for personal data and blocked with `403` if any is found. When off, this step is skipped and traffic passes through unchanged.
-4.  **Routing Engine**: Cencori determines the optimal provider based on cost, status, and your project rules.
-5.  **Provider Execution**: Request is forwarded to OpenAI/Anthropic/Google.
-6.  **Observability**: Response is logged, token usage is calculated, and async evals are triggered. Model responses are not scanned.
-7.  **Response**: Final payload is returned to your application.
+## Your data
 
-> **Cold Starts**: Cencori's edge network is built on warm execution environments. There is **zero cold-start latency** for standard API requests.
-
-## Data Residency & Privacy
-
-We take data sovereignty seriously.
-
-- **Logs & Analytics**: Stored in our secure US-East (N. Virginia) cluster by default. Enterprise plans support EU-only storage.
-- **Ephemeral Processing**: PII checks and routing logic run in memory and are never persisted to disk.
-
-## Global Infrastructure
-
-Cencori is multi-cloud and multi-region by default.
-
-- **Availability**: 99.99% uptime SLA for Enterprise.
-- **Regions**: We route traffic through AWS, GCP, and Cloudflare networks to ensure lowest-latency connectivity to AI providers.
-- **Failover**: If a region goes down, traffic is automatically re-routed to the next nearest healthy node.
+- **Logs** keep requests and responses so you can debug and audit them, for as long as your plan's log retention.
+- **PII checks** run on the request and aren't stored.
+- For data residency requirements, [contact us](mailto:support@cencori.com).
 
 ## Platform Limits
 
@@ -70,7 +56,6 @@ Why choose Cencori over other solutions?
 | **PII Protection** | **Native / Opt-in (off by default)** | Plugin / External | Manual Implementation |
 | **Unified SDK** | **Yes (One API)** | No (Proxy only) | Yes (Abstractions) |
 | **Multi-Provider** | **Native** | Native | Native |
-| **Latency Impact** | **< 15ms** | ~50-100ms | N/A (Client-side) |
 
 ## Glossary
 

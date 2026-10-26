@@ -1,0 +1,28 @@
+---
+title: "Models and Playground"
+description: "Browse every model you can call with prices and capabilities, and try models side by side without writing code."
+section: "AI Gateway"
+order: 2
+---
+
+Both live under **AI Gateway** in a project's sidebar.
+
+## Models
+
+**AI Gateway → Models** lists every model you can call through Cencori, with its provider, context window and price per million input and output tokens.
+
+- **Search** by model name, or narrow the list to one or more **providers**.
+- **Filter by capability:** Reasoning, Vision (image input), Code, Web search, Image generation, Tool use, Structured output, File input, Video input, Audio input and Prompt caching.
+
+The model ID shown is what you pass as `model` in a request. The same catalog, with live availability, is on the [Models](/docs/ai/models) page and in `GET /v1/models`.
+
+## Playground
+
+**AI Gateway → Playground** is a chat for trying models before you write code.
+
+- **Pick a model** from the composer, then ask a question.
+- **Compare models:** add up to 8 models and each answers the same message side by side. Use it to weigh quality, speed and cost before you choose.
+- **Model configuration:** temperature, max tokens, presence penalty and frequency penalty, per model.
+- **Regenerate** an answer, **copy** it, or start a **new chat**.
+
+Playground requests run through your project like any other request: they're billed to your credits and appear in [Logs](/docs/platform/ai-gateway/observability#logs).
