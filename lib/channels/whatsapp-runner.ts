@@ -17,6 +17,7 @@ import { decryptApiKey } from '@/lib/encryption';
 import { mintClientToken } from '@/lib/embedded/client-tokens';
 import { ensureWidgetInstallation } from '@/lib/embedded/widget';
 import {
+    channelAccessToken,
     downloadMedia,
     markReadAndTyping,
     patchChannelMetadata,
@@ -122,7 +123,8 @@ async function answerCustomer(db: Admin, channel: WhatsAppChannel, messages: Inb
 
 /** Answer one or more queued messages from a customer with a single turn. */
 async function answer(db: Admin, channel: WhatsAppChannel, customer: string, name: string | null, batch: Queued[]): Promise<void> {
-    const token = channel.accessTokenEncrypted ? safeDecrypt(channel.accessTokenEncrypted, await organizationOf(db, channel.projectId)) : null;
+    const organizationId = await organizationOf(db, channel.projectId);
+    const token = channelAccessToken(channel, (value) => safeDecrypt(value, organizationId));
     if (!token) return;
     const last = batch[batch.length - 1];
     if (batch.some((m) => m.text || m.audio)) void markReadAndTyping(channel, token, last.id);
