@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "@/components/ui/toast";
 import { useAgentWorkspace } from "@/components/agents/AgentWorkspace";
 import { DockedPanel } from "@/components/agents/DockedPanel";
-import { studioQueryKey } from "@/components/agents/studio";
+import { applyStudioResult } from "@/components/agents/studio";
 import { cn } from "@/lib/utils";
 
 type McpTool = { name: string; description: string; readOnly: boolean; destructive: boolean };
@@ -95,7 +95,8 @@ export function AgentMcp({ adding, onAddingChange }: { adding: boolean; onAdding
     const canEdit = canManage && editable;
     const locked = !canEdit || !!busy || saving || !!connecting;
 
-    const refetch = () => queryClient.invalidateQueries({ queryKey: studioQueryKey(projectId) });
+    // Show the saved draft from the response; the full reload runs in the background.
+    const refetch = (result?: Record<string, unknown> | null) => applyStudioResult(queryClient, projectId, result);
 
     /** Connect a new server (serverId null) or refresh / re-key a stored one. */
     /**
@@ -144,7 +145,7 @@ export function AgentMcp({ adding, onAddingChange }: { adding: boolean; onAdding
                 return;
             }
             if (!response.ok || !body.server) throw new Error(body.error ?? "Couldn't connect to that server.");
-            await refetch();
+            refetch(body as Record<string, unknown>);
             setAuth(null);
             if (!opts.serverId) {
                 setUrl("");
@@ -174,7 +175,7 @@ export function AgentMcp({ adding, onAddingChange }: { adding: boolean; onAdding
             });
             const body = await response.json().catch(() => ({})) as { error?: string };
             if (!response.ok) throw new Error(body.error ?? "Couldn't save. Try again.");
-            await refetch();
+            refetch(body as Record<string, unknown>);
             if (message) toast.success(message);
         } catch (cause) {
             setError(cause instanceof Error ? cause.message : "Couldn't save. Try again.");
