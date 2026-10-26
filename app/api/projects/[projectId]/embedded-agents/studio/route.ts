@@ -168,7 +168,7 @@ export async function POST(request: Request, ctx: Context) {
             // tools) and lets it close finished conversations.
             if (isBusinessTemplate(body.template)) {
                 config.template = body.template;
-                config.system_tools = { end_conversation: {} };
+                config.system_tools = { end_conversation: {}, request_callback: {} };
             }
             const { data: agent, error: agentError } = await db.from('agents').insert({
                 project_id: projectId, name, description: description || null,

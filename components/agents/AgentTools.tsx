@@ -20,7 +20,7 @@ import { AgentMcp } from "@/components/agents/AgentMcp";
 import { AgentIntegrations } from "@/components/agents/AgentIntegrations";
 import { postStudioAction, studioQueryKey } from "@/components/agents/studio";
 import { cn } from "@/lib/utils";
-import { END_CONVERSATION_TOOL, SYSTEM_TOOL_DEFAULT_DESCRIPTIONS, TRANSFER_TO_HUMAN_TOOL } from "@/lib/embedded/system-tool-defaults";
+import { END_CONVERSATION_TOOL, REQUEST_CALLBACK_TOOL, SYSTEM_TOOL_DEFAULT_DESCRIPTIONS, TRANSFER_TO_HUMAN_TOOL } from "@/lib/embedded/system-tool-defaults";
 
 const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
 const PARAM_TYPES = ["string", "number", "boolean"] as const;
@@ -335,13 +335,15 @@ function ToolForm({ draft, onChange, disabled }: { draft: Draft; onChange: (draf
 type SystemToolsConfig = {
     end_conversation?: { description?: string } | true;
     transfer_to_human?: { url: string; description?: string; rules?: string[] } | null;
+    request_callback?: { description?: string } | true | null;
 };
-type SystemToolKey = "end_conversation" | "transfer_to_human";
+type SystemToolKey = "end_conversation" | "transfer_to_human" | "request_callback";
 type SystemToolDraft = { description: string; url: string; rules: string[] };
 
 const SYSTEM_TOOLS: Array<{ key: SystemToolKey; label: string; summary: string }> = [
     { key: END_CONVERSATION_TOOL, label: "End conversation", summary: "Closes the chat once the person is done, so the next message starts fresh." },
     { key: TRANSFER_TO_HUMAN_TOOL, label: "Transfer to a person", summary: "Takes their contact details and a summary, and sends them to your team's URL with the conversation so far." },
+    { key: REQUEST_CALLBACK_TOOL, label: "Request a callback", summary: "Takes a name, number and what they need, and emails your team to call back. Set who's emailed under Settings → Owner alerts." },
 ];
 
 /** The saved settings as the server expects them back. */
@@ -350,6 +352,7 @@ function systemPayload(saved: SystemToolsConfig): Record<SystemToolKey, unknown>
     return {
         end_conversation: end ? (end === true ? {} : end) : null,
         transfer_to_human: saved.transfer_to_human ?? null,
+        request_callback: saved.request_callback ? (saved.request_callback === true ? {} : saved.request_callback) : null,
     };
 }
 

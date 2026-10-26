@@ -34,7 +34,12 @@ export function AgentSetupChecklist() {
         queryFn: async () => readJson<{ channel: { webhook_verified: boolean } | null }>(await fetch(`${api}/whatsapp`, { cache: "no-store" })),
         enabled,
     });
-    if (!enabled || knowledge.isLoading || whatsapp.isLoading) return null;
+    const alerts = useQuery({
+        queryKey: ["agent-alerts", projectId, agent.id],
+        queryFn: async () => readJson<{ alerts: { emails: string[] } }>(await fetch(`${api}/alerts`, { cache: "no-store" })),
+        enabled,
+    });
+    if (!enabled || knowledge.isLoading || whatsapp.isLoading || alerts.isLoading) return null;
 
     // Connected apps as stored: each names its app (`nango.integration`) and its switched-on tools.
     const apps = Array.isArray(version?.config_json.integrations) ? version.config_json.integrations as Array<{ nango?: { integration?: unknown }; enabled?: unknown }> : [];
@@ -77,6 +82,13 @@ export function AgentSetupChecklist() {
             detail: "Guests message your WhatsApp number and the host replies.",
             done: !!whatsapp.data?.channel?.webhook_verified,
             action: link(`${basePath}/settings`, "Connect"),
+        },
+        {
+            id: "alerts",
+            title: "Get booking alerts",
+            detail: "An email for each booking and each guest who needs a call back.",
+            done: (alerts.data?.alerts.emails.length ?? 0) > 0,
+            action: link(`${basePath}/settings`, "Set up"),
         },
     ];
     const left = steps.filter((step) => !step.done).length;
