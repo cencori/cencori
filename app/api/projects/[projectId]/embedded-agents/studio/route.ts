@@ -84,7 +84,8 @@ export async function GET(_request: Request, ctx: Context) {
     if (!access.ok) return access.response;
     const db = createAdminClient();
     try {
-        const [{ canManage }, agents, versions, tenants, installations, runs, schemaProbe, registry] = await Promise.all([
+        const { BUSINESS_DEFAULT_MODEL, getOrganizationPlan, modelAllowed } = await import('@/lib/business/plans');
+        const [{ canManage }, agents, versions, tenants, installations, runs, schemaProbe, registry, plan] = await Promise.all([
             projectRole(db, projectId, access.organizationId, access.userId),
             db.from('agents').select('id,name,description,is_active,stable_version_id,created_at').eq('project_id', projectId).order('created_at', { ascending: false }).limit(100),
             db.from('agent_versions').select('*').eq('project_id', projectId).order('created_at', { ascending: false }).limit(300),
@@ -93,6 +94,7 @@ export async function GET(_request: Request, ctx: Context) {
             db.from('embedded_runs').select('id,agent_id,tenant_id,status,error,created_at').eq('project_id', projectId).order('created_at', { ascending: false }).limit(30),
             db.from('agent_versions').select('last_tested_at,last_test_passed').eq('project_id', projectId).limit(1),
             buildUnifiedModelRegistry(db, { projectId, query: { available: true } }),
+            getOrganizationPlan(db as never, access.organizationId),
         ]);
         const queries = { agents, versions, tenants, installations, runs };
         const failed = Object.entries(queries).find(([, result]) => result.error);
@@ -109,7 +111,10 @@ export async function GET(_request: Request, ctx: Context) {
             studio_ready: !schemaProbe.error,
             agents: agents.data ?? [], versions: (versions.data ?? []).map(withoutToolSecrets), tenants: tenants.data ?? [],
             installations: installations.data ?? [], runs: runs.data ?? [],
-            models: registry.models.filter((model) => model.available && model.types.includes('chat')).slice(0, 100).map((model) => ({ id: model.id, name: model.name, provider: model.provider })),
+            models: registry.models.filter((model) => model.available && model.types.includes('chat')).slice(0, 100).map((model) => ({ id: model.id, name: model.name, provider: model.provider, locked: !modelAllowed(plan, model.id) })),
+            default_model: BUSINESS_DEFAULT_MODEL,
+            // Below the Business plan, agents use the default model only.
+            model_locked: plan.accountType === 'business' && !(plan.plan?.allModels && plan.active),
         });
     } catch (error) {
         console.error('[Embedded Agents studio] GET failed:', error);
@@ -163,10 +168,20 @@ export async function POST(request: Request, ctx: Context) {
         if (body.action === 'create_agent') {
             const name = cleanText(body.name, 120);
             const description = cleanText(body.description, 500);
-            const model = cleanText(body.model, 200);
             const instructions = cleanText(body.instructions, 20_000);
             if (!name) return fail('Give your agent a name.');
-            const config: AgentVersionConfig = { ...(model ? { model } : {}), instructions };
+            const { BUSINESS_DEFAULT_MODEL, getOrganizationPlan, modelAllowed } = await import('@/lib/business/plans');
+            const plan = await getOrganizationPlan(db as never, access.organizationId);
+            if (plan.accountType === 'business') {
+                const limit = plan.plan?.agents ?? 0;
+                const { data: orgProjects } = await db.from('projects').select('id').eq('organization_id', access.organizationId);
+                const { count } = await db.from('agents').select('id', { count: 'exact', head: true }).in('project_id', (orgProjects ?? []).map((p) => p.id as string));
+                if ((count ?? 0) >= limit) return fail(`Your plan includes ${limit} agent${limit === 1 ? '' : 's'}. Upgrade to add another.`, 402);
+            }
+            // Every new agent starts on the default model; below Business it's the only one.
+            const requested = cleanText(body.model, 200);
+            const model = requested && modelAllowed(plan, requested) ? requested : BUSINESS_DEFAULT_MODEL;
+            const config: AgentVersionConfig = { model, instructions };
             // A business template marks the agent (for its setup checklist and app
             // tools) and lets it close finished conversations.
             if (isBusinessTemplate(body.template)) {
@@ -281,10 +296,14 @@ export async function POST(request: Request, ctx: Context) {
             const model = cleanText(body.model, 200);
             const instructions = cleanText(body.instructions, 20_000);
             if (!name) return fail('Give your agent a name.');
+            const { BUSINESS_DEFAULT_MODEL, getOrganizationPlan, modelAllowed } = await import('@/lib/business/plans');
+            if (!modelAllowed(await getOrganizationPlan(db as never, access.organizationId), model)) {
+                return fail('Your plan uses DeepSeek V4 Flash. Upgrade to Business to choose other models.', 402);
+            }
             const existing = (version.config_json ?? {}) as AgentVersionConfig;
             const config: AgentVersionConfig = { ...existing, instructions };
-            if (model) config.model = model;
-            else delete config.model;
+            // No model can't answer on any channel, so an empty choice means the default.
+            config.model = model || BUSINESS_DEFAULT_MODEL;
             const checked = validateVersionConfig(config);
             if (!checked.ok) return fail(checked.message);
             const { data: saved, error: saveError } = await db.from('agent_versions').update({

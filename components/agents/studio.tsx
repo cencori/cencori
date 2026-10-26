@@ -14,8 +14,16 @@ export type Version = { id: string; agent_id: string; version: string; status: s
 export type Tenant = { id: string; name: string; external_id: string; status: string };
 export type Installation = { id: string; agent_id: string; tenant_id: string; agent_version_id: string | null; status: string };
 export type Run = { id: string; agent_id: string; tenant_id: string | null; status: string; error: string | null; created_at: string };
-export type Model = { id: string; name: string; provider: string };
-export type Workspace = { can_manage: boolean; studio_ready: boolean; agents: Agent[]; versions: Version[]; tenants: Tenant[]; installations: Installation[]; runs: Run[]; models: Model[] };
+export type Model = { id: string; name: string; provider: string; locked?: boolean };
+export type Workspace = { can_manage: boolean; studio_ready: boolean; agents: Agent[]; versions: Version[]; tenants: Tenant[]; installations: Installation[]; runs: Run[]; models: Model[]; default_model?: string; model_locked?: boolean };
+
+/** The models this organization's agents can use (below the Business plan, just the default). */
+export function usableModels(models: Model[]): Model[] {
+    return models.filter((model) => !model.locked);
+}
+
+/** Shown under a locked model picker. */
+export const MODEL_LOCK_NOTE = "Your plan includes DeepSeek V4 Flash. Upgrade to Business to choose other models.";
 export type AgentForm = { name: string; description: string; model: string; instructions: string };
 
 export const emptyAgentForm: AgentForm = { name: "", description: "", model: "", instructions: "" };

@@ -13,13 +13,13 @@ export const metadata: Metadata = {
   description:
     "One API for every frontier model, infrastructure to train and deploy your own, and observability to run it all in production.",
   alternates: {
-    canonical: "https://cencori.com/developers",
+    canonical: "https://developers.cencori.com",
   },
   openGraph: {
     title: "Cencori for Developers",
     description:
       "One API for every frontier model, infrastructure to train and deploy your own, and observability to run it all in production.",
-    url: "https://cencori.com/developers",
+    url: "https://developers.cencori.com",
     siteName: "Cencori",
     type: "website",
     images: [

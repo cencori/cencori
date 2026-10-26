@@ -11,7 +11,7 @@ import { ModelSelect } from "@/components/dashboard/embedded-agents/ModelSelect"
 import { STARTING_POINTS } from "@/components/agents/starting-points";
 import { AgentOrb } from "@/components/agents/AgentOrb";
 import { RestaurantSetup } from "@/components/agents/RestaurantSetup";
-import { emptyAgentForm, postStudioAction, studioQueryKey, useAgentStudio, useAgentsBasePath, type AgentForm } from "@/components/agents/studio";
+import { emptyAgentForm, MODEL_LOCK_NOTE, postStudioAction, studioQueryKey, usableModels, useAgentStudio, useAgentsBasePath, type AgentForm } from "@/components/agents/studio";
 import { useProjectIdBySlug } from "@/lib/hooks/useQueries";
 import { cn } from "@/lib/utils";
 
@@ -111,7 +111,7 @@ export default function NewAgentPage({ params }: { params: Promise<{ orgSlug: st
                         </div>
                     </>
                 ) : template?.business === "restaurant" ? (
-                    <RestaurantSetup projectId={projectId} basePath={basePath} models={data?.models ?? []} onBack={() => setStep(1)} />
+                    <RestaurantSetup projectId={projectId} basePath={basePath} models={usableModels(data?.models ?? [])} onBack={() => setStep(1)} />
                 ) : (
                     <>
                         <h1 className="text-xl font-medium tracking-[-0.02em]">Complete your agent</h1>
@@ -134,7 +134,8 @@ export default function NewAgentPage({ params }: { params: Promise<{ orgSlug: st
                             </label>
                             <div>
                                 <span className="mb-2 block text-xs font-medium">Model</span>
-                                <ModelSelect value={form.model} onChange={(value) => update("model", value)} models={data?.models ?? []} placeholder="Choose a model later" />
+                                <ModelSelect value={form.model} onChange={(value) => update("model", value)} models={usableModels(data?.models ?? [])} placeholder="DeepSeek V4 Flash" />
+                                {data?.model_locked && <p className="mt-2 text-xs text-muted-foreground">{MODEL_LOCK_NOTE}</p>}
                             </div>
                             {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
                             <div className="flex items-center justify-between pt-2">

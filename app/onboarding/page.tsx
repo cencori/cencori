@@ -8,6 +8,7 @@ import { useState, useEffect, Suspense, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { slugify } from "@/lib/utils";
 import { isReservedSlug } from "@/lib/reserved-slugs";
+import { clearSignupTrack, readSignupTrack } from "@/lib/signup-track";
 import { UpgradeDialog } from "@/components/billing/UpgradeDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +16,13 @@ import { toast } from "@/components/ui/toast";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Loading03Icon } from "@hugeicons/core-free-icons";
 import { Logo } from "@/components/logo";
+
+// Who the organization is for: a business running agents (naira plans per
+// conversation) or a developer building with the API (credits, today's plans).
+const TRACKS = [
+  { id: "business", name: "My business", description: "Agents that answer customers on WhatsApp and your website." },
+  { id: "developer", name: "With the API", description: "Build AI into your own product with our SDKs." },
+] as const;
 
 const PLANS = [
   {
@@ -52,6 +60,16 @@ function OnboardingContent() {
   const [fullName, setFullName] = useState("");
   const [orgName, setOrgName] = useState("");
   const [plan, setPlan] = useState<"free" | "pro">("free");
+  const [track, setTrack] = useState<"business" | "developer" | null>(null);
+  // Signed up from business.cencori.com (or developers.): the choice is already made.
+  const [trackFromSignup, setTrackFromSignup] = useState(false);
+  useEffect(() => {
+    const fromSignup = readSignupTrack() ?? (searchParams.get("for") === "business" || searchParams.get("for") === "developer" ? searchParams.get("for") as "business" | "developer" : null);
+    if (fromSignup) {
+      setTrack(fromSignup);
+      setTrackFromSignup(true);
+    }
+  }, [searchParams]);
   const [loading, setLoading] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
@@ -274,9 +292,46 @@ function OnboardingContent() {
   };
 
   const handleSubmit = async () => {
+    if (!track) {
+      toast.error("Choose what you're building.");
+      return;
+    }
     const organization = await ensureOrganization();
     if (!organization) return;
 
+    if (track === "business") {
+      setLoading(true);
+      try {
+        // A free trial (no card), then straight into choosing an agent template.
+        const trial = await fetch("/api/billing/business", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orgId: organization.id, action: "start_trial" }),
+        });
+        if (!trial.ok) throw new Error("trial");
+        const { data: existing } = await supabase.from("projects").select("slug").eq("organization_id", organization.id).limit(1).maybeSingle();
+        let projectSlug = existing?.slug as string | undefined;
+        if (!projectSlug) {
+          const { data: project, error } = await supabase
+            .from("projects")
+            .insert({ name: organization.name, slug: slugify(organization.name) || "main", organization_id: organization.id, visibility: "private", region: "europe" })
+            .select("slug")
+            .single();
+          if (error || !project) throw new Error("project");
+          projectSlug = project.slug as string;
+        }
+        clearSignupTrack();
+        toast.success("Your free trial has started.");
+        // Copilot builds the first agent with them from a description of the business.
+        router.push(`/${organization.slug}/${projectSlug}/copilot`);
+      } catch {
+        toast.error("Couldn't finish setting up. Try again.");
+        setLoading(false);
+      }
+      return;
+    }
+
+    clearSignupTrack();
     if (plan === "pro") {
       setCheckoutOpen(true);
     } else {
@@ -337,6 +392,37 @@ function OnboardingContent() {
             />
           </div>
 
+          {!trackFromSignup && (
+          <div>
+            <label className="block text-sm font-medium text-zinc-300 mb-3">
+              What are you building for?
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              {TRACKS.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setTrack(t.id)}
+                  disabled={loading}
+                  aria-pressed={track === t.id}
+                  className={`rounded-lg border p-4 text-left transition-colors ${
+                    track === t.id
+                      ? "border-blue-500/45 bg-zinc-900"
+                      : "border-white/[0.06] bg-zinc-900/50 hover:border-white/10 hover:bg-zinc-900/80"
+                  } disabled:cursor-wait disabled:opacity-60`}
+                >
+                  <span className="text-sm font-medium text-white">{t.name}</span>
+                  <p className="text-xs text-zinc-500 mt-0.5">{t.description}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+          )}
+          {track === "business" && (
+            <p className="-mt-3 text-xs text-zinc-500">Free for 14 days or 50 conversations. No card needed.</p>
+          )}
+
+          {track === "developer" && (
           <div>
             <label className="block text-sm font-medium text-zinc-300 mb-3">
               Choose your plan
@@ -366,6 +452,7 @@ function OnboardingContent() {
               ))}
             </div>
           </div>
+          )}
 
           <Button
             onClick={handleSubmit}

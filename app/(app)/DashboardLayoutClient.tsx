@@ -40,6 +40,7 @@ import {
 } from "@/lib/auth/dashboard-user-cache";
 import { getConsoleRoute, getConsoleSurface } from "@/lib/console/routing";
 import { sanitizeAuthRedirectTarget } from "@/lib/auth-redirect";
+import { useBusinessPlan } from "@/components/dashboard/billing/BusinessPlan";
 
 const CommandPalette = dynamic(
   () => import("@/components/dashboard/CommandPalette").then((mod) => mod.CommandPalette),
@@ -363,11 +364,15 @@ function LayoutContent({ user, avatar, name, children, initialAgentOpen, initial
   const isLowCredits = creditsBalance > 0 && creditsBalance < 5;
   // Matches the gateway: under a cent (or in debt) can't serve requests.
   const isOutOfCredits = creditsBalance < 0.01;
+  // Business organizations pay per conversation, not credits: the pill shows those instead.
+  const businessPlan = useBusinessPlan(currentOrgId);
+  const businessInfo = businessPlan.data?.account_type === "business" ? businessPlan.data : null;
+  const businessUsedUp = !!businessInfo && (!businessInfo.active || (!!businessInfo.plan && businessInfo.conversations_used >= businessInfo.plan.conversations));
   const creditsPillClassName = [
     "hidden lg:inline-flex h-6 items-center gap-1.5 rounded-[4px] border px-2 text-[11px] font-medium transition-colors",
-    isOutOfCredits
+    (businessInfo ? businessUsedUp : isOutOfCredits)
       ? "border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/15"
-      : isLowCredits
+      : !businessInfo && isLowCredits
         ? "border-orange-500/30 bg-orange-500/10 text-orange-400 hover:bg-orange-500/15"
         : "border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/15",
   ].join(" ");
@@ -467,11 +472,15 @@ function LayoutContent({ user, avatar, name, children, initialAgentOpen, initial
             <Link
               href={isCanonicalConsoleRoute ? "/billing" : `/${orgSlug}/~/billing`}
               className={creditsPillClassName}
-              aria-label="View organization credit balance"
-              title="Organization credits"
+              aria-label={businessInfo ? "View your plan" : "View organization credit balance"}
+              title={businessInfo ? "Conversations this month" : "Organization credits"}
             >
               <CreditCard className="h-3 w-3" />
-              <span>{creditsLabel}</span>
+              <span>{businessInfo
+                ? businessInfo.plan && businessInfo.active
+                  ? `${Math.min(businessInfo.conversations_used, businessInfo.plan.conversations)} / ${businessInfo.plan.conversations} chats`
+                  : "Plan ended"
+                : creditsLabel}</span>
             </Link>
           )}
 

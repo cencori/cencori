@@ -9,6 +9,7 @@ import {
   getCreditTopupCreditsByProductId,
   getCreditTopupPackConfig,
   getTensorPlanByProductId,
+  getBusinessPlanByProductId,
   netCreditsAfterFee,
   computePeriodEnd,
   type BachsCollectionData,
@@ -91,6 +92,39 @@ async function handleCollectionSucceeded(
       if (error) {
         console.error('[Bachs Webhook] Failed to update org subscription', error);
       }
+      break;
+    }
+
+    case 'business_pass': {
+      // A 30-day business plan, paid in naira. Only the independently fetched
+      // charge grants it, and one charge grants it once.
+      const orgId = data.metadata?.org_id;
+      const plan = getBusinessPlanByProductId(productId);
+      if (!orgId || !plan) throw new Error('Bachs business pass has no organization or plan');
+      if (!data.charge_id) throw new Error('Bachs business pass has no charge ID');
+      const { BUSINESS_PLANS, applyBusinessPass } = await import('@/lib/business/plans');
+      const charge = await getCharge(data.charge_id);
+      const paidNgn = Number(charge?.amount ?? 0);
+      const verified = ['succeeded', 'successful', 'paid'].includes(charge?.status)
+        && charge.currency === 'NGN'
+        && paidNgn >= BUSINESS_PLANS[plan].priceNgn
+        && charge.metadata?.org_id === orgId
+        && Array.isArray(charge.product_cart) && charge.product_cart.some((item) => item?.product_id === productId);
+      if (!verified) {
+        console.error('[Bachs Webhook] Business pass charge failed verification', { charge_id: data.charge_id, status: charge?.status ?? null, currency: charge?.currency ?? null, amount: charge?.amount ?? null });
+        throw new Error('Bachs business pass charge did not verify');
+      }
+      const { data: applied, error: appliedError } = await supabase
+        .from('webhook_events')
+        .select('id')
+        .eq('charge_id', data.charge_id)
+        .eq('event_type', 'collection.succeeded')
+        .limit(1)
+        .maybeSingle();
+      if (appliedError) throw appliedError;
+      if (applied) return;
+      await applyBusinessPass(supabase as never, orgId, plan);
+      await supabase.from('organizations').update({ bachs_customer_id: data.customer.id }).eq('id', orgId);
       break;
     }
 
