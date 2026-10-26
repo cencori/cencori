@@ -20,7 +20,7 @@ import { AgentMcp } from "@/components/agents/AgentMcp";
 import { AgentIntegrations } from "@/components/agents/AgentIntegrations";
 import { postStudioAction, studioQueryKey } from "@/components/agents/studio";
 import { cn } from "@/lib/utils";
-import { END_CONVERSATION_TOOL, REQUEST_CALLBACK_TOOL, SYSTEM_TOOL_DEFAULT_DESCRIPTIONS, TRANSFER_TO_HUMAN_TOOL } from "@/lib/embedded/system-tool-defaults";
+import { END_CONVERSATION_TOOL, REQUEST_CALLBACK_TOOL, SELL_PRODUCTS_TOOL, SYSTEM_TOOL_DEFAULT_DESCRIPTIONS, TAKE_PAYMENTS_TOOL, TRANSFER_TO_HUMAN_TOOL } from "@/lib/embedded/system-tool-defaults";
 
 const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
 const PARAM_TYPES = ["string", "number", "boolean"] as const;
@@ -334,13 +334,17 @@ type SystemToolsConfig = {
     end_conversation?: { description?: string } | true;
     transfer_to_human?: { url: string; description?: string; rules?: string[] } | null;
     request_callback?: { description?: string } | true | null;
+    take_payments?: { description?: string } | true | null;
+    sell_products?: { description?: string } | true | null;
 };
-type SystemToolKey = "end_conversation" | "transfer_to_human" | "request_callback";
+type SystemToolKey = "end_conversation" | "transfer_to_human" | "request_callback" | "take_payments" | "sell_products";
 type SystemToolDraft = { description: string; url: string; rules: string[] };
 
 const SYSTEM_TOOLS: Array<{ key: SystemToolKey; label: string; summary: string }> = [
     { key: END_CONVERSATION_TOOL, label: "End conversation", summary: "Closes the chat once the person is done, so the next message starts fresh." },
     { key: TRANSFER_TO_HUMAN_TOOL, label: "Transfer to a person", summary: "Takes their contact details and a summary, and sends them to your team's URL with the conversation so far." },
+    { key: TAKE_PAYMENTS_TOOL, label: "Take payments", summary: "Sends payment links for deposits, event tables and orders, and confirms when they're paid. Connect Paystack, Flutterwave or Stripe under Integrations." },
+    { key: SELL_PRODUCTS_TOOL, label: "Sell products", summary: "Answers about your products, prices and stock, and takes orders, paid through a link when payments are connected. Add your products under Integrations." },
     { key: REQUEST_CALLBACK_TOOL, label: "Request a callback", summary: "Takes a name, number and what they need, and emails your team to call back. Set who's emailed under Settings → Owner alerts." },
 ];
 
@@ -351,6 +355,8 @@ function systemPayload(saved: SystemToolsConfig): Record<SystemToolKey, unknown>
         end_conversation: end ? (end === true ? {} : end) : null,
         transfer_to_human: saved.transfer_to_human ?? null,
         request_callback: saved.request_callback ? (saved.request_callback === true ? {} : saved.request_callback) : null,
+        take_payments: saved.take_payments ? (saved.take_payments === true ? {} : saved.take_payments) : null,
+        sell_products: saved.sell_products ? (saved.sell_products === true ? {} : saved.sell_products) : null,
     };
 }
 
