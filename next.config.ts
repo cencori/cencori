@@ -42,10 +42,6 @@ const nextConfig: NextConfig = {
       './node_modules/@img/sharp-*/**/*',
     ],
   },
-  // The invoice PDF reads its fonts and logo from disk at runtime.
-  outputFileTracingIncludes: {
-    '/api/billing/invoices/[chargeId]': ['./lib/billing/invoice-assets/**/*'],
-  },
   // Transformers.js includes native ONNX binaries and runtime model loading.
   // Keep it out of Turbopack's module graph; API routes load it in Node only.
   serverExternalPackages: ["@huggingface/transformers", "onnxruntime-node", "ioredis"],
