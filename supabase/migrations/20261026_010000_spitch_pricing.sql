@@ -3,17 +3,16 @@
 -- $0.00042 per second of transcribed audio (docs.spitch.app/concepts/pricing).
 -- On Yoruba that placeholder recovered about a quarter of the TTS cost.
 --
--- TTS is now billed per measured minute of returned audio at $2/min; the
--- per-character rate is only the fallback when the audio can't be measured
--- (~760 Yoruba characters per audio minute). Applied to production by hand
--- on 2026-10-26.
+-- TTS is now billed per measured minute of returned audio at Spitch's own
+-- rate ($0.084/min); the per-character rate is only the fallback when the
+-- audio can't be measured. Applied to production by hand on 2026-10-26.
 
 UPDATE model_pricing
-SET price_per_minute = 2.00,
-    price_per_1k_chars = 2.60,
+SET price_per_minute = 0.084,
+    price_per_1k_chars = 0.11,
     pricing_source_url = 'https://docs.spitch.app/concepts/pricing',
     pricing_reviewed_at = now(),
-    review_notes = 'Spitch bills $0.0014/s ($0.084/min) of generated audio. Priced at $2/min of measured audio; $2.60/1k chars fallback (~760 Yoruba chars per audio minute) when audio length cannot be measured.',
+    review_notes = 'At Spitch''s own rate: $0.0014/s = $0.084/min of measured audio; $0.11/1k chars fallback (Yoruba break-even estimate) when audio length cannot be measured.',
     updated_at = now()
 WHERE provider = 'spitch' AND model_name = 'spitch-tts' AND is_active;
 
