@@ -115,31 +115,29 @@ export function AgentTools() {
 
     return (
         <div>
-            <header className="mb-6 flex items-start justify-between gap-4">
-                <div>
-                    <h1 className="text-base font-medium">Tools</h1>
-                    <div role="tablist" aria-label="Tool type" className="mt-3 grid grid-cols-3 rounded-md bg-muted/60 p-0.5 text-xs">
-                        {(["tools", "integrations", "mcp"] as const).map((value) => (
-                            <button key={value} type="button" role="tab" aria-selected={tab === value} onClick={() => { setTab(value); setMcpAdding(false); setAppsAdding(false); }} className={cn("rounded px-3 py-1 transition-colors", tab === value ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
-                                {value === "tools" ? "Tools" : value === "integrations" ? "Integrations" : "MCP"}
-                            </button>
-                        ))}
-                    </div>
+            <h1 className="text-base font-medium">Tools</h1>
+            <header className="mb-6 mt-3 flex items-end justify-between gap-4 border-b border-border/60">
+                <div role="tablist" aria-label="Tool type" className="-mb-px flex gap-5 text-sm">
+                    {(["tools", "integrations", "mcp"] as const).map((value) => (
+                        <button key={value} type="button" role="tab" aria-selected={tab === value} onClick={() => { setTab(value); setMcpAdding(false); setAppsAdding(false); }} className={cn("border-b-2 pb-2 transition-colors", tab === value ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground")}>
+                            {value === "tools" ? "Configure" : value === "integrations" ? "Integrations" : "MCP"}
+                        </button>
+                    ))}
                 </div>
                 {tab === "integrations" && canManage && editable && appCount > 0 && (
-                    <Button size="sm" className="h-7 shrink-0 gap-1.5 text-xs" onClick={() => setAppsAdding(true)} disabled={!!busy || appsAdding}>
+                    <Button size="sm" className="mb-2 h-7 shrink-0 gap-1.5 text-xs" onClick={() => setAppsAdding(true)} disabled={!!busy || appsAdding}>
                         <Plus className="h-3.5 w-3.5" />
                         Add integration
                     </Button>
                 )}
                 {tab === "mcp" && canManage && editable && mcpServerCount > 0 && (
-                    <Button size="sm" className="h-7 shrink-0 gap-1.5 text-xs" onClick={() => setMcpAdding(true)} disabled={!!busy || mcpAdding}>
+                    <Button size="sm" className="mb-2 h-7 shrink-0 gap-1.5 text-xs" onClick={() => setMcpAdding(true)} disabled={!!busy || mcpAdding}>
                         <Plus className="h-3.5 w-3.5" />
                         Add server
                     </Button>
                 )}
                 {tab === "tools" && canManage && editable && tools.length > 0 && (
-                    <Button size="sm" className="h-7 shrink-0 gap-1.5 text-xs" onClick={() => { setError(null); setEditing({ index: null, draft: emptyDraft() }); }} disabled={locked}>
+                    <Button size="sm" className="mb-2 h-7 shrink-0 gap-1.5 text-xs" onClick={() => { setError(null); setEditing({ index: null, draft: emptyDraft() }); }} disabled={locked}>
                         <Plus className="h-3.5 w-3.5" />
                         Add tool
                     </Button>
