@@ -109,13 +109,14 @@ html,body{margin:0;height:100%;background:transparent;font:14px/1.5 -apple-syste
 .shimmer::after{content:attr(data-text);position:absolute;inset:0;color:transparent;background-image:linear-gradient(100deg,transparent 30%,var(--fg) 48%,transparent 66%);background-position:180% 50%;background-repeat:no-repeat;background-size:240% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;animation:shimmer 1.9s linear infinite;pointer-events:none}
 @keyframes shimmer{from{background-position:180% 50%}to{background-position:-80% 50%}}
 @media (prefers-reduced-motion:reduce){.shimmer::after{animation:none}}
-.composer{display:flex;align-items:flex-end;gap:8px;margin:0 12px 8px;padding:6px 6px 6px 12px;border:1px solid var(--line);border-radius:14px;background:var(--bg)}
+.composer{display:flex;align-items:flex-end;gap:8px;margin:0 12px 8px;padding:6px 6px 6px 16px;border:1px solid var(--line);border-radius:999px;background:var(--bg)}
 .composer:focus-within{border-color:var(--muted)}
-textarea{flex:1;resize:none;border:0;outline:0;background:transparent;color:inherit;font:inherit;max-height:120px;padding:6px 0}
+.composer.multiline{border-radius:22px}
+textarea{flex:1;resize:none;border:0;outline:0;background:transparent;color:inherit;font:inherit;line-height:20px;max-height:120px;padding:6px 0}
 /* Phones zoom into fields under 16px when tapped (iOS Safari); 16px stops it. */
 @media (max-width:767px){textarea,input{font-size:16px}}
-.send{width:32px;height:32px;border:0;border-radius:10px;background:var(--accent);color:var(--accent-fg,#fff);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex:none}
-.send:disabled{opacity:.4;cursor:default}
+.send{width:32px;height:32px;border:0;border-radius:50%;background:var(--accent);color:var(--accent-fg,#fff);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex:none}
+.send:disabled{background:var(--soft);color:var(--muted);cursor:default}
 .send svg{width:16px;height:16px}
 .foot{padding:0 0 10px;text-align:center;font-size:11px;color:var(--muted)}
 .foot a{color:inherit;text-decoration:none}.foot a:hover{text-decoration:underline}

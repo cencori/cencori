@@ -274,7 +274,8 @@
 
     // ── Wiring ────────────────────────────────────────────────────────────
     function updateSend() { sendBtn.disabled = state.busy || !input.value.trim(); }
-    function grow() { input.style.height = "auto"; input.style.height = Math.min(input.scrollHeight, 120) + "px"; }
+    // A pill while it's one line; past that the round ends would cut into the text.
+    function grow() { input.style.height = "auto"; input.style.height = Math.min(input.scrollHeight, 120) + "px"; input.parentNode.classList.toggle("multiline", input.scrollHeight > 32); }
 
     input.addEventListener("input", function () { grow(); updateSend(); });
     input.addEventListener("keydown", function (e) {
