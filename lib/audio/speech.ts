@@ -85,6 +85,12 @@ interface ModelInfo {
     voices: string[];
     defaultVoice: string;
     formats: ResponseFormat[];
+    /**
+     * What the provider bills us on. Most bill per character of input;
+     * `audio_seconds` providers bill per second of generated audio, which the
+     * route measures from the returned bytes.
+     */
+    billing?: 'characters' | 'audio_seconds';
 }
 
 export const VOICE_MODELS: Record<string, ModelInfo> = {
@@ -130,7 +136,8 @@ export const VOICE_MODELS: Record<string, ModelInfo> = {
         description: 'Spitch — Yoruba, Hausa, Igbo, English, Amharic',
         voices: ['sade', 'funmi', 'segun', 'femi', 'amara', 'amina', 'aliyu', 'hasan', 'ngozi', 'obinna', 'henry', 'kani'],
         defaultVoice: 'sade',
-        formats: ['mp3'],
+        formats: ['mp3', 'wav'],
+        billing: 'audio_seconds',
     },
     // ElevenLabs — requires a paid plan to synthesize via API
     'eleven_turbo_v2_5': { provider: 'elevenlabs', description: 'ElevenLabs Turbo v2.5', voices: [], defaultVoice: '21m00Tcm4TlvDq8ikWAM', formats: ['mp3'] },
@@ -460,6 +467,8 @@ async function synthSpitch(apiKey: string, p: SynthParams): Promise<ArrayBuffer>
             text: p.input,
             language: p.language ?? 'en',
             voice: p.voice,
+            // Spitch defaults to wav; without this an mp3 request got wav bytes.
+            format: p.response_format,
         }),
         signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
     });
@@ -557,6 +566,8 @@ async function streamSpitch(apiKey: string, p: SynthParams): Promise<ReadableStr
             text: p.input,
             language: p.language ?? 'en',
             voice: p.voice,
+            // Spitch defaults to wav; without this an mp3 request got wav bytes.
+            format: p.response_format,
         }),
         signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
     });

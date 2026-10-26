@@ -23,12 +23,14 @@ import { promptPayload } from '@/lib/gateway/log-payload';
 import { runGatewayInputPipeline } from '@/lib/gateway/input-guard';
 import type { SubscriptionTier } from '@/lib/entitlements';
 import { getUsageUnitPricingFromDB } from '@/lib/providers/pricing';
+import { audioDurationSeconds } from '@/lib/audio/duration';
 import {
     generateSpeech,
     generateSpeechStream,
     listVoiceModels,
     resolveProviderModel,
     SpeechRequestError,
+    VOICE_MODELS,
     type SpeechRequest,
 } from '@/lib/audio/speech';
 
@@ -99,7 +101,6 @@ export async function POST(req: NextRequest) {
         let autoRequestedModel: string | null = null;
         {
             const { isAutoRouterModel, resolveAutoModelForTask } = await import('@/lib/gateway/auto-router');
-            const { VOICE_MODELS } = await import('@/lib/audio/speech');
             if (typeof body.model === 'string' && isAutoRouterModel(body.model)) {
                 autoRequestedModel = body.model;
                 const requestedFormat = body.response_format;
@@ -159,15 +160,29 @@ export async function POST(req: NextRequest) {
         model = resolved.model;
         provider = resolved.provider;
         const pricing = await getUsageUnitPricingFromDB(resolved.provider, resolved.model, 'characters');
+        // Providers that bill per second of generated audio are priced per
+        // minute of the audio we get back; the per-character rate stays as the
+        // fallback for audio we can't measure.
+        const billsByAudio = VOICE_MODELS[resolved.model]?.billing === 'audio_seconds';
+        const minutePricing = billsByAudio
+            ? await getUsageUnitPricingFromDB(resolved.provider, resolved.model, 'minutes')
+            : null;
 
         // ── Synthesize (validates voice/format, resolves BYOK key, dispatches) ──
-        const streaming = body.stream === true;
+        // Audio-billed models are buffered even when streaming is asked for:
+        // the duration has to be measured before the request is logged. Those
+        // providers synthesize in full before responding anyway, so the client
+        // loses only the transfer overlap.
+        const streaming = body.stream === true && !billsByAudio;
         const result = streaming
             ? await generateSpeechStream(ctx, { ...body, input: guardedInput })
             : await generateSpeech(ctx, { ...body, input: guardedInput });
 
-        // ── Cost tracking (per 1,000 characters) ──
-        const providerCost = (result.charCount / 1000) * pricing.unitPriceUsd;
+        // ── Cost tracking (per minute of audio, or per 1,000 characters) ──
+        const audioSeconds = minutePricing && 'audio' in result ? audioDurationSeconds(result.audio) : null;
+        const providerCost = minutePricing && audioSeconds !== null
+            ? (audioSeconds / 60) * minutePricing.unitPriceUsd
+            : (result.charCount / 1000) * pricing.unitPriceUsd;
         const cencoriCharge = result.usesByok ? 0 : providerCost;
 
         await logGatewayRequest(ctx, {
@@ -183,6 +198,7 @@ export async function POST(req: NextRequest) {
             markupPercentage: 0,
             metadata: {
                 streaming,
+                ...(audioSeconds !== null ? { audio_seconds: Math.round(audioSeconds * 100) / 100, billed_unit: 'audio_minutes' } : {}),
                 ...(autoRequestedModel ? { auto_routed: true, auto_requested_model: autoRequestedModel } : {}),
             },
             requestPayload: promptPayload(guardedInput, {
@@ -197,6 +213,7 @@ export async function POST(req: NextRequest) {
                 content: `[audio: ${body.response_format ?? 'mp3'}, ${result.charCount} characters synthesized]`,
                 format: body.response_format ?? 'mp3',
                 characters: result.charCount,
+                ...(audioSeconds !== null ? { audio_seconds: Math.round(audioSeconds * 100) / 100 } : {}),
             },
         });
         await incrementUsage(ctx, cencoriCharge);

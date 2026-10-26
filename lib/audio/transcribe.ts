@@ -18,6 +18,7 @@
 
 import type { GatewayContext } from '@/lib/gateway-middleware';
 import { decryptApiKey } from '@/lib/encryption';
+import { audioDurationSeconds } from './duration';
 
 export type STTProvider = 'openai' | 'deepgram' | 'assemblyai' | 'spitch' | 'groq';
 
@@ -429,9 +430,13 @@ async function transcribeSpitch(apiKey: string, model: string, req: TranscribeRe
         text: String(s.text ?? '').trim(),
     }));
 
+    // Spitch bills the whole upload, but the last sentence ends before any
+    // trailing silence. Measure the file when we can read its format.
+    const measured = audioDurationSeconds(await req.file.arrayBuffer());
+
     return {
         text: data.text || '',
-        durationSeconds: segments.at(-1)?.end || 0,
+        durationSeconds: Math.max(measured ?? 0, segments.at(-1)?.end || 0),
         language: data.detected_language || req.language,
         segments: segments.length ? segments : undefined,
         provider: 'spitch',
