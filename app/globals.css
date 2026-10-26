@@ -746,3 +746,28 @@ html[data-toast-preview="true"] [data-cookie-consent] {
     font-size: 16px !important;
   }
 }
+
+/* Console route loading bar: fades in after 300ms, then sweeps. */
+.route-loading-bar {
+    opacity: 0;
+    animation: route-loading-appear 0.2s ease-out 0.3s forwards;
+}
+.route-loading-bar::after {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 30%;
+    background: var(--foreground);
+    opacity: 0.6;
+    animation: route-loading-sweep 1.1s ease-in-out infinite;
+}
+@keyframes route-loading-appear {
+    to { opacity: 1; }
+}
+@keyframes route-loading-sweep {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(340%); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .route-loading-bar::after { animation: none; width: 100%; opacity: 0.25; }
+}
