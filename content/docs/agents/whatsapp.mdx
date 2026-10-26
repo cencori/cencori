@@ -1,0 +1,35 @@
+---
+title: "WhatsApp"
+description: "Connect your WhatsApp Business number and the agent replies to your customers, voice notes included."
+section: "Agents"
+order: 4
+---
+
+Customers message your WhatsApp number and the agent replies, from the published version, with the same knowledge and tools as on your website.
+
+## Connect
+
+Open the agent's **Settings → WhatsApp** and click **Connect WhatsApp**. Log in with Facebook, pick your business and confirm your number with the code WhatsApp sends. It takes about two minutes.
+
+If you already use the **WhatsApp Business app** on the number, tick **I use the WhatsApp Business app on this number** first. You keep using the app on your phone, and the agent answers alongside you.
+
+## Voice notes
+
+Customers can send voice notes. The agent transcribes them and replies in text, the same as if the customer had typed.
+
+## Limits
+
+**Conversations per day:** new conversations stop for the day at this number. A conversation restarts after 40 messages or a day of quiet.
+
+## Connect manually
+
+If you've already set up your own Meta app with the WhatsApp product, you can connect it directly instead:
+
+1. In your Meta app, go to **WhatsApp → API Setup** and copy the **Phone number ID** (the long ID under the number, not the number itself).
+2. Paste the phone number ID, an access token and your app secret into Cencori.
+3. In your Meta app, go to **WhatsApp → Configuration → Webhook → Edit**. Paste the **Callback URL** and **Verify token** Cencori shows you, verify, then subscribe to the `messages` field.
+
+## Good to know
+
+- WhatsApp only lets a business start a conversation within 24 hours of the customer's last message. The agent replies to customers; it doesn't message people out of the blue.
+- Pair WhatsApp with [owner alerts](/docs/agents/owner-alerts) so you hear about bookings and callbacks without watching the chat.
