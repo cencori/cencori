@@ -172,6 +172,11 @@ export const metadata: Metadata = {
   applicationName: "Cencori",
   category: "Technology",
 
+  // Meta (Facebook) domain verification for the Cencori business portfolio.
+  other: {
+    "facebook-domain-verification": "fa6kb2v4rk0tz3o7chv47qhgtpda0a",
+  },
+
   // Verification (add your actual verification codes)
   // verification: {
   //   google: "your-google-verification-code",
