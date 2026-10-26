@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const fetchMock = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/security/outbound-url', () => ({ safeOutboundFetch: fetchMock }));
 
-import { downloadMedia, parseInbound, sendText, splitForWhatsApp, toWhatsAppText, verifyWhatsAppSignature, type WhatsAppChannel } from '@/lib/channels/whatsapp';
+import { channelAccessToken, downloadMedia, parseInbound, sendText, splitForWhatsApp, toWhatsAppText, verifyWhatsAppSignature, type WhatsAppChannel } from '@/lib/channels/whatsapp';
 import { readReply } from '@/lib/channels/whatsapp-runner';
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -86,6 +86,17 @@ describe('WhatsApp channel', () => {
 
         fetchMock.mockResolvedValueOnce(json({ url: 'https://lookaside.fbsbx.com/x', file_size: 50 * 1024 * 1024 }));
         await expect(downloadMedia('token', 'media.10')).rejects.toThrow('Voice note too long');
+    });
+
+    it("uses Cencori's permanent token for numbers it has a seat on, the stored token otherwise", () => {
+        process.env.META_SYSTEM_USER_TOKEN = 'cencori-permanent';
+        const decrypt = (value: string) => `decrypted:${value}`;
+        const managed = { ...channel, accessTokenEncrypted: 'signup', metadata: { ...channel.metadata, managed: true, system_user_assigned: true } } as WhatsAppChannel;
+        expect(channelAccessToken(managed, decrypt)).toBe('cencori-permanent');
+        expect(channelAccessToken({ ...managed, metadata: { ...managed.metadata, system_user_assigned: false } }, decrypt)).toBe('decrypted:signup');
+        expect(channelAccessToken({ ...channel, accessTokenEncrypted: 'own-app' } as WhatsAppChannel, decrypt)).toBe('decrypted:own-app');
+        delete process.env.META_SYSTEM_USER_TOKEN;
+        expect(channelAccessToken(managed, decrypt)).toBe('decrypted:signup');
     });
 
     it('reads the reply off the turn event stream', async () => {
