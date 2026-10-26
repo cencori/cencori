@@ -57,6 +57,10 @@ export interface GatewayContext {
     endUserBillingEnabled: boolean;
     /** Agent identity is loaded with the API-key cache to avoid a second key lookup. */
     agentId?: string | null;
+    /** An agent conversation paid for by the organization's business plan, not credits. */
+    businessPlanCovered?: boolean;
+    /** The business plan only includes its default model. */
+    businessModelLocked?: boolean;
     /** M3 embedded attribution dims (set by scoped call sites: sessions, runs, ECT). */
     embedded?: {
         tenantId?: string | null;
@@ -1281,8 +1285,9 @@ export function describeTensorRefusal(reason: string | undefined): {
 }
 
 async function chargeCreditsForRequest(context: GatewayContext, costUsd?: number): Promise<void> {
-    // Enterprise is handled by contract; every other tier pays for managed usage.
-    if (context.tier === 'enterprise') {
+    // Enterprise is handled by contract, a business plan by its monthly price;
+    // everything else pays for managed usage.
+    if (context.tier === 'enterprise' || context.businessPlanCovered) {
         return;
     }
 

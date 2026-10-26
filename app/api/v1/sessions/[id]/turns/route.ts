@@ -121,10 +121,25 @@ export async function POST(
                 if (!project) return respondError(401, 'Invalid client token project', 'client_token_revoked');
                 const { data: tenant } = await admin.from('platform_tenants').select('id, status').eq('id', dePrefixId(verified.claims.tenant_id)).eq('project_id', verified.claims.project_id).maybeSingle();
                 if (!tenant || (tenant.status as string) !== 'active') return respondError(403, 'Tenant is not active', 'tenant_suspended');
+                // Who pays for this reply: a business plan covers it; otherwise it needs credits,
+                // like an API-key call (client tokens never pass through that preflight).
+                const organizationId = (project.organization_id as string) ?? '';
+                const { getOrganizationPlan } = await import('@/lib/business/plans');
+                const plan = await getOrganizationPlan(admin as never, organizationId);
+                if (plan.accountType === 'business' && !plan.active) {
+                    return respondError(402, 'This business’s plan isn’t active', 'plan_inactive');
+                }
+                if (plan.accountType !== 'business') {
+                    const { data: org } = await admin.from('organizations').select('subscription_tier, credits_balance').eq('id', organizationId).maybeSingle();
+                    const { isCreditBalanceExhausted } = await import('@/lib/credits');
+                    if (org && org.subscription_tier !== 'enterprise' && isCreditBalanceExhausted(Number(org.credits_balance ?? 0))) {
+                        return respondError(402, 'Credit balance exhausted: add credits to keep this agent replying', 'insufficient_credits');
+                    }
+                }
                 gatewayCtx = {
                     supabase: admin as never,
                     projectId: verified.claims.project_id,
-                    organizationId: (project.organization_id as string) ?? '',
+                    organizationId,
                     apiKeyId: null,
                     allowedModels: null,
                     sponsoredModels: null,
@@ -140,6 +155,8 @@ export async function POST(
                     defaultModel: null,
                     defaultProvider: null,
                     endUserBillingEnabled: false,
+                    businessPlanCovered: plan.accountType === 'business',
+                    businessModelLocked: plan.accountType === 'business' && !plan.plan?.allModels,
                 } as unknown as GatewayContext;
                 embeddedScope = { tenantId: tenant.id as string, externalUserId: verified.claims.external_user_id, installationIds: verified.claims.installation_ids?.map(dePrefixId), permissions: verified.claims.permissions };
                 if (!hasClientPermission(embeddedScope, 'sessions:turn')) {
@@ -317,10 +334,13 @@ export async function POST(
             );
         }
 
-        if (!body.model && !agentConfig?.model && !gatewayCtx?.defaultModel) {
+        const { BUSINESS_DEFAULT_MODEL } = await import('@/lib/business/plans');
+        // Below the Business plan, an agent always answers with the plan's model.
+        const lockedModel = gatewayCtx?.businessModelLocked ? BUSINESS_DEFAULT_MODEL : null;
+        if (!lockedModel && !body.model && !agentConfig?.model && !gatewayCtx?.defaultModel) {
             return respondError(400, "Missing model. Provide model in request body or set a default model in project settings.", 'missing_model');
         }
-        const configuredModel = agentConfig?.model || body.model || gatewayCtx?.defaultModel || '';
+        const configuredModel = lockedModel || agentConfig?.model || body.model || gatewayCtx?.defaultModel || '';
         const model = normalizeGatewayModelId(configuredModel.trim());
 
         const input = body.input;

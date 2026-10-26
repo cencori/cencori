@@ -9,6 +9,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/currency";
 import { CENCORI_PAID_PLANS } from "@/lib/billing/plans";
+import { BusinessPricing } from "@/components/landing/BusinessPricing";
 
 type Tier = "free" | "pro" | "team" | "enterprise";
 type BillingPeriod = "monthly" | "annual";
@@ -412,13 +413,19 @@ export function Pricing() {
                         Pricing
                     </Badge>
                     <h1 className="text-3xl font-semibold tracking-tight md:text-5xl">
-                        Pick a plan to power your AI applications.
+                        Simple pricing, whether you run a business or build with AI.
                     </h1>
                     <p className="mx-auto mt-4 max-w-2xl text-sm text-muted-foreground md:text-base">
-                        Free tier to build and test. Pro unlocks security scanning,
-                        failover, caching, and observability. AI usage is billed in
-                        prepaid credits — or bring your own keys and pay providers directly.
+                        Businesses pay a flat monthly price in naira for their agents&apos; conversations.
+                        Developers start free, and pay for AI usage in prepaid credits or bring their own keys.
                     </p>
+                </div>
+
+                <BusinessPricing />
+
+                <div className="mx-auto mb-8 max-w-2xl text-center">
+                    <h2 className="text-2xl font-semibold tracking-tight md:text-3xl">For developers</h2>
+                    <p className="mt-3 text-sm text-muted-foreground">Build AI into your own product with our API and SDKs. AI usage is billed in prepaid credits.</p>
                 </div>
 
                 <div className="mb-10 flex justify-center">

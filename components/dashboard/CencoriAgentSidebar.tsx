@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { supabase } from "@/lib/supabaseClient";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useBusinessPlan } from "@/components/dashboard/billing/BusinessPlan";
 import {
     COPILOT_CONVERSATION_COOKIE,
     COPILOT_CONVERSATION_EVENT,
@@ -144,6 +145,14 @@ async function downscaleImage(file: File, maxEdge = COPILOT_IMAGE_MAX_EDGE, qual
     bitmap.close();
     return canvas.toDataURL("image/jpeg", quality);
 }
+
+/** For a business account: describe the business and Copilot builds the agent. */
+const BUSINESS_PROMPTS = [
+    "I run a restaurant and want guests to book tables on WhatsApp",
+    "I sell clothes and want customers to order on WhatsApp",
+    "I run a salon and want clients to book appointments",
+    "Answer my customers' questions on my website",
+];
 
 const DEFAULT_PROMPTS = [
     "What changed in this project?",
@@ -431,7 +440,10 @@ export function CencoriAgentSidebar({
         ? `${firstName.charAt(0).toUpperCase()}${firstName.slice(1)}`
         : null;
 
+    const business = useBusinessPlan(organization?.id);
+    const isBusiness = business.data?.account_type === "business";
     const suggestions = useMemo(() => {
+        if (isBusiness) return BUSINESS_PROMPTS;
         if (pathname.includes("/observability")) {
             return [
                 "Explain the most important signal here",
@@ -449,7 +461,7 @@ export function CencoriAgentSidebar({
             ];
         }
         return DEFAULT_PROMPTS;
-    }, [pathname]);
+    }, [isBusiness, pathname]);
 
     useEffect(() => {
         if (!open) return;
@@ -885,7 +897,9 @@ export function CencoriAgentSidebar({
                                 {displayFirstName ? `Hi ${displayFirstName}` : "Hi there"}
                             </h2>
                             <p className="mt-3 text-sm leading-6 text-muted-foreground">
-                                I&apos;m Copilot. I&apos;ll help you manage your projects across Cencori&apos;s AI infrastructure. Let me know what you need.
+                                {isBusiness
+                                    ? <>I&apos;m Copilot. Tell me about your business: what you do, where you are, and what your customers usually ask. I&apos;ll build an agent that answers them for you.</>
+                                    : <>I&apos;m Copilot. I&apos;ll help you manage your projects across Cencori&apos;s AI infrastructure. Let me know what you need.</>}
                             </p>
                         </div>
 
@@ -1048,6 +1062,8 @@ export function CencoriAgentSidebar({
                             >
                                 <Paperclip className="h-4 w-4" />
                             </button>
+                            {/* Business accounts' Copilot always runs on their plan's model: no picker. */}
+                            {!isBusiness && <>
                             <span aria-hidden="true" className="mx-1 h-4 w-px bg-border/60" />
                             <DropdownMenu>
                                 <DropdownMenuTrigger
@@ -1068,6 +1084,7 @@ export function CencoriAgentSidebar({
                                     ))}
                                 </DropdownMenuContent>
                             </DropdownMenu>
+                            </>}
                             </div>
                             <button
                                 type="button"

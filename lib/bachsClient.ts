@@ -25,7 +25,8 @@ export function getWebhookSecret(): string {
 export type BachsProductType =
   | 'subscription'
   | 'credits_topup'
-  | 'basecode_subscription';
+  | 'basecode_subscription'
+  | 'business_pass';
 export type SubscriptionTier = 'pro' | 'team';
 export type BillingInterval = 'month' | 'year';
 
@@ -47,6 +48,8 @@ export interface CreateCheckoutSessionInput {
   metadata?: Record<string, string>;
   reference?: string;
   expires_in_minutes?: number;
+  /** The currency the customer pays in, e.g. NGN. */
+  billing_currency?: string;
 }
 
 export interface BachsCheckoutSession {
@@ -289,6 +292,10 @@ export const BACHS_CONFIG = {
     tensorStarterMonthly: process.env.BACHS_PRODUCT_BASECODE_STARTER_MONTHLY || '',
     tensorBuilderMonthly: process.env.BACHS_PRODUCT_BASECODE_BUILDER_MONTHLY || '',
     tensorProMonthly: process.env.BACHS_PRODUCT_BASECODE_PRO_MONTHLY || '',
+    // Business plans, as 30-day naira passes until Bachs enables NGN subscriptions.
+    businessStarter: process.env.BACHS_PRODUCT_BUSINESS_STARTER || '',
+    businessGrowth: process.env.BACHS_PRODUCT_BUSINESS_GROWTH || '',
+    businessBusiness: process.env.BACHS_PRODUCT_BUSINESS_BUSINESS || '',
   } as const,
 } as const;
 
@@ -393,6 +400,25 @@ export function getTensorPlanByProductId(
   return null;
 }
 
+/** The business plan a 30-day pass product buys. */
+export function getBusinessPlanByProductId(
+  productId: string
+): 'starter' | 'growth' | 'business' | null {
+  const p = BACHS_CONFIG.products;
+  if (!productId) return null;
+  if (productId === p.businessStarter) return 'starter';
+  if (productId === p.businessGrowth) return 'growth';
+  if (productId === p.businessBusiness) return 'business';
+  return null;
+}
+
+export function getBusinessPassProductId(plan: 'starter' | 'growth' | 'business'): string {
+  const p = BACHS_CONFIG.products;
+  const id = plan === 'starter' ? p.businessStarter : plan === 'growth' ? p.businessGrowth : p.businessBusiness;
+  if (!id) throw new Error(`No Bachs product configured for the ${plan} business plan`);
+  return id;
+}
+
 export function getSubscriptionTierFromProductId(
   productId: string
 ): SubscriptionTier | null {
@@ -448,6 +474,7 @@ export function getProductTypeFromId(
   ) {
     return 'basecode_subscription';
   }
+  if (getBusinessPlanByProductId(productId)) return 'business_pass';
   return null;
 }
 

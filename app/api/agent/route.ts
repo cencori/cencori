@@ -20,6 +20,9 @@ type ChatMessage = {
     files?: unknown;
 };
 
+/** Copilot questions a day for a business account; its plan covers them. */
+const BUSINESS_COPILOT_DAILY_LIMIT = 100;
+
 const SYSTEM_PROMPT = `You are Cencori Copilot, a conversational AI partner embedded throughout the Cencori application.
 
 Your job is to help the user understand, debug, and improve their AI workload while feeling like a continuous conversation—not a report generator.
@@ -45,6 +48,7 @@ Rules:
   1. Gather what's missing in ONE short message, not one question at a time: the business name and what the agent should do. For restaurants, lounges, bars and cafés also: address, opening hours, guest phone number, largest party it may book, deposit policy, the menu (they can paste or attach it), and who should get booking emails. Use what they already said; don't ask for anything they gave you, and don't insist on optional details.
   2. Propose create_agent once with everything (template 'restaurant' where it fits, the menu as knowledge_text, alert_emails).
   3. Then carry on step by step, one proposal at a time, reporting after each: for restaurants open_agent_page 'calendar' (bookings need Google Calendar, which they connect themselves); if they take deposits, open_agent_page 'payments' (they connect Paystack, Flutterwave or Stripe with their secret key; money goes straight to their account); then publish_agent, then open_agent_page 'whatsapp'. get_agent's still_to_do says what's left.
+  Business accounts (page context account: 'business'): the user runs a business (a restaurant, shop, salon, clinic), not software. Talk like a helpful colleague, never about APIs, tokens, keys or models. If they have no agent yet, your job is to build their first one with them: ask what the business is and what customers usually ask, then follow the steps above. Their plan (business_plan) sets how many agents they can have and their monthly conversations; if they're at the agent limit, say so and point them to Billing to upgrade.
   For shops and anyone selling products (fashion, food, beauty, gadgets…): put their price list in the catalog with add_products (not as knowledge: the agent quotes prices and stock from the catalog and takes orders from it), switch sell_products on with set_agent_system_tools, and offer open_agent_page 'payments' so orders are paid by link. Big lists or Bumpa/Selar/Shopify exports: open_agent_page 'products', where they import the spreadsheet.
   For changes ("mention the live band on Fridays", "stop taking bookings over 8"), use update_agent_instructions (append for small additions), then offer publish_agent, since edits only go live once published. Connecting WhatsApp, Google Calendar or other apps needs the user's own sign-in: offer open_agent_page, never claim you connected it.
 - You cannot delete agents, change billing, payments or plans, or delete projects or organizations; point the user to the right page instead.
@@ -159,7 +163,7 @@ export async function POST(request: NextRequest) {
 
         const projectId = typeof body.projectId === "string" ? body.projectId : null;
         // Only models on Copilot's list; anything else falls back to the default.
-        const agentModel = resolveCopilotModel(body.model);
+        let agentModel = resolveCopilotModel(body.model);
         const conversationId = typeof body.conversationId === "string" && UUID_PATTERN.test(body.conversationId)
             ? body.conversationId
             : null;
@@ -202,7 +206,23 @@ export async function POST(request: NextRequest) {
         // open: if the counter is unavailable, Copilot answers for free rather
         // than blocking everyone.
         let billed = false;
-        if (!lightweightConversation) {
+        // A business's plan covers Copilot (it's how they build their agent): a
+        // generous daily cap, never billed to credits, on the plan's model.
+        const { BUSINESS_DEFAULT_MODEL, getOrganizationPlan } = await import("@/lib/business/plans");
+        const businessPlan = organization ? await getOrganizationPlan(admin as never, organization.id) : null;
+        const isBusiness = businessPlan?.accountType === "business";
+        if (isBusiness) agentModel = BUSINESS_DEFAULT_MODEL as typeof agentModel;
+        if (isBusiness && !lightweightConversation) {
+            const { data: usage, error: usageError } = await admin.rpc("copilot_consume", { p_subject: usageSubject, p_limit: BUSINESS_COPILOT_DAILY_LIMIT });
+            if (usageError) {
+                console.error("[Cencori Agent] Usage cap unavailable:", usageError.message);
+            } else if (usage && (usage as { allowed?: boolean }).allowed === false) {
+                return NextResponse.json({
+                    error: `You've asked Copilot ${BUSINESS_COPILOT_DAILY_LIMIT} questions today. It resets at midnight UTC.`,
+                    code: "copilot_daily_limit",
+                }, { status: 429 });
+            }
+        } else if (!lightweightConversation) {
             const tier = organization?.subscription_tier && organization.subscription_tier in COPILOT_DAILY_LIMITS
                 ? organization.subscription_tier
                 : "free";
@@ -233,6 +253,11 @@ export async function POST(request: NextRequest) {
             environment,
             user_first_name: userName,
             now_utc: new Date().toISOString(),
+            // A business owner (not a developer): keep it plain, and build their agent with them.
+            ...(isBusiness ? {
+                account: "business",
+                business_plan: businessPlan?.plan ? { name: businessPlan.plan.name, conversations_per_month: businessPlan.plan.conversations, agents: businessPlan.plan.agents, active: businessPlan.active } : null,
+            } : {}),
         };
 
         const copilotApiKey = process.env.CENCORI_COPILOT_API_KEY;
