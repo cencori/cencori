@@ -1,5 +1,7 @@
 // Navigation commits immediately and the layout (sidebar, top bar) stays on
-// screen; each page draws its own skeletons once its code arrives. Until
-// then this shows a thin bar (after a beat, so quick navigations show
-// nothing) and, if the load stalls, a way to reload.
-export { RouteLoading as default } from "@/components/dashboard/RouteLoading";
+// screen; each page renders its own UI and skeletons only where data is still
+// loading. This boundary deliberately draws nothing so there's no generic
+// page-shaped placeholder flashing in between.
+export default function RouteLoading() {
+    return null;
+}
