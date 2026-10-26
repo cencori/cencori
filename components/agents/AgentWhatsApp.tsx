@@ -13,6 +13,7 @@ import { readJson } from "@/components/agents/widget-preview";
 import { cn } from "@/lib/utils";
 import { useWhatsAppSignup, type SignupConfig } from "@/components/agents/whatsapp-signup";
 import { SettingsCard, SettingsFooter, SettingsRow, SettingsSection, settingsInputClass } from "@/components/agents/settings-layout";
+import { SettingsCardSkeleton } from "@/components/agents/AgentSkeletons";
 
 interface Channel {
     id: string;
@@ -155,7 +156,7 @@ export function AgentWhatsApp() {
         return (
             <SettingsSection id="whatsapp" title="WhatsApp" description={description}>
                 {query.isLoading
-                    ? <div className="flex h-24 items-center justify-center text-muted-foreground"><HugeiconsIcon icon={Loading03Icon} className="h-4 w-4 animate-spin" /></div>
+                    ? <SettingsCardSkeleton rows={3} />
                     : <p className="text-sm text-destructive">{query.error instanceof Error ? query.error.message : "Could not load WhatsApp."}</p>}
             </SettingsSection>
         );
@@ -225,7 +226,7 @@ export function AgentWhatsApp() {
                         <div className="flex items-center gap-2">
                             {channel && <Button variant="outline" size="sm" className="h-7 text-xs" disabled={!!busy} onClick={() => { setEditing(false); setError(null); }}>Cancel</Button>}
                             <Button size="sm" className="h-7 gap-1.5 px-3 text-xs" disabled={disabled || !published || !signup.ready} onClick={() => void connectWithMeta()}>
-                                {(busy === "signup" || (!signup.ready && !signup.error)) && <HugeiconsIcon icon={Loading03Icon} className="h-3.5 w-3.5 animate-spin" />}
+                                {busy === "signup" && <HugeiconsIcon icon={Loading03Icon} className="h-3.5 w-3.5 animate-spin" />}
                                 Connect WhatsApp
                             </Button>
                         </div>
