@@ -8,13 +8,6 @@ export const navigationMenus = [
         label: "Explore products",
         items: [
           {
-            href: "https://business.cencori.com",
-            label: "Cencori for Business",
-            tagline: "Agents for your business",
-            description:
-              "An AI agent that answers your customers on WhatsApp and your website, takes bookings and orders.",
-          },
-          {
             href: "/tensor",
             label: "Tensor",
             tagline: "AI software engineering",
@@ -968,3 +961,4 @@ export type DeveloperDropdownMenu = Extract<
   DeveloperNavigationMenu,
   { readonly eyebrow: string }
 >;
+
