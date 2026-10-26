@@ -23,6 +23,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { toast } from "@/components/ui/toast";
 import { useAgentWorkspace } from "@/components/agents/AgentWorkspace";
 import { cn } from "@/lib/utils";
+import { KnowledgeSkeleton } from "@/components/agents/AgentSkeletons";
 
 const HEAD_CLASS = "h-8 text-[10px] font-medium uppercase tracking-wider text-muted-foreground";
 const ACCEPT = ".pdf,.docx,.md,.markdown,.txt,.html,.htm";
@@ -179,7 +180,7 @@ export function AgentKnowledge() {
                 </p>
             )}
             {knowledge.isLoading ? (
-                <div className="flex justify-center py-16"><HugeiconsIcon icon={Loading03Icon} className="size-5 animate-spin text-muted-foreground" /></div>
+                <KnowledgeSkeleton />
             ) : knowledge.error ? (
                 <p className="py-16 text-center text-xs text-destructive">{knowledge.error instanceof Error ? knowledge.error.message : "Could not load knowledge."}</p>
             ) : !knowledge.data?.ready ? (

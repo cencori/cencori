@@ -12,6 +12,7 @@ import { useAgentWorkspace } from "@/components/agents/AgentWorkspace";
 import { readJson } from "@/components/agents/widget-preview";
 import { SettingsCard, SettingsFooter, SettingsRow, SettingsSection, settingsInputClass } from "@/components/agents/settings-layout";
 import { cn } from "@/lib/utils";
+import { SettingsCardSkeleton } from "@/components/agents/AgentSkeletons";
 const TIME_ZONES = ["Africa/Lagos", "Africa/Accra", "Africa/Nairobi", "Africa/Johannesburg", "Africa/Cairo", "Europe/London", "America/New_York", "UTC"];
 
 type Entry = { type: "booking" | "callback" | "payment" | "order"; at: string; title: string; when?: string | null; contact?: string | null; source?: string | null };
@@ -97,7 +98,7 @@ export function AgentOwnerAlerts() {
         return (
             <SettingsSection id="alerts" title="Owner alerts" description={description}>
                 {query.isLoading
-                    ? <div className="flex h-24 items-center justify-center text-muted-foreground"><HugeiconsIcon icon={Loading03Icon} className="h-4 w-4 animate-spin" /></div>
+                    ? <SettingsCardSkeleton rows={4} />
                     : <p className="text-sm text-destructive">{query.error instanceof Error ? query.error.message : "Could not load alerts."}</p>}
             </SettingsSection>
         );

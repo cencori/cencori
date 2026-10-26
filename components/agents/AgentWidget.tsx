@@ -23,6 +23,7 @@ import {
 } from "@/components/agents/widget-preview";
 import { Segmented, SettingsCard, SettingsFooter, SettingsRow, SettingsSection, settingsInputClass } from "@/components/agents/settings-layout";
 import { cn } from "@/lib/utils";
+import { SettingsCardSkeleton } from "@/components/agents/AgentSkeletons";
 
 const FALLBACK_LOOK: WidgetAppearance = { title: "Assistant", greeting: "Hi! How can I help?", launcher_text: "Need help?", accent: "#111111", theme: "auto", position: "right", launcher_style: "card" };
 
@@ -130,7 +131,7 @@ export function AgentWidget() {
         return (
             <SettingsSection id="website" title="Website" description={<>Put {agent.name} on your website with one script tag.</>}>
                 {query.isLoading
-                    ? <div className="flex h-24 items-center justify-center text-muted-foreground"><HugeiconsIcon icon={Loading03Icon} className="h-4 w-4 animate-spin" /></div>
+                    ? <SettingsCardSkeleton rows={4} />
                     : !payload || query.isError
                         ? <p className="text-sm text-destructive">{query.error instanceof Error ? query.error.message : "Could not load the widget."}</p>
                         : <p className="text-sm text-muted-foreground">{payload.message}</p>}
