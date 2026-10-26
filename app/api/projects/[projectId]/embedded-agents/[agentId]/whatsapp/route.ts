@@ -26,6 +26,7 @@ import { randomInt } from 'crypto';
 import { encryptApiKey } from '@/lib/encryption';
 import {
     META_GRAPH_VERSION,
+    assignSystemUserToWaba,
     exchangeSignupCode,
     getAgentChannel,
     publicChannel,
@@ -159,7 +160,28 @@ export async function POST(req: NextRequest, ctx: Context) {
     const existing = await getAgentChannel(db, projectId, agentId);
     const saved = await saveSignupChannel(db, { projectId, organizationId: access.organizationId, agentId, existing, phoneNumberId, wabaId, accessToken: token, coexistence });
     if (!saved.ok) return fail(saved.message, saved.status);
-    if (pinEncrypted) await db.from('tool_connections').update({ metadata: { ...saved.channel.metadata, registration_pin_encrypted: pinEncrypted } }).eq('id', saved.channel.id);
+    // The signup token lasts 60 days; Cencori's system user doesn't expire. Best-effort:
+    // without it the stored token is used, and the console shows when it runs out.
+    let systemUserAssigned = false;
+    const systemUserId = process.env.META_SYSTEM_USER_ID;
+    const systemUserToken = process.env.META_SYSTEM_USER_TOKEN;
+    if (systemUserId && systemUserToken) {
+        try {
+            await assignSystemUserToWaba(wabaId, systemUserId, systemUserToken);
+            systemUserAssigned = true;
+        } catch (error) {
+            console.error('[whatsapp] system user assignment failed', error instanceof Error ? error.message : error);
+        }
+    }
+    await db.from('tool_connections').update({
+        metadata: {
+            ...saved.channel.metadata,
+            system_user_assigned: systemUserAssigned,
+            token_expires_at: new Date(Date.now() + 60 * 86_400_000).toISOString(),
+            ...(pinEncrypted ? { registration_pin_encrypted: pinEncrypted } : {}),
+        },
+    }).eq('id', saved.channel.id);
+    saved.channel.metadata.system_user_assigned = systemUserAssigned;
     return NextResponse.json({ channel: serialize(req, saved.channel), can_manage: true, signup: config });
 }
 

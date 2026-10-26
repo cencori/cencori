@@ -47,6 +47,14 @@ export interface WhatsAppChannelMetadata {
     waba_id?: string | null;
     /** The number also stays on the WhatsApp Business app (coexistence). */
     coexistence?: boolean;
+    /**
+     * Cencori's system user was added to the business's WhatsApp account, so
+     * replies use Cencori's permanent token (META_SYSTEM_USER_TOKEN) instead of
+     * the signup token, which expires after 60 days.
+     */
+    system_user_assigned?: boolean;
+    /** When the stored signup token stops working. */
+    token_expires_at?: string | null;
     enabled: boolean;
     /** When Meta last completed the webhook check against our URL. */
     webhook_verified_at: string | null;
@@ -243,6 +251,23 @@ export async function saveSignupChannel(
     const channel = toChannel(data as Record<string, unknown> | null);
     if (error || !channel) return { ok: false, status: 502, message: 'Couldn\'t save the WhatsApp channel. Try again.' };
     return { ok: true, channel };
+}
+
+/**
+ * Give Cencori's system user a seat on a business's WhatsApp account, so one
+ * permanent Cencori token can answer for every connected number. Uses Cencori's
+ * own token: the account is shared with Cencori's business by the signup.
+ */
+export async function assignSystemUserToWaba(wabaId: string, systemUserId: string, systemUserToken: string): Promise<void> {
+    const params = new URLSearchParams({ user: systemUserId, tasks: JSON.stringify(['MANAGE']) });
+    await graph('POST', `/${encodeURIComponent(wabaId)}/assigned_users?${params}`, systemUserToken);
+}
+
+/** The token to act for a channel with: Cencori's permanent one when it has a seat, the stored one otherwise. */
+export function channelAccessToken(channel: WhatsAppChannel, decrypt: (value: string) => string | null): string | null {
+    const shared = process.env.META_SYSTEM_USER_TOKEN;
+    if (channel.metadata.managed && channel.metadata.system_user_assigned && shared) return shared;
+    return channel.accessTokenEncrypted ? decrypt(channel.accessTokenEncrypted) : null;
 }
 
 /** Subscribe Cencori's app to a WhatsApp Business Account, so its messages reach the shared webhook. */
