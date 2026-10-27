@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { Drawer } from "vaul";
 import { useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { Camera, Check, Loader2, X } from "lucide-react";
 import { useStudio } from "@/components/studio/StudioShell";
 import { studioFetch } from "@/components/studio/studio-data";
@@ -16,9 +17,12 @@ import { cn } from "@/lib/utils";
  * signs in there sees everything done from Studio.
  */
 
-export type StudioTask = "knowledge" | "whatsapp" | "golive" | "alerts" | "payments" | "plans" | "later";
+export type StudioTask = "knowledge" | "whatsapp" | "golive" | "alerts" | "payments" | "plans" | "business" | "newbusiness" | "later";
 
-const TasksContext = createContext<{ open: (task: StudioTask) => void } | null>(null);
+/** Another business the ⋯ menu acts on (never the open one). */
+export type BusinessTarget = { id: string; name: string; isBusiness: boolean };
+
+const TasksContext = createContext<{ open: (task: StudioTask, target?: BusinessTarget) => void } | null>(null);
 
 export function useStudioTasks() {
     const value = useContext(TasksContext);
@@ -59,12 +63,18 @@ const TITLES: Record<StudioTask, string> = {
     alerts: "Get told when someone needs you",
     payments: "Get paid by link",
     plans: "Choose a plan",
+    business: "",
+    newbusiness: "New business",
     later: "Coming to Studio soon",
 };
 
 export function StudioTasksProvider({ children }: { children: ReactNode }) {
     const [task, setTask] = useState<StudioTask | null>(null);
-    const open = useCallback((next: StudioTask) => setTask(next), []);
+    const [target, setTarget] = useState<BusinessTarget | null>(null);
+    const open = useCallback((next: StudioTask, nextTarget?: BusinessTarget) => {
+        setTarget(nextTarget ?? null);
+        setTask(next);
+    }, []);
     const [notice, setNotice] = useState<string | null>(null);
     const { project, agents } = useStudio();
     const queryClient = useQueryClient();
@@ -112,12 +122,14 @@ export function StudioTasksProvider({ children }: { children: ReactNode }) {
                     <Drawer.Overlay className="fixed inset-0 z-[60] bg-black/30" />
                     <Drawer.Content className="dashboard-theme fixed inset-x-0 bottom-0 z-[60] mx-auto flex max-h-[92svh] max-w-md flex-col rounded-t-3xl border-t border-border/60 bg-background font-sans text-foreground outline-none">
                         <div className="flex items-center justify-between px-5 pt-3">
-                            <Drawer.Title className="text-[17px] font-semibold">{task ? TITLES[task] : ""}</Drawer.Title>
+                            <Drawer.Title className="min-w-0 truncate text-[17px] font-semibold">{task === "business" ? target?.name ?? "" : task ? TITLES[task] : ""}</Drawer.Title>
                             <button type="button" onClick={() => setTask(null)} aria-label="Close" className="-mr-2 flex h-10 w-10 items-center justify-center rounded-full"><X className="h-5 w-5" /></button>
                         </div>
                         <Drawer.Description className="sr-only">Set up your assistant without leaving Studio.</Drawer.Description>
                         <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-1">
-                            {task && <TaskBody task={task} onDone={() => { setTask(null); void queryClient.invalidateQueries(); }} />}
+                            {task === "business" && target
+                                ? <BusinessTask target={target} onDone={() => { setTask(null); void queryClient.invalidateQueries(); }} />
+                                : task && task !== "business" && <TaskBody task={task} onDone={() => { setTask(null); void queryClient.invalidateQueries(); }} />}
                         </div>
                     </Drawer.Content>
                 </Drawer.Portal>
@@ -136,16 +148,17 @@ function TaskBody({ task, onDone }: { task: StudioTask; onDone: () => void }) {
     const { project, agents, user, organization } = useStudio();
     const agentId = agents[0]?.id ?? null;
     if (task === "plans") return <PlansTask organizationId={organization.id} />;
+    if (task === "newbusiness") return <NewBusinessTask />;
     if (task === "later") {
         return (
             <>
-                <p className="text-[15px] leading-6 text-muted-foreground">This one can&apos;t be done from Studio yet. Your assistant works fine without it, and we&apos;re bringing it here soon.</p>
+                <p className="text-[15px] leading-6 text-muted-foreground">Not in Studio yet. Coming soon.</p>
                 <button type="button" onClick={onDone} className="mt-5 h-12 w-full rounded-full bg-foreground text-[15px] font-semibold text-background">OK</button>
             </>
         );
     }
     if (!agentId) {
-        return <p className="text-[15px] leading-6 text-muted-foreground">Set up your assistant first, then come back to this.</p>;
+        return <p className="text-[15px] leading-6 text-muted-foreground">Set up your assistant first.</p>;
     }
     const agentBase = `/api/projects/${project.id}/embedded-agents/${agentId}`;
     if (task === "knowledge") return <KnowledgeTask agentBase={agentBase} projectId={project.id} onDone={onDone} />;
@@ -211,7 +224,6 @@ function KnowledgeTask({ agentBase, projectId, onDone }: { agentBase: string; pr
 
     return (
         <>
-            <p className="text-[15px] leading-6 text-muted-foreground">What your assistant answers from: your menu or prices, opening hours, policies, anything customers ask.</p>
             <div role="tablist" className="mt-4 grid grid-cols-2 gap-1 rounded-full bg-muted p-1">
                 {(["text", "website"] as const).map((item) => (
                     <button key={item} type="button" role="tab" aria-selected={mode === item} onClick={() => setMode(item)} className={cn("h-9 rounded-full text-sm font-medium", mode === item ? "bg-background" : "text-muted-foreground")}>
@@ -254,8 +266,6 @@ function WhatsAppTask({ agentBase }: { agentBase: string }) {
     };
     return (
         <>
-            <p className="text-[15px] leading-6 text-muted-foreground">Your assistant answers on the WhatsApp Business number you already use. You keep using the WhatsApp Business app on your phone too.</p>
-            <p className="mt-3 text-[13px] leading-5 text-muted-foreground">Facebook will ask you to log in, confirm your business and approve the connection in the WhatsApp Business app. About two minutes; you come back here after.</p>
             <ErrorLine error={error} />
             <Primary busy={busy} onClick={() => void connect()}>Connect WhatsApp</Primary>
         </>
@@ -288,7 +298,6 @@ function GoLiveTask({ projectId, agentId, agentBase, onDone }: { projectId: stri
     };
     return (
         <>
-            <p className="text-[15px] leading-6 text-muted-foreground">Your assistant is ready but not answering customers yet. Going live tests it once, then turns it on for your link, website and WhatsApp.</p>
             {steps.length > 0 && (
                 <ul className="mt-4 space-y-1.5">
                     {steps.map((step) => <li key={step} className="flex items-center gap-2 text-sm"><Check className="h-4 w-4 text-emerald-600" />{step}</li>)}
@@ -318,7 +327,6 @@ function AlertsTask({ agentBase, email, onDone }: { agentBase: string; email: st
     };
     return (
         <>
-            <p className="text-[15px] leading-6 text-muted-foreground">We&apos;ll email you when a customer books, asks for a callback or pays. Add more than one address with commas.</p>
             <input value={emails} onChange={(event) => setEmails(event.target.value)} inputMode="email" autoCapitalize="none" placeholder="you@business.com" className={cn(field, "mt-4 h-12")} />
             <ErrorLine error={error} />
             <Primary busy={busy} disabled={!emails.trim()} onClick={() => void save()}>Save</Primary>
@@ -352,7 +360,6 @@ function PaymentsTask({ projectId, onDone }: { projectId: string; onDone: () => 
     };
     return (
         <>
-            <p className="text-[15px] leading-6 text-muted-foreground">Customers pay through a link and the money goes straight to your account. Cencori never holds it.</p>
             <div className="mt-4 flex flex-wrap gap-2">
                 {(providers.length ? providers : [{ id: "paystack", name: "Paystack" }]).map((item) => (
                     <button key={item.id} type="button" onClick={() => setProvider(item.id)} className={cn("h-10 rounded-full border px-4 text-sm", provider === item.id ? "border-foreground bg-foreground text-background" : "border-border/60")}>{item.name}</button>
@@ -392,7 +399,7 @@ function PlansTask({ organizationId }: { organizationId: string }) {
     const naira = (amount: number) => `₦${amount.toLocaleString("en-NG")}`;
     return (
         <>
-            <p className="text-[15px] leading-6 text-muted-foreground">Each plan runs for 30 days. Pay by card, bank transfer or USSD. Paying early keeps the days you have left.</p>
+            <p className="text-[15px] leading-6 text-muted-foreground">30 days each. Card, transfer or USSD.</p>
             {!data && !error && <div className="mt-5 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>}
             <div className="mt-4 flex flex-col gap-2.5">
                 {data?.plans.map((option) => {
@@ -414,6 +421,98 @@ function PlansTask({ organizationId }: { organizationId: string }) {
                 })}
             </div>
             <ErrorLine error={error} />
+        </>
+    );
+}
+
+/** The ⋯ menu for another business: rename it, or delete it and everything in it. */
+function BusinessTask({ target, onDone }: { target: BusinessTarget; onDone: () => void }) {
+    const router = useRouter();
+    const [view, setView] = useState<"menu" | "rename" | "delete">("menu");
+    const [name, setName] = useState(target.name);
+    const [confirm, setConfirm] = useState("");
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const run = async (method: "PATCH" | "DELETE", body: Record<string, unknown>) => {
+        setBusy(true);
+        setError(null);
+        try {
+            await send("/api/studio/business", method, { organization_id: target.id, ...body });
+            // The list of businesses comes with the page: load it again.
+            router.refresh();
+            onDone();
+        } catch (cause) {
+            setError(cause instanceof Error ? cause.message : "That didn't work.");
+            setBusy(false);
+        }
+    };
+
+    if (view === "menu") {
+        return (
+            <div className="mt-2 divide-y divide-border/40 overflow-hidden rounded-2xl bg-muted/60">
+                <button type="button" onClick={() => setView("rename")} className="flex h-13 w-full items-center px-4 py-3.5 text-left text-[15px]">Rename</button>
+                {target.isBusiness ? (
+                    <button type="button" onClick={() => setView("delete")} className="flex h-13 w-full items-center px-4 py-3.5 text-left text-[15px] text-destructive">Delete business</button>
+                ) : (
+                    // A developer organization holds API keys, logs and console projects: not deleted from a phone menu.
+                    <p className="px-4 py-3.5 text-[13px] leading-5 text-muted-foreground">This is a developer organization. Delete it from the console.</p>
+                )}
+            </div>
+        );
+    }
+    if (view === "rename") {
+        const ready = !!name.trim() && name.trim() !== target.name;
+        return (
+            <>
+                <input value={name} onChange={(event) => setName(event.target.value)} maxLength={48} autoFocus placeholder="Arcie Lounge" className={cn(field, "mt-4 h-12")} onKeyDown={(event) => { if (event.key === "Enter" && ready) void run("PATCH", { name: name.trim() }); }} />
+                <ErrorLine error={error} />
+                <Primary busy={busy} disabled={!ready} onClick={() => void run("PATCH", { name: name.trim() })}>Save</Primary>
+            </>
+        );
+    }
+    return (
+        <>
+            <p className="text-[15px] leading-6 text-muted-foreground">
+                Deletes <span className="font-semibold text-foreground">{target.name}</span> and everything in it. This can&apos;t be undone.
+            </p>
+            <p className="mt-4 text-[13px] text-muted-foreground">Type the name to confirm.</p>
+            <input value={confirm} onChange={(event) => setConfirm(event.target.value)} autoCapitalize="none" autoComplete="off" spellCheck={false} placeholder={target.name} className={cn(field, "mt-2 h-12")} />
+            <ErrorLine error={error} />
+            <button
+                type="button"
+                disabled={busy || confirm.trim() !== target.name}
+                onClick={() => void run("DELETE", { confirm: confirm.trim() })}
+                className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-destructive text-[15px] font-semibold text-white disabled:opacity-40"
+            >
+                {busy && <Loader2 className="h-4 w-4 animate-spin" />}Delete business
+            </button>
+        </>
+    );
+}
+
+/** Another business, set up like signing up: its own free trial, then setup starts there. */
+function NewBusinessTask() {
+    const [name, setName] = useState("");
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const create = async () => {
+        setBusy(true);
+        setError(null);
+        try {
+            const created = await send<{ organization_id: string }>("/api/studio/business", "POST", { name: name.trim() });
+            await send("/api/studio/workspace", "POST", { organization_id: created.organization_id });
+            // A full load into the new business, where Home starts its setup.
+            window.location.assign("/");
+        } catch (cause) {
+            setError(cause instanceof Error ? cause.message : "Couldn't create the business.");
+            setBusy(false);
+        }
+    };
+    return (
+        <>
+            <input value={name} onChange={(event) => setName(event.target.value)} maxLength={48} autoFocus placeholder="What's it called?" className={cn(field, "mt-4 h-12")} onKeyDown={(event) => { if (event.key === "Enter" && name.trim()) void create(); }} />
+            <ErrorLine error={error} />
+            <Primary busy={busy} disabled={!name.trim()} onClick={() => void create()}>Create business</Primary>
         </>
     );
 }

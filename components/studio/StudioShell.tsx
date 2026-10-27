@@ -18,7 +18,7 @@ import { useUnreadCount } from "@/components/studio/useInbox";
 export interface StudioContextValue {
     user: { id: string; firstName: string | null; fullName: string | null; email: string | null; avatarUrl: string | null };
     organization: { id: string; name: string; slug: string; isBusiness: boolean };
-    organizations: Array<{ id: string; name: string }>;
+    organizations: Array<{ id: string; name: string; isBusiness: boolean }>;
     project: { id: string; name: string; slug: string };
     agents: Array<{ id: string; name: string; live: boolean; published: boolean }>;
 }

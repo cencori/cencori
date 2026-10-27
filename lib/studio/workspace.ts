@@ -22,7 +22,7 @@ export interface StudioWorkspace {
     user: { id: string; firstName: string | null; fullName: string | null; email: string | null; avatarUrl: string | null };
     organization: { id: string; name: string; slug: string; isBusiness: boolean };
     /** Every organization the user belongs to that has a project, for switching. */
-    organizations: Array<{ id: string; name: string }>;
+    organizations: Array<{ id: string; name: string; isBusiness: boolean }>;
     project: { id: string; name: string; slug: string };
     agents: StudioAgent[];
 }
@@ -78,7 +78,7 @@ export const getStudioWorkspace = cache(async (): Promise<StudioWorkspace | null
     return {
         user: { id: user.id, firstName, fullName, email: user.email ?? null, avatarUrl: (profile?.avatar_url as string | null | undefined) || metadata.avatar_url || metadata.picture || null },
         organization: { id: organization.id, name: organization.name, slug: organization.slug, isBusiness: organization.account_type === "business" },
-        organizations: list.map((item) => ({ id: item.id, name: item.name })),
+        organizations: list.map((item) => ({ id: item.id, name: item.name, isBusiness: item.account_type === "business" })),
         project,
         agents: ((agents ?? []) as Array<{ id: string; name: string; is_active: boolean | null; stable_version_id: string | null }>).map((agent) => ({
             id: agent.id,

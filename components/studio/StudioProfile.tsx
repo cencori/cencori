@@ -9,6 +9,7 @@ import { Drawer } from "vaul";
 import posthog from "posthog-js";
 import { useTheme } from "next-themes";
 import { BellIcon } from "@solar-icons/react/bold-duotone/bell";
+import { MenuDotsIcon } from "@solar-icons/react/bold/menu-dots";
 import { SmartphoneIcon } from "@solar-icons/react/bold-duotone/smartphone";
 import { MonitorIcon } from "@solar-icons/react/bold-duotone/monitor";
 import { QuestionCircleIcon } from "@solar-icons/react/bold-duotone/question-circle";
@@ -186,17 +187,24 @@ export function StudioProfile({ className }: { className?: string }) {
         : push.state === "needs-install" ? <span className="text-sm text-muted-foreground">Install first</span>
         : <span className="text-sm font-semibold">{push.busy ? "Turning on…" : "Turn on"}</span>;
 
-    const businessRow = (item: { id: string; name: string }) => (
-        <Row
-            key={item.id}
-            icon={Shop2Icon}
-            label={item.name}
-            onClick={() => void switchTo(item.id)}
-            disabled={switching !== null}
-            right={item.id === organization.id
-                ? <CheckCircleIcon size={20} className="shrink-0" />
-                : switching === item.id ? <span className="text-sm text-muted-foreground">Opening…</span> : <span />}
-        />
+    // The open business shows its tick. Any other opens when tapped, and its ⋯ renames or deletes it.
+    const businessRow = (item: { id: string; name: string; isBusiness?: boolean }) => item.id === organization.id ? (
+        <Row key={item.id} icon={Shop2Icon} label={organization.name} right={<CheckCircleIcon size={20} className="shrink-0" />} />
+    ) : (
+        <div key={item.id} className="flex items-center">
+            <div className="min-w-0 flex-1">
+                <Row
+                    icon={Shop2Icon}
+                    label={item.name}
+                    onClick={() => void switchTo(item.id)}
+                    disabled={switching !== null}
+                    right={switching === item.id ? <span className="text-sm text-muted-foreground">Opening…</span> : <span />}
+                />
+            </div>
+            <button type="button" onClick={() => tasks.open("business", { id: item.id, name: item.name, isBusiness: !!item.isBusiness })} aria-label={`More for ${item.name}`} className="mr-2 flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground">
+                <MenuDotsIcon size={20} />
+            </button>
+        </div>
     );
 
     return (
@@ -227,6 +235,7 @@ export function StudioProfile({ className }: { className?: string }) {
                             <p className="text-[15px] font-semibold">Your businesses</p>
                         </div>
                         <Group>{organizations.map(businessRow)}</Group>
+                        <button type="button" onClick={() => tasks.open("newbusiness")} className="mt-5 h-12 w-full rounded-full border border-border/60 text-[15px] font-medium">New business</button>
                         {error && <p role="alert" className="mt-2 px-1 text-xs text-destructive">{error}</p>}
                     </div>
                     ) : screen === "theme" ? (
@@ -274,10 +283,12 @@ export function StudioProfile({ className }: { className?: string }) {
                             {organizations.length > 1
                                 // The one open now and one other; the rest are under All businesses.
                                 ? [organization, ...organizations.filter((item) => item.id !== organization.id).slice(0, 1)].map(businessRow)
-                                : <Row icon={Shop2Icon} label={organization.name} />}
+                                : businessRow(organization)}
                             {organizations.length > 2 && (
                                 <Row label="All businesses" onClick={() => setScreen("businesses")} right={<span className="flex items-center gap-1.5 text-sm text-muted-foreground">{organizations.length}<AltArrowRightIcon size={16} /></span>} />
                             )}
+                            {/* With All businesses, New business is at the foot of that screen instead. */}
+                            {organizations.length <= 2 && <Row label="New business" onClick={() => tasks.open("newbusiness")} right={<span className="text-lg leading-none text-muted-foreground">+</span>} />}
                         </Group>
 
                         {plan && (
