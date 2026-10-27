@@ -119,6 +119,7 @@
     "fumadocs-ui": "^16.10.3",
     "gray-matter": "^4.0.3",
     "ioredis": "5.11.1",
+    "jose": "^6.2.13",
     "js-yaml": "^4.2.0",
     "jspdf": "^4.2.1",
     "jszip": "^3.10.2",
