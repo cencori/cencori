@@ -110,10 +110,7 @@ export default function StudioMoneyPage() {
                         </p>
                     ) : (
                         // No payment provider: customers pay by transfer to the business's own account.
-                        <>
-                            <BankAccountCard account={data.bank_account} />
-                            <button type="button" onClick={() => ask("Help me connect payments so customers can pay by link")} className="mt-2 px-1 text-left text-[13px] text-muted-foreground underline underline-offset-2">Use Paystack or Flutterwave instead, for payment links</button>
-                        </>
+                        <BankAccountCard account={data.bank_account} onUseProvider={() => ask("Help me connect payments so customers can pay by link")} />
                     )}
                     <p className="mt-3 px-1 text-xs leading-5 text-muted-foreground">Counts payments through your assistant, transfers you confirm and orders you mark paid. Sales made elsewhere aren&apos;t included.</p>
                 </>
