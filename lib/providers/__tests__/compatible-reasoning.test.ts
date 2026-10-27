@@ -10,7 +10,7 @@ vi.mock('openai', () => ({
 vi.mock('../pricing', () => ({
     getPricingFromDB: async () => ({ inputPer1KTokens: 0, outputPer1KTokens: 0, cencoriMarkupPercentage: 0 }),
 }));
-import { OpenAICompatibleProvider, openAICompatibleReasoningEffort } from '../openai-compatible';
+import { OpenAICompatibleProvider, openAICompatibleReasoningEffort, upstreamModel } from '../openai-compatible';
 
 beforeEach(() => { create.mockReset(); });
 
@@ -76,5 +76,15 @@ describe('B.AI DeepSeek V4 thinking', () => {
         expect(openAICompatibleReasoningEffort('bai', { model: 'deepseek-v4-flash', reasoningEffort: 'low' })).toBe('low');
         expect(openAICompatibleReasoningEffort('bai', { model: 'deepseek-v4.1-flash' })).toBeUndefined();
         expect(openAICompatibleReasoningEffort('bai', { model: 'glm-5.3-flash', reasoningEffort: 'none' })).toBeUndefined();
+    });
+});
+
+describe('DeepSeek direct model names', () => {
+    it("sends DeepSeek's own name for Flash and leaves everything else as it is", () => {
+        expect(upstreamModel('deepseek', 'deepseek-v4.1-flash')).toBe('deepseek-flash');
+        expect(upstreamModel('deepseek', 'deepseek-v4-flash')).toBe('deepseek-flash');
+        expect(upstreamModel('deepseek', 'deepseek-v4-pro')).toBe('deepseek-v4-pro');
+        expect(upstreamModel('bai', 'deepseek-v4.1-flash')).toBe('deepseek-v4.1-flash');
+        expect(openAICompatibleReasoningEffort('deepseek', { model: 'deepseek-v4.1-flash', reasoningEffort: 'none' })).toBe('none');
     });
 });

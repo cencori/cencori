@@ -14,7 +14,8 @@ export const FALLBACK_CHAINS: Record<string, string[]> = {
     'anthropic': ['openai', 'google', 'groq', 'mistral'],
     'google': ['openai', 'anthropic', 'groq', 'mistral'],
     'xai': ['openai', 'anthropic', 'groq', 'google'],
-    'deepseek': ['openai', 'anthropic', 'groq', 'google'],
+    // DeepSeek's own API first, then the same model on B.AI, then the native providers.
+    'deepseek': ['bai', 'openai', 'anthropic', 'groq', 'google'],
     'mistral': ['openai', 'anthropic', 'groq', 'google'],
     'cohere': ['openai', 'anthropic', 'google'],
     'groq': ['openai', 'anthropic', 'google', 'mistral'],
@@ -92,9 +93,9 @@ export const MODEL_MAPPINGS: Record<string, Record<string, string>> = {
     'deepseek-chat': { 'openai': 'gpt-4o', 'anthropic': 'claude-sonnet-4-5', 'google': 'gemini-2.5-flash' },
     'deepseek-reasoner': { 'openai': 'o1', 'anthropic': 'claude-opus-4-6', 'google': 'gemini-3-deep-think' },
     'deepseek-v4-pro': { 'openai': 'gpt-5', 'anthropic': 'claude-opus-4-5', 'google': 'gemini-3.1-pro-preview' },
-    'deepseek-v4-flash': { 'openai': 'gpt-4o', 'anthropic': 'claude-sonnet-4-5', 'google': 'gemini-2.5-flash' },
+    'deepseek-v4-flash': { 'bai': 'deepseek-v4.1-flash', 'openai': 'gpt-4o', 'anthropic': 'claude-sonnet-4-5', 'google': 'gemini-2.5-flash' },
     'deepseek-v4-flash-vision-exp': { 'openai': 'gpt-4o', 'anthropic': 'claude-sonnet-4-5', 'google': 'gemini-2.5-flash' },
-    'deepseek-v4.1-flash': { 'openai': 'gpt-4o', 'anthropic': 'claude-sonnet-4-5', 'google': 'gemini-2.5-flash' },
+    'deepseek-v4.1-flash': { 'bai': 'deepseek-v4.1-flash', 'openai': 'gpt-4o', 'anthropic': 'claude-sonnet-4-5', 'google': 'gemini-2.5-flash' },
     'qwen3.8-flash': { 'openai': 'gpt-4o-mini', 'anthropic': 'claude-haiku-4-5', 'google': 'gemini-2.5-flash-lite' },
     'glm-5.3-flash': { 'openai': 'gpt-4o-mini', 'anthropic': 'claude-haiku-4-5', 'google': 'gemini-2.5-flash-lite' },
 };

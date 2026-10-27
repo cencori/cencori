@@ -91,13 +91,14 @@ const MODEL_PROVIDER_OVERRIDES: Record<string, string> = {
     // deepseek, qwen → qwen), so each needs an explicit override to the `bai`
     // endpoint that actually serves it. See also: catalog entries in
     // config.ts and OPENAI_COMPATIBLE_ENV_VARS in providers-setup.ts.
-    // Legacy `deepseek-v4-flash` (+ vision-exp) kept for backward compat:
-    // DeepSeek retired those builds on 2026-09-10 and serves V4.1-Flash
-    // behind them.
-    'deepseek-v4-flash': 'bai',
+    // DeepSeek V4.1 Flash (and the legacy `deepseek-v4-flash` id, which DeepSeek
+    // serves V4.1 Flash behind) goes to DeepSeek's own API since 2026-10-28:
+    // first word ~1 s there against ~2-3 s on B.AI, same price. B.AI is its
+    // first fallback (lib/providers/failover.ts). The vision build stays on B.AI.
+    'deepseek-v4-flash': 'deepseek',
     'deepseek-v4-flash-vision-exp': 'bai',
     'glm-5.3-flash': 'bai',
-    'deepseek-v4.1-flash': 'bai',
+    'deepseek-v4.1-flash': 'deepseek',
     'qwen3.8-flash': 'bai',
 };
 

@@ -79,11 +79,15 @@ describe('catalog has no duplicate model ids', () => {
         // provider — `bai` — and route there, otherwise the row strands in the
         // wrong provider filter or 503s on missing pricing.
         const router = new ProviderRouter();
-        for (const id of ['glm-5.3-flash', 'deepseek-v4.1-flash', 'qwen3.8-flash']) {
+        for (const id of ['glm-5.3-flash', 'qwen3.8-flash']) {
             const owners = SUPPORTED_PROVIDERS.filter(p => p.models.some(m => m.id === id)).map(p => p.id);
             expect(owners, id).toEqual(['bai']);
             expect(router.detectProvider(id), id).toBe('bai');
         }
+        // DeepSeek V4.1 Flash moved to DeepSeek's own API on 2026-10-28 (B.AI is its fallback).
+        const flashOwners = SUPPORTED_PROVIDERS.filter(p => p.models.some(m => m.id === 'deepseek-v4.1-flash')).map(p => p.id);
+        expect(flashOwners).toEqual(['deepseek']);
+        expect(router.detectProvider('deepseek-v4.1-flash')).toBe('deepseek');
         // The hidden vendor stays hidden.
         expect(SUPPORTED_PROVIDERS.find(p => p.id === 'zai')!.models).toEqual([]);
     });

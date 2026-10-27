@@ -185,13 +185,26 @@ function readReasoningText(value: unknown): string | undefined {
     return undefined;
 }
 
+/**
+ * The model name a provider's own API expects, when it differs from the
+ * catalog id (which stays the name for pricing, logs and the console).
+ */
+const UPSTREAM_MODEL: Record<string, Record<string, string>> = {
+    // DeepSeek's API calls V4.1 Flash `deepseek-flash` (listed by /models, 2026-10-28).
+    deepseek: { 'deepseek-v4.1-flash': 'deepseek-flash', 'deepseek-v4-flash': 'deepseek-flash' },
+};
+
+export function upstreamModel(providerName: string, model: string): string {
+    return UPSTREAM_MODEL[providerName]?.[model] ?? model;
+}
+
 /** Only providers and model families with a documented effort control receive it. */
 export function openAICompatibleReasoningEffort(
     providerName: string,
     request: Pick<UnifiedChatRequest, 'model' | 'reasoningEffort'>,
 ): OpenAI.ReasoningEffort | undefined {
-    if (providerName === 'bai' && /^deepseek-v4/.test(request.model)) {
-        // B.AI's DeepSeek V4 thinks before every reply unless told not to; 'none'
+    if ((providerName === 'bai' || providerName === 'deepseek') && /^deepseek-v4/.test(request.model)) {
+        // DeepSeek V4 (on B.AI and DeepSeek's own API) thinks before every reply unless told not to; 'none'
         // turns that off (verified 2026-10-27: first word 4.5 s -> 2.1 s on a
         // business prompt). Callers that want speed ask for it; the default stays.
         const effort = request.reasoningEffort;
@@ -312,7 +325,7 @@ export class OpenAICompatibleProvider extends AIProvider {
 
         try {
             const completion = await this.clientFor(transport).chat.completions.create({
-                model: request.model,
+                model: upstreamModel(this.providerName, request.model),
                 messages: toOpenAIMessages(request.messages, {
                     echoReasoning: echoesReasoning(this.providerName),
                 }) as any,
@@ -456,7 +469,7 @@ export class OpenAICompatibleProvider extends AIProvider {
                 })
                 : this.client;
             const stream = await client.chat.completions.create({
-                model: request.model,
+                model: upstreamModel(this.providerName, request.model),
                 messages: toOpenAIMessages(request.messages, {
                     echoReasoning: echoesReasoning(this.providerName),
                 }) as any,

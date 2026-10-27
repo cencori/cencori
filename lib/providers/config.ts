@@ -372,6 +372,7 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         keyPrefix: 'sk-',
         models: [
             // V4 Series (April 2026)
+            { id: 'deepseek-v4.1-flash', name: 'DeepSeek V4.1 Flash', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'Native multimodal MoE flash tier, 1M context, $0.15/$0.60 per 1M off-peak (DeepSeek direct; B.AI fallback)', capabilities: { tools: true, structuredOutput: true }, addedAt: '2026-09-10' },
             { id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: '1.6T total / 49B active params, flagship performance', capabilities: { tools: true, structuredOutput: true }, addedAt: '2026-04-24' },
             // DeepSeek V4 Flash (+ vision-exp) removed 2026-09-10 — the B.AI promo
             // that made them free has ended; see the bai provider block.
@@ -446,7 +447,6 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
         // router override in router.ts, otherwise it 503s / misroutes.
         models: [
             { id: 'glm-5.3-flash', name: 'GLM-5.3 Flash', type: ['chat', 'reasoning'], contextWindow: 1000000, description: 'Fast GLM model, 1M context, economical reasoning, $0.15/$0.50 per 1M', capabilities: { tools: true }, addedAt: '2026-08-26' },
-            { id: 'deepseek-v4.1-flash', name: 'DeepSeek V4.1 Flash', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'Native multimodal MoE flash tier, 1M context, $0.15/$0.60 per 1M off-peak', capabilities: { tools: true, structuredOutput: true }, addedAt: '2026-09-10' },
             { id: 'qwen3.8-flash', name: 'Qwen3.8 Flash', type: ['chat', 'reasoning', 'code'], contextWindow: 1000000, description: 'Fast Qwen flash tier, hybrid reasoning, 1M context, $0.15/$0.47 per 1M', capabilities: { tools: true, structuredOutput: true }, addedAt: '2026-08-26' },
         ],
     },

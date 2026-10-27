@@ -235,6 +235,7 @@ const KB_IDS_TTL_MS = 30_000;
 const kbIdsCache = new Map<string, { ids: string[]; expiresAt: number }>();
 
 export function clearKnowledgeBaseIdsCacheForTests(): void {
+    wholeCache.clear();
     kbIdsCache.clear();
 }
 
@@ -258,6 +259,43 @@ async function turnKnowledgeBaseIds(supabase: Admin, agentId: string | null | un
     return ids;
 }
 
+/**
+ * Small knowledge (a menu, a price list, a page of FAQs: most businesses) goes
+ * to the model whole instead of being searched: no embedding call and no vector
+ * query on the reply's critical path, the model sees everything rather than the
+ * few chunks a search guessed at, and the block is identical every turn, so the
+ * provider's prompt cache serves it. Larger knowledge is searched as before.
+ */
+export const TURN_KNOWLEDGE_WHOLE_MAX_CHUNKS = 16;
+const WHOLE_TTL_MS = 60_000;
+const wholeCache = new Map<string, { result: TurnKnowledge | null; expiresAt: number }>();
+
+/** Every chunk when the bases are small enough to send whole; null when they need searching. */
+async function wholeKnowledge(supabase: Admin, kbIds: string[]): Promise<TurnKnowledge | null> {
+    const key = [...kbIds].sort().join(',');
+    const cached = wholeCache.get(key);
+    if (cached && cached.expiresAt > Date.now()) return cached.result;
+    const { data, error } = await supabase.from('knowledge_chunks')
+        .select('id, source_id, ord, page, content')
+        .in('knowledge_base_id', kbIds)
+        .not('embedding', 'is', null)
+        .order('source_id', { ascending: true })
+        .order('ord', { ascending: true })
+        .limit(TURN_KNOWLEDGE_WHOLE_MAX_CHUNKS + 1);
+    if (error) return null;
+    const chunks = (data ?? []) as Array<{ id: string; source_id: string; ord: number | null; page: number | null; content: string }>;
+    const result: TurnKnowledge | null = chunks.length > TURN_KNOWLEDGE_WHOLE_MAX_CHUNKS ? null : {
+        block: buildKnowledgeBlock(chunks.map((chunk) => chunk.content.slice(0, KNOWLEDGE_CHUNK_SIZE))),
+        citations: chunks.map((chunk) => ({ chunk_id: chunk.id, source_id: chunk.source_id, ord: chunk.ord ?? null, page: chunk.page ?? null, score: 1 })),
+    };
+    wholeCache.set(key, { result, expiresAt: Date.now() + WHOLE_TTL_MS });
+    if (wholeCache.size > 5_000) {
+        const oldest = wholeCache.keys().next().value;
+        if (oldest !== undefined) wholeCache.delete(oldest);
+    }
+    return result;
+}
+
 export async function retrieveTurnKnowledge(
     supabase: Admin,
     opts: { projectId: string; organizationId: string; installationId: string | null; agentId?: string | null; queryText: string },
@@ -268,6 +306,8 @@ export async function retrieveTurnKnowledge(
         const kbIds = await turnKnowledgeBaseIds(supabase, opts.agentId, opts.installationId);
         // Nothing to search: skip the embedding call, which is billed work.
         if (kbIds.length === 0) return empty;
+        const whole = await wholeKnowledge(supabase, kbIds.slice(0, TURN_KNOWLEDGE_MAX_KBS));
+        if (whole) return whole;
         return await searchKnowledgeBases(supabase, { ...opts, knowledgeBaseIds: kbIds });
     } catch {
         return empty;
