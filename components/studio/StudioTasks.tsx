@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
  * signs in there sees everything done from Studio.
  */
 
-export type StudioTask = "knowledge" | "whatsapp" | "golive" | "alerts" | "payments" | "later";
+export type StudioTask = "knowledge" | "whatsapp" | "golive" | "alerts" | "payments" | "plans" | "later";
 
 const TasksContext = createContext<{ open: (task: StudioTask) => void } | null>(null);
 
@@ -58,6 +58,7 @@ const TITLES: Record<StudioTask, string> = {
     golive: "Go live",
     alerts: "Get told when someone needs you",
     payments: "Get paid by link",
+    plans: "Choose a plan",
     later: "Coming to Studio soon",
 };
 
@@ -68,6 +69,19 @@ export function StudioTasksProvider({ children }: { children: ReactNode }) {
     const { project, agents } = useStudio();
     const queryClient = useQueryClient();
     const finishing = useRef(false);
+
+    // Back from paying for a plan (Bachs returns here with ?plan=paid). The plan
+    // itself switches on when Bachs tells us (the billing webhook), moments later.
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get("plan") !== "paid") return;
+        window.history.replaceState(null, "", window.location.pathname);
+        setNotice("Payment received. Your plan is on: thank you!");
+        const refresh = () => void queryClient.invalidateQueries();
+        refresh();
+        const later = window.setTimeout(refresh, 5000);
+        return () => window.clearTimeout(later);
+    }, [queryClient]);
 
     // Back from connecting WhatsApp (Kapso returns here with ?whatsapp=…).
     useEffect(() => {
@@ -119,8 +133,9 @@ export function StudioTasksProvider({ children }: { children: ReactNode }) {
 }
 
 function TaskBody({ task, onDone }: { task: StudioTask; onDone: () => void }) {
-    const { project, agents, user } = useStudio();
+    const { project, agents, user, organization } = useStudio();
     const agentId = agents[0]?.id ?? null;
+    if (task === "plans") return <PlansTask organizationId={organization.id} />;
     if (task === "later") {
         return (
             <>
@@ -347,6 +362,58 @@ function PaymentsTask({ projectId, onDone }: { projectId: string; onDone: () => 
             {chosen?.key_help && <p className="mt-2 text-[13px] leading-5 text-muted-foreground">{chosen.key_help}</p>}
             <ErrorLine error={error} />
             <Primary busy={busy} disabled={!key.trim()} onClick={() => void save()}>Connect</Primary>
+        </>
+    );
+}
+
+interface BusinessPlanOption { id: string; name: string; price_ngn: number; conversations: number; agents: number; all_models: boolean }
+
+/** Starter, Growth or Business: a 30-day pass, paid through Bachs, back to Studio after. */
+function PlansTask({ organizationId }: { organizationId: string }) {
+    const [data, setData] = useState<{ plan: { id: string } | null; active: boolean; plans: BusinessPlanOption[] } | null>(null);
+    const [busy, setBusy] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    useEffect(() => {
+        send<NonNullable<typeof data>>(`/api/billing/business?orgId=${organizationId}`, "GET")
+            .then(setData)
+            .catch((cause) => setError(cause instanceof Error ? cause.message : "Couldn't load the plans."));
+    }, [organizationId]);
+    const choose = async (plan: string) => {
+        setBusy(plan);
+        setError(null);
+        try {
+            const { url } = await send<{ url: string }>("/api/billing/business", "POST", { orgId: organizationId, action: "checkout", plan });
+            window.location.assign(url);
+        } catch (cause) {
+            setError(cause instanceof Error ? cause.message : "Couldn't open checkout.");
+            setBusy(null);
+        }
+    };
+    const naira = (amount: number) => `₦${amount.toLocaleString("en-NG")}`;
+    return (
+        <>
+            <p className="text-[15px] leading-6 text-muted-foreground">Each plan runs for 30 days. Pay by card, bank transfer or USSD. Paying early keeps the days you have left.</p>
+            {!data && !error && <div className="mt-5 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>}
+            <div className="mt-4 flex flex-col gap-2.5">
+                {data?.plans.map((option) => {
+                    const current = data.active && data.plan?.id === option.id;
+                    return (
+                        <div key={option.id} className={cn("rounded-2xl border px-4 py-3.5", current ? "border-foreground" : "border-border/60")}>
+                            <div className="flex items-baseline justify-between gap-3">
+                                <span className="text-[15px] font-semibold">{option.name}</span>
+                                <span className="text-[15px] font-semibold">{naira(option.price_ngn)}<span className="text-xs font-normal text-muted-foreground"> / 30 days</span></span>
+                            </div>
+                            <p className="mt-1 text-[13px] leading-5 text-muted-foreground">
+                                {option.conversations.toLocaleString("en-NG")} customer chats · {option.agents} {option.agents === 1 ? "assistant" : "assistants"}{option.all_models ? " · every AI model" : ""}
+                            </p>
+                            <button type="button" disabled={busy !== null} onClick={() => void choose(option.id)} className={cn("mt-3 flex h-10 w-full items-center justify-center gap-2 rounded-full text-sm font-semibold disabled:opacity-60", current ? "border border-border/60" : "bg-foreground text-background")}>
+                                {busy === option.id && <Loader2 className="h-4 w-4 animate-spin" />}{current ? "Pay for another 30 days" : `Choose ${option.name}`}
+                            </button>
+                        </div>
+                    );
+                })}
+            </div>
+            <ErrorLine error={error} />
         </>
     );
 }

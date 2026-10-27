@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { cn } from "@/lib/utils";
 import { StudioLoadError } from "@/components/studio/studio-data";
 import { StudioLink } from "@/components/studio/studio-nav";
 import { useRouter } from "next/navigation";
@@ -55,6 +56,25 @@ export default function StudioHomePage() {
                 </div>
                 {setUp && <StudioNotificationBell className="size-10" />}
             </div>
+
+            {/* The trial's last days, or a plan that has run out: say so, with the way to pay. */}
+            {setUp && data?.plan && (() => {
+                const plan = data.plan;
+                const daysLeft = plan.period_end ? Math.ceil((Date.parse(plan.period_end) - Date.now()) / 86_400_000) : null;
+                const ending = plan.active && plan.name === "Free trial" && daysLeft !== null && daysLeft <= 3;
+                if (plan.active && !ending) return null;
+                return (
+                    <div className={cn("mt-5 rounded-2xl px-4 py-3.5", plan.active ? "bg-amber-50 text-amber-900 dark:bg-amber-500/10 dark:text-amber-200" : "bg-destructive/10 text-destructive")}>
+                        <p className="text-[15px] font-semibold">
+                            {plan.active ? (daysLeft! <= 1 ? "Your free trial ends today" : `Your free trial ends in ${daysLeft} days`) : `Your ${plan.name.toLowerCase()} has ended`}
+                        </p>
+                        <p className="mt-0.5 text-[13px] leading-5 opacity-90">
+                            {plan.active ? "Choose a plan so your assistant keeps answering customers." : "Your assistant isn't starting new chats. Choose a plan to switch it back on."}
+                        </p>
+                        <button type="button" onClick={() => tasks.open("plans")} className="mt-3 h-10 rounded-full bg-foreground px-5 text-sm font-semibold text-background">Choose a plan</button>
+                    </div>
+                );
+            })()}
 
             {!setUp ? (
                 <div className="my-auto flex min-h-[26rem] flex-col items-center justify-center rounded-3xl bg-foreground p-6 text-center text-background">

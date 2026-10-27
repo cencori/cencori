@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useStudioTasks } from "@/components/studio/StudioTasks";
 import { useStudioOverview } from "@/components/studio/useStudioOverview";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -106,6 +107,7 @@ export function StudioProfile({ className }: { className?: string }) {
     const { user, organization, organizations } = useStudio();
     // The business's plan and how much of it is used (moved here from Home).
     const plan = useStudioOverview().data?.plan ?? null;
+    const tasks = useStudioTasks();
     const push = useStudioPush();
     const [open, setOpen] = useState(false);
     // The sheet's screens: the profile itself, or one setting opened from it.
@@ -295,6 +297,9 @@ export function StudioProfile({ className }: { className?: string }) {
                                     <p className="mt-2 text-[13px] text-muted-foreground">
                                         {plan.active ? `${plan.used} of ${plan.conversations} chats used` : "Your plan has ended. Your assistant isn't starting new chats."}
                                     </p>
+                                    <button type="button" onClick={() => tasks.open("plans")} className={cn("mt-3 h-10 w-full rounded-full text-sm font-semibold", plan.name === "Free trial" || !plan.active ? "bg-foreground text-background" : "border border-border/60")}>
+                                        {plan.name === "Free trial" || !plan.active ? "Choose a plan" : "Change or renew"}
+                                    </button>
                                 </div>
                             </Group>
                         )}

@@ -25,10 +25,21 @@ function isIosBrowser(): boolean {
     return ios && !standalone;
 }
 
-/** Registers Studio's service worker once, on any page. */
+/**
+ * Registers Studio's service worker once, on any page. Not in development: it
+ * keeps the app's code for opening offline, and the dev server changes that code
+ * under the same file names, so a kept copy would run old code (a screen that
+ * never loads). Any worker left from before is removed there, with what it kept.
+ */
 export function useStudioServiceWorker() {
     useEffect(() => {
-        if ("serviceWorker" in navigator) void navigator.serviceWorker.register("/studio-sw.js").catch(() => undefined);
+        if (!("serviceWorker" in navigator)) return;
+        if (process.env.NODE_ENV !== "production") {
+            void navigator.serviceWorker.getRegistrations().then((registrations) => registrations.forEach((registration) => void registration.unregister())).catch(() => undefined);
+            void globalThis.caches?.keys().then((names) => names.filter((name) => name.startsWith("studio-")).forEach((name) => void caches.delete(name))).catch(() => undefined);
+            return;
+        }
+        void navigator.serviceWorker.register("/studio-sw.js").catch(() => undefined);
     }, []);
 }
 

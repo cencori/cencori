@@ -12,6 +12,7 @@ import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { createServerClient } from "@/lib/supabaseServer";
 import { resolveConsoleBaseUrl } from "@/lib/auth-redirect";
+import { isStudioHostname } from "@/lib/studio/routing";
 import { createCheckoutSession, getBusinessPassProductId } from "@/lib/bachsClient";
 import {
     BUSINESS_PLANS,
@@ -87,14 +88,18 @@ export async function POST(req: NextRequest) {
         const plan = body.plan as PaidBusinessPlanId;
         if (!PAID_BUSINESS_PLANS.includes(plan)) return fail("Choose Starter, Growth or Business.");
         const { data: organization } = await db.from("organizations").select("name, billing_email").eq("id", organizationId).maybeSingle();
+        // Bought from Studio (studio.cencori.com): back to Studio, which says the plan is on.
+        const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? req.nextUrl.host;
+        const fromStudio = isStudioHostname(host);
+        const studio = fromStudio ? `${req.nextUrl.protocol}//${host}` : null;
         const base = resolveConsoleBaseUrl(req.nextUrl.origin);
         try {
             const session = await createCheckoutSession({
                 product_cart: [{ product_id: getBusinessPassProductId(plan), quantity: 1 }],
                 customer: { email: (organization?.billing_email as string | null) || user.email, name: (organization?.name as string | null) || user.email.split("@")[0] },
                 billing_currency: "NGN",
-                success_url: `${base}/billing?business=paid`,
-                cancel_url: `${base}/billing`,
+                success_url: studio ? `${studio}/?plan=paid` : `${base}/billing?business=paid`,
+                cancel_url: studio ? `${studio}/` : `${base}/billing`,
                 reference: `biz_${organizationId.replace(/-/g, "").slice(0, 16)}_${plan}_${Date.now().toString(36)}`,
                 metadata: { org_id: organizationId, purchase_type: "business_pass", business_plan: plan },
             });
