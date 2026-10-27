@@ -8,7 +8,6 @@ import DashboardCircleIcon from "@hugeicons/core-free-icons/DashboardCircleIcon"
 import UserSettings01Icon from "@hugeicons/core-free-icons/UserSettings01Icon";
 import LeftToRightListDashIcon from "@hugeicons/core-free-icons/LeftToRightListDashIcon";
 import UserMultipleIcon from "@hugeicons/core-free-icons/UserMultipleIcon";
-import Store01Icon from "@hugeicons/core-free-icons/Store01Icon";
 import Settings02Icon from "@hugeicons/core-free-icons/Settings02Icon";
 import Folder02Icon from "@hugeicons/core-free-icons/Folder02Icon";
 import Wrench01Icon from "@hugeicons/core-free-icons/Wrench01Icon";
@@ -30,7 +29,6 @@ export function AgentSubnav() {
         { href: `${agentHref}/tools`, label: "Tools", icon: Wrench01Icon },
         { href: `${agentHref}/runs`, label: "Runs", icon: LeftToRightListDashIcon },
         { href: `${agentHref}/customers`, label: "Customers", icon: UserMultipleIcon },
-        { href: `${agentHref}/marketplace`, label: "Marketplace", icon: Store01Icon },
         { href: `${agentHref}/settings`, label: "Settings", icon: Settings02Icon },
     ];
 

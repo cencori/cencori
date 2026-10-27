@@ -83,7 +83,7 @@ type ProviderState =
 
 /**
  * One agent's editing session, shared by all of its sections (Overview, Agent,
- * Runs, Customers, Marketplace) and the docked test panel. Lives in the agent's
+ * Runs, Customers) and the docked test panel. Lives in the agent's
  * layout, so moving between sections keeps unsaved edits and the test chat.
  */
 export function AgentWorkspaceProvider({
