@@ -278,7 +278,12 @@ function flattenModels(): FlatModel[] {
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
-export function ModelCatalog() {
+/**
+ * `inConsole`: inside the dashboard. On phones there the filter bar scrolls
+ * with the page: stacked, it would pin most of the screen, and the sticky
+ * offset (sized for the marketing nav) left a gap under the profile bar.
+ */
+export function ModelCatalog({ inConsole = false }: { inConsole?: boolean } = {}) {
     const allModels = useMemo(flattenModels, []);
 
     const [search, setSearch] = useState("");
@@ -429,7 +434,7 @@ export function ModelCatalog() {
     return (
         <div className="space-y-5">
             {/* Sticky filter bar: pins below the fixed nav while the table scrolls */}
-            <div className="sticky top-20 z-30 -mx-4 border-b border-border/20 bg-background/85 px-4 py-3 backdrop-blur-xl">
+            <div className={cn("sticky top-20 z-30 -mx-4 border-b border-border/20 bg-background/85 px-4 py-3 backdrop-blur-xl", inConsole && "max-lg:static")}>
             <div className="flex flex-col gap-3">
                 {/* Filters: search, type tags and dropdowns on one line */}
                 <div className="flex flex-col xl:flex-row xl:items-center gap-3">

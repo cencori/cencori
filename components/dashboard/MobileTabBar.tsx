@@ -15,8 +15,10 @@ interface MobileTabBarProps {
     /**
      * "bottom": floating at the foot of the screen. "top": in the flow under
      * the profile bar, for pages whose composer owns the bottom (the playground).
+     * "header": at the end of a full-screen workspace's action bar, compact,
+     * with search as a circle so the page's own actions fit beside it.
      */
-    position?: "bottom" | "top";
+    position?: "bottom" | "top" | "header";
 }
 
 // Every round button in the pill sits in its own outlined circle.
@@ -62,7 +64,9 @@ export function MobileTabBar({ onCopilot, onSearch, onMenu, menuOpen = false, po
                 // (Find keeps its minimum width).
                 position === "bottom"
                     ? "fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 p-1.5 shadow-lg shadow-black/20"
-                    : "relative mx-auto mt-3 w-fit shrink-0 p-1 [&_button]:h-8 [&_button]:w-8 [&_svg]:size-3.5",
+                    : position === "top"
+                        ? "relative mx-auto mt-3 w-fit shrink-0 p-1 [&_button]:h-8 [&_button]:w-8 [&_svg]:size-3.5"
+                        : "relative ml-auto shrink-0 p-[3px] [&_button]:h-7 [&_button]:w-7 [&_svg]:size-3.5",
                 menuOpen ? "z-[60]" : "z-40",
             )}
         >
@@ -77,15 +81,21 @@ export function MobileTabBar({ onCopilot, onSearch, onMenu, menuOpen = false, po
                     <HugeiconsIcon icon={AirdropIcon} className="h-4 w-4" />
                 </button>
             )}
-            <button
-                type="button"
-                onClick={onSearch}
-                className="flex h-10 min-w-32 cursor-pointer items-center gap-2 rounded-full bg-secondary/60 px-4 text-sm text-muted-foreground transition-[background-color,transform] hover:bg-secondary active:scale-[0.98]"
-                aria-label="Search"
-            >
-                <Search className="h-4 w-4" />
-                Find
-            </button>
+            {position === "header" ? (
+                <button type="button" onClick={onSearch} className={circle} aria-label="Search">
+                    <Search className="h-4 w-4" />
+                </button>
+            ) : (
+                <button
+                    type="button"
+                    onClick={onSearch}
+                    className="flex h-10 min-w-32 cursor-pointer items-center gap-2 rounded-full bg-secondary/60 px-4 text-sm text-muted-foreground transition-[background-color,transform] hover:bg-secondary active:scale-[0.98]"
+                    aria-label="Search"
+                >
+                    <Search className="h-4 w-4" />
+                    Find
+                </button>
+            )}
             <div id={TAB_BAR_END_SLOT_ID} className="flex items-center gap-1 empty:hidden" />
             <button
                 type="button"

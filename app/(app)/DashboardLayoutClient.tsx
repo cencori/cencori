@@ -10,7 +10,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import AirdropIcon from "@hugeicons/core-free-icons/AirdropIcon";
 import { CopilotContext } from "@/lib/contexts/CopilotContext";
-import { CreditCard, Menu, Search } from "lucide-react";
+import { CreditCard } from "lucide-react";
 import { MobileTabBar } from "@/components/dashboard/MobileTabBar";
 import { formatCurrency } from "@/lib/currency";
 import {
@@ -429,10 +429,12 @@ function LayoutContent({ user, avatar, name, children, initialAgentOpen, initial
       <header className={cn(
         "fixed top-[var(--maintenance-banner-height,0px)] left-0 right-0 z-50 h-12 border-b border-border/30 bg-background px-4 md:px-6 flex items-center justify-between font-mono",
         hasMobileTabBar && "max-lg:hidden",
+        // Phones, full-screen workspaces: under the profile bar (45px), not above it.
+        !hasMobileTabBar && "max-lg:top-[calc(var(--maintenance-banner-height,0px)+45px)] max-lg:justify-start max-lg:gap-2",
         agentOpen && !isCopilotPage && "lg:right-[520px]",
         hasDesktopSidebar && "lg:left-64",
       )}>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 max-lg:hidden">
           {/* Breadcrumbs - hidden on mobile */}
           <Breadcrumb className="hidden lg:flex">
             <BreadcrumbList>
@@ -462,11 +464,13 @@ function LayoutContent({ user, avatar, name, children, initialAgentOpen, initial
             </BreadcrumbList>
           </Breadcrumb>
         </div>
-        <div className="flex items-center gap-2">
+        {/* Phones: these sit straight in the bar, the page's actions far left and
+            the pill far right. */}
+        <div className="flex items-center gap-2 max-lg:contents">
           {/* Filled by the full-screen Copilot page (new chat, exit full screen). */}
-          {isCopilotPage && <div id={COPILOT_HEADER_ACTIONS_SLOT_ID} className="flex items-center gap-1 font-sans" />}
+          {isCopilotPage && <div id={COPILOT_HEADER_ACTIONS_SLOT_ID} className="flex items-center gap-1 font-sans max-lg:mr-auto" />}
           {/* Filled by an agent's pages: Test, Save, Publish. */}
-          {isAgentWorkspace && <div id={AGENT_HEADER_ACTIONS_SLOT_ID} className="flex items-center gap-2 font-sans" />}
+          {isAgentWorkspace && <div id={AGENT_HEADER_ACTIONS_SLOT_ID} className="flex items-center gap-2 font-sans max-lg:mr-auto" />}
           {orgSlug && isProjectSettingsPage && (
             <Link
               href={isCanonicalConsoleRoute ? "/organization/settings" : `/${orgSlug}/~/settings`}
@@ -508,7 +512,7 @@ function LayoutContent({ user, avatar, name, children, initialAgentOpen, initial
                 <button
                   type="button"
                   onClick={() => setAgentOpen(true)}
-                  className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-border/60 bg-background text-foreground transition-[background-color,border-color,transform] hover:border-border hover:bg-secondary/70 active:scale-[0.98] lg:h-6 lg:w-6"
+                  className="hidden h-6 w-6 cursor-pointer items-center justify-center rounded-full border border-border/60 bg-background text-foreground transition-[background-color,border-color,transform] hover:border-border hover:bg-secondary/70 active:scale-[0.98] lg:flex"
                   aria-label="Open Copilot"
                 >
                   <HugeiconsIcon icon={AirdropIcon} className="h-3.5 w-3.5" />
@@ -518,33 +522,27 @@ function LayoutContent({ user, avatar, name, children, initialAgentOpen, initial
             </Tooltip>
           )}
 
-          {/* Search Button — mobile only (desktop lives in the sidebar footer) */}
-          <button
-            type="button"
-            className="w-8 h-8 flex lg:hidden items-center justify-center gap-2 text-[11px] text-muted-foreground rounded-full bg-secondary/60 hover:bg-secondary transition-colors cursor-pointer"
-            onClick={() => setCommandPaletteOpen(true)}
-            aria-label="Search"
-          >
-            <Search className="h-4 w-4" />
-          </button>
-
-          {/* Hamburger Menu - visible on mobile only */}
-          <button
-            type="button"
-            onClick={toggle}
-            className="w-8 h-8 flex lg:hidden items-center justify-center rounded-md bg-secondary/60 hover:bg-secondary transition-colors cursor-pointer"
-            aria-label="Open navigation menu"
-          >
-            <Menu className="h-4 w-4 text-muted-foreground" />
-          </button>
-
+          {/* Phones: the same pill as everywhere else, compact, at the far right. */}
+          <MobileTabBar
+            position="header"
+            onCopilot={!agentOpen && !isCopilotPage ? () => {
+              setMobileSheetOpen(false);
+              setAgentOpen(true);
+            } : undefined}
+            onSearch={() => {
+              setMobileSheetOpen(false);
+              setCommandPaletteOpen(true);
+            }}
+            onMenu={toggle}
+            menuOpen={mobileSheetOpen}
+          />
         </div>
       </header>
       )}
 
       {/* Mobile Navigation Bar - only visible on mobile screens */}
       {!isOnboardingFlow && (
-        <MobileNav onMenuClick={toggle} projectSlug={projectSlug} user={user} avatar={displayAvatar} placement={!isFixedWorkspace ? "sticky" : hasMobileTabBar ? "inline" : "belowHeader"} />
+        <MobileNav onMenuClick={toggle} projectSlug={projectSlug} user={user} avatar={displayAvatar} placement={!isFixedWorkspace ? "sticky" : hasMobileTabBar ? "inline" : "aboveHeader"} />
       )}
       {!isOnboardingFlow && hasMobileTabBar && (
         <MobileTabBar
