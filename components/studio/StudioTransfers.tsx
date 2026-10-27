@@ -88,8 +88,11 @@ export function TransfersToConfirm({ transfers }: { transfers: TransferToConfirm
     );
 }
 
-/** The account customers transfer to: shown with Edit, or a prompt to add it. */
-export function BankAccountCard({ account }: { account: BankAccount | null }) {
+/**
+ * The account customers transfer to: shown with Edit, or a prompt to add it
+ * (with the other way to get paid, a payment provider, beside it).
+ */
+export function BankAccountCard({ account, onUseProvider }: { account: BankAccount | null; onUseProvider?: () => void }) {
     const [open, setOpen] = useState(false);
     return (
         <>
@@ -113,6 +116,9 @@ export function BankAccountCard({ account }: { account: BankAccount | null }) {
                         </span>
                     </div>
                     <button type="button" onClick={() => setOpen(true)} className="mt-3 h-11 w-full rounded-full bg-foreground text-sm font-semibold text-background">Add your account</button>
+                    {onUseProvider && (
+                        <button type="button" onClick={onUseProvider} className="mt-2 h-11 w-full rounded-full border border-border/60 text-sm font-semibold">Use a payment provider</button>
+                    )}
                 </section>
             )}
             <BankAccountSheet account={account} open={open} onOpenChange={setOpen} />

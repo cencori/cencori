@@ -8,10 +8,10 @@ import { ChevronRight } from "lucide-react";
 import { UserRoundedIcon } from "@solar-icons/react/bold-duotone/user-rounded";
 import { useStudio } from "@/components/studio/StudioShell";
 import { useStudioCopilot } from "@/components/studio/StudioCopilot";
-import { formatMoney, joinWords, liveChannels, setupSteps, useStudioOverview } from "@/components/studio/useStudioOverview";
-import { shortTime, useInbox } from "@/components/studio/useInbox";
+import { formatMoney, setupSteps, useStudioOverview } from "@/components/studio/useStudioOverview";
 import { StudioNotificationsCard } from "@/components/studio/StudioNotifications";
 import { StudioProfile } from "@/components/studio/StudioProfile";
+import { StudioNotificationBell } from "@/components/studio/StudioNotificationBell";
 import { Skeleton } from "@/components/ui/skeleton";
 
 function greeting(): string {
@@ -24,11 +24,7 @@ export default function StudioHomePage() {
     const { user, organization, agents } = useStudio();
     const { ask } = useStudioCopilot();
     const overview = useStudioOverview();
-    // Chats waiting on the owner: the assistant handed them over, or the owner is mid-reply.
-    const inbox = useInbox(null);
-    const waiting = (inbox.data?.conversations ?? []).filter((conversation) => conversation.needs_owner || conversation.owner_active);
     const data = overview.data;
-    const live = liveChannels(data?.assistant ?? null);
     const steps = setupSteps(data?.assistant?.still_to_do ?? []);
     const router = useRouter();
 
@@ -45,12 +41,13 @@ export default function StudioHomePage() {
         <div className={agents.length === 0 ? "flex min-h-[calc(100svh-11.25rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] flex-col" : undefined}>
             <div className="flex items-center gap-3">
                 <StudioProfile className="size-10" />
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                     <p className="truncate text-xs text-muted-foreground">{organization.name}</p>
                     <h1 className="text-xl font-semibold leading-tight tracking-tight">
                         {greeting()}{user.firstName ? `, ${user.firstName}` : ""}
                     </h1>
                 </div>
+                {agents.length > 0 && <StudioNotificationBell className="size-10" />}
             </div>
 
             {agents.length === 0 ? (
@@ -70,43 +67,9 @@ export default function StudioHomePage() {
                 <StudioLoadError error={overview.error} fallback="Couldn't load your business." onRetry={() => void overview.refetch()} />
             ) : (
                 <>
-                    <StudioLink href="/assistant" className="mt-4 flex items-center gap-2 text-[13px] text-muted-foreground">
-                        <span className={live.length ? "h-2 w-2 rounded-full bg-emerald-500" : "h-2 w-2 rounded-full bg-amber-500"} />
-                        {live.length
-                            ? <span><span className="font-medium text-foreground">Live</span> on {joinWords(live)}</span>
-                            : <span><span className="font-medium text-foreground">Not live yet.</span> Finish setting up below.</span>}
-                    </StudioLink>
-
                     <StudioNotificationsCard />
 
-                    {waiting.length > 0 && (
-                        <section className="mt-4">
-                            <div className="mb-2 flex items-baseline justify-between">
-                                <h2 className="text-[15px] font-semibold">Needs you</h2>
-                                <StudioLink href="/inbox" className="text-[13px] text-muted-foreground">See all</StudioLink>
-                            </div>
-                            <ul className="overflow-hidden rounded-2xl border border-orange-200 bg-orange-50/60 dark:border-orange-500/20 dark:bg-orange-500/5">
-                                {waiting.slice(0, 3).map((conversation) => (
-                                    <li key={conversation.id} className="border-b border-orange-200 last:border-0 dark:border-orange-500/20">
-                                        <StudioLink href={`/inbox/${conversation.id}`} className="flex gap-3 px-4 py-3">
-                                            <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-orange-600" />
-                                            <span className="min-w-0 flex-1">
-                                                <span className="flex items-baseline justify-between gap-2">
-                                                    <span className="truncate text-[15px] font-semibold">{conversation.name}</span>
-                                                    <span className="shrink-0 text-xs text-muted-foreground">{shortTime(conversation.needs_owner?.at ?? conversation.updated_at)}</span>
-                                                </span>
-                                                <span className="mt-0.5 block line-clamp-2 text-[13px] leading-5 text-foreground/80">
-                                                    {conversation.owner_active ? "You're replying in this chat." : conversation.needs_owner?.reason}
-                                                </span>
-                                            </span>
-                                        </StudioLink>
-                                    </li>
-                                ))}
-                            </ul>
-                        </section>
-                    )}
-
-                    <div className="mt-4 rounded-3xl bg-foreground p-5 text-background">
+                    <div className="mt-5 rounded-2xl bg-foreground p-5 text-background">
                         {data?.payments_connected && data.today.earned ? (
                             <>
                                 <p className="text-[13px] opacity-70">Earned today</p>
