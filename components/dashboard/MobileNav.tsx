@@ -9,18 +9,29 @@ import {
 import { ChevronsUpDown } from "lucide-react";
 import { UserMenu } from "@/components/dashboard/UserMenu";
 import { ProjectSwitcherMenuContent } from "@/components/dashboard/ProjectSwitcherMenu";
-import { getConsoleRoute } from "@/lib/console/routing";
+import { getCanonicalConsoleRedirect, getConsoleRoute } from "@/lib/console/routing";
+
+// Pages whose title sits in the centre of this bar on phones (they drop
+// their own heading there), by their flat console path.
+const BAR_TITLES: Record<string, string> = {
+    "/ai-gateway/logs": "Logs",
+    "/ai-gateway/playground": "Playground",
+};
 
 interface MobileNavProps {
     onMenuClick: () => void;
     projectSlug?: string | null;
     user?: { email?: string | null };
     avatar?: string | null;
-    /** True when the fixed top bar shows on phones too, so this bar sits under it. */
-    belowHeader?: boolean;
+    /**
+     * "sticky": pinned to the top as the page scrolls. Full-screen workspaces
+     * don't scroll, so there it sits in the flow ("inline"), or under the
+     * fixed top bar when that shows on phones too ("belowHeader").
+     */
+    placement?: "sticky" | "inline" | "belowHeader";
 }
 
-export function MobileNav({ projectSlug, belowHeader = false }: MobileNavProps) {
+export function MobileNav({ projectSlug, placement = "sticky" }: MobileNavProps) {
     const pathname = usePathname();
     const {
         organizations,
@@ -50,10 +61,15 @@ export function MobileNav({ projectSlug, belowHeader = false }: MobileNavProps) 
 
     // Get available orgs and projects for dropdowns
     const availableProjects = projects.filter((proj) => proj.orgSlug === orgSlug);
+    // The same page under /{org}/{project}/… reads as its flat path.
+    const title = BAR_TITLES[consoleRoute?.canonicalPath ?? getCanonicalConsoleRedirect(pathname)?.canonicalPath ?? ""];
 
     return (
-        <div className={`sticky ${belowHeader ? "top-[calc(3rem+var(--maintenance-banner-height,0px))]" : "top-[var(--maintenance-banner-height,0px)]"} z-50 lg:hidden border-b border-border/40 bg-background`}>
-            <div className="flex items-center gap-1 px-4 py-2 overflow-x-auto scrollbar-hide">
+        // In a full-screen workspace it takes its place in the flow, pushing the
+        // workspace down instead of floating over it (sticky there would add
+        // the banner's height twice).
+        <div className={`${placement === "sticky" ? "sticky top-[var(--maintenance-banner-height,0px)]" : `relative shrink-0 ${placement === "belowHeader" ? "mt-12" : ""}`} z-50 lg:hidden border-b border-border/40 bg-background`}>
+            <div className="relative flex items-center gap-1 px-4 py-2 overflow-x-auto scrollbar-hide">
                 {/* Project selector dropdown */}
                 {resolvedProjectSlug && (
                     <DropdownMenu>
@@ -63,7 +79,8 @@ export function MobileNav({ projectSlug, belowHeader = false }: MobileNavProps) 
                                     className="flex h-7 shrink-0 items-center rounded-full border border-border bg-secondary/50 text-xs font-medium text-foreground transition-colors hover:bg-secondary"
                                     aria-label="Switch project"
                                 >
-                                    <span className="max-w-40 truncate pl-3 pr-2">{currentProject?.name || resolvedProjectSlug}</span>
+                                    {/* Shorter beside a centred title, so the two never meet. */}
+                                    <span className={`${title ? "max-w-20" : "max-w-40"} truncate pl-3 pr-2`}>{currentProject?.name || resolvedProjectSlug}</span>
                                     <span aria-hidden="true" className="h-3.5 w-px bg-border" />
                                     <ChevronsUpDown className="mx-2 h-3 w-3 text-muted-foreground" />
                                 </button>
@@ -75,6 +92,10 @@ export function MobileNav({ projectSlug, belowHeader = false }: MobileNavProps) 
                                 consoleMode={Boolean(consoleRoute)}
                             />
                     </DropdownMenu>
+                )}
+
+                {title && (
+                    <h1 className="pointer-events-none absolute left-1/2 -translate-x-1/2 text-sm font-medium">{title}</h1>
                 )}
 
                 {/* Spacer */}

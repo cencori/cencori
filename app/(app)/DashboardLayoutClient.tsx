@@ -302,8 +302,10 @@ function LayoutContent({ user, avatar, name, children, initialAgentOpen, initial
   const isMemoryGraph = /\/memory\/graph\/?$/.test(pathname);
   const isFixedWorkspace = isPlayground || isAgentWorkspace || isMemoryGraph || isCopilotPage;
   // Phones get a bottom tab bar instead of the top bar, except in full-screen
-  // workspaces, which put their own actions in the top bar and a composer at the bottom.
-  const hasMobileTabBar = !isFixedWorkspace;
+  // workspaces, which put their own actions in the top bar and a composer at
+  // the bottom. The playground has no top-bar actions, so it keeps the pill,
+  // under the profile bar instead of over its composer.
+  const hasMobileTabBar = !isFixedWorkspace || isPlayground;
   const isOnboardingFlow = pathname.includes("/onboarding");
   // Project settings (every tab) swaps the header's credits + Copilot buttons
   // for a single way out to organization settings.
@@ -542,7 +544,7 @@ function LayoutContent({ user, avatar, name, children, initialAgentOpen, initial
 
       {/* Mobile Navigation Bar - only visible on mobile screens */}
       {!isOnboardingFlow && (
-        <MobileNav onMenuClick={toggle} projectSlug={projectSlug} user={user} avatar={displayAvatar} belowHeader={!hasMobileTabBar} />
+        <MobileNav onMenuClick={toggle} projectSlug={projectSlug} user={user} avatar={displayAvatar} placement={!isFixedWorkspace ? "sticky" : hasMobileTabBar ? "inline" : "belowHeader"} />
       )}
       {!isOnboardingFlow && hasMobileTabBar && (
         <MobileTabBar
@@ -558,6 +560,7 @@ function LayoutContent({ user, avatar, name, children, initialAgentOpen, initial
           }}
           onMenu={toggle}
           menuOpen={mobileSheetOpen}
+          position={isPlayground ? "top" : "bottom"}
         />
       )}
 

@@ -120,105 +120,102 @@ export default function RequestLogsPage({ params }: PageProps) {
 
     return (
         <div className="w-full max-w-[1360px] mx-auto px-0 sm:px-6 pt-0 pb-8 sm:pt-8">
-            <div className="mb-6">
-                <h1 className="text-base font-medium">Logs</h1>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                    View and monitor all AI requests for this project.
-                </p>
-            </div>
-
             <div className="min-w-0">
-                <div data-copilot-spot="logs_filters" className="flex flex-wrap items-center gap-3 mb-4">
-                    <Select
-                        value={aiFilters.status}
-                        onValueChange={(value) => setAiFilters((prev) => ({ ...prev, status: value }))}
-                    >
-                        <SelectTrigger className="w-[130px] h-7 text-xs shadow-none dark:shadow-xs">
-                            <SelectValue placeholder="All statuses" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all" className="text-xs">All statuses</SelectItem>
-                            <SelectItem value="success" className="text-xs">Success</SelectItem>
-                            <SelectItem value="success_fallback" className="text-xs">Fallback Used</SelectItem>
-                            <SelectItem value="filtered" className="text-xs">Filtered</SelectItem>
-                            <SelectItem value="blocked_output" className="text-xs">Blocked</SelectItem>
-                            <SelectItem value="error" className="text-xs">Error</SelectItem>
-                            <SelectItem value="rate_limited" className="text-xs">Rate Limited</SelectItem>
-                        </SelectContent>
-                    </Select>
-
-                    <Select
-                        value={aiFilters.model}
-                        onValueChange={(value) => setAiFilters((prev) => ({ ...prev, model: value }))}
-                    >
-                        <SelectTrigger className="w-[150px] h-7 text-xs shadow-none dark:shadow-xs">
-                            <SelectValue placeholder="All models" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all" className="text-xs">All models</SelectItem>
-                            {modelOptions?.map((model) => (
-                                <SelectItem key={model} value={model} className="text-xs">
-                                    {model}
-                                </SelectItem>
-                            ))}
-                            {aiFilters.model !== 'all' && !modelOptions?.includes(aiFilters.model) && (
-                                <SelectItem value={aiFilters.model} className="text-xs">
-                                    {aiFilters.model}
-                                </SelectItem>
-                            )}
-                        </SelectContent>
-                    </Select>
-
-                    <TimeRangeSelector
-                        value={aiFilters.time_range}
-                        onChange={(value) => setAiFilters((prev) => ({ ...prev, time_range: value }))}
-                    />
-
-                    <Select
-                        value={aiFilters.api_key_id}
-                        onValueChange={(value) => setAiFilters((prev) => ({ ...prev, api_key_id: value }))}
-                    >
-                        <SelectTrigger className="w-[190px] h-7 text-xs shadow-none dark:shadow-xs">
-                            <SelectValue placeholder="All API keys" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all" className="text-xs">All API keys</SelectItem>
-                            {filteredApiKeys?.map((key) => (
-                                <SelectItem key={key.id} value={key.id} className="text-xs">
-                                    {key.name} ({key.key_prefix}...)
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-
-                    <form onSubmit={handleAiSearchSubmit} className="relative">
+                <div data-copilot-spot="logs_filters" className="mb-4 flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center">
+                    {/* Phones: the search on its own full-width row, then the filters in one
+                        scrolling row. Desktop: one wrapping row, search after the filters. */}
+                    <form onSubmit={handleAiSearchSubmit} className="relative w-full lg:order-1 lg:w-auto">
                         <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
                         <Input
                             placeholder="Search AI requests..."
                             value={aiSearchInput}
                             onChange={(e) => setAiSearchInput(e.target.value)}
-                            className="w-40 sm:w-56 h-7 pl-7 text-xs rounded border-border/50 bg-transparent placeholder:text-muted-foreground/60 shadow-none dark:shadow-xs"
+                            className="w-full lg:w-56 h-9 lg:h-7 pl-7 text-xs rounded border-border/50 bg-transparent placeholder:text-muted-foreground/60 shadow-none dark:shadow-xs"
                         />
                     </form>
 
-                    {hasActiveAiFilters && (
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 text-xs px-2"
-                            onClick={handleClearAiFilters}
+                    <div className="-mx-5 flex items-center gap-3 overflow-x-auto px-5 scrollbar-hide sm:mx-0 sm:px-0 [&>*]:shrink-0 [&_button]:h-9 lg:contents lg:[&_button]:h-7">
+                        <Select
+                            value={aiFilters.status}
+                            onValueChange={(value) => setAiFilters((prev) => ({ ...prev, status: value }))}
                         >
-                            <X className="h-3 w-3 mr-1" />
-                            Clear
-                        </Button>
-                    )}
+                            <SelectTrigger className="w-[130px] h-7 text-xs shadow-none dark:shadow-xs">
+                                <SelectValue placeholder="All statuses" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all" className="text-xs">All statuses</SelectItem>
+                                <SelectItem value="success" className="text-xs">Success</SelectItem>
+                                <SelectItem value="success_fallback" className="text-xs">Fallback Used</SelectItem>
+                                <SelectItem value="filtered" className="text-xs">Filtered</SelectItem>
+                                <SelectItem value="blocked_output" className="text-xs">Blocked</SelectItem>
+                                <SelectItem value="error" className="text-xs">Error</SelectItem>
+                                <SelectItem value="rate_limited" className="text-xs">Rate Limited</SelectItem>
+                            </SelectContent>
+                        </Select>
 
-                    <div data-copilot-spot="logs_export" className="ml-auto">
-                        {projectId ? (
-                            <ExportButton projectId={projectId} filters={aiFilters} environment="production" />
-                        ) : (
-                            <Skeleton className="h-7 w-16" />
+                        <Select
+                            value={aiFilters.model}
+                            onValueChange={(value) => setAiFilters((prev) => ({ ...prev, model: value }))}
+                        >
+                            <SelectTrigger className="w-[150px] h-7 text-xs shadow-none dark:shadow-xs">
+                                <SelectValue placeholder="All models" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all" className="text-xs">All models</SelectItem>
+                                {modelOptions?.map((model) => (
+                                    <SelectItem key={model} value={model} className="text-xs">
+                                        {model}
+                                    </SelectItem>
+                                ))}
+                                {aiFilters.model !== 'all' && !modelOptions?.includes(aiFilters.model) && (
+                                    <SelectItem value={aiFilters.model} className="text-xs">
+                                        {aiFilters.model}
+                                    </SelectItem>
+                                )}
+                            </SelectContent>
+                        </Select>
+
+                        <TimeRangeSelector
+                            value={aiFilters.time_range}
+                            onChange={(value) => setAiFilters((prev) => ({ ...prev, time_range: value }))}
+                        />
+
+                        <Select
+                            value={aiFilters.api_key_id}
+                            onValueChange={(value) => setAiFilters((prev) => ({ ...prev, api_key_id: value }))}
+                        >
+                            <SelectTrigger className="w-[190px] h-7 text-xs shadow-none dark:shadow-xs">
+                                <SelectValue placeholder="All API keys" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all" className="text-xs">All API keys</SelectItem>
+                                {filteredApiKeys?.map((key) => (
+                                    <SelectItem key={key.id} value={key.id} className="text-xs">
+                                        {key.name} ({key.key_prefix}...)
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+
+                        {hasActiveAiFilters && (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-xs px-2 lg:order-2"
+                                onClick={handleClearAiFilters}
+                            >
+                                <X className="h-3 w-3 mr-1" />
+                                Clear
+                            </Button>
                         )}
+
+                        <div data-copilot-spot="logs_export" className="ml-auto lg:order-2">
+                            {projectId ? (
+                                <ExportButton projectId={projectId} filters={aiFilters} environment="production" />
+                            ) : (
+                                <Skeleton className="h-7 w-16" />
+                            )}
+                        </div>
                     </div>
                 </div>
 

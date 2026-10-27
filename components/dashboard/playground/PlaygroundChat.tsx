@@ -16,6 +16,7 @@ import {
     Settings,
     PanelLeftIcon,
     Plus,
+    X,
 } from "lucide-react";
 import {
     OpenAI, Anthropic, Google, Mistral, Cohere,
@@ -27,7 +28,6 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { PlusSignIcon, Cancel01Icon } from "@hugeicons/core-free-icons";
 import { toast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
     Dialog,
     DialogContent,
@@ -45,6 +45,9 @@ import { cn } from "@/lib/utils";
 import { getSessions, saveSession, deleteSession, generateSessionId } from "@/lib/playground-history";
 import type { PlaygroundSession } from "@/lib/playground-history";
 import { PlaygroundSidebar } from "./PlaygroundSidebar";
+import { PlaygroundSheet, usePhone } from "./PlaygroundSheet";
+import { createPortal } from "react-dom";
+import { TAB_BAR_END_SLOT_ID, tabBarButtonClass, useTabBarSlot } from "@/components/dashboard/MobileTabBar";
 
 interface Message {
     id: string;
@@ -219,7 +222,6 @@ export function PlaygroundChat({
     selectedModelsRef.current = selectedModels;
 
     // History state
-    const [sidebarOpen, setSidebarOpen] = useState(false);
     const [sessions, setSessions] = useState<PlaygroundSession[]>([]);
     const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
@@ -675,6 +677,93 @@ export function PlaygroundChat({
     // Helpers for rendering
     const getModelObj = (modelId: string) => chatCatalogModels.find((m) => m.id === modelId);
     const isMultiModel = selectedModels.length > 1;
+    // One model's settings, in the floating cards (desktop) and the sheet (phones).
+    const renderModelConfig = (configModelId: string, inSheet = false) => {
+        const configModelObj = getModelObj(configModelId);
+        const mc = modelConfig[configModelId] ?? defaultConfig;
+        // The sheet has room for readable sizes; the cards stay compact.
+        const labelClass = cn("font-medium text-muted-foreground uppercase", inSheet ? "text-[11px] tracking-wider" : "text-[9px] tracking-wide");
+        const valueClass = cn("font-mono tabular-nums text-muted-foreground/70", inSheet ? "text-xs" : "text-[9px]");
+        return (
+            <>
+                <div className="flex items-center gap-1.5 mb-3">
+                    {configModelObj && (
+                        <ProviderIcon providerId={configModelObj.providerId} size={11} />
+                    )}
+                    <span className={cn("font-semibold text-foreground truncate", inSheet ? "text-sm" : "text-[10px]")}>
+                        {configModelObj?.name ?? configModelId}
+                    </span>
+                </div>
+                <div className="flex flex-col gap-2.5">
+                    <div>
+                        <div className="flex items-center justify-between mb-1">
+                            <label className={labelClass}>Max Tokens</label>
+                            <span className={valueClass}>{mc.maxTokens}</span>
+                        </div>
+                        <Slider
+                            value={mc.maxTokens}
+                            min={1}
+                            max={16384}
+                            step={256}
+                            onChange={(v) => setModelConfig((prev) => ({ ...prev, [configModelId]: { ...prev[configModelId] ?? defaultConfig, maxTokens: v } }))}
+                            showValue={false}
+                            size="sm"
+                        />
+                    </div>
+                    <div>
+                        <div className="flex items-center justify-between mb-1">
+                            <label className={labelClass}>Temperature</label>
+                            <span className={valueClass}>{mc.temperature.toFixed(1)}</span>
+                        </div>
+                        <Slider
+                            value={mc.temperature}
+                            min={0}
+                            max={2}
+                            step={0.1}
+                            onChange={(v) => setModelConfig((prev) => ({ ...prev, [configModelId]: { ...prev[configModelId] ?? defaultConfig, temperature: v } }))}
+                            showValue={false}
+                            size="sm"
+                        />
+                    </div>
+                    <div>
+                        <div className="flex items-center justify-between mb-1">
+                            <label className={labelClass}>Freq Penalty</label>
+                            <span className={valueClass}>{mc.frequencyPenalty.toFixed(1)}</span>
+                        </div>
+                        <Slider
+                            value={mc.frequencyPenalty}
+                            min={0}
+                            max={2}
+                            step={0.1}
+                            onChange={(v) => setModelConfig((prev) => ({ ...prev, [configModelId]: { ...prev[configModelId] ?? defaultConfig, frequencyPenalty: v } }))}
+                            showValue={false}
+                            size="sm"
+                        />
+                    </div>
+                    <div>
+                        <div className="flex items-center justify-between mb-1">
+                            <label className={labelClass}>Presence Penalty</label>
+                            <span className={valueClass}>{mc.presencePenalty.toFixed(1)}</span>
+                        </div>
+                        <Slider
+                            value={mc.presencePenalty}
+                            min={0}
+                            max={2}
+                            step={0.1}
+                            onChange={(v) => setModelConfig((prev) => ({ ...prev, [configModelId]: { ...prev[configModelId] ?? defaultConfig, presencePenalty: v } }))}
+                            showValue={false}
+                            size="sm"
+                        />
+                    </div>
+                </div>
+            </>
+        );
+    };
+
+    // Phones in the console: the settings button lives in the pill and the
+    // settings open as a sheet.
+    const pillSlot = useTabBarSlot(TAB_BAR_END_SLOT_ID);
+    const phone = usePhone();
 
     return (
         <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -682,7 +771,8 @@ export function PlaygroundChat({
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
                 <div
                     ref={messagesContainerRef}
-                    className="min-h-0 flex-1 overflow-y-auto overscroll-contain pt-16 pb-4 md:py-4"
+                    // Room at the top for the floating buttons, unless they're in the pill.
+                    className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain pb-4 md:py-4", pillSlot ? "pt-2" : "pt-16")}
                 >
                     <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col justify-start gap-6">
                         {messages.length === 0 && !isLoading && (
@@ -749,58 +839,33 @@ export function PlaygroundChat({
                                         {!message.isStreaming && (
                                             <div className="flex flex-wrap items-center gap-1.5 pt-1">
                                                 {message.metrics && (
-                                                    <div className="mr-2 flex flex-wrap items-center gap-1.5">
-                                                        <Badge
-                                                            variant="outline"
-                                                            className="h-5 font-mono text-[9px] text-muted-foreground border-border/30 bg-muted/5 px-1.5"
-                                                        >
-                                                            {message.metrics.latencyMs}ms
-                                                        </Badge>
-                                                        {message.metrics.costUsd > 0 && (
-                                                            <Badge
-                                                                variant="outline"
-                                                                className="h-5 font-mono text-[9px] text-muted-foreground border-border/30 bg-muted/5 px-1.5"
-                                                            >
-                                                                ${message.metrics.costUsd.toFixed(5)}
-                                                            </Badge>
-                                                        )}
-                                                        {message.metrics.promptTokens > 0 && (
-                                                            <Badge
-                                                                variant="outline"
-                                                                className="h-5 font-mono text-[9px] text-muted-foreground border-border/30 bg-muted/5 px-1.5"
-                                                            >
-                                                                {message.metrics.promptTokens.toLocaleString()} in
-                                                            </Badge>
-                                                        )}
-                                                        {message.metrics.completionTokens > 0 && (
-                                                            <Badge
-                                                                variant="outline"
-                                                                className="h-5 font-mono text-[9px] text-muted-foreground border-border/30 bg-muted/5 px-1.5"
-                                                            >
-                                                                {message.metrics.completionTokens.toLocaleString()} out
-                                                            </Badge>
-                                                        )}
+                                                    // One joined strip, not separate pills.
+                                                    <div className="mr-2 inline-flex h-5 items-stretch divide-x divide-border/40 overflow-hidden rounded-[4px] border border-border/40 font-mono text-[9px] text-muted-foreground [&>span]:flex [&>span]:items-center [&>span]:px-1.5">
+                                                        <span>{message.metrics.latencyMs}ms</span>
+                                                        {message.metrics.costUsd > 0 && <span>${message.metrics.costUsd.toFixed(5)}</span>}
+                                                        {message.metrics.promptTokens > 0 && <span>{message.metrics.promptTokens.toLocaleString()} in</span>}
+                                                        {message.metrics.completionTokens > 0 && <span>{message.metrics.completionTokens.toLocaleString()} out</span>}
                                                     </div>
                                                 )}
                                                 <Button
                                                     type="button"
                                                     variant="ghost"
                                                     size="icon"
-                                                    className="h-6 w-6 text-muted-foreground/60 hover:text-foreground hover:bg-muted/30"
+                                                    className="size-5 text-muted-foreground/60 hover:text-foreground hover:bg-muted/30"
                                                     onClick={() => copyMessage(message.content)}
                                                     title="Copy to clipboard"
                                                 >
-                                                    <Copy className="h-3 w-3" />
+                                                    <Copy className="size-3" />
                                                 </Button>
                                                 <Button
                                                     type="button"
                                                     variant="ghost"
                                                     size="icon"
-                                                    className="h-6 w-6 text-muted-foreground/60 hover:text-foreground hover:bg-muted/30"
+                                                    className="size-5 text-muted-foreground/60 hover:text-foreground hover:bg-muted/30"
                                                     onClick={regenerate}
                                                     title="Regenerate response"
                                                 >
-                                                    <RotateCcw className="h-3 w-3" />
+                                                    <RotateCcw className="size-3" />
                                                 </Button>
                                             </div>
                                         )}
@@ -1075,8 +1140,6 @@ export function PlaygroundChat({
 
             {/* History Sidebar */}
             <PlaygroundSidebar
-                open={sidebarOpen}
-                onToggle={() => setSidebarOpen((prev) => !prev)}
                 sessions={sessions}
                 activeSessionId={activeSessionId}
                 onSelect={handleSelectSession}
@@ -1090,7 +1153,8 @@ export function PlaygroundChat({
                 type="button"
                 onClick={() => setConfigOpen((prev) => !prev)}
                 className={cn(
-                    "absolute right-4 top-16 md:top-1/2 md:-translate-y-1/2 z-50 flex items-center justify-center h-9 w-9 rounded-full border shadow-md transition-all cursor-pointer",
+                    pillSlot && "max-lg:hidden",
+                    "absolute right-4 top-4 md:top-1/2 md:-translate-y-1/2 z-50 flex items-center justify-center h-9 w-9 rounded-full border shadow-md transition-all cursor-pointer",
                     configOpen
                         ? "bg-foreground text-background border-foreground"
                         : "bg-background text-muted-foreground/70 border-border/40 hover:text-foreground hover:border-border/60"
@@ -1100,87 +1164,52 @@ export function PlaygroundChat({
                 <Settings className="h-4 w-4" />
             </button>
             {configOpen && (
-                <div className="absolute right-[calc(1rem+2.25rem+0.75rem)] top-16 md:top-1/2 md:-translate-y-1/2 z-50 flex flex-col gap-2">
-                    {selectedModels.map((configModelId) => {
-                        const configModelObj = getModelObj(configModelId);
-                        const mc = modelConfig[configModelId] ?? defaultConfig;
-                        return (
-                            <div key={configModelId} className="w-64 rounded-2xl border border-border/40 bg-popover/95 backdrop-blur-xl shadow-2xl p-4 animate-in fade-in slide-in-from-right-2 duration-150">
-                                <div className="flex items-center gap-1.5 mb-3">
-                                    {configModelObj && (
-                                        <ProviderIcon providerId={configModelObj.providerId} size={11} />
-                                    )}
-                                    <span className="text-[10px] font-semibold text-foreground truncate">
-                                        {configModelObj?.name ?? configModelId}
-                                    </span>
-                                </div>
-                                <div className="flex flex-col gap-2.5">
-                                    <div>
-                                        <div className="flex items-center justify-between mb-1">
-                                            <label className="text-[9px] font-medium text-muted-foreground uppercase tracking-wide">Max Tokens</label>
-                                            <span className="text-[9px] font-mono tabular-nums text-muted-foreground/70">{mc.maxTokens}</span>
-                                        </div>
-                                        <Slider
-                                            value={mc.maxTokens}
-                                            min={1}
-                                            max={16384}
-                                            step={256}
-                                            onChange={(v) => setModelConfig((prev) => ({ ...prev, [configModelId]: { ...prev[configModelId] ?? defaultConfig, maxTokens: v } }))}
-                                            showValue={false}
-                                            size="sm"
-                                        />
-                                    </div>
-                                    <div>
-                                        <div className="flex items-center justify-between mb-1">
-                                            <label className="text-[9px] font-medium text-muted-foreground uppercase tracking-wide">Temperature</label>
-                                            <span className="text-[9px] font-mono tabular-nums text-muted-foreground/70">{mc.temperature.toFixed(1)}</span>
-                                        </div>
-                                        <Slider
-                                            value={mc.temperature}
-                                            min={0}
-                                            max={2}
-                                            step={0.1}
-                                            onChange={(v) => setModelConfig((prev) => ({ ...prev, [configModelId]: { ...prev[configModelId] ?? defaultConfig, temperature: v } }))}
-                                            showValue={false}
-                                            size="sm"
-                                        />
-                                    </div>
-                                    <div>
-                                        <div className="flex items-center justify-between mb-1">
-                                            <label className="text-[9px] font-medium text-muted-foreground uppercase tracking-wide">Freq Penalty</label>
-                                            <span className="text-[9px] font-mono tabular-nums text-muted-foreground/70">{mc.frequencyPenalty.toFixed(1)}</span>
-                                        </div>
-                                        <Slider
-                                            value={mc.frequencyPenalty}
-                                            min={0}
-                                            max={2}
-                                            step={0.1}
-                                            onChange={(v) => setModelConfig((prev) => ({ ...prev, [configModelId]: { ...prev[configModelId] ?? defaultConfig, frequencyPenalty: v } }))}
-                                            showValue={false}
-                                            size="sm"
-                                        />
-                                    </div>
-                                    <div>
-                                        <div className="flex items-center justify-between mb-1">
-                                            <label className="text-[9px] font-medium text-muted-foreground uppercase tracking-wide">Presence Penalty</label>
-                                            <span className="text-[9px] font-mono tabular-nums text-muted-foreground/70">{mc.presencePenalty.toFixed(1)}</span>
-                                        </div>
-                                        <Slider
-                                            value={mc.presencePenalty}
-                                            min={0}
-                                            max={2}
-                                            step={0.1}
-                                            onChange={(v) => setModelConfig((prev) => ({ ...prev, [configModelId]: { ...prev[configModelId] ?? defaultConfig, presencePenalty: v } }))}
-                                            showValue={false}
-                                            size="sm"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                        );
-                    })}
+                <div className="absolute right-[calc(1rem+2.25rem+0.75rem)] top-4 md:top-1/2 md:-translate-y-1/2 z-50 flex flex-col gap-2">
+                    {selectedModels.map((configModelId) => (
+                        <div key={configModelId} className="w-64 rounded-2xl border border-border/40 bg-popover/95 backdrop-blur-xl shadow-2xl p-4 animate-in fade-in slide-in-from-right-2 duration-150">
+                            {renderModelConfig(configModelId)}
+                        </div>
+                    ))}
                 </div>
             )}
+            {pillSlot && phone && (
+                <ModelSettingsSheet slot={pillSlot}>
+                    {selectedModels.map((configModelId) => (
+                        <section key={configModelId} className="border-b border-border/40 pb-4 last:border-0">
+                            {renderModelConfig(configModelId, true)}
+                        </section>
+                    ))}
+                </ModelSettingsSheet>
+            )}
         </div>
+    );
+}
+
+/**
+ * Phones: the settings button in the pill, and every model's settings in a
+ * sheet from below. Keeps its own open state, so opening it doesn't
+ * re-render the conversation.
+ */
+function ModelSettingsSheet({ slot, children }: { slot: HTMLElement; children: React.ReactNode }) {
+    const [open, setOpen] = useState(false);
+    return (
+        <>
+            {createPortal(
+                <button
+                    type="button"
+                    onClick={() => setOpen((prev) => !prev)}
+                    // Open, it becomes its close button, like the menu's.
+                    className={tabBarButtonClass}
+                    aria-label={open ? "Close model settings" : "Model settings"}
+                    aria-expanded={open}
+                >
+                    {open ? <X className="h-4 w-4" /> : <Settings className="h-4 w-4" />}
+                </button>,
+                slot,
+            )}
+            <PlaygroundSheet open={open} onOpenChange={setOpen} title="Model settings" description="Max tokens, temperature and penalties for each model.">
+                {children}
+            </PlaygroundSheet>
+        </>
     );
 }
