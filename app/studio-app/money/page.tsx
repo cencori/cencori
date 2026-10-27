@@ -5,6 +5,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useStudio } from "@/components/studio/StudioShell";
 import { useStudioCopilot } from "@/components/studio/StudioCopilot";
 import { formatMoney } from "@/components/studio/useStudioOverview";
+import { CardIcon } from "@solar-icons/react/bold-duotone/card";
+import { StudioEmptyCard } from "@/components/studio/StudioEmptyCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import type { MoneyPeriod, MoneySummary } from "@/lib/studio/money";
@@ -41,13 +43,16 @@ export default function StudioMoneyPage() {
 
     return (
         <div>
-            <h1 className="text-[26px] font-semibold leading-tight tracking-tight">Money</h1>
-            <div role="tablist" aria-label="Period" className="mt-4 grid grid-cols-3 gap-1 rounded-full bg-muted p-1">
-                {PERIODS.map((item) => (
-                    <button key={item.id} type="button" role="tab" aria-selected={period === item.id} onClick={() => setPeriod(item.id)} className={cn("h-9 rounded-full text-sm font-medium", period === item.id ? "bg-background text-foreground" : "text-muted-foreground")}>
-                        {item.label}
-                    </button>
-                ))}
+            {/* The title and switcher stay put while the page scrolls under them. */}
+            <div className="sticky top-0 z-30 -mx-4 -mt-[calc(1.25rem+env(safe-area-inset-top))] bg-background px-4 pb-3 pt-[calc(1.25rem+env(safe-area-inset-top))]">
+                <h1 className="text-[26px] font-semibold leading-tight tracking-tight">Money</h1>
+                <div role="tablist" aria-label="Period" className="mt-4 grid grid-cols-3 gap-1 rounded-full bg-muted p-1">
+                    {PERIODS.map((item) => (
+                        <button key={item.id} type="button" role="tab" aria-selected={period === item.id} onClick={() => setPeriod(item.id)} className={cn("h-9 rounded-full text-sm font-medium", period === item.id ? "bg-background text-foreground" : "text-muted-foreground")}>
+                            {item.label}
+                        </button>
+                    ))}
+                </div>
             </div>
 
             {money.isLoading ? (
@@ -101,10 +106,15 @@ export default function StudioMoneyPage() {
                             Payments by link go straight to your <span className="font-semibold">{PROVIDER[data.payments.provider] ?? "payment"}</span> account{data.payments.mode === "test" ? " (test mode: no real money yet)" : ""}. Cencori never holds your money.
                         </p>
                     ) : (
-                        <div className="mt-6 rounded-2xl bg-muted px-4 py-3.5">
-                            <p className="text-[13px] leading-5">Let customers pay by link: connect Paystack, Flutterwave or Stripe and the money goes straight to you.</p>
-                            <button type="button" onClick={() => ask("Help me connect payments so customers can pay by link")} className="mt-3 h-9 rounded-full bg-foreground px-4 text-sm font-semibold text-background">Connect payments</button>
-                        </div>
+                        // Same card as the empty tabs, but in the flow with the rest of the page.
+                        <StudioEmptyCard
+                            icon={CardIcon}
+                            title="Get paid by link"
+                            description="Connect your payment provider and the money goes straight to you."
+                            className="mt-6 min-h-0 py-8"
+                        >
+                            <button type="button" onClick={() => ask("Help me connect payments so customers can pay by link")} className="mt-4 h-11 rounded-full bg-foreground px-5 text-sm font-semibold text-background">Connect payments</button>
+                        </StudioEmptyCard>
                     )}
                     <p className="mt-3 px-1 text-xs leading-5 text-muted-foreground">Counts payments through your assistant and orders you mark paid. Sales made elsewhere aren&apos;t included.</p>
                 </>

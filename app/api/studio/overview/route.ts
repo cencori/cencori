@@ -44,8 +44,9 @@ export async function GET(req: NextRequest) {
 
     const chats = (since: Date) => db.from('sessions').select('id', { count: 'exact', head: true })
         .eq('project_id', projectId).gte('created_at', since.toISOString())
-        // Console previews and tests aren't customers.
-        .or('metadata->>preview.is.null,metadata->>preview.eq.false');
+        // Console previews and tests aren't customers, and a chat nobody wrote in isn't a chat.
+        .or('metadata->>preview.is.null,metadata->>preview.eq.false')
+        .or('last_turn_number.gt.0,metadata->manual_messages.not.is.null');
 
     const [summary, today, month, payments, plan, widget] = await Promise.all([
         agent

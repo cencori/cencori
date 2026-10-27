@@ -7,6 +7,10 @@ import { useStudioCopilot } from "@/components/studio/StudioCopilot";
 import { formatMoney } from "@/components/studio/useStudioOverview";
 import { shortTime } from "@/components/studio/useInbox";
 import { bookingWhen, useSales, useSalesAction, type SalesBooking, type SalesOrder } from "@/components/studio/useSales";
+import { Bag4Icon } from "@solar-icons/react/bold-duotone/bag-4";
+import { BoxIcon } from "@solar-icons/react/bold-duotone/box";
+import { CalendarIcon } from "@solar-icons/react/bold-duotone/calendar";
+import { STUDIO_FILL_PAGE, StudioEmptyCard } from "@/components/studio/StudioEmptyCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
@@ -50,16 +54,20 @@ export default function StudioSalesPage() {
     const orders = data?.orders ?? [];
     const bookings = data?.bookings ?? [];
     const toCollect = orders.filter((o) => o.status === "new" || o.status === "awaiting_payment");
+    const empty = !sales.isLoading && !sales.isError && (view === "orders" ? orders : bookings).length === 0;
 
     return (
-        <div>
-            <h1 className="text-[26px] font-semibold leading-tight tracking-tight">Sales</h1>
-            <div role="tablist" aria-label="Show" className="mt-4 grid grid-cols-2 gap-1 rounded-full bg-muted p-1">
-                {(["orders", "bookings"] as const).map((id) => (
-                    <button key={id} type="button" role="tab" aria-selected={view === id} onClick={() => setView(id)} className={cn("h-9 rounded-full text-sm font-medium", view === id ? "bg-background text-foreground" : "text-muted-foreground")}>
-                        {id === "orders" ? `Orders${orders.length ? ` · ${orders.length}` : ""}` : `Bookings${bookings.length ? ` · ${bookings.length}` : ""}`}
-                    </button>
-                ))}
+        <div className={empty ? STUDIO_FILL_PAGE : undefined}>
+            {/* The title and switcher stay put while the page scrolls under them. */}
+            <div className="sticky top-0 z-30 -mx-4 -mt-[calc(1.25rem+env(safe-area-inset-top))] bg-background px-4 pb-3 pt-[calc(1.25rem+env(safe-area-inset-top))]">
+                <h1 className="text-[26px] font-semibold leading-tight tracking-tight">Sales</h1>
+                <div role="tablist" aria-label="Show" className="mt-4 grid grid-cols-2 gap-1 rounded-full bg-muted p-1">
+                    {(["orders", "bookings"] as const).map((id) => (
+                        <button key={id} type="button" role="tab" aria-selected={view === id} onClick={() => setView(id)} className={cn("h-9 rounded-full text-sm font-medium", view === id ? "bg-background text-foreground" : "text-muted-foreground")}>
+                            {id === "orders" ? `Orders${orders.length ? ` · ${orders.length}` : ""}` : `Bookings${bookings.length ? ` · ${bookings.length}` : ""}`}
+                        </button>
+                    ))}
+                </div>
             </div>
             {act.error && <p role="alert" className="mt-3 text-[13px] text-destructive">{act.error.message}</p>}
 
@@ -69,12 +77,13 @@ export default function StudioSalesPage() {
                 <p className="mt-6 text-sm text-destructive">{sales.error instanceof Error ? sales.error.message : "Couldn't load your sales."}</p>
             ) : view === "orders" ? (
                 orders.length === 0 ? (
-                    <div className="mt-6 rounded-2xl border border-border/60 px-4 py-5">
-                        <p className="text-sm leading-6 text-muted-foreground">
-                            {data?.has_products ? "No orders yet. When customers order from your assistant, they show up here." : "Your assistant can take orders once it has your product list."}
-                        </p>
-                        {!data?.has_products && <button type="button" onClick={() => ask("I want my assistant to take orders. Here's my price list:")} className="mt-3 h-10 rounded-full bg-foreground px-4 text-sm font-medium text-background">Add your products</button>}
-                    </div>
+                    data?.has_products ? (
+                        <StudioEmptyCard icon={Bag4Icon} title="No orders yet" description="When customers order from your assistant, they show up here." />
+                    ) : (
+                        <StudioEmptyCard icon={BoxIcon} title="No products yet" description="Your assistant can take orders once it has your product list.">
+                            <button type="button" onClick={() => ask("I want my assistant to take orders. Here's my price list:")} className="mt-4 h-11 rounded-full bg-foreground px-5 text-sm font-semibold text-background">Add your products</button>
+                        </StudioEmptyCard>
+                    )
                 ) : (
                     <>
                         {toCollect.length > 0 && (
@@ -114,9 +123,7 @@ export default function StudioSalesPage() {
                     </>
                 )
             ) : bookings.length === 0 ? (
-                <p className="mt-6 rounded-2xl border border-border/60 px-4 py-5 text-sm leading-6 text-muted-foreground">
-                    No bookings yet. When your assistant books a table or an appointment, it shows up here.
-                </p>
+                <StudioEmptyCard icon={CalendarIcon} title="No bookings yet" description="When your assistant books a table or an appointment, it shows up here." />
             ) : (
                 <ul className="-mx-4 mt-3">
                     {bookings.map((booking) => {

@@ -697,6 +697,18 @@ export async function POST(
         }
 
         step('tools');
+        // A website or link conversation counts against the business's plan when its
+        // first message goes through, not when the chat window opened it, so a visitor
+        // who never says anything (or whose send failed) costs the business nothing.
+        if ((source === 'widget' || source === 'link') && (session.last_turn_number ?? 0) === 0
+            && !(session.metadata as { preview?: boolean } | null)?.preview && session.organization_id) {
+            const { consumeConversation } = await import('@/lib/business/plans');
+            const counted = await consumeConversation(adminClient as never, session.organization_id as string);
+            if (!counted.ok) {
+                return respondError(402, 'This chat isn’t taking new conversations right now. Please contact the business directly.', counted.reason === 'limit' ? 'plan_conversations_used' : 'plan_inactive');
+            }
+        }
+
         // Reserve a turn only after authentication, validation, quota, memory,
         // and security checks have succeeded. Invalid requests must not burn a
         // turn number or create gaps in replay history.

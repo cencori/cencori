@@ -23,6 +23,17 @@ export const viewport: Viewport = {
     viewportFit: "cover",
 };
 
+/**
+ * Studio opens light: the site-wide default is dark, and Studio's origin has
+ * its own stored theme, so a first visit stores "light" before anything
+ * paints (next-themes then reads it like any saved choice).
+ */
+const LIGHT_BY_DEFAULT = `try{if(!localStorage.getItem("theme")){localStorage.setItem("theme","light");var d=document.documentElement;d.classList.remove("dark");d.classList.add("light");d.style.colorScheme="light"}}catch(e){}`;
+
+function LightByDefault() {
+    return <script dangerouslySetInnerHTML={{ __html: LIGHT_BY_DEFAULT }} />;
+}
+
 // Every page reads the signed-in user's business; none of it is static.
 export const dynamic = "force-dynamic";
 
@@ -34,6 +45,8 @@ export default async function StudioLayout({ children }: { children: React.React
         const host = (await headers()).get("host") ?? "studio.cencori.com";
         const origin = `${host.includes("localhost") ? "http" : "https"}://${host.replace(/^studio\./, "")}`;
         return (
+            <>
+            <LightByDefault />
             <div className="dashboard-theme flex min-h-svh flex-col items-center justify-center bg-background px-6 text-center font-sans text-foreground">
                 <h1 className="text-2xl font-semibold tracking-tight">Let&apos;s set up your business</h1>
                 <p className="mt-2 max-w-xs text-sm leading-6 text-muted-foreground">Tell us what you do and your assistant will be ready to answer customers in a few minutes.</p>
@@ -41,7 +54,13 @@ export default async function StudioLayout({ children }: { children: React.React
                     Get started
                 </a>
             </div>
+            </>
         );
     }
-    return <StudioShell workspace={workspace}>{children}</StudioShell>;
+    return (
+        <>
+            <LightByDefault />
+            <StudioShell workspace={workspace}>{children}</StudioShell>
+        </>
+    );
 }

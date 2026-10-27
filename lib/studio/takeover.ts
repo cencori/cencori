@@ -11,6 +11,8 @@
  *   manual_messages  what the customer and the owner said while the
  *                    assistant was paused; `seen` turns true once the
  *                    assistant has been shown them
+ *   owner_read       { [userId]: when that person last opened the chat },
+ *                    for read / unread in the Inbox (each person their own)
  */
 
 import type { createAdminClient } from "@/lib/supabaseAdmin";
@@ -37,6 +39,7 @@ type Metadata = Record<string, unknown> & {
     owner_active_at?: string | null;
     needs_owner?: NeedsOwner | null;
     manual_messages?: ManualMessage[];
+    owner_read?: Record<string, string>;
 };
 
 /** The owner is handling this chat right now (stepped in, and not quiet for 30 minutes). */
@@ -86,6 +89,42 @@ export async function addManualMessage(db: Admin, sessionId: string, message: Om
         manual_messages: [...manualMessages(metadata), entry].slice(-MANUAL_MESSAGES_MAX),
         ...(message.from === "owner" ? { owner_active_at: entry.at, needs_owner: null } : {}),
     }), true);
+}
+
+/**
+ * Read / unread starts here: chats whose last customer message is older
+ * count as read, so turning it on doesn't light up every old chat.
+ */
+const READ_TRACKING_SINCE = Date.parse("2026-10-27T00:00:00Z");
+
+/** When this person last opened the chat, as a time in ms; null if never. */
+export function readAt(metadata: Record<string, unknown> | null | undefined, userId: string): number | null {
+    const at = (metadata as Metadata | null | undefined)?.owner_read?.[userId];
+    const time = typeof at === "string" ? Date.parse(at) : NaN;
+    return Number.isFinite(time) ? time : null;
+}
+
+/**
+ * Unread for this person: the customer wrote after they last opened the chat,
+ * and nobody from the business has replied since (a reply means it was read).
+ */
+export function isUnread(lastCustomerAt: number | null, lastOwnerAt: number | null, read: number | null): boolean {
+    if (lastCustomerAt === null || lastCustomerAt < READ_TRACKING_SINCE) return false;
+    return lastCustomerAt > Math.max(read ?? 0, lastOwnerAt ?? 0);
+}
+
+/** This person opened the chat. Doesn't move it in the Inbox (updated_at stays). */
+export async function markRead(db: Admin, sessionId: string, userId: string): Promise<void> {
+    await patchMetadata(db, sessionId, (metadata) => ({ ...metadata, owner_read: { ...(metadata.owner_read ?? {}), [userId]: new Date().toISOString() } }));
+}
+
+/** "Mark as unread": as if this person had never opened it. */
+export async function markUnread(db: Admin, sessionId: string, userId: string): Promise<void> {
+    await patchMetadata(db, sessionId, (metadata) => {
+        const rest = { ...(metadata.owner_read ?? {}) };
+        delete rest[userId];
+        return { ...metadata, owner_read: rest };
+    });
 }
 
 const CATCH_UP_NOTE = /^\[While you were paused, the business owner talked with the customer directly:[\s\S]*?don't repeat what the owner already said\.\]\n\n/;

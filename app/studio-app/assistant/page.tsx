@@ -5,6 +5,8 @@ import { Check, QrCode } from "lucide-react";
 import { StudioLinkQr } from "@/components/studio/StudioLinkQr";
 import { useStudioCopilot } from "@/components/studio/StudioCopilot";
 import { joinWords, liveChannels, useStudioOverview, type StudioAssistantSummary } from "@/components/studio/useStudioOverview";
+import { UserRoundedIcon } from "@solar-icons/react/bold-duotone/user-rounded";
+import { STUDIO_FILL_PAGE, StudioEmptyCard } from "@/components/studio/StudioEmptyCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getMainSiteUrl } from "@/lib/main-site-url";
 
@@ -48,7 +50,7 @@ export default function StudioAssistantPage() {
     const linkUrl = data?.share_token ? `${new URL(getMainSiteUrl("/")).origin}/talk/${data.share_token}` : null;
 
     return (
-        <div>
+        <div className={!overview.isLoading && !assistant ? STUDIO_FILL_PAGE : undefined}>
             <h1 className="text-[26px] font-semibold leading-tight tracking-tight">{assistant?.name ?? "Your assistant"}</h1>
             {overview.isLoading ? (
                 <div className="mt-5 space-y-3">
@@ -56,17 +58,11 @@ export default function StudioAssistantPage() {
                     {[0, 1, 2, 3].map((index) => <Skeleton key={index} className="h-24 w-full rounded-2xl" />)}
                 </div>
             ) : !assistant ? (
-                <div className="mt-6 rounded-2xl border border-border/60 px-4 py-5">
-                    <p className="text-sm leading-6 text-muted-foreground">You don&apos;t have an assistant yet.</p>
-                    <button type="button" onClick={() => ask("Help me set up an assistant for my business")} className="mt-3 inline-flex h-10 items-center rounded-full bg-foreground px-4 text-sm font-medium text-background">Set one up</button>
-                </div>
+                <StudioEmptyCard icon={UserRoundedIcon} title="No assistant yet" description="Set one up and it starts answering customers on your link and WhatsApp.">
+                    <button type="button" onClick={() => ask("Help me set up an assistant for my business")} className="mt-4 inline-flex h-11 items-center rounded-full bg-foreground px-5 text-sm font-semibold text-background">Set one up</button>
+                </StudioEmptyCard>
             ) : (
                 <>
-                    <p className="mt-1 flex items-center gap-2 text-[13px] text-muted-foreground">
-                        <span className={live.length ? "h-2 w-2 rounded-full bg-emerald-500" : "h-2 w-2 rounded-full bg-amber-500"} />
-                        {live.length ? "Live" : assistant.published ? "Not on any channel yet" : "Not live yet"}
-                    </p>
-
                     <div className="mt-5 flex flex-col gap-3">
                         <Card title="What it knows" action="Add" onAction={() => ask("I want to add something my assistant should know")}>
                             {assistant.knowledge.length || assistant.products?.count ? (

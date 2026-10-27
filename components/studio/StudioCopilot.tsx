@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { Drawer } from "vaul";
 import { ArrowUp, Square, X } from "lucide-react";
+import { StarsMinimalisticIcon } from "@solar-icons/react/bold-duotone/stars-minimalistic";
 import { useQueryClient } from "@tanstack/react-query";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
 import { ThinkingState } from "@/components/chat/ThinkingState";
@@ -262,7 +263,7 @@ export function StudioAskBar() {
             onClick={() => ask()}
             className="fixed inset-x-0 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-30 mx-auto flex h-12 w-[calc(100%-2rem)] max-w-sm items-center gap-2.5 rounded-full border border-border/60 bg-muted px-4 text-[15px] text-muted-foreground"
         >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="text-foreground"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z" /></svg>
+            <StarsMinimalisticIcon size={18} aria-hidden className="text-foreground" />
             Ask or change anything…
         </button>
     );

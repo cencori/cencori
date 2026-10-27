@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BellRing } from "lucide-react";
+import { BellRing, X } from "lucide-react";
 import { useStudio } from "@/components/studio/StudioShell";
 
 type State = "unsupported" | "needs-install" | "off" | "denied" | "on";
 
 const VAPID_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
+/** Set on this device once the home card is closed; notifications stay in the profile sheet. */
+const CARD_DISMISSED_KEY = "studio:notifications-card-dismissed";
 
 function keyBytes(base64: string): Uint8Array<ArrayBuffer> {
     const padded = (base64 + "=".repeat((4 - (base64.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/");
@@ -30,11 +32,8 @@ export function useStudioServiceWorker() {
     }, []);
 }
 
-/**
- * The "Get notified" card: turns push notifications on for this device.
- * Hidden once they're on, or when the browser can't do them at all.
- */
-export function StudioNotificationsCard() {
+/** This device's push notifications: whether they're on, and turning them on. */
+export function useStudioPush() {
     const { project } = useStudio();
     const [state, setState] = useState<State>("unsupported");
     const [busy, setBusy] = useState(false);
@@ -79,9 +78,31 @@ export function StudioNotificationsCard() {
         }
     };
 
-    if (state === "on" || state === "unsupported") return null;
+    return { state, busy, error, turnOn };
+}
+
+/**
+ * The "Get notified" card: turns push notifications on for this device.
+ * Hidden once they're on, or when the browser can't do them at all.
+ */
+export function StudioNotificationsCard() {
+    const { state, busy, error, turnOn } = useStudioPush();
+    // Hidden until storage is read, so a closed card never flashes in.
+    const [dismissed, setDismissed] = useState(true);
+    useEffect(() => {
+        try { setDismissed(localStorage.getItem(CARD_DISMISSED_KEY) === "1"); } catch { setDismissed(false); }
+    }, []);
+    const dismiss = () => {
+        setDismissed(true);
+        try { localStorage.setItem(CARD_DISMISSED_KEY, "1"); } catch { /* closed for this visit only */ }
+    };
+
+    if (dismissed || state === "on" || state === "unsupported") return null;
     return (
-        <section className="mt-4 flex gap-3 rounded-2xl border border-border/60 px-4 py-3.5">
+        <section className="relative mt-4 flex gap-3 rounded-2xl border border-border/60 py-3.5 pl-4 pr-10">
+            <button type="button" onClick={dismiss} aria-label="Dismiss" className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:text-foreground">
+                <X className="h-4 w-4" />
+            </button>
             <BellRing className="mt-0.5 h-5 w-5 shrink-0" />
             <div className="min-w-0 flex-1">
                 <p className="text-[15px] font-semibold">Never miss a customer</p>

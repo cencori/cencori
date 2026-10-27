@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { createAdminClient } from "@/lib/supabaseAdmin";
-import { isOwnerActive, manualMessages, needsOwner, withoutCatchUpNote, type NeedsOwner } from "@/lib/studio/takeover";
+import { isOwnerActive, isUnread, manualMessages, needsOwner, readAt, withoutCatchUpNote, type NeedsOwner } from "@/lib/studio/takeover";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -22,6 +22,8 @@ export interface InboxConversation {
     needs_owner: NeedsOwner | null;
     /** The owner has stepped in: the assistant is quiet in this chat. */
     owner_active: boolean;
+    /** The customer wrote since the person asking last opened it. */
+    unread: boolean;
 }
 
 export interface InboxMessage {
@@ -69,10 +71,30 @@ function outputText(output: unknown): string {
 }
 
 /** A project's customer conversations (console previews left out), newest first. */
-export async function listConversations(db: Admin, projectId: string, opts: { channel?: InboxChannel | null; limit?: number } = {}): Promise<InboxConversation[]> {
+/** The newest customer and owner message times among the paused-chat messages. */
+function manualTimes(metadata: Record<string, unknown> | null): { customer: number | null; owner: number | null } {
+    let customer: number | null = null;
+    let owner: number | null = null;
+    for (const message of manualMessages(metadata)) {
+        const at = Date.parse(message.at);
+        if (!Number.isFinite(at)) continue;
+        if (message.from === "customer") customer = Math.max(customer ?? 0, at);
+        else owner = Math.max(owner ?? 0, at);
+    }
+    return { customer, owner };
+}
+
+const latest = (...times: Array<number | null>): number | null => {
+    const known = times.filter((time): time is number => time !== null);
+    return known.length ? Math.max(...known) : null;
+};
+
+export async function listConversations(db: Admin, projectId: string, opts: { channel?: InboxChannel | null; limit?: number; userId: string }): Promise<InboxConversation[]> {
     let query = db.from("sessions").select(SESSION_COLUMNS)
         .eq("project_id", projectId)
         .or("metadata->>preview.is.null,metadata->>preview.eq.false")
+        // Only chats where someone said something: a chat window opened and never used isn't a conversation.
+        .or("last_turn_number.gt.0,metadata->manual_messages.not.is.null")
         .order("updated_at", { ascending: false })
         .limit(Math.min(100, opts.limit ?? 50));
     if (opts.channel === "whatsapp") query = query.eq("metadata->>source", "whatsapp");
@@ -102,6 +124,9 @@ export async function listConversations(db: Admin, projectId: string, opts: { ch
         const manual = manualMessages(row.metadata).at(-1);
         const manualIsLast = !!manual && new Date(manual.at).getTime() > turnAt;
         const { name, number } = nameOf(row);
+        // Every turn starts with the customer's message.
+        const started = turn.find((event) => event.event_type === "turn.started");
+        const manualAt = manualTimes(row.metadata);
         return {
             id: row.id,
             channel: channelOf(row.metadata),
@@ -113,6 +138,7 @@ export async function listConversations(db: Admin, projectId: string, opts: { ch
             open: row.status === "active",
             needs_owner: needsOwner(row.metadata),
             owner_active: isOwnerActive(row.metadata),
+            unread: isUnread(latest(started ? Date.parse(started.created_at) : null, manualAt.customer), manualAt.owner, readAt(row.metadata, opts.userId)),
         };
     });
 }
@@ -121,7 +147,7 @@ export async function listConversations(db: Admin, projectId: string, opts: { ch
 /** Whether the owner can reply from Studio, and if not, why: a chat from elsewhere (the API), or WhatsApp's 24-hour window has closed. */
 export type ReplyAbility = { possible: true; reason: null } | { possible: false; reason: "website" | "window" };
 
-export async function getConversation(db: Admin, projectId: string, sessionId: string): Promise<{ conversation: InboxConversation; messages: InboxMessage[]; reply: ReplyAbility } | null> {
+export async function getConversation(db: Admin, projectId: string, sessionId: string, userId: string): Promise<{ conversation: InboxConversation; messages: InboxMessage[]; reply: ReplyAbility } | null> {
     if (!/^[0-9a-f-]{36}$/i.test(sessionId)) return null;
     const { data } = await db.from("sessions").select(SESSION_COLUMNS).eq("id", sessionId).eq("project_id", projectId).maybeSingle();
     const row = data as SessionRow | null;
@@ -154,6 +180,11 @@ export async function getConversation(db: Admin, projectId: string, sessionId: s
             last_message: last?.text ?? null, last_from: last?.from ?? null,
             updated_at: row.updated_at, open: row.status === "active",
             needs_owner: needsOwner(row.metadata), owner_active: isOwnerActive(row.metadata),
+            unread: isUnread(
+                latest(...messages.filter((message) => message.from === "customer").map((message) => Date.parse(message.at))),
+                latest(...messages.filter((message) => message.from === "owner").map((message) => Date.parse(message.at))),
+                readAt(row.metadata, userId),
+            ),
         },
         messages,
         // Replying from Studio: website and link chats any time (the visitor sees it

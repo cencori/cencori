@@ -3,16 +3,22 @@
 import { createContext, useContext, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { House, MessageCircle, ShoppingBag, Sparkles, Wallet } from "lucide-react";
+import { HomeIcon } from "@solar-icons/react/bold-duotone/home";
+import { ChatRoundLineIcon } from "@solar-icons/react/bold-duotone/chat-round-line";
+import { Bag4Icon } from "@solar-icons/react/bold-duotone/bag-4";
+import { WalletIcon } from "@solar-icons/react/bold-duotone/wallet";
+import { StarsMinimalisticIcon } from "@solar-icons/react/bold-duotone/stars-minimalistic";
 import { ReactQueryProvider } from "@/lib/providers/ReactQueryProvider";
 import { ThemeScope } from "@/components/theme-scope";
 import { cn } from "@/lib/utils";
 import { StudioAskBar, StudioCopilotProvider } from "@/components/studio/StudioCopilot";
 import { useStudioServiceWorker } from "@/components/studio/StudioNotifications";
+import { useUnreadCount } from "@/components/studio/useInbox";
 
 export interface StudioContextValue {
-    user: { id: string; firstName: string | null; email: string | null };
+    user: { id: string; firstName: string | null; fullName: string | null; email: string | null; avatarUrl: string | null };
     organization: { id: string; name: string; slug: string; isBusiness: boolean };
+    organizations: Array<{ id: string; name: string }>;
     project: { id: string; name: string; slug: string };
     agents: Array<{ id: string; name: string; live: boolean }>;
 }
@@ -27,11 +33,11 @@ export function useStudio(): StudioContextValue {
 }
 
 const TABS = [
-    { href: "/", label: "Home", icon: House, match: (path: string) => path === "/" },
-    { href: "/inbox", label: "Inbox", icon: MessageCircle, match: (path: string) => path.startsWith("/inbox") },
-    { href: "/sales", label: "Sales", icon: ShoppingBag, match: (path: string) => path.startsWith("/sales") },
-    { href: "/money", label: "Money", icon: Wallet, match: (path: string) => path.startsWith("/money") },
-    { href: "/assistant", label: "Assistant", icon: Sparkles, match: (path: string) => path.startsWith("/assistant") },
+    { href: "/", label: "Home", icon: HomeIcon, match: (path: string) => path === "/" },
+    { href: "/inbox", label: "Inbox", icon: ChatRoundLineIcon, match: (path: string) => path.startsWith("/inbox") },
+    { href: "/sales", label: "Sales", icon: Bag4Icon, match: (path: string) => path.startsWith("/sales") },
+    { href: "/money", label: "Money", icon: WalletIcon, match: (path: string) => path.startsWith("/money") },
+    { href: "/assistant", label: "AI", icon: StarsMinimalisticIcon, match: (path: string) => path.startsWith("/assistant") },
 ];
 
 /**
@@ -58,7 +64,7 @@ export function StudioShell({ workspace, children }: { workspace: StudioContextV
                     </main>
                     {!focused && <nav
                         aria-label="Studio"
-                        className="fixed inset-x-0 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-40 mx-auto grid w-[calc(100%-2rem)] max-w-sm grid-cols-5 gap-0.5 rounded-full border border-border/60 bg-background/90 p-1.5 backdrop-blur-md"
+                        className="fixed inset-x-0 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-40 mx-auto flex w-fit items-center gap-3 rounded-full border border-border/60 bg-background/90 p-1 backdrop-blur-md"
                     >
                         {TABS.map((tab) => {
                             const active = tab.match(pathname);
@@ -68,11 +74,14 @@ export function StudioShell({ workspace, children }: { workspace: StudioContextV
                                     href={tab.href}
                                     aria-current={active ? "page" : undefined}
                                     className={cn(
-                                        "flex h-12 flex-col items-center justify-center gap-0.5 rounded-full text-[11px] font-medium transition-colors",
-                                        active ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground",
+                                        "flex size-12 shrink-0 flex-col items-center justify-center gap-0.5 rounded-full border text-[9px] font-medium transition-colors",
+                                        active ? "border-border text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
                                     )}
                                 >
-                                    <tab.icon className="h-5 w-5" strokeWidth={1.8} />
+                                    <span className="relative">
+                                        <tab.icon size={18} />
+                                        {tab.href === "/inbox" && <UnreadBadge />}
+                                    </span>
                                     {tab.label}
                                 </Link>
                             );
@@ -83,5 +92,16 @@ export function StudioShell({ workspace, children }: { workspace: StudioContextV
                 </StudioCopilotProvider>
             </StudioContext.Provider>
         </ReactQueryProvider>
+    );
+}
+
+/** The number of unread chats, on the Inbox tab. */
+function UnreadBadge() {
+    const count = useUnreadCount();
+    if (count === 0) return null;
+    return (
+        <span aria-label={`${count} unread`} className="absolute -right-2.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-600 px-1 text-[9px] font-semibold leading-none text-white">
+            {count > 9 ? "9+" : count}
+        </span>
     );
 }
