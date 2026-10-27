@@ -38,8 +38,14 @@ export const BUSINESS_PLANS: Record<BusinessPlanId, BusinessPlan> = {
 export const PAID_BUSINESS_PLANS: PaidBusinessPlanId[] = ['starter', 'growth', 'business'];
 export const BUSINESS_TRIAL_DAYS = 14;
 
-/** Every new agent's model, and the only one below the Business plan. */
-export const BUSINESS_DEFAULT_MODEL = 'deepseek-v4-flash';
+/**
+ * Every new agent's model, and the only one below the Business plan. The
+ * catalog id: agents are validated against the model registry, which doesn't
+ * list the legacy `deepseek-v4-flash` alias.
+ */
+export const BUSINESS_DEFAULT_MODEL = 'deepseek-v4.1-flash';
+/** Agents made before the switch still name the legacy id; it's the same model. */
+const BUSINESS_LEGACY_MODEL = 'deepseek-v4-flash';
 
 export function isBusinessPlanId(value: unknown): value is BusinessPlanId {
     return typeof value === 'string' && value in BUSINESS_PLANS;
@@ -91,7 +97,7 @@ export function readPlan(row: Record<string, unknown>, now = Date.now()): Organi
 export function modelAllowed(plan: OrganizationPlan, model: string | null | undefined): boolean {
     if (plan.accountType !== 'business') return true;
     if (plan.plan?.allModels && plan.active) return true;
-    return !model || model === BUSINESS_DEFAULT_MODEL;
+    return !model || model === BUSINESS_DEFAULT_MODEL || model === BUSINESS_LEGACY_MODEL;
 }
 
 export type ConversationCheck =

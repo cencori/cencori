@@ -15,10 +15,13 @@ import { cn } from "@/lib/utils";
 
 type Answers = Partial<Record<AnswerKey, string>>;
 type Built = { agentId: string; publicKey: string; previewToken: string; shareToken: string | null };
-type Saved = { step: number; kind: BusinessKind | null; answers: Answers; asked: number; built: Built | null };
+/** The build's steps, in order. A failed build keeps the ones that finished so "Try again" carries on from there. */
+type BuildStep = "knowledge" | "tools" | "alerts" | "tested" | "published";
+/** An assistant created by a build that didn't finish, and how far it got. */
+type HalfBuilt = { agentId: string; versionId: string; done: BuildStep[] };
+type Saved = { step: number; kind: BusinessKind | null; answers: Answers; asked: number; built: Built | null; partial?: HalfBuilt | null };
 
 const STORAGE_KEY = (projectId: string) => `cencori:studio-setup:${projectId}`;
-const BUSINESS_MODEL = "deepseek-v4-flash";
 
 async function call<T>(url: string, method: string, body?: unknown): Promise<T> {
     const response = await fetch(url, {
@@ -142,6 +145,9 @@ export default function StudioSetupPage() {
     };
 
     // Build the assistant the same way Copilot does, as the signed-in owner.
+    // A build that failed part way left an assistant behind (state.partial):
+    // "Try again" reuses it and skips the steps that already finished, so a
+    // retry never makes a second assistant.
     const build = async (businessKind: BusinessKind, answers: Answers) => {
         setError(null);
         const done: string[] = [];
@@ -151,37 +157,84 @@ export default function StudioSetupPage() {
         };
         setBuilding([]);
         const studio = `/api/projects/${project.id}/embedded-agents/studio`;
+        let partial = state.partial ?? null;
+        const finished = (step: BuildStep) => partial?.done.includes(step) ?? false;
+        // Saved after every step, so leaving or failing keeps the progress.
+        const mark = (step: BuildStep) => {
+            if (!partial) return;
+            partial = { ...partial, done: [...partial.done, step] };
+            const next = partial;
+            setState((s) => ({ ...s, partial: next }));
+        };
         try {
-            const name = answers.name?.trim() || organization.name;
-            const created = await call<{ agent_id: string; version_id: string }>(studio, "POST", {
-                action: "create_agent",
-                name,
-                description: BUSINESS_KINDS.find((item) => item.id === businessKind)?.name ?? "",
-                model: BUSINESS_MODEL,
-                instructions: setupInstructions(businessKind, answers),
-                ...(businessKind === "restaurant" ? { template: "restaurant" } : {}),
-            });
+            if (!partial) {
+                const name = answers.name?.trim() || organization.name;
+                const created = await call<{ agent_id: string; version_id: string }>(studio, "POST", {
+                    action: "create_agent",
+                    name,
+                    description: BUSINESS_KINDS.find((item) => item.id === businessKind)?.name ?? "",
+                    instructions: setupInstructions(businessKind, answers),
+                    ...(businessKind === "restaurant" ? { template: "restaurant" } : {}),
+                });
+                partial = { agentId: created.agent_id, versionId: created.version_id, done: [] };
+                const next = partial;
+                setState((s) => ({ ...s, partial: next }));
+            } else if (!finished("published")) {
+                // They may have gone back and changed an answer since: the
+                // draft takes the latest, and a saved draft needs testing again.
+                await call(studio, "POST", {
+                    action: "save_draft",
+                    agent_id: partial.agentId,
+                    version_id: partial.versionId,
+                    name: answers.name?.trim() || organization.name,
+                    description: BUSINESS_KINDS.find((item) => item.id === businessKind)?.name ?? "",
+                    instructions: setupInstructions(businessKind, answers),
+                });
+                partial = { ...partial, done: partial.done.filter((step) => step !== "tested") };
+                const next = partial;
+                setState((s) => ({ ...s, partial: next }));
+            }
+            const { agentId, versionId } = partial;
             tick("Created your assistant");
             const knowledge = setupKnowledge(businessKind, answers);
-            const agentBase = `/api/projects/${project.id}/embedded-agents/${created.agent_id}`;
+            const agentBase = `/api/projects/${project.id}/embedded-agents/${agentId}`;
             if (knowledge) {
-                await call(`${agentBase}/knowledge`, "POST", knowledge);
+                if (!finished("knowledge")) {
+                    await call(`${agentBase}/knowledge`, "POST", knowledge);
+                    mark("knowledge");
+                }
                 tick(businessKind === "restaurant" ? "Added your menu" : "Added your prices");
             }
-            await call(studio, "POST", { action: "save_tools", agent_id: created.agent_id, version_id: created.version_id, system_tools: { end_conversation: {}, request_callback: {} } });
-            if (user.email) await call(`${agentBase}/alerts`, "PUT", { emails: [user.email], ...(businessKind === "restaurant" ? { time_zone: "Africa/Lagos" } : {}) }).catch(() => undefined);
+            if (!finished("tools")) {
+                await call(studio, "POST", { action: "save_tools", agent_id: agentId, version_id: versionId, system_tools: { end_conversation: {}, request_callback: {} } });
+                mark("tools");
+            }
+            if (!finished("alerts")) {
+                if (user.email) await call(`${agentBase}/alerts`, "PUT", { emails: [user.email], ...(businessKind === "restaurant" ? { time_zone: "Africa/Lagos" } : {}) }).catch(() => undefined);
+                mark("alerts");
+            }
             tick("Set it to tell you when someone needs you");
-            await call(studio, "POST", { action: "test_version", agent_id: created.agent_id, version_id: created.version_id, input: "Hello" });
-            await call(studio, "POST", { action: "publish_version", agent_id: created.agent_id, version_id: created.version_id });
+            if (!finished("tested")) {
+                await call(studio, "POST", { action: "test_version", agent_id: agentId, version_id: versionId, input: "Hello" });
+                mark("tested");
+            }
+            if (!finished("published")) {
+                await call(studio, "POST", { action: "publish_version", agent_id: agentId, version_id: versionId });
+                mark("published");
+            }
             tick("Tested it and made it live");
             const widget = await call<{ widget: { public_key: string }; preview_token: string; share_token: string | null }>(`${agentBase}/widget`, "PUT", {});
             tick("Made your link");
             void queryClient.invalidateQueries();
-            setState((s) => ({ ...s, step: 3, built: { agentId: created.agent_id, publicKey: widget.widget.public_key, previewToken: widget.preview_token, shareToken: widget.share_token } }));
+            setState((s) => ({ ...s, step: 3, partial: null, built: { agentId, publicKey: widget.widget.public_key, previewToken: widget.preview_token, shareToken: widget.share_token } }));
             setBuilding(null);
             router.refresh();
         } catch (cause) {
-            setError(cause instanceof Error ? cause.message : "Setting up didn't finish. Try again.");
+            // The server's reasons are written for developers; the owner gets a plain one.
+            console.error("Studio setup failed", cause);
+            // The half-built assistant is gone (deleted in the console, say): the next try starts over.
+            if (cause instanceof Error && /not found/i.test(cause.message)) setState((s) => ({ ...s, partial: null }));
+            setError("We couldn't finish setting up your assistant. Try again, and if it keeps happening, email support@cencori.com.");
             setBuilding(null);
         }
     };

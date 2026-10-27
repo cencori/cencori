@@ -1,5 +1,13 @@
 import type { createAdminClient } from '@/lib/supabaseAdmin';
 import { buildUnifiedModelRegistry } from './model-registry';
+
+/**
+ * Retired model ids the gateway still serves under their catalog id. Agents
+ * saved with one keep validating instead of failing as "not in the registry".
+ */
+const LEGACY_MODEL_IDS: Record<string, string> = {
+    'deepseek-v4-flash': 'deepseek-v4.1-flash',
+};
 import { canonicalAllowedHost } from './net-policy';
 import { dePrefixId } from './http';
 
@@ -201,7 +209,8 @@ export async function validateManifest(
         }
         try {
             const registry = await buildUnifiedModelRegistry(supabase, { projectId: opts.projectId });
-            const match = registry.models.find((row) => row.id === m.model || `${row.provider}/${row.id}` === m.model || row.id === (m.model as string).split('/').pop());
+            const wanted = LEGACY_MODEL_IDS[m.model] ?? m.model;
+            const match = registry.models.find((row) => row.id === wanted || `${row.provider}/${row.id}` === wanted || row.id === wanted.split('/').pop());
             if (!match) {
                 errors.push(`model '${m.model}' is not in the project registry`);
             } else {
