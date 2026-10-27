@@ -1,6 +1,6 @@
 /**
  * Adapter SDK — the contract every adapter implements. An adapter has two
- * halves (COMPUTE_UNIVERSAL_DEPLOY.md §5):
+ * halves (docs/compute/COMPUTE_UNIVERSAL_DEPLOY.md §5):
  *   - build-time: `detect` + `plan` (run here, in the pipeline)
  *   - runtime:    a shim that serves the Runtime Contract (ships in the base image)
  *

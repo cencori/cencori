@@ -1,6 +1,6 @@
 /**
  * Cencori adapter SDK + registry — the universal-deploy foundation.
- * See COMPUTE_UNIVERSAL_DEPLOY.md.
+ * See docs/compute/COMPUTE_UNIVERSAL_DEPLOY.md.
  */
 
 export * from './types';

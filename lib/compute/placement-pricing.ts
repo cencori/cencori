@@ -7,7 +7,7 @@
  *      (one per memory tier and region), priced per vCPU-hour and per GB-hour.
  *   2. Quote placement: for the machine shape an agent runs on, the cheapest equivalent per cloud
  *      on the same continent, and the saving against what we pay today. This is the input to the v2
- *      runtime decision (COMPUTE_ARCHITECTURE.md §14) — where to run once we own the runtime.
+ *      runtime decision (docs/compute/COMPUTE_ARCHITECTURE.md §14) — where to run once we own the runtime.
  *
  * Our rates come from configuration, never from a guess in code:
  *   COMPUTE_SHARED_CPU_HOURLY_USD   price of one shared vCPU for one hour

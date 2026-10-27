@@ -8,7 +8,7 @@
  * v0: the CLONE step is real; adapter/containerize/run are stubbed behind
  * clean boundaries (the Arcie adapter + Fly runtime land next). Each phase
  * updates the deployment row so the dashboard can stream status.
- * See COMPUTE_ARCHITECTURE.md §6, §8.
+ * See docs/compute/COMPUTE_ARCHITECTURE.md §6, §8.
  */
 
 import type { Octokit } from '@octokit/rest';
@@ -125,7 +125,7 @@ export async function buildAndDeploy(ctx: DeploymentContext): Promise<void> {
 
         // ── 2. Detect the agent → normalized build plan ──────────
         // Static scan of the repo (no execution). Picks the best adapter; falls
-        // back to the Arcie shape if detection can't run. See COMPUTE_UNIVERSAL_DEPLOY.md.
+        // back to the Arcie shape if detection can't run. See docs/compute/COMPUTE_UNIVERSAL_DEPLOY.md.
         let plan = fallbackPlan(ctx);
         if (octokit) {
             try {

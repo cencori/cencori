@@ -10,7 +10,7 @@
  *   - `localProvider` otherwise → mock: the deploy loop completes end-to-end
  *     (building → active + a URL) with no infra, for local/preview testing.
  *
- * See COMPUTE_ARCHITECTURE.md §9 and COMPUTE_RUNTIME_SETUP.md.
+ * See docs/compute/COMPUTE_ARCHITECTURE.md §9 and docs/compute/COMPUTE_RUNTIME_SETUP.md.
  */
 
 /**
@@ -96,7 +96,7 @@ export const localProvider: RuntimeProvider = {
 
 // ── Fly Machines provider ────────────────────────────────────────────────
 // One Fly app per agent → the agent's public URL is `<app>.fly.dev`. Requires
-// FLY_API_TOKEN (+ FLY_ORG). See COMPUTE_RUNTIME_SETUP.md for the one-time
+// FLY_API_TOKEN (+ FLY_ORG). See docs/compute/COMPUTE_RUNTIME_SETUP.md for the one-time
 // setup (create org token, push the base image, allocate shared IPs).
 const FLY_API = process.env.FLY_API_HOST || 'https://api.machines.dev';
 
@@ -126,7 +126,7 @@ async function flyBuildFromDockerfile(appName: string, build: DockerBuildSpec): 
     void build;
     throw new Error(
         '[fly] Dockerfile builds require the Fly remote builder (not yet provisioned). ' +
-            'Docker-deploy runs end-to-end in local/mock mode; wire the remote builder to ship it on Fly. See COMPUTE_RUNTIME_SETUP.md.',
+            'Docker-deploy runs end-to-end in local/mock mode; wire the remote builder to ship it on Fly. See docs/compute/COMPUTE_RUNTIME_SETUP.md.',
     );
 }
 

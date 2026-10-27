@@ -2,7 +2,7 @@
  * A DetectionContext backed by the GitHub Contents API — reads the specific
  * files an adapter needs (manifests, entry points) at a pinned ref, WITHOUT
  * cloning or executing the repo. This is how "detection is a product, not
- * executed untrusted code" (COMPUTE_UNIVERSAL_DEPLOY.md §2).
+ * executed untrusted code" (docs/compute/COMPUTE_UNIVERSAL_DEPLOY.md §2).
  */
 
 import type { Octokit } from '@octokit/rest';

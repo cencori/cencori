@@ -6,7 +6,7 @@
 # AGENT_ENTRYPOINT ("module:attr") in the Runtime Contract. Native Python
 # frameworks (LangGraph, CrewAI) supply their own START_COMMAND / shim.
 #
-# Build & push (one-time — COMPUTE_RUNTIME_SETUP.md):
+# Build & push (one-time — docs/compute/COMPUTE_RUNTIME_SETUP.md):
 #   fly auth docker
 #   docker build -t registry.fly.io/cencori-python-runtime:latest compute/runtime/python
 #   docker push  registry.fly.io/cencori-python-runtime:latest

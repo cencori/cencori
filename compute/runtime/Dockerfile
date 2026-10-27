@@ -5,7 +5,7 @@
 # the Runtime Contract (GET /_health, POST /invoke, …) on $PORT. This keeps the
 # deploy API free of Docker builds — the machine does the work.
 #
-# Build & push (one-time, see COMPUTE_RUNTIME_SETUP.md):
+# Build & push (one-time, see docs/compute/COMPUTE_RUNTIME_SETUP.md):
 #   fly auth docker
 #   docker build -t registry.fly.io/cencori-arcie-runtime:latest compute/runtime
 #   docker push registry.fly.io/cencori-arcie-runtime:latest

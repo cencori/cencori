@@ -1,6 +1,6 @@
 /**
  * The normalized model every adapter emits. Cencori's pipeline and dashboard
- * speak *this* — never per-framework internals. See COMPUTE_UNIVERSAL_DEPLOY.md §3.
+ * speak *this* — never per-framework internals. See docs/compute/COMPUTE_UNIVERSAL_DEPLOY.md §3.
  */
 
 /** Which compatibility layer got us here (§1). */

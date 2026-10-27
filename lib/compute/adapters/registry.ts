@@ -3,7 +3,7 @@
  * (non-executing) DetectionContext, ranks by confidence, and produces the
  * winning build plan plus the alternatives. Native adapters outrank language
  * fallbacks; if nothing matches, callers fall through to HTTP/Docker/Custom
- * (COMPUTE_UNIVERSAL_DEPLOY.md §1) rather than ever saying "unsupported".
+ * (docs/compute/COMPUTE_UNIVERSAL_DEPLOY.md §1) rather than ever saying "unsupported".
  *
  * Ordered lowest-to-highest specificity is irrelevant — ranking is by score.
  */

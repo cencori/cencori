@@ -9,7 +9,7 @@
  * sugar** over `POST /runs` + awaiting the terminal event, so today's Arcie
  * server and the `<agent-chat>` widget keep working during the rollout.
  *
- * See COMPUTE_UNIVERSAL_DEPLOY.md §4.
+ * See docs/compute/COMPUTE_UNIVERSAL_DEPLOY.md §4.
  */
 
 export const RUNTIME_CONTRACT_VERSION = '2.0';
