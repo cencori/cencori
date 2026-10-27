@@ -3,11 +3,11 @@ import type { Icon } from "@solar-icons/react/lib/types";
 import { cn } from "@/lib/utils";
 
 /**
- * Lets a page fill the space between the top of the screen and the ask bar,
+ * Lets a page fill the space between the top of the screen and the tabs,
  * so a StudioEmptyCard inside it sits in the middle (matches the main
  * column's top and bottom padding in StudioShell).
  */
-export const STUDIO_FILL_PAGE = "flex min-h-[calc(100svh-11.25rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] flex-col";
+export const STUDIO_FILL_PAGE = "flex min-h-[calc(100svh-7.25rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] flex-col";
 
 interface StudioEmptyCardProps {
     icon: Icon;
