@@ -16,6 +16,8 @@ import { getCanonicalConsoleRedirect, getConsoleRoute } from "@/lib/console/rout
 const BAR_TITLES: Record<string, string> = {
     "/ai-gateway/logs": "Logs",
     "/ai-gateway/playground": "Playground",
+    "/ai-gateway/models": "Models",
+    "/organization/ai-gateway/models": "Models",
 };
 
 interface MobileNavProps {
@@ -25,10 +27,11 @@ interface MobileNavProps {
     avatar?: string | null;
     /**
      * "sticky": pinned to the top as the page scrolls. Full-screen workspaces
-     * don't scroll, so there it sits in the flow ("inline"), or under the
-     * fixed top bar when that shows on phones too ("belowHeader").
+     * don't scroll, so there it sits in the flow ("inline"), or above the
+     * fixed top bar when that shows on phones too ("aboveHeader"), leaving
+     * room for it underneath.
      */
-    placement?: "sticky" | "inline" | "belowHeader";
+    placement?: "sticky" | "inline" | "aboveHeader";
 }
 
 export function MobileNav({ projectSlug, placement = "sticky" }: MobileNavProps) {
@@ -68,7 +71,7 @@ export function MobileNav({ projectSlug, placement = "sticky" }: MobileNavProps)
         // In a full-screen workspace it takes its place in the flow, pushing the
         // workspace down instead of floating over it (sticky there would add
         // the banner's height twice).
-        <div className={`${placement === "sticky" ? "sticky top-[var(--maintenance-banner-height,0px)]" : `relative shrink-0 ${placement === "belowHeader" ? "mt-12" : ""}`} z-50 lg:hidden border-b border-border/40 bg-background`}>
+        <div className={`${placement === "sticky" ? "sticky top-[var(--maintenance-banner-height,0px)]" : `relative shrink-0 ${placement === "aboveHeader" ? "mb-12" : ""}`} z-50 lg:hidden border-b border-border/40 bg-background`}>
             <div className="relative flex items-center gap-1 px-4 py-2 overflow-x-auto scrollbar-hide">
                 {/* Project selector dropdown */}
                 {resolvedProjectSlug && (

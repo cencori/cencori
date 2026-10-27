@@ -19,14 +19,15 @@ export default function ProjectModelsPage() {
 
     return (
         <div className="w-full max-w-5xl mx-auto px-0 sm:px-6 pt-0 pb-6 sm:py-8">
-            <div className="mb-5 sm:mb-6">
+            {/* On phones the title sits in the top bar instead (MobileNav). */}
+            <div className="mb-6 hidden lg:block">
                 <h1 className="text-base sm:text-lg font-medium">Models</h1>
                 <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
                     Browse {totalModels}+ models from {totalProviders} providers available through Cencori
                 </p>
             </div>
 
-            <ModelCatalog />
+            <ModelCatalog inConsole />
         </div>
     );
 }

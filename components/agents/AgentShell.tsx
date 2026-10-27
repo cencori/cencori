@@ -142,7 +142,9 @@ function ShellBody({ children }: { children: ReactNode }) {
         <WidgetPreviewProvider openPanel={openPanel}>
         <div className="flex min-h-0 flex-1 overflow-hidden">
             <HeaderContent testOpen={testOpen} onToggleTest={() => setOpen(!testOpen)} />
-            <div className="no-scrollbar min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain">
+            {/* Phones: the preview takes the page's place (below), so it starts
+                right under the profile bar instead of floating over the page. */}
+            <div className={cn("no-scrollbar min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain", testOpen && "max-lg:hidden")}>
                 {!data.studio_ready && (
                     <div role="status" className="border-b border-border/40 bg-muted/50 px-6 py-3 text-xs leading-5 text-muted-foreground">
                         This database is missing the version-test migration. You can browse agents, but creating, testing, and publishing are paused until it is applied.
@@ -161,7 +163,7 @@ function ShellBody({ children }: { children: ReactNode }) {
                 </div>
             </div>
             {testOpen && (
-                <div className="fixed inset-x-0 top-[var(--maintenance-banner-height,0px)] bottom-0 z-40 flex bg-background lg:static lg:z-auto lg:w-[380px] lg:shrink-0 xl:w-[420px]">
+                <div className="flex min-w-0 flex-1 bg-background lg:w-[380px] lg:flex-none lg:shrink-0 xl:w-[420px]">
                     <AgentTestPanel onClose={() => setOpen(false)} />
                 </div>
             )}
