@@ -3,13 +3,14 @@ import { headers } from "next/headers";
 import { getStudioWorkspace } from "@/lib/studio/workspace";
 import { StudioShell } from "@/components/studio/StudioShell";
 import { getMainSiteUrl } from "@/lib/main-site-url";
+import { STUDIO_STARTUP_IMAGES } from "@/lib/studio/splash";
 
 export const metadata: Metadata = {
     title: { default: "Cencori Studio", template: "%s · Studio" },
     description: "Your business assistant on WhatsApp, your website and your link.",
     manifest: "/studio/manifest.webmanifest",
     applicationName: "Cencori Studio",
-    appleWebApp: { capable: true, title: "Studio", statusBarStyle: "default" },
+    appleWebApp: { capable: true, title: "Studio", statusBarStyle: "default", startupImage: STUDIO_STARTUP_IMAGES },
     icons: { apple: "/studio/apple-touch-icon.png", icon: "/studio/icon-192.png" },
     robots: { index: false, follow: false },
 };
