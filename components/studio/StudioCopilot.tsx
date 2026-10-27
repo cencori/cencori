@@ -3,7 +3,8 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { Drawer } from "vaul";
 import { ArrowUp, Square, X } from "lucide-react";
-import { StarsMinimalisticIcon } from "@solar-icons/react/bold-duotone/stars-minimalistic";
+import { HugeiconsIcon } from "@hugeicons/react";
+import AirdropIcon from "@hugeicons/core-free-icons/AirdropIcon";
 import { useQueryClient } from "@tanstack/react-query";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
 import { ThinkingState } from "@/components/chat/ThinkingState";
@@ -254,17 +255,19 @@ export function StudioCopilotProvider({ workspace, children }: { workspace: Stud
     );
 }
 
-/** The ask bar above the tabs: one tap into Copilot. */
+/** Copilot's button beside the tabs: one tap into Copilot. */
 export function StudioAskBar() {
     const { ask } = useStudioCopilot();
     return (
+        // A round button beside the tabs, as tall as their pill.
         <button
             type="button"
             onClick={() => ask()}
-            className="fixed inset-x-0 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-30 mx-auto flex h-12 w-[calc(100%-2rem)] max-w-sm items-center gap-2.5 rounded-full border border-border/60 bg-muted px-4 text-[15px] text-muted-foreground"
+            aria-label="Ask or change anything"
+            className="flex size-[58px] shrink-0 items-center justify-center rounded-full border border-border/60 bg-background/90 text-foreground backdrop-blur-md"
         >
-            <StarsMinimalisticIcon size={18} aria-hidden className="text-foreground" />
-            Ask or change anything…
+            {/* The console's Copilot icon. */}
+            <HugeiconsIcon icon={AirdropIcon} aria-hidden className="size-5" />
         </button>
     );
 }
