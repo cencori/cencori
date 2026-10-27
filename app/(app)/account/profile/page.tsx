@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/dialog";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { beginIntentionalSignOut, clearClientSessionCaches } from "@/lib/auth/session-caches";
+import { useUnsavedChanges } from "@/lib/console/unsaved-changes";
 
 interface UserProfile {
     id: string;
@@ -44,6 +45,7 @@ export default function ProfilePage() {
     const [lastName, setLastName] = useState("");
     const [username, setUsername] = useState("");
     const [isDirty, setIsDirty] = useState(false);
+    useUnsavedChanges(isDirty);
 
     const { data: profile, isLoading } = useQuery<UserProfile>({
         queryKey: ["userProfile"],

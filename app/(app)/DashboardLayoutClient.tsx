@@ -26,7 +26,7 @@ import { ThemeScope } from "@/components/theme-scope";
 import { MobileNav } from "@/components/dashboard/MobileNav";
 import { MaintenanceBanner } from "@/components/dashboard/MaintenanceBanner";
 import { CencoriAgentSidebar } from "@/components/dashboard/CencoriAgentSidebar";
-import { AGENT_HEADER_ACTIONS_SLOT_ID, COPILOT_HEADER_ACTIONS_SLOT_ID, COPILOT_OPEN_COOKIE } from "@/lib/console/copilot";
+import { AGENT_HEADER_ACTIONS_SLOT_ID, COPILOT_HEADER_ACTIONS_SLOT_ID, COPILOT_OPEN_COOKIE, COPILOT_OPEN_MENU_EVENT } from "@/lib/console/copilot";
 import { EnvironmentProvider, useEnvironment } from "@/lib/contexts/EnvironmentContext";
 import { ReactQueryProvider } from "@/lib/providers/ReactQueryProvider";
 import { SessionProvider } from "@/lib/contexts/SessionContext";
@@ -251,6 +251,15 @@ function LayoutContent({ user, avatar, name, children, initialAgentOpen, initial
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, []);
+
+  // Copilot opening the command palette for the user.
+  useEffect(() => {
+    const onOpenMenu = (event: Event) => {
+      if ((event as CustomEvent<string>).detail === "command_palette") setCommandPaletteOpen(true);
+    };
+    window.addEventListener(COPILOT_OPEN_MENU_EVENT, onOpenMenu);
+    return () => window.removeEventListener(COPILOT_OPEN_MENU_EVENT, onOpenMenu);
+  }, [setCommandPaletteOpen]);
 
   const routeOrgSlug = useMemo(() => {
     if (getConsoleSurface(pathname)) {

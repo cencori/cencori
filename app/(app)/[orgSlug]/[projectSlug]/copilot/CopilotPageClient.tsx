@@ -20,11 +20,12 @@ export function CopilotPageClient({ initialConversationId }: { initialConversati
             open
             onOpenChange={() => {}}
             initialConversationId={initialConversationId}
-            onExitFullScreen={() => {
-                // Back to the overview, with Copilot docked as a panel.
-                copilot.setOpen(true);
+            onExitFullScreen={(to) => {
+                // Docked as a panel again: on the page Copilot is taking the
+                // user to, else back to the overview.
+                copilot.setOpen(to ? to.openPanel : true);
                 const base = copilot.fullPageHref?.replace(/\/copilot$/, '');
-                router.push(base || '/home');
+                router.push(to?.href ?? (base || '/home'));
             }}
             {...copilot.agent}
         />

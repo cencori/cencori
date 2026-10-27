@@ -32,8 +32,10 @@ export type CopilotActionProposal = {
     // placeholders in a path or body take values the earlier responses returned.
     steps?: CopilotActionRequest[];
     // Not a write: Confirm opens this console page, for things that need the
-    // user's own sign-in (connecting WhatsApp, Google Calendar).
-    link?: { href: string; label: string };
+    // user's own sign-in (connecting WhatsApp, Google Calendar), in a new tab.
+    // sameTab: Copilot taking the user somewhere, once they agree to leave
+    // unsaved edits behind.
+    link?: { href: string; label: string; sameTab?: boolean };
     // Past-tense line shown once it succeeds.
     doneMessage: string;
 };

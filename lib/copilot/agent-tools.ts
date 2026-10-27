@@ -29,7 +29,7 @@ export const AGENT_READ_TOOLS: ChatCompletionFunctionTool[] = [
         type: "function",
         function: {
             name: "list_agents",
-            description: "The current project's embedded agents (the ones businesses deploy to WhatsApp, their website and so on): name, whether published, template, model and where they're live.",
+            description: "The current project's embedded agents (the ones businesses deploy to WhatsApp, their website and so on): name, whether published, template, model, and how busy each is (runs in the last 7 days, last run). Sorted busiest first.",
             parameters: { type: "object", properties: {} },
         },
     },
@@ -211,7 +211,7 @@ type VersionRow = { id: string; version: string; status: string; config_json: Re
 const text = (value: unknown, max: number) => (typeof value === "string" ? value.trim().slice(0, max) : "");
 const LOCKED = new Set(["published", "deprecated", "retired"]);
 
-async function findAgent(ctx: CopilotToolContext, ref: unknown): Promise<{ agent: AgentRow } | { error: string }> {
+export async function findAgent(ctx: CopilotToolContext, ref: unknown): Promise<{ agent: AgentRow } | { error: string }> {
     if (typeof ref !== "string" || !ref.trim()) return { error: "Say which agent (id or name)." };
     const needle = ref.trim();
     const { data } = await ctx.admin.from("agents").select("id, name, description, is_active, stable_version_id, created_at").eq("project_id", ctx.project!.id);
@@ -251,14 +251,23 @@ export async function runAgentReadTool(name: string, args: Args, ctx: CopilotToo
     if (name === "list_agents") {
         const { data } = await ctx.admin.from("agents").select("id, name, description, is_active, stable_version_id, created_at").eq("project_id", ctx.project.id).order("created_at", { ascending: false }).limit(50);
         const agents = (data ?? []) as AgentRow[];
-        return {
-            count: agents.length,
-            agents: await Promise.all(agents.map(async (a) => {
-                const working = workingVersion(await versionsOf(ctx, a.id));
-                const config = working?.config_json ?? {};
-                return { id: a.id, name: a.name, description: a.description, published: !!a.stable_version_id, template: config.template ?? null, model: config.model ?? null };
-            })),
-        };
+        const since = new Date(Date.now() - 7 * 86_400_000).toISOString();
+        const listed = await Promise.all(agents.map(async (a) => {
+            const runs = () => ctx.admin.from("embedded_runs").select("created_at", { count: "exact" }).eq("project_id", ctx.project!.id).eq("agent_id", a.id);
+            const [versions, recent, last] = await Promise.all([
+                versionsOf(ctx, a.id),
+                runs().gte("created_at", since).limit(0),
+                runs().order("created_at", { ascending: false }).limit(1),
+            ]);
+            const config = workingVersion(versions)?.config_json ?? {};
+            return {
+                id: a.id, name: a.name, description: a.description, published: !!a.stable_version_id, template: config.template ?? null, model: config.model ?? null,
+                runs_last_7_days: recent.count ?? 0,
+                last_run_at: (last.data?.[0] as { created_at?: string } | undefined)?.created_at ?? null,
+            };
+        }));
+        listed.sort((x, y) => y.runs_last_7_days - x.runs_last_7_days || (y.last_run_at ?? "").localeCompare(x.last_run_at ?? ""));
+        return { count: listed.length, agents: listed };
     }
     if (name === "get_agent") {
         const found = await findAgent(ctx, args.agent);

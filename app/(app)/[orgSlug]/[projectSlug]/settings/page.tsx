@@ -53,6 +53,7 @@ import { CostGraphIntegration } from "@/components/finops/CostGraphIntegration";
 import { CardShell } from "@/components/integrations/CardShell";
 import { IntegrationGroup } from "@/components/integrations/IntegrationGroup";
 import { PiiProtectionSetting, ResponseCachingSetting } from "@/components/dashboard/ProjectRequestSettings";
+import { useUnsavedChanges } from "@/lib/console/unsaved-changes";
 
 interface ProjectData {
   id: string;
@@ -257,6 +258,7 @@ export default function ProjectSettingsPage({ params }: PageProps) {
   const [circuitBreakerTimeoutSeconds, setCircuitBreakerTimeoutSeconds] = useState('60');
   const [isSavingProviders, setIsSavingProviders] = useState(false);
   const [providerSettingsDirty, setProviderSettingsDirty] = useState(false);
+  useUnsavedChanges(providerSettingsDirty);
 
   // Budget Settings state
   const [monthlyBudget, setMonthlyBudget] = useState('');

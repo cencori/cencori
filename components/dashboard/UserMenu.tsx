@@ -18,7 +18,8 @@ import {
     DropdownMenuSubContent,
     DropdownMenuSubTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { COPILOT_OPEN_MENU_EVENT } from "@/lib/console/copilot";
 import type { Session } from "@supabase/supabase-js";
 import posthog from "posthog-js";
 import { beginIntentionalSignOut, clearClientSessionCaches } from "@/lib/auth/session-caches";
@@ -65,6 +66,21 @@ export function UserMenu({ organization, variant = "sidebar" }: UserMenuProps) {
     const [organizationView, setOrganizationView] = useState(false);
     const [upgradeOpen, setUpgradeOpen] = useState(false);
     const [upgradePreload, setUpgradePreload] = useState(false);
+    const triggerRef = useRef<HTMLButtonElement>(null);
+
+    // Copilot opening this menu for the user. The menu renders twice (sidebar
+    // and phone nav); only the one on screen opens.
+    useEffect(() => {
+        const onOpenMenu = (event: Event) => {
+            const menu = (event as CustomEvent<string>).detail;
+            if (menu !== "account_menu" && menu !== "switch_organization") return;
+            if (!triggerRef.current?.getClientRects().length) return;
+            setOrganizationView(menu === "switch_organization");
+            setMenuOpen(true);
+        };
+        window.addEventListener(COPILOT_OPEN_MENU_EVENT, onOpenMenu);
+        return () => window.removeEventListener(COPILOT_OPEN_MENU_EVENT, onOpenMenu);
+    }, []);
 
     useEffect(() => {
         let cancelled = false;
@@ -217,6 +233,7 @@ export function UserMenu({ organization, variant = "sidebar" }: UserMenuProps) {
                 <DropdownMenuTrigger asChild>
                     {variant === "avatar" ? (
                     <button
+                        ref={triggerRef}
                         type="button"
                         className="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border transition-colors hover:bg-secondary"
                         aria-label="User menu"
@@ -225,6 +242,7 @@ export function UserMenu({ organization, variant = "sidebar" }: UserMenuProps) {
                     </button>
                     ) : (
                     <button
+                        ref={triggerRef}
                         type="button"
                         className="flex w-full items-center gap-2 rounded-md p-2 text-left text-sm hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors outline-hidden"
                         aria-label="User menu"
