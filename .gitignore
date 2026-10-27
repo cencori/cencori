@@ -94,3 +94,6 @@ AUDIT.md
 branch_structure.json
 temp_auto_push.bat
 temp_interactive_push.bat
+
+# One-off exports and scratch output: never commit these (repo is public).
+/output/
