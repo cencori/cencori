@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { createAdminClient } from "@/lib/supabaseAdmin";
-import { isOwnerActive, manualMessages, needsOwner, type NeedsOwner } from "@/lib/studio/takeover";
+import { isOwnerActive, manualMessages, needsOwner, withoutCatchUpNote, type NeedsOwner } from "@/lib/studio/takeover";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -95,7 +95,8 @@ export async function listConversations(db: Admin, projectId: string, opts: { ch
     return sessions.map((row) => {
         const turn = bySession.get(row.id) ?? [];
         const reply = outputText(turn.find((event) => event.event_type === "turn.completed")?.output);
-        const asked = turn.find((event) => event.event_type === "turn.started")?.input ?? null;
+        const startedInput = turn.find((event) => event.event_type === "turn.started")?.input ?? null;
+        const asked = startedInput ? withoutCatchUpNote(startedInput) : null;
         const turnAt = Math.max(0, ...turn.map((event) => new Date(event.created_at).getTime()));
         // A message sent while the assistant was paused, if it's the newest.
         const manual = manualMessages(row.metadata).at(-1);
@@ -117,7 +118,7 @@ export async function listConversations(db: Admin, projectId: string, opts: { ch
 }
 
 /** One conversation with its messages, in order. Null when it isn't this project's. */
-/** Whether the owner can reply from Studio, and if not, why: a website chat, or WhatsApp's 24-hour window has closed. */
+/** Whether the owner can reply from Studio, and if not, why: a chat from elsewhere (the API), or WhatsApp's 24-hour window has closed. */
 export type ReplyAbility = { possible: true; reason: null } | { possible: false; reason: "website" | "window" };
 
 export async function getConversation(db: Admin, projectId: string, sessionId: string): Promise<{ conversation: InboxConversation; messages: InboxMessage[]; reply: ReplyAbility } | null> {
@@ -131,8 +132,9 @@ export async function getConversation(db: Admin, projectId: string, sessionId: s
         .limit(400);
     const messages: InboxMessage[] = [];
     for (const event of (events ?? []) as EventRow[]) {
-        if (event.event_type === "turn.started" && event.input?.trim()) {
-            messages.push({ id: `${event.turn_number}:in`, from: "customer", text: event.input.trim(), at: event.created_at });
+        const said = event.input ? withoutCatchUpNote(event.input).trim() : "";
+        if (event.event_type === "turn.started" && said) {
+            messages.push({ id: `${event.turn_number}:in`, from: "customer", text: said, at: event.created_at });
         } else if (event.event_type === "turn.completed") {
             const text = outputText(event.output);
             if (text) messages.push({ id: `${event.turn_number}:out`, from: "assistant", text, at: event.created_at });
@@ -154,9 +156,12 @@ export async function getConversation(db: Admin, projectId: string, sessionId: s
             needs_owner: needsOwner(row.metadata), owner_active: isOwnerActive(row.metadata),
         },
         messages,
-        // Replying from Studio: WhatsApp only, inside WhatsApp's 24-hour window.
-        reply: channel !== "whatsapp"
-            ? { possible: false, reason: "website" as const }
-            : windowOpen ? { possible: true, reason: null } : { possible: false, reason: "window" as const },
+        // Replying from Studio: website and link chats any time (the visitor sees it
+        // while the chat is open); WhatsApp inside its 24-hour window.
+        reply: channel === "website" || channel === "link"
+            ? { possible: true, reason: null }
+            : channel !== "whatsapp"
+                ? { possible: false, reason: "website" as const }
+                : windowOpen ? { possible: true, reason: null } : { possible: false, reason: "window" as const },
     };
 }

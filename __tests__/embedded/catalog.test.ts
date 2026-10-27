@@ -10,7 +10,7 @@ vi.mock('@/lib/embedded/payments', () => payments);
 vi.mock('@/lib/embedded/owner-alerts', () => alerts);
 
 import { cleanProducts, describeProduct, importCatalogCsv, parsePrice, searchProducts, type CatalogProduct } from '@/lib/embedded/catalog-format';
-import { markOrderPaid, placeOrder, type CatalogMetadata } from '@/lib/embedded/catalog';
+import { markOrderPaid, markOrderPaidByOwner, placeOrder, type CatalogMetadata } from '@/lib/embedded/catalog';
 import { agentToolset } from '@/lib/embedded/agent-tools';
 
 /** tool_connections in memory: just the queries the catalog makes. */
@@ -137,6 +137,23 @@ describe('orders', () => {
         expect(row.metadata.orders[0].status).toBe('new');
         expect(row.metadata.products[0].stock).toBe(2);
         expect(alerts.notifyOrder).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ total: '₦25,000', summary: '1 × Ankara wrap dress' }), false);
+    });
+
+    it('lets the owner mark an order paid another way, taking held-back stock once', async () => {
+        const row = catalogRow([product({ id: 'p_dress', stock: 3 })]);
+        const db = fakeDb([row]);
+        payments.getPaymentsConnection.mockResolvedValue({ metadata: { currency: 'NGN' } });
+        payments.requestPayment.mockResolvedValue({ ok: true, link: 'https://pay.example/y', reference: 'cen_bbbbbbbbbbbbbbbbbb', amount: '₦25,000' });
+        const placed = await placeOrder(ctx(db), order([{ product_id: 'p_dress', quantity: 1 }]));
+        if (!placed.ok) throw new Error('order not placed');
+        // Paid in cash instead of by the link.
+        await markOrderPaidByOwner(db as never, 'p1', placed.order.id);
+        expect(row.metadata.orders[0]).toMatchObject({ status: 'paid', paid_by: 'owner' });
+        expect(row.metadata.products[0].stock).toBe(2);
+        // The link paid later too: no second deduction.
+        await markOrderPaid(db as never, 'p1', 'cen_bbbbbbbbbbbbbbbbbb', '2026-10-26T10:00:00Z');
+        await markOrderPaidByOwner(db as never, 'p1', placed.order.id);
+        expect(row.metadata.products[0].stock).toBe(2);
     });
 
     it('refuses what the catalog can\'t fill', async () => {

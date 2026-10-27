@@ -1,11 +1,14 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { useStudio } from "@/components/studio/StudioShell";
 import { useStudioCopilot } from "@/components/studio/StudioCopilot";
 import { formatMoney, joinWords, liveChannels, setupSteps, useStudioOverview } from "@/components/studio/useStudioOverview";
 import { shortTime, useInbox } from "@/components/studio/useInbox";
+import { StudioNotificationsCard } from "@/components/studio/StudioNotifications";
 import { Skeleton } from "@/components/ui/skeleton";
 
 function greeting(): string {
@@ -24,6 +27,14 @@ export default function StudioHomePage() {
     const data = overview.data;
     const live = liveChannels(data?.assistant ?? null);
     const steps = setupSteps(data?.assistant?.still_to_do ?? []);
+    const router = useRouter();
+
+    // Opened from the home screen with nothing set up yet: setup starts right away.
+    useEffect(() => {
+        if (agents.length > 0) return;
+        const installed = window.matchMedia("(display-mode: standalone)").matches || (navigator as Navigator & { standalone?: boolean }).standalone === true;
+        if (installed) router.replace("/setup");
+    }, [agents.length, router]);
 
     return (
         <div>
@@ -54,6 +65,8 @@ export default function StudioHomePage() {
                             ? <span><span className="font-medium text-foreground">Live</span> on {joinWords(live)}</span>
                             : <span><span className="font-medium text-foreground">Not live yet.</span> Finish setting up below.</span>}
                     </Link>
+
+                    <StudioNotificationsCard />
 
                     {waiting.length > 0 && (
                         <section className="mt-4">

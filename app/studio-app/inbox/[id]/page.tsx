@@ -110,7 +110,7 @@ export default function StudioConversationPage({ params }: { params: Promise<{ i
             <div className="sticky bottom-0 border-t border-border/60 bg-background px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3">
                 {act.error && <p role="alert" className="mb-2 text-[13px] leading-5 text-destructive">{act.error.message}</p>}
                 {!conversation || !reply ? null : reply.reason === "website" ? (
-                    <p className="text-[13px] leading-5 text-muted-foreground">Your assistant is handling this chat. Replying yourself works on WhatsApp chats for now.</p>
+                    <p className="text-[13px] leading-5 text-muted-foreground">Your assistant is handling this chat. Replying yourself works on WhatsApp, website and link chats.</p>
                 ) : conversation.owner_active ? (
                     <>
                         {reply.possible ? (
@@ -131,6 +131,9 @@ export default function StudioConversationPage({ params }: { params: Promise<{ i
                             </form>
                         ) : (
                             <p className="text-[13px] leading-5 text-muted-foreground">WhatsApp only lets businesses reply within 24 hours of the customer&apos;s last message. Call them, or wait for them to message again.</p>
+                        )}
+                        {reply.possible && conversation.channel !== "whatsapp" && (
+                            <p className="mt-2 text-[12px] leading-4 text-muted-foreground">They&apos;ll see your messages while the chat is open on their screen.</p>
                         )}
                         <button type="button" onClick={() => act.mutate({ action: "hand_back" })} disabled={act.isPending} className="mt-2 h-11 w-full rounded-full border border-border/60 text-sm font-medium">
                             Hand back to the assistant

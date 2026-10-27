@@ -14,7 +14,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { waitUntil } from '@vercel/functions';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { KAPSO_TOKEN_HEADER, verifyKapsoDelivery } from '@/lib/channels/kapso';
-import { getKapsoChannelByPhoneNumberId, parseInbound, type InboundMessage } from '@/lib/channels/whatsapp';
+import { getKapsoChannelByPhoneNumberId, parseInbound, parseOwnerEchoes, type InboundMessage, type OwnerEcho } from '@/lib/channels/whatsapp';
 
 export const maxDuration = 300;
 
@@ -35,21 +35,25 @@ export async function POST(req: NextRequest) {
         return new NextResponse(null, { status: 400 });
     }
     const messages = parseInbound(payload);
-    if (messages.length > 0) {
-        waitUntil(route(messages).catch((error) => console.error('[whatsapp:kapso] delivery failed', error instanceof Error ? error.message : error)));
+    // Replies the owner sent from the WhatsApp Business app on their phone.
+    const echoes = parseOwnerEchoes(payload);
+    if (messages.length > 0 || echoes.length > 0) {
+        waitUntil(route(messages, echoes).catch((error) => console.error('[whatsapp:kapso] delivery failed', error instanceof Error ? error.message : error)));
     }
     return NextResponse.json({ ok: true });
 }
 
 /** Each number's messages to its agent; numbers nobody connected (or turned off) are dropped. */
-async function route(messages: InboundMessage[]): Promise<void> {
+async function route(messages: InboundMessage[], echoes: OwnerEcho[]): Promise<void> {
     const db = createAdminClient();
-    const byNumber = new Map<string, InboundMessage[]>();
-    for (const message of messages) byNumber.set(message.phoneNumberId, [...(byNumber.get(message.phoneNumberId) ?? []), message]);
-    const { handleInboundMessages } = await import('@/lib/channels/whatsapp-runner');
-    await Promise.all([...byNumber.entries()].map(async ([phoneNumberId, list]) => {
+    const numbers = new Set([...messages.map((m) => m.phoneNumberId), ...echoes.map((e) => e.phoneNumberId)]);
+    const { handleInboundMessages, handleOwnerEchoes } = await import('@/lib/channels/whatsapp-runner');
+    await Promise.all([...numbers].map(async (phoneNumberId) => {
         const channel = await getKapsoChannelByPhoneNumberId(db, phoneNumberId);
         if (!channel || !channel.metadata.enabled || channel.status !== 'active') return;
-        await handleInboundMessages(db, channel, list);
+        // The owner's own replies first, so a customer message in the same delivery finds the chat paused.
+        await handleOwnerEchoes(db, channel, echoes.filter((e) => e.phoneNumberId === phoneNumberId));
+        const list = messages.filter((m) => m.phoneNumberId === phoneNumberId);
+        if (list.length) await handleInboundMessages(db, channel, list);
     }));
 }

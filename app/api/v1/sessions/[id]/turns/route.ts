@@ -259,6 +259,23 @@ export async function POST(
             return respondError(400, 'Request body is not valid JSON', 'invalid_json');
         }
 
+        // Studio: the owner stepped into this website or link chat. The visitor's
+        // message is kept for them and the assistant stays quiet; once it's handed
+        // back, the assistant first hears what was said. (WhatsApp does the same in
+        // its runner, before it ever calls this route.)
+        if ((source === 'widget' || source === 'link') && typeof body.input === 'string' && body.input.trim()) {
+            const takeover = await import('@/lib/studio/takeover');
+            if (takeover.isOwnerActive(session.metadata as Record<string, unknown> | null)) {
+                await takeover.addManualMessage(adminClient as never, sessionId, { from: 'customer', text: body.input.trim().slice(0, 4000) });
+                return new Response('event: owner.handling\ndata: {}\n\n', {
+                    status: 200,
+                    headers: { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-store' },
+                });
+            }
+            const missed = await takeover.takeUnseenManualMessages(adminClient as never, sessionId).catch(() => null);
+            if (missed) body.input = `${missed}\n\n${body.input}`;
+        }
+
         // Installed versions override legacy agent_configs: the normalized
         // manifest is the runtime source of truth whenever the session
         // carries an installation — model, instructions, temperature, the

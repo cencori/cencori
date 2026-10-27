@@ -88,6 +88,13 @@ export async function addManualMessage(db: Admin, sessionId: string, message: Om
     }), true);
 }
 
+const CATCH_UP_NOTE = /^\[While you were paused, the business owner talked with the customer directly:[\s\S]*?don't repeat what the owner already said\.\]\n\n/;
+
+/** A customer message without the catch-up note the assistant was given with it. */
+export function withoutCatchUpNote(text: string): string {
+    return text.replace(CATCH_UP_NOTE, "");
+}
+
 /**
  * What the assistant missed while it was paused, as a note for its next turn,
  * and mark it seen. Null when there's nothing new.

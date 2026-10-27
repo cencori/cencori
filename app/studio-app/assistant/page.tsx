@@ -1,10 +1,12 @@
 "use client";
 
-import type { ReactNode } from "react";
-import { Check } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { Check, QrCode } from "lucide-react";
+import { StudioLinkQr } from "@/components/studio/StudioLinkQr";
 import { useStudioCopilot } from "@/components/studio/StudioCopilot";
 import { joinWords, liveChannels, useStudioOverview, type StudioAssistantSummary } from "@/components/studio/useStudioOverview";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getMainSiteUrl } from "@/lib/main-site-url";
 
 /** What each ability is called for an owner. */
 const ABILITIES: Record<string, string> = {
@@ -42,6 +44,8 @@ export default function StudioAssistantPage() {
     const data = overview.data;
     const assistant = data?.assistant ?? null;
     const live = liveChannels(assistant);
+    const [qrOpen, setQrOpen] = useState(false);
+    const linkUrl = data?.share_token ? `${new URL(getMainSiteUrl("/")).origin}/talk/${data.share_token}` : null;
 
     return (
         <div>
@@ -95,7 +99,9 @@ export default function StudioAssistantPage() {
                                 <div className="flex flex-wrap gap-1.5">
                                     {assistant.whatsapp?.replies_on && <span className="rounded-full bg-muted px-3 py-1 text-[13px]">WhatsApp {assistant.whatsapp.number ?? ""}</span>}
                                     {assistant.website_chat?.on && <span className="rounded-full bg-muted px-3 py-1 text-[13px]">{assistant.website_chat.sites[0]?.replace(/^https?:\/\//, "") ?? "Your website"}</span>}
-                                    {assistant.website_chat && <span className="rounded-full bg-muted px-3 py-1 text-[13px]">Your link</span>}
+                                    {assistant.website_chat && (linkUrl ? (
+                                        <button type="button" onClick={() => setQrOpen(true)} className="flex items-center gap-1.5 rounded-full bg-muted px-3 py-1 text-[13px]"><QrCode className="h-3.5 w-3.5" />Your link and QR code</button>
+                                    ) : <span className="rounded-full bg-muted px-3 py-1 text-[13px]">Your link</span>)}
                                 </div>
                             ) : (
                                 <p className="text-[15px] leading-6 text-muted-foreground">Nowhere yet. Connect WhatsApp or add it to your website.</p>
@@ -120,6 +126,7 @@ export default function StudioAssistantPage() {
                     </div>
                 </>
             )}
+            {linkUrl && assistant && <StudioLinkQr url={linkUrl} name={assistant.name} open={qrOpen} onOpenChange={setQrOpen} />}
         </div>
     );
 }

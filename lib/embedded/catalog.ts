@@ -45,6 +45,8 @@ export interface CatalogOrder {
     conversation_id: string | null;
     created_at: string;
     paid_at: string | null;
+    /** How it was paid: by the payment link, or marked paid by the owner (cash, transfer). */
+    paid_by?: 'link' | 'owner';
 }
 
 export interface CatalogMetadata {
@@ -125,6 +127,25 @@ async function updateCatalog(db: Admin, catalogId: string, change: (metadata: Ca
     const metadata = { ...next, orders: next.orders.slice(-ORDERS_KEPT) };
     const { error } = await db.from('tool_connections').update({ metadata }).eq('id', catalogId);
     return error ? null : { ...current, metadata };
+}
+
+/** The owner was paid another way (cash, transfer): the order counts as paid from now. */
+export async function markOrderPaidByOwner(db: Admin, projectId: string, orderId: string): Promise<Catalog | null> {
+    const catalog = await getCatalog(db, projectId);
+    const order = catalog?.metadata.orders.find((o) => o.id === orderId);
+    if (!catalog || !order || order.status === 'cancelled') return null;
+    if (order.status === 'paid' || order.paid_at) return catalog;
+    const paidAt = new Date().toISOString();
+    return updateCatalog(db, catalog.id, (metadata) => {
+        const current = metadata.orders.find((o) => o.id === orderId);
+        if (!current || current.status === 'paid' || current.status === 'cancelled') return metadata;
+        return {
+            ...metadata,
+            // Stock for an order waiting on its payment link comes off when it's paid, however it's paid.
+            products: current.status === 'awaiting_payment' ? takeStock(metadata.products, current.items) : metadata.products,
+            orders: metadata.orders.map((o) => (o.id === orderId ? { ...o, status: 'paid', paid_at: paidAt, paid_by: 'owner' } : o)),
+        };
+    });
 }
 
 /** Owner's changes to an order from the console: done or cancelled. */
@@ -260,7 +281,7 @@ export async function markOrderPaid(db: Admin, projectId: string, paymentReferen
         return {
             ...metadata,
             products: takeStock(metadata.products, current.items),
-            orders: metadata.orders.map((o) => (o.id === order.id ? { ...o, status: 'paid', paid_at: paidAt } : o)),
+            orders: metadata.orders.map((o) => (o.id === order.id ? { ...o, status: 'paid', paid_at: paidAt, paid_by: 'link' } : o)),
         };
     });
     return { ...order, status: 'paid', paid_at: paidAt };

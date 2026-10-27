@@ -197,12 +197,22 @@ interface AlertContext {
     conversationId?: string | null;
 }
 
+/**
+ * The same event as a Studio push notification, for whoever turned them on
+ * (whether or not email alerts are set up). Previews never notify.
+ */
+function push(ctx: AlertContext, message: { title: string; body: string; url: string; tag?: string }): Promise<void> {
+    if (ctx.surface === 'preview') return Promise.resolve();
+    return import('@/lib/studio/push').then(({ pushToOwners }) => pushToOwners(ctx.db, ctx.projectId, message)).catch(() => undefined);
+}
+
 /** Email the owner about a booking the agent just made. Best-effort; never throws. */
 export async function notifyBooking(ctx: AlertContext, argsJson: string): Promise<void> {
     try {
         const alerts = await getOwnerAlerts(ctx.db, ctx.projectId, ctx.agentId);
-        if (!alerts) return;
         const booking = bookingFromArgs(argsJson);
+        await push(ctx, { title: 'New booking', body: [booking.title, formatWhen(booking.start, alerts?.settings.time_zone ?? 'Africa/Lagos')].filter(Boolean).join(', '), url: '/sales', tag: 'booking' });
+        if (!alerts) return;
         const when = formatWhen(booking.start, alerts.settings.time_zone);
         const source = await conversationSource(ctx.db, ctx.surface, ctx.conversationId);
         await appendLog(ctx.db, alerts, { type: 'booking', at: new Date().toISOString(), title: booking.title, when, detail: booking.detail, source });
@@ -224,6 +234,7 @@ export async function notifyBooking(ctx: AlertContext, argsJson: string): Promis
  * it, so the agent never promises a callback that goes nowhere.
  */
 export async function notifyCallback(ctx: AlertContext, request: { name: string | null; contact: string; reason: string }): Promise<boolean> {
+    await push(ctx, { title: `${request.name ?? request.contact} wants a call back`, body: request.reason.slice(0, 200), url: ctx.conversationId ? `/inbox/${ctx.conversationId}` : '/inbox', tag: `needs-${ctx.conversationId ?? request.contact}` });
     const alerts = await getOwnerAlerts(ctx.db, ctx.projectId, ctx.agentId);
     if (!alerts || !alerts.settings.callbacks || alerts.settings.emails.length === 0) return false;
     const source = await conversationSource(ctx.db, ctx.surface, ctx.conversationId);
@@ -241,6 +252,7 @@ export async function notifyCallback(ctx: AlertContext, request: { name: string 
 /** Email the owner that a customer paid (a deposit, a table, an order). Best-effort. */
 export async function notifyPayment(ctx: AlertContext, payment: { amount: string; description: string; customer: string | null; reference: string }): Promise<void> {
     try {
+        await push(ctx, { title: `Paid ${payment.amount}`, body: [payment.description, payment.customer].filter(Boolean).join(' · '), url: '/money', tag: `paid-${payment.reference}` });
         const alerts = await getOwnerAlerts(ctx.db, ctx.projectId, ctx.agentId);
         if (!alerts) return;
         const source = await conversationSource(ctx.db, ctx.surface, ctx.conversationId);
@@ -262,6 +274,7 @@ export async function notifyPayment(ctx: AlertContext, payment: { amount: string
  */
 export async function notifyOrder(ctx: AlertContext, order: { id: string; summary: string; total: string; customer: string | null; delivery: string | null; note: string | null }, paid: boolean): Promise<void> {
     try {
+        await push(ctx, { title: `${paid ? 'Paid order' : 'New order'}: ${order.total}`, body: [order.summary, order.customer].filter(Boolean).join(' · ').slice(0, 200), url: '/sales', tag: `order-${order.id}` });
         const alerts = await getOwnerAlerts(ctx.db, ctx.projectId, ctx.agentId);
         if (!alerts) return;
         const source = await conversationSource(ctx.db, ctx.surface, ctx.conversationId);

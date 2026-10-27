@@ -432,6 +432,42 @@ export function parseInbound(payload: unknown): InboundMessage[] {
     return out;
 }
 
+/**
+ * A message the business sent from the WhatsApp Business app on its phone
+ * (coexistence): Meta reports it as an "echo" (the smb_message_echoes field).
+ */
+export interface OwnerEcho {
+    id: string;
+    /** The customer it went to (wa_id). */
+    to: string;
+    text: string;
+    phoneNumberId: string;
+}
+
+const ECHO_LABELS: Record<string, string> = { image: '[Sent a photo]', video: '[Sent a video]', audio: '[Sent a voice note]', document: '[Sent a document]', sticker: '[Sent a sticker]', location: '[Sent a location]' };
+
+/** The owner's own messages in a webhook delivery (coexistence echoes). */
+export function parseOwnerEchoes(payload: unknown): OwnerEcho[] {
+    const out: OwnerEcho[] = [];
+    const entries = (payload as { entry?: Array<{ changes?: Array<{ field?: string; value?: Record<string, unknown> }> }> } | null)?.entry ?? [];
+    for (const entry of entries) {
+        for (const change of entry.changes ?? []) {
+            if (change.field !== 'smb_message_echoes' || !change.value) continue;
+            const value = change.value as {
+                metadata?: { phone_number_id?: string };
+                message_echoes?: Array<{ id?: string; to?: string; type?: string; text?: { body?: string }; image?: { caption?: string } }>;
+            };
+            for (const echo of value.message_echoes ?? []) {
+                if (!echo.id || !echo.to) continue;
+                const text = echo.type === 'text' ? echo.text?.body?.trim() : echo.image?.caption?.trim() || ECHO_LABELS[echo.type ?? ''] || '[Sent a message]';
+                if (!text) continue;
+                out.push({ id: echo.id, to: echo.to, text: text.slice(0, 4000), phoneNumberId: value.metadata?.phone_number_id ?? '' });
+            }
+        }
+    }
+    return out;
+}
+
 /** Markdown from the model in WhatsApp's own formatting, which has no headings or links syntax. */
 export function toWhatsAppText(markdown: string): string {
     return markdown

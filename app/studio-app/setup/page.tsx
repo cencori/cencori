@@ -4,10 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowUp, Check, ChevronLeft, Link2, Loader2 } from "lucide-react";
+import { ArrowUp, Camera, Check, ChevronLeft, Link2, Loader2, QrCode } from "lucide-react";
+import { StudioLinkQr } from "@/components/studio/StudioLinkQr";
 import { useStudio } from "@/components/studio/StudioShell";
 import { useStudioCopilot } from "@/components/studio/StudioCopilot";
 import { BUSINESS_KINDS, setupInstructions, setupKnowledge, setupQuestions, type AnswerKey, type BusinessKind } from "@/lib/studio/setup";
+import { resizePhoto } from "@/lib/studio/resize-photo";
 import { getMainSiteUrl } from "@/lib/main-site-url";
 import { cn } from "@/lib/utils";
 
@@ -55,6 +57,9 @@ export default function StudioSetupPage() {
     const [building, setBuilding] = useState<string[] | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
+    const [qrOpen, setQrOpen] = useState(false);
+    const [reading, setReading] = useState<"reading" | "read" | null>(null);
+    const photoRef = useRef<HTMLInputElement>(null);
     const endRef = useRef<HTMLDivElement>(null);
 
     // Pick up where they left off.
@@ -102,6 +107,24 @@ export default function StudioSetupPage() {
             .finally(() => setBusy(false));
     }, [project.id]);
 
+    // "Take a photo": the menu or price list read from up to four pictures, into the answer box to check.
+    const readPhotos = async (files: FileList | null) => {
+        if (!files?.length) return;
+        setError(null);
+        setReading("reading");
+        try {
+            const images = await Promise.all(Array.from(files).slice(0, 4).map((file) => resizePhoto(file)));
+            const { text } = await call<{ text: string }>("/api/studio/menu-photo", "POST", { project_id: project.id, images });
+            setDraft((current) => (current.trim() ? `${current.trim()}\n\n${text}` : text));
+            setReading("read");
+        } catch (cause) {
+            setError(cause instanceof Error ? cause.message : "Couldn't read the photo. Type your list instead.");
+            setReading(null);
+        } finally {
+            if (photoRef.current) photoRef.current.value = "";
+        }
+    };
+
     const kind = state.kind;
     const questions = kind ? setupQuestions(kind) : [];
     const current = questions[state.asked];
@@ -111,6 +134,7 @@ export default function StudioSetupPage() {
         const text = value?.trim() ?? "";
         if (!text && !current.optional) return;
         setDraft("");
+        setReading(null);
         const answers = { ...state.answers, [current.key]: text };
         const asked = state.asked + 1;
         setState((s) => ({ ...s, answers, asked }));
@@ -208,7 +232,7 @@ export default function StudioSetupPage() {
                 <span className="text-[13px] text-muted-foreground">Step {state.step} of 5</span>
             </div>
             <div className="mt-3"><Progress step={state.step} /></div>
-            {error && <p role="alert" className="mt-4 rounded-2xl bg-destructive/10 px-4 py-3 text-[13px] leading-5 text-destructive">{error}</p>}
+            {error && !(state.step === 2 && current?.key === "list") && <p role="alert" className="mt-4 rounded-2xl bg-destructive/10 px-4 py-3 text-[13px] leading-5 text-destructive">{error}</p>}
 
             {state.step === 1 && (
                 <>
@@ -264,8 +288,22 @@ export default function StudioSetupPage() {
                     </div>
                     {current && !building && (
                         <div className="sticky bottom-0 -mx-5 mt-4 border-t border-border/60 bg-background px-5 pt-3">
-                            {(current.choices || current.optional) && (
+                            {current.key === "list" && reading && (
+                                <p className={cn("mb-2 flex items-center gap-2 text-[13px] leading-5", reading === "read" ? "text-foreground" : "text-muted-foreground")}>
+                                    {reading === "reading" ? <><Loader2 className="h-4 w-4 animate-spin" />Reading your photo…</> : <><Check className="h-4 w-4 text-emerald-600" />Here&apos;s what I read. Fix anything that&apos;s off, then send.</>}
+                                </p>
+                            )}
+                            {current.key === "list" && error && <p role="alert" className="mb-2 text-[13px] leading-5 text-destructive">{error}</p>}
+                            {(current.choices || current.optional || current.key === "list") && (
                                 <div className="mb-3 flex flex-wrap gap-2">
+                                    {current.key === "list" && (
+                                        <>
+                                            <input ref={photoRef} type="file" accept="image/*" multiple hidden onChange={(event) => void readPhotos(event.target.files)} />
+                                            <button type="button" onClick={() => photoRef.current?.click()} disabled={reading === "reading"} className="flex h-9 items-center gap-1.5 rounded-full border border-border/60 px-4 text-sm disabled:opacity-60">
+                                                <Camera className="h-4 w-4" />Take a photo
+                                            </button>
+                                        </>
+                                    )}
                                     {current.choices?.map((choice) => (
                                         <button key={choice} type="button" onClick={() => answer(choice)} className="h-9 rounded-full border border-border/60 px-4 text-sm">{choice}</button>
                                     ))}
@@ -276,7 +314,7 @@ export default function StudioSetupPage() {
                                 <label className="flex min-h-12 flex-1 items-center rounded-3xl bg-muted px-4 py-2">
                                     <span className="sr-only">{current.ask(state.answers)}</span>
                                     {current.long ? (
-                                        <textarea value={draft} onChange={(event) => setDraft(event.target.value)} rows={3} placeholder={current.placeholder} className="max-h-40 w-full resize-none bg-transparent text-[15px] leading-6 outline-none placeholder:text-muted-foreground" />
+                                        <textarea value={draft} onChange={(event) => setDraft(event.target.value)} rows={reading === "read" ? 8 : 3} placeholder={current.placeholder} className="max-h-40 w-full resize-none bg-transparent text-[15px] leading-6 outline-none placeholder:text-muted-foreground" />
                                     ) : (
                                         <input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={current.placeholder} autoFocus className="w-full bg-transparent text-[15px] outline-none placeholder:text-muted-foreground" />
                                     )}
@@ -312,7 +350,11 @@ export default function StudioSetupPage() {
                         <div className="flex items-center gap-3 px-4 py-3.5">
                             <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"><Link2 className="h-5 w-5" /></span>
                             <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold">Your link</span><span className="block truncate text-[13px] text-muted-foreground">For Instagram, a QR code or a table card</span></span>
-                            <span className="text-[13px] font-semibold text-emerald-700 dark:text-emerald-400">Ready</span>
+                            {state.built.shareToken ? (
+                                <button type="button" onClick={() => setQrOpen(true)} className="flex h-9 items-center gap-1.5 rounded-full border border-border/60 px-3 text-sm font-medium"><QrCode className="h-4 w-4" />QR code</button>
+                            ) : (
+                                <span className="text-[13px] font-semibold text-emerald-700 dark:text-emerald-400">Ready</span>
+                            )}
                         </div>
                         <div className="flex items-center gap-3 border-t border-border/60 px-4 py-3.5">
                             <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted">
@@ -341,7 +383,10 @@ export default function StudioSetupPage() {
                         <div className="mt-6 rounded-2xl border border-border/60 px-4 py-3.5">
                             <p className="text-[13px] text-muted-foreground">Your link</p>
                             <p className="mt-0.5 truncate text-sm font-semibold">{shareUrl(state.built.shareToken).replace(/^https?:\/\//, "")}</p>
-                            <button type="button" onClick={() => void copyLink()} className="mt-3 h-9 rounded-full border border-border/60 px-4 text-sm font-semibold">Share link</button>
+                            <div className="mt-3 flex gap-2">
+                                <button type="button" onClick={() => void copyLink()} className="h-9 rounded-full border border-border/60 px-4 text-sm font-semibold">Share link</button>
+                                <button type="button" onClick={() => setQrOpen(true)} className="flex h-9 items-center gap-1.5 rounded-full border border-border/60 px-4 text-sm font-semibold"><QrCode className="h-4 w-4" />QR code</button>
+                            </div>
                         </div>
                     )}
                     <div className="mt-3 rounded-2xl bg-muted px-4 py-3.5">
@@ -353,6 +398,7 @@ export default function StudioSetupPage() {
                     </div>
                 </>
             )}
+            {state.built?.shareToken && <StudioLinkQr url={shareUrl(state.built.shareToken)} name={state.answers.name || organization.name} open={qrOpen} onOpenChange={setQrOpen} />}
         </div>
     );
 }

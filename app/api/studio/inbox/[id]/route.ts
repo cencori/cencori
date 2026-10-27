@@ -4,8 +4,9 @@
  *      every message in order, and whether the owner can reply here.
  * POST /api/studio/inbox/:id  { project_id, action: 'step_in' | 'hand_back' | 'reply', text? }
  *      Stepping in: pause the assistant in this chat, hand it back, or send the
- *      customer a message as the owner (WhatsApp, inside its 24-hour window;
- *      it keeps the assistant paused).
+ *      customer a message as the owner (it keeps the assistant paused). On
+ *      WhatsApp it's sent inside the 24-hour window; on website and link chats
+ *      it's kept on the conversation, where the visitor's chat window polls it.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -51,8 +52,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             return NextResponse.json({
                 error: found.reply.reason === 'window'
                     ? 'WhatsApp only lets a business reply within 24 hours of the customer\'s last message. Call them, or wait for them to message again.'
-                    : 'You can reply from here on WhatsApp chats.',
+                    : 'You can reply from here on WhatsApp, website and link chats.',
             }, { status: 409 });
+        }
+        // Website and link chats: the visitor's chat window picks it up.
+        if (found.conversation.channel !== 'whatsapp') {
+            await addManualMessage(db, id, { from: 'owner', text });
+            const updated = await getConversation(db, projectId, id);
+            return NextResponse.json(updated, { headers: { 'Cache-Control': 'no-store' } });
         }
         const { data: session } = await db.from('sessions').select('metadata').eq('id', id).maybeSingle();
         const metadata = (session?.metadata ?? {}) as { channel_id?: string; customer_number?: string };

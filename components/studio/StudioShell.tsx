@@ -3,11 +3,12 @@
 import { createContext, useContext, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { House, MessageCircle, Sparkles } from "lucide-react";
+import { House, MessageCircle, ShoppingBag, Sparkles, Wallet } from "lucide-react";
 import { ReactQueryProvider } from "@/lib/providers/ReactQueryProvider";
 import { ThemeScope } from "@/components/theme-scope";
 import { cn } from "@/lib/utils";
 import { StudioAskBar, StudioCopilotProvider } from "@/components/studio/StudioCopilot";
+import { useStudioServiceWorker } from "@/components/studio/StudioNotifications";
 
 export interface StudioContextValue {
     user: { id: string; firstName: string | null; email: string | null };
@@ -25,10 +26,11 @@ export function useStudio(): StudioContextValue {
     return value;
 }
 
-// Sales and Money join in the next phase.
 const TABS = [
     { href: "/", label: "Home", icon: House, match: (path: string) => path === "/" },
     { href: "/inbox", label: "Inbox", icon: MessageCircle, match: (path: string) => path.startsWith("/inbox") },
+    { href: "/sales", label: "Sales", icon: ShoppingBag, match: (path: string) => path.startsWith("/sales") },
+    { href: "/money", label: "Money", icon: Wallet, match: (path: string) => path.startsWith("/money") },
     { href: "/assistant", label: "Assistant", icon: Sparkles, match: (path: string) => path.startsWith("/assistant") },
 ];
 
@@ -39,9 +41,11 @@ const TABS = [
  */
 export function StudioShell({ workspace, children }: { workspace: StudioContextValue; children: ReactNode }) {
     // Studio is served at the subdomain's root; the internal prefix never shows.
+    // Installable app and push notifications.
+    useStudioServiceWorker();
     const pathname = (usePathname() ?? "/").replace(/^\/studio-app(?=\/|$)/, "") || "/";
-    // A conversation and setup take the whole screen: their own controls, no tabs.
-    const focused = /^\/inbox\/[^/]+/.test(pathname) || pathname.startsWith("/setup");
+    // A conversation, setup and getting the app take the whole screen: their own controls, no tabs.
+    const focused = /^\/inbox\/[^/]+/.test(pathname) || pathname.startsWith("/setup") || pathname.startsWith("/get-app");
     return (
         <ReactQueryProvider>
             <StudioContext.Provider value={workspace}>
@@ -54,7 +58,7 @@ export function StudioShell({ workspace, children }: { workspace: StudioContextV
                     </main>
                     {!focused && <nav
                         aria-label="Studio"
-                        className="fixed inset-x-0 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-40 mx-auto grid w-[calc(100%-2rem)] max-w-sm grid-cols-3 gap-1 rounded-full border border-border/60 bg-background/90 p-1.5 backdrop-blur-md"
+                        className="fixed inset-x-0 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-40 mx-auto grid w-[calc(100%-2rem)] max-w-sm grid-cols-5 gap-0.5 rounded-full border border-border/60 bg-background/90 p-1.5 backdrop-blur-md"
                     >
                         {TABS.map((tab) => {
                             const active = tab.match(pathname);

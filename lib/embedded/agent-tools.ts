@@ -295,7 +295,13 @@ export function agentToolset(config: Record<string, unknown> | null | undefined)
                 if (outcome.ok && isBookingTool(binding.tool)) {
                     waitUntil(import('./owner-alerts').then(async ({ notifyBooking }) => {
                         const { createAdminClient } = await import('@/lib/supabaseAdmin');
-                        await notifyBooking({ db: createAdminClient(), projectId: context.projectId, agentId: context.agentId, agentName: context.agentName, surface: context.surface, conversationId: context.conversationId }, call.args);
+                        const db = createAdminClient();
+                        await notifyBooking({ db, projectId: context.projectId, agentId: context.agentId, agentName: context.agentName, surface: context.surface, conversationId: context.conversationId }, call.args);
+                        // Kept for Studio's Sales tab too (previews aren't real bookings).
+                        if (context.surface !== 'preview') {
+                            const { recordBooking } = await import('./bookings');
+                            await recordBooking(db, { projectId: context.projectId, agentId: context.agentId, conversationId: context.conversationId ?? null, argsJson: call.args });
+                        }
                     }).catch(() => undefined));
                 }
                 return outcome;
@@ -513,9 +519,16 @@ async function transferToHuman(url: string, argumentsJson: string, context: Agen
     const summary = typeof args.summary === 'string' ? args.summary.trim().slice(0, 2000) : '';
     if (!contact) return { ok: false, output: 'Ask the person how to reach them (an email or phone number) before handing off.' };
     if (!summary) return { ok: false, output: 'Include a short summary of what they need.' };
-    // Studio shows the chat as needing the owner, whatever their hand-off address does.
-    await Promise.all([import('@/lib/studio/takeover'), import('@/lib/supabaseAdmin')])
-        .then(([{ flagNeedsOwner }, { createAdminClient }]) => flagNeedsOwner(createAdminClient(), context.conversationId, summary))
+    // Studio shows the chat as needing the owner, whatever their hand-off address does, and tells them.
+    await Promise.all([import('@/lib/studio/takeover'), import('@/lib/studio/push'), import('@/lib/supabaseAdmin')])
+        .then(async ([{ flagNeedsOwner }, { pushToOwners }, { createAdminClient }]) => {
+            const db = createAdminClient();
+            await flagNeedsOwner(db, context.conversationId, summary);
+            if (context.surface !== 'preview') {
+                const who = typeof args.name === 'string' && args.name.trim() ? args.name.trim() : 'A customer';
+                await pushToOwners(db, context.projectId, { title: `${who} needs you`, body: summary.slice(0, 200), url: context.conversationId ? `/inbox/${context.conversationId}` : '/inbox', tag: `needs-${context.conversationId ?? contact}` });
+            }
+        })
         .catch(() => undefined);
 
     const payload = {

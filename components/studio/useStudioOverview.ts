@@ -21,6 +21,7 @@ export interface StudioAssistantSummary {
 
 export interface StudioOverview {
     assistant: StudioAssistantSummary | null;
+    share_token: string | null;
     time_zone: string;
     today: { chats: number; earned?: { amount: number; count: number } };
     month: { chats: number; earned?: { amount: number; count: number } };

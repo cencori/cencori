@@ -14,24 +14,10 @@ import { runAgentReadTool } from '@/lib/copilot/agent-tools';
 import { getPaymentsConnection } from '@/lib/embedded/payments';
 import { getOwnerAlerts } from '@/lib/embedded/owner-alerts';
 import { conversationsUsed, getOrganizationPlan } from '@/lib/business/plans';
+import { periodStarts, safeTimeZone } from '@/lib/studio/time';
+import { mintWidgetShareToken } from '@/lib/embedded/widget';
 
 const fail = (message: string, status = 400) => NextResponse.json({ error: message }, { status });
-
-/** Midnight today and the 1st of this month in a time zone, as UTC instants. */
-function periodStarts(timeZone: string, now = new Date()): { day: Date; month: Date } {
-    const parts = Object.fromEntries(
-        new Intl.DateTimeFormat('en-US', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' })
-            .formatToParts(now)
-            .map((part) => [part.type, part.value]),
-    );
-    // How far the zone's wall clock is ahead of UTC right now.
-    const wall = Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour, +parts.minute, +parts.second);
-    const offset = wall - Math.floor(now.getTime() / 1000) * 1000;
-    return {
-        day: new Date(Date.UTC(+parts.year, +parts.month - 1, +parts.day) - offset),
-        month: new Date(Date.UTC(+parts.year, +parts.month - 1, 1) - offset),
-    };
-}
 
 export async function GET(req: NextRequest) {
     const projectId = req.nextUrl.searchParams.get('project_id') ?? '';
@@ -53,20 +39,15 @@ export async function GET(req: NextRequest) {
     const agent = list.find((item) => item.id === wanted) ?? list.find((item) => item.is_active && item.stable_version_id) ?? list[0] ?? null;
 
     const alerts = agent ? await getOwnerAlerts(db, projectId, agent.id).catch(() => null) : null;
-    const timeZone = (alerts?.settings as { time_zone?: string } | undefined)?.time_zone || 'Africa/Lagos';
-    let starts: { day: Date; month: Date };
-    try {
-        starts = periodStarts(timeZone);
-    } catch {
-        starts = periodStarts('Africa/Lagos');
-    }
+    const timeZone = safeTimeZone(alerts?.settings.time_zone);
+    const starts = periodStarts(timeZone);
 
     const chats = (since: Date) => db.from('sessions').select('id', { count: 'exact', head: true })
         .eq('project_id', projectId).gte('created_at', since.toISOString())
         // Console previews and tests aren't customers.
         .or('metadata->>preview.is.null,metadata->>preview.eq.false');
 
-    const [summary, today, month, payments, plan] = await Promise.all([
+    const [summary, today, month, payments, plan, widget] = await Promise.all([
         agent
             ? runAgentReadTool('get_agent', { agent: agent.id }, { admin: db, organization: organization as { id: string; name: string; slug: string }, project: project as { id: string; name: string; slug: string } })
             : Promise.resolve(null),
@@ -74,6 +55,9 @@ export async function GET(req: NextRequest) {
         chats(starts.month),
         getPaymentsConnection(db, projectId).catch(() => null),
         getOrganizationPlan(db as never, access.organizationId),
+        agent
+            ? db.from('agent_widgets').select('id, public_key').eq('project_id', projectId).eq('agent_id', agent.id).maybeSingle().then(({ data }) => data as { id: string; public_key: string } | null)
+            : Promise.resolve(null),
     ]);
 
     // Money that came in through the assistant's payment links.
@@ -87,6 +71,8 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
         assistant: summary && !('error' in (summary as object)) ? summary : null,
+        // The customer link (/talk/<token>), for sharing and its QR code.
+        share_token: widget ? mintWidgetShareToken(widget) : null,
         time_zone: timeZone,
         today: { chats: today.count ?? 0, ...(payments ? { earned: earned(starts.day) } : {}) },
         month: { chats: month.count ?? 0, ...(payments ? { earned: earned(starts.month) } : {}) },

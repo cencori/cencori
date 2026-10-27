@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { OWNER_IDLE_MS, addManualMessage, flagNeedsOwner, handBack, isOwnerActive, needsOwner, stepIn, takeUnseenManualMessages } from '@/lib/studio/takeover';
+import { OWNER_IDLE_MS, addManualMessage, flagNeedsOwner, handBack, isOwnerActive, needsOwner, stepIn, takeUnseenManualMessages, withoutCatchUpNote } from '@/lib/studio/takeover';
 
 /** One sessions row, read and written the way the module does. */
 function fakeDb(metadata: Record<string, unknown> = {}) {
@@ -48,5 +48,15 @@ describe('stepping in', () => {
         expect(note).toContain('Customer: Can we have the terrace?');
         expect(note).toContain('Owner: Yes, terrace at 8pm.');
         expect(await takeUnseenManualMessages(db, 's1')).toBeNull();
+    });
+});
+
+describe('withoutCatchUpNote', () => {
+    it('shows the customer only what they typed, not the note the assistant was given', async () => {
+        const { db } = fakeDb();
+        await addManualMessage(db, 's1', { from: 'owner', text: 'Yes we deliver' });
+        const note = await takeUnseenManualMessages(db, 's1');
+        expect(withoutCatchUpNote(`${note}\n\nHow much is it?`)).toBe('How much is it?');
+        expect(withoutCatchUpNote('Plain message')).toBe('Plain message');
     });
 });

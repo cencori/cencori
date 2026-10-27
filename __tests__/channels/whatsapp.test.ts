@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const fetchMock = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/security/outbound-url', () => ({ safeOutboundFetch: fetchMock }));
 
-import { channelAccessToken, downloadMedia, parseInbound, sendText, splitForWhatsApp, toWhatsAppText, verifyWhatsAppSignature, type WhatsAppChannel } from '@/lib/channels/whatsapp';
+import { channelAccessToken, downloadMedia, parseInbound, parseOwnerEchoes, sendText, splitForWhatsApp, toWhatsAppText, verifyWhatsAppSignature, type WhatsAppChannel } from '@/lib/channels/whatsapp';
 import { readReply } from '@/lib/channels/whatsapp-runner';
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -86,6 +86,27 @@ describe('WhatsApp channel', () => {
 
         fetchMock.mockResolvedValueOnce(json({ url: 'https://lookaside.fbsbx.com/x', file_size: 50 * 1024 * 1024 }));
         await expect(downloadMedia(channel, 'token', 'media.10')).rejects.toThrow('Voice note too long');
+    });
+
+    it("reads the owner's own replies from the WhatsApp Business app, and nothing else", () => {
+        const payload = {
+            entry: [{
+                changes: [
+                    { field: 'smb_message_echoes', value: { metadata: { phone_number_id: '1065' }, message_echoes: [
+                        { id: 'wamid.e1', from: '2347085231045', to: '2349126230221', type: 'text', text: { body: 'Yes, terrace at 8pm' } },
+                        { id: 'wamid.e2', to: '2349126230221', type: 'image', image: { caption: '' } },
+                        { id: 'wamid.e3', type: 'text', text: { body: 'no recipient' } },
+                    ] } },
+                    { field: 'messages', value: { metadata: { phone_number_id: '1065' }, messages: [{ id: 'wamid.m1', from: '2349126230221', type: 'text', text: { body: 'Hi' } }] } },
+                ],
+            }],
+        };
+        expect(parseOwnerEchoes(payload)).toEqual([
+            { id: 'wamid.e1', to: '2349126230221', text: 'Yes, terrace at 8pm', phoneNumberId: '1065' },
+            { id: 'wamid.e2', to: '2349126230221', text: '[Sent a photo]', phoneNumberId: '1065' },
+        ]);
+        // Echoes are never mistaken for customer messages.
+        expect(parseInbound(payload).map((m) => m.id)).toEqual(['wamid.m1']);
     });
 
     it('goes through Kapso for numbers connected through Kapso', async () => {
