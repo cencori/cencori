@@ -56,14 +56,32 @@ export async function ensureKapsoCustomer(name: string, externalId: string): Pro
     return created.data;
 }
 
-/** A link the business opens to connect its number; it sends them back to `successUrl` or `failureUrl`. */
+/** Kapso's setup page in Cencori's console colours, so the hand-off doesn't feel like another product. */
+const SETUP_THEME = {
+    primary_color: '#111111',
+    primary_foreground_color: '#FFFFFF',
+    background_color: '#FFFFFF',
+    text_color: '#111111',
+    muted_text_color: '#5F5F5F',
+    card_color: '#F4F4F2',
+    muted_color: '#F4F4F2',
+    border_color: '#E7E7E5',
+};
+
+/**
+ * A link the business opens to connect its number. It sends them back to
+ * `successUrl` (Kapso adds phone_number_id and the rest) or `failureUrl`
+ * (with error_code). Coexistence only for now: the WhatsApp Business app
+ * number they already use, which also skips Kapso's choice screen.
+ */
 export async function createKapsoSetupLink(customerId: string, opts: { successUrl: string; failureUrl: string }): Promise<string> {
     const created = await platform<{ data: { url: string } }>('POST', `/customers/${encodeURIComponent(customerId)}/setup_links`, {
         setup_link: {
             success_redirect_url: opts.successUrl,
             failure_redirect_url: opts.failureUrl,
-            // Their WhatsApp Business app number (kept on their phone), or a new number.
-            allowed_connection_types: ['coexistence', 'dedicated'],
+            allowed_connection_types: ['coexistence'],
+            theme_config: SETUP_THEME,
+            language: 'en',
         },
     });
     return created.data.url;
