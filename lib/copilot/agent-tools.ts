@@ -282,8 +282,8 @@ export async function runAgentReadTool(name: string, args: Args, ctx: CopilotToo
             channelState(ctx, found.agent.id),
         ]);
         const { data: sources } = kb
-            ? await ctx.admin.from("knowledge_sources").select("name, status").eq("knowledge_base_id", (kb as { id: string }).id).order("created_at", { ascending: false }).limit(30)
-            : { data: [] as Array<{ name: string; status: string }> };
+            ? await ctx.admin.from("knowledge_sources").select("id, name, status").eq("knowledge_base_id", (kb as { id: string }).id).order("created_at", { ascending: false }).limit(30)
+            : { data: [] as Array<{ id: string; name: string; status: string }> };
         const apps = readAgentIntegrations(config).map((s) => ({ app: s.name, tools_on: s.enabled.length }));
         const instructions = String(config.instructions ?? config.system_prompt ?? "");
         const published = !!found.agent.stable_version_id;
@@ -312,7 +312,7 @@ export async function runAgentReadTool(name: string, args: Args, ctx: CopilotToo
             payments: paystack ? { provider: (paystack.metadata as { provider?: string } | null)?.provider ?? null, mode: (paystack.metadata as { mode?: string } | null)?.mode ?? null, currency: (paystack.metadata as { currency?: string } | null)?.currency ?? null } : null,
             products: catalog ? { count: catalog.metadata.products.length, currency: catalog.metadata.currency, orders_to_fulfil: catalog.metadata.orders.filter((o) => o.status === "paid" || o.status === "new").length } : null,
             mcp_servers: readAgentMcpServers(config).map((s) => s.name),
-            knowledge: (sources ?? []).map((s) => ({ name: s.name, status: s.status })),
+            knowledge: (sources ?? []).map((s) => ({ id: s.id, name: s.name, status: s.status })),
             ...channels,
             still_to_do: left,
         };

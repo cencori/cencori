@@ -8,7 +8,8 @@ import { NextResponse } from 'next/server';
 import { orbBackground } from '@/lib/agents/orb';
 import type { WidgetAppearance } from './widget';
 
-export type WidgetPageMode = 'widget' | 'inline' | 'page';
+/** bare: the chat without its close button, on the page's own background (Studio's "Try it" sheet). */
+export type WidgetPageMode = 'widget' | 'inline' | 'page' | 'bare';
 
 const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 
@@ -74,9 +75,9 @@ export function widgetChatPage(opts: {
 
 const STYLES = `
 :root{color-scheme:light dark;--bg:#ffffff;--fg:#111111;--muted:#6b6b6b;--line:#ececec;--soft:#f4f4f3;--bubble:#f1f1f0}
-@media (prefers-color-scheme:dark){:root{--bg:#0b0b0b;--fg:#f2f2f2;--muted:#9a9a9a;--line:#1f1f1f;--soft:#161616;--bubble:#1b1b1b}}
+@media (prefers-color-scheme:dark){:root{--bg:#000000;--fg:#f2f2f2;--muted:#9a9a9a;--line:#1f1f1f;--soft:#161616;--bubble:#1b1b1b}}
 [data-theme="light"]{--bg:#ffffff;--fg:#111111;--muted:#6b6b6b;--line:#ececec;--soft:#f4f4f3;--bubble:#f1f1f0;color-scheme:light}
-[data-theme="dark"]{--bg:#0b0b0b;--fg:#f2f2f2;--muted:#9a9a9a;--line:#1f1f1f;--soft:#161616;--bubble:#1b1b1b;color-scheme:dark}
+[data-theme="dark"]{--bg:#000000;--fg:#f2f2f2;--muted:#9a9a9a;--line:#1f1f1f;--soft:#161616;--bubble:#1b1b1b;color-scheme:dark}
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;background:transparent;font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;-webkit-font-smoothing:antialiased}
 .app{display:flex;flex-direction:column;height:100%;background:var(--bg);color:var(--fg)}
@@ -90,6 +91,9 @@ html,body{margin:0;height:100%;background:transparent;font:14px/1.5 -apple-syste
 .icon svg{width:16px;height:16px}
 .mode-inline .close{display:none}
 .mode-page .close{display:none}
+.mode-bare{background:transparent}
+.mode-bare .close{display:none}
+.mode-bare .head{border-bottom:0;border-top:1px solid var(--line)}
 .mode-page .head{padding:14px max(16px,calc(50% - 368px))}
 .mode-page .list{padding:24px max(16px,calc(50% - 360px))}
 .mode-page .composer{margin:0 max(12px,calc(50% - 360px)) 10px}

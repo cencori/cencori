@@ -80,6 +80,17 @@ export default function StudioSetupPage() {
     // Pick up where they left off.
     useEffect(() => {
         let saved: Saved | null = null;
+        // "Add assistant" (?new=1): a new one from the start, whatever was saved.
+        const fresh = new URLSearchParams(window.location.search).get("new") === "1";
+        if (fresh) {
+            window.history.replaceState(null, "", window.location.pathname);
+            try {
+                localStorage.removeItem(STORAGE_KEY(project.id));
+            } catch {
+                // Nothing to clear.
+            }
+            return;
+        }
         try {
             saved = JSON.parse(localStorage.getItem(STORAGE_KEY(project.id)) ?? "null") as Saved | null;
         } catch {

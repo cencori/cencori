@@ -5,6 +5,7 @@ import { Drawer } from "vaul";
 import { BellIcon } from "@solar-icons/react/bold-duotone/bell";
 import { ChatRoundCheckIcon } from "@solar-icons/react/bold-duotone/chat-round-check";
 import { StudioLink } from "@/components/studio/studio-nav";
+import { StudioNotificationsCard } from "@/components/studio/StudioNotifications";
 import { shortTime, useInbox, type InboxConversation } from "@/components/studio/useInbox";
 import { cn } from "@/lib/utils";
 
@@ -62,6 +63,8 @@ export function StudioNotificationBell({ className }: { className?: string }) {
                     </div>
                     {/* Scrolls only at full height, so a drag on the list moves the sheet until then. */}
                     <div className={cn("min-h-0 flex-1 px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-4", snap === 1 ? "overflow-y-auto" : "overflow-hidden")}>
+                        {/* Push notifications off on this device: the way to turn them on comes first. */}
+                        <StudioNotificationsCard className="mb-4 mt-0" />
                         {count === 0 ? (
                             <div className="flex flex-col items-center rounded-3xl bg-muted/60 px-6 py-10 text-center">
                                 <ChatRoundCheckIcon size={36} className="mb-2" />

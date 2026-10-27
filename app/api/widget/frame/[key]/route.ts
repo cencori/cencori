@@ -1,5 +1,5 @@
 /**
- * GET /api/widget/frame/:key?mode=widget|inline&preview=
+ * GET /api/widget/frame/:key?mode=widget|inline|bare&preview=
  *
  * The chat page the loader puts in an iframe. Its frame-ancestors list is the
  * widget's allowed sites, so browsers refuse to show it anywhere else; a valid
@@ -29,7 +29,10 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ key: string
     return widgetChatPage({
         key,
         agentId: widget.agent_id,
-        mode: req.nextUrl.searchParams.get('mode') === 'inline' ? 'inline' : 'widget',
+        mode: (() => {
+            const mode = req.nextUrl.searchParams.get('mode');
+            return mode === 'inline' || mode === 'bare' ? mode : 'widget';
+        })(),
         appearance: sanitizeAppearance(widget.appearance, widget.agents?.name ?? 'Assistant'),
         nonce,
         ancestors,

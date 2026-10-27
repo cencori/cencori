@@ -92,7 +92,7 @@ export async function GET(req: NextRequest) {
         currency,
         payments_connected: !!payments,
         plan: plan.accountType === 'business' && plan.plan
-            ? { name: plan.plan.name, conversations: plan.plan.conversations, used: used ?? 0, active: plan.active, period_end: plan.periodEnd }
+            ? { name: plan.plan.name, conversations: plan.plan.conversations, agents: plan.plan.agents, used: used ?? 0, active: plan.active, period_end: plan.periodEnd }
             : null,
     }, { headers: { 'Cache-Control': 'no-store' } });
 }

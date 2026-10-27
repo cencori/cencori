@@ -13,7 +13,7 @@ export interface StudioAssistantSummary {
     connected_apps: Array<{ app: string; tools_on: number }>;
     payments: { provider: string | null; mode: string | null; currency: string | null } | null;
     products: { count: number; currency: string; orders_to_fulfil: number } | null;
-    knowledge: Array<{ name: string; status: string }>;
+    knowledge: Array<{ id?: string; name: string; status: string }>;
     website_chat: { on: boolean; sites: string[] } | null;
     whatsapp: { number: string | null; replies_on: boolean } | null;
     owner_alerts: { emails: string[] } | null;
@@ -28,16 +28,16 @@ export interface StudioOverview {
     month: { chats: number; earned?: { amount: number; count: number } };
     currency: string;
     payments_connected: boolean;
-    plan: { name: string; conversations: number; used: number; active: boolean; period_end: string | null } | null;
+    plan: { name: string; conversations: number; agents: number; used: number; active: boolean; period_end: string | null } | null;
 }
 
-/** Home and Assistant's data: one request, refreshed when the owner comes back to the app. */
-export function useStudioOverview() {
+/** Home's data (and one assistant's, with agentId): one request, refreshed when the owner comes back to the app. */
+export function useStudioOverview(agentId?: string) {
     const { project } = useStudio();
     return useQuery({
-        queryKey: ["studio-overview", project.id],
+        queryKey: agentId ? ["studio-overview", project.id, agentId] : ["studio-overview", project.id],
         queryFn: async (): Promise<StudioOverview> => {
-            const response = await studioFetch(`/api/studio/overview?project_id=${project.id}`, { cache: "no-store" });
+            const response = await studioFetch(`/api/studio/overview?project_id=${project.id}${agentId ? `&agent_id=${agentId}` : ""}`, { cache: "no-store" });
             const body = await response.json().catch(() => null);
             if (!response.ok) throw new Error((body as { error?: string } | null)?.error ?? "Couldn't load your business.");
             return body as StudioOverview;

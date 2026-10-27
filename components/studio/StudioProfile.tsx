@@ -201,7 +201,7 @@ export function StudioProfile({ className }: { className?: string }) {
                     right={switching === item.id ? <span className="text-sm text-muted-foreground">Opening…</span> : <span />}
                 />
             </div>
-            <button type="button" onClick={() => tasks.open("business", { id: item.id, name: item.name, isBusiness: !!item.isBusiness })} aria-label={`More for ${item.name}`} className="mr-2 flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground">
+            <button type="button" onClick={() => tasks.open("business", { business: { id: item.id, name: item.name, isBusiness: !!item.isBusiness } })} aria-label={`More for ${item.name}`} className="mr-2 flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground">
                 <MenuDotsIcon size={20} />
             </button>
         </div>

@@ -22,7 +22,10 @@ export type StudioTask = "knowledge" | "whatsapp" | "golive" | "alerts" | "payme
 /** Another business the ⋯ menu acts on (never the open one). */
 export type BusinessTarget = { id: string; name: string; isBusiness: boolean };
 
-const TasksContext = createContext<{ open: (task: StudioTask, target?: BusinessTarget) => void } | null>(null);
+/** business: the business the ⋯ menu acts on. agentId: which assistant (else the first). */
+type TaskOptions = { business?: BusinessTarget; agentId?: string };
+
+const TasksContext = createContext<{ open: (task: StudioTask, options?: TaskOptions) => void } | null>(null);
 
 export function useStudioTasks() {
     const value = useContext(TasksContext);
@@ -71,8 +74,10 @@ const TITLES: Record<StudioTask, string> = {
 export function StudioTasksProvider({ children }: { children: ReactNode }) {
     const [task, setTask] = useState<StudioTask | null>(null);
     const [target, setTarget] = useState<BusinessTarget | null>(null);
-    const open = useCallback((next: StudioTask, nextTarget?: BusinessTarget) => {
-        setTarget(nextTarget ?? null);
+    const [agentId, setAgentId] = useState<string | null>(null);
+    const open = useCallback((next: StudioTask, options?: TaskOptions) => {
+        setTarget(options?.business ?? null);
+        setAgentId(options?.agentId ?? null);
         setTask(next);
     }, []);
     const [notice, setNotice] = useState<string | null>(null);
@@ -129,7 +134,7 @@ export function StudioTasksProvider({ children }: { children: ReactNode }) {
                         <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-1">
                             {task === "business" && target
                                 ? <BusinessTask target={target} onDone={() => { setTask(null); void queryClient.invalidateQueries(); }} />
-                                : task && task !== "business" && <TaskBody task={task} onDone={() => { setTask(null); void queryClient.invalidateQueries(); }} />}
+                                : task && task !== "business" && <TaskBody task={task} agentId={agentId} onDone={() => { setTask(null); void queryClient.invalidateQueries(); }} />}
                         </div>
                     </Drawer.Content>
                 </Drawer.Portal>
@@ -144,9 +149,9 @@ export function StudioTasksProvider({ children }: { children: ReactNode }) {
     );
 }
 
-function TaskBody({ task, onDone }: { task: StudioTask; onDone: () => void }) {
+function TaskBody({ task, agentId: chosen, onDone }: { task: StudioTask; agentId: string | null; onDone: () => void }) {
     const { project, agents, user, organization } = useStudio();
-    const agentId = agents[0]?.id ?? null;
+    const agentId = chosen ?? agents[0]?.id ?? null;
     if (task === "plans") return <PlansTask organizationId={organization.id} />;
     if (task === "newbusiness") return <NewBusinessTask />;
     if (task === "later") {

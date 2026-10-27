@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { cn } from "@/lib/utils";
 import { BellRing, X } from "lucide-react";
 import { useStudio } from "@/components/studio/StudioShell";
 
@@ -96,7 +97,7 @@ export function useStudioPush() {
  * The "Get notified" card: turns push notifications on for this device.
  * Hidden once they're on, or when the browser can't do them at all.
  */
-export function StudioNotificationsCard() {
+export function StudioNotificationsCard({ className }: { className?: string } = {}) {
     const { state, busy, error, turnOn } = useStudioPush();
     // Hidden until storage is read, so a closed card never flashes in.
     const [dismissed, setDismissed] = useState(true);
@@ -110,7 +111,7 @@ export function StudioNotificationsCard() {
 
     if (dismissed || state === "on" || state === "unsupported") return null;
     return (
-        <section className="relative mt-4 flex gap-3 rounded-2xl border border-border/60 py-3.5 pl-4 pr-10">
+        <section className={cn("relative mt-4 flex gap-3 rounded-2xl border border-border/60 py-3.5 pl-4 pr-10", className)}>
             <button type="button" onClick={dismiss} aria-label="Dismiss" className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:text-foreground">
                 <X className="h-4 w-4" />
             </button>

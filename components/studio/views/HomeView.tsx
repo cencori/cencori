@@ -11,7 +11,6 @@ import { useStudio } from "@/components/studio/StudioShell";
 import { useStudioCopilot } from "@/components/studio/StudioCopilot";
 import { taskForStep, useStudioTasks } from "@/components/studio/StudioTasks";
 import { formatMoney, setupSteps, useStudioOverview } from "@/components/studio/useStudioOverview";
-import { StudioNotificationsCard } from "@/components/studio/StudioNotifications";
 import { StudioProfile } from "@/components/studio/StudioProfile";
 import { StudioNotificationBell } from "@/components/studio/StudioNotificationBell";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -97,7 +96,6 @@ export default function StudioHomePage() {
                 <StudioLoadError error={overview.error} fallback="Couldn't load your business." onRetry={() => void overview.refetch()} />
             ) : (
                 <>
-                    <StudioNotificationsCard />
 
                     <div className="mt-5 rounded-2xl bg-foreground p-5 text-background">
                         {data?.today.earned ? (

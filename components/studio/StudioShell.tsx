@@ -51,7 +51,7 @@ export function StudioShell({ workspace, children }: { workspace: StudioContextV
     useStudioServiceWorker();
     const pathname = useStudioPath();
     // A conversation, setup and getting the app take the whole screen: their own controls, no tabs.
-    const focused = /^\/inbox\/[^/]+/.test(pathname) || pathname.startsWith("/setup") || pathname.startsWith("/get-app");
+    const focused = /^\/(inbox|assistant)\/[^/]+/.test(pathname) || pathname.startsWith("/setup") || pathname.startsWith("/get-app");
     return (
         <StudioDataProvider>
             <StudioContext.Provider value={workspace}>
