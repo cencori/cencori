@@ -193,7 +193,7 @@ function safeDecrypt(value: string, organizationId: string): string | null {
  * (per minute, from model_pricing). Null when it had no words.
  */
 async function transcribeVoiceNote(db: Admin, channel: WhatsAppChannel, accessToken: string, mediaId: string, billing: Array<Promise<unknown>>): Promise<string | null> {
-    return transcribeMedia(db, channel, await downloadMedia(accessToken, mediaId), billing);
+    return transcribeMedia(db, channel, await downloadMedia(channel, accessToken, mediaId), billing);
 }
 
 /**

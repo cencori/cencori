@@ -77,7 +77,7 @@ describe('WhatsApp channel', () => {
         fetchMock
             .mockResolvedValueOnce(json({ url: 'https://lookaside.fbsbx.com/whatsapp/media/9', mime_type: 'audio/ogg; codecs=opus', file_size: 4 }))
             .mockResolvedValueOnce(new Response(new Uint8Array([1, 2, 3, 4])));
-        const media = await downloadMedia('token', 'media.9');
+        const media = await downloadMedia(channel, 'token', 'media.9');
         expect(fetchMock.mock.calls[0][0]).toBe('https://graph.facebook.com/v23.0/media.9');
         expect(fetchMock.mock.calls[1][0]).toBe('https://lookaside.fbsbx.com/whatsapp/media/9');
         expect((fetchMock.mock.calls[1][1] as RequestInit).headers).toEqual({ Authorization: 'Bearer token' });
@@ -85,7 +85,28 @@ describe('WhatsApp channel', () => {
         expect(media.bytes.byteLength).toBe(4);
 
         fetchMock.mockResolvedValueOnce(json({ url: 'https://lookaside.fbsbx.com/x', file_size: 50 * 1024 * 1024 }));
-        await expect(downloadMedia('token', 'media.10')).rejects.toThrow('Voice note too long');
+        await expect(downloadMedia(channel, 'token', 'media.10')).rejects.toThrow('Voice note too long');
+    });
+
+    it('goes through Kapso for numbers connected through Kapso', async () => {
+        const kapso = { ...channel, metadata: { ...channel.metadata, provider: 'kapso' } } as WhatsAppChannel;
+        fetchMock
+            .mockResolvedValueOnce(json({ download_url: 'https://api.kapso.ai/meta/whatsapp/media_download?token=t', mime_type: 'audio/ogg', file_size: '4' }))
+            .mockResolvedValueOnce(new Response(new Uint8Array([1, 2, 3, 4])));
+        const media = await downloadMedia(kapso, 'kapso-key', 'media.9');
+        expect(fetchMock.mock.calls[0][0]).toBe('https://api.kapso.ai/meta/whatsapp/v24.0/media.9?phone_number_id=1065');
+        expect((fetchMock.mock.calls[0][1] as RequestInit).headers).toMatchObject({ 'X-API-Key': 'kapso-key' });
+        // Kapso's link carries its own token: no key sent to it.
+        expect((fetchMock.mock.calls[1][1] as RequestInit).headers).toBeUndefined();
+        expect(media.bytes.byteLength).toBe(4);
+
+        fetchMock.mockResolvedValueOnce(json({ messages: [{ id: 'wamid.1' }] }));
+        await sendText(kapso, 'kapso-key', '2348000000000', 'Hi');
+        expect(fetchMock.mock.calls[2][0]).toBe('https://api.kapso.ai/meta/whatsapp/v24.0/1065/messages');
+
+        process.env.KAPSO_API_KEY = 'kapso-key';
+        expect(channelAccessToken(kapso, () => 'stored')).toBe('kapso-key');
+        delete process.env.KAPSO_API_KEY;
     });
 
     it("uses Cencori's permanent token for numbers it has a seat on, the stored token otherwise", () => {

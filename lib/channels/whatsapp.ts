@@ -19,6 +19,7 @@ import { createHmac, randomBytes, timingSafeEqual } from 'crypto';
 import type { createAdminClient } from '@/lib/supabaseAdmin';
 import { decryptApiKey, encryptApiKey } from '@/lib/encryption';
 import { safeOutboundFetch } from '@/lib/security/outbound-url';
+import { KAPSO_META_BASE } from '@/lib/channels/kapso';
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -47,6 +48,13 @@ export interface WhatsAppChannelMetadata {
     waba_id?: string | null;
     /** The number also stays on the WhatsApp Business app (coexistence). */
     coexistence?: boolean;
+    /**
+     * Connected through Kapso's Meta app: webhooks arrive on
+     * /api/channels/whatsapp/kapso and replies go through Kapso's Cloud API
+     * proxy with Cencori's Kapso key (KAPSO_API_KEY). No token is stored.
+     */
+    provider?: 'kapso';
+    kapso_customer_id?: string | null;
     /**
      * Cencori's system user was added to the business's WhatsApp account, so
      * replies use Cencori's permanent token (META_SYSTEM_USER_TOKEN) instead of
@@ -91,6 +99,17 @@ export async function getManagedChannelByPhoneNumberId(db: Admin, phoneNumberId:
     const { data } = await db.from('tool_connections').select(COLUMNS)
         .eq('connector_slug', WHATSAPP_CHANNEL_SLUG).eq('metadata->>phone_number_id', phoneNumberId).eq('metadata->>managed', 'true')
         .order('updated_at', { ascending: false }).limit(1).maybeSingle();
+    const channel = toChannel(data as Record<string, unknown> | null);
+    // Kapso numbers only take deliveries from Kapso's webhook.
+    return channel?.metadata.provider === 'kapso' ? null : channel;
+}
+
+/** A number connected through Kapso, found by the phone number id on each forwarded delivery. */
+export async function getKapsoChannelByPhoneNumberId(db: Admin, phoneNumberId: string): Promise<WhatsAppChannel | null> {
+    if (!/^\d{5,25}$/.test(phoneNumberId)) return null;
+    const { data } = await db.from('tool_connections').select(COLUMNS)
+        .eq('connector_slug', WHATSAPP_CHANNEL_SLUG).eq('metadata->>phone_number_id', phoneNumberId).eq('metadata->>provider', 'kapso')
+        .order('updated_at', { ascending: false }).limit(1).maybeSingle();
     return toChannel(data as Record<string, unknown> | null);
 }
 
@@ -112,6 +131,7 @@ export function publicChannel(channel: WhatsAppChannel, webhookUrl: string) {
         enabled: m.enabled,
         managed: !!m.managed,
         coexistence: !!m.coexistence,
+        provider: m.provider ?? 'meta',
         // Numbers connected through Cencori's app need no webhook set-up of their own.
         webhook_url: m.managed ? null : webhookUrl,
         verify_token: m.managed ? null : m.verify_token,
@@ -121,10 +141,14 @@ export function publicChannel(channel: WhatsAppChannel, webhookUrl: string) {
     };
 }
 
-async function graph<T>(method: string, path: string, token: string, body?: unknown): Promise<T> {
-    const response = await safeOutboundFetch(`${GRAPH}${path}`, {
+/** Meta's Graph API, or Kapso's copy of it (same paths, Kapso key) for numbers connected through Kapso. */
+type Via = 'meta' | 'kapso';
+const viaOf = (channel: WhatsAppChannel): Via => (channel.metadata.provider === 'kapso' ? 'kapso' : 'meta');
+
+async function graph<T>(method: string, path: string, token: string, body?: unknown, via: Via = 'meta'): Promise<T> {
+    const response = await safeOutboundFetch(`${via === 'kapso' ? KAPSO_META_BASE : GRAPH}${path}`, {
         method,
-        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', ...(body ? { 'Content-Type': 'application/json' } : {}) },
+        headers: { ...(via === 'kapso' ? { 'X-API-Key': token } : { Authorization: `Bearer ${token}` }), Accept: 'application/json', ...(body ? { 'Content-Type': 'application/json' } : {}) },
         ...(body ? { body: JSON.stringify(body) } : {}),
         signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS),
     });
@@ -254,6 +278,60 @@ export async function saveSignupChannel(
 }
 
 /**
+ * Save a number connected through Kapso. Nothing secret is stored: Kapso
+ * holds the business's token and Cencori acts with its own Kapso key.
+ * Replaces whatever the agent had, and takes the number from any other agent.
+ */
+export async function saveKapsoChannel(
+    db: Admin,
+    opts: {
+        projectId: string;
+        agentId: string;
+        existing: WhatsAppChannel | null;
+        customerId: string;
+        number: { phone_number_id: string; display_phone_number: string | null; verified_name: string | null; business_account_id: string | null; is_coexistence: boolean };
+    },
+): Promise<{ ok: true; channel: WhatsAppChannel } | { ok: false; status: number; message: string }> {
+    const { number } = opts;
+    const metadata: WhatsAppChannelMetadata = {
+        kind: 'whatsapp_channel',
+        agent_id: opts.agentId,
+        phone_number_id: number.phone_number_id,
+        display_phone_number: number.display_phone_number,
+        verified_name: number.verified_name,
+        app_secret_encrypted: null,
+        verify_token: opts.existing?.metadata.verify_token ?? `cencori_${randomBytes(16).toString('hex')}`,
+        managed: true,
+        provider: 'kapso',
+        kapso_customer_id: opts.customerId,
+        waba_id: number.business_account_id,
+        coexistence: number.is_coexistence,
+        enabled: opts.existing?.metadata.enabled ?? true,
+        webhook_verified_at: new Date().toISOString(),
+        last_message_at: opts.existing?.metadata.last_message_at ?? null,
+        daily_session_cap: opts.existing?.metadata.daily_session_cap ?? 500,
+    };
+    const row = {
+        project_id: opts.projectId,
+        connector_slug: WHATSAPP_CHANNEL_SLUG,
+        owner_type: 'platform',
+        status: 'active',
+        encrypted_access_ref: null,
+        key_hint: number.display_phone_number ?? number.phone_number_id,
+        metadata,
+        last_error: null,
+    };
+    await db.from('tool_connections').delete().eq('connector_slug', WHATSAPP_CHANNEL_SLUG).eq('metadata->>phone_number_id', number.phone_number_id).neq('metadata->>agent_id', opts.agentId);
+    const write = opts.existing
+        ? db.from('tool_connections').update(row).eq('id', opts.existing.id).select(COLUMNS).single()
+        : db.from('tool_connections').insert(row).select(COLUMNS).single();
+    const { data, error } = await write;
+    const channel = toChannel(data as Record<string, unknown> | null);
+    if (error || !channel) return { ok: false, status: 502, message: 'Couldn\'t save the WhatsApp channel. Try again.' };
+    return { ok: true, channel };
+}
+
+/**
  * Give Cencori's system user a seat on a business's WhatsApp account, so one
  * permanent Cencori token can answer for every connected number. Uses Cencori's
  * own token: the account is shared with Cencori's business by the signup.
@@ -263,8 +341,12 @@ export async function assignSystemUserToWaba(wabaId: string, systemUserId: strin
     await graph('POST', `/${encodeURIComponent(wabaId)}/assigned_users?${params}`, systemUserToken);
 }
 
-/** The token to act for a channel with: Cencori's permanent one when it has a seat, the stored one otherwise. */
+/**
+ * The token to act for a channel with: Cencori's Kapso key for a Kapso number,
+ * Cencori's permanent one when it has a seat, the stored one otherwise.
+ */
 export function channelAccessToken(channel: WhatsAppChannel, decrypt: (value: string) => string | null): string | null {
+    if (channel.metadata.provider === 'kapso') return process.env.KAPSO_API_KEY ?? null;
     const shared = process.env.META_SYSTEM_USER_TOKEN;
     if (channel.metadata.managed && channel.metadata.system_user_assigned && shared) return shared;
     return channel.accessTokenEncrypted ? decrypt(channel.accessTokenEncrypted) : null;
@@ -385,11 +467,18 @@ export const MAX_VOICE_NOTE_BYTES = 8 * 1024 * 1024;
  * A media file a customer sent: Meta gives a short-lived URL for the media id,
  * which is fetched with the same token.
  */
-export async function downloadMedia(accessToken: string, mediaId: string): Promise<{ bytes: ArrayBuffer; mimeType: string }> {
-    const info = await graph<{ url?: string; mime_type?: string; file_size?: number }>('GET', `/${encodeURIComponent(mediaId)}`, accessToken);
-    if (!info.url) throw new Error('WhatsApp gave no address for that file');
-    if ((info.file_size ?? 0) > MAX_VOICE_NOTE_BYTES) throw Object.assign(new Error('Voice note too long'), { code: 'too_large' });
-    const response = await safeOutboundFetch(info.url, { headers: { Authorization: `Bearer ${accessToken}` }, signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS) });
+export async function downloadMedia(channel: WhatsAppChannel, accessToken: string, mediaId: string): Promise<{ bytes: ArrayBuffer; mimeType: string }> {
+    const via = viaOf(channel);
+    // Kapso needs the number that owns the file, and hands back its own signed download link.
+    const query = via === 'kapso' ? `?phone_number_id=${encodeURIComponent(channel.metadata.phone_number_id)}` : '';
+    const info = await graph<{ url?: string; download_url?: string; mime_type?: string; file_size?: number | string }>('GET', `/${encodeURIComponent(mediaId)}${query}`, accessToken, undefined, via);
+    const address = via === 'kapso' ? info.download_url : info.url;
+    if (!address) throw new Error('WhatsApp gave no address for that file');
+    if (Number(info.file_size ?? 0) > MAX_VOICE_NOTE_BYTES) throw Object.assign(new Error('Voice note too long'), { code: 'too_large' });
+    const response = await safeOutboundFetch(address, {
+        ...(via === 'kapso' ? {} : { headers: { Authorization: `Bearer ${accessToken}` } }),
+        signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS),
+    });
     if (!response.ok) throw new Error(`Couldn't download the file (${response.status})`);
     const bytes = await response.arrayBuffer();
     if (bytes.byteLength > MAX_VOICE_NOTE_BYTES) throw Object.assign(new Error('Voice note too long'), { code: 'too_large' });
@@ -403,7 +492,7 @@ export async function markReadAndTyping(channel: WhatsAppChannel, accessToken: s
         status: 'read',
         message_id: messageId,
         typing_indicator: { type: 'text' },
-    }).catch(() => undefined);
+    }, viaOf(channel)).catch(() => undefined);
 }
 
 export async function sendText(channel: WhatsAppChannel, accessToken: string, to: string, text: string, replyTo?: string): Promise<void> {
@@ -417,6 +506,6 @@ export async function sendText(channel: WhatsAppChannel, accessToken: string, to
             text: { body, preview_url: true },
             // The first part quotes the customer's message, so a reply after a pause is clearly an answer.
             ...(index === 0 && replyTo ? { context: { message_id: replyTo } } : {}),
-        });
+        }, viaOf(channel));
     }
 }
