@@ -97,3 +97,7 @@ temp_interactive_push.bat
 
 # One-off exports and scratch output: never commit these (repo is public).
 /output/
+
+# Playwright output
+/playwright-report/
+/test-results/
