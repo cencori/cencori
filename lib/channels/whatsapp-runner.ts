@@ -67,9 +67,13 @@ async function firstDelivery(messageId: string): Promise<boolean> {
     }
 }
 
-interface Queued { id: string; text: string | null; audio?: string | null }
+/** `at`: when it arrived (ms); absent on items queued before it was recorded. */
+interface Queued { id: string; text: string | null; audio?: string | null; at?: number }
 
-const queued = (m: InboundMessage): Queued => ({ id: m.id, text: m.text, audio: m.audio?.id ?? null });
+const queued = (m: InboundMessage): Queued => ({ id: m.id, text: m.text, audio: m.audio?.id ?? null, at: Date.now() });
+
+/** A reply this long after the customer's message quotes it, since the chat may have moved on. */
+const QUOTE_AFTER_MS = 60_000;
 
 export async function handleInboundMessages(db: Admin, channel: WhatsAppChannel, messages: InboundMessage[]): Promise<void> {
     const fresh: InboundMessage[] = [];
@@ -131,6 +135,9 @@ async function answer(db: Admin, channel: WhatsAppChannel, customer: string, nam
     const token = channelAccessToken(channel, (value) => safeDecrypt(value, organizationId));
     if (!token) return;
     const last = batch[batch.length - 1];
+    // Quote the customer's message only when it helps: they sent several, or the answer is slow.
+    // In a quick back-and-forth a quote on every reply is just noise.
+    const quoteOf = () => (batch.length > 1 || Date.now() - (last.at ?? Date.now()) > QUOTE_AFTER_MS ? last.id : undefined);
     if (batch.some((m) => m.text || m.audio)) void markReadAndTyping(channel, token, last.id);
     // Voice notes become text first; the agent sees them marked as such.
     const texts: string[] = [];
@@ -148,7 +155,7 @@ async function answer(db: Admin, channel: WhatsAppChannel, customer: string, nam
         }
     }
     if (texts.length === 0) {
-        await Promise.all([sendText(channel, token, customer, unheard ? UNHEARD_REPLY : UNSUPPORTED_REPLY, last.id).catch(() => undefined), ...billing]);
+        await Promise.all([sendText(channel, token, customer, unheard ? UNHEARD_REPLY : UNSUPPORTED_REPLY, quoteOf()).catch(() => undefined), ...billing]);
         return;
     }
 
@@ -161,7 +168,7 @@ async function answer(db: Admin, channel: WhatsAppChannel, customer: string, nam
     }
     if (!reply.trim()) return;
     try {
-        await sendText(channel, token, customer, reply, batch.length > 1 ? undefined : last.id);
+        await sendText(channel, token, customer, reply, quoteOf());
     } catch (error) {
         const message = error instanceof Error ? error.message : 'Send failed';
         console.error('[whatsapp] send failed', message);

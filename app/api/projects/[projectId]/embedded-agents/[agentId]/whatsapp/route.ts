@@ -11,9 +11,9 @@
  *   POST    { action: 'kapso_link', return_path }
  *           Start "Connect WhatsApp" through Kapso: a setup link the business
  *           opens; it comes back to return_path with ?whatsapp=connected.
- *   POST    { action: 'kapso_finish' }
- *           After that: save the number Kapso connected and have Kapso forward
- *           its messages here.
+ *   POST    { action: 'kapso_finish', phone_number_id? }
+ *           After that: save the number Kapso connected (the one it named on
+ *           the way back) and have Kapso forward its messages here.
  *   POST    { code, phone_number_id, waba_id, coexistence? }
  *           Finish Embedded Signup ("Connect WhatsApp"): swap the code for the
  *           business's token, subscribe Cencori's app to their WhatsApp
@@ -31,6 +31,7 @@ import { resolvePublicOrigin } from '@/lib/public-origin';
 import { randomInt } from 'crypto';
 import { encryptApiKey } from '@/lib/encryption';
 import { createKapsoSetupLink, ensureKapsoCustomer, ensureKapsoWebhook, kapsoConfigured, listKapsoNumbers } from '@/lib/channels/kapso';
+import { getOwnerAlerts } from '@/lib/embedded/owner-alerts';
 import {
     META_GRAPH_VERSION,
     assignSystemUserToWaba,
@@ -76,14 +77,39 @@ function serialize(req: NextRequest, channel: WhatsAppChannel | null) {
     return publicChannel(channel, getMainSiteUrl(`/api/channels/whatsapp/${channel.id}`, resolvePublicOrigin(req)));
 }
 
+/**
+ * What Facebook will ask for when the business connects, from what Cencori
+ * already knows, so the console can show it ready to copy (Meta's sign-up
+ * can't be pre-filled through Kapso).
+ */
+async function businessDetails(db: Admin, projectId: string, agent: { id: string; name: string }, userId: string) {
+    const [alerts, { data: widget }, { data: user }] = await Promise.all([
+        getOwnerAlerts(db, projectId, agent.id).catch(() => null),
+        db.from('agent_widgets').select('allowed_origins').eq('project_id', projectId).eq('agent_id', agent.id).maybeSingle(),
+        db.auth.admin.getUserById(userId),
+    ]);
+    const origin = ((widget?.allowed_origins as string[] | null) ?? []).find((value) => !value.includes('*'));
+    return {
+        business_name: agent.name,
+        email: alerts?.settings.emails[0] ?? user?.user?.email ?? null,
+        website: origin ? origin.replace(/^https?:\/\//, '').replace(/^www\./, '') : null,
+    };
+}
+
 export async function GET(req: NextRequest, ctx: Context) {
     const { projectId, agentId } = await ctx.params;
     const access = await requireProjectAccess(projectId);
     if (!access.ok) return access.response;
     const db = createAdminClient();
-    if (!await scopedAgent(db, projectId, agentId)) return fail('Agent not found in this project.', 404);
-    const [channel, { canManage }] = await Promise.all([getAgentChannel(db, projectId, agentId), role(db, access.organizationId, access.userId)]);
-    return NextResponse.json({ channel: serialize(req, channel), can_manage: canManage, signup: signupConfig(), kapso: kapsoConfigured() }, { headers: { 'Cache-Control': 'no-store' } });
+    const agent = await scopedAgent(db, projectId, agentId);
+    if (!agent) return fail('Agent not found in this project.', 404);
+    const kapso = kapsoConfigured();
+    const [channel, { canManage }, details] = await Promise.all([
+        getAgentChannel(db, projectId, agentId),
+        role(db, access.organizationId, access.userId),
+        kapso ? businessDetails(db, projectId, agent, access.userId) : Promise.resolve(null),
+    ]);
+    return NextResponse.json({ channel: serialize(req, channel), can_manage: canManage, signup: signupConfig(), kapso, details }, { headers: { 'Cache-Control': 'no-store' } });
 }
 
 export async function PUT(req: NextRequest, ctx: Context) {
@@ -221,7 +247,8 @@ async function kapso(
     if (body.action === 'kapso_link') {
         // Back to the page they started on, in the console.
         const returnPath = typeof body.return_path === 'string' && /^\/[^/\\]/.test(body.return_path) ? body.return_path.split('?')[0].split('#')[0] : '/';
-        const back = (outcome: string) => `${req.nextUrl.origin}${returnPath}?whatsapp=${outcome}#whatsapp`;
+        // No fragment: Kapso adds its own query parameters to these.
+        const back = (outcome: string) => `${req.nextUrl.origin}${returnPath}?whatsapp=${outcome}`;
         try {
             const url = await createKapsoSetupLink(customer.id, { successUrl: back('connected'), failureUrl: back('failed') });
             return NextResponse.json({ url });
@@ -230,11 +257,15 @@ async function kapso(
         }
     }
 
-    // kapso_finish: the newest connected number of this agent's customer.
+    // kapso_finish: the number Kapso named on the way back, if it's this agent's
+    // customer's; else its newest connected one.
+    const named = typeof body.phone_number_id === 'string' ? body.phone_number_id.trim() : '';
     let number;
     try {
         const numbers = await listKapsoNumbers(customer.id);
-        number = numbers.find((item) => !item.status || /connected|active/i.test(item.status)) ?? numbers[0];
+        number = numbers.find((item) => item.phone_number_id === named)
+            ?? numbers.find((item) => !item.status || /connected|active/i.test(item.status))
+            ?? numbers[0];
     } catch (error) {
         return fail(`Couldn't read the connected number: ${error instanceof Error ? error.message : 'unknown error'}`, 502);
     }

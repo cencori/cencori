@@ -33,8 +33,20 @@ interface Channel {
     daily_session_cap: number;
 }
 
+/** What Facebook asks for during the connection, from what Cencori already knows. */
+type BusinessDetails = { business_name: string; email: string | null; website: string | null };
 /** `kapso`: "Connect WhatsApp" goes through Kapso's setup link instead of Meta's popup. */
-type Payload = { channel: Channel | null; can_manage: boolean; signup: SignupConfig | null; kapso?: boolean };
+type Payload = { channel: Channel | null; can_manage: boolean; signup: SignupConfig | null; kapso?: boolean; details?: BusinessDetails | null };
+
+/** Why the connection didn't finish, from Kapso's error_code, in plain words. */
+const CONNECT_ERRORS: Record<string, string> = {
+    facebook_auth_failed: "Facebook didn't finish logging you in. Try again.",
+    phone_verification_failed: "WhatsApp couldn't confirm your number. Check the WhatsApp Business app on your phone and try again.",
+    waba_limit_reached: "Facebook says you have too many business accounts. Remove one you don't use in Meta Business Settings, or pick an existing one.",
+    token_exchange_failed: "Facebook didn't hand over access. Try again.",
+    link_expired: "That connection link expired. Start again.",
+    already_used: "That connection link was already used. Start again.",
+};
 type Form = { phoneNumberId: string; accessToken: string; appSecret: string; cap: string };
 
 function CopyRow({ label, value }: { label: string; value: string }) {
@@ -163,10 +175,14 @@ export function AgentWhatsApp() {
         const params = new URLSearchParams(window.location.search);
         const outcome = params.get("whatsapp");
         if (!outcome) return;
-        params.delete("whatsapp");
+        const phoneNumberId = params.get("phone_number_id");
+        const errorCode = params.get("error_code");
+        // Kapso adds its own parameters on the way back; none of them stay in the address bar.
+        for (const key of ["whatsapp", "setup_link_id", "status", "phone_number_id", "business_account_id", "whatsapp_config_id", "provisioned_phone_number_id", "display_phone_number", "error_code"]) params.delete(key);
         window.history.replaceState(null, "", `${window.location.pathname}${params.size ? `?${params}` : ""}${window.location.hash}`);
+        window.requestAnimationFrame(() => document.getElementById("whatsapp")?.scrollIntoView({ block: "start" }));
         if (outcome !== "connected") {
-            setError("WhatsApp didn't finish connecting. Try again.");
+            setError((errorCode && CONNECT_ERRORS[errorCode]) || "WhatsApp didn't finish connecting. Try again.");
             return;
         }
         setBusy("signup");
@@ -175,7 +191,7 @@ export function AgentWhatsApp() {
                 const saved = await readJson<Payload>(await fetch(endpoint, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ action: "kapso_finish" }),
+                    body: JSON.stringify({ action: "kapso_finish", ...(phoneNumberId ? { phone_number_id: phoneNumberId } : {}) }),
                 }));
                 queryClient.setQueryData<Payload>(queryKey, saved);
                 setEditing(false);
@@ -269,10 +285,36 @@ export function AgentWhatsApp() {
             {showSignup && (
                 <SettingsCard>
                     {viaKapso ? (
-                        <SettingsRow
-                            label={channel ? "Connect another number" : "Connect your number"}
-                            description={<>Log in with Facebook and choose the WhatsApp Business app number you already use, or a new number. You keep using the app on your phone; {agent.name} answers alongside you. About five minutes.</>}
-                        />
+                        <>
+                            <SettingsRow
+                                label={channel ? "Connect another number" : "Connect your WhatsApp"}
+                                description={<>{agent.name} answers on the WhatsApp Business number you already use. You keep the app on your phone and see every chat.</>}
+                            />
+                            <div className="space-y-3 px-4 py-3">
+                                <p className="text-xs font-medium text-foreground">Facebook will ask you to:</p>
+                                <ol className="space-y-2 text-xs leading-5 text-muted-foreground">
+                                    {[
+                                        "Log in with Facebook.",
+                                        "Choose your business, or create it with the details below.",
+                                        "Approve the connection in the WhatsApp Business app on your phone.",
+                                    ].map((step, index) => (
+                                        <li key={step} className="flex gap-2.5">
+                                            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border/60 text-[10px] font-medium text-foreground">{index + 1}</span>
+                                            <span className="pt-px">{step}</span>
+                                        </li>
+                                    ))}
+                                </ol>
+                                <p className="text-[11px] leading-4 text-muted-foreground">About two minutes. Needs the WhatsApp Business app (not regular WhatsApp) on that number. Your recent chats come across so {agent.name} has context.</p>
+                            </div>
+                            {query.data?.details && (
+                                <>
+                                    <SettingsRow label="Have these ready" description="Copy them into Facebook when it asks." />
+                                    <CopyRow label="Business name" value={query.data.details.business_name} />
+                                    {query.data.details.email && <CopyRow label="Email" value={query.data.details.email} />}
+                                    {query.data.details.website && <CopyRow label="Website" value={query.data.details.website} />}
+                                </>
+                            )}
+                        </>
                     ) : (
                         <>
                             <SettingsRow label={channel ? "Connect another number" : "Connect your number"} description="Log in with Facebook, pick your business and confirm your number with the code WhatsApp sends. About two minutes." />
