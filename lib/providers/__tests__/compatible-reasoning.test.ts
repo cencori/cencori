@@ -69,3 +69,12 @@ describe('Maximo reasoning and stream cancellation', () => {
         await expect(pending).rejects.toThrow('cancelled');
     });
 });
+
+describe('B.AI DeepSeek V4 thinking', () => {
+    it('passes none (thinking off) only when asked, and leaves the default alone', () => {
+        expect(openAICompatibleReasoningEffort('bai', { model: 'deepseek-v4.1-flash', reasoningEffort: 'none' })).toBe('none');
+        expect(openAICompatibleReasoningEffort('bai', { model: 'deepseek-v4-flash', reasoningEffort: 'low' })).toBe('low');
+        expect(openAICompatibleReasoningEffort('bai', { model: 'deepseek-v4.1-flash' })).toBeUndefined();
+        expect(openAICompatibleReasoningEffort('bai', { model: 'glm-5.3-flash', reasoningEffort: 'none' })).toBeUndefined();
+    });
+});

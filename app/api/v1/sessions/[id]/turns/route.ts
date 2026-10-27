@@ -782,7 +782,9 @@ export async function POST(
             pinnedConnectionId: installedManifest?.provider_connection_id ?? null,
             reasoningEffort: installedManifest && ['low', 'medium', 'high'].includes(installedManifest.reasoning_effort as string)
                 ? (installedManifest.reasoning_effort as 'low' | 'medium' | 'high')
-                : undefined,
+                // A customer is waiting: DeepSeek Flash answers without thinking first
+                // unless the agent asks for it (thinking roughly doubled time to first word).
+                : /^deepseek-v4(\.\d+)?-flash$/.test(model) ? 'none' : undefined,
             endUserId,
             tier: (gatewayCtx.tier || "free") as SubscriptionTier,
             logSuccess: (meta) => {

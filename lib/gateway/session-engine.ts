@@ -63,7 +63,7 @@ export type TurnExecuteParams = {
     /** Exact provider-connection pin from the installed manifest. */
     pinnedConnectionId?: string | null;
     /** Reasoning effort from the installed manifest (OpenAI family only). */
-    reasoningEffort?: 'low' | 'medium' | 'high';
+    reasoningEffort?: 'none' | 'low' | 'medium' | 'high';
     /**
      * The installed version's own tools (webhook and system): the engine runs
      * them itself and continues the reply. `agentId` and `agentName` go with a
@@ -176,7 +176,7 @@ function makeStream(params: {
     pauseOnToolCalls: boolean;
     needsApprovalToolNames: Set<string>;
     collectedBuiltinToolOutputs: ToolCallOutput[];
-    reasoningEffort?: 'low' | 'medium' | 'high';
+    reasoningEffort?: 'none' | 'low' | 'medium' | 'high';
     /** Exact provider-connection pin (frozen into turn.started for resume). */
     pinnedConnectionId?: string | null;
     agentTools?: { toolset: AgentToolset; agentId: string; agentName?: string };

@@ -394,6 +394,9 @@ export async function POST(request: NextRequest) {
                             // Large enough for a tool call that carries a whole document (create_agent's knowledge_text).
                             max_tokens: lightweightConversation ? 80 : 8000,
                             temperature: 0.25,
+                            // DeepSeek Flash thinks before every reply unless told not to; Copilot is
+                            // conversational and tool-led, so it answers straight away.
+                            ...(/^deepseek-v4(\.\d+)?-flash$/.test(agentModel) ? { reasoning_effort: "none" as never } : {}),
                             stream: true,
                             // Ask for token counts so Copilot → Usage can show them.
                             stream_options: { include_usage: true },

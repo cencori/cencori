@@ -1,4 +1,5 @@
 {
+    "regions": ["arn1"],
     "rewrites": [
         {
             "source": "/v1/health",

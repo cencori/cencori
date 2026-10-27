@@ -190,6 +190,13 @@ export function openAICompatibleReasoningEffort(
     providerName: string,
     request: Pick<UnifiedChatRequest, 'model' | 'reasoningEffort'>,
 ): OpenAI.ReasoningEffort | undefined {
+    if (providerName === 'bai' && /^deepseek-v4/.test(request.model)) {
+        // B.AI's DeepSeek V4 thinks before every reply unless told not to; 'none'
+        // turns that off (verified 2026-10-27: first word 4.5 s -> 2.1 s on a
+        // business prompt). Callers that want speed ask for it; the default stays.
+        const effort = request.reasoningEffort;
+        return effort && ['none', 'low', 'medium', 'high'].includes(effort) ? effort as OpenAI.ReasoningEffort : undefined;
+    }
     if (providerName === 'maximo' && /^maximo-atlas-1\.[2-5]$/.test(request.model)) {
         // Maximo supports Low through Max; max extends the OpenAI SDK's enum.
         const effort = request.reasoningEffort;
