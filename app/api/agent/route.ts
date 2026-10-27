@@ -11,6 +11,7 @@ import { runCopilotTool, toolsFor, TOOL_STATUS, type CopilotToolContext } from "
 import { ACTION_NAMES, ACTION_STATUS, COPILOT_ACTIONS, prepareCopilotAction } from "@/lib/copilot/actions";
 import { verifyOrganizationAccess } from "@/lib/copilot/access";
 import { findAgent } from "@/lib/copilot/agent-tools";
+import { DOCS_TOOL_NAMES, DOCS_TOOL_STATUS, DOCS_TOOLS, runDocsTool } from "@/lib/copilot/docs";
 import { COPILOT_MENUS, NAVIGATE_TOOL, OPEN_MENU_TOOL, prepareNavigation, type CopilotMenu } from "@/lib/copilot/navigation";
 import { COPILOT_FILES_REQUEST_BUDGET, sanitizeFiles, sanitizeImages, withFiles, type CopilotFile } from "@/lib/copilot/files";
 import { COPILOT_DAILY_LIMITS, COPILOT_TOKEN_RATE_USD_PER_MILLION, PLAN_NAMES, copilotVisionModel, resolveCopilotModel } from "@/lib/console/copilot";
@@ -38,6 +39,7 @@ Rules:
 - Do not repeat the same metric in the conclusion, bullets, and recommendation.
 - You have read-only tools for this workspace's data (usage, the request log, individual requests, security incidents, billing, project settings, API keys, projects, memory). Call them whenever a question depends on workspace data; never answer data questions from memory or guesswork. Prefer the fewest calls that answer the question.
 - Never invent metrics, requests, incidents, models, providers, completed actions, or product capabilities.
+- You know the product through its documentation: search_docs (and read_doc for a whole page). For any question about what Cencori does or how to do something in it (features, integrations like CostGraph, console pages and settings, SDKs, the API, plans and pricing), search the docs first and answer from them. Never say a feature or integration doesn't exist without searching the docs; if they don't cover it, say the docs don't mention it. Workspace tools tell you about the user's own data; the docs tell you about the product. When it helps, take them to the page where they'd do it (navigate) and link the doc page.
 - Clearly distinguish an observed fact from an inference or recommendation.
 - When there is not enough evidence, say exactly what is missing.
 - Costs are USD. Latency values are milliseconds. Times are UTC. State the time window you looked at.
@@ -53,7 +55,7 @@ Rules:
   Business accounts (page context account: 'business'): the user runs a business (a restaurant, shop, salon, clinic), not software. Talk like a helpful colleague, never about APIs, tokens, keys or models. If they have no agent yet, your job is to build their first one with them: ask what the business is and what customers usually ask, then follow the steps above. Their plan (business_plan) sets how many agents they can have and their monthly conversations; if they're at the agent limit, say so and point them to Billing to upgrade.
   For shops and anyone selling products (fashion, food, beauty, gadgets…): put their price list in the catalog with add_products (not as knowledge: the agent quotes prices and stock from the catalog and takes orders from it), switch sell_products on with set_agent_system_tools, and offer open_agent_page 'payments' so orders are paid by link. Big lists or Bumpa/Selar/Shopify exports: open_agent_page 'products', where they import the spreadsheet.
   For changes ("mention the live band on Fridays", "stop taking bookings over 8"), use update_agent_instructions (append for small additions), then offer publish_agent, since edits only go live once published. Connecting WhatsApp, Google Calendar or other apps needs the user's own sign-in: offer open_agent_page, never claim you connected it.
-- You can take the user around the dashboard with navigate: it opens the page in the same tab and you stay open beside it. Use it when they ask to go somewhere or be shown something ("take me to…", "show me…", "open my billing"), or when a page shows the answer better than words (the full log, a chart). Look up first when the target depends on data (e.g. list_agents for their busiest agent, which comes sorted by recent runs), then navigate once. Don't navigate for questions you can just answer, and never more than once per reply. current_path in the dashboard context is the page they're on now. After navigating, say in one short line where you took them and what to look at; don't say "click" or describe links. If navigate is awaiting confirmation (unsaved changes), say so in one line instead. open_menu opens the command palette, their account menu or the organization switcher on screen, when they ask for one.
+- You can take the user around the dashboard with navigate: it opens the page in the same tab and you stay open beside it. Use it when they ask to go somewhere or be shown something ("take me to…", "show me…", "open my billing"), or when a page shows the answer better than words (the full log, a chart). Look up first when the target depends on data (e.g. list_agents for their busiest agent, which comes sorted by recent runs), then navigate once. Don't navigate for questions you can just answer, and never more than once per reply. current_path in the dashboard context is the page they're on now. For "where do I…" / "where is…" questions about a setting or button, navigate with highlight so it's outlined on screen. After navigating, say in one short line where you took them and what to look at (with highlight: "the part I've outlined"); don't say "click" or describe links. If navigate is awaiting confirmation (unsaved changes), say so in one line instead. open_menu opens the command palette, their account menu or the organization switcher on screen, when they ask for one.
 - You cannot delete agents, change billing, payments or plans, or delete projects or organizations; point the user to the right page instead.
 `;
 
@@ -344,7 +346,7 @@ export async function POST(request: NextRequest) {
             : null;
         // Read tools always; action tools only inside a project.
         const tools = !lightweightConversation && toolContext
-            ? [...toolsFor(toolContext), NAVIGATE_TOOL, OPEN_MENU_TOOL, ...(toolContext.project ? COPILOT_ACTIONS : [])]
+            ? [...toolsFor(toolContext), ...DOCS_TOOLS, NAVIGATE_TOOL, OPEN_MENU_TOOL, ...(toolContext.project ? COPILOT_ACTIONS : [])]
             : undefined;
         const encoder = new TextEncoder();
 
@@ -431,7 +433,7 @@ export async function POST(request: NextRequest) {
                             const isAction = ACTION_NAMES.has(call.function.name);
                             const isNavigate = call.function.name === NAVIGATE_TOOL.function.name;
                             const isMenu = call.function.name === OPEN_MENU_TOOL.function.name;
-                            send({ status: isNavigate ? "Opening the page" : isMenu ? "Opening the menu" : (isAction ? ACTION_STATUS : TOOL_STATUS)[call.function.name] ?? "Looking it up" });
+                            send({ status: DOCS_TOOL_STATUS[call.function.name] ?? (isNavigate ? "Opening the page" : isMenu ? "Opening the menu" : (isAction ? ACTION_STATUS : TOOL_STATUS)[call.function.name] ?? "Looking it up") });
                             let output: unknown;
                             try {
                                 const args = JSON.parse(call.function.arguments || "{}") as Record<string, unknown>;
@@ -447,13 +449,17 @@ export async function POST(request: NextRequest) {
                                     // The panel opens it (or asks first over unsaved changes).
                                     const prepared = await prepareNavigation(args, { hasProject: !!toolContext.project }, (ref) => findAgent(toolContext, ref));
                                     if ("navigation" in prepared) {
-                                        send({ navigate: { ...prepared.navigation, confirm: unsavedChanges } });
-                                        output = unsavedChanges
+                                        // Pointing at the page they're on leaves nothing behind.
+                                        const leaving = unsavedChanges && prepared.navigation.path !== null;
+                                        send({ navigate: { ...prepared.navigation, confirm: leaving } });
+                                        output = leaving
                                             ? { status: "awaiting_user_confirmation", reason: "They have unsaved changes on this page; it opens once they confirm leaving.", page: prepared.navigation.label }
                                             : { status: "opened", page: prepared.navigation.label };
                                     } else {
                                         output = { error: prepared.error };
                                     }
+                                } else if (DOCS_TOOL_NAMES.has(call.function.name)) {
+                                    output = await runDocsTool(call.function.name, args);
                                 } else if (isAction) {
                                     // Never executes: the panel shows a card
                                     // and the user's click runs it.

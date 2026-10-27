@@ -419,7 +419,7 @@ function SystemTools() {
     };
 
     return (
-        <section className="mt-8">
+        <section data-copilot-spot="agent_system_tools" className="mt-8">
             <h2 className="text-sm font-medium">System tools</h2>
             <p className="mt-0.5 text-xs text-muted-foreground">Built-in actions {agent.name} can take on its own.</p>
             <ul className="mt-3 divide-y divide-border/60 overflow-hidden rounded-lg border border-border/60">

@@ -15,9 +15,9 @@ const VISIBILITY = [
 
 const inputClass = "w-full rounded-md border border-border/50 bg-background px-3 py-2 text-sm outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-ring disabled:cursor-not-allowed disabled:opacity-60";
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, spot, children }: { title: string; spot?: string; children: React.ReactNode }) {
     return (
-        <section>
+        <section data-copilot-spot={spot}>
             <h2 className="text-sm font-medium">{title}</h2>
             <div className="mt-3">{children}</div>
         </section>
@@ -54,7 +54,7 @@ export default function AgentConfigurePage() {
                     <Section title="Name">
                         <input value={form.name} onChange={(event) => updateForm("name", event.target.value)} disabled={locked} placeholder="Agent name" className={inputClass} />
                     </Section>
-                    <Section title="Instructions">
+                    <Section title="Instructions" spot="agent_instructions">
                         <textarea
                             value={form.instructions}
                             onChange={(event) => updateForm("instructions", event.target.value)}
@@ -82,7 +82,7 @@ export default function AgentConfigurePage() {
                 </div>
 
                 <div className="space-y-7">
-                    <Section title="Model">
+                    <Section title="Model" spot="agent_model">
                         <ModelSelect value={form.model} onChange={(value) => updateForm("model", value)} models={usableModels(models?.models ?? [])} disabled={locked} placeholder="Choose a model" />
                         {models?.model_locked && <p className="mt-2 text-xs text-muted-foreground">{MODEL_LOCK_NOTE}</p>}
                     </Section>

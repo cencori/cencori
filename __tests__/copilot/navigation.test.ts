@@ -1,5 +1,6 @@
+import { execSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
-import { COPILOT_AGENT_PAGES, COPILOT_PAGES, prepareNavigation, resolveCopilotHref } from '@/lib/copilot/navigation';
+import { COPILOT_AGENT_PAGES, COPILOT_PAGES, COPILOT_SPOTS, prepareNavigation, resolveCopilotHref, spotSelector } from '@/lib/copilot/navigation';
 import { getConsoleRoute } from '@/lib/console/routing';
 
 const agents = [{ id: 'agent-1', name: 'Support Bot' }];
@@ -41,5 +42,32 @@ describe('copilot navigation', () => {
         expect(resolveCopilotHref('/organization/settings', legacy)).toBe('/acme/~/settings');
         expect(resolveCopilotHref('/account/profile', legacy)).toBe('/account/profile');
         expect(resolveCopilotHref('/logs', { ...legacy, projectSlug: null })).toBeNull();
+    });
+
+    it('opens the page a highlight lives on, and names the spot', async () => {
+        expect(await prepareNavigation({ page: 'overview', highlight: 'spend_cap' }, { hasProject: true }, findAgent))
+            .toEqual({ navigation: { path: '/settings?tab=budget', label: 'Budget settings · Spend cap', spot: 'spend_cap' } });
+        expect(await prepareNavigation({ highlight: 'agent_whatsapp', agent: 'Support Bot' }, { hasProject: true }, findAgent))
+            .toEqual({ navigation: { path: '/agents/agent-1/settings#whatsapp', label: 'Support Bot · WhatsApp', spot: 'agent_whatsapp' } });
+        expect(await prepareNavigation({ highlight: 'agent_model' }, { hasProject: true }, findAgent)).toHaveProperty('error');
+        expect(await prepareNavigation({ highlight: 'body' }, { hasProject: true }, findAgent)).toHaveProperty('error');
+        expect(spotSelector('spend_cap')).toBe('[data-copilot-spot="spend_cap"]');
+        expect(spotSelector('nope')).toBeNull();
+    });
+
+    it('points at anything by its visible text, here or on another page', async () => {
+        expect(await prepareNavigation({ page: 'integrations', highlight_text: 'CostGraph' }, { hasProject: true }, findAgent))
+            .toEqual({ navigation: { path: '/settings?tab=integrations', label: 'Integrations · CostGraph', text: 'CostGraph' } });
+        expect(await prepareNavigation({ page: 'current', highlight_text: 'Rate limiting' }, { hasProject: true }, findAgent))
+            .toEqual({ navigation: { path: null, label: 'Rate limiting', text: 'Rate limiting' } });
+        expect(await prepareNavigation({ page: 'current' }, { hasProject: true }, findAgent)).toHaveProperty('error');
+    });
+
+    it('has every spot marked somewhere in the console', () => {
+        const marked = execSync('grep -rhoE "data-copilot-spot=\\"[a-z_]+\\"|spot=\\"[a-z_]+\\"" app components', { encoding: 'utf8' });
+        for (const [id, spot] of Object.entries(COPILOT_SPOTS)) {
+            if ('selector' in spot) continue;
+            expect(marked, id).toContain(`"${id}"`);
+        }
     });
 });

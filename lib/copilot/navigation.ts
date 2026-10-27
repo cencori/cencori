@@ -63,8 +63,52 @@ export const COPILOT_AGENT_PAGES = {
 export type CopilotPage = keyof typeof COPILOT_PAGES;
 export type CopilotAgentPage = keyof typeof COPILOT_AGENT_PAGES;
 
-/** Sent to the panel when Copilot takes the user somewhere. */
-export type CopilotNavigation = { path: string; label: string };
+/**
+ * Parts of a page Copilot can point at: it opens the page and outlines the
+ * spot. Each is marked in the page with data-copilot-spot="<id>" (or found by
+ * `selector`). Agent spots open on that agent's page.
+ */
+export const COPILOT_SPOTS = {
+    monthly_budget: { page: "budget", label: "Monthly budget" },
+    spend_cap: { page: "budget", label: "Spend cap" },
+    budget_alerts: { page: "budget", label: "Budget alerts" },
+    failover: { page: "failover", label: "Fallback configuration" },
+    request_handling: { page: "project_settings", label: "Response caching and PII protection" },
+    secret_keys: { page: "api_keys", label: "Secret keys" },
+    publishable_keys: { page: "api_keys", label: "Publishable keys" },
+    webhooks: { page: "webhooks", label: "Webhooks" },
+    logs_filters: { page: "gateway_logs", label: "Filters" },
+    logs_export: { page: "gateway_logs", label: "Export" },
+    plan: { page: "billing", label: "Your plan" },
+    business_plan: { page: "billing", label: "Your plan" },
+    credits: { page: "billing", label: "Credits" },
+    payment_methods: { page: "billing", label: "Payment methods" },
+    invoices: { page: "billing", label: "Invoices" },
+    invite_member: { page: "teams", label: "Invite member" },
+    agent_instructions: { agentPage: "configure", label: "Instructions" },
+    agent_model: { agentPage: "configure", label: "Model" },
+    agent_add_knowledge: { agentPage: "knowledge", label: "Add document" },
+    agent_system_tools: { agentPage: "tools", label: "System tools" },
+    agent_whatsapp: { agentPage: "whatsapp", label: "WhatsApp", selector: "#whatsapp" },
+    agent_website: { agentPage: "website", label: "Website chat", selector: "#website" },
+    agent_alerts: { agentPage: "alerts", label: "Owner alerts", selector: "#alerts" },
+} as const satisfies Record<string, { label: string; selector?: string } & ({ page: CopilotPage } | { agentPage: CopilotAgentPage })>;
+
+export type CopilotSpot = keyof typeof COPILOT_SPOTS;
+
+/** Where on the page a spot is. */
+export function spotSelector(spot: string): string | null {
+    const found = COPILOT_SPOTS[spot as CopilotSpot] as { selector?: string } | undefined;
+    if (!found) return null;
+    return found.selector ?? `[data-copilot-spot="${spot}"]`;
+}
+
+/**
+ * Sent to the panel when Copilot takes the user somewhere and what to point
+ * at there: a marked spot, or any heading, label or button by its visible
+ * text. A null path points at something on the page they're already on.
+ */
+export type CopilotNavigation = { path: string | null; label: string; spot?: CopilotSpot; text?: string };
 
 /** Pages that only make sense inside a project. */
 const PROJECT_ONLY = (path: string) => getConsoleRoute(path.split(/[?#]/)[0])?.scope === "project";
@@ -73,13 +117,15 @@ export const NAVIGATE_TOOL: ChatCompletionFunctionTool = {
     type: "function",
     function: {
         name: "navigate",
-        description: "Take the user to a page of the dashboard, in the same tab; Copilot stays open beside it. Use when they ask to go somewhere, be shown something or have something opened ('take me to…', 'show me…', 'open…'), or when a page shows the answer better than words (a chart, the full log). For an agent, page='agent' with agent (id or name from list_agents) and optionally agent_page. Don't use it for plain questions you can answer in the chat, or to open pages they never asked to see.",
+        description: "Take the user to a page of the dashboard, in the same tab; Copilot stays open beside it. Use when they ask to go somewhere, be shown something or have something opened ('take me to…', 'show me…', 'open…'), or when a page shows the answer better than words (a chart, the full log). For an agent, page='agent' with agent (id or name from list_agents) and optionally agent_page. To point at one part of a page ('where do I set…', 'where is…'), pass highlight: it opens that part's page (page is then ignored; agent spots still need agent) and outlines it on screen. For anything else on a page, pass highlight_text: the exact visible text of a heading, setting name, tab or button there (e.g. 'Connect', 'CostGraph', 'Rate limiting'), and it's outlined once the page shows it. page='current' points at something on the page they're on without moving. Don't use it for plain questions you can answer in the chat, or to open pages they never asked to see.",
         parameters: {
             type: "object",
             properties: {
-                page: { type: "string", enum: [...Object.keys(COPILOT_PAGES), "agent"] },
+                page: { type: "string", enum: [...Object.keys(COPILOT_PAGES), "agent", "current"] },
                 agent: { type: "string", description: "With page='agent': the agent's id or exact name." },
                 agent_page: { type: "string", enum: Object.keys(COPILOT_AGENT_PAGES), description: "With page='agent'. Defaults to overview." },
+                highlight: { type: "string", enum: Object.keys(COPILOT_SPOTS), description: "Outline this part of the page. Spots starting agent_ are on an agent's pages." },
+                highlight_text: { type: "string", description: "Outline the heading, setting, tab or button with this exact visible text on the page." },
             },
             required: ["page"],
         },
@@ -95,7 +141,31 @@ export async function prepareNavigation(
     scope: { hasProject: boolean },
     findAgent: (ref: unknown) => Promise<{ agent: { id: string; name: string } } | { error: string }>,
 ): Promise<{ navigation: CopilotNavigation } | { error: string }> {
+    if (args.highlight !== undefined && args.highlight !== null && args.highlight !== "") {
+        const spot = COPILOT_SPOTS[args.highlight as CopilotSpot] as { label: string; page?: CopilotPage; agentPage?: CopilotAgentPage } | undefined;
+        if (!spot) return { error: `Unknown highlight "${args.highlight}".` };
+        const prepared = await prepareNavigation(
+            spot.agentPage ? { page: "agent", agent: args.agent, agent_page: spot.agentPage } : { page: spot.page },
+            scope,
+            findAgent,
+        );
+        if ("error" in prepared) return prepared;
+        const { label } = prepared.navigation;
+        // "Arcie · WhatsApp", not "Arcie · WhatsApp · WhatsApp".
+        const named = label.toLowerCase().endsWith(spot.label.toLowerCase()) ? label : `${label} · ${spot.label}`;
+        return { navigation: { ...prepared.navigation, label: named, spot: args.highlight as CopilotSpot } };
+    }
+    const text = typeof args.highlight_text === "string" ? args.highlight_text.trim().slice(0, 80) : "";
+    if (text) {
+        const rest = { ...args, highlight_text: undefined };
+        const prepared = String(args.page ?? "current") === "current"
+            ? { navigation: { path: null, label: "this page" } }
+            : await prepareNavigation(rest, scope, findAgent);
+        if ("error" in prepared) return prepared;
+        return { navigation: { ...prepared.navigation, label: prepared.navigation.path === null ? text : `${prepared.navigation.label} · ${text}`, text } };
+    }
     const page = String(args.page ?? "");
+    if (page === "current") return { error: "page='current' needs highlight_text: what to point at." };
     if (page === "agent") {
         if (!scope.hasProject) return { error: "No project is selected, so there are no agents to open." };
         const found = await findAgent(args.agent);

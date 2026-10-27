@@ -164,7 +164,7 @@ export function AgentKnowledge() {
                     <div className="flex items-center gap-2">
                         {all.length > 0 && <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setTesting(true)}>Test retrieval</Button>}
                         {canManage && addMenu(
-                            <Button size="sm" className="h-7 gap-1.5 text-xs" disabled={sync.isPending}>
+                            <Button data-copilot-spot="agent_add_knowledge" size="sm" className="h-7 gap-1.5 text-xs" disabled={sync.isPending}>
                                 {sync.isPending && <HugeiconsIcon icon={Loading03Icon} className="h-3.5 w-3.5 animate-spin" />}
                                 {sync.isPending ? "Syncing…" : "Add document"}
                             </Button>,
@@ -192,7 +192,7 @@ export function AgentKnowledge() {
                     </span>
                     <p className="text-sm font-medium">No documents yet</p>
                     <p className="mt-1 max-w-sm text-xs leading-5 text-muted-foreground">Add web pages, help articles, policies or product docs. The agent looks things up here for every customer.</p>
-                    {canManage && <div className="mt-5">{addMenu(<Button size="sm" className="h-7 text-xs">Add document</Button>)}</div>}
+                    {canManage && <div className="mt-5">{addMenu(<Button data-copilot-spot="agent_add_knowledge" size="sm" className="h-7 text-xs">Add document</Button>)}</div>}
                 </div>
             ) : (
                 <>

@@ -70,3 +70,7 @@ export const COPILOT_HANDOFF_EVENT = "copilot:handoff";
 // Fired on window when Copilot opens a piece of the dashboard's UI for the
 // user (detail: a CopilotMenu, see lib/copilot/navigation.ts).
 export const COPILOT_OPEN_MENU_EVENT = "copilot:open-menu";
+
+// Fired on window to outline a part of the page Copilot is pointing at
+// (detail: { selector, label }). See components/dashboard/CopilotSpotlight.tsx.
+export const COPILOT_HIGHLIGHT_EVENT = "copilot:highlight";
