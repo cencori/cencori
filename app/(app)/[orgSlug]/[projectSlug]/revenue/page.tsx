@@ -1050,7 +1050,7 @@ export default function UsageBillingPage({ params }: PageProps) {
 
   if (identityLoading) {
     return (
-      <main className="mx-auto w-full max-w-[1180px] px-4 pb-6 pt-2 sm:px-6 sm:pt-4 lg:px-8 lg:pt-6">
+      <main className="mx-auto w-full max-w-[1180px] px-0 pb-6 pt-0 sm:px-6 sm:pt-4 lg:px-8 lg:pt-6">
         <header className="mb-6 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h1 className="text-base font-medium">Revenue</h1>
@@ -1109,7 +1109,7 @@ export default function UsageBillingPage({ params }: PageProps) {
   }
 
   return (
-    <main className="mx-auto w-full max-w-[1180px] px-4 pb-6 pt-2 sm:px-6 sm:pt-4 lg:px-8 lg:pt-6">
+    <main className="mx-auto w-full max-w-[1180px] px-0 pb-6 pt-0 sm:px-6 sm:pt-4 lg:px-8 lg:pt-6">
       <header className="mb-6 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-base font-medium">Revenue</h1>

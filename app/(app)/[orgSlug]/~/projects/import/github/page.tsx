@@ -181,7 +181,7 @@ export default function GitHubImportPage({ params }: PageProps) {
   // Loading state
   if (isLoading) {
     return (
-      <div className="w-full max-w-5xl mx-auto px-6 py-8">
+      <div className="w-full max-w-5xl mx-auto px-0 sm:px-6 pt-0 pb-8 sm:pt-8">
         <div className="mb-8">
           <Skeleton className="h-5 w-40 mb-2" />
           <Skeleton className="h-3 w-64" />
@@ -212,7 +212,7 @@ export default function GitHubImportPage({ params }: PageProps) {
   // Error state
   if (error) {
     return (
-      <div className="w-full max-w-2xl mx-auto px-6 py-10">
+      <div className="w-full max-w-2xl mx-auto px-0 sm:px-6 pt-0 pb-10 sm:pt-10">
         <div className="bg-card border border-red-500/30 rounded-md p-6 text-center">
           <div className="w-12 h-12 rounded-md bg-red-500/10 flex items-center justify-center mx-auto mb-4">
             <AlertCircle className="h-6 w-6 text-red-500" />
@@ -239,7 +239,7 @@ export default function GitHubImportPage({ params }: PageProps) {
   // Not installed state
   if (githubData?.status === 'not_installed') {
     return (
-      <div className="w-full max-w-2xl mx-auto px-6 py-10">
+      <div className="w-full max-w-2xl mx-auto px-0 sm:px-6 pt-0 pb-10 sm:pt-10">
         <div className="bg-card border border-border/40 rounded-md p-6 text-center">
           <div className="w-12 h-12 rounded-md bg-secondary flex items-center justify-center mx-auto mb-4">
             <GitHubLogo className="h-6 w-6 text-muted-foreground" />
@@ -281,7 +281,7 @@ export default function GitHubImportPage({ params }: PageProps) {
 
   // Main repository selection view
   return (
-    <div className="w-full max-w-5xl mx-auto px-6 py-8">
+    <div className="w-full max-w-5xl mx-auto px-0 sm:px-6 pt-0 pb-8 sm:pt-8">
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-base font-medium mb-1">Import from GitHub</h1>

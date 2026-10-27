@@ -148,7 +148,9 @@ function ShellBody({ children }: { children: ReactNode }) {
                         This database is missing the version-test migration. You can browse agents, but creating, testing, and publishing are paused until it is applied.
                     </div>
                 )}
-                <div className={cn("mx-auto w-full", wide ? "max-w-[1180px] px-6 py-12 lg:px-10" : "max-w-[1000px] px-4 pb-10 pt-2 sm:px-6 sm:pt-4 lg:px-8 lg:pt-6")}>
+                {/* Agent pages are a full-screen workspace with no layout gutter, so they
+                    carry the phone gutter (20px, matching other pages) themselves. */}
+                <div className={cn("mx-auto w-full", wide ? "max-w-[1180px] px-5 pt-6 pb-12 sm:px-6 sm:pt-12 lg:px-10" : "max-w-[1000px] px-5 pb-10 pt-6 sm:px-6 sm:pt-4 lg:px-8 lg:pt-6")}>
                     {error && (
                         <div role="alert" className="mb-6 flex items-start justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/5 px-3.5 py-3 text-xs text-destructive">
                             <span>{error}</span>
@@ -159,7 +161,7 @@ function ShellBody({ children }: { children: ReactNode }) {
                 </div>
             </div>
             {testOpen && (
-                <div className="fixed inset-0 z-40 flex bg-background lg:static lg:z-auto lg:w-[380px] lg:shrink-0 xl:w-[420px]">
+                <div className="fixed inset-x-0 top-[var(--maintenance-banner-height,0px)] bottom-0 z-40 flex bg-background lg:static lg:z-auto lg:w-[380px] lg:shrink-0 xl:w-[420px]">
                     <AgentTestPanel onClose={() => setOpen(false)} />
                 </div>
             )}

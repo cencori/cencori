@@ -18,7 +18,7 @@ export function CopilotPageFrame({
     const organizationId = copilot?.agent.organization?.id;
 
     return (
-        <main className="mx-auto w-full max-w-[1180px] px-4 pb-6 pt-2 sm:px-6 sm:pt-4 lg:px-8 lg:pt-6">
+        <main className="mx-auto w-full max-w-[1180px] px-0 pb-6 pt-0 sm:px-6 sm:pt-4 lg:px-8 lg:pt-6">
             <header className="mb-6">
                 <h1 className="text-base font-medium">{title}</h1>
                 <p className="mt-0.5 max-w-[60ch] text-xs text-muted-foreground">{description}</p>

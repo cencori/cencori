@@ -254,7 +254,7 @@ export default function TeamsPage({ params }: PageProps) {
     };
 
     return (
-        <div className="w-full max-w-5xl mx-auto px-6 py-8">
+        <div className="w-full max-w-5xl mx-auto px-0 sm:px-6 pt-0 pb-8 sm:pt-8">
             {/* Header */}
             <h1 className="text-lg font-medium mb-6">Team</h1>
 

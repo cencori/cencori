@@ -247,7 +247,7 @@ export function CostGraphIntegrationPage({ orgSlug }: { orgSlug: string }) {
     const connection = data?.costgraph ?? null;
 
     return (
-        <main className="w-full max-w-[1180px] mx-auto px-6 lg:px-10 py-12">
+        <main className="w-full max-w-[1180px] mx-auto px-0 sm:px-6 lg:px-10 pt-0 pb-12 sm:pt-12">
             <Link href={paths.list} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
                 <ChevronLeft className="size-3.5" />
                 Integrations

@@ -6,7 +6,7 @@ import { Brain } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useProjectIdBySlug } from '@/lib/hooks/useQueries';
 
-const PAGE_CLASS = 'mx-auto w-full px-4 pb-6 pt-2 sm:px-6 sm:pt-4 lg:px-8 lg:pt-6';
+const PAGE_CLASS = 'mx-auto w-full px-0 pb-6 pt-0 sm:px-6 sm:pt-4 lg:px-8 lg:pt-6';
 
 /** `/acme/app/memory/graph` → `/acme/app/memory`; console hosts give `/memory`. */
 export function useMemoryBasePath(): string {

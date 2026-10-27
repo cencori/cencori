@@ -78,7 +78,7 @@ export default function AILogsPage({ params }: PageProps) {
     }
 
     return (
-        <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        <div className="w-full max-w-[1600px] mx-auto px-0 sm:px-6 lg:px-8 pt-0 pb-6 sm:pt-6 space-y-6">
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold">AI Request Logs</h1>

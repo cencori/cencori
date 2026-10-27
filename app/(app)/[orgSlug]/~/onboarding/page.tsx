@@ -366,7 +366,7 @@ export default function OnboardingPage({ params }: PageProps) {
 
   if (orgLoading) {
     return (
-      <div className="w-full max-w-4xl mx-auto px-6 py-10">
+      <div className="w-full max-w-4xl mx-auto px-0 sm:px-6 pt-0 pb-10 sm:pt-10">
         <Skeleton className="h-5 w-40 mb-2" />
         <Skeleton className="h-3 w-64 mb-8" />
         <Skeleton className="h-64 w-full" />

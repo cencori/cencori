@@ -8,19 +8,29 @@ import ReactMarkdown from "react-markdown";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { getMainSiteUrl } from "@/lib/main-site-url";
-import { ObservabilityIcon } from "@/components/icons/ObservabilityIcon";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
+import DashboardCircleIcon from "@hugeicons/core-free-icons/DashboardCircleIcon";
+import GameController03Icon from "@hugeicons/core-free-icons/GameController03Icon";
+import KeySquareIcon from "@hugeicons/core-free-icons/KeySquareIcon";
+import Chart01Icon from "@hugeicons/core-free-icons/Chart01Icon";
+import LeftToRightListDashIcon from "@hugeicons/core-free-icons/LeftToRightListDashIcon";
+import Blockchain01Icon from "@hugeicons/core-free-icons/Blockchain01Icon";
+import BadgeDollarSignIcon from "@hugeicons/core-free-icons/BadgeDollarSignIcon";
+import ThreeDRotateIcon from "@hugeicons/core-free-icons/ThreeDRotateIcon";
+import PlusSignIcon from "@hugeicons/core-free-icons/PlusSignIcon";
+import BrainIcon from "@hugeicons/core-free-icons/BrainIcon";
+import AirdropIcon from "@hugeicons/core-free-icons/AirdropIcon";
+import Settings02Icon from "@hugeicons/core-free-icons/Settings02Icon";
+import UserMultipleIcon from "@hugeicons/core-free-icons/UserMultipleIcon";
+import DollarCircleIcon from "@hugeicons/core-free-icons/DollarCircleIcon";
+import DiscoverSquareIcon from "@hugeicons/core-free-icons/DiscoverSquareIcon";
+import { useOrganizationProject } from "@/lib/contexts/OrganizationProjectContext";
 import {
   Search,
   Code2,
-  Settings,
-  FolderKanban,
   Book,
-  Key,
-  ScrollText,
-  Play,
   CreditCard,
-  Home,
-  Plus,
   FileText,
   Lock,
   Building2,
@@ -29,12 +39,6 @@ import {
   Lightbulb,
   Wand2,
   ArrowLeft,
-  Bot,
-  Brain,
-  Sparkles,
-  KeyRound,
-  Boxes,
-  BadgeDollarSign,
 } from "lucide-react";
 
 // Official GitHub Logo SVG
@@ -47,24 +51,6 @@ const GitHubLogo = ({ className }: { className?: string }) => (
     <path
       d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"
       fill="currentColor"
-    />
-  </svg>
-);
-
-// Heroicons - User Group
-const UserGroupIcon = ({ className }: { className?: string }) => (
-  <svg
-    className={className}
-    xmlns="http://www.w3.org/2000/svg"
-    fill="none"
-    viewBox="0 0 24 24"
-    strokeWidth={1.5}
-    stroke="currentColor"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z"
     />
   </svg>
 );
@@ -197,8 +183,17 @@ interface CommandItem {
 interface CommandGroup {
   id: string;
   label: string;
+  /** Shown under each item on phones, where group headings are hidden. */
+  context?: string;
   items: CommandItem[];
 }
+
+// The sidebar's icons, so a page looks the same in search as in the nav.
+const navIcon = (icon: IconSvgElement) => <HugeiconsIcon icon={icon} className="h-3.5 w-3.5" />;
+
+/** What phones show before anything is typed: the pages people open most. */
+const MOBILE_SUGGESTED_IDS = ["project-overview", "logs", "playground", "agents", "copilot"];
+const MOBILE_SUGGESTION_COUNT = 5;
 
 // Example questions for AI
 const AI_EXAMPLE_QUESTIONS = [
@@ -218,6 +213,10 @@ export function CommandPalette({
   consoleMode = false,
 }: CommandPaletteProps) {
   const router = useRouter();
+  const isMobile = useIsMobile();
+  const { organizations, projects } = useOrganizationProject();
+  const orgName = organizations.find((org) => org.slug === orgSlug)?.name ?? orgSlug ?? undefined;
+  const projectName = projects.find((project) => project.slug === projectSlug && project.orgSlug === orgSlug)?.name ?? projectSlug ?? undefined;
   const [search, setSearch] = React.useState("");
   const [selectedIndex, setSelectedIndex] = React.useState(0);
   const inputRef = React.useRef<HTMLInputElement>(null);
@@ -297,18 +296,19 @@ export function CommandPalette({
       groups.push({
         id: "project",
         label: "PROJECT",
+        context: projectName,
         items: [
           {
             id: "project-overview",
-            label: "Project overview",
-            icon: <Home className="h-3.5 w-3.5" />,
+            label: "Overview",
+            icon: navIcon(DashboardCircleIcon),
             action: () => navigate(consoleMode ? "/home" : `/${orgSlug}/${projectSlug}`),
-          keywords: ["dashboard", "home", "main"],
+          keywords: ["project", "dashboard", "home", "main"],
           },
           {
             id: "playground",
             label: "AI Playground",
-            icon: <Play className="h-3.5 w-3.5" />,
+            icon: navIcon(GameController03Icon),
             action: () => navigate(
               consoleMode
                 ? "/ai-gateway/playground"
@@ -319,7 +319,7 @@ export function CommandPalette({
           {
             id: "api-keys",
             label: "API Keys",
-            icon: <Key className="h-3.5 w-3.5" />,
+            icon: navIcon(KeySquareIcon),
             action: () => navigate(
               consoleMode ? "/settings?tab=api" : `/${orgSlug}/${projectSlug}/settings?tab=api`,
             ),
@@ -328,7 +328,7 @@ export function CommandPalette({
           {
             id: "project-usage",
             label: "Usage",
-            icon: <ObservabilityIcon className="h-3.5 w-3.5" />,
+            icon: navIcon(Chart01Icon),
             action: () => navigate(
               consoleMode ? "/ai-gateway" : `/${orgSlug}/${projectSlug}/ai-gateway`,
             ),
@@ -344,17 +344,17 @@ export function CommandPalette({
           },
           {
             id: "logs",
-            label: "Request Logs",
-            icon: <ScrollText className="h-3.5 w-3.5" />,
+            label: "Logs",
+            icon: navIcon(LeftToRightListDashIcon),
             action: () => navigate(
               consoleMode ? "/ai-gateway/logs" : `/${orgSlug}/${projectSlug}/ai-gateway/logs`,
             ),
-            keywords: ["history", "requests", "debug", "trace"],
+            keywords: ["request logs", "history", "requests", "debug", "trace"],
           },
           {
             id: "byok",
             label: "BYOK provider keys",
-            icon: <KeyRound className="h-3.5 w-3.5" />,
+            icon: navIcon(KeySquareIcon),
             action: () => navigate(
               consoleMode ? "/ai-gateway/providers" : `/${orgSlug}/${projectSlug}/ai-gateway/providers`,
             ),
@@ -363,7 +363,7 @@ export function CommandPalette({
           {
             id: "models",
             label: "Models",
-            icon: <Boxes className="h-3.5 w-3.5" />,
+            icon: navIcon(Blockchain01Icon),
             action: () => navigate(
               consoleMode ? "/ai-gateway/models" : `/${orgSlug}/${projectSlug}/ai-gateway/models`,
             ),
@@ -372,35 +372,35 @@ export function CommandPalette({
           {
             id: "revenue",
             label: "Revenue",
-            icon: <BadgeDollarSign className="h-3.5 w-3.5" />,
+            icon: navIcon(BadgeDollarSignIcon),
             action: () => navigate(consoleMode ? "/revenue" : `/${orgSlug}/${projectSlug}/revenue`),
             keywords: ["monetization", "billing", "customers", "plans", "markup", "charge"],
           },
           {
             id: "agents",
             label: "Agents",
-            icon: <Bot className="h-3.5 w-3.5" />,
+            icon: navIcon(ThreeDRotateIcon),
             action: () => navigate(consoleMode ? "/agents" : `/${orgSlug}/${projectSlug}/agents`),
             keywords: ["chatbot", "assistant", "whatsapp", "widget", "build", "studio"],
           },
           {
             id: "new-agent",
             label: "New agent",
-            icon: <Plus className="h-3.5 w-3.5" />,
+            icon: navIcon(PlusSignIcon),
             action: () => navigate(consoleMode ? "/agents/new" : `/${orgSlug}/${projectSlug}/agents/new`),
             keywords: ["create agent", "chatbot", "template"],
           },
           {
             id: "memory",
             label: "Memory",
-            icon: <Brain className="h-3.5 w-3.5" />,
+            icon: navIcon(BrainIcon),
             action: () => navigate(consoleMode ? "/memory" : `/${orgSlug}/${projectSlug}/memory`),
             keywords: ["memories", "graph", "recall", "remember"],
           },
           {
             id: "copilot",
             label: "Copilot",
-            icon: <Sparkles className="h-3.5 w-3.5" />,
+            icon: navIcon(AirdropIcon),
             action: () => navigate(consoleMode ? "/copilot" : `/${orgSlug}/${projectSlug}/copilot`),
             keywords: ["assistant", "ask", "chat", "ai"],
           },
@@ -416,7 +416,7 @@ export function CommandPalette({
           {
             id: "project-settings",
             label: "Project Settings",
-            icon: <Settings className="h-3.5 w-3.5" />,
+            icon: navIcon(Settings02Icon),
             action: () => navigate(
               consoleMode ? "/settings" : `/${orgSlug}/${projectSlug}/settings`,
             ),
@@ -431,18 +431,19 @@ export function CommandPalette({
       groups.push({
         id: "organization",
         label: "ORGANIZATION",
+        context: orgName,
         items: [
           {
             id: "all-projects",
             label: "All Projects",
-            icon: <FolderKanban className="h-3.5 w-3.5" />,
+            icon: navIcon(DiscoverSquareIcon),
             action: () => navigate(consoleMode ? "/projects" : `/${orgSlug}/~/projects`),
             keywords: ["list", "browse", "view"],
           },
           {
             id: "new-project",
             label: "Create new project",
-            icon: <Plus className="h-3.5 w-3.5" />,
+            icon: navIcon(PlusSignIcon),
             action: () => navigate(consoleMode ? "/projects/new" : `/${orgSlug}/~/projects/new`),
             keywords: ["add", "create", "start"],
           },
@@ -465,21 +466,21 @@ export function CommandPalette({
           {
             id: "teams",
             label: "Team Members",
-            icon: <UserGroupIcon className="h-3.5 w-3.5" />,
+            icon: navIcon(UserMultipleIcon),
             action: () => navigate(consoleMode ? "/teams" : `/${orgSlug}/~/teams`),
             keywords: ["users", "invite", "members", "access"],
           },
           {
             id: "billing",
             label: "Billing & Usage",
-            icon: <CreditCard className="h-3.5 w-3.5" />,
+            icon: navIcon(DollarCircleIcon),
             action: () => navigate(consoleMode ? "/billing" : `/${orgSlug}/~/billing`),
             keywords: ["payment", "invoice", "plan", "subscription", "upgrade"],
           },
           {
             id: "org-settings",
             label: "Organization Settings",
-            icon: <Settings className="h-3.5 w-3.5" />,
+            icon: navIcon(Settings02Icon),
             action: () => navigate(
               consoleMode ? "/organization/settings" : `/${orgSlug}/~/settings`,
             ),
@@ -493,6 +494,7 @@ export function CommandPalette({
     groups.push({
       id: "actions",
       label: "QUICK ACTIONS",
+      context: "Quick action",
       items: [
         {
           id: "switch-org",
@@ -504,7 +506,7 @@ export function CommandPalette({
         {
           id: "new-org",
           label: "Create organization",
-          icon: <Plus className="h-3.5 w-3.5" />,
+          icon: navIcon(PlusSignIcon),
           action: () => navigate("/onboarding"),
           keywords: ["add", "workspace", "team"],
         },
@@ -515,6 +517,7 @@ export function CommandPalette({
     groups.push({
       id: "docs",
       label: "DOCUMENTATION",
+      context: "Documentation",
       items: [
         {
           id: "docs-home",
@@ -565,6 +568,7 @@ export function CommandPalette({
     groups.push({
       id: "resources",
       label: "RESOURCES",
+      context: "Resources",
       items: [
         {
           id: "pricing",
@@ -627,11 +631,20 @@ export function CommandPalette({
 
     return groups;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router, onOpenChange, orgSlug, projectSlug, consoleMode]);
+  }, [router, onOpenChange, orgSlug, projectSlug, consoleMode, orgName, projectName]);
 
   // Smart search: filter items based on label and keywords
   const filteredGroups = React.useMemo(() => {
-    if (!search.trim()) return commandGroups;
+    if (!search.trim()) {
+      if (!isMobile) return commandGroups;
+      // Phones start with a short list; typing searches everything.
+      const all = commandGroups.flatMap((group) => group.items.map((item) => ({ item, group })));
+      const suggested = MOBILE_SUGGESTED_IDS.flatMap((id) => all.filter(({ item }) => item.id === id));
+      const picks = (suggested.length >= 3 ? suggested : all).slice(0, MOBILE_SUGGESTION_COUNT);
+      return commandGroups
+        .map((group) => ({ ...group, items: picks.filter((pick) => pick.group === group).map((pick) => pick.item) }))
+        .filter((group) => group.items.length > 0);
+    }
 
     const searchLower = search.toLowerCase();
 
@@ -648,7 +661,7 @@ export function CommandPalette({
         }),
       }))
       .filter((group) => group.items.length > 0);
-  }, [commandGroups, search]);
+  }, [commandGroups, search, isMobile]);
 
   // Flatten items for keyboard navigation
   const allItems = React.useMemo(() => {
@@ -738,14 +751,15 @@ export function CommandPalette({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl p-0 gap-0 overflow-hidden">
+      {/* Phones: full screen below the maintenance banner, like a native search. */}
+      <DialogContent animated={false} className="max-w-2xl p-0 gap-0 overflow-hidden max-md:top-[var(--maintenance-banner-height,0px)] max-md:left-0 max-md:flex max-md:h-[calc(100svh-var(--maintenance-banner-height,0px))] max-md:max-h-none max-md:w-full max-md:max-w-none sm:max-md:max-w-none max-md:translate-x-0 max-md:translate-y-0 max-md:flex-col max-md:rounded-none max-md:border-0">
         <VisuallyHidden>
           <DialogTitle>Command Palette</DialogTitle>
         </VisuallyHidden>
 
         {showAI ? (
           // ============ AI VIEW ============
-          <div className="flex flex-col h-[450px]">
+          <div className="flex flex-col h-[450px] max-md:h-full">
             {/* AI Header */}
             <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border/40">
               <button
@@ -870,21 +884,21 @@ export function CommandPalette({
           // ============ MAIN COMMAND VIEW ============
           <>
             {/* Search Input */}
-            <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border/40">
+            <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border/40 max-md:gap-2.5 max-md:py-3 max-md:pl-4 max-md:pr-12">
               <Search className="h-4 w-4 text-muted-foreground shrink-0" />
               <Input
                 ref={inputRef}
                 type="text"
-                placeholder="Run a command or search..."
+                placeholder={isMobile ? "Find" : "Run a command or search..."}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 onKeyDown={handleKeyDown}
-                className="border-0 shadow-none focus-visible:ring-0 px-0 h-7 text-sm bg-transparent"
+                className="border-0 shadow-none focus-visible:ring-0 px-0 h-7 text-sm bg-transparent max-md:text-base"
               />
             </div>
 
             {/* Command List */}
-            <div className="max-h-[400px] overflow-y-auto py-1">
+            <div className="max-h-[400px] overflow-y-auto py-1 max-md:max-h-none max-md:min-h-0 max-md:flex-1 max-md:px-2 max-md:py-2">
               {filteredGroups.length === 0 ? (
                 <div className="px-4 py-8 text-center">
                   <p className="text-xs text-muted-foreground">
@@ -897,8 +911,8 @@ export function CommandPalette({
                 </div>
               ) : (
                 filteredGroups.map((group) => (
-                  <div key={group.id} className="mb-1">
-                    <div className="px-3 py-1.5 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                  <div key={group.id} className="mb-1 max-md:mb-0">
+                    <div className="px-3 py-1.5 text-[10px] font-medium text-muted-foreground uppercase tracking-wider max-md:hidden">
                       {group.label}
                     </div>
                     <div>
@@ -912,21 +926,29 @@ export function CommandPalette({
                             onClick={item.action}
                             className={cn(
                               "w-full flex items-center gap-2.5 px-3 py-1.5 text-left transition-colors cursor-pointer",
+                              "max-md:gap-3 max-md:rounded-md max-md:px-2.5 max-md:py-2 max-md:text-foreground",
                               isSelected
                                 ? "bg-secondary/80 text-foreground"
                                 : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground",
                             )}
                           >
-                            <span className="shrink-0">{item.icon}</span>
-                            <span className="flex-1 text-xs truncate">
-                              {item.label}
+                            <span className="shrink-0 max-md:text-muted-foreground max-md:[&_svg]:size-4">{item.icon}</span>
+                            <span className="flex min-w-0 flex-1 flex-col">
+                              <span className="text-xs truncate max-md:text-sm">
+                                {item.label}
+                              </span>
+                              {group.context && (
+                                <span className="hidden truncate text-xs text-muted-foreground max-md:block">
+                                  {group.context}
+                                </span>
+                              )}
                             </span>
                             {item.shortcut && (
                               <span className="text-[10px] text-muted-foreground/60 shrink-0">
                                 {item.shortcut}
                               </span>
                             )}
-                            <ChevronRight className="h-3 w-3 text-muted-foreground/40 shrink-0" />
+                            <ChevronRight className="h-3 w-3 text-muted-foreground/40 shrink-0 max-md:hidden" />
                           </button>
                         );
                       })}
@@ -937,7 +959,7 @@ export function CommandPalette({
             </div>
 
             {/* Footer hint */}
-            <div className="px-3 py-2 border-t border-border/40 flex items-center justify-between text-[10px] text-muted-foreground/60">
+            <div className="px-3 py-2 border-t border-border/40 flex items-center justify-between text-[10px] text-muted-foreground/60 max-md:hidden">
               <div className="flex items-center gap-3">
                 <span className="flex items-center gap-1">
                   <kbd className="px-1 py-0.5 bg-secondary rounded text-[9px]">

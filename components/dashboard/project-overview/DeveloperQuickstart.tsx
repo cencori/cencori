@@ -566,7 +566,7 @@ Instructions:
   };
 
   return (
-    <section className="mx-auto w-full max-w-[1180px] px-4 pb-4 pt-2 sm:px-6 sm:pt-4 lg:px-8 lg:pb-6 lg:pt-6">
+    <section className="mx-auto w-full max-w-[1180px] px-0 pb-4 pt-0 sm:px-6 sm:pt-4 lg:px-8 lg:pb-6 lg:pt-6">
       {!quickstartDismissed && (
       <>
       <header className="mb-6 flex items-start justify-between gap-4">

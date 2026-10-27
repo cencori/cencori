@@ -707,8 +707,9 @@ export default function ProjectSettingsPage({ params }: PageProps) {
     );
   }
 
+  // Phones: no side or top padding of its own; the layout's spacing is enough.
   return (
-    <main className="w-full max-w-[1180px] mx-auto px-6 lg:px-10 py-12">
+    <main className="w-full max-w-[1180px] mx-auto px-0 pt-0 pb-12 sm:px-6 sm:pt-12 lg:px-10">
       <Tabs value={activeSettingsTab} className="space-y-0">
         {identityLoading || !project ? (
           <TabsContent value={activeSettingsTab} className={settingsTabClass}>

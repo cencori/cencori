@@ -87,14 +87,14 @@ export default function OrgSettingsPage({ params }: PageProps) {
 
     if (!identityLoading && !org) {
         return (
-            <div className="w-full max-w-[1120px] mx-auto px-6 lg:px-10 py-12">
+            <div className="w-full max-w-[1120px] mx-auto px-0 sm:px-6 lg:px-10 pt-0 pb-12 sm:pt-12">
                 <p className="text-sm font-medium">Organization not found</p>
             </div>
         );
     }
 
     return (
-        <main className="w-full max-w-[1120px] mx-auto px-6 lg:px-10 py-12">
+        <main className="w-full max-w-[1120px] mx-auto px-0 sm:px-6 lg:px-10 pt-0 pb-12 sm:pt-12">
             <header className="pb-8">
                 <div>
                     <h1 className="text-2xl font-semibold tracking-[-0.03em]">

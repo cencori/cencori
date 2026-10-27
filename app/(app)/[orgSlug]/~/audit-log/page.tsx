@@ -438,7 +438,7 @@ export default function AuditLogPage({ params }: PageProps) {
 
     if (isContextLoading) {
         return (
-            <div className="w-full max-w-[1360px] mx-auto px-6 py-8">
+            <div className="w-full max-w-[1360px] mx-auto px-0 sm:px-6 pt-0 pb-8 sm:pt-8">
                 {pageHeader}
                 <div className="flex flex-wrap items-center gap-3 mb-4">
                     <Skeleton className="h-7 w-[130px]" />
@@ -453,7 +453,7 @@ export default function AuditLogPage({ params }: PageProps) {
 
     if (isContextError || !organizationContext) {
         return (
-            <div className="w-full max-w-[1360px] mx-auto px-6 py-8">
+            <div className="w-full max-w-[1360px] mx-auto px-0 sm:px-6 pt-0 pb-8 sm:pt-8">
                 {pageHeader}
                 <div className="text-center py-16">
                     <p className="text-sm font-medium">Organization unavailable</p>
@@ -468,7 +468,7 @@ export default function AuditLogPage({ params }: PageProps) {
 
     if (isAuditLogLocked) {
         return (
-            <div className="w-full max-w-[1360px] mx-auto px-6 py-8">
+            <div className="w-full max-w-[1360px] mx-auto px-0 sm:px-6 pt-0 pb-8 sm:pt-8">
                 {pageHeader}
                 <FeatureUpgradeWall
                     orgSlug={orgSlug}
@@ -484,7 +484,7 @@ export default function AuditLogPage({ params }: PageProps) {
     }
 
     return (
-        <div className="w-full max-w-[1360px] mx-auto px-6 py-8">
+        <div className="w-full max-w-[1360px] mx-auto px-0 sm:px-6 pt-0 pb-8 sm:pt-8">
             {pageHeader}
 
             <div className="min-w-0">

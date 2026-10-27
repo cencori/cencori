@@ -11,6 +11,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import AirdropIcon from "@hugeicons/core-free-icons/AirdropIcon";
 import { CopilotContext } from "@/lib/contexts/CopilotContext";
 import { CreditCard, Menu, Search } from "lucide-react";
+import { MobileTabBar } from "@/components/dashboard/MobileTabBar";
 import { formatCurrency } from "@/lib/currency";
 import {
   Breadcrumb,
@@ -213,7 +214,7 @@ function LayoutContent({ user, avatar, name, children, initialAgentOpen, initial
     activeOrganization,
     activeProject,
   } = useOrganizationProject();
-  const { toggle } = useMobileSheet();
+  const { toggle, isOpen: mobileSheetOpen, setIsOpen: setMobileSheetOpen } = useMobileSheet();
   const { isTestMode } = useEnvironment();
 
   const { open: commandPaletteOpen, setOpen: setCommandPaletteOpen } = useCommandPalette();
@@ -290,6 +291,9 @@ function LayoutContent({ user, avatar, name, children, initialAgentOpen, initial
   // The memory graph is a canvas: it fills the workspace edge to edge.
   const isMemoryGraph = /\/memory\/graph\/?$/.test(pathname);
   const isFixedWorkspace = isPlayground || isAgentWorkspace || isMemoryGraph || isCopilotPage;
+  // Phones get a bottom tab bar instead of the top bar, except in full-screen
+  // workspaces, which put their own actions in the top bar and a composer at the bottom.
+  const hasMobileTabBar = !isFixedWorkspace;
   const isOnboardingFlow = pathname.includes("/onboarding");
   // Project settings (every tab) swaps the header's credits + Copilot buttons
   // for a single way out to organization settings.
@@ -412,6 +416,7 @@ function LayoutContent({ user, avatar, name, children, initialAgentOpen, initial
       {!isOnboardingFlow && (
       <header className={cn(
         "fixed top-[var(--maintenance-banner-height,0px)] left-0 right-0 z-50 h-12 border-b border-border/30 bg-background px-4 md:px-6 flex items-center justify-between font-mono",
+        hasMobileTabBar && "max-lg:hidden",
         agentOpen && !isCopilotPage && "lg:right-[520px]",
         hasDesktopSidebar && "lg:left-64",
       )}>
@@ -527,7 +532,23 @@ function LayoutContent({ user, avatar, name, children, initialAgentOpen, initial
 
       {/* Mobile Navigation Bar - only visible on mobile screens */}
       {!isOnboardingFlow && (
-        <MobileNav onMenuClick={toggle} projectSlug={projectSlug} user={user} avatar={displayAvatar} />
+        <MobileNav onMenuClick={toggle} projectSlug={projectSlug} user={user} avatar={displayAvatar} belowHeader={!hasMobileTabBar} />
+      )}
+      {!isOnboardingFlow && hasMobileTabBar && (
+        <MobileTabBar
+          // Unlike the desktop header, settings pages keep Copilot here: the pill
+          // has no settings shortcut competing for the space.
+          onCopilot={!agentOpen ? () => {
+            setMobileSheetOpen(false);
+            setAgentOpen(true);
+          } : undefined}
+          onSearch={() => {
+            setMobileSheetOpen(false);
+            setCommandPaletteOpen(true);
+          }}
+          onMenu={toggle}
+          menuOpen={mobileSheetOpen}
+        />
       )}
 
       <main
@@ -536,7 +557,8 @@ function LayoutContent({ user, avatar, name, children, initialAgentOpen, initial
             ? "flex min-h-0 flex-1 flex-col overflow-hidden pt-0 lg:pt-12 pb-0"
             : isOnboardingFlow
               ? "p-4 md:p-6"
-              : "p-4 md:p-6 pt-20 lg:pt-14"
+              // Phones: a 20px side gutter, so content runs close to the screen edge.
+              : "px-5 md:p-6 pt-6 pb-28 md:pb-28 lg:pt-14 lg:pb-6"
         )}
       >
         <CopilotContext.Provider value={copilotContext}>

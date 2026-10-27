@@ -793,7 +793,7 @@ export function ProjectOverviewDashboard({
         initial={reduceMotion ? false : { opacity: 0, y: 4 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: reduceMotion ? 0 : 0.22, ease: [0.22, 1, 0.36, 1] }}
-        className="mx-auto min-h-[calc(100svh-7.5rem)] w-full max-w-[980px] px-4 pb-24 sm:px-6 lg:px-8"
+        className="mx-auto min-h-[calc(100svh-7.5rem)] w-full max-w-[980px] px-0 pb-24 sm:px-6 lg:px-8"
       >
         <header className="flex flex-col gap-5 py-6 lg:flex-row lg:items-end lg:justify-between lg:py-7">
           <div>

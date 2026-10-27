@@ -109,7 +109,7 @@ export default function RequestLogsPage({ params }: PageProps) {
 
     if (!isLoading && !projectId) {
         return (
-            <div className="w-full max-w-[1360px] mx-auto px-6 py-8">
+            <div className="w-full max-w-[1360px] mx-auto px-0 sm:px-6 pt-0 pb-8 sm:pt-8">
                 <div className="text-center py-16">
                     <p className="text-sm font-medium">Project not found</p>
                     <p className="text-xs text-muted-foreground mt-1">Unable to load request logs</p>
@@ -119,7 +119,7 @@ export default function RequestLogsPage({ params }: PageProps) {
     }
 
     return (
-        <div className="w-full max-w-[1360px] mx-auto px-6 py-8">
+        <div className="w-full max-w-[1360px] mx-auto px-0 sm:px-6 pt-0 pb-8 sm:pt-8">
             <div className="mb-6">
                 <h1 className="text-base font-medium">Logs</h1>
                 <p className="text-xs text-muted-foreground mt-0.5">

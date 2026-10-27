@@ -29,14 +29,14 @@ export default function ProvidersPage({ params }: PageProps) {
 
     if (!isLoading && !projectId) {
         return (
-            <div className="w-full max-w-4xl mx-auto px-6 py-8">
+            <div className="w-full max-w-4xl mx-auto px-0 sm:px-6 pt-0 pb-8 sm:pt-8">
                 <p className="py-16 text-center text-sm text-muted-foreground">Project not found.</p>
             </div>
         );
     }
 
     return (
-        <div className="w-full max-w-4xl mx-auto px-6 py-8">
+        <div className="w-full max-w-4xl mx-auto px-0 sm:px-6 pt-0 pb-8 sm:pt-8">
             {/* Header */}
             <div className="mb-6">
                 <h1 className="text-lg font-semibold">Providers</h1>

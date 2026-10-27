@@ -6,10 +6,35 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
+// Radix opens a menu on pointer-down. That suits a mouse, but on a touch screen
+// a thumb landing on a trigger to start a scroll opened the menu. Touch opens
+// on click instead, which the browser only fires for a tap, not a scroll; that
+// needs the menu's open state, so the root keeps it and shares a toggle.
+const DropdownMenuToggleContext = React.createContext<(() => void) | null>(null);
+
 function DropdownMenu({
+  open: openProp,
+  defaultOpen = false,
+  onOpenChange,
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Root>) {
-  return <DropdownMenuPrimitive.Root data-slot="dropdown-menu" {...props} />;
+  const [uncontrolledOpen, setUncontrolledOpen] = React.useState(defaultOpen);
+  const controlled = openProp !== undefined;
+  const open = controlled ? openProp : uncontrolledOpen;
+  const setOpen = React.useCallback(
+    (next: boolean) => {
+      if (!controlled) setUncontrolledOpen(next);
+      onOpenChange?.(next);
+    },
+    [controlled, onOpenChange],
+  );
+  const toggle = React.useCallback(() => setOpen(!open), [open, setOpen]);
+
+  return (
+    <DropdownMenuToggleContext.Provider value={toggle}>
+      <DropdownMenuPrimitive.Root data-slot="dropdown-menu" open={open} onOpenChange={setOpen} {...props} />
+    </DropdownMenuToggleContext.Provider>
+  );
 }
 
 function DropdownMenuPortal({
@@ -21,11 +46,35 @@ function DropdownMenuPortal({
 }
 
 function DropdownMenuTrigger({
+  onPointerDown,
+  onPointerCancel,
+  onClick,
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Trigger>) {
+  const toggle = React.useContext(DropdownMenuToggleContext);
+  const pressedByTouch = React.useRef(false);
+
   return (
     <DropdownMenuPrimitive.Trigger
       data-slot="dropdown-menu-trigger"
+      onPointerDown={(event) => {
+        onPointerDown?.(event);
+        pressedByTouch.current = event.pointerType !== "mouse";
+        // Stops Radix opening on touch-down; the click below opens it on a tap.
+        if (pressedByTouch.current && toggle) event.preventDefault();
+      }}
+      // The browser cancels the pointer when the touch becomes a scroll.
+      onPointerCancel={(event) => {
+        onPointerCancel?.(event);
+        pressedByTouch.current = false;
+      }}
+      onClick={(event) => {
+        onClick?.(event);
+        if (pressedByTouch.current && toggle && !event.defaultPrevented) {
+          pressedByTouch.current = false;
+          toggle();
+        }
+      }}
       {...props}
     />
   );

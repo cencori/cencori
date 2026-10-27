@@ -120,7 +120,7 @@ export default function ApiKeysPage({
 
     if (loading) {
         return (
-            <div className="w-full max-w-5xl mx-auto px-6 py-8">
+            <div className="w-full max-w-5xl mx-auto px-0 sm:px-6 pt-0 pb-8 sm:pt-8">
                 <div className="mb-8">
                     <Skeleton className="h-5 w-20" />
                 </div>
@@ -154,7 +154,7 @@ export default function ApiKeysPage({
     }
 
     return (
-        <div className="w-full max-w-5xl mx-auto px-6 py-8">
+        <div className="w-full max-w-5xl mx-auto px-0 sm:px-6 pt-0 pb-8 sm:pt-8">
             {/* Header */}
             <div className="mb-8">
                 <h1 className="text-base font-medium">API Keys</h1>

@@ -55,7 +55,7 @@ export function SessionInterruptionOverlay({
             role="dialog"
             aria-modal="true"
             aria-labelledby="session-interruption-title"
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm"
+            className="fixed inset-x-0 top-[var(--maintenance-banner-height,0px)] bottom-0 z-[100] flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm"
         >
             <div className="w-full max-w-md rounded-lg border border-border/60 bg-background p-6 shadow-xl">
                 <Logo variant="mark" className="mb-5 h-4" />

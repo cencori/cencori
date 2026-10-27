@@ -87,7 +87,7 @@ export default function AgentDetailPage({ params }: PageProps) {
 
     if (isLoading || !data) {
         return (
-            <div className="w-full max-w-4xl mx-auto px-6 py-8">
+            <div className="w-full max-w-4xl mx-auto px-0 sm:px-6 pt-0 pb-8 sm:pt-8">
                 <Skeleton className="h-4 w-24 mb-6" />
                 <Skeleton className="h-7 w-48 mb-2" />
                 <Skeleton className="h-4 w-80 mb-8" />
@@ -103,7 +103,7 @@ export default function AgentDetailPage({ params }: PageProps) {
     const url = agent.hostname ? `https://${agent.hostname}` : null;
 
     return (
-        <div className="w-full max-w-4xl mx-auto px-6 py-8">
+        <div className="w-full max-w-4xl mx-auto px-0 sm:px-6 pt-0 pb-8 sm:pt-8">
             {(() => {
                 const sha = selected?.commit_sha?.slice(0, 7);
                 const buildLog = getBuildLog(selected);

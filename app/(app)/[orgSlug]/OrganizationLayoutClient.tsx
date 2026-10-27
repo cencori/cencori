@@ -24,7 +24,7 @@ import {
     DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Book, ArrowUpRight, HelpCircle, Wrench, Activity, Mail, FileText, Check, ChevronsUpDown, ChevronLeft, ChevronRight, Plus, Search, Command } from "lucide-react";
+import { Book, ArrowUpRight, HelpCircle, Wrench, Activity, Mail, FileText, ChevronsUpDown, ChevronLeft, ChevronRight, Search, Command } from "lucide-react";
 import DashboardCircleIcon from "@hugeicons/core-free-icons/DashboardCircleIcon";
 import DiscoverSquareIcon from "@hugeicons/core-free-icons/DiscoverSquareIcon";
 import BrainIcon from "@hugeicons/core-free-icons/BrainIcon";
@@ -52,16 +52,17 @@ import { useMobileSheet } from "@/lib/contexts/MobileSheetContext";
 import { useSession } from "@/lib/contexts/SessionContext";
 import { isAuthExpiredError } from "@/lib/auth/auth-errors";
 import { WorkspaceUnavailable } from "@/components/dashboard/WorkspaceUnavailable";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { Drawer } from "vaul";
+import { cn } from "@/lib/utils";
 import { UserMenu } from "@/components/dashboard/UserMenu";
 import { CreateProjectDialog } from "@/components/dashboard/CreateProjectDialog";
 import { useCommandPalette } from "@/lib/contexts/CommandPaletteContext";
 import { FeedbackMenu } from "@/components/dashboard/FeedbackMenu";
+import { OPEN_CREATE_PROJECT_EVENT, ProjectSwitcherMenuContent } from "@/components/dashboard/ProjectSwitcherMenu";
 import { getConsoleRoute } from "@/lib/console/routing";
 import { getMainSiteUrl } from "@/lib/main-site-url";
 import { useOrganizationProject } from "@/lib/contexts/OrganizationProjectContext";
 import { announceNavigationIntent, announceSettingsTab } from "@/lib/navigation-intent";
-import { swapWorkspaceInPath } from "@/lib/workspace-switch";
 
 interface OrganizationData {
     id: string;
@@ -130,6 +131,9 @@ function isAgentPath(pathname: string): boolean {
     return /\/agents\/(?!new(?:\/|$))[^/]+/.test(pathname);
 }
 
+/** Phone nav sheet heights, as fractions of the screen: resting, then dragged to the top (the maintenance banner's edge when it shows). */
+const NAV_SHEET_SNAPS = [0.7, 1] as const;
+
 function isCopilotPath(pathname: string): boolean {
     return /\/copilot(\/|$)/.test(pathname);
 }
@@ -163,11 +167,15 @@ export default function OrganizationLayoutClient({
     const searchParams = useSearchParams();
     const searchParamsKey = searchParams.toString();
     const { isOpen, setIsOpen } = useMobileSheet();
+    // The nav sheet opens at 70% of the screen and drags up to full height.
+    const [sheetSnap, setSheetSnap] = useState<number | string | null>(NAV_SHEET_SNAPS[0]);
+    useEffect(() => {
+        if (isOpen) setSheetSnap(NAV_SHEET_SNAPS[0]);
+    }, [isOpen]);
     const { reportSessionExpired } = useSession();
     const {
         projects: workspaceProjects,
         activeProject,
-        selectProject,
         loading: workspaceLoading,
     } = useOrganizationProject();
     const { data: organization, error } = useOrganization(orgSlug);
@@ -251,6 +259,12 @@ export default function OrganizationLayoutClient({
     });
     const [pendingSubnavEntry, setPendingSubnavEntry] = useState<Exclude<typeof activeView, "main"> | null>(null);
     const [createProjectOpen, setCreateProjectOpen] = useState(false);
+    // The phone top bar's project switcher asks for this dialog by event.
+    useEffect(() => {
+        const open = () => setCreateProjectOpen(true);
+        window.addEventListener(OPEN_CREATE_PROJECT_EVENT, open);
+        return () => window.removeEventListener(OPEN_CREATE_PROJECT_EVENT, open);
+    }, []);
     const { setOpen: setCommandPaletteOpen } = useCommandPalette();
 
     const orgBase = `/${orgSlug}`;
@@ -485,8 +499,6 @@ export default function OrganizationLayoutClient({
     const runItems = process.env.NODE_ENV !== "production"
         ? [{ href: scopeProjectSlug ? scopedProjectHref("deployments") : orgProductHref("deployments"), icon: <HugeiconsIcon icon={ThreeDMoveIcon} className="!h-5 !w-5" />, label: "Deployments" }]
         : [];
-    // Security is no longer a page: opt-in PII protection lives in project settings.
-    const projectSecondaryItems = [...buildItems, ...runItems];
 
     const bottomItems = [
         { href: settingsHref, icon: <HugeiconsIcon icon={Settings02Icon} className="!h-5 !w-5" />, label: "Settings" },
@@ -538,6 +550,7 @@ export default function OrganizationLayoutClient({
                         <Link
                             href={item.href}
                             prefetch={true}
+                            data-subnav-toggle=""
                             onClick={() => {
                                 setPendingSubnavEntry("project-settings");
                                 setActiveView("project-settings");
@@ -560,6 +573,303 @@ export default function OrganizationLayoutClient({
             </SidebarMenuItem>
         );
     });
+
+    // The sidebar's navigation, shared by the desktop sidebar and the phone
+    // menu sheet so the two always list the same pages.
+    const navMenu = (
+        activeView === "agent" ? (
+            <AgentSubnav />
+        ) : activeView === "ai-gateway" || (activeView === "memory" && memoryHref) || (activeView === "copilot" && copilotHref) ? (
+            <>
+                <SidebarMenuItem>
+                    <SidebarMenuButton
+                        onClick={() => setActiveView("main")}
+                        size="sm"
+                        className="gap-1 text-muted-foreground"
+                    >
+                        <ChevronLeft className="!h-5 !w-5" />
+                        <span className="text-sm">Back</span>
+                    </SidebarMenuButton>
+                </SidebarMenuItem>
+                {(activeView === "memory" ? memorySubItems : activeView === "copilot" ? copilotSubItems : projectSubItems).map((item) => (
+                    <SidebarMenuItem key={item.href}>
+                        <SidebarMenuButton
+                            asChild
+                            tooltip={item.label}
+                            // New chat is an action, not a place: the open conversation
+                            // is highlighted under Recent chats instead.
+                            isActive={item.href !== copilotHref && (isActive(item.href) || (
+                                pendingSubnavEntry === activeView
+                                && (item.href === aiGatewayHref || item.href === memoryHref)
+                            ))}
+                            size="sm"
+                        >
+                            <Link
+                                href={item.href}
+                                prefetch={true}
+                                onMouseEnter={() => prefetchRoute(item.href)}
+                                onClick={item.href === copilotHref ? (event) => {
+                                    // Chat opens whatever conversation the cookie names, so
+                                    // clear it; if Chat is already open, reset it in place.
+                                    document.cookie = `${COPILOT_CONVERSATION_COOKIE}=; path=/; max-age=0; samesite=lax`;
+                                    if (pathname === copilotHref) {
+                                        event.preventDefault();
+                                        window.dispatchEvent(new Event(COPILOT_NEW_CHAT_EVENT));
+                                    }
+                                } : undefined}
+                            >
+                                {item.icon}
+                                <span className="text-sm">{item.label}</span>
+                            </Link>
+                        </SidebarMenuButton>
+                    </SidebarMenuItem>
+                ))}
+                {activeView === "copilot" && copilotHref && organization?.id && (
+                    <CopilotRecentChats organizationId={organization.id} chatHref={copilotHref} />
+                )}
+            </>
+        ) : activeView === "project-settings" ? (
+            <>
+                <SidebarMenuItem>
+                    <SidebarMenuButton
+                        onClick={() => setActiveView("main")}
+                        size="sm"
+                        className="gap-1 text-muted-foreground"
+                    >
+                        <ChevronLeft className="!h-5 !w-5" />
+                        <span className="text-sm">Back</span>
+                    </SidebarMenuButton>
+                </SidebarMenuItem>
+                {projectSettingsItems.map((item) => (
+                    <SidebarMenuItem key={item.tab}>
+                        <SidebarMenuButton
+                            asChild
+                            tooltip={item.label}
+                            isActive={projectSettingsTab === item.tab}
+                            size="sm"
+                        >
+                            <Link
+                                href={item.href}
+                                prefetch={true}
+                                onMouseEnter={() => prefetchRoute(item.href)}
+                                onClick={(event) => {
+                                    // Already on the settings page: swap the
+                                    // tab locally instead of navigating.
+                                    // The page syncs ?tab= itself so links
+                                    // stay shareable. Deep links from
+                                    // elsewhere remain normal navigations.
+                                    // An integration's own page has no tabs, so navigate.
+                                    if (!isProjectSettingsView || isIntegrationPage) {
+                                        setPendingSettingsTab(null);
+                                        return;
+                                    }
+                                    event.preventDefault();
+                                    setPendingSettingsTab(item.tab);
+                                    announceSettingsTab(item.tab);
+                                }}
+                            >
+                                <span className="text-sm">{item.label}</span>
+                            </Link>
+                        </SidebarMenuButton>
+                    </SidebarMenuItem>
+                ))}
+            </>
+        ) : activeView === "settings" ? (
+            <>
+                <SidebarMenuItem>
+                    <SidebarMenuButton
+                        onClick={() => setActiveView("main")}
+                        size="sm"
+                        className="gap-1 text-muted-foreground"
+                    >
+                        <ChevronLeft className="!h-5 !w-5" />
+                        <span className="text-sm">Back</span>
+                    </SidebarMenuButton>
+                </SidebarMenuItem>
+                {organizationSettingsItems.map((item) => (
+                    <SidebarMenuItem key={item.section}>
+                        <SidebarMenuButton
+                            asChild
+                            tooltip={item.label}
+                            isActive={organizationSettingsSection === item.section}
+                            size="sm"
+                        >
+                            <Link href={item.href} prefetch={true} onMouseEnter={() => prefetchRoute(item.href)}>
+                                {item.icon}
+                                <span className="text-sm">{item.label}</span>
+                            </Link>
+                        </SidebarMenuButton>
+                    </SidebarMenuItem>
+                ))}
+            </>
+        ) : (
+            <>
+                {/* 1. Project Overview */}
+                <SidebarMenuItem>
+                    <SidebarMenuButton asChild tooltip={overviewItem.label} isActive={isActive(overviewItem.href)} size="sm">
+                        <Link href={overviewItem.href} prefetch={true} onMouseEnter={() => prefetchRoute(overviewItem.href)}>
+                            {overviewItem.icon}
+                            <span className="text-sm">{overviewItem.label}</span>
+                        </Link>
+                    </SidebarMenuButton>
+                </SidebarMenuItem>
+                {/* 4. AI Gateway toggle */}
+                <SidebarMenuItem>
+                    <SidebarMenuButton
+                        asChild
+                        isActive={isActive(aiGatewayHref)}
+                        size="sm"
+                        className="gap-1"
+                    >
+                        <Link
+                            href={aiGatewayHref}
+                            prefetch={true}
+                            data-subnav-toggle=""
+                            onClick={() => {
+                                setPendingSubnavEntry("ai-gateway");
+                                setActiveView("ai-gateway");
+                            }}
+                            onMouseEnter={() => prefetchRoute(aiGatewayHref)}
+                        >
+                            <HugeiconsIcon icon={DiscoverSquareIcon} className="!h-5 !w-5" />
+                            <span className="text-sm">AI Gateway</span>
+                            <ChevronRight className="!h-3 !w-3 ml-auto text-muted-foreground/50" />
+                        </Link>
+                    </SidebarMenuButton>
+                </SidebarMenuItem>
+                {buildItems.map(renderMenuItem)}
+                {/* Memory toggle */}
+                {memoryHref && (
+                    <SidebarMenuItem>
+                        <SidebarMenuButton
+                            asChild
+                            isActive={isMemoryPath(pathname)}
+                            size="sm"
+                            className="gap-1"
+                        >
+                            <Link
+                                href={memoryHref}
+                                prefetch={true}
+                                data-subnav-toggle=""
+                                onClick={() => {
+                                    setPendingSubnavEntry("memory");
+                                    setActiveView("memory");
+                                }}
+                                onMouseEnter={() => prefetchRoute(memoryHref)}
+                            >
+                                <HugeiconsIcon icon={BrainIcon} className="!h-5 !w-5" />
+                                <span className="text-sm">Memory</span>
+                                <ChevronRight className="!h-3 !w-3 ml-auto text-muted-foreground/50" />
+                            </Link>
+                        </SidebarMenuButton>
+                    </SidebarMenuItem>
+                )}
+                {runItems.map(renderMenuItem)}
+                {/* Copilot toggle */}
+                {copilotHref && (
+                    <SidebarMenuItem>
+                        <SidebarMenuButton
+                            asChild
+                            isActive={isCopilotPath(pathname)}
+                            size="sm"
+                            className="gap-1"
+                        >
+                            <Link
+                                href={copilotHref}
+                                prefetch={true}
+                                data-subnav-toggle=""
+                                onClick={() => {
+                                    setPendingSubnavEntry("copilot");
+                                    setActiveView("copilot");
+                                }}
+                                onMouseEnter={() => prefetchRoute(copilotHref)}
+                            >
+                                <HugeiconsIcon icon={AirdropIcon} className="!h-5 !w-5" />
+                                <span className="text-sm">Copilot</span>
+                                <ChevronRight className="!h-3 !w-3 ml-auto text-muted-foreground/50" />
+                            </Link>
+                        </SidebarMenuButton>
+                    </SidebarMenuItem>
+                )}
+                {renderBottomItems()}
+            </>
+        )
+    );
+
+    // Documentation, help and feedback: the desktop sidebar's footer, and the
+    // bottom of the phone menu sheet (the phone top bar no longer has them).
+    const supportLinks = (
+        <>
+            <Link
+                href={docsUrl}
+                target="_blank"
+                className="flex w-full items-center gap-2 rounded-md p-2 text-left text-sm text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors outline-hidden"
+            >
+                <Book className="size-3.5 shrink-0" />
+                <span className="flex-1">Documentation</span>
+                <ArrowUpRight className="size-3 shrink-0" />
+            </Link>
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <button
+                        type="button"
+                        className="flex w-full items-center gap-2 rounded-md p-2 text-left text-sm text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors outline-hidden"
+                    >
+                        <HelpCircle className="size-3.5 shrink-0" />
+                        <span className="flex-1">Help & Resources</span>
+                    </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" side="top" sideOffset={4} className="w-80 max-h-none overflow-visible !border-0 !bg-[#f3f3f1] dark:!bg-[#101010] p-1 font-mono shadow-[0_18px_48px_rgba(0,0,0,0.35)]">
+                    <DropdownMenuItem asChild className="text-sm py-1.5 cursor-pointer">
+                        <Link href={getMainSiteUrl("/docs/troubleshooting")} className="flex justify-between w-full items-center">
+                            Troubleshooting
+                            <Wrench className="h-3.5 w-3.5 shrink-0" />
+                        </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild className="text-sm py-1.5 cursor-pointer">
+                        <Link href="/changelog" className="flex justify-between w-full items-center">
+                            Changelog
+                            <FileText className="h-3.5 w-3.5 shrink-0" />
+                        </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild className="text-sm py-1.5 cursor-pointer">
+                        <Link href="https://status.cencori.com" target="_blank" rel="noopener noreferrer" className="flex justify-between w-full items-center">
+                            Cencori status
+                            <Activity className="h-3.5 w-3.5 shrink-0" />
+                        </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild className="text-sm py-1.5 cursor-pointer">
+                        <Link href="mailto:support@cencori.com" className="flex justify-between w-full items-center">
+                            Contact support
+                            <Mail className="h-3.5 w-3.5 shrink-0" />
+                        </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator className="my-1" />
+                    <div className="px-2 py-2">
+                        <p className="text-sm font-medium mb-1">Community support</p>
+                        <p className="text-[10px] text-muted-foreground mb-2">Our Discord community can help with code-related issues.</p>
+                        <Link
+                            href="https://cencori.com/discord"
+                            target="_blank"
+                            className="flex items-center gap-1.5 text-[11px] font-medium text-primary hover:underline"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" color="currentColor" fill="none" stroke="currentColor" stroke-width="0.5" stroke-linecap="round" stroke-linejoin="round" className="shrink-0">
+                                <path d="M15.5 17.5C16.5 19 17.3333 19.6667 18 20C19.3333 19.6667 22 18.2 22 15C22 11.8 20.6667 7.33333 20 5.5C18 4.3 15.8333 4 15 4L14.198 5.60393C13.4135 5.28708 12.4058 5.25438 12 5.27763C11.5942 5.25438 10.5865 5.28708 9.80197 5.60393L9 4C8.16667 4 6 4.3 4 5.5C3.33333 7.33333 2 11.8 2 15C2 18.2 4.66667 19.6667 6 20C6.66667 19.6667 7.5 19 8.5 17.5"></path>
+                                <path d="M17.3652 11.5C17.3652 12.6046 16.5817 13.5 15.6152 13.5C14.6487 13.5 13.8652 12.6046 13.8652 11.5C13.8652 10.3954 14.6487 9.5 15.6152 9.5C16.5817 9.5 17.3652 10.3954 17.3652 11.5Z"></path>
+                                <path d="M10 11.5C10 12.6046 9.2165 13.5 8.25 13.5C7.2835 13.5 6.5 12.6046 6.5 11.5C6.5 10.3954 7.2835 9.5 8.25 9.5C9.2165 9.5 10 10.3954 10 11.5Z"></path>
+                                <path d="M17.5 16.5C16.4022 17.3967 14.3502 18 12 18C9.64981 18 7.59785 17.3967 6.5 16.5"></path>
+                            </svg>
+                            Join us on Discord
+                        </Link>
+                        <div className="mt-2 -mx-2 -mb-2 rounded-b-md overflow-hidden">
+                            <img src="/dbanner.png" alt="Discord banner" className="w-full h-auto" />
+                        </div>
+                    </div>
+                </DropdownMenuContent>
+            </DropdownMenu>
+            <FeedbackMenu />
+        </>
+    );
 
     return (
         <SidebarProvider
@@ -594,73 +904,13 @@ export default function OrganizationLayoutClient({
                                     )}
                                 </button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent
-                                side="bottom"
-                                align="start"
-                                sideOffset={5}
-                                className="z-[70] w-64 rounded-xl !border-0 !bg-[#f3f3f1] p-1 shadow-[0_18px_48px_rgba(0,0,0,0.35)] data-[state=closed]:!animate-none data-[state=open]:!animate-none dark:!bg-[#181818]"
-                            >
-                                <p className="px-3 pb-1 pt-1 text-[9px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
-                                    Projects
-                                </p>
-                                <div className="max-h-52 overflow-y-auto">
-                                    {availableProjects.map((project) => (
-                                        <DropdownMenuItem
-                                            key={project.id}
-                                            className="min-h-8 cursor-pointer rounded-lg px-3 py-1 text-[13px] font-medium"
-                                            onClick={async () => {
-                                                if (consoleMode) {
-                                                    let switched = false;
-                                                    try {
-                                                        switched = await selectProject(project.id);
-                                                    } catch {
-                                                        switched = false;
-                                                    }
-                                                    if (switched) {
-                                                        // Cookies carry the new workspace; the
-                                                        // flat URL stays valid, so refresh keeps
-                                                        // the current page under the new project.
-                                                        router.refresh();
-                                                        return;
-                                                    }
-                                                }
-                                                // Slug hosts (and the console fallback): keep the
-                                                // subpath, swap the workspace segments.
-                                                const preserved = swapWorkspaceInPath(
-                                                    window.location.pathname,
-                                                    orgSlug,
-                                                    project.slug,
-                                                ) ?? `/${orgSlug}/${project.slug}`;
-                                                announceNavigationIntent(preserved);
-                                                router.push(preserved);
-                                            }}
-                                        >
-                                            <span className="min-w-0 flex-1 truncate">{project.name}</span>
-                                            {project.id === selectedProject?.id && (
-                                                <Check className="ml-auto size-4 shrink-0" />
-                                            )}
-                                        </DropdownMenuItem>
-                                    ))}
-                                    {availableProjects.length === 0 && (
-                                        <p className="px-3 py-3 text-xs text-muted-foreground">No projects yet.</p>
-                                    )}
-                                </div>
-                                <DropdownMenuSeparator className="-mx-1 my-1 bg-border/35" />
-                                <DropdownMenuItem
-                                    className="min-h-8 cursor-pointer rounded-lg px-3 py-1 text-[13px]"
-                                    onSelect={() => setCreateProjectOpen(true)}
-                                >
-                                    <span className="min-w-0 flex-1 truncate">Create project</span>
-                                    <Plus className="ml-auto size-4 shrink-0" />
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                    className="min-h-8 cursor-pointer rounded-lg px-3 py-1 text-[13px]"
-                                    onClick={() => router.push(consoleMode ? "/projects" : `/${orgSlug}/~/projects`)}
-                                >
-                                    <span className="min-w-0 flex-1 truncate">Manage projects</span>
-                                    <HugeiconsIcon icon={Settings02Icon} className="ml-auto !size-4 shrink-0" />
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
+                            <ProjectSwitcherMenuContent
+                                projects={availableProjects}
+                                selectedProjectId={selectedProject?.id}
+                                orgSlug={orgSlug}
+                                consoleMode={consoleMode}
+                                onCreateProject={() => setCreateProjectOpen(true)}
+                            />
                         </DropdownMenu>
                     </SidebarHeader>
                     <SidebarContent>
@@ -680,292 +930,12 @@ export default function OrganizationLayoutClient({
                                         </span>
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
-                                {activeView === "agent" ? (
-                                    <AgentSubnav />
-                                ) : activeView === "ai-gateway" || (activeView === "memory" && memoryHref) || (activeView === "copilot" && copilotHref) ? (
-                                    <>
-                                        <SidebarMenuItem>
-                                            <SidebarMenuButton
-                                                onClick={() => setActiveView("main")}
-                                                size="sm"
-                                                className="gap-1 text-muted-foreground"
-                                            >
-                                                <ChevronLeft className="!h-5 !w-5" />
-                                                <span className="text-sm">Back</span>
-                                            </SidebarMenuButton>
-                                        </SidebarMenuItem>
-                                        {(activeView === "memory" ? memorySubItems : activeView === "copilot" ? copilotSubItems : projectSubItems).map((item) => (
-                                            <SidebarMenuItem key={item.href}>
-                                                <SidebarMenuButton
-                                                    asChild
-                                                    tooltip={item.label}
-                                                    // New chat is an action, not a place: the open conversation
-                                                    // is highlighted under Recent chats instead.
-                                                    isActive={item.href !== copilotHref && (isActive(item.href) || (
-                                                        pendingSubnavEntry === activeView
-                                                        && (item.href === aiGatewayHref || item.href === memoryHref)
-                                                    ))}
-                                                    size="sm"
-                                                >
-                                                    <Link
-                                                        href={item.href}
-                                                        prefetch={true}
-                                                        onMouseEnter={() => prefetchRoute(item.href)}
-                                                        onClick={item.href === copilotHref ? (event) => {
-                                                            // Chat opens whatever conversation the cookie names, so
-                                                            // clear it; if Chat is already open, reset it in place.
-                                                            document.cookie = `${COPILOT_CONVERSATION_COOKIE}=; path=/; max-age=0; samesite=lax`;
-                                                            if (pathname === copilotHref) {
-                                                                event.preventDefault();
-                                                                window.dispatchEvent(new Event(COPILOT_NEW_CHAT_EVENT));
-                                                            }
-                                                        } : undefined}
-                                                    >
-                                                        {item.icon}
-                                                        <span className="text-sm">{item.label}</span>
-                                                    </Link>
-                                                </SidebarMenuButton>
-                                            </SidebarMenuItem>
-                                        ))}
-                                        {activeView === "copilot" && copilotHref && organization?.id && (
-                                            <CopilotRecentChats organizationId={organization.id} chatHref={copilotHref} />
-                                        )}
-                                    </>
-                                ) : activeView === "project-settings" ? (
-                                    <>
-                                        <SidebarMenuItem>
-                                            <SidebarMenuButton
-                                                onClick={() => setActiveView("main")}
-                                                size="sm"
-                                                className="gap-1 text-muted-foreground"
-                                            >
-                                                <ChevronLeft className="!h-5 !w-5" />
-                                                <span className="text-sm">Back</span>
-                                            </SidebarMenuButton>
-                                        </SidebarMenuItem>
-                                        {projectSettingsItems.map((item) => (
-                                            <SidebarMenuItem key={item.tab}>
-                                                <SidebarMenuButton
-                                                    asChild
-                                                    tooltip={item.label}
-                                                    isActive={projectSettingsTab === item.tab}
-                                                    size="sm"
-                                                >
-                                                    <Link
-                                                        href={item.href}
-                                                        prefetch={true}
-                                                        onMouseEnter={() => prefetchRoute(item.href)}
-                                                        onClick={(event) => {
-                                                            // Already on the settings page: swap the
-                                                            // tab locally instead of navigating.
-                                                            // The page syncs ?tab= itself so links
-                                                            // stay shareable. Deep links from
-                                                            // elsewhere remain normal navigations.
-                                                            // An integration's own page has no tabs, so navigate.
-                                                            if (!isProjectSettingsView || isIntegrationPage) {
-                                                                setPendingSettingsTab(null);
-                                                                return;
-                                                            }
-                                                            event.preventDefault();
-                                                            setPendingSettingsTab(item.tab);
-                                                            announceSettingsTab(item.tab);
-                                                        }}
-                                                    >
-                                                        <span className="text-sm">{item.label}</span>
-                                                    </Link>
-                                                </SidebarMenuButton>
-                                            </SidebarMenuItem>
-                                        ))}
-                                    </>
-                                ) : activeView === "settings" ? (
-                                    <>
-                                        <SidebarMenuItem>
-                                            <SidebarMenuButton
-                                                onClick={() => setActiveView("main")}
-                                                size="sm"
-                                                className="gap-1 text-muted-foreground"
-                                            >
-                                                <ChevronLeft className="!h-5 !w-5" />
-                                                <span className="text-sm">Back</span>
-                                            </SidebarMenuButton>
-                                        </SidebarMenuItem>
-                                        {organizationSettingsItems.map((item) => (
-                                            <SidebarMenuItem key={item.section}>
-                                                <SidebarMenuButton
-                                                    asChild
-                                                    tooltip={item.label}
-                                                    isActive={organizationSettingsSection === item.section}
-                                                    size="sm"
-                                                >
-                                                    <Link href={item.href} prefetch={true} onMouseEnter={() => prefetchRoute(item.href)}>
-                                                        {item.icon}
-                                                        <span className="text-sm">{item.label}</span>
-                                                    </Link>
-                                                </SidebarMenuButton>
-                                            </SidebarMenuItem>
-                                        ))}
-                                    </>
-                                ) : (
-                                    <>
-                                        {/* 1. Project Overview */}
-                                        <SidebarMenuItem>
-                                            <SidebarMenuButton asChild tooltip={overviewItem.label} isActive={isActive(overviewItem.href)} size="sm">
-                                                <Link href={overviewItem.href} prefetch={true} onMouseEnter={() => prefetchRoute(overviewItem.href)}>
-                                                    {overviewItem.icon}
-                                                    <span className="text-sm">{overviewItem.label}</span>
-                                                </Link>
-                                            </SidebarMenuButton>
-                                        </SidebarMenuItem>
-                                        {/* 4. AI Gateway toggle */}
-                                        <SidebarMenuItem>
-                                            <SidebarMenuButton
-                                                asChild
-                                                isActive={isActive(aiGatewayHref)}
-                                                size="sm"
-                                                className="gap-1"
-                                            >
-                                                <Link
-                                                    href={aiGatewayHref}
-                                                    prefetch={true}
-                                                    onClick={() => {
-                                                        setPendingSubnavEntry("ai-gateway");
-                                                        setActiveView("ai-gateway");
-                                                    }}
-                                                    onMouseEnter={() => prefetchRoute(aiGatewayHref)}
-                                                >
-                                                    <HugeiconsIcon icon={DiscoverSquareIcon} className="!h-5 !w-5" />
-                                                    <span className="text-sm">AI Gateway</span>
-                                                    <ChevronRight className="!h-3 !w-3 ml-auto text-muted-foreground/50" />
-                                                </Link>
-                                            </SidebarMenuButton>
-                                        </SidebarMenuItem>
-                                        {buildItems.map(renderMenuItem)}
-                                        {/* Memory toggle */}
-                                        {memoryHref && (
-                                            <SidebarMenuItem>
-                                                <SidebarMenuButton
-                                                    asChild
-                                                    isActive={isMemoryPath(pathname)}
-                                                    size="sm"
-                                                    className="gap-1"
-                                                >
-                                                    <Link
-                                                        href={memoryHref}
-                                                        prefetch={true}
-                                                        onClick={() => {
-                                                            setPendingSubnavEntry("memory");
-                                                            setActiveView("memory");
-                                                        }}
-                                                        onMouseEnter={() => prefetchRoute(memoryHref)}
-                                                    >
-                                                        <HugeiconsIcon icon={BrainIcon} className="!h-5 !w-5" />
-                                                        <span className="text-sm">Memory</span>
-                                                        <ChevronRight className="!h-3 !w-3 ml-auto text-muted-foreground/50" />
-                                                    </Link>
-                                                </SidebarMenuButton>
-                                            </SidebarMenuItem>
-                                        )}
-                                        {runItems.map(renderMenuItem)}
-                                        {/* Copilot toggle */}
-                                        {copilotHref && (
-                                            <SidebarMenuItem>
-                                                <SidebarMenuButton
-                                                    asChild
-                                                    isActive={isCopilotPath(pathname)}
-                                                    size="sm"
-                                                    className="gap-1"
-                                                >
-                                                    <Link
-                                                        href={copilotHref}
-                                                        prefetch={true}
-                                                        onClick={() => {
-                                                            setPendingSubnavEntry("copilot");
-                                                            setActiveView("copilot");
-                                                        }}
-                                                        onMouseEnter={() => prefetchRoute(copilotHref)}
-                                                    >
-                                                        <HugeiconsIcon icon={AirdropIcon} className="!h-5 !w-5" />
-                                                        <span className="text-sm">Copilot</span>
-                                                        <ChevronRight className="!h-3 !w-3 ml-auto text-muted-foreground/50" />
-                                                    </Link>
-                                                </SidebarMenuButton>
-                                            </SidebarMenuItem>
-                                        )}
-                                        {renderBottomItems()}
-                                    </>
-                                )}
+                                {navMenu}
                             </SidebarMenu>
                         </SidebarGroup>
                     </SidebarContent>
                     <SidebarFooter className="pt-1 space-y-0.5">
-                        <Link
-                            href={docsUrl}
-                            target="_blank"
-                            className="flex w-full items-center gap-2 rounded-md p-2 text-left text-sm text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors outline-hidden"
-                        >
-                            <Book className="size-3.5 shrink-0" />
-                            <span className="flex-1">Documentation</span>
-                            <ArrowUpRight className="size-3 shrink-0" />
-                        </Link>
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <button
-                                    type="button"
-                                    className="flex w-full items-center gap-2 rounded-md p-2 text-left text-sm text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors outline-hidden"
-                                >
-                                    <HelpCircle className="size-3.5 shrink-0" />
-                                    <span className="flex-1">Help & Resources</span>
-                                </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="start" side="top" sideOffset={4} className="w-80 max-h-none overflow-visible !border-0 !bg-[#f3f3f1] dark:!bg-[#101010] p-1 font-mono shadow-[0_18px_48px_rgba(0,0,0,0.35)]">
-                                <DropdownMenuItem asChild className="text-sm py-1.5 cursor-pointer">
-                                    <Link href={getMainSiteUrl("/docs/troubleshooting")} className="flex justify-between w-full items-center">
-                                        Troubleshooting
-                                        <Wrench className="h-3.5 w-3.5 shrink-0" />
-                                    </Link>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem asChild className="text-sm py-1.5 cursor-pointer">
-                                    <Link href="/changelog" className="flex justify-between w-full items-center">
-                                        Changelog
-                                        <FileText className="h-3.5 w-3.5 shrink-0" />
-                                    </Link>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem asChild className="text-sm py-1.5 cursor-pointer">
-                                    <Link href="https://status.cencori.com" target="_blank" rel="noopener noreferrer" className="flex justify-between w-full items-center">
-                                        Cencori status
-                                        <Activity className="h-3.5 w-3.5 shrink-0" />
-                                    </Link>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem asChild className="text-sm py-1.5 cursor-pointer">
-                                    <Link href="mailto:support@cencori.com" className="flex justify-between w-full items-center">
-                                        Contact support
-                                        <Mail className="h-3.5 w-3.5 shrink-0" />
-                                    </Link>
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator className="my-1" />
-                                <div className="px-2 py-2">
-                                    <p className="text-sm font-medium mb-1">Community support</p>
-                                    <p className="text-[10px] text-muted-foreground mb-2">Our Discord community can help with code-related issues.</p>
-                                    <Link
-                                        href="https://cencori.com/discord"
-                                        target="_blank"
-                                        className="flex items-center gap-1.5 text-[11px] font-medium text-primary hover:underline"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" color="currentColor" fill="none" stroke="currentColor" stroke-width="0.5" stroke-linecap="round" stroke-linejoin="round" className="shrink-0">
-                                            <path d="M15.5 17.5C16.5 19 17.3333 19.6667 18 20C19.3333 19.6667 22 18.2 22 15C22 11.8 20.6667 7.33333 20 5.5C18 4.3 15.8333 4 15 4L14.198 5.60393C13.4135 5.28708 12.4058 5.25438 12 5.27763C11.5942 5.25438 10.5865 5.28708 9.80197 5.60393L9 4C8.16667 4 6 4.3 4 5.5C3.33333 7.33333 2 11.8 2 15C2 18.2 4.66667 19.6667 6 20C6.66667 19.6667 7.5 19 8.5 17.5"></path>
-                                            <path d="M17.3652 11.5C17.3652 12.6046 16.5817 13.5 15.6152 13.5C14.6487 13.5 13.8652 12.6046 13.8652 11.5C13.8652 10.3954 14.6487 9.5 15.6152 9.5C16.5817 9.5 17.3652 10.3954 17.3652 11.5Z"></path>
-                                            <path d="M10 11.5C10 12.6046 9.2165 13.5 8.25 13.5C7.2835 13.5 6.5 12.6046 6.5 11.5C6.5 10.3954 7.2835 9.5 8.25 9.5C9.2165 9.5 10 10.3954 10 11.5Z"></path>
-                                            <path d="M17.5 16.5C16.4022 17.3967 14.3502 18 12 18C9.64981 18 7.59785 17.3967 6.5 16.5"></path>
-                                        </svg>
-                                        Join us on Discord
-                                    </Link>
-                                    <div className="mt-2 -mx-2 -mb-2 rounded-b-md overflow-hidden">
-                                        <img src="/dbanner.png" alt="Discord banner" className="w-full h-auto" />
-                                    </div>
-                                </div>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                        <FeedbackMenu />
+                        {supportLinks}
                         <UserMenu
                             organization={organization ? {
                                 id: organization.id,
@@ -978,36 +948,46 @@ export default function OrganizationLayoutClient({
                 </Sidebar>
             )}
 
-            <Sheet open={isOpen} onOpenChange={setIsOpen}>
-                <SheetContent
-                    side="bottom"
-                    className="h-[70vh]"
-                    onClickCapture={handleSidebarNavigationCapture}
-                >
-                    <div className="py-3">
-                        <SidebarGroup>
-                            <SidebarMenu>
-                                {[
-                                    overviewItem,
-                                    logsItem,
-                                    ...projectSecondaryItems,
-                                    ...organizationSettingsItems.filter((item) => item.section !== "general" && item.section !== "advanced"),
-                                    ...bottomItems,
-                                ].map((item) => (
-                                    <SidebarMenuItem key={item.href}>
-                                        <SidebarMenuButton asChild size="sm" onClick={() => setIsOpen(false)}>
-                                            <Link href={item.href} prefetch={true}>
-                                                {item.icon}
-                                                <span className="text-sm">{item.label}</span>
-                                            </Link>
-                                        </SidebarMenuButton>
-                                    </SidebarMenuItem>
-                                ))}
-                            </SidebarMenu>
-                        </SidebarGroup>
-                    </div>
-                </SheetContent>
-            </Sheet>
+            <Drawer.Root
+                open={isOpen}
+                onOpenChange={setIsOpen}
+                snapPoints={[...NAV_SHEET_SNAPS]}
+                activeSnapPoint={sheetSnap}
+                setActiveSnapPoint={setSheetSnap}
+                fadeFromIndex={0}
+            >
+                <Drawer.Portal>
+                    <Drawer.Overlay className="fixed inset-x-0 top-[var(--maintenance-banner-height,0px)] bottom-0 z-50 bg-black/50 lg:hidden" />
+                    <Drawer.Content
+                        className="fixed inset-x-0 bottom-0 z-50 flex h-[calc(100svh-var(--maintenance-banner-height,0px))] flex-col rounded-t-2xl bg-background outline-none lg:hidden"
+                        onClickCapture={(event) => {
+                            handleSidebarNavigationCapture(event);
+                            // A page link closes the sheet; a link that opens a sub-menu
+                            // (AI Gateway, Memory, Copilot, Settings) keeps it up to show it.
+                            const link = (event.target as HTMLElement).closest("a");
+                            if (link && !link.hasAttribute("data-subnav-toggle")) setIsOpen(false);
+                        }}
+                    >
+                        {/* Screen readers announce the sheet by these; Radix requires a title. */}
+                        <Drawer.Title className="sr-only">Navigation</Drawer.Title>
+                        <Drawer.Description className="sr-only">Pages in this project and organization.</Drawer.Description>
+                        <div aria-hidden="true" className="mx-auto mt-3 mb-1 h-1 w-10 shrink-0 rounded-full bg-muted-foreground/40" />
+                        {/* Scrolls only at full height, so a drag on the list moves the sheet until then.
+                            pb clears the tab bar, which floats over the sheet. */}
+                        <div
+                            className={cn(
+                                "min-h-0 flex-1 pt-2 pb-24",
+                                sheetSnap === NAV_SHEET_SNAPS[1] ? "overflow-y-auto" : "overflow-hidden",
+                            )}
+                        >
+                            <SidebarGroup>
+                                <SidebarMenu>{navMenu}</SidebarMenu>
+                            </SidebarGroup>
+                            <div className="mt-10 space-y-0.5 px-2">{supportLinks}</div>
+                        </div>
+                    </Drawer.Content>
+                </Drawer.Portal>
+            </Drawer.Root>
 
             <main className="flex min-h-0 w-full flex-1 flex-col overflow-hidden">
                 <div

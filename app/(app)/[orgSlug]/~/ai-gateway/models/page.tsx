@@ -12,7 +12,7 @@ export default function DashboardModelsPage() {
     const totalProviders = SUPPORTED_PROVIDERS.length;
 
     return (
-        <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        <div className="w-full max-w-5xl mx-auto px-0 sm:px-6 pt-0 pb-6 sm:py-8">
             <div className="mb-5 sm:mb-6">
                 <h1 className="text-base sm:text-lg font-medium">Models</h1>
                 <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">

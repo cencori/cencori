@@ -1,47 +1,33 @@
 "use client";
-import { browserAuth } from "@/lib/auth/browser-auth";
 
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { usePathname } from "next/navigation";
 import { useOrganizationProject } from "@/lib/contexts/OrganizationProjectContext";
 import {
     DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuSub,
-    DropdownMenuSubContent,
-    DropdownMenuSubTrigger,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Check, ChevronsUpDown, HelpCircle, ExternalLink, CircleUserRound, CreditCard, PlusCircle, Settings } from "lucide-react";
-import { UserAvatar } from "@/components/ui/user-avatar";
-import { useTheme } from "next-themes";
-import { supabase } from "@/lib/supabaseClient";
-import { beginIntentionalSignOut, clearClientSessionCaches } from "@/lib/auth/session-caches";
+import { ChevronsUpDown } from "lucide-react";
+import { UserMenu } from "@/components/dashboard/UserMenu";
+import { ProjectSwitcherMenuContent } from "@/components/dashboard/ProjectSwitcherMenu";
 import { getConsoleRoute } from "@/lib/console/routing";
-import { getMainSiteUrl } from "@/lib/main-site-url";
 
 interface MobileNavProps {
     onMenuClick: () => void;
     projectSlug?: string | null;
     user?: { email?: string | null };
     avatar?: string | null;
+    /** True when the fixed top bar shows on phones too, so this bar sits under it. */
+    belowHeader?: boolean;
 }
 
-export function MobileNav({ projectSlug, user, avatar }: MobileNavProps) {
+export function MobileNav({ projectSlug, belowHeader = false }: MobileNavProps) {
     const pathname = usePathname();
-    const router = useRouter();
     const {
         organizations,
         projects,
         activeOrganization,
         activeProject,
-        selectProject,
     } = useOrganizationProject();
-    const { theme, setTheme } = useTheme();
-    const [feedbackOpen, setFeedbackOpen] = useState(false);
-    const [feedbackText, setFeedbackText] = useState("");
 
     const getOrgSlug = () => {
         if (pathname === "/" || pathname === "/dashboard" || pathname.startsWith("/dashboard/")) {
@@ -63,251 +49,47 @@ export function MobileNav({ projectSlug, user, avatar }: MobileNavProps) {
     const currentProject = projects.find((proj) => proj.slug === resolvedProjectSlug && proj.orgSlug === orgSlug);
 
     // Get available orgs and projects for dropdowns
-    const availableOrgs = organizations;
     const availableProjects = projects.filter((proj) => proj.orgSlug === orgSlug);
 
     return (
-        <div className="sticky top-[calc(3rem+var(--maintenance-banner-height,0px))] z-50 lg:hidden border-b border-border/40 bg-background">
+        <div className={`sticky ${belowHeader ? "top-[calc(3rem+var(--maintenance-banner-height,0px))]" : "top-[var(--maintenance-banner-height,0px)]"} z-50 lg:hidden border-b border-border/40 bg-background`}>
             <div className="flex items-center gap-1 px-4 py-2 overflow-x-auto scrollbar-hide">
                 {/* Project selector dropdown */}
                 {resolvedProjectSlug && (
                     <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <button className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-foreground bg-secondary/50 hover:bg-secondary rounded-md transition-colors shrink-0">
-                                    {currentProject?.name || resolvedProjectSlug}
-                                    <ChevronsUpDown className="h-3 w-3 text-muted-foreground" />
+                                <button
+                                    type="button"
+                                    className="flex h-7 shrink-0 items-center rounded-full border border-border bg-secondary/50 text-xs font-medium text-foreground transition-colors hover:bg-secondary"
+                                    aria-label="Switch project"
+                                >
+                                    <span className="max-w-40 truncate pl-3 pr-2">{currentProject?.name || resolvedProjectSlug}</span>
+                                    <span aria-hidden="true" className="h-3.5 w-px bg-border" />
+                                    <ChevronsUpDown className="mx-2 h-3 w-3 text-muted-foreground" />
                                 </button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="start" className="w-48">
-                                <DropdownMenuItem
-                                    className="text-xs cursor-pointer"
-                                    onClick={() => router.push(consoleRoute ? "/projects" : `/${orgSlug}/~/projects`)}
-                                >
-                                    All projects
-                                </DropdownMenuItem>
-                                {availableProjects.map((proj) => (
-                                    <DropdownMenuItem
-                                        key={proj.id}
-                                        className="text-xs cursor-pointer"
-                                        onClick={async () => {
-                                            if (consoleRoute && await selectProject(proj.id)) {
-                                                router.refresh();
-                                                return;
-                                            }
-                                            router.push(`/${orgSlug}/${proj.slug}`);
-                                        }}
-                                    >
-                                        {proj.name}
-                                    </DropdownMenuItem>
-                                ))}
-                                <DropdownMenuItem
-                                    className="text-xs cursor-pointer text-primary"
-                                    onClick={() => router.push(consoleRoute ? "/projects/new" : `/${orgSlug}/~/projects/new`)}
-                                >
-                                    + New project
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
+                            <ProjectSwitcherMenuContent
+                                projects={availableProjects}
+                                selectedProjectId={currentProject?.id}
+                                orgSlug={orgSlug}
+                                consoleMode={Boolean(consoleRoute)}
+                            />
                     </DropdownMenu>
                 )}
 
                 {/* Spacer */}
                 <div className="flex-1 min-w-4" />
 
-                {/* Feedback dropdown */}
-                <DropdownMenu open={feedbackOpen} onOpenChange={setFeedbackOpen}>
-                    <DropdownMenuTrigger asChild>
-                        <button
-                            type="button"
-                            className="px-2.5 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors shrink-0"
-                        >
-                            Feedback
-                        </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-72 p-3">
-                        <div className="space-y-3">
-                            <textarea
-                                placeholder="My idea for improving Cencori is..."
-                                value={feedbackText}
-                                onChange={(e) => setFeedbackText(e.target.value)}
-                                className="w-full h-20 text-xs bg-secondary/50 border border-border/40 rounded-md p-2 resize-none focus:outline-none focus:ring-1 focus:ring-ring/20"
-                            />
-                            <div className="flex items-center justify-end gap-2">
-                                <button
-                                    type="button"
-                                    className="h-7 px-3 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
-                                    disabled={!feedbackText.trim()}
-                                    onClick={() => {
-                                        // TODO: Submit feedback
-                                        setFeedbackText("");
-                                        setFeedbackOpen(false);
-                                    }}
-                                >
-                                    Send
-                                </button>
-                            </div>
-                        </div>
-                    </DropdownMenuContent>
-                </DropdownMenu>
-
-                {/* Help dropdown */}
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <button
-                            type="button"
-                            className="w-7 h-7 flex items-center justify-center rounded-full border border-border/100 hover:bg-secondary transition-colors shrink-0"
-                            aria-label="Help"
-                        >
-                            <HelpCircle className="h-4 w-4 text-muted-foreground" />
-                        </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56 p-2">
-                        <div className="px-2 py-1.5 mb-1">
-                            <p className="text-xs font-medium">Need help?</p>
-                            <p className="text-[10px] text-muted-foreground">Start with our docs or community.</p>
-                        </div>
-                        <DropdownMenuItem asChild className="text-xs cursor-pointer">
-                            <Link href={getMainSiteUrl("/docs")} target="_blank">
-                                <ExternalLink className="h-3 w-3 mr-2" />
-                                Documentation
-                            </Link>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem asChild className="text-xs cursor-pointer">
-                            <Link href="https://discord.gg/j3eAV5WzCa" target="_blank">
-                                <ExternalLink className="h-3 w-3 mr-2" />
-                                Discord Community
-                            </Link>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem asChild className="text-xs cursor-pointer">
-                            <Link href="mailto:support@cencori.com">
-                                <ExternalLink className="h-3 w-3 mr-2" />
-                                Email Support
-                            </Link>
-                        </DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
-
-                {/* User Avatar Menu */}
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <button
-                            type="button"
-                            className="w-7 h-7 flex items-center justify-center rounded-full border border-border/100 hover:bg-secondary transition-colors shrink-0 overflow-hidden"
-                            aria-label="User menu"
-                        >
-                            <UserAvatar
-                                src={avatar}
-                                email={user?.email}
-                                size={28}
-                                className="border-0"
-                            />
-                        </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent className="w-66 p-1" align="end" forceMount>
-                        {user?.email && (
-                            <div className="px-2 py-1.5 border-b border-border/40 mb-1">
-                                <p className="text-xs font-medium truncate">
-                                    {user.email}
-                                </p>
-                            </div>
-                        )}
-                        {currentOrg && (
-                            <>
-                                <p className="px-2 py-1 text-[10px] text-muted-foreground uppercase tracking-wider">Organization</p>
-                                <DropdownMenuSub>
-                                    <DropdownMenuSubTrigger className="min-h-11 cursor-pointer px-2 py-1.5 text-xs">
-                                        <span className="flex size-6 shrink-0 items-center justify-center rounded-full border border-border/60 bg-secondary text-[10px] font-semibold">
-                                            {currentOrg.name.slice(0, 1).toUpperCase()}
-                                        </span>
-                                        <span className="min-w-0 flex-1 text-left">
-                                            <span className="block truncate font-medium">{currentOrg.name}</span>
-                                            <span className="block text-[10px] text-muted-foreground">Organization</span>
-                                        </span>
-                                    </DropdownMenuSubTrigger>
-                                    <DropdownMenuSubContent className="w-56 p-1">
-                                        <p className="px-2 py-1 text-[10px] text-muted-foreground uppercase tracking-wider">Organizations</p>
-                                        <div className="max-h-52 overflow-y-auto">
-                                            {availableOrgs.map((org) => (
-                                                <DropdownMenuItem
-                                                    key={org.id}
-                                                    className="cursor-pointer py-1.5 text-xs"
-                                                    onClick={async () => {
-                                                        const firstProject = projects.find((project) => project.organization_id === org.id);
-                                                        if (consoleRoute && firstProject && await selectProject(firstProject.id)) {
-                                                            router.push("/home");
-                                                            router.refresh();
-                                                            return;
-                                                        }
-                                                        router.push(firstProject ? `/${org.slug}/${firstProject.slug}` : `/${org.slug}/~/projects`);
-                                                    }}
-                                                >
-                                                    <span className="flex size-5 shrink-0 items-center justify-center rounded-full border border-border/60 bg-secondary text-[9px] font-semibold">
-                                                        {org.name.slice(0, 1).toUpperCase()}
-                                                    </span>
-                                                    <span className="truncate">{org.name}</span>
-                                                    {org.id === currentOrg.id && <Check className="ml-auto h-3.5 w-3.5" />}
-                                                </DropdownMenuItem>
-                                            ))}
-                                        </div>
-                                        <div className="my-1 border-t border-border/40" />
-                                        <DropdownMenuItem
-                                            className="cursor-pointer py-1.5 text-xs"
-                                            onClick={() => router.push(consoleRoute ? "/organization/settings" : `/${currentOrg.slug}/~/settings`)}
-                                        >
-                                            <Settings className="h-3.5 w-3.5" />
-                                            Organization settings
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem className="cursor-pointer py-1.5 text-xs" onClick={() => router.push("/onboarding")}>
-                                            <PlusCircle className="h-3.5 w-3.5" />
-                                            New organization
-                                        </DropdownMenuItem>
-                                    </DropdownMenuSubContent>
-                                </DropdownMenuSub>
-                                <div className="my-1 border-t border-border/40" />
-                            </>
-                        )}
-                        <p className="px-2 py-1 text-[10px] text-muted-foreground uppercase tracking-wider">Account</p>
-                        <DropdownMenuItem className="text-xs py-1.5 cursor-pointer" onClick={() => router.push("/account/profile")}>
-                            <CircleUserRound className="mr-2 h-3.5 w-3.5" />
-                            Profile
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="text-xs py-1.5 cursor-pointer" onClick={() => router.push("/account/settings")}>
-                            <Settings className="mr-2 h-3.5 w-3.5" />
-                            Settings
-                        </DropdownMenuItem>
-                        <div className="my-1 border-t border-border/40" />
-                        <p className="px-2 py-1 text-[10px] text-muted-foreground uppercase tracking-wider">Theme</p>
-                        <DropdownMenuItem className="text-xs py-1.5 cursor-pointer" onClick={() => setTheme("light")}>
-                            {theme === "light" && <span className="mr-2 h-1.5 w-1.5 rounded-full bg-foreground" />}
-                            {theme !== "light" && <span className="mr-2 h-1.5 w-1.5" />}
-                            Light
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="text-xs py-1.5 cursor-pointer" onClick={() => setTheme("dark")}>
-                            {theme === "dark" && <span className="mr-2 h-1.5 w-1.5 rounded-full bg-foreground" />}
-                            {theme !== "dark" && <span className="mr-2 h-1.5 w-1.5" />}
-                            Dark
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="text-xs py-1.5 cursor-pointer" onClick={() => setTheme("system")}>
-                            {theme === "system" && <span className="mr-2 h-1.5 w-1.5 rounded-full bg-foreground" />}
-                            {theme !== "system" && <span className="mr-2 h-1.5 w-1.5" />}
-                            System
-                        </DropdownMenuItem>
-                        <div className="my-1 border-t border-border/40" />
-                        <DropdownMenuItem className="text-xs py-1.5 cursor-pointer" onClick={() => router.push("/")}>
-                            Homepage
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                            className="text-xs py-1.5 cursor-pointer text-red-500 focus:text-red-500"
-                            onClick={async () => {
-                                beginIntentionalSignOut();
-                                clearClientSessionCaches();
-                                await browserAuth.signOut({ scope: "local" });
-                                router.push("/login");
-                            }}
-                        >
-                            Log out
-                        </DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
+                {/* The desktop sidebar's profile menu, opened from the avatar. */}
+                <UserMenu
+                    variant="avatar"
+                    organization={currentOrg ? {
+                        id: currentOrg.id,
+                        name: currentOrg.name,
+                        slug: currentOrg.slug,
+                        subscriptionTier: currentOrg.subscription_tier ?? "free",
+                    } : undefined}
+                />
             </div>
         </div>
     );

@@ -6,7 +6,7 @@ import dynamic from "next/dynamic";
 import { supabase } from "@/lib/supabaseClient";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { ThemeSwitcher } from "@/components/ui/theme-switcher";
-import { Check, CircleUserRound, LogOut, PlusCircle, Settings } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, CircleUserRound, LogOut, PlusCircle, Settings } from "lucide-react";
 import { Logo } from "@/components/logo";
 import {
     DropdownMenu,
@@ -46,9 +46,12 @@ type UserMenuProps = {
         slug: string;
         subscriptionTier: string;
     };
+    /** "sidebar": a full-width row opening upward (desktop footer). "avatar": just the
+     *  avatar, opening downward (phone top bar). Same menu either way. */
+    variant?: "sidebar" | "avatar";
 };
 
-export function UserMenu({ organization }: UserMenuProps) {
+export function UserMenu({ organization, variant = "sidebar" }: UserMenuProps) {
     const router = useRouter();
     const pathname = usePathname();
     const {
@@ -59,6 +62,7 @@ export function UserMenu({ organization }: UserMenuProps) {
     } = useOrganizationProject();
     const [profile, setProfile] = useState<ProfileData | null>(null);
     const [menuOpen, setMenuOpen] = useState(false);
+    const [organizationView, setOrganizationView] = useState(false);
     const [upgradeOpen, setUpgradeOpen] = useState(false);
     const [upgradePreload, setUpgradePreload] = useState(false);
 
@@ -155,10 +159,71 @@ export function UserMenu({ organization }: UserMenuProps) {
         router.push(`/${nextOrganization.slug}/~/projects`);
     };
 
+    // Switch organization, its settings, or a new one: a side menu on desktop,
+    // an in-place view on a phone.
+    const organizationPanel = (
+        <>
+        <p className="px-3 pb-1 pt-1 text-[9px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Organizations</p>
+        <div className="max-h-52 overflow-y-auto">
+            {organizationOptions.map((item) => (
+                <DropdownMenuItem
+                    key={item.id}
+                    className="min-h-8 cursor-pointer rounded-lg px-3 py-1 text-[13px]"
+                    onClick={() => void switchOrganization(item.id)}
+                >
+                    <span className="flex size-5 shrink-0 items-center justify-center rounded-full border border-border/60 bg-secondary text-[9px] font-semibold">
+                        {item.name.slice(0, 1).toUpperCase()}
+                    </span>
+                    <span className="truncate">{item.name}</span>
+                    {item.id === currentOrganization?.id && <Check className="ml-auto h-3.5 w-3.5" />}
+                </DropdownMenuItem>
+            ))}
+        </div>
+        <DropdownMenuSeparator className="-mx-1 my-1 bg-border/35" />
+        {organizationSettingsHref && (
+            <DropdownMenuItem
+                className="min-h-8 cursor-pointer rounded-lg px-3 py-1 text-[13px]"
+                onClick={() => {
+                    setMenuOpen(false);
+                    router.push(organizationSettingsHref);
+                }}
+            >
+                <span className="min-w-0 flex-1 truncate">Organization settings</span>
+                <Settings className="ml-auto size-4 shrink-0" />
+            </DropdownMenuItem>
+        )}
+        <DropdownMenuItem
+            className="min-h-8 cursor-pointer rounded-lg px-3 py-1 text-[13px]"
+            onClick={() => {
+                setMenuOpen(false);
+                router.push("/onboarding");
+            }}
+        >
+            <span className="min-w-0 flex-1 truncate">New organization</span>
+            <PlusCircle className="ml-auto size-4 shrink-0" />
+        </DropdownMenuItem>
+        </>
+    );
+
     return (
         <>
-            <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+            <DropdownMenu
+                open={menuOpen}
+                onOpenChange={(open) => {
+                    setMenuOpen(open);
+                    if (!open) setOrganizationView(false);
+                }}
+            >
                 <DropdownMenuTrigger asChild>
+                    {variant === "avatar" ? (
+                    <button
+                        type="button"
+                        className="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border transition-colors hover:bg-secondary"
+                        aria-label="User menu"
+                    >
+                        <UserAvatar src={displayAvatar} name={fullName} email={email} size={28} className="border-0" />
+                    </button>
+                    ) : (
                     <button
                         type="button"
                         className="flex w-full items-center gap-2 rounded-md p-2 text-left text-sm hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors outline-hidden"
@@ -173,8 +238,25 @@ export function UserMenu({ organization }: UserMenuProps) {
                         <span className="flex-1 truncate">{displayName}</span>
                         <span className="inline-flex items-center justify-center size-6 rounded-full border border-border/60 text-xs text-muted-foreground font-bold leading-none">⋯</span>
                     </button>
+                    )}
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-66 rounded-xl !border-0 !bg-[#f3f3f1] dark:!bg-[#181818] p-1 shadow-[0_18px_48px_rgba(0,0,0,0.35)] data-[state=closed]:!animate-none data-[state=open]:!animate-none" side="top" sideOffset={4} align="start" forceMount>
+                <DropdownMenuContent className="w-66 rounded-xl !border-0 !bg-[#f3f3f1] dark:!bg-[#181818] p-1 shadow-[0_18px_48px_rgba(0,0,0,0.35)] data-[state=closed]:!animate-none data-[state=open]:!animate-none" side={variant === "avatar" ? "bottom" : "top"} sideOffset={4} align={variant === "avatar" ? "end" : "start"} forceMount>
+                    {organizationView ? (
+                        <>
+                            <DropdownMenuItem
+                                className="min-h-8 cursor-pointer rounded-lg px-3 py-1 text-[13px] text-muted-foreground"
+                                onSelect={(event) => {
+                                    event.preventDefault();
+                                    setOrganizationView(false);
+                                }}
+                            >
+                                <ChevronLeft className="size-4 shrink-0" />
+                                Back
+                            </DropdownMenuItem>
+                            {organizationPanel}
+                        </>
+                    ) : (
+                    <>
                     <div className="space-y-0 px-3 pb-1.5 pt-1.5">
                         <p className="truncate text-[13px] font-medium leading-tight text-popover-foreground">{fullName || email}</p>
                         {fullName && <p className="truncate text-[11px] leading-tight text-muted-foreground">{email}</p>}
@@ -183,6 +265,21 @@ export function UserMenu({ organization }: UserMenuProps) {
                     {currentOrganization && (
                         <>
                             <p className="px-3 pb-1 pt-1 text-[9px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Organization</p>
+                            {variant === "avatar" ? (
+                                // No room for a side menu on a phone: open the list in place.
+                                <DropdownMenuItem
+                                    className="min-h-9 cursor-pointer rounded-lg px-3 py-1 text-[13px]"
+                                    onSelect={(event) => {
+                                        event.preventDefault();
+                                        setOrganizationView(true);
+                                    }}
+                                >
+                                    <span className="min-w-0 flex-1 truncate text-left font-medium text-popover-foreground">
+                                        {currentOrganization.name}
+                                    </span>
+                                    <ChevronRight className="ml-auto size-4 shrink-0 text-muted-foreground" />
+                                </DropdownMenuItem>
+                            ) : (
                             <DropdownMenuSub>
                                 <DropdownMenuSubTrigger className="min-h-9 cursor-pointer rounded-lg px-3 py-1 text-[13px]">
                                     <span className="min-w-0 flex-1 truncate text-left font-medium text-popover-foreground">
@@ -193,47 +290,10 @@ export function UserMenu({ organization }: UserMenuProps) {
                                     sideOffset={6}
                                     className="w-64 rounded-xl !border-0 !bg-[#f3f3f1] dark:!bg-[#181818] p-1 shadow-[0_18px_48px_rgba(0,0,0,0.35)]"
                                 >
-                                    <p className="px-3 pb-1 pt-1 text-[9px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Organizations</p>
-                                    <div className="max-h-52 overflow-y-auto">
-                                        {organizationOptions.map((item) => (
-                                            <DropdownMenuItem
-                                                key={item.id}
-                                                className="min-h-8 cursor-pointer rounded-lg px-3 py-1 text-[13px]"
-                                                onClick={() => void switchOrganization(item.id)}
-                                            >
-                                                <span className="flex size-5 shrink-0 items-center justify-center rounded-full border border-border/60 bg-secondary text-[9px] font-semibold">
-                                                    {item.name.slice(0, 1).toUpperCase()}
-                                                </span>
-                                                <span className="truncate">{item.name}</span>
-                                                {item.id === currentOrganization.id && <Check className="ml-auto h-3.5 w-3.5" />}
-                                            </DropdownMenuItem>
-                                        ))}
-                                    </div>
-                                    <DropdownMenuSeparator className="-mx-1 my-1 bg-border/35" />
-                                    {organizationSettingsHref && (
-                                        <DropdownMenuItem
-                                            className="min-h-8 cursor-pointer rounded-lg px-3 py-1 text-[13px]"
-                                            onClick={() => {
-                                                setMenuOpen(false);
-                                                router.push(organizationSettingsHref);
-                                            }}
-                                        >
-                                            <span className="min-w-0 flex-1 truncate">Organization settings</span>
-                                            <Settings className="ml-auto size-4 shrink-0" />
-                                        </DropdownMenuItem>
-                                    )}
-                                    <DropdownMenuItem
-                                        className="min-h-8 cursor-pointer rounded-lg px-3 py-1 text-[13px]"
-                                        onClick={() => {
-                                            setMenuOpen(false);
-                                            router.push("/onboarding");
-                                        }}
-                                    >
-                                        <span className="min-w-0 flex-1 truncate">New organization</span>
-                                        <PlusCircle className="ml-auto size-4 shrink-0" />
-                                    </DropdownMenuItem>
+                                    {organizationPanel}
                                 </DropdownMenuSubContent>
                             </DropdownMenuSub>
+                            )}
                             <DropdownMenuSeparator className="-mx-1 my-1 bg-border/35" />
                         </>
                     )}
@@ -292,6 +352,8 @@ export function UserMenu({ organization }: UserMenuProps) {
                         <span className="min-w-0 flex-1 truncate">Log out</span>
                         <LogOut className="ml-auto size-4 shrink-0" />
                     </DropdownMenuItem>
+                    </>
+                    )}
                 </DropdownMenuContent>
             </DropdownMenu>
 

@@ -185,7 +185,7 @@ export function ConsoleHomeOverview({
     if (businessHome) return <BusinessHomeLoading />;
 
     return (
-        <section className="mx-auto w-full max-w-[1360px] px-6 py-8">
+        <section className="mx-auto w-full max-w-[1360px] px-0 pt-0 pb-6 sm:px-6 sm:py-8">
             <header className="mb-6">
                 <h1 className="text-base font-medium">
                     Good {greeting}{firstName ? `, ${firstName}` : ""}
@@ -204,7 +204,8 @@ export function ConsoleHomeOverview({
                             "radial-gradient(circle 340px at 88% 50%, rgba(139, 92, 246, 0.55) 0%, rgba(139, 92, 246, 0.18) 38%, transparent 68%), radial-gradient(circle 220px at 95% 28%, rgba(59, 130, 246, 0.45) 0%, transparent 70%), radial-gradient(circle 220px at 96% 74%, rgba(249, 115, 22, 0.42) 0%, transparent 70%), radial-gradient(circle 170px at 89% 55%, rgba(250, 204, 21, 0.32) 0%, transparent 70%), radial-gradient(circle 170px at 101% 52%, rgba(239, 68, 68, 0.32) 0%, transparent 70%)",
                     }}
                 />
-                <div className="relative z-10 mt-auto flex items-end justify-between gap-4 pt-3">
+                {/* Phones: title at the top, buttons pinned bottom right. From sm up: one row along the bottom. */}
+                <div className="relative z-10 flex flex-1 flex-col justify-between gap-4 sm:mt-auto sm:flex-none sm:flex-row sm:items-end sm:pt-3">
                     <div className="min-w-0">
                         <p className="text-2xl font-medium tracking-tight">
                             Integrate Cencori API
@@ -213,15 +214,15 @@ export function ConsoleHomeOverview({
                             Follow the path that matches what you&apos;re building.
                         </p>
                     </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                    <Button asChild size="sm" className="h-7 text-xs">
-                        <Link href="/docs/quick-start#3-new-product-scaffold-an-app">New product</Link>
-                    </Button>
-                    <Button asChild size="sm" className="h-7 text-xs">
-                        <Link href="/docs/quick-start#4-existing-product-follow-the-dashboard-to-code-guide">
-                            Existing product
-                        </Link>
-                    </Button>
+                    <div className="flex shrink-0 items-center gap-2 self-end">
+                        <Button asChild size="sm" className="h-7 text-xs">
+                            <Link href="/docs/quick-start#3-new-product-scaffold-an-app">New product</Link>
+                        </Button>
+                        <Button asChild size="sm" className="h-7 text-xs">
+                            <Link href="/docs/quick-start#4-existing-product-follow-the-dashboard-to-code-guide">
+                                Existing product
+                            </Link>
+                        </Button>
                     </div>
                 </div>
             </article>

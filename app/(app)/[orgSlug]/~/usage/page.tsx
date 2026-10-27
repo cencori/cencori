@@ -364,7 +364,7 @@ export default function UsagePage({ params }: PageProps) {
     const hoveredActivityPoint = hoveredActivityIndex === null ? null : activity[hoveredActivityIndex] || null;
 
     return (
-        <main className="mx-auto w-full max-w-[980px] px-4 py-8 pb-24 sm:px-6 sm:py-10 lg:px-8">
+        <main className="mx-auto w-full max-w-[980px] px-0 pt-0 pb-24 sm:px-6 sm:py-10 lg:px-8">
             <header className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                     <p className="text-[10px] font-medium tracking-[0.18em] text-muted-foreground">ORGANIZATION TELEMETRY</p>
@@ -499,7 +499,7 @@ export default function UsagePage({ params }: PageProps) {
                     </div>
                 </>
             ) : !org ? (
-                <div className="w-full max-w-5xl mx-auto px-6 py-8">
+                <div className="w-full max-w-5xl mx-auto px-0 sm:px-6 pt-0 pb-8 sm:pt-8">
                     <div className="text-center py-16 flex flex-col items-center">
                         <div className="w-10 h-10 rounded-md bg-secondary flex items-center justify-center mb-3">
                         </div>

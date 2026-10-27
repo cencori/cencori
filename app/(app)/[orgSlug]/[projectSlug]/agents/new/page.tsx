@@ -69,7 +69,7 @@ export default function NewAgentPage({ params }: { params: Promise<{ orgSlug: st
     const template = STARTING_POINTS.find((point) => point.id === start);
 
     return (
-        <main className="relative flex min-h-[calc(100dvh-8rem)] flex-col px-4 pb-10 pt-6 sm:px-6">
+        <main className="relative flex min-h-[calc(100dvh-8rem)] flex-col px-0 pb-10 pt-0 sm:px-6 sm:pt-6">
             <Link href={basePath} aria-label="Close" className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full border border-border/50 text-muted-foreground hover:bg-muted hover:text-foreground sm:right-6">
                 <X className="h-4 w-4" />
             </Link>

@@ -728,7 +728,7 @@ export default function DeploymentsPage({ params }: PageProps) {
 
     if (identityLoading) {
         return (
-            <div className="w-full max-w-4xl mx-auto px-6 py-8">
+            <div className="w-full max-w-4xl mx-auto px-0 sm:px-6 pt-0 pb-8 sm:pt-8">
                 <div className="mb-6">
                     <h1 className="text-lg font-semibold">Deployments</h1>
                     <p className="text-xs text-muted-foreground mt-0.5 max-w-[60ch]">
@@ -744,7 +744,7 @@ export default function DeploymentsPage({ params }: PageProps) {
     // ── AGENT EXISTS → the deployment history (list is the primary view) ──
     if (agent) {
         return (
-            <div className="w-full max-w-4xl mx-auto px-6 py-8">
+            <div className="w-full max-w-4xl mx-auto px-0 sm:px-6 pt-0 pb-8 sm:pt-8">
                 {/* Agent-level sections */}
                 <div className="flex gap-0.5 border-b border-border/40 mb-6">
                     {AGENT_TABS.map((t) => (
@@ -1022,7 +1022,7 @@ export default function DeploymentsPage({ params }: PageProps) {
     // ── NO AGENT → deploy the project's one agent ──
     const notInstalled = !githubLoading && github?.status !== "installed";
     return (
-        <div className="w-full max-w-4xl mx-auto px-6 py-8">
+        <div className="w-full max-w-4xl mx-auto px-0 sm:px-6 pt-0 pb-8 sm:pt-8">
             <div className="mb-6">
                 <h1 className="text-lg font-semibold">Deployments</h1>
                 <p className="text-xs text-muted-foreground mt-0.5 max-w-[60ch]">

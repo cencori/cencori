@@ -167,7 +167,7 @@ export default function OrgDeploymentsPage({ params }: PageProps) {
 
     if (isLoading) {
         return (
-            <div className="w-full max-w-5xl mx-auto px-6 py-8">
+            <div className="w-full max-w-5xl mx-auto px-0 sm:px-6 pt-0 pb-8 sm:pt-8">
                 <Skeleton className="h-5 w-32 mb-4" />
                 <Skeleton className="h-9 w-full mb-2" />
                 <Skeleton className="h-8 w-full mb-4" />
@@ -178,7 +178,7 @@ export default function OrgDeploymentsPage({ params }: PageProps) {
 
     if (agents.length === 0) {
         return (
-            <div className="w-full max-w-5xl mx-auto px-6 py-8">
+            <div className="w-full max-w-5xl mx-auto px-0 sm:px-6 pt-0 pb-8 sm:pt-8">
                 <div className="mb-6 flex items-start justify-between">
                     <div>
                         <h2 className="text-[13px] font-medium">Deployments</h2>
@@ -205,7 +205,7 @@ export default function OrgDeploymentsPage({ params }: PageProps) {
     }
 
     return (
-        <div className="w-full max-w-5xl mx-auto px-6 py-8">
+        <div className="w-full max-w-5xl mx-auto px-0 sm:px-6 pt-0 pb-8 sm:pt-8">
             {/* Header */}
             <div className="mb-3 flex items-center justify-between">
                 <h2 className="text-[13px] font-medium">Deployments</h2>

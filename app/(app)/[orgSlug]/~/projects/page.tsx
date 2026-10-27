@@ -104,7 +104,7 @@ export default function OrgProjectsPage({
   );
 
   return (
-    <main className="mx-auto w-full max-w-[1120px] px-4 py-8 pb-28 sm:px-6 sm:py-10 lg:px-8">
+    <main className="mx-auto w-full max-w-[1120px] px-0 pt-0 pb-28 sm:px-6 sm:py-10 lg:px-8">
       <header>
         <h1 className="text-3xl font-medium tracking-[-0.04em]">Projects</h1>
       </header>
