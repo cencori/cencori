@@ -133,13 +133,14 @@ export function CopilotRecentChats({ organizationId, chatHref }: { organizationI
                         isActive={pathname === chatHref && chat.id === activeId}
                         onClick={() => open(chat.id)}
                         tooltip={chat.title || 'Untitled'}
-                        // The age and the delete button share the right edge, so
-                        // don't reserve extra room for the button.
-                        className="group-has-data-[sidebar=menu-action]/menu-item:pr-2"
+                        // With a mouse, the age and the delete button share the right
+                        // edge (they swap on hover). On phones, where the button always
+                        // shows, the age sits just left of it instead of under it.
+                        className="group-has-data-[sidebar=menu-action]/menu-item:pr-9 md:group-has-data-[sidebar=menu-action]/menu-item:pr-2"
                     >
                         <span className="min-w-0 flex-1 truncate text-sm">{chat.title || 'Untitled'}</span>
-                        {/* Swaps with the delete button on hover. */}
-                        <span className="min-w-5 shrink-0 whitespace-nowrap text-right text-xs text-muted-foreground group-hover/menu-item:invisible group-focus-within/menu-item:invisible">
+                        {/* Swaps with the delete button on hover (not on phones: both show). */}
+                        <span className="min-w-5 shrink-0 whitespace-nowrap text-right text-xs text-muted-foreground md:group-hover/menu-item:invisible md:group-focus-within/menu-item:invisible">
                             {timeAgo(chat.updated_at)}
                         </span>
                     </SidebarMenuButton>

@@ -74,7 +74,8 @@ export function AgentsList({ projectId }: { projectId: string }) {
                             <p className="px-5 py-12 text-center text-xs text-muted-foreground">No agents match that search.</p>
                         ) : (
                             <div className="overflow-x-auto">
-                                <Table>
+                                {/* Phones: full width for names, the table scrolls sideways instead of squeezing them. */}
+                                <Table className="min-w-[640px] lg:min-w-0">
                                     <TableHeader>
                                         <TableRow className="border-b border-border/40 hover:bg-transparent">
                                             <TableHead className={cn(HEAD_CLASS, "px-3")}>Agent</TableHead>
