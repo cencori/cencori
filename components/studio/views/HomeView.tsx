@@ -42,7 +42,7 @@ export default function StudioHomePage() {
     }, [setUp, router]);
 
     return (
-        // Nothing set up yet: the page fills the space above the ask bar so the
+        // Nothing set up yet: the page fills the space above the tabs so the
         // setup card can sit in the middle of it.
         <div className={!setUp ? "flex min-h-[calc(100svh-7.25rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] flex-col" : undefined}>
             <div className="flex items-center gap-3">

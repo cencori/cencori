@@ -268,7 +268,7 @@ export function StudioCopilotProvider({ workspace, children }: { workspace: Stud
     );
 }
 
-/** The ask bar above the tabs: one tap into Copilot. */
+/** Copilot's button beside the tabs: one tap into Copilot. */
 export function StudioAskBar() {
     const { ask } = useStudioCopilot();
     return (
