@@ -24,6 +24,8 @@ interface Channel {
     /** Connected through Cencori's Meta app (Connect WhatsApp): no webhook to set up. */
     managed: boolean;
     coexistence: boolean;
+    /** Who connected it: Cencori's Meta app, or Kapso's. */
+    provider: "meta" | "kapso";
     webhook_url: string | null;
     verify_token: string | null;
     webhook_verified: boolean;
@@ -31,7 +33,8 @@ interface Channel {
     daily_session_cap: number;
 }
 
-type Payload = { channel: Channel | null; can_manage: boolean; signup: SignupConfig | null };
+/** `kapso`: "Connect WhatsApp" goes through Kapso's setup link instead of Meta's popup. */
+type Payload = { channel: Channel | null; can_manage: boolean; signup: SignupConfig | null; kapso?: boolean };
 type Form = { phoneNumberId: string; accessToken: string; appSecret: string; cap: string };
 
 function CopyRow({ label, value }: { label: string; value: string }) {
@@ -138,6 +141,53 @@ export function AgentWhatsApp() {
         }
     };
 
+    // Kapso: off to its setup page, which brings them back here with ?whatsapp=connected.
+    const connectWithKapso = async () => {
+        setBusy("signup");
+        setError(null);
+        try {
+            const { url } = await readJson<{ url: string }>(await fetch(endpoint, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "kapso_link", return_path: window.location.pathname }),
+            }));
+            window.location.assign(url);
+        } catch (cause) {
+            setError(cause instanceof Error ? cause.message : "That didn't work. Try again.");
+            setBusy(null);
+        }
+    };
+
+    // Back from Kapso: save the number it connected, once.
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const outcome = params.get("whatsapp");
+        if (!outcome) return;
+        params.delete("whatsapp");
+        window.history.replaceState(null, "", `${window.location.pathname}${params.size ? `?${params}` : ""}${window.location.hash}`);
+        if (outcome !== "connected") {
+            setError("WhatsApp didn't finish connecting. Try again.");
+            return;
+        }
+        setBusy("signup");
+        void (async () => {
+            try {
+                const saved = await readJson<Payload>(await fetch(endpoint, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ action: "kapso_finish" }),
+                }));
+                queryClient.setQueryData<Payload>(queryKey, saved);
+                setEditing(false);
+                toast.success(`Connected ${saved.channel?.display_phone_number ?? "WhatsApp"}`, { description: `${agent.name} now answers messages to this number.` });
+            } catch (cause) {
+                setError(cause instanceof Error ? cause.message : "That didn't work. Try again.");
+            } finally {
+                setBusy(null);
+            }
+        })();
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
     const connect = async () => {
         const result = await request("PUT", {
             phone_number_id: form.phoneNumberId.trim(),
@@ -163,7 +213,8 @@ export function AgentWhatsApp() {
     }
 
     const disabled = !canManage || !!busy;
-    const signupAvailable = !!query.data?.signup;
+    const viaKapso = !!query.data?.kapso;
+    const signupAvailable = viaKapso || !!query.data?.signup;
     // The form is for a business's own Meta app: shown when signup isn't available, chosen, or editing such a number.
     const showForm = (!channel && (!signupAvailable || ownApp)) || (editing && !channel?.managed);
     const showSignup = signupAvailable && !ownApp && (!channel || (editing && !!channel.managed));
@@ -205,27 +256,41 @@ export function AgentWhatsApp() {
                         />
                     </SettingsRow>
                     {channel.managed && (
-                        <SettingsRow label="Connection" description={channel.coexistence ? "Through Meta, alongside the WhatsApp Business app on your phone." : "Through Meta, on the WhatsApp Cloud API."} />
+                        <SettingsRow
+                            label="Connection"
+                            description={channel.coexistence
+                                ? "Alongside the WhatsApp Business app on your phone. Open the app at least once every 14 days to stay connected."
+                                : "On the WhatsApp Cloud API."}
+                        />
                     )}
                 </SettingsCard>
             )}
 
             {showSignup && (
                 <SettingsCard>
-                    <SettingsRow label={channel ? "Connect another number" : "Connect your number"} description="Log in with Facebook, pick your business and confirm your number with the code WhatsApp sends. About two minutes." />
-                    <SettingsRow
-                        label="I use the WhatsApp Business app on this number"
-                        description={<>Keep using the app on your phone; {agent.name} answers alongside you and you see every chat. Off for a new number that isn&apos;t on WhatsApp yet.</>}
-                    >
-                        <Switch checked={coexistence} onCheckedChange={setCoexistence} disabled={disabled} aria-label="I use the WhatsApp Business app on this number" />
-                    </SettingsRow>
+                    {viaKapso ? (
+                        <SettingsRow
+                            label={channel ? "Connect another number" : "Connect your number"}
+                            description={<>Log in with Facebook and choose the WhatsApp Business app number you already use, or a new number. You keep using the app on your phone; {agent.name} answers alongside you. About five minutes.</>}
+                        />
+                    ) : (
+                        <>
+                            <SettingsRow label={channel ? "Connect another number" : "Connect your number"} description="Log in with Facebook, pick your business and confirm your number with the code WhatsApp sends. About two minutes." />
+                            <SettingsRow
+                                label="I use the WhatsApp Business app on this number"
+                                description={<>Keep using the app on your phone; {agent.name} answers alongside you and you see every chat. Off for a new number that isn&apos;t on WhatsApp yet.</>}
+                            >
+                                <Switch checked={coexistence} onCheckedChange={setCoexistence} disabled={disabled} aria-label="I use the WhatsApp Business app on this number" />
+                            </SettingsRow>
+                        </>
+                    )}
                     <SettingsFooter className="justify-between">
                         <button type="button" className="text-left text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline" onClick={() => { setOwnApp(true); setError(null); }}>
                             Use my own Meta app instead
                         </button>
                         <div className="flex items-center gap-2">
                             {channel && <Button variant="outline" size="sm" className="h-7 text-xs" disabled={!!busy} onClick={() => { setEditing(false); setError(null); }}>Cancel</Button>}
-                            <Button size="sm" className="h-7 gap-1.5 px-3 text-xs" disabled={disabled || !published || !signup.ready} onClick={() => void connectWithMeta()}>
+                            <Button size="sm" className="h-7 gap-1.5 px-3 text-xs" disabled={disabled || !published || (!viaKapso && !signup.ready)} onClick={() => void (viaKapso ? connectWithKapso() : connectWithMeta())}>
                                 {busy === "signup" && <HugeiconsIcon icon={Loading03Icon} className="h-3.5 w-3.5 animate-spin" />}
                                 Connect WhatsApp
                             </Button>
