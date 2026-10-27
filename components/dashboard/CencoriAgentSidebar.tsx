@@ -29,7 +29,7 @@ import Loading03Icon from "@hugeicons/core-free-icons/Loading03Icon";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
 import { cn } from "@/lib/utils";
 import { DitherCanvas } from "@/components/dashboard/project-overview/DitherCanvas";
-import { CopilotActionConfirm, CopilotActionStep, CopilotSecret, isOpenAction, type CopilotAction } from "@/components/dashboard/CopilotActionCard";
+import { CopilotActionConfirm, CopilotActionStep, CopilotSecret, actionOutcomeNote, isOpenAction, type CopilotAction } from "@/components/dashboard/CopilotActionCard";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -70,13 +70,6 @@ type AgentMessage = {
     // href is empty when Copilot pointed at something on the page they were on.
     navigation?: { label: string; href: string; from: string; spot?: string; text?: string };
 };
-
-/** What Copilot is told after an action settles, so it reports back and carries on. */
-function actionOutcomeNote(action: CopilotAction): string {
-    if (action.state === "done") return `[The user confirmed "${action.title}" and it succeeded: ${action.result ?? action.doneMessage}] Tell the user in one or two plain sentences what changed and what it means for them, then offer the next step if there is a natural one. Don't propose the same change again.`;
-    if (action.state === "failed") return `[The user confirmed "${action.title}" but it failed: ${action.result ?? "unknown error"}] Explain briefly what went wrong and what they can do about it.`;
-    return `[The user cancelled "${action.title}". Nothing was changed.] Acknowledge it in one short sentence and ask if they want something different.`;
-}
 
 // Cards left unconfirmed in an earlier session can't be confirmed later:
 // what they'd change may have moved on since.

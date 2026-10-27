@@ -487,7 +487,10 @@ async function requestCallback(argumentsJson: string, context: AgentToolContext)
     const name = typeof args.name === 'string' && args.name.trim() ? args.name.trim().slice(0, 200) : null;
     try {
         const [{ notifyCallback }, { createAdminClient }] = await Promise.all([import('./owner-alerts'), import('@/lib/supabaseAdmin')]);
-        const sent = await notifyCallback({ db: createAdminClient(), projectId: context.projectId, agentId: context.agentId, agentName: context.agentName, surface: context.surface, conversationId: context.conversationId }, { name, contact: phone, reason });
+        const db = createAdminClient();
+        const sent = await notifyCallback({ db, projectId: context.projectId, agentId: context.agentId, agentName: context.agentName, surface: context.surface, conversationId: context.conversationId }, { name, contact: phone, reason });
+        // Studio shows the chat as needing the owner.
+        await import('@/lib/studio/takeover').then(({ flagNeedsOwner }) => flagNeedsOwner(db, context.conversationId, `Wants a call back: ${reason}`)).catch(() => undefined);
         if (sent) return { ok: true, output: `Done: the team has the request and will call ${phone}.` };
     } catch {
         // fall through
@@ -510,6 +513,10 @@ async function transferToHuman(url: string, argumentsJson: string, context: Agen
     const summary = typeof args.summary === 'string' ? args.summary.trim().slice(0, 2000) : '';
     if (!contact) return { ok: false, output: 'Ask the person how to reach them (an email or phone number) before handing off.' };
     if (!summary) return { ok: false, output: 'Include a short summary of what they need.' };
+    // Studio shows the chat as needing the owner, whatever their hand-off address does.
+    await Promise.all([import('@/lib/studio/takeover'), import('@/lib/supabaseAdmin')])
+        .then(([{ flagNeedsOwner }, { createAdminClient }]) => flagNeedsOwner(createAdminClient(), context.conversationId, summary))
+        .catch(() => undefined);
 
     const payload = {
         type: 'agent.transfer_to_human',

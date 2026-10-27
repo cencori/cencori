@@ -16,6 +16,7 @@ import type { SubscriptionTier } from '@/lib/entitlements';
 import { decryptApiKey } from '@/lib/encryption';
 import { mintClientToken } from '@/lib/embedded/client-tokens';
 import { ensureWidgetInstallation } from '@/lib/embedded/widget';
+import { addManualMessage, isOwnerActive, takeUnseenManualMessages } from '@/lib/studio/takeover';
 import {
     channelAccessToken,
     downloadMedia,
@@ -138,7 +139,10 @@ async function answer(db: Admin, channel: WhatsAppChannel, customer: string, nam
     // Quote the customer's message only when it helps: they sent several, or the answer is slow.
     // In a quick back-and-forth a quote on every reply is just noise.
     const quoteOf = () => (batch.length > 1 || Date.now() - (last.at ?? Date.now()) > QUOTE_AFTER_MS ? last.id : undefined);
-    if (batch.some((m) => m.text || m.audio)) void markReadAndTyping(channel, token, last.id);
+    // The owner stepped in (Studio): the assistant stays quiet in this chat.
+    const open = await openConversation(db, channel, customer);
+    const paused = !!open && isOwnerActive(open.metadata);
+    if (!paused && batch.some((m) => m.text || m.audio)) void markReadAndTyping(channel, token, last.id);
     // Voice notes become text first; the agent sees them marked as such.
     const texts: string[] = [];
     const billing: Array<Promise<unknown>> = [];
@@ -154,6 +158,13 @@ async function answer(db: Admin, channel: WhatsAppChannel, customer: string, nam
             else unheard++;
         }
     }
+    if (paused && open) {
+        // Kept for the owner to read in Studio, and for the assistant once it's handed back.
+        const said = texts.length ? texts : [unheard ? "[Sent a voice note that couldn't be heard]" : '[Sent something the assistant can\'t read]'];
+        for (const text of said) await addManualMessage(db, open.id, { from: 'customer', text });
+        await Promise.all(billing);
+        return;
+    }
     if (texts.length === 0) {
         await Promise.all([sendText(channel, token, customer, unheard ? UNHEARD_REPLY : UNSUPPORTED_REPLY, quoteOf()).catch(() => undefined), ...billing]);
         return;
@@ -161,7 +172,9 @@ async function answer(db: Admin, channel: WhatsAppChannel, customer: string, nam
 
     let reply: string;
     try {
-        reply = await runTurn(db, channel, customer, name, texts.join('\n'));
+        // Back from a pause: the assistant first hears what the owner and the customer said.
+        const missed = open ? await takeUnseenManualMessages(db, open.id).catch(() => null) : null;
+        reply = await runTurn(db, channel, customer, name, missed ? `${missed}\n\n${texts.join('\n')}` : texts.join('\n'));
     } catch (error) {
         console.error('[whatsapp] turn failed', error instanceof Error ? error.message : error);
         reply = error instanceof PlanClosedError ? PLAN_CLOSED_REPLY : FALLBACK_REPLY;
@@ -175,6 +188,15 @@ async function answer(db: Admin, channel: WhatsAppChannel, customer: string, nam
         await db.from('tool_connections').update({ last_error: message.slice(0, 300) }).eq('id', channel.id);
     }
     await Promise.all(billing);
+}
+
+/** The customer's current WhatsApp conversation with this number's agent, if one is open. */
+async function openConversation(db: Admin, channel: WhatsAppChannel, customer: string): Promise<{ id: string; metadata: Record<string, unknown> | null } | null> {
+    const { data } = await db.from('sessions').select('id, metadata')
+        .eq('project_id', channel.projectId).eq('external_user_id', `wa:${customer}`).eq('status', 'active')
+        .eq('metadata->>channel_id', channel.id)
+        .order('created_at', { ascending: false }).limit(1).maybeSingle();
+    return data ? { id: data.id as string, metadata: (data.metadata as Record<string, unknown> | null) ?? null } : null;
 }
 
 const orgCache = new Map<string, string>();

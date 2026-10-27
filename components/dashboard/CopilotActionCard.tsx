@@ -17,6 +17,13 @@ export type CopilotAction = CopilotActionProposal & {
 
 export const isOpenAction = (action: CopilotAction) => action.state === "pending" || action.state === "running";
 
+/** What Copilot is told after an action settles, so it reports back and carries on. */
+export function actionOutcomeNote(action: CopilotAction): string {
+    if (action.state === "done") return `[The user confirmed "${action.title}" and it succeeded: ${action.result ?? action.doneMessage}] Tell the user in one or two plain sentences what changed and what it means for them, then offer the next step if there is a natural one. Don't propose the same change again.`;
+    if (action.state === "failed") return `[The user confirmed "${action.title}" but it failed: ${action.result ?? "unknown error"}] Explain briefly what went wrong and what they can do about it.`;
+    return `[The user cancelled "${action.title}". Nothing was changed.] Acknowledge it in one short sentence and ask if they want something different.`;
+}
+
 /** Fill "{{key}}" placeholders from what earlier steps returned. */
 export function fillPlaceholders<T>(value: T, vars: Record<string, string>): T {
     return JSON.parse(JSON.stringify(value).replace(/\{\{(\w+)\}\}/g, (match, key: string) => vars[key] ?? match)) as T;

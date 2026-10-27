@@ -1,5 +1,6 @@
 "use client";
 import { browserAuth } from "@/lib/auth/browser-auth";
+import { studioOrigin } from "@/lib/studio/routing";
 import { getBrowserAuthUser } from "@/lib/auth/get-browser-auth-user";
 
 import { useRouter, useSearchParams } from "next/navigation";
@@ -322,8 +323,9 @@ function OnboardingContent() {
         }
         clearSignupTrack();
         toast.success("Your free trial has started.");
-        // Copilot builds the first agent with them from a description of the business.
-        router.push(`/${organization.slug}/${projectSlug}/copilot`);
+        // Studio's setup builds the first assistant with them (studio.cencori.com/setup).
+        void projectSlug;
+        window.location.assign(`${studioOrigin(window.location.host)}/setup`);
       } catch {
         toast.error("Couldn't finish setting up. Try again.");
         setLoading(false);

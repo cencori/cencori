@@ -7,6 +7,7 @@ import { createClient } from "@supabase/supabase-js";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { RESERVED_ORG_SLUGS, isReservedSlug } from "@/lib/reserved-slugs";
 import { mainSiteSubdomainRedirect, marketingSubdomainFor, routeMarketingSubdomain } from "@/lib/marketing/subdomains";
+import { STUDIO_INTERNAL_PREFIX, isStudioHostname, isStudioPassThrough, studioInternalPath, studioOrigin } from "@/lib/studio/routing";
 import {
   ACTIVE_ORG_COOKIE,
   ACTIVE_PROJECT_COOKIE,
@@ -456,6 +457,8 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next({ request: { headers } });
   }
   const isConsoleSubdomain = isConsoleHostname(hostname);
+  // studio.cencori.com: the business owners' app (lib/studio/routing.ts).
+  const isStudioSubdomain = isStudioHostname(hostname);
   const isScanSubdomain =
     domain === "scan.cencori.com" ||
     domain === "scan.localhost" ||
@@ -672,6 +675,15 @@ export async function proxy(request: NextRequest) {
   // flat console URL (/home, /logs, /billing, …) resolves immediately.
   // Preview deployments (*.vercel.app) have no console counterpart, so they
   // keep the legacy same-host behavior via the compat blocks below.
+  // Studio's pages only on its own host (before the console redirects below,
+  // which would read "studio-app" as an organization).
+  if (!isStudioSubdomain && !isFile && (pathname === STUDIO_INTERNAL_PREFIX || pathname.startsWith(`${STUDIO_INTERNAL_PREFIX}/`))) {
+    const url = new URL(studioOrigin(hostname));
+    url.pathname = pathname.slice(STUDIO_INTERNAL_PREFIX.length) || "/";
+    url.search = request.nextUrl.search;
+    return applySecurityHeaders(NextResponse.redirect(url, 308));
+  }
+
   const consoleOrigin = getConsoleOriginForHostname(hostname);
   if (consoleOrigin && !isConsoleSubdomain && !isFile && !isScanSubdomain) {
     const buildConsoleRedirect = (
@@ -924,6 +936,16 @@ export async function proxy(request: NextRequest) {
       rewriteUrl = url;
       response = NextResponse.rewrite(url);
     }
+    // Studio pages are served from the subdomain's root; sign-in and the API pass through.
+    else if (isStudioSubdomain) {
+      const internal = studioInternalPath(pathname);
+      if (internal) {
+        const url = request.nextUrl.clone();
+        url.pathname = internal;
+        rewriteUrl = url;
+        response = NextResponse.rewrite(url);
+      }
+    }
     // Handle pitch subdomain
     else if (domain === "pitch.cencori.com" || domain === "pitch.localhost") {
       const url = request.nextUrl.clone();
@@ -1050,7 +1072,7 @@ export async function proxy(request: NextRequest) {
     !isFile &&
     !isScanSubdomain &&
     !userId &&
-    (isProtectedPagePath(pathname) || isCanonicalConsolePage)
+    (isProtectedPagePath(pathname) || isCanonicalConsolePage || (isStudioSubdomain && !isStudioPassThrough(pathname)))
   ) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
@@ -1078,6 +1100,10 @@ export async function proxy(request: NextRequest) {
     );
     if (isConsoleSubdomain && destination === "/dashboard") {
       destination = "/home";
+    }
+    // Studio's home is its root.
+    if (isStudioSubdomain && destination === "/dashboard") {
+      destination = "/";
     }
     const redirectUrl =
       /^https?:\/\//i.test(destination)
