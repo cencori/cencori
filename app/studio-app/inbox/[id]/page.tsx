@@ -2,9 +2,12 @@
 
 import { use, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowUp, ChevronLeft } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { ArrowUp, ChevronLeft, MailWarning } from "lucide-react";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
-import { CHANNEL_LABEL, initials, useConversation, useConversationAction } from "@/components/studio/useInbox";
+import { CHANNEL_LABEL, initials, useConversation, useConversationAction, useMarkRead } from "@/components/studio/useInbox";
+import { useStudio } from "@/components/studio/StudioShell";
 import { Skeleton } from "@/components/ui/skeleton";
 
 function dayLabel(iso: string): string {
@@ -26,6 +29,16 @@ export default function StudioConversationPage({ params }: { params: Promise<{ i
     const reply = query.data?.reply;
     const [draft, setDraft] = useState("");
     const endRef = useRef<HTMLDivElement>(null);
+    const router = useRouter();
+    const queryClient = useQueryClient();
+    const { project } = useStudio();
+    const markRead = useMarkRead();
+    // Opening the chat read it: the list and the tab badge catch up.
+    const loaded = !!query.data;
+    useEffect(() => {
+        if (loaded) void queryClient.invalidateQueries({ queryKey: ["studio-inbox", project.id] });
+    }, [loaded, project.id, queryClient]);
+    const keepUnread = () => markRead.mutate({ id, read: false }, { onSuccess: () => router.push("/inbox") });
     const send = () => {
         const text = draft.trim();
         if (!text || act.isPending) return;
@@ -49,6 +62,9 @@ export default function StudioConversationPage({ params }: { params: Promise<{ i
                             <p className="truncate text-base font-semibold">{conversation.name}</p>
                             <p className="truncate text-xs text-muted-foreground">{CHANNEL_LABEL[conversation.channel]}{conversation.number && conversation.number !== conversation.name ? ` · ${conversation.number}` : ""}</p>
                         </div>
+                        <button type="button" onClick={keepUnread} disabled={markRead.isPending} aria-label="Mark as unread" title="Mark as unread" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted-foreground disabled:opacity-50">
+                            <MailWarning className="h-5 w-5" />
+                        </button>
                     </>
                 ) : (
                     <div className="flex-1 space-y-1.5"><Skeleton className="h-4 w-32" /><Skeleton className="h-3 w-24" /></div>
@@ -110,7 +126,7 @@ export default function StudioConversationPage({ params }: { params: Promise<{ i
             <div className="sticky bottom-0 border-t border-border/60 bg-background px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3">
                 {act.error && <p role="alert" className="mb-2 text-[13px] leading-5 text-destructive">{act.error.message}</p>}
                 {!conversation || !reply ? null : reply.reason === "website" ? (
-                    <p className="text-[13px] leading-5 text-muted-foreground">Your assistant is handling this chat. Replying yourself works on WhatsApp chats for now.</p>
+                    <p className="text-[13px] leading-5 text-muted-foreground">Your assistant is handling this chat. Replying yourself works on WhatsApp, website and link chats.</p>
                 ) : conversation.owner_active ? (
                     <>
                         {reply.possible ? (
@@ -131,6 +147,9 @@ export default function StudioConversationPage({ params }: { params: Promise<{ i
                             </form>
                         ) : (
                             <p className="text-[13px] leading-5 text-muted-foreground">WhatsApp only lets businesses reply within 24 hours of the customer&apos;s last message. Call them, or wait for them to message again.</p>
+                        )}
+                        {reply.possible && conversation.channel !== "whatsapp" && (
+                            <p className="mt-2 text-[12px] leading-4 text-muted-foreground">They&apos;ll see your messages while the chat is open on their screen.</p>
                         )}
                         <button type="button" onClick={() => act.mutate({ action: "hand_back" })} disabled={act.isPending} className="mt-2 h-11 w-full rounded-full border border-border/60 text-sm font-medium">
                             Hand back to the assistant

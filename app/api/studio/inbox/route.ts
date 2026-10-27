@@ -2,7 +2,7 @@
  * GET /api/studio/inbox?project_id=&channel=whatsapp|website|link
  *
  * Studio's Inbox: the project's customer conversations, newest first, each
- * with its last message.
+ * with its last message and whether it's unread for the person asking.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -18,6 +18,6 @@ export async function GET(req: NextRequest) {
     const access = await requireProjectAccess(projectId);
     if (!access.ok) return access.response;
     const requested = req.nextUrl.searchParams.get('channel') as InboxChannel | null;
-    const conversations = await listConversations(createAdminClient(), projectId, { channel: requested && CHANNELS.has(requested) ? requested : null });
+    const conversations = await listConversations(createAdminClient(), projectId, { channel: requested && CHANNELS.has(requested) ? requested : null, userId: access.userId });
     return NextResponse.json({ conversations }, { headers: { 'Cache-Control': 'no-store' } });
 }

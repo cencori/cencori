@@ -1,11 +1,16 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ChevronRight } from "lucide-react";
+import { UserRoundedIcon } from "@solar-icons/react/bold-duotone/user-rounded";
 import { useStudio } from "@/components/studio/StudioShell";
 import { useStudioCopilot } from "@/components/studio/StudioCopilot";
 import { formatMoney, joinWords, liveChannels, setupSteps, useStudioOverview } from "@/components/studio/useStudioOverview";
 import { shortTime, useInbox } from "@/components/studio/useInbox";
+import { StudioNotificationsCard } from "@/components/studio/StudioNotifications";
+import { StudioProfile } from "@/components/studio/StudioProfile";
 import { Skeleton } from "@/components/ui/skeleton";
 
 function greeting(): string {
@@ -24,16 +29,32 @@ export default function StudioHomePage() {
     const data = overview.data;
     const live = liveChannels(data?.assistant ?? null);
     const steps = setupSteps(data?.assistant?.still_to_do ?? []);
+    const router = useRouter();
+
+    // Opened from the home screen with nothing set up yet: setup starts right away.
+    useEffect(() => {
+        if (agents.length > 0) return;
+        const installed = window.matchMedia("(display-mode: standalone)").matches || (navigator as Navigator & { standalone?: boolean }).standalone === true;
+        if (installed) router.replace("/setup");
+    }, [agents.length, router]);
 
     return (
-        <div>
-            <p className="text-sm text-muted-foreground">{organization.name}</p>
-            <h1 className="mt-1 text-[26px] font-semibold leading-tight tracking-tight">
-                {greeting()}{user.firstName ? `, ${user.firstName}` : ""}
-            </h1>
+        // Nothing set up yet: the page fills the space above the ask bar so the
+        // setup card can sit in the middle of it.
+        <div className={agents.length === 0 ? "flex min-h-[calc(100svh-11.25rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] flex-col" : undefined}>
+            <div className="flex items-center gap-3">
+                <StudioProfile className="size-10" />
+                <div className="min-w-0">
+                    <p className="truncate text-xs text-muted-foreground">{organization.name}</p>
+                    <h1 className="text-xl font-semibold leading-tight tracking-tight">
+                        {greeting()}{user.firstName ? `, ${user.firstName}` : ""}
+                    </h1>
+                </div>
+            </div>
 
             {agents.length === 0 ? (
-                <div className="mt-6 rounded-3xl bg-foreground p-5 text-background">
+                <div className="my-auto flex min-h-[26rem] flex-col items-center justify-center rounded-3xl bg-foreground p-6 text-center text-background">
+                    <UserRoundedIcon size={40} className="mb-3" />
                     <p className="text-lg font-semibold">Set up your assistant</p>
                     <p className="mt-1 text-sm leading-6 opacity-80">A few questions about your business, and it starts answering customers on your link and WhatsApp.</p>
                     <Link href="/setup" className="mt-4 inline-flex h-11 items-center rounded-full bg-background px-5 text-sm font-semibold text-foreground">Start</Link>
@@ -54,6 +75,8 @@ export default function StudioHomePage() {
                             ? <span><span className="font-medium text-foreground">Live</span> on {joinWords(live)}</span>
                             : <span><span className="font-medium text-foreground">Not live yet.</span> Finish setting up below.</span>}
                     </Link>
+
+                    <StudioNotificationsCard />
 
                     {waiting.length > 0 && (
                         <section className="mt-4">

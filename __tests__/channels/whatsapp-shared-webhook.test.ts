@@ -6,7 +6,7 @@ const handled = vi.hoisted(() => vi.fn(async () => undefined));
 const channels = vi.hoisted(() => new Map<string, unknown>());
 vi.mock('@vercel/functions', () => ({ waitUntil: (promise: Promise<unknown>) => promise }));
 vi.mock('@/lib/supabaseAdmin', () => ({ createAdminClient: () => ({}) }));
-vi.mock('@/lib/channels/whatsapp-runner', () => ({ handleInboundMessages: handled }));
+vi.mock('@/lib/channels/whatsapp-runner', () => ({ handleInboundMessages: handled, handleOwnerEchoes: vi.fn(async () => undefined) }));
 vi.mock('@/lib/channels/whatsapp', async (original) => ({
     ...(await original<typeof import('@/lib/channels/whatsapp')>()),
     getManagedChannelByPhoneNumberId: async (_db: unknown, id: string) => channels.get(id) ?? null,

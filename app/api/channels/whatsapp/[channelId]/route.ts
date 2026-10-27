@@ -13,7 +13,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { waitUntil } from '@vercel/functions';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { decryptApiKey } from '@/lib/encryption';
-import { getChannelById, parseInbound, patchChannelMetadata, verifyWhatsAppSignature } from '@/lib/channels/whatsapp';
+import { getChannelById, parseInbound, parseOwnerEchoes, patchChannelMetadata, verifyWhatsAppSignature } from '@/lib/channels/whatsapp';
 
 export const maxDuration = 300;
 
@@ -62,10 +62,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ cha
         return new NextResponse(null, { status: 400 });
     }
     const messages = parseInbound(payload);
-    if (messages.length > 0) {
+    // Replies the owner sent from the WhatsApp Business app on their phone (coexistence).
+    const echoes = parseOwnerEchoes(payload);
+    if (messages.length > 0 || echoes.length > 0) {
         waitUntil((async () => {
-            const { handleInboundMessages } = await import('@/lib/channels/whatsapp-runner');
-            await handleInboundMessages(db, channel, messages);
+            const { handleInboundMessages, handleOwnerEchoes } = await import('@/lib/channels/whatsapp-runner');
+            await handleOwnerEchoes(db, channel, echoes);
+            if (messages.length) await handleInboundMessages(db, channel, messages);
         })().catch((error) => console.error('[whatsapp] delivery failed', error instanceof Error ? error.message : error)));
     }
     return NextResponse.json({ ok: true });

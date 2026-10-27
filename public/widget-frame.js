@@ -21,7 +21,7 @@
         try { return JSON.parse(localStorage.getItem(storeKey) || "null") || {}; } catch (e) { return {}; }
     }
     function save() {
-        try { localStorage.setItem(storeKey, JSON.stringify({ visitorId: state.visitorId, sessionId: state.sessionId, messages: state.messages.slice(-50) })); } catch (e) { /* ignore */ }
+        try { localStorage.setItem(storeKey, JSON.stringify({ visitorId: state.visitorId, sessionId: state.sessionId, messages: state.messages.slice(-50), ownerSince: state.ownerSince, lastActive: state.lastActive })); } catch (e) { /* ignore */ }
     }
     function newVisitorId() {
         var bytes = new Uint8Array(16);
@@ -37,6 +37,10 @@
         token: null,
         tokenExpires: 0,
         busy: false,
+        // Someone from the business stepped into this chat (from Cencori Studio).
+        ownerActive: false,
+        ownerSince: saved.ownerSince || null,
+        lastActive: saved.lastActive || 0,
     };
 
     function parentOrigin() {
@@ -122,7 +126,7 @@
         }
         var el = document.createElement("div");
         el.className = "msg " + (message.role === "user" ? "user" : "bot");
-        if (message.role === "user") el.textContent = message.text;
+        if (message.role === "user" || message.role === "owner") el.textContent = message.text;
         else el.innerHTML = markdown(message.text);
         return el;
     }
@@ -206,7 +210,7 @@
         }
         var reader = res.body.getReader();
         var decoder = new TextDecoder();
-        var buffer = "", reply = "", citations = [], failure = null, ended = false;
+        var buffer = "", reply = "", citations = [], failure = null, ended = false, handled = false;
         for (;;) {
             var step = await reader.read();
             if (step.done) break;
@@ -221,11 +225,13 @@
                     ended = data.conversation_ended === true;
                 }
                 else if (type === "turn.failed") failure = (data.output && data.output.error) || "Something went wrong. Try again.";
+                // The owner is handling this chat: the message reached them, no assistant reply.
+                else if (type === "owner.handling") handled = true;
                 else if (type === "turn.paused") failure = "This request needs a person to approve it, which isn't available in this chat.";
             });
         }
         if (failure && !reply) throw new ApiError(500, "turn_failed", failure);
-        return { reply: reply, citations: citations, ended: ended };
+        return { reply: reply, citations: citations, ended: ended, handled: handled };
     }
 
     function friendly(err) {
@@ -237,6 +243,7 @@
     async function send(text) {
         state.busy = true;
         state.messages.push({ role: "user", text: text });
+        state.lastActive = Date.now();
         save();
         render(true);
         var streamed = function (partial) { render(true, partial); };
@@ -254,7 +261,11 @@
                     throw err;
                 }
             }
-            state.messages.push({ role: "assistant", text: result.reply || "…" });
+            if (result.handled) {
+                if (!state.ownerActive) joined();
+            } else {
+                state.messages.push({ role: "assistant", text: result.reply || "…" });
+            }
             // The agent closed the conversation: the next message opens a new one.
             if (result.ended) {
                 state.messages.push({ role: "note", text: "Conversation ended. Send a message to start a new one." });
@@ -269,8 +280,56 @@
             render(false);
             updateSend();
             input.focus();
+            schedulePoll();
         }
     }
+
+    // ── The owner, live ───────────────────────────────────────────────────
+    // While a conversation is recent, check for messages the business sent from
+    // Cencori Studio: often while someone from the team is in the chat, slowly
+    // otherwise, and not at all once it's been quiet for a couple of hours.
+    var POLL_FAST = 4000, POLL_SLOW = 20000, RECENT = 2 * 60 * 60 * 1000;
+    var pollTimer = null;
+
+    function joined() {
+        state.ownerActive = true;
+        state.messages.push({ role: "note", text: "Someone from the team joined the chat." });
+    }
+
+    function schedulePoll() {
+        clearTimeout(pollTimer);
+        if (!state.sessionId || Date.now() - state.lastActive > RECENT) return;
+        pollTimer = setTimeout(poll, state.ownerActive ? POLL_FAST : POLL_SLOW);
+    }
+
+    async function poll() {
+        if (state.busy || document.visibilityState !== "visible" || !state.sessionId) return schedulePoll();
+        try {
+            await ensureToken();
+            var res = await fetch("/api/widget/messages" + (state.ownerSince ? "?since=" + encodeURIComponent(state.ownerSince) : ""), {
+                headers: { Authorization: "Bearer " + state.token },
+                cache: "no-store",
+            });
+            var body = res.ok ? await res.json() : null;
+            if (body && !state.busy) {
+                var fresh = (body.messages || []).filter(function (m) {
+                    return !state.messages.some(function (x) { return x.id === m.id; });
+                });
+                var changed = fresh.length > 0 || body.owner_active !== state.ownerActive;
+                if (fresh.length && !state.ownerActive) joined();
+                fresh.forEach(function (m) { state.messages.push({ role: "owner", id: m.id, text: m.text }); });
+                if (fresh.length) {
+                    state.ownerSince = fresh[fresh.length - 1].at;
+                    state.lastActive = Date.now();
+                }
+                state.ownerActive = body.owner_active === true;
+                if (changed) { save(); render(false); }
+            }
+        } catch (e) { /* try again next time */ }
+        schedulePoll();
+    }
+
+    document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible") schedulePoll(); });
 
     // ── Wiring ────────────────────────────────────────────────────────────
     function updateSend() { sendBtn.disabled = state.busy || !input.value.trim(); }
@@ -295,6 +354,9 @@
         state.sessionId = null;
         state.token = null;
         state.messages = [];
+        state.ownerActive = false;
+        state.ownerSince = null;
+        clearTimeout(pollTimer);
         save();
         render(false);
         input.focus();
@@ -309,5 +371,6 @@
     });
 
     render(false);
+    schedulePoll();
     parent.postMessage({ type: "cencori:ready", key: cfg.key }, "*");
 })();

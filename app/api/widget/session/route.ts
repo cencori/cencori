@@ -92,11 +92,17 @@ export async function POST(req: NextRequest) {
             if (!perDay.allowed) return fail(429, 'widget_daily_limit', 'This chat is busy right now. Try again later.');
         }
         const { data: project } = await db.from('projects').select('organization_id').eq('id', widget.project_id).maybeSingle();
+        // A business plan pays per conversation, counted when the first message is
+        // sent (the turns route), so a chat opened and never used costs nothing. A
+        // plan that's used up or inactive still says so before anyone types.
         if (!preview && project?.organization_id) {
-            // A business plan pays per conversation: count this one, or say the chat is closed.
-            const { consumeConversation } = await import('@/lib/business/plans');
-            const counted = await consumeConversation(db as never, project.organization_id as string);
-            if (!counted.ok) return fail(402, counted.reason === 'limit' ? 'plan_conversations_used' : 'plan_inactive', 'This chat isn’t taking new conversations right now. Please contact the business directly.');
+            const { getOrganizationPlan, conversationsUsed } = await import('@/lib/business/plans');
+            const plan = await getOrganizationPlan(db as never, project.organization_id as string);
+            if (plan.accountType === 'business') {
+                const closed = !plan.active || !plan.plan || !plan.periodStart
+                    || await conversationsUsed(db as never, project.organization_id as string, plan.periodStart) >= plan.plan.conversations;
+                if (closed) return fail(402, plan.active ? 'plan_conversations_used' : 'plan_inactive', 'This chat isn’t taking new conversations right now. Please contact the business directly.');
+            }
         }
         const { data: created, error: createError } = await db.from('sessions').insert({
             project_id: widget.project_id,

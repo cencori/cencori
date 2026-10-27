@@ -17,6 +17,7 @@ import { decryptApiKey } from '@/lib/encryption';
 import { mintClientToken } from '@/lib/embedded/client-tokens';
 import { ensureWidgetInstallation } from '@/lib/embedded/widget';
 import { addManualMessage, isOwnerActive, takeUnseenManualMessages } from '@/lib/studio/takeover';
+import type { OwnerEcho } from '@/lib/channels/whatsapp';
 import {
     channelAccessToken,
     downloadMedia,
@@ -75,6 +76,21 @@ const queued = (m: InboundMessage): Queued => ({ id: m.id, text: m.text, audio: 
 
 /** A reply this long after the customer's message quotes it, since the chat may have moved on. */
 const QUOTE_AFTER_MS = 60_000;
+
+/**
+ * The owner answered from the WhatsApp Business app on their phone: record it
+ * in the conversation and pause the assistant there, exactly as if they had
+ * stepped in from Studio (it hands back after 30 quiet minutes).
+ */
+export async function handleOwnerEchoes(db: Admin, channel: WhatsAppChannel, echoes: OwnerEcho[]): Promise<void> {
+    for (const echo of echoes) {
+        if (echo.phoneNumberId && echo.phoneNumberId !== channel.metadata.phone_number_id) continue;
+        if (!await firstDelivery(`echo:${echo.id}`)) continue;
+        const open = await openConversation(db, channel, echo.to);
+        // A chat the owner started themselves has no conversation here yet: nothing to pause.
+        if (open) await addManualMessage(db, open.id, { from: 'owner', text: echo.text });
+    }
+}
 
 export async function handleInboundMessages(db: Admin, channel: WhatsAppChannel, messages: InboundMessage[]): Promise<void> {
     const fresh: InboundMessage[] = [];

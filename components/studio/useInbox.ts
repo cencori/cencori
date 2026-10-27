@@ -16,6 +16,8 @@ export interface InboxConversation {
     open: boolean;
     needs_owner: { reason: string; at: string } | null;
     owner_active: boolean;
+    /** The customer wrote since you last opened it. */
+    unread: boolean;
 }
 
 export interface InboxMessage {
@@ -48,6 +50,34 @@ export function useInbox(channel: InboxChannel | null) {
     });
 }
 
+/** How many chats are unread for you (the Inbox tab's badge). */
+export function useUnreadCount(): number {
+    const inbox = useInbox(null);
+    return (inbox.data?.conversations ?? []).filter((conversation) => conversation.unread).length;
+}
+
+/** Mark a chat read or unread from the list, without opening it. */
+export function useMarkRead() {
+    const { project } = useStudio();
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async ({ id, read }: { id: string; read: boolean }) => {
+            const response = await fetch(`/api/studio/inbox/${id}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ project_id: project.id, action: read ? "mark_read" : "mark_unread" }),
+            });
+            if (!response.ok) throw new Error("That didn't work. Try again.");
+        },
+        onMutate: ({ id, read }) => {
+            // Show it straight away; the next refresh confirms it.
+            queryClient.setQueriesData<{ conversations: InboxConversation[] }>({ queryKey: ["studio-inbox", project.id] }, (data) =>
+                data && { conversations: data.conversations.map((conversation) => (conversation.id === id ? { ...conversation, unread: !read } : conversation)) });
+        },
+        onSettled: () => void queryClient.invalidateQueries({ queryKey: ["studio-inbox", project.id] }),
+    });
+}
+
 export function useConversation(id: string) {
     const { project } = useStudio();
     return useQuery({
@@ -63,7 +93,7 @@ export function useConversationAction(id: string) {
     const { project } = useStudio();
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: async (input: { action: "step_in" | "hand_back" | "reply"; text?: string }) => {
+        mutationFn: async (input: { action: "step_in" | "hand_back" | "reply" | "mark_read" | "mark_unread"; text?: string }) => {
             const response = await fetch(`/api/studio/inbox/${id}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },

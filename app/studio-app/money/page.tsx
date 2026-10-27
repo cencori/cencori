@@ -1,0 +1,124 @@
+"use client";
+
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useStudio } from "@/components/studio/StudioShell";
+import { useStudioCopilot } from "@/components/studio/StudioCopilot";
+import { formatMoney } from "@/components/studio/useStudioOverview";
+import { CardIcon } from "@solar-icons/react/bold-duotone/card";
+import { StudioEmptyCard } from "@/components/studio/StudioEmptyCard";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
+import type { MoneyPeriod, MoneySummary } from "@/lib/studio/money";
+
+type Money = MoneySummary & { payments: { provider: string; mode: string } | null };
+
+const PERIODS: Array<{ id: MoneyPeriod; label: string; caption: string; previous: string }> = [
+    { id: "week", label: "Week", caption: "Last 7 days", previous: "the 7 days before" },
+    { id: "month", label: "Month", caption: "This month so far", previous: "the same days last month" },
+    { id: "year", label: "Year", caption: "This year so far", previous: "the same time last year" },
+];
+
+const PROVIDER: Record<string, string> = { paystack: "Paystack", flutterwave: "Flutterwave", stripe: "Stripe" };
+
+/** What came in through the assistant: totals, a bar chart, where it came from and what sold. */
+export default function StudioMoneyPage() {
+    const { project } = useStudio();
+    const { ask } = useStudioCopilot();
+    const [period, setPeriod] = useState<MoneyPeriod>("week");
+    const meta = PERIODS.find((p) => p.id === period)!;
+    const money = useQuery({
+        queryKey: ["studio-money", project.id, period],
+        queryFn: async (): Promise<Money> => {
+            const response = await fetch(`/api/studio/money?project_id=${project.id}&period=${period}`, { cache: "no-store" });
+            const body = await response.json().catch(() => null);
+            if (!response.ok) throw new Error((body as { error?: string } | null)?.error ?? "Couldn't load your money.");
+            return body as Money;
+        },
+        refetchOnWindowFocus: true,
+    });
+    const data = money.data;
+    const max = Math.max(1, ...(data?.bars ?? []).map((bar) => bar.amount));
+    const change = data ? data.total - data.previous : 0;
+
+    return (
+        <div>
+            {/* The title and switcher stay put while the page scrolls under them. */}
+            <div className="sticky top-0 z-30 -mx-4 -mt-[calc(1.25rem+env(safe-area-inset-top))] bg-background px-4 pb-3 pt-[calc(1.25rem+env(safe-area-inset-top))]">
+                <h1 className="text-[26px] font-semibold leading-tight tracking-tight">Money</h1>
+                <div role="tablist" aria-label="Period" className="mt-4 grid grid-cols-3 gap-1 rounded-full bg-muted p-1">
+                    {PERIODS.map((item) => (
+                        <button key={item.id} type="button" role="tab" aria-selected={period === item.id} onClick={() => setPeriod(item.id)} className={cn("h-9 rounded-full text-sm font-medium", period === item.id ? "bg-background text-foreground" : "text-muted-foreground")}>
+                            {item.label}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {money.isLoading ? (
+                <div className="mt-6 space-y-3"><Skeleton className="h-10 w-48" /><Skeleton className="h-32 w-full rounded-2xl" /><Skeleton className="h-28 w-full rounded-2xl" /></div>
+            ) : money.isError || !data ? (
+                <p className="mt-6 text-sm text-destructive">{money.error instanceof Error ? money.error.message : "Couldn't load your money."}</p>
+            ) : (
+                <>
+                    <p className="mt-5 text-[13px] text-muted-foreground">{meta.caption}</p>
+                    <p className="mt-1 text-[38px] font-semibold leading-none tracking-tight">{formatMoney(data.total, data.currency)}</p>
+                    {(data.total > 0 || data.previous > 0) && (
+                        <p className={cn("mt-2 text-[13px] font-medium", change >= 0 ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground")}>
+                            {change === 0 ? `Same as ${meta.previous}` : `${change > 0 ? "Up" : "Down"} ${formatMoney(Math.abs(change), data.currency)} on ${meta.previous}`}
+                        </p>
+                    )}
+
+                    <div role="img" aria-label={`${meta.caption}: ${data.bars.map((bar) => `${bar.label} ${formatMoney(bar.amount, data.currency)}`).join(", ")}`} className="mt-5 flex h-32 items-end gap-2">
+                        {data.bars.map((bar, index) => (
+                            <div key={`${bar.label}-${index}`} className="flex h-full flex-1 flex-col items-center justify-end gap-1.5">
+                                <span
+                                    className={cn("w-full rounded-md", bar.amount > 0 ? (bar.current ? "bg-foreground" : "bg-emerald-600/80") : "bg-muted")}
+                                    style={{ height: bar.amount > 0 ? `${Math.max(6, Math.round((bar.amount / max) * 100))}%` : "4px" }}
+                                />
+                                <span className={cn("text-[11px]", bar.current ? "font-semibold text-foreground" : "text-muted-foreground")}>{bar.label}</span>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="mt-6 overflow-hidden rounded-2xl border border-border/60 text-[15px]">
+                        <div className="flex justify-between px-4 py-3"><span>Paid by link</span><span className="font-semibold">{formatMoney(data.by_link, data.currency)}</span></div>
+                        <div className="flex justify-between border-t border-border/60 px-4 py-3"><span>Cash and transfer, marked paid</span><span className="font-semibold">{formatMoney(data.marked_paid, data.currency)}</span></div>
+                        {data.to_collect > 0 && <div className="flex justify-between border-t border-border/60 px-4 py-3 text-amber-800 dark:text-amber-400"><span>Still to collect</span><span className="font-semibold">{formatMoney(data.to_collect, data.currency)}</span></div>}
+                    </div>
+
+                    {data.top_items.length > 0 && (
+                        <section className="mt-6">
+                            <h2 className="mb-2 text-[15px] font-semibold">Best sellers</h2>
+                            <ul className="overflow-hidden rounded-2xl border border-border/60">
+                                {data.top_items.map((item) => (
+                                    <li key={item.name} className="flex items-center justify-between border-b border-border/60 px-4 py-3 last:border-0">
+                                        <span className="min-w-0 truncate text-[15px]">{item.name}<span className="ml-2 text-xs text-muted-foreground">× {item.quantity}</span></span>
+                                        <span className="shrink-0 text-[15px] font-semibold">{formatMoney(item.amount, data.currency)}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </section>
+                    )}
+
+                    {data.payments ? (
+                        <p className="mt-6 rounded-2xl bg-muted px-4 py-3.5 text-[13px] leading-5">
+                            Payments by link go straight to your <span className="font-semibold">{PROVIDER[data.payments.provider] ?? "payment"}</span> account{data.payments.mode === "test" ? " (test mode: no real money yet)" : ""}. Cencori never holds your money.
+                        </p>
+                    ) : (
+                        // Same card as the empty tabs, but in the flow with the rest of the page.
+                        <StudioEmptyCard
+                            icon={CardIcon}
+                            title="Get paid by link"
+                            description="Connect your payment provider and the money goes straight to you."
+                            className="mt-6 min-h-0 py-8"
+                        >
+                            <button type="button" onClick={() => ask("Help me connect payments so customers can pay by link")} className="mt-4 h-11 rounded-full bg-foreground px-5 text-sm font-semibold text-background">Connect payments</button>
+                        </StudioEmptyCard>
+                    )}
+                    <p className="mt-3 px-1 text-xs leading-5 text-muted-foreground">Counts payments through your assistant and orders you mark paid. Sales made elsewhere aren&apos;t included.</p>
+                </>
+            )}
+        </div>
+    );
+}

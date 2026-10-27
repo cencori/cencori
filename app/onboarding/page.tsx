@@ -323,9 +323,10 @@ function OnboardingContent() {
         }
         clearSignupTrack();
         toast.success("Your free trial has started.");
-        // Studio's setup builds the first assistant with them (studio.cencori.com/setup).
+        // Studio onto their home screen first (studio.cencori.com/get-app), then
+        // its setup builds the first assistant with them.
         void projectSlug;
-        window.location.assign(`${studioOrigin(window.location.host)}/setup`);
+        window.location.assign(`${studioOrigin(window.location.host)}/get-app`);
       } catch {
         toast.error("Couldn't finish setting up. Try again.");
         setLoading(false);
