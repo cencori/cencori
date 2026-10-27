@@ -67,10 +67,13 @@ export function CopilotActionConfirm({
     action,
     onUpdate,
     onSecret,
+    onNavigate,
 }: {
     action: CopilotAction;
     onUpdate: (patch: Partial<CopilotAction>) => void;
     onSecret: (secret: string) => void;
+    // Opens a same-tab link (Copilot comes along).
+    onNavigate?: (href: string) => void;
 }) {
     const [typed, setTyped] = useState("");
     const destructive = action.tier === "destructive";
@@ -81,9 +84,10 @@ export function CopilotActionConfirm({
         if (!phraseOk || action.state !== "pending") return;
         // A page to open (the user signs in there), not a change to run.
         if (action.link) {
-            // A new tab, so the conversation stays where it is.
-            window.open(action.link.href, "_blank", "noopener");
             onUpdate({ state: "done", result: action.doneMessage });
+            if (action.link.sameTab && onNavigate) onNavigate(action.link.href);
+            // A new tab, so the conversation stays where it is.
+            else window.open(action.link.href, "_blank", "noopener");
             return;
         }
         onUpdate({ state: "running" });

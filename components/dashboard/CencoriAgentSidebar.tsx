@@ -3,10 +3,10 @@
 import { ThinkingState } from "@/components/chat/ThinkingState";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
-import { ArrowUp, Check, ChevronDown, FileText, Image as ImageIcon, Paperclip, Plus, Square, X } from "lucide-react";
+import { ArrowUp, CornerUpLeft, Check, ChevronDown, FileText, Image as ImageIcon, Paperclip, Plus, Square, X } from "lucide-react";
 import { getProviderLogoMark } from "@/components/dashboard/ProviderLogo";
 import {
     COPILOT_FILE_ACCEPT,
@@ -19,6 +19,8 @@ import {
     looksLikeText,
     type CopilotFile,
 } from "@/lib/copilot/files";
+import { resolveCopilotHref, type CopilotNavigation } from "@/lib/copilot/navigation";
+import { hasUnsavedChanges } from "@/lib/console/unsaved-changes";
 import { HugeiconsIcon } from "@hugeicons/react";
 import FullScreenIcon from "@hugeicons/core-free-icons/FullScreenIcon";
 import CollapseIcon from "@hugeicons/core-free-icons/CollapseIcon";
@@ -43,6 +45,8 @@ import {
     COPILOT_CONVERSATION_COOKIE,
     COPILOT_CONVERSATION_EVENT,
     COPILOT_NEW_CHAT_EVENT,
+    COPILOT_HANDOFF_EVENT,
+    COPILOT_OPEN_MENU_EVENT,
     COPILOT_HEADER_ACTIONS_SLOT_ID,
     COPILOT_DEFAULT_MODEL,
     COPILOT_MODELS,
@@ -61,6 +65,8 @@ type AgentMessage = {
     // Sent to the model but not shown: the outcome of an action, so Copilot
     // carries on and reports what happened.
     hidden?: boolean;
+    // The page Copilot took the user to with this reply, and where from.
+    navigation?: { label: string; href: string; from: string };
 };
 
 /** What Copilot is told after an action settles, so it reports back and carries on. */
@@ -84,8 +90,9 @@ function expireStaleActions(list: AgentMessage[]): AgentMessage[] {
 // What the model sees of a reply: its text plus how each proposed action
 // ended, so follow-ups know what actually changed.
 function toAgentContent(message: AgentMessage): string {
-    if (!message.actions?.length) return message.content;
-    const outcomes = message.actions.map((a) => `[${a.title}: ${a.state}${a.result ? ` — ${a.result}` : ""}]`);
+    const outcomes = (message.actions ?? []).map((a) => `[${a.title}: ${a.state}${a.result ? ` — ${a.result}` : ""}]`);
+    if (message.navigation) outcomes.push(`[Opened ${message.navigation.label}]`);
+    if (!outcomes.length) return message.content;
     return [message.content, ...outcomes].filter(Boolean).join("\n");
 }
 
@@ -116,8 +123,9 @@ interface CencoriAgentSidebarProps {
     variant?: "panel" | "page";
     // Panel only: open the full-screen Copilot page.
     onFullScreen?: () => void;
-    // Page only: go back to where the user came from.
-    onExitFullScreen?: () => void;
+    // Page only: shrink back to the panel, on the page Copilot is taking the
+    // user to (with the panel open or not), else where they came from.
+    onExitFullScreen?: (to?: { href: string; openPanel: boolean }) => void;
 }
 
 // Width of the docked panel on desktop. The app layout reserves exactly this
@@ -185,6 +193,11 @@ const AGENT_MARKDOWN_STYLES = cn(
 );
 
 function getSurfaceLabel(pathname: string, section: string | null) {
+    if (/\/agents\/[^/]+/.test(pathname)) return "Agents / Agent";
+    if (pathname.includes("/agents")) return "Agents";
+    if (pathname.includes("/memory")) return "Memory";
+    if (pathname.includes("/copilot")) return "Copilot";
+    if (pathname.startsWith("/account/")) return "Account";
     if (pathname.includes("/observability")) {
         const label = section && section !== "overview" ? section : "overview";
         return `Observability / ${label.charAt(0).toUpperCase()}${label.slice(1)}`;
@@ -233,6 +246,7 @@ export function CencoriAgentSidebar({
     const column = isPage ? "mx-auto w-full max-w-[760px]" : undefined;
     const pathname = usePathname();
     const searchParams = useSearchParams();
+    const router = useRouter();
     const { resolvedTheme } = useTheme();
     const surface = getSurfaceLabel(pathname, searchParams.get("section"));
     const [messages, setMessages] = useState<AgentMessage[]>([]);
@@ -499,6 +513,40 @@ export function CencoriAgentSidebar({
         setConversationId(null);
     }, [project?.id]);
 
+    // Take the user to a page, in this tab. The panel stays open beside it
+    // (on phones, where it would cover the page, it closes); the full page
+    // first hands its conversation to the panel and shrinks back into it.
+    const goTo = useCallback((href: string, all: AgentMessage[]) => {
+        const desktop = window.matchMedia("(min-width: 1024px)").matches;
+        if (isPage) {
+            window.dispatchEvent(new CustomEvent(COPILOT_HANDOFF_EVENT, {
+                detail: { conversationId: conversationIdRef.current, messages: all },
+            }));
+            onExitFullScreen?.({ href, openPanel: desktop });
+            return;
+        }
+        router.push(href);
+        if (!desktop) onOpenChange(false);
+    }, [isPage, onExitFullScreen, onOpenChange, router]);
+
+    // The panel picks up the conversation the full page was having.
+    useEffect(() => {
+        if (isPage) return;
+        const onHandoff = (event: Event) => {
+            const { conversationId: id, messages: handed } = (event as CustomEvent<{ conversationId: string | null; messages: AgentMessage[] }>).detail;
+            abortControllerRef.current?.abort();
+            conversationIdRef.current = id;
+            pendingConversationIdRef.current = null;
+            setConversationId(id);
+            setMessages(handed);
+            setStreamingContent("");
+            setIsLoading(false);
+            setRestoring(false);
+        };
+        window.addEventListener(COPILOT_HANDOFF_EVENT, onHandoff);
+        return () => window.removeEventListener(COPILOT_HANDOFF_EVENT, onHandoff);
+    }, [isPage]);
+
     // One answer from Copilot for the conversation so far (ending in a user
     // message, shown or hidden).
     const runTurn = useCallback(async (nextMessages: AgentMessage[]) => {
@@ -534,6 +582,7 @@ export function CencoriAgentSidebar({
                     currentPath: `${pathname}${searchParams.size ? `?${searchParams.toString()}` : ""}`,
                     currentSurface: surface,
                     userName: firstName ?? null,
+                    unsavedChanges: hasUnsavedChanges(),
                 }),
                 signal: controller.signal,
             });
@@ -554,6 +603,8 @@ export function CencoriAgentSidebar({
             let sentMessages = nextMessages;
             let fullContent = "";
             const proposed: CopilotAction[] = [];
+            let navigation: AgentMessage["navigation"];
+            const here = `${pathname}${searchParams.size ? `?${searchParams.toString()}` : ""}`;
 
             while (true) {
                 const { done, value } = await reader.read();
@@ -573,6 +624,8 @@ export function CencoriAgentSidebar({
                         status?: string;
                         discard?: boolean;
                         action?: CopilotAction;
+                        navigate?: CopilotNavigation & { confirm?: boolean };
+                        openMenu?: string;
                         imageDescriptions?: CopilotFile[];
                     };
                     // Images were described: keep the descriptions, drop the
@@ -590,6 +643,42 @@ export function CencoriAgentSidebar({
                     }
                     // A proposed change: shown as a card once the reply lands.
                     if (payload.action) proposed.push({ ...payload.action, state: "pending" });
+                    // A page to take the user to: right away from the panel
+                    // (it keeps talking beside the page), once the reply is in
+                    // from the full page, and only once they agree if leaving
+                    // would lose unsaved edits.
+                    // A menu to open on screen. On phones the panel covers
+                    // the screen, so it steps aside first.
+                    if (payload.openMenu) {
+                        const menu = payload.openMenu;
+                        if (!isPage && !window.matchMedia("(min-width: 1024px)").matches) onOpenChange(false);
+                        window.requestAnimationFrame(() => window.dispatchEvent(new CustomEvent(COPILOT_OPEN_MENU_EVENT, { detail: menu })));
+                    }
+                    if (payload.navigate && !navigation) {
+                        const { path, label, confirm } = payload.navigate;
+                        const href = resolveCopilotHref(path, {
+                            hostname: window.location.hostname,
+                            pathname,
+                            organizationSlug: organization?.slug ?? null,
+                            projectSlug: project?.slug ?? null,
+                        });
+                        if (href && confirm) {
+                            proposed.push({
+                                id: crypto.randomUUID(),
+                                kind: "navigate",
+                                tier: "normal",
+                                title: `Leave this page for ${label}?`,
+                                details: [{ label: "Unsaved changes", value: "Edits you haven't saved here will be lost." }],
+                                request: { method: "POST", path: "" },
+                                link: { href, label: "Leave page", sameTab: true },
+                                doneMessage: `Opened ${label}.`,
+                                state: "pending",
+                            });
+                        } else if (href) {
+                            navigation = { label, href, from: here };
+                            if (!isPage) goTo(href, []);
+                        }
+                    }
                     if (payload.error) throw new Error(payload.error);
                     // The model streamed a preamble, then called tools: drop it.
                     if (payload.discard) {
@@ -605,7 +694,7 @@ export function CencoriAgentSidebar({
                 }
             }
 
-            if (!fullContent.trim() && proposed.length === 0) throw new Error("The agent returned an empty response.");
+            if (!fullContent.trim() && proposed.length === 0 && !navigation) throw new Error("The agent returned an empty response.");
             const finished: AgentMessage[] = [
                 // Never save image data, even if a description didn't arrive.
                 ...sentMessages.map((message) => message.files?.some((file) => file.dataUrl) ? {
@@ -617,11 +706,18 @@ export function CencoriAgentSidebar({
                     role: "assistant",
                     content: fullContent,
                     ...(proposed.length ? { actions: proposed } : {}),
+                    ...(navigation ? { navigation } : {}),
                 },
             ];
             setMessages(finished);
             setStreamingContent("");
-            void saveConversation(finished);
+            if (isPage && navigation) {
+                // Saved first, so the panel continues the same conversation.
+                await saveConversation(finished);
+                goTo(navigation.href, finished);
+            } else {
+                void saveConversation(finished);
+            }
         } catch (error) {
             if ((error as Error).name !== "AbortError") {
                 setMessages((current) => [
@@ -639,7 +735,7 @@ export function CencoriAgentSidebar({
             setIsLoading(false);
             abortControllerRef.current = null;
         }
-    }, [environment, firstName, model, organization?.id, pathname, project?.id, saveConversation, searchParams, surface]);
+    }, [environment, firstName, goTo, isPage, model, onOpenChange, organization?.id, organization?.slug, pathname, project?.id, project?.slug, saveConversation, searchParams, surface]);
 
     const sendMessage = useCallback(async (rawContent: string) => {
         const content = rawContent.trim();
@@ -682,10 +778,12 @@ export function CencoriAgentSidebar({
         messagesRef.current = next;
         setMessages(next);
         if (patch.state && patch.state !== "running") void saveConversation(next);
+        const action = next.find((m) => m.id === messageId)?.actions?.find((a) => a.id === actionId);
+        // Leaving for a page: Copilot already said where; nothing to report.
+        if (action?.kind === "navigate") return;
         if (patch.state === "done") void queryClient.invalidateQueries();
         // Settled: Copilot hears how it went and reports back, like a step in a task.
         if (patch.state === "done" || patch.state === "failed" || patch.state === "cancelled") {
-            const action = next.find((m) => m.id === messageId)?.actions?.find((a) => a.id === actionId);
             if (action) void runTurn([...next, { id: crypto.randomUUID(), role: "user", content: actionOutcomeNote(action), hidden: true }]);
         }
     };
@@ -806,7 +904,13 @@ export function CencoriAgentSidebar({
                 onExitFullScreen && (
                     <button
                         type="button"
-                        onClick={onExitFullScreen}
+                        onClick={() => {
+                            // The panel carries on with this conversation.
+                            window.dispatchEvent(new CustomEvent(COPILOT_HANDOFF_EVENT, {
+                                detail: { conversationId: conversationIdRef.current, messages },
+                            }));
+                            onExitFullScreen();
+                        }}
                         aria-label="Exit full screen"
                         title="Exit full screen"
                         className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
@@ -950,6 +1054,24 @@ export function CencoriAgentSidebar({
                                             <MarkdownRenderer content={message.content} className={AGENT_MARKDOWN_STYLES} />
                                         )}
                                         {message.actions?.map((action) => <CopilotActionStep key={action.id} action={action} />)}
+                                        {message.navigation && (
+                                            <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+                                                <span className="truncate">Took you to <span className="text-foreground/80">{message.navigation.label}</span></span>
+                                                {message.navigation.from !== `${pathname}${searchParams.size ? `?${searchParams.toString()}` : ""}` && (
+                                                    <>
+                                                        <span aria-hidden>·</span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => goTo(message.navigation!.from, messagesRef.current)}
+                                                            className="inline-flex shrink-0 items-center gap-1 rounded text-foreground/70 transition-colors hover:text-foreground"
+                                                        >
+                                                            <CornerUpLeft className="h-3 w-3" />
+                                                            Back
+                                                        </button>
+                                                    </>
+                                                )}
+                                            </p>
+                                        )}
                                     </div>
                                 )}
                             </article>
@@ -977,6 +1099,7 @@ export function CencoriAgentSidebar({
                         action={openAction.action}
                         onUpdate={(patch) => updateAction(openAction.messageId, openAction.action.id, patch)}
                         onSecret={(secret) => setRevealedSecret({ title: openAction.action.title, secret })}
+                        onNavigate={(href) => goTo(href, messagesRef.current)}
                     />
                 )}
                 <div className="rounded-[28px] bg-background">

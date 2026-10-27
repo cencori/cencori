@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/components/ui/toast";
+import { useUnsavedChanges } from "@/lib/console/unsaved-changes";
 import {
     emptyAgentForm,
     isLockedVersion,
@@ -135,7 +136,8 @@ export function AgentWorkspaceProvider({
         setInput("");
     }, [agent, version, savedForm]);
 
-    // Leaving the page with unsaved edits asks first.
+    // Leaving the page with unsaved edits asks first (Copilot too).
+    useUnsavedChanges(dirty);
     useEffect(() => {
         if (!dirty) return;
         const onBeforeUnload = (event: BeforeUnloadEvent) => { event.preventDefault(); };

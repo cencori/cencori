@@ -61,3 +61,12 @@ export function resolveCopilotModel(value: unknown): CopilotModelId {
 // Top-bar slot an agent's pages fill with their Test / Publish buttons, so
 // agent pages keep the one shared navbar.
 export const AGENT_HEADER_ACTIONS_SLOT_ID = "agent-header-actions";
+
+// Fired on window when the full-screen Copilot shrinks back to the panel
+// (detail: the conversation id and its messages), so the panel carries on
+// with the same chat instead of the one it had before.
+export const COPILOT_HANDOFF_EVENT = "copilot:handoff";
+
+// Fired on window when Copilot opens a piece of the dashboard's UI for the
+// user (detail: a CopilotMenu, see lib/copilot/navigation.ts).
+export const COPILOT_OPEN_MENU_EVENT = "copilot:open-menu";
