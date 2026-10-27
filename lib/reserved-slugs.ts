@@ -92,6 +92,7 @@ export const RESERVED_ORG_SLUGS: ReadonlySet<string> = new Set([
     "pricing",
     "privacy",
     "scan-app",
+    "studio-app",
     "signup",
     "solutions",
     "team-invite",

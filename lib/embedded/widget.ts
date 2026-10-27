@@ -128,8 +128,9 @@ export function originAllowed(origin: string | null | undefined, allowed: readon
 
 /** Cencori's own origins: the console preview frames the widget from these. */
 export function appOrigins(): string[] {
-    const origins = ['https://cencori.com', 'https://www.cencori.com', 'https://console.cencori.com'];
-    if (process.env.NODE_ENV !== 'production') origins.push('http://localhost:*', 'http://console.localhost:*');
+    // Studio's setup shows the preview too ("Try it").
+    const origins = ['https://cencori.com', 'https://www.cencori.com', 'https://console.cencori.com', 'https://studio.cencori.com'];
+    if (process.env.NODE_ENV !== 'production') origins.push('http://localhost:*', 'http://console.localhost:*', 'http://studio.localhost:*');
     return origins;
 }
 
