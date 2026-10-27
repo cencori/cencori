@@ -290,7 +290,7 @@ export default function TeamsPage({ params }: PageProps) {
                     {canManageMembers && teamsEnabled && (
                         <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
                             <DialogTrigger asChild>
-                                <Button size="sm" className="h-8 text-xs gap-1.5">
+                                <Button data-copilot-spot="invite_member" size="sm" className="h-8 text-xs gap-1.5">
                                     Invite member
                                 </Button>
                             </DialogTrigger>

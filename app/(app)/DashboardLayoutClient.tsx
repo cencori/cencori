@@ -26,6 +26,7 @@ import { ThemeScope } from "@/components/theme-scope";
 import { MobileNav } from "@/components/dashboard/MobileNav";
 import { MaintenanceBanner } from "@/components/dashboard/MaintenanceBanner";
 import { CencoriAgentSidebar } from "@/components/dashboard/CencoriAgentSidebar";
+import { CopilotSpotlight } from "@/components/dashboard/CopilotSpotlight";
 import { AGENT_HEADER_ACTIONS_SLOT_ID, COPILOT_HEADER_ACTIONS_SLOT_ID, COPILOT_OPEN_COOKIE, COPILOT_OPEN_MENU_EVENT } from "@/lib/console/copilot";
 import { EnvironmentProvider, useEnvironment } from "@/lib/contexts/EnvironmentContext";
 import { ReactQueryProvider } from "@/lib/providers/ReactQueryProvider";
@@ -581,6 +582,7 @@ function LayoutContent({ user, avatar, name, children, initialAgentOpen, initial
         projectSlug={projectSlug}
         consoleMode={isCanonicalConsoleRoute}
       />
+      <CopilotSpotlight />
       <CencoriAgentSidebar
         open={agentOpen && !isCopilotPage}
         initialConversationId={initialConversationId}

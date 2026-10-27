@@ -271,7 +271,9 @@ export default function BillingPage({ params }: PageProps) {
                 </div>
             ) : businessPlan.data?.account_type === "business" ? (
             <div>
-                <BusinessPlan orgId={org.id} data={businessPlan.data} />
+                <div data-copilot-spot="business_plan">
+                    <BusinessPlan orgId={org.id} data={businessPlan.data} />
+                </div>
                 <BillingCommunication
                     orgSlug={orgSlug}
                     email={org.billing_email || ''}
@@ -286,42 +288,50 @@ export default function BillingPage({ params }: PageProps) {
                         taxId: org.billing_tax_id || ''
                     }}
                 />
-                <InvoiceHistory invoices={invoices} />
+                <div data-copilot-spot="invoices">
+                    <InvoiceHistory invoices={invoices} />
+                </div>
             </div>
             ) : (
             <div>
-                <PlanDetails
-                    tier={org.subscription_tier}
-                    status={org.subscription_status}
-                    currentPeriodEnd={org.subscription_current_period_end}
-                    price={isPaidPlanTier(org.subscription_tier) ? CENCORI_PAID_PLANS[org.subscription_tier].prices.month / 100 : 0}
-                    monthlyRequestsUsed={org.monthly_requests_used}
-                    projectCount={projects.length}
-                    projectLimit={org.subscription_tier === 'free' ? 1 : 999999}
-                    creditBalance={org.credits_balance || 0}
-                    actionLabel={org.subscription_tier === 'free' ? 'Upgrade Plan' : 'Current Plan'}
-                    onAction={org.subscription_tier === 'free' ? () => setShowUpgradeDialog(true) : undefined}
-                />
+                <div data-copilot-spot="plan">
+                    <PlanDetails
+                        tier={org.subscription_tier}
+                        status={org.subscription_status}
+                        currentPeriodEnd={org.subscription_current_period_end}
+                        price={isPaidPlanTier(org.subscription_tier) ? CENCORI_PAID_PLANS[org.subscription_tier].prices.month / 100 : 0}
+                        monthlyRequestsUsed={org.monthly_requests_used}
+                        projectCount={projects.length}
+                        projectLimit={org.subscription_tier === 'free' ? 1 : 999999}
+                        creditBalance={org.credits_balance || 0}
+                        actionLabel={org.subscription_tier === 'free' ? 'Upgrade Plan' : 'Current Plan'}
+                        onAction={org.subscription_tier === 'free' ? () => setShowUpgradeDialog(true) : undefined}
+                    />
+                </div>
 
-                <CreditBalance
-                    orgId={org.id}
-                    balance={org.credits_balance || 0}
-                    transactions={formattedTransactions}
-                />
+                <div data-copilot-spot="credits">
+                    <CreditBalance
+                        orgId={org.id}
+                        balance={org.credits_balance || 0}
+                        transactions={formattedTransactions}
+                    />
+                </div>
 
-                <PaymentMethods
-                    orgSlug={orgSlug}
-                    methods={paymentMethods}
-                    billingAddress={{
-                        name: org.name,
-                        line1: org.billing_address_line1 || '',
-                        line2: org.billing_address_line2 || '',
-                        city: org.billing_city || '',
-                        state: org.billing_state || '',
-                        zip: org.billing_zip || '',
-                        country: org.billing_country || '',
-                    }}
-                />
+                <div data-copilot-spot="payment_methods">
+                    <PaymentMethods
+                        orgSlug={orgSlug}
+                        methods={paymentMethods}
+                        billingAddress={{
+                            name: org.name,
+                            line1: org.billing_address_line1 || '',
+                            line2: org.billing_address_line2 || '',
+                            city: org.billing_city || '',
+                            state: org.billing_state || '',
+                            zip: org.billing_zip || '',
+                            country: org.billing_country || '',
+                        }}
+                    />
+                </div>
 
                 <BillingCommunication
                     orgSlug={orgSlug}
@@ -340,7 +350,9 @@ export default function BillingPage({ params }: PageProps) {
 
                 <CostControl orgSlug={orgSlug} projects={formattedProjects} />
 
-                <InvoiceHistory invoices={invoices} />
+                <div data-copilot-spot="invoices">
+                    <InvoiceHistory invoices={invoices} />
+                </div>
 
                 <OperationalControls orgSlug={orgSlug} />
 

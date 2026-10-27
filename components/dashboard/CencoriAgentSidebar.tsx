@@ -19,7 +19,7 @@ import {
     looksLikeText,
     type CopilotFile,
 } from "@/lib/copilot/files";
-import { resolveCopilotHref, type CopilotNavigation } from "@/lib/copilot/navigation";
+import { COPILOT_SPOTS, resolveCopilotHref, spotSelector, type CopilotNavigation } from "@/lib/copilot/navigation";
 import { hasUnsavedChanges } from "@/lib/console/unsaved-changes";
 import { HugeiconsIcon } from "@hugeicons/react";
 import FullScreenIcon from "@hugeicons/core-free-icons/FullScreenIcon";
@@ -47,6 +47,7 @@ import {
     COPILOT_NEW_CHAT_EVENT,
     COPILOT_HANDOFF_EVENT,
     COPILOT_OPEN_MENU_EVENT,
+    COPILOT_HIGHLIGHT_EVENT,
     COPILOT_HEADER_ACTIONS_SLOT_ID,
     COPILOT_DEFAULT_MODEL,
     COPILOT_MODELS,
@@ -66,7 +67,8 @@ type AgentMessage = {
     // carries on and reports what happened.
     hidden?: boolean;
     // The page Copilot took the user to with this reply, and where from.
-    navigation?: { label: string; href: string; from: string };
+    // href is empty when Copilot pointed at something on the page they were on.
+    navigation?: { label: string; href: string; from: string; spot?: string; text?: string };
 };
 
 /** What Copilot is told after an action settles, so it reports back and carries on. */
@@ -516,17 +518,30 @@ export function CencoriAgentSidebar({
     // Take the user to a page, in this tab. The panel stays open beside it
     // (on phones, where it would cover the page, it closes); the full page
     // first hands its conversation to the panel and shrinks back into it.
-    const goTo = useCallback((href: string, all: AgentMessage[]) => {
+    // With a spot (or a heading/button's text), it's outlined once the page
+    // shows it. No href: point at something on this page.
+    const goTo = useCallback((href: string, all: AgentMessage[], spot?: string, text?: string) => {
         const desktop = window.matchMedia("(min-width: 1024px)").matches;
-        if (isPage) {
+        // Already on that page: the outline needn't wait for it to change.
+        const navigating = !!href && href.split("#")[0] !== window.location.pathname + window.location.search;
+        if (!href) {
+            if (!isPage && !desktop) onOpenChange(false);
+        } else if (isPage) {
             window.dispatchEvent(new CustomEvent(COPILOT_HANDOFF_EVENT, {
                 detail: { conversationId: conversationIdRef.current, messages: all },
             }));
             onExitFullScreen?.({ href, openPanel: desktop });
-            return;
+        } else {
+            router.push(href);
+            if (!desktop) onOpenChange(false);
         }
-        router.push(href);
-        if (!desktop) onOpenChange(false);
+        const selector = spot ? spotSelector(spot) : null;
+        if (selector) {
+            const label = COPILOT_SPOTS[spot as keyof typeof COPILOT_SPOTS].label;
+            window.dispatchEvent(new CustomEvent(COPILOT_HIGHLIGHT_EVENT, { detail: { selector, label, navigating } }));
+        } else if (text) {
+            window.dispatchEvent(new CustomEvent(COPILOT_HIGHLIGHT_EVENT, { detail: { text, label: text, navigating } }));
+        }
     }, [isPage, onExitFullScreen, onOpenChange, router]);
 
     // The panel picks up the conversation the full page was having.
@@ -655,14 +670,14 @@ export function CencoriAgentSidebar({
                         window.requestAnimationFrame(() => window.dispatchEvent(new CustomEvent(COPILOT_OPEN_MENU_EVENT, { detail: menu })));
                     }
                     if (payload.navigate && !navigation) {
-                        const { path, label, confirm } = payload.navigate;
-                        const href = resolveCopilotHref(path, {
+                        const { path, label, confirm, spot, text } = payload.navigate;
+                        const href = path === null ? "" : resolveCopilotHref(path, {
                             hostname: window.location.hostname,
                             pathname,
                             organizationSlug: organization?.slug ?? null,
                             projectSlug: project?.slug ?? null,
                         });
-                        if (href && confirm) {
+                        if (href && confirm && path !== null) {
                             proposed.push({
                                 id: crypto.randomUUID(),
                                 kind: "navigate",
@@ -674,9 +689,9 @@ export function CencoriAgentSidebar({
                                 doneMessage: `Opened ${label}.`,
                                 state: "pending",
                             });
-                        } else if (href) {
-                            navigation = { label, href, from: here };
-                            if (!isPage) goTo(href, []);
+                        } else if (href !== null) {
+                            navigation = { label, href, from: here, ...(spot ? { spot } : {}), ...(text ? { text } : {}) };
+                            if (!isPage || !href) goTo(href, [], spot, text);
                         }
                     }
                     if (payload.error) throw new Error(payload.error);
@@ -711,10 +726,10 @@ export function CencoriAgentSidebar({
             ];
             setMessages(finished);
             setStreamingContent("");
-            if (isPage && navigation) {
+            if (isPage && navigation?.href) {
                 // Saved first, so the panel continues the same conversation.
                 await saveConversation(finished);
-                goTo(navigation.href, finished);
+                goTo(navigation.href, finished, navigation.spot, navigation.text);
             } else {
                 void saveConversation(finished);
             }
@@ -1056,8 +1071,8 @@ export function CencoriAgentSidebar({
                                         {message.actions?.map((action) => <CopilotActionStep key={action.id} action={action} />)}
                                         {message.navigation && (
                                             <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
-                                                <span className="truncate">Took you to <span className="text-foreground/80">{message.navigation.label}</span></span>
-                                                {message.navigation.from !== `${pathname}${searchParams.size ? `?${searchParams.toString()}` : ""}` && (
+                                                <span className="truncate">{message.navigation.href ? "Took you to" : "Pointed at"} <span className="text-foreground/80">{message.navigation.label}</span></span>
+                                                {message.navigation.href && message.navigation.from !== `${pathname}${searchParams.size ? `?${searchParams.toString()}` : ""}` && (
                                                     <>
                                                         <span aria-hidden>·</span>
                                                         <button

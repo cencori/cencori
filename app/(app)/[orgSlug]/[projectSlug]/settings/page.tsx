@@ -780,7 +780,7 @@ export default function ProjectSettingsPage({ params }: PageProps) {
           </section>
 
           {/* Data protection */}
-          <section>
+          <section data-copilot-spot="request_handling">
             <div className="space-y-0.5">
               <h2 className="text-sm font-medium">Request handling</h2>
               <p className="text-xs text-muted-foreground md:text-[10px]">Optional behaviour for requests sent through this project. Both are off by default.</p>
@@ -919,7 +919,7 @@ export default function ProjectSettingsPage({ params }: PageProps) {
             </div>
             <div className="overflow-hidden rounded-lg border border-border/35 bg-muted/30">
               {/* Monthly Budget */}
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 border-b border-border/30 gap-2 md:gap-0">
+              <div data-copilot-spot="monthly_budget" className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 border-b border-border/30 gap-2 md:gap-0">
                 <div className="space-y-0.5">
                   <p className="text-sm md:text-xs font-medium">Monthly budget</p>
                   <p className="text-xs md:text-[10px] text-muted-foreground">Get alerts when you approach this amount.</p>
@@ -939,7 +939,7 @@ export default function ProjectSettingsPage({ params }: PageProps) {
               </div>
 
               {/* Spend Cap */}
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 border-b border-border/30 gap-2 md:gap-0">
+              <div data-copilot-spot="spend_cap" className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 border-b border-border/30 gap-2 md:gap-0">
                 <div className="space-y-0.5">
                   <p className="text-sm md:text-xs font-medium">Spend cap (hard limit)</p>
                   <p className="text-xs md:text-[10px] text-muted-foreground">Block requests when this limit is reached.</p>
@@ -971,7 +971,7 @@ export default function ProjectSettingsPage({ params }: PageProps) {
               </div>
 
               {/* Budget Alerts */}
-              <div className="flex items-center justify-between px-4 py-3 border-b border-border/30">
+              <div data-copilot-spot="budget_alerts" className="flex items-center justify-between px-4 py-3 border-b border-border/30">
                 <div className="flex items-center gap-3">
                   <Bell className="h-4 w-4 text-muted-foreground" />
                   <div className="space-y-0.5">
@@ -1146,7 +1146,7 @@ export default function ProjectSettingsPage({ params }: PageProps) {
           </section>
 
           {/* Fallback Configuration */}
-          <section>
+          <section data-copilot-spot="failover">
             <div>
               <h2 className="text-sm font-medium">Fallback configuration</h2>
               <p className="text-xs md:text-[10px] text-muted-foreground">Configure automatic failover when primary provider is unavailable.</p>
@@ -1899,7 +1899,7 @@ export default function ProjectSettingsPage({ params }: PageProps) {
           />
 
           {/* Publishable Keys Section */}
-          <section>
+          <section data-copilot-spot="publishable_keys">
             <div>
               <h2 className="text-sm font-medium">Publishable keys</h2>
               <p className="mt-1 text-xs leading-5 text-muted-foreground">Safe for browser use. Requires domain whitelisting for security.</p>
@@ -1970,7 +1970,7 @@ export default function ProjectSettingsPage({ params }: PageProps) {
           </section>
 
           {/* Secret Keys Section */}
-          <section>
+          <section data-copilot-spot="secret_keys">
             <div>
               <h2 className="text-sm font-medium">Secret keys</h2>
               <p className="mt-1 text-xs leading-5 text-muted-foreground">Server-side keys. Keep them private and never share with models.</p>
@@ -2049,7 +2049,7 @@ export default function ProjectSettingsPage({ params }: PageProps) {
             description="Send real-time notifications to your endpoints when events occur."
           />
 
-          <section>
+          <section data-copilot-spot="webhooks">
             <div className="space-y-0.5">
               <h2 className="text-sm font-medium">Event deliveries</h2>
               <p className="text-xs text-muted-foreground md:text-[10px]">Endpoints subscribed to this project&apos;s events.</p>

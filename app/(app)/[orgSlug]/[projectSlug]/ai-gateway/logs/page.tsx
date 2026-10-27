@@ -128,7 +128,7 @@ export default function RequestLogsPage({ params }: PageProps) {
             </div>
 
             <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-3 mb-4">
+                <div data-copilot-spot="logs_filters" className="flex flex-wrap items-center gap-3 mb-4">
                     <Select
                         value={aiFilters.status}
                         onValueChange={(value) => setAiFilters((prev) => ({ ...prev, status: value }))}
@@ -213,7 +213,7 @@ export default function RequestLogsPage({ params }: PageProps) {
                         </Button>
                     )}
 
-                    <div className="ml-auto">
+                    <div data-copilot-spot="logs_export" className="ml-auto">
                         {projectId ? (
                             <ExportButton projectId={projectId} filters={aiFilters} environment="production" />
                         ) : (
