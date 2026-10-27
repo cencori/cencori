@@ -3,7 +3,8 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { Drawer } from "vaul";
 import { ArrowUp, Square, X } from "lucide-react";
-import { StarsMinimalisticIcon } from "@solar-icons/react/bold-duotone/stars-minimalistic";
+import { HugeiconsIcon } from "@hugeicons/react";
+import AirdropIcon from "@hugeicons/core-free-icons/AirdropIcon";
 import { useQueryClient } from "@tanstack/react-query";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
 import { ThinkingState } from "@/components/chat/ThinkingState";
@@ -11,6 +12,14 @@ import { CopilotActionConfirm, CopilotActionStep, CopilotSecret, actionOutcomeNo
 import { getConsoleOriginForHostname } from "@/lib/console/routing";
 import { cn } from "@/lib/utils";
 import type { StudioContextValue } from "@/components/studio/StudioShell";
+import { taskForCopilotPage, useStudioTasks, type StudioTask } from "@/components/studio/StudioTasks";
+
+/** A random id. crypto.randomUUID exists only on secure pages (HTTPS, localhost); a phone on the dev server over plain http has getRandomValues only. */
+function newId(): string {
+    if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
+    return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
 
 type Message = { id: string; role: "user" | "assistant"; content: string; actions?: CopilotAction[]; hidden?: boolean };
 
@@ -48,8 +57,9 @@ export function StudioCopilotProvider({ workspace, children }: { workspace: Stud
     const [status, setStatus] = useState("Thinking");
     const [busy, setBusy] = useState(false);
     const [secret, setSecret] = useState<{ title: string; secret: string } | null>(null);
-    const conversationId = useRef<string>(crypto.randomUUID());
+    const conversationId = useRef<string>(newId());
     const abort = useRef<AbortController | null>(null);
+    const tasks = useStudioTasks();
     const messagesRef = useRef(messages);
     messagesRef.current = messages;
     const endRef = useRef<HTMLDivElement>(null);
@@ -116,18 +126,21 @@ export function StudioCopilotProvider({ workspace, children }: { workspace: Stud
                         setStreaming(content);
                     }
                     if (payload.action) {
-                        // Pages a change needs (connecting WhatsApp, an app) open in the console.
-                        const link = payload.action.link && payload.action.link.href.startsWith("/")
-                            ? { ...payload.action.link, href: `${consoleOrigin}${payload.action.link.href}` }
-                            : payload.action.link;
+                        // A page to set something up (WhatsApp, payments…) opens as a Studio sheet
+                        // over Copilot, never the console; other console links stay console links.
+                        const link = payload.action.kind === "open_agent_page"
+                            ? { href: `studio-task:${taskForCopilotPage(payload.action.title)}`, label: payload.action.title, sameTab: true }
+                            : payload.action.link && payload.action.link.href.startsWith("/")
+                                ? { ...payload.action.link, href: `${consoleOrigin}${payload.action.link.href}` }
+                                : payload.action.link;
                         proposed.push({ ...payload.action, ...(link ? { link } : {}), state: "pending" });
                     }
                 }
             }
-            setMessages([...next, { id: crypto.randomUUID(), role: "assistant", content, ...(proposed.length ? { actions: proposed } : {}) }]);
+            setMessages([...next, { id: newId(), role: "assistant", content, ...(proposed.length ? { actions: proposed } : {}) }]);
         } catch (error) {
             if ((error as Error).name !== "AbortError") {
-                setMessages([...next, { id: crypto.randomUUID(), role: "assistant", content: (error as Error).message }]);
+                setMessages([...next, { id: newId(), role: "assistant", content: (error as Error).message }]);
             }
         } finally {
             setStreaming("");
@@ -142,7 +155,7 @@ export function StudioCopilotProvider({ workspace, children }: { workspace: Stud
         setInput("");
         // Moving on without answering a confirmation leaves it unconfirmed.
         const settled = messagesRef.current.map((m) => (m.actions?.some(isOpenAction) ? { ...m, actions: m.actions.map((a) => (isOpenAction(a) ? { ...a, state: "expired" as const } : a)) } : m));
-        void run([...settled, { id: crypto.randomUUID(), role: "user", content }]);
+        void run([...settled, { id: newId(), role: "user", content }]);
     }, [busy, run]);
 
     const ask = useCallback((message?: string) => {
@@ -157,7 +170,7 @@ export function StudioCopilotProvider({ workspace, children }: { workspace: Stud
         if (patch.state === "done") void queryClient.invalidateQueries();
         if (patch.state === "done" || patch.state === "failed" || patch.state === "cancelled") {
             const action = next.find((m) => m.id === messageId)?.actions?.find((a) => a.id === actionId);
-            if (action) void run([...next, { id: crypto.randomUUID(), role: "user", content: actionOutcomeNote(action), hidden: true }]);
+            if (action) void run([...next, { id: newId(), role: "user", content: actionOutcomeNote(action), hidden: true }]);
         }
     };
 
@@ -223,6 +236,7 @@ export function StudioCopilotProvider({ workspace, children }: { workspace: Stud
                                     action={pending.action}
                                     onUpdate={(patch) => updateAction(pending.messageId, pending.action.id, patch)}
                                     onSecret={(value) => setSecret({ title: pending.action.title, secret: value })}
+                                    onNavigate={(href) => { if (href.startsWith("studio-task:")) tasks.open(href.slice("studio-task:".length) as StudioTask); }}
                                 />
                             )}
                             <form
@@ -258,13 +272,15 @@ export function StudioCopilotProvider({ workspace, children }: { workspace: Stud
 export function StudioAskBar() {
     const { ask } = useStudioCopilot();
     return (
+        // A round button beside the tabs, as tall as their pill.
         <button
             type="button"
             onClick={() => ask()}
-            className="fixed inset-x-0 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-30 mx-auto flex h-12 w-[calc(100%-2rem)] max-w-sm items-center gap-2.5 rounded-full border border-border/60 bg-muted px-4 text-[15px] text-muted-foreground"
+            aria-label="Ask or change anything"
+            className="flex size-[58px] shrink-0 items-center justify-center rounded-full border border-border/60 bg-background/90 text-foreground backdrop-blur-md"
         >
-            <StarsMinimalisticIcon size={18} aria-hidden className="text-foreground" />
-            Ask or change anything…
+            {/* The console's Copilot icon. */}
+            <HugeiconsIcon icon={AirdropIcon} aria-hidden className="size-5" />
         </button>
     );
 }

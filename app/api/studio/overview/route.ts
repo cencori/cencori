@@ -16,6 +16,8 @@ import { getOwnerAlerts } from '@/lib/embedded/owner-alerts';
 import { conversationsUsed, getOrganizationPlan } from '@/lib/business/plans';
 import { periodStarts, safeTimeZone } from '@/lib/studio/time';
 import { mintWidgetShareToken } from '@/lib/embedded/widget';
+import { transferHistory } from '@/lib/embedded/transfers';
+import { getCatalog } from '@/lib/embedded/catalog';
 
 const fail = (message: string, status = 400) => NextResponse.json({ error: message }, { status });
 
@@ -61,10 +63,20 @@ export async function GET(req: NextRequest) {
             : Promise.resolve(null),
     ]);
 
-    // Money that came in through the assistant's payment links.
-    const paid = (payments?.metadata.payments ?? []).filter((entry) => entry.status === 'paid' && entry.paid_at);
+    // Money that came in through the assistant, counted like the Money tab: paid
+    // links, confirmed transfers, and orders the owner marked paid (cash).
+    const currency = payments?.metadata.currency ?? 'NGN';
+    const [transfers, catalog] = await Promise.all([
+        transferHistory(db, projectId).catch(() => []),
+        getCatalog(db, projectId).catch(() => null),
+    ]);
+    const paid = [
+        ...(payments?.metadata.payments ?? []).filter((entry) => entry.status === 'paid' && entry.paid_at && entry.currency === currency).map((entry) => ({ amount: entry.amount, at: entry.paid_at! })),
+        ...transfers.filter((entry) => entry.status === 'paid' && entry.paid_at && entry.currency === currency).map((entry) => ({ amount: entry.amount, at: entry.paid_at! })),
+        ...(catalog?.metadata.orders ?? []).filter((order) => order.paid_by === 'owner' && order.paid_at && order.status !== 'cancelled' && order.currency === currency).map((order) => ({ amount: order.total, at: order.paid_at! })),
+    ];
     const earned = (since: Date) => {
-        const inPeriod = paid.filter((entry) => new Date(entry.paid_at!).getTime() >= since.getTime());
+        const inPeriod = paid.filter((entry) => new Date(entry.at).getTime() >= since.getTime());
         return { amount: inPeriod.reduce((sum, entry) => sum + entry.amount, 0), count: inPeriod.length };
     };
 
@@ -75,9 +87,9 @@ export async function GET(req: NextRequest) {
         // The customer link (/talk/<token>), for sharing and its QR code.
         share_token: widget ? mintWidgetShareToken(widget) : null,
         time_zone: timeZone,
-        today: { chats: today.count ?? 0, ...(payments ? { earned: earned(starts.day) } : {}) },
-        month: { chats: month.count ?? 0, ...(payments ? { earned: earned(starts.month) } : {}) },
-        currency: payments?.metadata.currency ?? 'NGN',
+        today: { chats: today.count ?? 0, earned: earned(starts.day) },
+        month: { chats: month.count ?? 0, earned: earned(starts.month) },
+        currency,
         payments_connected: !!payments,
         plan: plan.accountType === 'business' && plan.plan
             ? { name: plan.plan.name, conversations: plan.plan.conversations, used: used ?? 0, active: plan.active, period_end: plan.periodEnd }

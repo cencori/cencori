@@ -278,6 +278,30 @@ export function AdminDashboard() {
                                 value={data.users.newThisMonth}
                             />
                         </MetricsGrid>
+                        <div className="mt-4 rounded-lg border border-border/60 p-4">
+                            <div className="flex items-baseline justify-between gap-3">
+                                <h3 className="text-sm font-medium">How people heard about us</h3>
+                                <span className="text-xs text-muted-foreground">
+                                    {data.users.heardAboutAnswered} of {data.users.newThisPeriod} new users answered ({PERIOD_LABELS[period]})
+                                </span>
+                            </div>
+                            {data.users.heardAbout.length === 0 ? (
+                                <p className="mt-3 text-xs text-muted-foreground">No answers in this period yet.</p>
+                            ) : (
+                                <ul className="mt-3 space-y-2">
+                                    {data.users.heardAbout.map((row) => {
+                                        const total = data.users.heardAbout.reduce((sum, r) => sum + r.count, 0);
+                                        const share = Math.round((row.count / total) * 100);
+                                        return (
+                                            <li key={row.source} className="text-sm">
+                                                <div className="flex justify-between gap-3"><span>{row.label}</span><span className="tabular-nums text-muted-foreground">{row.count} · {share}%</span></div>
+                                                <div className="mt-1 h-1.5 rounded-full bg-muted"><div className="h-1.5 rounded-full bg-foreground" style={{ width: `${share}%` }} /></div>
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+                            )}
+                        </div>
                     </MetricsSection>
 
                     {/* Billing / Revenue */}

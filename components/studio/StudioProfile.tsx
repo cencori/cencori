@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useStudioOverview } from "@/components/studio/useStudioOverview";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Drawer } from "vaul";
@@ -60,7 +61,7 @@ function Avatar({ url, name, className }: { url: string | null; name: string; cl
 
 /** One row of a group: icon, label, and what sits on the right. */
 function Row({ icon: RowIcon, label, right, href, external, onClick, disabled }: {
-    icon: Icon;
+    icon?: Icon;
     label: string;
     right?: ReactNode;
     href?: string;
@@ -70,7 +71,7 @@ function Row({ icon: RowIcon, label, right, href, external, onClick, disabled }:
 }) {
     const inner = (
         <>
-            <RowIcon size={20} className="shrink-0" />
+            {RowIcon && <RowIcon size={20} className="shrink-0" />}
             <span className="min-w-0 flex-1 truncate text-[15px]">{label}</span>
             {right ?? ((href || onClick) && <AltArrowRightIcon size={16} className="shrink-0 text-muted-foreground" />)}
         </>
@@ -103,10 +104,12 @@ function Group({ title, children }: { title?: string; children: ReactNode }) {
  */
 export function StudioProfile({ className }: { className?: string }) {
     const { user, organization, organizations } = useStudio();
+    // The business's plan and how much of it is used (moved here from Home).
+    const plan = useStudioOverview().data?.plan ?? null;
     const push = useStudioPush();
     const [open, setOpen] = useState(false);
     // The sheet's screens: the profile itself, or one setting opened from it.
-    const [screen, setScreen] = useState<"profile" | "theme">("profile");
+    const [screen, setScreen] = useState<"profile" | "theme" | "businesses">("profile");
     const { theme = "system", setTheme } = useTheme();
     const [installed, setInstalled] = useState(true);
     const [consoleUrl, setConsoleUrl] = useState("https://console.cencori.com");
@@ -170,7 +173,7 @@ export function StudioProfile({ className }: { className?: string }) {
         beginIntentionalSignOut();
         clearClientSessionCaches();
         // Pages kept for opening offline hold this business's data: not for the next person.
-        await caches?.delete("studio-pages").catch(() => false);
+        await globalThis.caches?.delete("studio-pages").catch(() => false);
         await browserAuth.signOut({ scope: "local" }).catch(() => undefined);
         posthog.reset();
         window.location.assign("/login");
@@ -180,6 +183,19 @@ export function StudioProfile({ className }: { className?: string }) {
         : push.state === "denied" ? <span className="text-sm text-muted-foreground">Blocked</span>
         : push.state === "needs-install" ? <span className="text-sm text-muted-foreground">Install first</span>
         : <span className="text-sm font-semibold">{push.busy ? "Turning on…" : "Turn on"}</span>;
+
+    const businessRow = (item: { id: string; name: string }) => (
+        <Row
+            key={item.id}
+            icon={Shop2Icon}
+            label={item.name}
+            onClick={() => void switchTo(item.id)}
+            disabled={switching !== null}
+            right={item.id === organization.id
+                ? <CheckCircleIcon size={20} className="shrink-0" />
+                : switching === item.id ? <span className="text-sm text-muted-foreground">Opening…</span> : <span />}
+        />
+    );
 
     return (
         <Drawer.Root open={open} onOpenChange={(next) => { setOpen(next); if (!next) setScreen("profile"); }}>
@@ -200,7 +216,18 @@ export function StudioProfile({ className }: { className?: string }) {
                     <div className="flex justify-center pt-3">
                         <span aria-hidden className="h-1 w-10 rounded-full bg-muted-foreground/30" />
                     </div>
-                    {screen === "theme" ? (
+                    {screen === "businesses" ? (
+                    <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+                        <div className="relative flex items-center justify-center pt-3">
+                            <button type="button" onClick={() => setScreen("profile")} aria-label="Back" className="absolute left-0 flex size-9 items-center justify-center rounded-full border border-border/60">
+                                <AltArrowLeftIcon size={16} />
+                            </button>
+                            <p className="text-[15px] font-semibold">Your businesses</p>
+                        </div>
+                        <Group>{organizations.map(businessRow)}</Group>
+                        {error && <p role="alert" className="mt-2 px-1 text-xs text-destructive">{error}</p>}
+                    </div>
+                    ) : screen === "theme" ? (
                     <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
                         <div className="relative flex items-center justify-center pt-3">
                             <button type="button" onClick={() => setScreen("profile")} aria-label="Back" className="absolute left-0 flex size-9 items-center justify-center rounded-full border border-border/60">
@@ -242,19 +269,35 @@ export function StudioProfile({ className }: { className?: string }) {
                         </div>
 
                         <Group title={organizations.length > 1 ? "Your businesses" : "Your business"}>
-                            {organizations.length > 1 ? organizations.map((item) => (
-                                <Row
-                                    key={item.id}
-                                    icon={Shop2Icon}
-                                    label={item.name}
-                                    onClick={() => void switchTo(item.id)}
-                                    disabled={switching !== null}
-                                    right={item.id === organization.id
-                                        ? <CheckCircleIcon size={20} className="shrink-0" />
-                                        : switching === item.id ? <span className="text-sm text-muted-foreground">Opening…</span> : <span />}
-                                />
-                            )) : <Row icon={Shop2Icon} label={organization.name} />}
+                            {organizations.length > 1
+                                // The one open now and one other; the rest are under All businesses.
+                                ? [organization, ...organizations.filter((item) => item.id !== organization.id).slice(0, 1)].map(businessRow)
+                                : <Row icon={Shop2Icon} label={organization.name} />}
+                            {organizations.length > 2 && (
+                                <Row label="All businesses" onClick={() => setScreen("businesses")} right={<span className="flex items-center gap-1.5 text-sm text-muted-foreground">{organizations.length}<AltArrowRightIcon size={16} /></span>} />
+                            )}
                         </Group>
+
+                        {plan && (
+                            <Group title="Your plan">
+                                <div className="px-4 py-3.5">
+                                    <div className="flex items-baseline justify-between gap-3">
+                                        <span className="text-[15px] font-medium">{plan.name}</span>
+                                        {plan.active && plan.period_end && (
+                                            <span className="text-xs text-muted-foreground">
+                                                {plan.name === "Free trial" ? "Ends" : "Renews"} {new Date(plan.period_end).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-background">
+                                        <span className="block h-full rounded-full bg-foreground" style={{ width: `${Math.min(100, Math.round((plan.used / Math.max(1, plan.conversations)) * 100))}%` }} />
+                                    </div>
+                                    <p className="mt-2 text-[13px] text-muted-foreground">
+                                        {plan.active ? `${plan.used} of ${plan.conversations} chats used` : "Your plan has ended. Your assistant isn't starting new chats."}
+                                    </p>
+                                </div>
+                            </Group>
+                        )}
 
                         <Group title="Settings">
                             <Row

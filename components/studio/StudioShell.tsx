@@ -11,6 +11,7 @@ import { StudioDataProvider, StudioOfflineStrip } from "@/components/studio/stud
 import { ThemeScope } from "@/components/theme-scope";
 import { cn } from "@/lib/utils";
 import { StudioAskBar, StudioCopilotProvider } from "@/components/studio/StudioCopilot";
+import { StudioTasksProvider } from "@/components/studio/StudioTasks";
 import { useStudioServiceWorker } from "@/components/studio/StudioNotifications";
 import { useUnreadCount } from "@/components/studio/useInbox";
 
@@ -19,7 +20,7 @@ export interface StudioContextValue {
     organization: { id: string; name: string; slug: string; isBusiness: boolean };
     organizations: Array<{ id: string; name: string }>;
     project: { id: string; name: string; slug: string };
-    agents: Array<{ id: string; name: string; live: boolean }>;
+    agents: Array<{ id: string; name: string; live: boolean; published: boolean }>;
 }
 
 const StudioContext = createContext<StudioContextValue | null>(null);
@@ -54,17 +55,20 @@ export function StudioShell({ workspace, children }: { workspace: StudioContextV
     return (
         <StudioDataProvider>
             <StudioContext.Provider value={workspace}>
+                <StudioTasksProvider>
                 <StudioCopilotProvider workspace={workspace}>
                 <ThemeScope name="dashboard-theme" />
                 <div className="min-h-svh bg-background font-sans text-foreground">
                     <StudioOfflineStrip />
-                    {/* Room at the bottom for the ask bar and the tabs. */}
-                    <main className={cn("mx-auto w-full max-w-md", focused ? "" : "px-4 pb-[calc(10rem+env(safe-area-inset-bottom))] pt-[calc(1.25rem+env(safe-area-inset-top))]")}>
+                    {/* Room at the bottom for the tabs and the Copilot button. */}
+                    <main className={cn("mx-auto w-full max-w-md", focused ? "" : "px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-[calc(1.25rem+env(safe-area-inset-top))]")}>
                         {children}
                     </main>
-                    {!focused && <nav
+                    {/* The tabs, and Copilot beside them. */}
+                    {!focused && <div className="fixed inset-x-0 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-40 mx-auto flex w-fit items-center gap-2">
+                    <nav
                         aria-label="Studio"
-                        className="fixed inset-x-0 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-40 mx-auto flex w-fit items-center gap-3 rounded-full border border-border/60 bg-background/90 p-1 backdrop-blur-md"
+                        className="flex items-center gap-3 rounded-full border border-border/60 bg-background/90 p-1 backdrop-blur-md"
                     >
                         {TABS.map((tab) => {
                             const active = tab.match(pathname);
@@ -86,10 +90,12 @@ export function StudioShell({ workspace, children }: { workspace: StudioContextV
                                 </StudioLink>
                             );
                         })}
-                    </nav>}
-                    {!focused && <StudioAskBar />}
+                    </nav>
+                    <StudioAskBar />
+                    </div>}
                 </div>
                 </StudioCopilotProvider>
+                </StudioTasksProvider>
             </StudioContext.Provider>
         </StudioDataProvider>
     );

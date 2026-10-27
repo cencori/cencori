@@ -48,14 +48,16 @@ export async function meterAgentTestUsage(params: {
     latencyMs?: number;
     apiKeyId?: string | null;
     environment?: string;
+    /** A business plan pays for the organization's agents: nothing is taken from credits. */
+    planCovered?: boolean;
 }): Promise<{ ok: true } | { ok: false; code: 'insufficient_credits' | 'metering_failure'; message: string }> {
     const {
         supabase, projectId, organizationId, tier, endpoint, requestId,
         agentId, model, provider, usage, cost, latencyMs = 0,
-        apiKeyId = null, environment = 'production',
+        apiKeyId = null, environment = 'production', planCovered = false,
     } = params;
 
-    const chargeUsd = Number(cost.cencoriChargeUsd) || 0;
+    const chargeUsd = planCovered ? 0 : Number(cost.cencoriChargeUsd) || 0;
     const providerCostUsd = Number(cost.providerCostUsd) || 0;
     const markupPercentage = Number(cost.markupPercentage) || 0;
 

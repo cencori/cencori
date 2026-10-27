@@ -7,9 +7,11 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ArrowUp, Camera, Check, ChevronLeft, Link2, Loader2, QrCode } from "lucide-react";
 import { StudioLinkQr } from "@/components/studio/StudioLinkQr";
 import { useStudio } from "@/components/studio/StudioShell";
-import { useStudioCopilot } from "@/components/studio/StudioCopilot";
 import { BUSINESS_KINDS, setupInstructions, setupKnowledge, setupQuestions, type AnswerKey, type BusinessKind } from "@/lib/studio/setup";
+import { HEARD_ABOUT_OPTIONS, type HeardAboutSource } from "@/lib/heard-about";
+import { sendHeardAbout } from "@/lib/heard-about-client";
 import { resizePhoto } from "@/lib/studio/resize-photo";
+import { useVisualViewport } from "@/components/studio/use-visual-viewport";
 import { getMainSiteUrl } from "@/lib/main-site-url";
 import { cn } from "@/lib/utils";
 
@@ -22,6 +24,7 @@ type HalfBuilt = { agentId: string; versionId: string; done: BuildStep[] };
 type Saved = { step: number; kind: BusinessKind | null; answers: Answers; asked: number; built: Built | null; partial?: HalfBuilt | null };
 
 const STORAGE_KEY = (projectId: string) => `cencori:studio-setup:${projectId}`;
+
 
 async function call<T>(url: string, method: string, body?: unknown): Promise<T> {
     const response = await fetch(url, {
@@ -51,28 +54,48 @@ function Progress({ step }: { step: number }) {
  * WhatsApp, say) picks up where it stopped.
  */
 export default function StudioSetupPage() {
-    const { project, organization, user } = useStudio();
-    const { ask } = useStudioCopilot();
+    const { project, organization, user, agents } = useStudio();
     const router = useRouter();
     const queryClient = useQueryClient();
     const [state, setState] = useState<Saved>({ step: 1, kind: null, answers: { name: organization.name }, asked: 0, built: null });
     const [draft, setDraft] = useState("");
+    const [askHeard, setAskHeard] = useState(false);
+    const [heard, setHeard] = useState<HeardAboutSource | null>(null);
+    const [heardDetail, setHeardDetail] = useState("");
+    useEffect(() => {
+        fetch("/api/me/heard-about", { cache: "no-store" })
+            .then((response) => (response.ok ? response.json() : null))
+            .then((body: { answered?: boolean } | null) => setAskHeard(body?.answered === false))
+            .catch(() => undefined);
+    }, []);
     const [building, setBuilding] = useState<string[] | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
     const [qrOpen, setQrOpen] = useState(false);
     const [reading, setReading] = useState<"reading" | "read" | null>(null);
     const photoRef = useRef<HTMLInputElement>(null);
-    const endRef = useRef<HTMLDivElement>(null);
+    const scrollRef = useRef<HTMLDivElement>(null);
+    const viewport = useVisualViewport();
 
     // Pick up where they left off.
     useEffect(() => {
+        let saved: Saved | null = null;
         try {
-            const saved = localStorage.getItem(STORAGE_KEY(project.id));
-            if (saved) setState(JSON.parse(saved) as Saved);
+            saved = JSON.parse(localStorage.getItem(STORAGE_KEY(project.id)) ?? "null") as Saved | null;
         } catch {
             // Starting fresh is fine.
         }
+        if (saved) setState(saved);
+        if (saved?.partial || saved?.built) return;
+        // Started on another device, or this one's progress is gone: carry on with
+        // the assistant setup already made (answers are asked again), never a second one.
+        const unfinished = agents.find((agent) => !agent.published);
+        if (!unfinished) return;
+        call<{ version_id: string }>(`/api/projects/${project.id}/embedded-agents/studio`, "POST", { action: "new_version", agent_id: unfinished.id })
+            .then(({ version_id }) => setState((current) => (current.partial || current.built ? current : { ...current, partial: { agentId: unfinished.id, versionId: version_id, done: [] } })))
+            .catch(() => undefined);
+        // Once per business: the assistants list doesn't change while setup runs.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [project.id]);
     useEffect(() => {
         try {
@@ -82,7 +105,10 @@ export default function StudioSetupPage() {
         }
     }, [project.id, state]);
     useEffect(() => {
-        endRef.current?.scrollIntoView({ block: "end", behavior: "smooth" });
+        // A new question or progress: show the newest, which only moves anything
+        // once the chat is taller than the screen. Opening the keyboard doesn't.
+        const list = scrollRef.current;
+        if (list) list.scrollTo({ top: list.scrollHeight, behavior: "smooth" });
     }, [state.asked, building]);
 
     // Back from connecting WhatsApp.
@@ -129,6 +155,7 @@ export default function StudioSetupPage() {
     };
 
     const kind = state.kind;
+    // Asked last, and only of people who didn't answer it at onboarding.
     const questions = kind ? setupQuestions(kind) : [];
     const current = questions[state.asked];
 
@@ -226,7 +253,7 @@ export default function StudioSetupPage() {
             const widget = await call<{ widget: { public_key: string }; preview_token: string; share_token: string | null }>(`${agentBase}/widget`, "PUT", {});
             tick("Made your link");
             void queryClient.invalidateQueries();
-            setState((s) => ({ ...s, step: 3, partial: null, built: { agentId, publicKey: widget.widget.public_key, previewToken: widget.preview_token, shareToken: widget.share_token } }));
+            setState((s) => ({ ...s, step: askHeard ? 3 : 4, partial: null, built: { agentId, publicKey: widget.widget.public_key, previewToken: widget.preview_token, shareToken: widget.share_token } }));
             setBuilding(null);
             router.refresh();
         } catch (cause) {
@@ -274,8 +301,8 @@ export default function StudioSetupPage() {
 
     const back = state.step > 1 && state.step < 3 && !building ? () => setState((s) => ({ ...s, step: s.step - 1, asked: 0 })) : null;
 
-    return (
-        <div className="flex min-h-svh flex-col px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-[calc(1.25rem+env(safe-area-inset-top))]">
+    const header = (
+        <>
             <div className="flex h-10 items-center justify-between">
                 {back ? (
                     <button type="button" onClick={back} aria-label="Back" className="-ml-2 flex h-10 w-10 items-center justify-center rounded-full"><ChevronLeft className="h-5 w-5" /></button>
@@ -286,35 +313,23 @@ export default function StudioSetupPage() {
             </div>
             <div className="mt-3"><Progress step={state.step} /></div>
             {error && !(state.step === 2 && (current?.key === "list" || state.asked >= questions.length)) && <p role="alert" className="mt-4 rounded-2xl bg-destructive/10 px-4 py-3 text-[13px] leading-5 text-destructive">{error}</p>}
+        </>
+    );
 
-            {state.step === 1 && (
-                <>
-                    <h1 className="mt-8 text-[28px] font-semibold leading-tight tracking-tight">What kind of business do you run?</h1>
-                    <p className="mt-2 text-[15px] leading-6 text-muted-foreground">Your assistant starts with what businesses like yours need. You can change anything later.</p>
-                    <div className="mt-6 grid grid-cols-2 gap-2.5">
-                        {BUSINESS_KINDS.map((item) => (
-                            <button
-                                key={item.id}
-                                type="button"
-                                onClick={() => setState((s) => ({ ...s, kind: item.id }))}
-                                className={cn("min-h-24 rounded-2xl border p-3.5 text-left", state.kind === item.id ? "border-2 border-foreground p-[13px]" : "border-border/60")}
-                            >
-                                <span className="block text-[15px] font-semibold">{item.name}</span>
-                                <span className="mt-1 block text-xs leading-4 text-muted-foreground">{item.hint}</span>
-                            </button>
-                        ))}
-                    </div>
-                    <div className="mt-auto pt-8">
-                        <button type="button" disabled={!state.kind} onClick={() => setState((s) => ({ ...s, step: 2, asked: 0 }))} className="h-[52px] w-full rounded-full bg-foreground text-base font-semibold text-background disabled:opacity-40">Continue</button>
-                    </div>
-                </>
-            )}
-
-            {state.step === 2 && kind && (
-                <>
+    // The questions are a chat: the screen is exactly what's visible above the
+    // keyboard, the answer box sits on the keyboard, and everything above it
+    // (header included) scrolls on its own, starting at the top.
+    if (state.step === 2 && kind) {
+        return (
+            <div
+                className="fixed inset-x-0 z-10 mx-auto flex max-w-md flex-col bg-background"
+                style={{ top: viewport.offsetTop, height: viewport.height ?? "100svh" }}
+            >
+                <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-4 pt-[calc(1.25rem+env(safe-area-inset-top))]">
+                    {header}
                     <h1 className="mt-6 text-2xl font-semibold leading-tight tracking-tight">Tell it about your business</h1>
                     <p className="mt-1 text-sm text-muted-foreground">Answer like you&apos;d brief a new member of staff.</p>
-                    <div className="mt-5 flex flex-1 flex-col gap-3">
+                    <div className="mt-5 flex flex-col gap-3">
                         {questions.slice(0, state.asked + 1).map((question, index) => (
                             <div key={question.key} className="flex flex-col gap-3">
                                 <div className="max-w-[85%] rounded-2xl rounded-bl-md bg-muted px-4 py-2.5 text-[15px] leading-6">{question.ask(state.answers)}</div>
@@ -340,10 +355,10 @@ export default function StudioSetupPage() {
                                 <button type="button" onClick={() => void build(kind, state.answers)} className="h-11 rounded-full border border-border/60 text-sm font-medium">Try again</button>
                             </div>
                         )}
-                        <div ref={endRef} />
                     </div>
+                </div>
                     {current && !building && (
-                        <div className="sticky bottom-0 -mx-5 mt-4 border-t border-border/60 bg-background px-5 pt-3">
+                        <div className={cn("shrink-0 border-t border-border/60 bg-background px-5 pt-3", viewport.keyboard ? "pb-3" : "pb-[calc(0.75rem+env(safe-area-inset-bottom))]")}>
                             {current.key === "list" && reading && (
                                 <p className={cn("mb-2 flex items-center gap-2 text-[13px] leading-5", reading === "read" ? "text-foreground" : "text-muted-foreground")}>
                                     {reading === "reading" ? <><Loader2 className="h-4 w-4 animate-spin" />Reading your photo…</> : <><Check className="h-4 w-4 text-emerald-600" />Here&apos;s what I read. Fix anything that&apos;s off, then send.</>}
@@ -379,21 +394,75 @@ export default function StudioSetupPage() {
                             </form>
                         </div>
                     )}
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex min-h-svh flex-col px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-[calc(1.25rem+env(safe-area-inset-top))]">
+            {header}
+            {state.step === 1 && (
+                <>
+                    <h1 className="mt-8 text-[28px] font-semibold leading-tight tracking-tight">What kind of business do you run?</h1>
+                    <p className="mt-2 text-[15px] leading-6 text-muted-foreground">Your assistant starts with what businesses like yours need. You can change anything later.</p>
+                    <div className="mt-6 grid grid-cols-2 gap-2.5">
+                        {BUSINESS_KINDS.map((item) => (
+                            <button
+                                key={item.id}
+                                type="button"
+                                onClick={() => setState((s) => ({ ...s, kind: item.id }))}
+                                className={cn("min-h-24 rounded-2xl border p-3.5 text-left", state.kind === item.id ? "border-2 border-foreground p-[13px]" : "border-border/60")}
+                            >
+                                <span className="block text-[15px] font-semibold">{item.name}</span>
+                                <span className="mt-1 block text-xs leading-4 text-muted-foreground">{item.hint}</span>
+                            </button>
+                        ))}
+                    </div>
+                    <div className="mt-auto pt-8">
+                        <button type="button" disabled={!state.kind} onClick={() => setState((s) => ({ ...s, step: 2, asked: 0 }))} className="h-[52px] w-full rounded-full bg-foreground text-base font-semibold text-background disabled:opacity-40">Continue</button>
+                    </div>
                 </>
             )}
 
             {state.step === 3 && state.built && (
                 <>
-                    <h1 className="mt-6 text-2xl font-semibold leading-tight tracking-tight">Try it like a customer</h1>
-                    <p className="mt-1 text-sm leading-5 text-muted-foreground">This is a preview: nothing you say here counts as a real chat.</p>
-                    <iframe
-                        title="Preview your assistant"
-                        src={`${new URL(getMainSiteUrl("/")).origin}/api/widget/frame/${state.built.publicKey}?mode=inline&preview=${encodeURIComponent(state.built.previewToken)}`}
-                        className="mt-4 h-[52svh] w-full rounded-3xl border border-border/60"
-                    />
-                    <button type="button" onClick={() => ask("Something about my assistant is off. ")} className="mt-3 text-left text-[13px] text-muted-foreground underline underline-offset-2">Something off? Tell Copilot what to change</button>
-                    <div className="mt-auto pt-6">
-                        <button type="button" onClick={() => setState((s) => ({ ...s, step: 4 }))} className="h-[52px] w-full rounded-full bg-foreground text-base font-semibold text-background">Looks good</button>
+                    <h1 className="mt-6 text-2xl font-semibold leading-tight tracking-tight">How did you hear about Cencori Studio?</h1>
+                    <p className="mt-1 text-sm leading-5 text-muted-foreground">Your assistant is ready. One quick question before you put it to work.</p>
+                    <div className="mt-5 flex flex-wrap gap-2">
+                        {HEARD_ABOUT_OPTIONS.map((option) => (
+                            <button
+                                key={option.id}
+                                type="button"
+                                onClick={() => setHeard(option.id)}
+                                aria-pressed={heard === option.id}
+                                className={cn("h-10 rounded-full border px-4 text-sm", heard === option.id ? "border-foreground bg-foreground text-background" : "border-border/60")}
+                            >
+                                {option.label}
+                            </button>
+                        ))}
+                    </div>
+                    {(heard === "other" || heard === "event" || heard === "friend") && (
+                        <input
+                            value={heardDetail}
+                            onChange={(event) => setHeardDetail(event.target.value)}
+                            placeholder={heard === "other" ? "Where?" : heard === "event" ? "Which event or community?" : "Who? (optional)"}
+                            maxLength={200}
+                            className="mt-3 h-12 w-full rounded-2xl bg-muted px-4 text-[15px] outline-none placeholder:text-muted-foreground"
+                        />
+                    )}
+                    <div className="mt-auto flex flex-col gap-2 pt-6">
+                        <button
+                            type="button"
+                            disabled={!heard}
+                            onClick={() => {
+                                if (heard) void sendHeardAbout(heard, heardDetail.trim() || null, "studio_setup");
+                                setState((s) => ({ ...s, step: 4 }));
+                            }}
+                            className="h-[52px] w-full rounded-full bg-foreground text-base font-semibold text-background disabled:opacity-40"
+                        >
+                            Continue
+                        </button>
+                        <button type="button" onClick={() => setState((s) => ({ ...s, step: 4 }))} className="h-10 text-sm text-muted-foreground">Skip</button>
                     </div>
                 </>
             )}

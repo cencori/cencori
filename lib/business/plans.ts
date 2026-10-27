@@ -165,13 +165,20 @@ export async function applyBusinessPass(db: Admin, organizationId: string, plan:
 }
 
 /** Start a business organization's free trial (once). */
-export async function startBusinessTrial(db: Admin, organizationId: string, now = Date.now()): Promise<void> {
-    const { error } = await db.from('organizations').update({
+/** Credits every business gets once, with its trial: enough for setup and testing on the plan's model. */
+export const BUSINESS_TRIAL_CREDITS_USD = 1;
+
+/** Starts the trial; true only when this call started it (a repeat changes nothing). */
+export async function startBusinessTrial(db: Admin, organizationId: string, now = Date.now()): Promise<boolean> {
+    const { data, error } = await db.from('organizations').update({
         account_type: 'business',
         business_plan: 'trial',
         business_plan_status: 'active',
         business_period_start: new Date(now).toISOString(),
         business_period_end: new Date(now + BUSINESS_TRIAL_DAYS * DAY_MS).toISOString(),
-    } as never).eq('id', organizationId).is('business_plan', null);
+    } as never).eq('id', organizationId).is('business_plan', null).select('id');
     if (error) throw new Error(`Could not start the trial: ${error.message}`);
+    // The caller adds BUSINESS_TRIAL_CREDITS_USD when this is true (server-side: credits
+    // can't be imported here, the pricing page uses this file in the browser).
+    return (data ?? []).length > 0;
 }

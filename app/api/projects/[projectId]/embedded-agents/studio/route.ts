@@ -556,6 +556,10 @@ export async function POST(request: Request, ctx: Context) {
             const checked = validateVersionConfig(config);
             if (!checked.ok) return fail(checked.message, 422);
             const organizationId = access.organizationId;
+            // A business plan pays for its agents (tests included), so it needs no prepaid credits.
+            const { getOrganizationPlan } = await import('@/lib/business/plans');
+            const businessPlan = await getOrganizationPlan(db as never, organizationId);
+            const planCovered = businessPlan.accountType === 'business' && businessPlan.active;
             // The agent's own knowledge is live, so the test uses it too. It only
             // needs the input, so the lookup runs while the checks below do.
             const knowledgePromise = import('@/lib/embedded/turn-knowledge')
@@ -619,7 +623,7 @@ export async function POST(request: Request, ctx: Context) {
                 }
                 const { meterAgentTestUsage } = await import('@/lib/embedded/test-metering');
                 const metered = await meterAgentTestUsage({
-                    supabase: db as never, projectId, organizationId, tier,
+                    supabase: db as never, projectId, organizationId, tier, planCovered,
                     endpoint: 'agents.studio_test', requestId: testRequestId, agentId,
                     model: outcome.model, provider: outcome.provider,
                     usage: outcome.usage, cost: outcome.cost,
@@ -681,7 +685,7 @@ export async function POST(request: Request, ctx: Context) {
                                 // Once the agent has ended the conversation it only says goodbye.
                                 const offerTools = toolset.definitions.length > 0 && round < WEBHOOK_TOOL_MAX_ITERATIONS && !conversationEnded;
                                 for await (const chunk of streamGatewayChat({
-                                    supabase: db as never, projectId, organizationId, tier,
+                                    supabase: db as never, projectId, organizationId, tier, planCovered,
                                     request: { messages: conversation, model: resolved.model, maxTokens: TEST_MAX_TOKENS, stream: true, ...(offerTools ? { tools: toolset.definitions as never } : {}) },
                                     resolved: resolved as never,
                                     requestId: testRequestId,
@@ -771,7 +775,7 @@ export async function POST(request: Request, ctx: Context) {
             try {
                 const { executeGatewayChat } = await import('@/lib/gateway/chat-executor');
                 const result = await executeGatewayChat({
-                    supabase: db as never, projectId, organizationId, tier,
+                    supabase: db as never, projectId, organizationId, tier, planCovered,
                     request: { messages, model: simple.manifest.model!, maxTokens: TEST_MAX_TOKENS },
                     requestId: testRequestId,
                 });

@@ -260,6 +260,10 @@ export async function POST(request: NextRequest) {
             environment,
             user_first_name: userName,
             now_utc: new Date().toISOString(),
+            // Studio (the business owner's phone app) has no console: everything happens in it.
+            ...(currentPath === "studio" ? {
+                studio: "The user is in Cencori Studio, the business app on their phone. Never send them to the console, a dashboard or a computer. open_agent_page opens a sheet right here in Studio (WhatsApp, payments). Adding knowledge, going live and owner alerts are also sheets here: under Finish setting up on Home.",
+            } : {}),
             // A business owner (not a developer): keep it plain, and build their agent with them.
             ...(isBusiness ? {
                 account: "business",

@@ -130,7 +130,8 @@ export function originAllowed(origin: string | null | undefined, allowed: readon
 export function appOrigins(): string[] {
     // Studio's setup shows the preview too ("Try it").
     const origins = ['https://cencori.com', 'https://www.cencori.com', 'https://console.cencori.com', 'https://studio.cencori.com'];
-    if (process.env.NODE_ENV !== 'production') origins.push('http://localhost:*', 'http://console.localhost:*', 'http://studio.localhost:*');
+    // Development: this machine, and a phone reaching it through <ip>.sslip.io.
+    if (process.env.NODE_ENV !== 'production') origins.push('http://localhost:*', 'http://console.localhost:*', 'http://studio.localhost:*', 'http://*.sslip.io:*');
     return origins;
 }
 

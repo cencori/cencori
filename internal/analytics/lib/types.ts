@@ -69,6 +69,10 @@ export interface UsersMetrics {
     newThisWeek: number;
     newThisMonth: number;
     newThisPeriod: number;
+    /** "How did you hear about us?" answers given in the period, most common first. */
+    heardAbout: Array<{ source: string; label: string; count: number }>;
+    /** Of the people who signed up in the period, how many answered. */
+    heardAboutAnswered: number;
 }
 
 export interface BillingMetrics {

@@ -1,6 +1,8 @@
 "use client";
 import { browserAuth } from "@/lib/auth/browser-auth";
 import { studioOrigin } from "@/lib/studio/routing";
+import { HEARD_ABOUT_OPTIONS, type HeardAboutSource } from "@/lib/heard-about";
+import { sendHeardAbout } from "@/lib/heard-about-client";
 import { getBrowserAuthUser } from "@/lib/auth/get-browser-auth-user";
 
 import { useRouter, useSearchParams } from "next/navigation";
@@ -62,6 +64,8 @@ function OnboardingContent() {
   const [orgName, setOrgName] = useState("");
   const [plan, setPlan] = useState<"free" | "pro">("free");
   const [track, setTrack] = useState<"business" | "developer" | null>(null);
+  const [heard, setHeard] = useState<HeardAboutSource | null>(null);
+  const [heardDetail, setHeardDetail] = useState("");
   // Signed up from business.cencori.com (or developers.): the choice is already made.
   const [trackFromSignup, setTrackFromSignup] = useState(false);
   useEffect(() => {
@@ -297,8 +301,13 @@ function OnboardingContent() {
       toast.error("Choose what you're building.");
       return;
     }
+    if (!heard) {
+      toast.error("Tell us how you heard about Cencori.");
+      return;
+    }
     const organization = await ensureOrganization();
     if (!organization) return;
+    void sendHeardAbout(heard, heardDetail.trim() || null, "onboarding");
 
     if (track === "business") {
       setLoading(true);
@@ -424,6 +433,40 @@ function OnboardingContent() {
           {track === "business" && (
             <p className="-mt-3 text-xs text-zinc-500">Free for 14 days or 50 conversations. No card needed.</p>
           )}
+
+          <div>
+            <label className="block text-sm font-medium text-zinc-300 mb-3">
+              How did you hear about us?
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {HEARD_ABOUT_OPTIONS.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => setHeard(option.id)}
+                  disabled={loading}
+                  aria-pressed={heard === option.id}
+                  className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
+                    heard === option.id
+                      ? "border-blue-500/45 bg-zinc-900 text-white"
+                      : "border-white/[0.06] bg-zinc-900/50 text-zinc-400 hover:border-white/10 hover:text-zinc-200"
+                  } disabled:cursor-wait disabled:opacity-60`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+            {(heard === "other" || heard === "event" || heard === "friend") && (
+              <Input
+                placeholder={heard === "other" ? "Where?" : heard === "event" ? "Which event or community?" : "Who? (optional)"}
+                value={heardDetail}
+                onChange={(e) => setHeardDetail(e.target.value)}
+                disabled={loading}
+                maxLength={200}
+                className="mt-2 h-9 border-white/10 bg-zinc-900 text-sm text-white placeholder:text-zinc-500"
+              />
+            )}
+          </div>
 
           {track === "developer" && (
           <div>

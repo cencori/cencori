@@ -11,6 +11,8 @@ export interface StudioAgent {
     name: string;
     /** Live: published and switched on. */
     live: boolean;
+    /** Published at least once: setup got it all the way (it may be switched off since). */
+    published: boolean;
 }
 
 /** The cookie that remembers which business Studio shows, for people in more than one. */
@@ -82,6 +84,7 @@ export const getStudioWorkspace = cache(async (): Promise<StudioWorkspace | null
             id: agent.id,
             name: agent.name,
             live: !!agent.is_active && !!agent.stable_version_id,
+            published: !!agent.stable_version_id,
         })),
     };
 });

@@ -1,5 +1,6 @@
 // Platform Analytics Database Queries
 import { createAdminClient } from '@/lib/supabaseAdmin';
+import { heardAboutLabel, readHeardAbout } from '@/lib/heard-about';
 import { fetchAllRows } from '@/lib/supabase-paginate';
 import type { TimePeriod, AIGatewayMetrics, SecurityMetrics, OrganizationsMetrics, ProjectsMetrics, ApiKeysMetrics, UsersMetrics, ScanMetrics, PlatformEventsMetrics, CaptureMetrics } from './types';
 import type { User } from '@supabase/supabase-js';
@@ -466,7 +467,7 @@ export async function getUsersMetrics(period: TimePeriod): Promise<UsersMetrics>
     const users = await listAllUsers();
 
     if (!users) {
-        return { total: 0, active: 0, newToday: 0, newThisWeek: 0, newThisMonth: 0, newThisPeriod: 0 };
+        return { total: 0, active: 0, newToday: 0, newThisWeek: 0, newThisMonth: 0, newThisPeriod: 0, heardAbout: [], heardAboutAnswered: 0 };
     }
 
     // Track only real signed-up users (exclude service/system rows without email).
@@ -480,7 +481,21 @@ export async function getUsersMetrics(period: TimePeriod): Promise<UsersMetrics>
     const newThisMonth = realUsers.filter((u) => new Date(u.created_at) >= thisMonth).length;
     const newThisPeriod = realUsers.filter((u) => new Date(u.created_at) >= startDate).length;
 
-    return { total, active, newToday, newThisWeek, newThisMonth, newThisPeriod };
+    // "How did you hear about us?" (lib/heard-about.ts): answers given in the period.
+    const heardCounts = new Map<string, number>();
+    let heardAboutAnswered = 0;
+    for (const user of realUsers) {
+        const answer = readHeardAbout(user.user_metadata as Record<string, unknown> | undefined);
+        if (!answer) continue;
+        if (new Date(user.created_at) >= startDate) heardAboutAnswered++;
+        if (new Date(answer.at) < startDate) continue;
+        heardCounts.set(answer.source, (heardCounts.get(answer.source) ?? 0) + 1);
+    }
+    const heardAbout = [...heardCounts.entries()]
+        .map(([source, count]) => ({ source, label: heardAboutLabel(source), count }))
+        .sort((a, b) => b.count - a.count);
+
+    return { total, active, newToday, newThisWeek, newThisMonth, newThisPeriod, heardAbout, heardAboutAnswered };
 }
 
 // Tier pricing (monthly prices in USD) - from components/landing/Pricing.tsx

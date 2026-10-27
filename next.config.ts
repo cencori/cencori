@@ -17,7 +17,7 @@ const portableRedirects = onVercel ? [] : vercelConfig.redirects;
 
 const nextConfig: NextConfig = {
   // Exercise local subdomains with the same host-based routing as production.
-  allowedDevOrigins: ["console.localhost", "pitch.localhost"],
+  allowedDevOrigins: ["console.localhost", "pitch.localhost", "studio.localhost", "**.sslip.io", "172-20-10-5.sslip.io", "studio.172-20-10-5.sslip.io"],
   // The Vercel build container (8GB) OOMs when Next forks tsc after a
   // 4-minute webpack compile. The tree typechecks clean — verify with
   // `npm run typecheck` locally or in CI instead of during the build.

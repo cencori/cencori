@@ -61,8 +61,10 @@ async function assertManagedCreditsAvailable(
     billingMode: GatewayBillingMode,
     organizationId: string,
     tier: SubscriptionTier,
+    planCovered = false,
 ): Promise<void> {
-    if (billingMode !== 'standard' || tier === 'enterprise') return;
+    // Enterprise is billed by contract, a business plan by its monthly price.
+    if (billingMode !== 'standard' || tier === 'enterprise' || planCovered) return;
     if (await getCreditsBalanceForGate(organizationId) <= 0) {
         throw new CreditExhaustedError();
     }
@@ -175,6 +177,8 @@ export async function executeGatewayChat(params: {
     sponsoredModels?: string[] | null;
     tensorModelPolicy?: 'auto' | 'open_weight' | 'frontier' | 'custom' | null;
     tier: SubscriptionTier;
+    /** A business plan pays for this call (agent tests and turns): no prepaid credits needed. */
+    planCovered?: boolean;
     request: UnifiedChatRequest;
     resolved?: ResolvedGatewayProvider;
     requestId?: string;
@@ -251,7 +255,7 @@ export async function executeGatewayChat(params: {
         };
     }
 
-    await assertManagedCreditsAvailable(resolved.billingMode, params.organizationId, params.tier);
+    await assertManagedCreditsAvailable(resolved.billingMode, params.organizationId, params.tier, params.planCovered);
 
     const { providerName, model, provider, router } = resolved;
     const chatRequest: UnifiedChatRequest = { ...params.request, model };
@@ -361,7 +365,7 @@ export async function executeGatewayChat(params: {
                 model: fallbackModel,
             });
             const fallbackBillingMode = resolveProviderBillingMode(fallbackAccessMode, initialized.usesByok);
-            await assertManagedCreditsAvailable(fallbackBillingMode, params.organizationId, params.tier);
+            await assertManagedCreditsAvailable(fallbackBillingMode, params.organizationId, params.tier, params.planCovered);
             await fallbackProvider.getPricing(fallbackModel);
             const providerResponse = await withTimeout(
                 fallbackProvider.chat({ ...chatRequest, model: fallbackModel, signal: attemptSignal }),
@@ -420,6 +424,8 @@ export async function* streamGatewayChat(params: {
     sponsoredModels?: string[] | null;
     tensorModelPolicy?: 'auto' | 'open_weight' | 'frontier' | 'custom' | null;
     tier: SubscriptionTier;
+    /** A business plan pays for this call (agent tests and turns): no prepaid credits needed. */
+    planCovered?: boolean;
     request: UnifiedChatRequest;
     resolved?: ResolvedGatewayProvider;
     requestId?: string;
@@ -445,7 +451,7 @@ export async function* streamGatewayChat(params: {
             },
         }));
 
-    await assertManagedCreditsAvailable(resolved.billingMode, params.organizationId, params.tier);
+    await assertManagedCreditsAvailable(resolved.billingMode, params.organizationId, params.tier, params.planCovered);
 
     const { providerName, model, provider, router } = resolved;
     const chatRequest: UnifiedChatRequest = { ...params.request, model };
@@ -513,7 +519,7 @@ export async function* streamGatewayChat(params: {
                             model: fallbackModel,
                         });
                         const billingMode = resolveProviderBillingMode(accessMode, initialized.usesByok);
-                        await assertManagedCreditsAvailable(billingMode, params.organizationId, params.tier);
+                        await assertManagedCreditsAvailable(billingMode, params.organizationId, params.tier, params.planCovered);
                         await fallbackProvider.getPricing(fallbackModel);
                         hedgeFallbackProviderName = candidate;
                         hedgeFallbackModel = fallbackModel;
@@ -664,7 +670,7 @@ export async function* streamGatewayChat(params: {
                 model: fallbackModel,
             });
             const fallbackBillingMode = resolveProviderBillingMode(fallbackAccessMode, initialized.usesByok);
-            await assertManagedCreditsAvailable(fallbackBillingMode, params.organizationId, params.tier);
+            await assertManagedCreditsAvailable(fallbackBillingMode, params.organizationId, params.tier, params.planCovered);
             await fallbackProvider.getPricing(fallbackModel);
             params.performance?.markProviderStart();
             const stream = streamWithTimeout(
