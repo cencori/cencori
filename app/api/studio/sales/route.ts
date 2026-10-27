@@ -14,14 +14,16 @@ import { requireProjectAccess } from '@/lib/require-project-access';
 import { getCatalog, markOrderPaidByOwner, setOrderStatus } from '@/lib/embedded/catalog';
 import { listBookings, setBookingStatus } from '@/lib/embedded/bookings';
 import { getPaymentsConnection } from '@/lib/embedded/payments';
+import { confirmTransfer, transferHistory } from '@/lib/embedded/transfers';
 
 const fail = (message: string, status = 400) => NextResponse.json({ error: message }, { status });
 const isId = (value: unknown): value is string => typeof value === 'string' && /^[0-9a-f-]{36}$/i.test(value);
 
 async function sales(projectId: string) {
     const db = createAdminClient();
-    const [catalog, bookings, payments] = await Promise.all([getCatalog(db, projectId), listBookings(db, projectId), getPaymentsConnection(db, projectId).catch(() => null)]);
-    const paid = (payments?.metadata.payments ?? []).filter((p) => p.status === 'paid');
+    const [catalog, bookings, payments, transfers] = await Promise.all([getCatalog(db, projectId), listBookings(db, projectId), getPaymentsConnection(db, projectId).catch(() => null), transferHistory(db, projectId).catch(() => [])]);
+    // Deposits came in by link or by a transfer the owner confirmed.
+    const paid = [...(payments?.metadata.payments ?? []), ...transfers].filter((p) => p.status === 'paid');
     return {
         currency: catalog?.metadata.currency ?? payments?.metadata.currency ?? 'NGN',
         has_products: !!catalog?.metadata.products.length,
@@ -63,7 +65,13 @@ export async function POST(req: NextRequest) {
     if (typeof body.id !== 'string' || !/^[A-Za-z0-9-]{4,64}$/.test(body.id)) return fail('Say which one.');
     const db = createAdminClient();
     let ok = false;
-    if (body.kind === 'order' && body.action === 'paid') ok = !!await markOrderPaidByOwner(db, body.project_id, body.id);
+    if (body.kind === 'order' && body.action === 'paid') {
+        // Waiting on a bank transfer: confirming the transfer pays the order (and counts it once).
+        const order = (await getCatalog(db, body.project_id))?.metadata.orders.find((o) => o.id === body.id);
+        ok = order?.payment_reference?.startsWith('TRF-') && order.status === 'awaiting_payment'
+            ? !!await confirmTransfer(db, body.project_id, order.payment_reference)
+            : !!await markOrderPaidByOwner(db, body.project_id, body.id);
+    }
     else if (body.kind === 'order' && (body.action === 'done' || body.action === 'cancelled')) ok = !!await setOrderStatus(db, body.project_id, body.id, body.action);
     else if (body.kind === 'booking' && (body.action === 'done' || body.action === 'cancelled')) ok = await setBookingStatus(db, body.project_id, body.id, body.action);
     else return fail('Unknown change.');

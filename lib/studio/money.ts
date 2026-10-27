@@ -2,10 +2,10 @@
  * Studio's Money tab: what the business earned through its assistant, by
  * day, week or month, in its own time zone.
  *
- * Counted: payment links that were paid (deposits, orders, anything), and
- * orders the owner marked paid (cash, transfer). An order paid by link is
- * counted once, through its payment. Nothing else is known to Cencori, and
- * the screen says so.
+ * Counted: payment links that were paid (deposits, orders, anything), bank
+ * transfers the owner confirmed, and orders the owner marked paid (cash). An
+ * order paid by link or transfer is counted once, through its payment.
+ * Nothing else is known to Cencori, and the screen says so.
  */
 
 import { localDate, localMidnight } from "@/lib/studio/time";
@@ -14,7 +14,7 @@ export type MoneyPeriod = "week" | "month" | "year";
 
 export interface MoneyPayment { amount: number; currency: string; status: string; paid_at: string | null; description?: string | null }
 export interface MoneyOrderItem { name: string; quantity: number; price: number }
-export interface MoneyOrder { total: number; currency: string; status: string; paid_at: string | null; paid_by?: "link" | "owner" | null; payment_reference?: string | null; items: MoneyOrderItem[] }
+export interface MoneyOrder { total: number; currency: string; status: string; paid_at: string | null; paid_by?: "link" | "transfer" | "owner" | null; payment_reference?: string | null; items: MoneyOrderItem[] }
 
 export interface MoneySummary {
     period: MoneyPeriod;
@@ -22,6 +22,7 @@ export interface MoneySummary {
     total: number;
     previous: number;
     by_link: number;
+    by_transfer: number;
     marked_paid: number;
     /** Orders not paid yet, whenever they were placed. */
     to_collect: number;
@@ -42,7 +43,7 @@ function periodStart(period: MoneyPeriod, timeZone: string, now: Date): Date {
     return localMidnight(timeZone, weekAgo.getUTCFullYear(), weekAgo.getUTCMonth() + 1, weekAgo.getUTCDate());
 }
 
-export function summarizeMoney(input: { payments: MoneyPayment[]; orders: MoneyOrder[]; period: MoneyPeriod; timeZone: string; currency: string; now?: Date }): MoneySummary {
+export function summarizeMoney(input: { payments: MoneyPayment[]; transfers?: MoneyPayment[]; orders: MoneyOrder[]; period: MoneyPeriod; timeZone: string; currency: string; now?: Date }): MoneySummary {
     const now = input.now ?? new Date();
     const { period, timeZone, currency } = input;
     const start = periodStart(period, timeZone, now);
@@ -51,6 +52,7 @@ export function summarizeMoney(input: { payments: MoneyPayment[]; orders: MoneyO
     // Every amount that came in, once: paid links, and orders the owner marked paid.
     const income = [
         ...input.payments.filter((p) => p.status === "paid" && p.paid_at && p.currency === currency).map((p) => ({ amount: p.amount, at: new Date(p.paid_at!), how: "link" as const })),
+        ...(input.transfers ?? []).filter((t) => t.status === "paid" && t.paid_at && t.currency === currency).map((t) => ({ amount: t.amount, at: new Date(t.paid_at!), how: "transfer" as const })),
         ...input.orders.filter((o) => o.paid_by === "owner" && o.paid_at && o.currency === currency && o.status !== "cancelled").map((o) => ({ amount: o.total, at: new Date(o.paid_at!), how: "owner" as const })),
     ];
     const inPeriod = income.filter((entry) => entry.at >= start && entry.at <= now);
@@ -97,6 +99,7 @@ export function summarizeMoney(input: { payments: MoneyPayment[]; orders: MoneyO
         total: sum(inPeriod),
         previous: sum(income.filter((entry) => entry.at >= previousStart && entry.at < start)),
         by_link: sum(inPeriod.filter((e) => e.how === "link")),
+        by_transfer: sum(inPeriod.filter((e) => e.how === "transfer")),
         marked_paid: sum(inPeriod.filter((e) => e.how === "owner")),
         to_collect: input.orders.filter((o) => (o.status === "new" || o.status === "awaiting_payment") && o.currency === currency).reduce((total, o) => total + o.total, 0),
         paid_count: inPeriod.length,

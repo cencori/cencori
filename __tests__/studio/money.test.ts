@@ -49,3 +49,22 @@ describe('Money', () => {
         expect(year.bars[9]).toMatchObject({ label: 'O', amount: 92000, current: true });
     });
 });
+
+describe('Money with transfers', () => {
+    it('counts confirmed transfers once, in their own line', () => {
+        const summary = summarizeMoney({
+            payments: [],
+            transfers: [
+                paid(15000, '2026-10-27T12:00:00Z'), // confirmed today
+                { ...paid(8000, '2026-10-27T12:00:00Z'), status: 'claimed', paid_at: null }, // said they paid, not confirmed
+            ],
+            // The order the confirmed transfer paid for: counted through the transfer, not again.
+            orders: [{ total: 15000, currency: 'NGN', status: 'paid', paid_at: '2026-10-27T12:00:00Z', paid_by: 'transfer', items: [{ name: 'Suya', quantity: 3, price: 5000 }] }],
+            period: 'week', timeZone: 'Africa/Lagos', currency: 'NGN', now: NOW,
+        });
+        expect(summary.total).toBe(15000);
+        expect(summary.by_transfer).toBe(15000);
+        expect(summary.marked_paid).toBe(0);
+        expect(summary.top_items[0]).toMatchObject({ name: 'Suya', quantity: 3 });
+    });
+});

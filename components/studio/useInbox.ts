@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { studioFetch } from "@/components/studio/studio-data";
 import { useStudio } from "@/components/studio/StudioShell";
 
 export type InboxChannel = "whatsapp" | "website" | "link" | "other";
@@ -33,7 +34,7 @@ type ConversationPayload = { conversation: InboxConversation; messages: InboxMes
 export const CHANNEL_LABEL: Record<InboxChannel, string> = { whatsapp: "WhatsApp", website: "Website", link: "Link", other: "Chat" };
 
 async function read<T>(url: string): Promise<T> {
-    const response = await fetch(url, { cache: "no-store" });
+    const response = await studioFetch(url, { cache: "no-store" });
     const body = await response.json().catch(() => null);
     if (!response.ok) throw new Error((body as { error?: string } | null)?.error ?? "Couldn't load your chats.");
     return body as T;
@@ -62,7 +63,7 @@ export function useMarkRead() {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: async ({ id, read }: { id: string; read: boolean }) => {
-            const response = await fetch(`/api/studio/inbox/${id}`, {
+            const response = await studioFetch(`/api/studio/inbox/${id}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ project_id: project.id, action: read ? "mark_read" : "mark_unread" }),
@@ -94,7 +95,7 @@ export function useConversationAction(id: string) {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: async (input: { action: "step_in" | "hand_back" | "reply" | "mark_read" | "mark_unread"; text?: string }) => {
-            const response = await fetch(`/api/studio/inbox/${id}`, {
+            const response = await studioFetch(`/api/studio/inbox/${id}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ project_id: project.id, ...input }),

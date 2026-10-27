@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { StudioLoadError } from "@/components/studio/studio-data";
 import { Check, QrCode } from "lucide-react";
 import { StudioLinkQr } from "@/components/studio/StudioLinkQr";
+import { useStudioNavigate } from "@/components/studio/studio-nav";
 import { useStudioCopilot } from "@/components/studio/StudioCopilot";
 import { joinWords, liveChannels, useStudioOverview, type StudioAssistantSummary } from "@/components/studio/useStudioOverview";
 import { UserRoundedIcon } from "@solar-icons/react/bold-duotone/user-rounded";
@@ -42,6 +44,7 @@ function Card({ title, action, onAction, children }: { title: string; action: st
 /** The assistant in four cards: what it knows, can do, where it works, how it's doing. Changes go through Copilot. */
 export default function StudioAssistantPage() {
     const { ask } = useStudioCopilot();
+    const navigate = useStudioNavigate();
     const overview = useStudioOverview();
     const data = overview.data;
     const assistant = data?.assistant ?? null;
@@ -50,13 +53,15 @@ export default function StudioAssistantPage() {
     const linkUrl = data?.share_token ? `${new URL(getMainSiteUrl("/")).origin}/talk/${data.share_token}` : null;
 
     return (
-        <div className={!overview.isLoading && !assistant ? STUDIO_FILL_PAGE : undefined}>
+        <div className={overview.data && !assistant ? STUDIO_FILL_PAGE : undefined}>
             <h1 className="text-[26px] font-semibold leading-tight tracking-tight">{assistant?.name ?? "Your assistant"}</h1>
             {overview.isLoading ? (
                 <div className="mt-5 space-y-3">
                     <Skeleton className="h-4 w-48" />
                     {[0, 1, 2, 3].map((index) => <Skeleton key={index} className="h-24 w-full rounded-2xl" />)}
                 </div>
+            ) : !overview.data ? (
+                <StudioLoadError error={overview.error} fallback="Couldn't load your assistant." onRetry={() => void overview.refetch()} />
             ) : !assistant ? (
                 <StudioEmptyCard icon={UserRoundedIcon} title="No assistant yet" description="Set one up and it starts answering customers on your link and WhatsApp.">
                     <button type="button" onClick={() => ask("Help me set up an assistant for my business")} className="mt-4 inline-flex h-11 items-center rounded-full bg-foreground px-5 text-sm font-semibold text-background">Set one up</button>
@@ -104,7 +109,7 @@ export default function StudioAssistantPage() {
                             )}
                         </Card>
 
-                        <Card title="How it's doing · this month" action="Chats" onAction={() => window.location.assign("/inbox")}>
+                        <Card title="How it's doing · this month" action="Chats" onAction={() => navigate("/inbox")}>
                             <div className="grid grid-cols-3 gap-2">
                                 <span><span className="block text-xl font-semibold">{data?.month.chats ?? 0}</span><span className="text-xs text-muted-foreground">chats</span></span>
                                 {data?.month.earned && <span><span className="block text-xl font-semibold">{data.month.earned.count}</span><span className="text-xs text-muted-foreground">paid</span></span>}

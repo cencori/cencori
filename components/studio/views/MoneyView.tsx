@@ -1,17 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import { StudioLoadError, studioFetch } from "@/components/studio/studio-data";
 import { useQuery } from "@tanstack/react-query";
 import { useStudio } from "@/components/studio/StudioShell";
 import { useStudioCopilot } from "@/components/studio/StudioCopilot";
 import { formatMoney } from "@/components/studio/useStudioOverview";
-import { CardIcon } from "@solar-icons/react/bold-duotone/card";
-import { StudioEmptyCard } from "@/components/studio/StudioEmptyCard";
+import { BankAccountCard, TransfersToConfirm, type BankAccount, type TransferToConfirm } from "@/components/studio/StudioTransfers";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import type { MoneyPeriod, MoneySummary } from "@/lib/studio/money";
 
-type Money = MoneySummary & { payments: { provider: string; mode: string } | null };
+type Money = MoneySummary & { payments: { provider: string; mode: string } | null; bank_account: BankAccount | null; transfers_to_confirm: TransferToConfirm[] };
 
 const PERIODS: Array<{ id: MoneyPeriod; label: string; caption: string; previous: string }> = [
     { id: "week", label: "Week", caption: "Last 7 days", previous: "the 7 days before" },
@@ -30,7 +30,7 @@ export default function StudioMoneyPage() {
     const money = useQuery({
         queryKey: ["studio-money", project.id, period],
         queryFn: async (): Promise<Money> => {
-            const response = await fetch(`/api/studio/money?project_id=${project.id}&period=${period}`, { cache: "no-store" });
+            const response = await studioFetch(`/api/studio/money?project_id=${project.id}&period=${period}`, { cache: "no-store" });
             const body = await response.json().catch(() => null);
             if (!response.ok) throw new Error((body as { error?: string } | null)?.error ?? "Couldn't load your money.");
             return body as Money;
@@ -55,10 +55,10 @@ export default function StudioMoneyPage() {
                 </div>
             </div>
 
-            {money.isLoading ? (
+            {money.isPending && !money.isError ? (
                 <div className="mt-6 space-y-3"><Skeleton className="h-10 w-48" /><Skeleton className="h-32 w-full rounded-2xl" /><Skeleton className="h-28 w-full rounded-2xl" /></div>
-            ) : money.isError || !data ? (
-                <p className="mt-6 text-sm text-destructive">{money.error instanceof Error ? money.error.message : "Couldn't load your money."}</p>
+            ) : !data ? (
+                <StudioLoadError error={money.error} fallback="Couldn't load your money." onRetry={() => void money.refetch()} />
             ) : (
                 <>
                     <p className="mt-5 text-[13px] text-muted-foreground">{meta.caption}</p>
@@ -68,6 +68,8 @@ export default function StudioMoneyPage() {
                             {change === 0 ? `Same as ${meta.previous}` : `${change > 0 ? "Up" : "Down"} ${formatMoney(Math.abs(change), data.currency)} on ${meta.previous}`}
                         </p>
                     )}
+
+                    <TransfersToConfirm transfers={data.transfers_to_confirm} />
 
                     <div role="img" aria-label={`${meta.caption}: ${data.bars.map((bar) => `${bar.label} ${formatMoney(bar.amount, data.currency)}`).join(", ")}`} className="mt-5 flex h-32 items-end gap-2">
                         {data.bars.map((bar, index) => (
@@ -83,7 +85,8 @@ export default function StudioMoneyPage() {
 
                     <div className="mt-6 overflow-hidden rounded-2xl border border-border/60 text-[15px]">
                         <div className="flex justify-between px-4 py-3"><span>Paid by link</span><span className="font-semibold">{formatMoney(data.by_link, data.currency)}</span></div>
-                        <div className="flex justify-between border-t border-border/60 px-4 py-3"><span>Cash and transfer, marked paid</span><span className="font-semibold">{formatMoney(data.marked_paid, data.currency)}</span></div>
+                        {(data.by_transfer > 0 || data.bank_account) && <div className="flex justify-between border-t border-border/60 px-4 py-3"><span>By transfer, confirmed</span><span className="font-semibold">{formatMoney(data.by_transfer, data.currency)}</span></div>}
+                        <div className="flex justify-between border-t border-border/60 px-4 py-3"><span>{data.bank_account ? "Cash, marked paid" : "Cash and transfer, marked paid"}</span><span className="font-semibold">{formatMoney(data.marked_paid, data.currency)}</span></div>
                         {data.to_collect > 0 && <div className="flex justify-between border-t border-border/60 px-4 py-3 text-amber-800 dark:text-amber-400"><span>Still to collect</span><span className="font-semibold">{formatMoney(data.to_collect, data.currency)}</span></div>}
                     </div>
 
@@ -106,17 +109,13 @@ export default function StudioMoneyPage() {
                             Payments by link go straight to your <span className="font-semibold">{PROVIDER[data.payments.provider] ?? "payment"}</span> account{data.payments.mode === "test" ? " (test mode: no real money yet)" : ""}. Cencori never holds your money.
                         </p>
                     ) : (
-                        // Same card as the empty tabs, but in the flow with the rest of the page.
-                        <StudioEmptyCard
-                            icon={CardIcon}
-                            title="Get paid by link"
-                            description="Connect your payment provider and the money goes straight to you."
-                            className="mt-6 min-h-0 py-8"
-                        >
-                            <button type="button" onClick={() => ask("Help me connect payments so customers can pay by link")} className="mt-4 h-11 rounded-full bg-foreground px-5 text-sm font-semibold text-background">Connect payments</button>
-                        </StudioEmptyCard>
+                        // No payment provider: customers pay by transfer to the business's own account.
+                        <>
+                            <BankAccountCard account={data.bank_account} />
+                            <button type="button" onClick={() => ask("Help me connect payments so customers can pay by link")} className="mt-2 px-1 text-left text-[13px] text-muted-foreground underline underline-offset-2">Use Paystack or Flutterwave instead, for payment links</button>
+                        </>
                     )}
-                    <p className="mt-3 px-1 text-xs leading-5 text-muted-foreground">Counts payments through your assistant and orders you mark paid. Sales made elsewhere aren&apos;t included.</p>
+                    <p className="mt-3 px-1 text-xs leading-5 text-muted-foreground">Counts payments through your assistant, transfers you confirm and orders you mark paid. Sales made elsewhere aren&apos;t included.</p>
                 </>
             )}
         </div>

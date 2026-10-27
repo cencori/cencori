@@ -5,8 +5,18 @@ const payments = vi.hoisted(() => ({
     latestPaymentIn: vi.fn(),
     findPayment: vi.fn(),
     settlePayment: vi.fn(),
+    // A payment provider is connected unless a test says otherwise.
+    getPaymentsConnection: vi.fn(async () => ({ id: 'conn' }) as unknown),
+    customerOf: vi.fn(async () => ({ label: null, number: null })),
+}));
+const transfers = vi.hoisted(() => ({
+    getTransfers: vi.fn(async () => null as unknown),
+    startTransfer: vi.fn(),
+    latestTransferIn: vi.fn(async () => null as unknown),
+    claimTransfer: vi.fn(),
 }));
 vi.mock('@/lib/embedded/payments', async (original) => ({ ...(await original<typeof import('@/lib/embedded/payments')>()), ...payments }));
+vi.mock('@/lib/embedded/transfers', () => transfers);
 vi.mock('@/lib/supabaseAdmin', () => ({ createAdminClient: () => ({}) }));
 
 import { agentToolset } from '@/lib/embedded/agent-tools';
@@ -66,5 +76,36 @@ describe('agent payments', () => {
         expect((await toolset.run(call('check_payment', {}), context)).output).toMatch(/Not paid yet/);
         payments.latestPaymentIn.mockResolvedValue({ connection: { projectId: 'other' }, payment: entry });
         expect((await toolset.run(call('check_payment', {}), context)).ok).toBe(false);
+    });
+});
+
+describe('pay by transfer', () => {
+    const toolset = agentToolset({}, { takesTransfers: true });
+    const context = { projectId: 'p1', organizationId: 'o1', agentId: 'a1', surface: 'conversation', conversationId: 's1' } as never;
+
+    it('switches the payment tools on for a business that takes transfers', () => {
+        expect(toolset.has('request_payment')).toBe(true);
+        expect(toolset.has('check_payment')).toBe(true);
+        expect(agentToolset({}).has('request_payment')).toBe(false);
+    });
+
+    it('gives the account instead of a link when no provider is connected', async () => {
+        payments.getPaymentsConnection.mockResolvedValueOnce(null);
+        transfers.getTransfers.mockResolvedValueOnce({ id: 't' });
+        transfers.startTransfer.mockResolvedValueOnce({ ok: true, reference: 'TRF-1A2B3C', amount: '₦20,000', instructions: '₦20,000 to Arcie Lounge, OPay 8012345678. Narration / description: TRF-1A2B3C' });
+        const outcome = await toolset.run({ name: 'request_payment', args: JSON.stringify({ amount: 20000, description: 'Table deposit' }) } as never, context);
+        expect(outcome.ok).toBe(true);
+        expect(outcome.output).toContain('OPay 8012345678');
+        expect(outcome.output).toContain("Don't say it's paid");
+        expect(payments.requestPayment).not.toHaveBeenCalled();
+    });
+
+    it('turns "I\'ve paid" into a claim the owner confirms, never a confirmation', async () => {
+        const transfer = { reference: 'TRF-1A2B3C', amount: 20000, currency: 'NGN', description: 'Table deposit', status: 'awaiting', created_at: new Date().toISOString() };
+        transfers.latestTransferIn.mockResolvedValueOnce({ connection: { id: 't' }, transfer });
+        payments.latestPaymentIn.mockResolvedValueOnce(null);
+        const outcome = await toolset.run({ name: 'check_payment', args: '{}' } as never, context);
+        expect(transfers.claimTransfer).toHaveBeenCalled();
+        expect(outcome.output).toContain("don't say it's paid yet");
     });
 });

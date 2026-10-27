@@ -169,6 +169,8 @@ export function StudioProfile({ className }: { className?: string }) {
         setSigningOut(true);
         beginIntentionalSignOut();
         clearClientSessionCaches();
+        // Pages kept for opening offline hold this business's data: not for the next person.
+        await caches?.delete("studio-pages").catch(() => false);
         await browserAuth.signOut({ scope: "local" }).catch(() => undefined);
         posthog.reset();
         window.location.assign("/login");

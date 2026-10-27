@@ -1,8 +1,8 @@
 "use client";
 
-import { use, useEffect, useRef, useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { StudioLoadError } from "@/components/studio/studio-data";
+import { StudioLink, useStudioNavigate } from "@/components/studio/studio-nav";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowUp, ChevronLeft, MailWarning } from "lucide-react";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
@@ -20,8 +20,7 @@ function dayLabel(iso: string): string {
 }
 
 /** One conversation: the customer on the left, the assistant on the right. */
-export default function StudioConversationPage({ params }: { params: Promise<{ id: string }> }) {
-    const { id } = use(params);
+export default function StudioConversationPage({ id }: { id: string }) {
     const query = useConversation(id);
     const act = useConversationAction(id);
     const conversation = query.data?.conversation;
@@ -29,7 +28,7 @@ export default function StudioConversationPage({ params }: { params: Promise<{ i
     const reply = query.data?.reply;
     const [draft, setDraft] = useState("");
     const endRef = useRef<HTMLDivElement>(null);
-    const router = useRouter();
+    const navigate = useStudioNavigate();
     const queryClient = useQueryClient();
     const { project } = useStudio();
     const markRead = useMarkRead();
@@ -38,7 +37,7 @@ export default function StudioConversationPage({ params }: { params: Promise<{ i
     useEffect(() => {
         if (loaded) void queryClient.invalidateQueries({ queryKey: ["studio-inbox", project.id] });
     }, [loaded, project.id, queryClient]);
-    const keepUnread = () => markRead.mutate({ id, read: false }, { onSuccess: () => router.push("/inbox") });
+    const keepUnread = () => markRead.mutate({ id, read: false }, { onSuccess: () => navigate("/inbox") });
     const send = () => {
         const text = draft.trim();
         if (!text || act.isPending) return;
@@ -52,9 +51,9 @@ export default function StudioConversationPage({ params }: { params: Promise<{ i
     return (
         <div className="flex min-h-svh flex-col">
             <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-border/60 bg-background/95 px-3 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] backdrop-blur">
-                <Link href="/inbox" aria-label="Back to Inbox" className="flex h-10 w-10 items-center justify-center rounded-full">
+                <StudioLink href="/inbox" aria-label="Back to Inbox" className="flex h-10 w-10 items-center justify-center rounded-full">
                     <ChevronLeft className="h-5 w-5" />
-                </Link>
+                </StudioLink>
                 {conversation ? (
                     <>
                         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-semibold text-muted-foreground">{initials(conversation.name)}</span>
@@ -85,8 +84,8 @@ export default function StudioConversationPage({ params }: { params: Promise<{ i
                         <Skeleton className="h-12 w-3/4 rounded-2xl" />
                         <Skeleton className="ml-auto h-20 w-4/5 rounded-2xl" />
                     </div>
-                ) : query.isError ? (
-                    <p className="text-sm text-destructive">{query.error instanceof Error ? query.error.message : "Couldn't load this chat."}</p>
+                ) : !query.data ? (
+                    <StudioLoadError error={query.error} fallback="Couldn't load this chat." onRetry={() => void query.refetch()} className="mt-0" />
                 ) : messages.length === 0 ? (
                     <p className="text-sm text-muted-foreground">No messages yet.</p>
                 ) : (
