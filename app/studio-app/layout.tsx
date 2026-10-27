@@ -11,6 +11,9 @@ export const metadata: Metadata = {
     manifest: "/studio/manifest.webmanifest",
     applicationName: "Cencori Studio",
     appleWebApp: { capable: true, title: "Studio", statusBarStyle: "default", startupImage: STUDIO_STARTUP_IMAGES },
+    // Next writes only the generic "mobile-web-app-capable"; iOS shows launch
+    // screens (startupImage above) only with its own tag.
+    other: { "apple-mobile-web-app-capable": "yes" },
     icons: { apple: "/studio/apple-touch-icon.png", icon: "/studio/icon-192.png" },
     robots: { index: false, follow: false },
 };
