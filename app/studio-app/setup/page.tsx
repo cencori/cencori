@@ -285,7 +285,7 @@ export default function StudioSetupPage() {
                 <span className="text-[13px] text-muted-foreground">Step {state.step} of 5</span>
             </div>
             <div className="mt-3"><Progress step={state.step} /></div>
-            {error && !(state.step === 2 && current?.key === "list") && <p role="alert" className="mt-4 rounded-2xl bg-destructive/10 px-4 py-3 text-[13px] leading-5 text-destructive">{error}</p>}
+            {error && !(state.step === 2 && (current?.key === "list" || state.asked >= questions.length)) && <p role="alert" className="mt-4 rounded-2xl bg-destructive/10 px-4 py-3 text-[13px] leading-5 text-destructive">{error}</p>}
 
             {state.step === 1 && (
                 <>
@@ -335,7 +335,10 @@ export default function StudioSetupPage() {
                             </div>
                         )}
                         {!building && state.asked >= questions.length && error && (
-                            <button type="button" onClick={() => void build(kind, state.answers)} className="h-11 rounded-full border border-border/60 text-sm font-medium">Try again</button>
+                            <div className="flex flex-col gap-2">
+                                <p role="alert" className="rounded-2xl bg-destructive/10 px-4 py-3 text-[13px] leading-5 text-destructive">{error}</p>
+                                <button type="button" onClick={() => void build(kind, state.answers)} className="h-11 rounded-full border border-border/60 text-sm font-medium">Try again</button>
+                            </div>
                         )}
                         <div ref={endRef} />
                     </div>

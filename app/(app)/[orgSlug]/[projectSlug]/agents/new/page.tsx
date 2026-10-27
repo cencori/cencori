@@ -135,7 +135,7 @@ export default function NewAgentPage({ params }: { params: Promise<{ orgSlug: st
                             </label>
                             <div>
                                 <span className="mb-2 block text-xs font-medium">Model</span>
-                                <ModelSelect value={form.model} onChange={(value) => update("model", value)} models={usableModels(models?.models ?? [])} placeholder="DeepSeek V4 Flash" />
+                                <ModelSelect value={form.model} onChange={(value) => update("model", value)} models={usableModels(models?.models ?? [])} placeholder="DeepSeek V4.1 Flash" />
                                 {models?.model_locked && <p className="mt-2 text-xs text-muted-foreground">{MODEL_LOCK_NOTE}</p>}
                             </div>
                             {error && <p role="alert" className="text-xs text-destructive">{error}</p>}

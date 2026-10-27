@@ -115,7 +115,7 @@ export function BusinessPlan({ orgId, data }: { orgId: string; data: BusinessPla
                                 <ul className="mt-3 flex-1 space-y-1 text-xs text-muted-foreground">
                                     <li>{option.conversations.toLocaleString()} conversations</li>
                                     <li>{option.agents} agent{option.agents === 1 ? "" : "s"}</li>
-                                    <li>{option.all_models ? "Every model" : "DeepSeek V4 Flash"}</li>
+                                    <li>{option.all_models ? "Every model" : "DeepSeek V4.1 Flash"}</li>
                                 </ul>
                                 <Button className="mt-4 h-7 text-[11px]" variant={current ? "outline" : "default"} disabled={!!buying} onClick={() => void buy(option.id)}>
                                     {buying === option.id ? "Opening checkout…" : current ? "Renew" : "Choose"}

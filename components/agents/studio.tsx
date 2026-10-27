@@ -39,7 +39,7 @@ export function usableModels(models: Model[]): Model[] {
 }
 
 /** Shown under a locked model picker. */
-export const MODEL_LOCK_NOTE = "Your plan includes DeepSeek V4 Flash. Upgrade to Business to choose other models.";
+export const MODEL_LOCK_NOTE = "Your plan includes DeepSeek V4.1 Flash. Upgrade to Business to choose other models.";
 export type AgentForm = { name: string; description: string; model: string; instructions: string };
 
 export const emptyAgentForm: AgentForm = { name: "", description: "", model: "", instructions: "" };

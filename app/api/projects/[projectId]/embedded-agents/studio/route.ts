@@ -347,7 +347,7 @@ export async function POST(request: Request, ctx: Context) {
             if (!name) return fail('Give your agent a name.');
             const { BUSINESS_DEFAULT_MODEL, getOrganizationPlan, modelAllowed } = await import('@/lib/business/plans');
             if (!modelAllowed(await getOrganizationPlan(db as never, access.organizationId), model)) {
-                return fail('Your plan uses DeepSeek V4 Flash. Upgrade to Business to choose other models.', 402);
+                return fail('Your plan uses DeepSeek V4.1 Flash. Upgrade to Business to choose other models.', 402);
             }
             const existing = (version.config_json ?? {}) as AgentVersionConfig;
             const config: AgentVersionConfig = { ...existing, instructions };

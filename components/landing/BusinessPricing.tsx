@@ -43,7 +43,7 @@ export function BusinessPricing({ signupHref, title = "For your business" }: { s
                                     `${plan.agents} agent${plan.agents === 1 ? "" : "s"}`,
                                     "WhatsApp, website chat and share link",
                                     "Bookings, payments and orders",
-                                    plan.allModels ? "Every AI model" : "DeepSeek V4 Flash",
+                                    plan.allModels ? "Every AI model" : "DeepSeek V4.1 Flash",
                                 ].map((feature) => (
                                     <li key={feature} className="flex items-start gap-2"><Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />{feature}</li>
                                 ))}
