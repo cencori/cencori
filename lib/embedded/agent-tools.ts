@@ -246,10 +246,17 @@ export interface AgentToolset {
     warm(projectId: string): void;
 }
 
-/** The version's tools: its webhook tools, the MCP tools switched on, and the system tools switched on. */
-export function agentToolset(config: Record<string, unknown> | null | undefined): AgentToolset {
+/**
+ * The version's tools: its webhook tools, the MCP tools switched on, and the
+ * system tools switched on. `takesTransfers`: the business added a bank account
+ * in Studio, so the payment tools are on even if the version didn't switch them on.
+ */
+export function agentToolset(config: Record<string, unknown> | null | undefined, opts: { takesTransfers?: boolean } = {}): AgentToolset {
     const webhooks = readWebhookTools(config).filter((tool) => !(SYSTEM_TOOL_NAMES as readonly string[]).includes(tool.name));
     const system = readSystemTools(config);
+    if (opts.takesTransfers && !system.take_payments) {
+        system.take_payments = { description: 'Ask the customer to pay (a deposit, a booking, an order, anything with a price) by bank transfer to the business\'s account. Returns the account details and a reference to give them. Use it once the amount is agreed.' };
+    }
     const local: FunctionToolDefinition[] = [
         ...webhookToolDefinitions(webhooks),
         ...(system.end_conversation ? [systemDefinition(END_CONVERSATION_TOOL, system)] : []),
@@ -338,7 +345,7 @@ const CHECK_PAYMENT_DEFINITION: FunctionToolDefinition = {
     type: 'function',
     function: {
         name: CHECK_PAYMENT_TOOL,
-        description: 'Check whether the customer\'s latest payment link in this conversation has been paid, e.g. when they say they\'ve paid.',
+        description: 'Check whether the customer\'s latest payment (a payment link, or a bank transfer) in this conversation has been paid, e.g. when they say they\'ve paid. For a transfer, this is also how the business hears they\'ve sent it.',
         parameters: { type: 'object', properties: { reference: { type: 'string', description: 'A specific payment reference; omit for the latest one here.' } }, required: [] },
     },
 };
@@ -430,8 +437,9 @@ async function placeOrderTool(argumentsJson: string, context: AgentToolContext):
         },
     );
     if (!result.ok) return { ok: false, output: result.message };
-    const { order, link } = result;
+    const { order, link, transfer } = result;
     const total = formatPrice(order.total, order.currency);
+    if (transfer) return { ok: true, output: `Order ${order.id}: ${orderSummary(order)}, total ${total}. The business takes payment by bank transfer. Give them exactly: ${transfer.instructions}\nAsk them to put the reference in the narration and to tell you once they've sent it; then call check_payment. Don't say it's paid until check_payment says the business confirmed it.` };
     if (link) return { ok: true, output: `Order ${order.id}: ${orderSummary(order)}, total ${total}. Payment link: ${link}\nSend this link as it is. The order is confirmed once they've paid; they'll get a confirmation here automatically, or use check_payment when they say they've paid.` };
     return { ok: true, output: `Order ${order.id} placed: ${orderSummary(order)}, total ${total}. The business has it and will contact them to arrange payment and delivery. Tell them so; don't say it's paid.` };
 }
@@ -447,9 +455,20 @@ async function requestPaymentTool(argumentsJson: string, context: AgentToolConte
     const description = typeof args.description === 'string' ? args.description.trim().slice(0, 200) : '';
     if (!Number.isFinite(amount) || amount <= 0) return { ok: false, output: 'Give the amount.' };
     if (!description) return { ok: false, output: 'Say what the payment is for.' };
-    const [{ requestPayment }, { createAdminClient }] = await Promise.all([import('./payments'), import('@/lib/supabaseAdmin')]);
+    const [{ requestPayment, getPaymentsConnection, customerOf }, { createAdminClient }] = await Promise.all([import('./payments'), import('@/lib/supabaseAdmin')]);
+    const db = createAdminClient();
+    // No payment provider connected, but the business takes transfers: give the account instead of a link.
+    if (!await getPaymentsConnection(db, context.projectId)) {
+        const { getTransfers, startTransfer } = await import('./transfers');
+        if (await getTransfers(db, context.projectId)) {
+            const customer = await customerOf(db, context.conversationId);
+            const started = await startTransfer({ db, projectId: context.projectId, agentId: context.agentId, conversationId: context.conversationId }, { amount, description, customer: customer.label });
+            if (!started.ok) return { ok: false, output: `${started.message} Don't confirm anything that needs payment.` };
+            return { ok: true, output: `The business takes payment by bank transfer. Give them exactly: ${started.instructions}\nAsk them to put the reference in the narration and to tell you once they've sent it; then call check_payment. Don't say it's paid or confirmed until check_payment says the business confirmed it.` };
+        }
+    }
     const result = await requestPayment(
-        { db: createAdminClient(), projectId: context.projectId, agentId: context.agentId, agentName: context.agentName, surface: context.surface, conversationId: context.conversationId },
+        { db, projectId: context.projectId, agentId: context.agentId, agentName: context.agentName, surface: context.surface, conversationId: context.conversationId },
         { amount, description, email: typeof args.email === 'string' ? args.email.trim() : null },
     );
     if (!result.ok) return { ok: false, output: `${result.message} Don't confirm anything that needs payment; offer the business's phone number if you know it.` };
@@ -464,9 +483,23 @@ async function checkPaymentTool(argumentsJson: string, context: AgentToolContext
     } catch {
         // check the latest instead
     }
-    const [{ findPayment, latestPaymentIn, settlePayment, formatMoney }, { createAdminClient }] = await Promise.all([import('./payments'), import('@/lib/supabaseAdmin')]);
+    const [{ findPayment, latestPaymentIn, settlePayment, formatMoney }, { createAdminClient }, transfers] = await Promise.all([import('./payments'), import('@/lib/supabaseAdmin'), import('./transfers')]);
     const db = createAdminClient();
-    const found = reference ? await findPayment(db, reference) : await latestPaymentIn(db, context.projectId, context.conversationId);
+    // A bank transfer, when that's what was asked for last here (or by its TRF- reference).
+    const transferHere = await transfers.latestTransferIn(db, context.projectId, context.conversationId);
+    const linkHere = reference ? null : await latestPaymentIn(db, context.projectId, context.conversationId);
+    const transferFound = reference
+        ? (reference.toUpperCase().startsWith('TRF-') && transferHere?.transfer.reference === reference.toUpperCase() ? transferHere : null)
+        : transferHere && (!linkHere || transferHere.transfer.created_at > linkHere.payment.created_at) ? transferHere : null;
+    if (transferFound) {
+        const { connection, transfer } = transferFound;
+        const amount = formatMoney(transfer.amount, transfer.currency);
+        if (transfer.status === 'paid') return { ok: true, output: `Paid: ${amount} for ${transfer.description}. The business confirmed the transfer arrived.` };
+        if (transfer.status === 'claimed') return { ok: true, output: `They've said they sent ${amount}; the business is checking its account and will confirm. Tell them so, kindly; don't say it's confirmed yet.` };
+        await transfers.claimTransfer(db, connection, transfer, { preview: context.surface === 'preview' });
+        return { ok: true, output: `Noted that they've sent ${amount} by transfer (reference ${transfer.reference}). The business has been told to check its account and will confirm. Thank them and say they'll hear once it's confirmed; don't say it's paid yet.` };
+    }
+    const found = reference ? await findPayment(db, reference) : linkHere;
     if (!found || found.connection.projectId !== context.projectId) return { ok: false, output: 'There\'s no payment link from this conversation to check.' };
     try {
         const payment = await settlePayment(db, found.connection, found.payment);

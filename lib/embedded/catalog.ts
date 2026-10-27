@@ -45,8 +45,11 @@ export interface CatalogOrder {
     conversation_id: string | null;
     created_at: string;
     paid_at: string | null;
-    /** How it was paid: by the payment link, or marked paid by the owner (cash, transfer). */
-    paid_by?: 'link' | 'owner';
+    /**
+     * How it was paid: by the payment link, by a bank transfer the owner
+     * confirmed (lib/embedded/transfers.ts), or marked paid by the owner (cash).
+     */
+    paid_by?: 'link' | 'transfer' | 'owner';
 }
 
 export interface CatalogMetadata {
@@ -189,7 +192,7 @@ export interface OrderRequest {
  * Place an order from the catalog. Prices and stock come from the catalog;
  * the outcome is what the agent tells the customer.
  */
-export async function placeOrder(ctx: OrderContext, request: OrderRequest): Promise<{ ok: true; order: CatalogOrder; link: string | null } | { ok: false; message: string }> {
+export async function placeOrder(ctx: OrderContext, request: OrderRequest): Promise<{ ok: true; order: CatalogOrder; link: string | null; transfer: { reference: string; instructions: string } | null } | { ok: false; message: string }> {
     const catalog = await getCatalog(ctx.db, ctx.projectId);
     if (!catalog || catalog.metadata.products.length === 0) return { ok: false, message: 'This business hasn\'t added its products yet.' };
     if (!Array.isArray(request.items) || request.items.length === 0) return { ok: false, message: 'Add at least one item (product_id and quantity, from find_products).' };
@@ -233,12 +236,24 @@ export async function placeOrder(ctx: OrderContext, request: OrderRequest): Prom
     // Paid through a link when the business takes payments in the catalog's currency.
     const payments = await getPaymentsConnection(ctx.db, ctx.projectId);
     let link: string | null = null;
+    let transfer: { reference: string; instructions: string } | null = null;
     if (payments && payments.metadata.currency === currency && total > 0) {
         const started = await requestPayment(ctx, { amount: total, description: `Order ${order.id}: ${orderSummary(order)}`.slice(0, 200), email: request.email });
         if (!started.ok) return { ok: false, message: started.message };
         order.status = 'awaiting_payment';
         order.payment_reference = started.reference;
         link = started.link;
+    } else if (total > 0 && currency === 'NGN') {
+        // No payment links, but the business takes transfers: the customer sends it, the owner confirms.
+        const { getTransfers, startTransfer } = await import('./transfers');
+        if (await getTransfers(ctx.db, ctx.projectId)) {
+            const started = await startTransfer(ctx, { amount: total, description: `Order ${order.id}: ${orderSummary(order)}`.slice(0, 200), orderId: order.id, customer: order.customer });
+            if (started.ok) {
+                order.status = 'awaiting_payment';
+                order.payment_reference = started.reference;
+                transfer = { reference: started.reference, instructions: started.instructions };
+            }
+        }
     }
     const saved = await updateCatalog(ctx.db, catalog.id, (metadata) => ({
         ...metadata,
@@ -251,7 +266,7 @@ export async function placeOrder(ctx: OrderContext, request: OrderRequest): Prom
         const { notifyOrder } = await import('./owner-alerts');
         await notifyOrder(ctx, describeOrder(order), false);
     }
-    return { ok: true, order, link };
+    return { ok: true, order, link, transfer };
 }
 
 /** The order as the owner reads it. */
@@ -285,6 +300,21 @@ export async function markOrderPaid(db: Admin, projectId: string, paymentReferen
         };
     });
     return { ...order, status: 'paid', paid_at: paidAt };
+}
+
+/** A transfer for the order arrived (the owner confirmed it): mark it paid and take its stock. */
+export async function markOrderPaidByTransfer(db: Admin, projectId: string, orderId: string, paidAt: string): Promise<void> {
+    const catalog = await getCatalog(db, projectId);
+    if (!catalog) return;
+    await updateCatalog(db, catalog.id, (metadata) => {
+        const current = metadata.orders.find((o) => o.id === orderId);
+        if (!current || current.status === 'paid' || current.status === 'cancelled' || current.paid_at) return metadata;
+        return {
+            ...metadata,
+            products: current.status === 'awaiting_payment' ? takeStock(metadata.products, current.items) : metadata.products,
+            orders: metadata.orders.map((o) => (o.id === orderId ? { ...o, status: 'paid', paid_at: paidAt, paid_by: 'transfer' } : o)),
+        };
+    });
 }
 
 /** The latest order placed in a conversation, for "where's my order?". */

@@ -663,7 +663,8 @@ export async function POST(request: Request, ctx: Context) {
                             const pricing = await resolved.provider.getPricing(resolved.model);
                             // Tools run for real here: Cencori calls the endpoint (or the system
                             // action) and the agent answers from the result, a few rounds at most.
-                            const toolset = agentToolset(config as Record<string, unknown>);
+                            const { takesTransfers } = await import('@/lib/embedded/transfers');
+                            const toolset = agentToolset(config as Record<string, unknown>, { takesTransfers: await takesTransfers(db as never, projectId) });
                             toolset.warm(projectId);
                             let conversationEnded = false;
                             let conversation: UnifiedMessage[] = messages;

@@ -1,14 +1,13 @@
 "use client";
 
 import { createContext, useContext, type ReactNode } from "react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { StudioLink, useStudioPath } from "@/components/studio/studio-nav";
 import { HomeIcon } from "@solar-icons/react/bold-duotone/home";
 import { ChatRoundLineIcon } from "@solar-icons/react/bold-duotone/chat-round-line";
 import { Bag4Icon } from "@solar-icons/react/bold-duotone/bag-4";
 import { WalletIcon } from "@solar-icons/react/bold-duotone/wallet";
 import { StarsMinimalisticIcon } from "@solar-icons/react/bold-duotone/stars-minimalistic";
-import { ReactQueryProvider } from "@/lib/providers/ReactQueryProvider";
+import { StudioDataProvider, StudioOfflineStrip } from "@/components/studio/studio-data";
 import { ThemeScope } from "@/components/theme-scope";
 import { cn } from "@/lib/utils";
 import { StudioAskBar, StudioCopilotProvider } from "@/components/studio/StudioCopilot";
@@ -49,15 +48,16 @@ export function StudioShell({ workspace, children }: { workspace: StudioContextV
     // Studio is served at the subdomain's root; the internal prefix never shows.
     // Installable app and push notifications.
     useStudioServiceWorker();
-    const pathname = (usePathname() ?? "/").replace(/^\/studio-app(?=\/|$)/, "") || "/";
+    const pathname = useStudioPath();
     // A conversation, setup and getting the app take the whole screen: their own controls, no tabs.
     const focused = /^\/inbox\/[^/]+/.test(pathname) || pathname.startsWith("/setup") || pathname.startsWith("/get-app");
     return (
-        <ReactQueryProvider>
+        <StudioDataProvider>
             <StudioContext.Provider value={workspace}>
                 <StudioCopilotProvider workspace={workspace}>
                 <ThemeScope name="dashboard-theme" />
                 <div className="min-h-svh bg-background font-sans text-foreground">
+                    <StudioOfflineStrip />
                     {/* Room at the bottom for the ask bar and the tabs. */}
                     <main className={cn("mx-auto w-full max-w-md", focused ? "" : "px-4 pb-[calc(10rem+env(safe-area-inset-bottom))] pt-[calc(1.25rem+env(safe-area-inset-top))]")}>
                         {children}
@@ -69,7 +69,7 @@ export function StudioShell({ workspace, children }: { workspace: StudioContextV
                         {TABS.map((tab) => {
                             const active = tab.match(pathname);
                             return (
-                                <Link
+                                <StudioLink
                                     key={tab.href}
                                     href={tab.href}
                                     aria-current={active ? "page" : undefined}
@@ -83,7 +83,7 @@ export function StudioShell({ workspace, children }: { workspace: StudioContextV
                                         {tab.href === "/inbox" && <UnreadBadge />}
                                     </span>
                                     {tab.label}
-                                </Link>
+                                </StudioLink>
                             );
                         })}
                     </nav>}
@@ -91,7 +91,7 @@ export function StudioShell({ workspace, children }: { workspace: StudioContextV
                 </div>
                 </StudioCopilotProvider>
             </StudioContext.Provider>
-        </ReactQueryProvider>
+        </StudioDataProvider>
     );
 }
 

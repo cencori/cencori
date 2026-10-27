@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { studioFetch } from "@/components/studio/studio-data";
 import { useStudio } from "@/components/studio/StudioShell";
 
 export interface SalesOrder {
@@ -12,7 +13,7 @@ export interface SalesOrder {
     delivery: string | null;
     note: string | null;
     status: "awaiting_payment" | "paid" | "new" | "done" | "cancelled";
-    paid_by: "link" | "owner" | null;
+    paid_by: "link" | "transfer" | "owner" | null;
     conversation_id: string | null;
     created_at: string;
     paid_at: string | null;
@@ -41,7 +42,7 @@ export function useSales() {
     return useQuery({
         queryKey: ["studio-sales", project.id],
         queryFn: async (): Promise<Sales> => {
-            const response = await fetch(`/api/studio/sales?project_id=${project.id}`, { cache: "no-store" });
+            const response = await studioFetch(`/api/studio/sales?project_id=${project.id}`, { cache: "no-store" });
             const body = await response.json().catch(() => null);
             if (!response.ok) throw new Error((body as { error?: string } | null)?.error ?? "Couldn't load your sales.");
             return body as Sales;
@@ -57,7 +58,7 @@ export function useSalesAction() {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: async (input: { kind: "order" | "booking"; id: string; action: "paid" | "done" | "cancelled" }) => {
-            const response = await fetch("/api/studio/sales", {
+            const response = await studioFetch("/api/studio/sales", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ project_id: project.id, ...input }),

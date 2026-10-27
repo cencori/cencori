@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import { StudioLoadError } from "@/components/studio/studio-data";
+import { StudioLink } from "@/components/studio/studio-nav";
 import { MessageCircle } from "lucide-react";
 import { useStudioCopilot } from "@/components/studio/StudioCopilot";
 import { formatMoney } from "@/components/studio/useStudioOverview";
@@ -21,7 +22,7 @@ const tag = {
 };
 
 function orderStatus(order: SalesOrder): { label: string; tone: keyof typeof tag } {
-    if (order.status === "paid") return { label: order.paid_by === "owner" ? "Marked paid" : "Paid by link", tone: "good" };
+    if (order.status === "paid") return { label: order.paid_by === "owner" ? "Marked paid" : order.paid_by === "transfer" ? "Paid by transfer" : "Paid by link", tone: "good" };
     if (order.status === "awaiting_payment") return { label: "Waiting for payment", tone: "wait" };
     if (order.status === "new") return { label: "Not paid yet", tone: "wait" };
     if (order.status === "done") return { label: "Done", tone: "off" };
@@ -54,7 +55,7 @@ export default function StudioSalesPage() {
     const orders = data?.orders ?? [];
     const bookings = data?.bookings ?? [];
     const toCollect = orders.filter((o) => o.status === "new" || o.status === "awaiting_payment");
-    const empty = !sales.isLoading && !sales.isError && (view === "orders" ? orders : bookings).length === 0;
+    const empty = !!sales.data && (view === "orders" ? orders : bookings).length === 0;
 
     return (
         <div className={empty ? STUDIO_FILL_PAGE : undefined}>
@@ -73,8 +74,8 @@ export default function StudioSalesPage() {
 
             {sales.isLoading ? (
                 <div className="mt-4 space-y-3">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-20 w-full rounded-2xl" />)}</div>
-            ) : sales.isError ? (
-                <p className="mt-6 text-sm text-destructive">{sales.error instanceof Error ? sales.error.message : "Couldn't load your sales."}</p>
+            ) : !sales.data ? (
+                <StudioLoadError error={sales.error} fallback="Couldn't load your sales." onRetry={() => void sales.refetch()} />
             ) : view === "orders" ? (
                 orders.length === 0 ? (
                     data?.has_products ? (
@@ -113,7 +114,7 @@ export default function StudioSalesPage() {
                                                 {unpaid && <SmallButton strong disabled={act.isPending} onClick={() => act.mutate({ kind: "order", id: order.id, action: "paid" })}>Mark as paid</SmallButton>}
                                                 {order.status === "paid" && <SmallButton disabled={act.isPending} onClick={() => act.mutate({ kind: "order", id: order.id, action: "done" })}>Sent / done</SmallButton>}
                                                 <SmallButton disabled={act.isPending} onClick={() => act.mutate({ kind: "order", id: order.id, action: "cancelled" })}>Cancel</SmallButton>
-                                                {order.conversation_id && <Link href={`/inbox/${order.conversation_id}`} aria-label="Open the chat" className="flex h-8 w-8 items-center justify-center rounded-full border border-border/60"><MessageCircle className="h-4 w-4" /></Link>}
+                                                {order.conversation_id && <StudioLink href={`/inbox/${order.conversation_id}`} aria-label="Open the chat" className="flex h-8 w-8 items-center justify-center rounded-full border border-border/60"><MessageCircle className="h-4 w-4" /></StudioLink>}
                                             </div>
                                         )}
                                     </li>
@@ -141,7 +142,7 @@ export default function StudioSalesPage() {
                                     <div className="mt-2.5 flex flex-wrap gap-2">
                                         <SmallButton disabled={act.isPending} onClick={() => act.mutate({ kind: "booking", id: booking.id, action: "done" })}>They came</SmallButton>
                                         <SmallButton disabled={act.isPending} onClick={() => act.mutate({ kind: "booking", id: booking.id, action: "cancelled" })}>Cancelled</SmallButton>
-                                        {booking.conversation_id && <Link href={`/inbox/${booking.conversation_id}`} aria-label="Open the chat" className="flex h-8 w-8 items-center justify-center rounded-full border border-border/60"><MessageCircle className="h-4 w-4" /></Link>}
+                                        {booking.conversation_id && <StudioLink href={`/inbox/${booking.conversation_id}`} aria-label="Open the chat" className="flex h-8 w-8 items-center justify-center rounded-full border border-border/60"><MessageCircle className="h-4 w-4" /></StudioLink>}
                                     </div>
                                 )}
                             </li>

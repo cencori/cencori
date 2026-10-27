@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { studioFetch } from "@/components/studio/studio-data";
 import { useStudio } from "@/components/studio/StudioShell";
 
 export interface StudioAssistantSummary {
@@ -36,7 +37,7 @@ export function useStudioOverview() {
     return useQuery({
         queryKey: ["studio-overview", project.id],
         queryFn: async (): Promise<StudioOverview> => {
-            const response = await fetch(`/api/studio/overview?project_id=${project.id}`, { cache: "no-store" });
+            const response = await studioFetch(`/api/studio/overview?project_id=${project.id}`, { cache: "no-store" });
             const body = await response.json().catch(() => null);
             if (!response.ok) throw new Error((body as { error?: string } | null)?.error ?? "Couldn't load your business.");
             return body as StudioOverview;

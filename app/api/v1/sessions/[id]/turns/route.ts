@@ -330,7 +330,9 @@ export async function POST(
                         }
                     } else return respondError(409, 'Installed agent has no published model', 'version_unavailable');
                     installedManifest = manifest;
-                    installedToolset = (await import('@/lib/embedded/agent-tools')).agentToolset(config);
+                    // A business that takes bank transfers (Studio → Money) gets the payment tools without republishing.
+                    const takesTransfers = await (await import('@/lib/embedded/transfers')).takesTransfers(adminClient as never, session.project_id as string);
+                    installedToolset = (await import('@/lib/embedded/agent-tools')).agentToolset(config, { takesTransfers });
                     installedToolset.warm(session.project_id as string);
                     effectiveNetworkPolicy = intersectNetworkPolicy(manifest.policy, (ins as { overlay_config?: unknown }).overlay_config);
                     effectiveBrowserEnabled = intersectBrowserEnabled(manifest.policy, (ins as { overlay_config?: unknown }).overlay_config);

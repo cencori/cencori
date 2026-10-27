@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
-import Link from "next/link";
+import { StudioLoadError } from "@/components/studio/studio-data";
+import { StudioLink } from "@/components/studio/studio-nav";
 import { useRouter } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { UserRoundedIcon } from "@solar-icons/react/bold-duotone/user-rounded";
@@ -57,7 +58,7 @@ export default function StudioHomePage() {
                     <UserRoundedIcon size={40} className="mb-3" />
                     <p className="text-lg font-semibold">Set up your assistant</p>
                     <p className="mt-1 text-sm leading-6 opacity-80">A few questions about your business, and it starts answering customers on your link and WhatsApp.</p>
-                    <Link href="/setup" className="mt-4 inline-flex h-11 items-center rounded-full bg-background px-5 text-sm font-semibold text-foreground">Start</Link>
+                    <StudioLink href="/setup" className="mt-4 inline-flex h-11 items-center rounded-full bg-background px-5 text-sm font-semibold text-foreground">Start</StudioLink>
                 </div>
             ) : overview.isLoading ? (
                 <div className="mt-5 space-y-3">
@@ -65,16 +66,16 @@ export default function StudioHomePage() {
                     <Skeleton className="h-36 w-full rounded-3xl" />
                     <Skeleton className="h-24 w-full rounded-2xl" />
                 </div>
-            ) : overview.isError ? (
-                <p className="mt-6 text-sm text-destructive">{overview.error instanceof Error ? overview.error.message : "Couldn't load your business."}</p>
+            ) : !overview.data ? (
+                <StudioLoadError error={overview.error} fallback="Couldn't load your business." onRetry={() => void overview.refetch()} />
             ) : (
                 <>
-                    <Link href="/assistant" className="mt-4 flex items-center gap-2 text-[13px] text-muted-foreground">
+                    <StudioLink href="/assistant" className="mt-4 flex items-center gap-2 text-[13px] text-muted-foreground">
                         <span className={live.length ? "h-2 w-2 rounded-full bg-emerald-500" : "h-2 w-2 rounded-full bg-amber-500"} />
                         {live.length
                             ? <span><span className="font-medium text-foreground">Live</span> on {joinWords(live)}</span>
                             : <span><span className="font-medium text-foreground">Not live yet.</span> Finish setting up below.</span>}
-                    </Link>
+                    </StudioLink>
 
                     <StudioNotificationsCard />
 
@@ -82,12 +83,12 @@ export default function StudioHomePage() {
                         <section className="mt-4">
                             <div className="mb-2 flex items-baseline justify-between">
                                 <h2 className="text-[15px] font-semibold">Needs you</h2>
-                                <Link href="/inbox" className="text-[13px] text-muted-foreground">See all</Link>
+                                <StudioLink href="/inbox" className="text-[13px] text-muted-foreground">See all</StudioLink>
                             </div>
                             <ul className="overflow-hidden rounded-2xl border border-orange-200 bg-orange-50/60 dark:border-orange-500/20 dark:bg-orange-500/5">
                                 {waiting.slice(0, 3).map((conversation) => (
                                     <li key={conversation.id} className="border-b border-orange-200 last:border-0 dark:border-orange-500/20">
-                                        <Link href={`/inbox/${conversation.id}`} className="flex gap-3 px-4 py-3">
+                                        <StudioLink href={`/inbox/${conversation.id}`} className="flex gap-3 px-4 py-3">
                                             <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-orange-600" />
                                             <span className="min-w-0 flex-1">
                                                 <span className="flex items-baseline justify-between gap-2">
@@ -98,7 +99,7 @@ export default function StudioHomePage() {
                                                     {conversation.owner_active ? "You're replying in this chat." : conversation.needs_owner?.reason}
                                                 </span>
                                             </span>
-                                        </Link>
+                                        </StudioLink>
                                     </li>
                                 ))}
                             </ul>

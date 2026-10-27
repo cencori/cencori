@@ -1,7 +1,8 @@
 "use client";
 
 import { useRef, useState } from "react";
-import Link from "next/link";
+import { StudioLoadError } from "@/components/studio/studio-data";
+import { StudioLink } from "@/components/studio/studio-nav";
 import { Drawer } from "vaul";
 import { CHANNEL_LABEL, initials, shortTime, useInbox, useMarkRead, type InboxChannel, type InboxConversation } from "@/components/studio/useInbox";
 import { ChatRoundDotsIcon } from "@solar-icons/react/bold-duotone/chat-round-dots";
@@ -27,7 +28,7 @@ export default function StudioInboxPage() {
     const all = inbox.data?.conversations ?? [];
     const waiting = all.filter((conversation) => conversation.needs_owner || conversation.owner_active);
     const conversations = channel === "needs" ? waiting : all;
-    const empty = !inbox.isLoading && !inbox.isError && conversations.length === 0;
+    const empty = !!inbox.data && conversations.length === 0;
     const markRead = useMarkRead();
     // Long-press a chat for "Mark as read / unread", the way phones do it.
     const [held, setHeld] = useState<InboxConversation | null>(null);
@@ -67,7 +68,7 @@ export default function StudioInboxPage() {
                 </div>
             </div>
 
-            {inbox.isLoading ? (
+            {inbox.isPending && !inbox.isError ? (
                 <div className="mt-4 space-y-4">
                     {[0, 1, 2, 3, 4].map((index) => (
                         <div key={index} className="flex gap-3">
@@ -76,8 +77,8 @@ export default function StudioInboxPage() {
                         </div>
                     ))}
                 </div>
-            ) : inbox.isError ? (
-                <p className="mt-6 text-sm text-destructive">{inbox.error instanceof Error ? inbox.error.message : "Couldn't load your chats."}</p>
+            ) : !inbox.data ? (
+                <StudioLoadError error={inbox.error} fallback="Couldn't load your chats." onRetry={() => void inbox.refetch()} />
             ) : conversations.length === 0 ? (
                 channel === "needs" ? (
                     <StudioEmptyCard icon={ChatRoundCheckIcon} title="Nothing needs you" description="Your assistant is handling every chat." />
@@ -92,7 +93,7 @@ export default function StudioInboxPage() {
                 <ul className="-mx-4 mt-3">
                     {conversations.map((conversation) => (
                         <li key={conversation.id}>
-                            <Link
+                            <StudioLink
                                 href={`/inbox/${conversation.id}`}
                                 onPointerDown={() => startPress(conversation)}
                                 onPointerUp={endPress}
@@ -123,7 +124,7 @@ export default function StudioInboxPage() {
                                         ) : null}
                                     </span>
                                 </span>
-                            </Link>
+                            </StudioLink>
                         </li>
                     ))}
                 </ul>
