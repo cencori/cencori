@@ -57,7 +57,7 @@ const nextConfig: NextConfig = {
     // webpack build small enough for the build machine's memory.
     optimizePackageImports: ["lucide-react", "@lobehub/icons"],
     // Lower peak memory during the webpack compile (Vercel builds were OOMing
-    // on the 16GB machine).
+    // on the 16GB machine with webpack; Turbopack is the build now).
     webpackMemoryOptimizations: true,
     staleTimes: {
       dynamic: 300,
