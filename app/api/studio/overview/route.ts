@@ -77,6 +77,8 @@ export async function GET(req: NextRequest) {
         brief: brief ? { headline: brief.headline, points: brief.points, at: brief.at } : null,
         today: { chats: today.count ?? 0, earned: earned(starts.day) },
         month: { chats: month.count ?? 0, earned: earned(starts.month) },
+        // Everything that ever came in through the assistant (Home's balance).
+        all_time: { earned: earned(new Date(0)) },
         currency,
         payments_connected: money.connected,
         plan: plan.accountType === 'business' && plan.plan

@@ -1,7 +1,8 @@
 /**
  * /api/studio/stores?project_id=
  *
- * The business's online store (Shopify, WooCommerce) or WhatsApp catalog, for product sync.
+ * The business's online store (Shopify, WooCommerce through Nango; Square
+ * through Composio) or WhatsApp catalog, for product sync.
  *   GET   which stores can be connected, which are, and how their last sync went
  *   POST  { project_id, action: 'connect', provider }     a sign-in link (Nango)
  *         { project_id, action: 'fetch', provider }       its products, for the review
@@ -15,6 +16,8 @@ import { createAdminClient } from '@/lib/supabaseAdmin';
 import { requireProjectAccess } from '@/lib/require-project-access';
 import { NangoError, createConnectLink, deleteConnection, listNangoIntegrations, listProjectConnections } from '@/lib/integrations/nango';
 import { getProjectChannel } from '@/lib/channels/whatsapp';
+import { activeComposioConnection, composioConfigured, createComposioLink, deleteComposioConnection, listComposioConnections } from '@/lib/integrations/composio';
+import { studioOrigin } from '@/lib/studio/routing';
 import { STORES, readStore, removeStoreLink, saveStoreLink, storeLinks, syncStore, type StoreProvider } from '@/lib/embedded/store-sync';
 
 export const maxDuration = 60;
@@ -25,6 +28,8 @@ const fail = (message: string, status = 400) => NextResponse.json({ error: messa
 /** Store product id → catalog product id, as the review worked them out. */
 const cleanLinks = (value: unknown): Record<string, string> => Object.fromEntries(Object.entries((value ?? {}) as Record<string, unknown>)
     .filter((entry): entry is [string, string] => typeof entry[1] === 'string' && /^p_[a-z0-9]{6,24}$/.test(entry[1])).slice(0, 1_000));
+/** Stores connected through Composio (the rest through Nango, and WhatsApp through its own connection). */
+const COMPOSIO_STORES = ['square'] as const;
 const isProvider = (value: unknown): value is StoreProvider => typeof value === 'string' && value in STORES;
 
 async function canManage(db: Admin, organizationId: string, userId: string) {
@@ -52,7 +57,13 @@ export async function GET(req: NextRequest) {
     if (!access.ok) return access.response;
     const db = createAdminClient();
     try {
-        const [integrations, connections, links, channel] = await Promise.all([storeIntegrations(), listProjectConnections(projectId), storeLinks(db, projectId), getProjectChannel(db, projectId)]);
+        const [integrations, connections, links, channel, composioConnections] = await Promise.all([
+            storeIntegrations(),
+            listProjectConnections(projectId),
+            storeLinks(db, projectId),
+            getProjectChannel(db, projectId),
+            composioConfigured() ? listComposioConnections(projectId).catch(() => []) : Promise.resolve([]),
+        ]);
         const status = (provider: StoreProvider, connected: boolean, broken: boolean) => {
             const link = links.find((item) => item.provider === provider);
             return {
@@ -72,6 +83,12 @@ export async function GET(req: NextRequest) {
                 const connection = connections.find((item) => item.integration === integrations[provider]);
                 return status(provider, !!connection && !connection.broken, !!connection?.broken);
             }),
+            // Through Composio (it signs in to Square itself).
+            ...(composioConfigured() ? COMPOSIO_STORES.map((provider) => {
+                const connection = composioConnections.find((item) => item.toolkit === provider && item.status === 'ACTIVE');
+                const failed = composioConnections.find((item) => item.toolkit === provider && /EXPIRED|FAILED/.test(item.status));
+                return status(provider, !!connection, !connection && !!failed);
+            }) : []),
             // The catalog on the WhatsApp number, once WhatsApp is connected.
             ...(channel ? [status('whatsapp', true, false)] : []),
         ];
@@ -112,6 +129,36 @@ export async function POST(req: NextRequest) {
                 return NextResponse.json({ ok: true });
             }
             return fail('WhatsApp is connected from its own sheet.');
+        }
+
+        if ((COMPOSIO_STORES as readonly string[]).includes(provider)) {
+            if (!composioConfigured()) return fail(`${STORES[provider].label} isn't available yet.`, 404);
+            if (body.action === 'connect') {
+                // Back to Studio after signing in; the sheet looks again when it's in view.
+                const back = `${studioOrigin(req.headers.get('host') ?? 'studio.cencori.com')}/?store=${provider}`;
+                const link = await createComposioLink(projectId, provider, back);
+                return NextResponse.json({ url: link.url });
+            }
+            const connection = await activeComposioConnection(projectId, provider);
+            if (!connection) return fail(`Connect your ${STORES[provider].label} account first.`, 409);
+            if (body.action === 'fetch') return NextResponse.json({ products: await readStore(db, provider, 'composio', connection.connectionId, projectId) });
+            if (body.action === 'link') {
+                await saveStoreLink(db, projectId, { provider, integration: 'composio', connection_id: connection.connectionId, links: cleanLinks(body.links), last_synced_at: new Date().toISOString(), last_error: null, last_counts: null });
+                return NextResponse.json({ ok: true });
+            }
+            if (body.action === 'sync') {
+                const link = (await storeLinks(db, projectId)).find((item) => item.provider === provider);
+                if (!link) return fail('Bring in your products first.', 409);
+                const result = await syncStore(db, projectId, { ...link, connection_id: connection.connectionId });
+                if (result.last_error) return fail(result.last_error, 502);
+                return NextResponse.json({ counts: result.last_counts });
+            }
+            if (body.action === 'disconnect') {
+                await removeStoreLink(db, projectId, provider);
+                await deleteComposioConnection(connection.connectionId).catch(() => undefined);
+                return NextResponse.json({ ok: true });
+            }
+            return fail('Unknown action.');
         }
 
         const integration = (await storeIntegrations())[provider];

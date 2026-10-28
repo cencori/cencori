@@ -12,6 +12,10 @@ export interface InboxConversation {
     channel: InboxChannel;
     /** What the owner sees: the customer's WhatsApp name, else their number, else "Website visitor". */
     name: string;
+    /** A real name (WhatsApp gives one), not a stand-in. */
+    named: boolean;
+    /** What they came for, from their first message ("Laptops under ₦500k"); null when it was only a greeting. */
+    topic: string | null;
     number: string | null;
     last_message: string | null;
     /** Who sent the last message. */
@@ -51,12 +55,42 @@ export function channelOf(metadata: Record<string, unknown> | null): InboxChanne
     return "other";
 }
 
-function nameOf(row: SessionRow): { name: string; number: string | null } {
+function nameOf(row: SessionRow): { name: string; number: string | null; named: boolean } {
     const metadata = row.metadata ?? {};
     const number = typeof metadata.customer_number === "string" ? `+${metadata.customer_number.replace(/^\+/, "")}` : null;
     const name = typeof metadata.customer_name === "string" && metadata.customer_name.trim() ? metadata.customer_name.trim() : null;
     const channel = channelOf(metadata);
-    return { name: name ?? number ?? (channel === "link" ? "Visitor from your link" : "Website visitor"), number };
+    return { name: name ?? number ?? (channel === "link" ? "Visitor from your link" : "Website visitor"), number, named: !!name };
+}
+
+const GREETING = /^(hi+|hello+|hey+|hiya|good\s+(morning|afternoon|evening|day)|how\s+far|howdy|yo|sup|wassup|what['’]?s\s+up|how['’]?s\s+it\s+going|how\s+are\s+you(\s+doing)?(\s+today)?|how\s+is\s+it\s+going|hallo|ekaaro|ekasan|ekaale|bawo|nnoo|sannu|please|pls|abeg|sir|ma|madam|boss|dear)\b[\s,!.?]*/i;
+
+/**
+ * What a customer came for, from their first message, in a few words: the
+ * greeting gone, the first sentence, up to six words. Null when the message
+ * was only a greeting ("Hi!").
+ */
+export function topicOf(message: string | null | undefined): string | null {
+    let text = (message ?? "").replace(/\s+/g, " ").trim();
+    // "Hi, good morning, please …": every greeting off the front.
+    for (let i = 0; i < 4 && GREETING.test(text); i++) text = text.replace(GREETING, "").trim();
+    text = text.split(/(?<=[.!?])\s/)[0].replace(/[.!?,;:]+$/, "").trim();
+    if (text.length < 3) return null;
+    const words = text.split(" ");
+    const short = words.slice(0, 6).join(" ");
+    return `${short.charAt(0).toUpperCase()}${short.slice(1)}${words.length > 6 ? "…" : ""}`;
+}
+
+/** A message as one plain line for the inbox preview: no Markdown (bold, bullets, headings), no line breaks. */
+function previewText(text: string | null | undefined): string | null {
+    if (!text) return null;
+    const plain = text
+        .replace(/\*\*|__|`/g, "")
+        .replace(/^\s*(#{1,6}\s+|[-*•]\s+|\d+[.)]\s+)/gm, "")
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+        .replace(/\s+/g, " ")
+        .trim();
+    return plain || null;
 }
 
 /** The assistant's words in a completed turn (its output messages' text parts). */
@@ -104,15 +138,21 @@ export async function listConversations(db: Admin, projectId: string, opts: { ch
     const sessions = (data ?? []) as SessionRow[];
     if (sessions.length === 0) return [];
 
-    // Each conversation's last turn only.
+    // Each conversation's last turn, and its first message (what they came for).
     const lastTurns = sessions.filter((row) => (row.last_turn_number ?? 0) > 0);
-    const { data: events } = lastTurns.length
-        ? await db.from("session_events").select(EVENT_COLUMNS)
-            .in("event_type", ["turn.started", "turn.completed"])
-            .or(lastTurns.map((row) => `and(session_id.eq.${row.id},turn_number.eq.${row.last_turn_number})`).join(","))
-        : { data: [] };
+    const [{ data: events }, { data: firsts }] = lastTurns.length
+        ? await Promise.all([
+            db.from("session_events").select(EVENT_COLUMNS)
+                .in("event_type", ["turn.started", "turn.completed"])
+                .or(lastTurns.map((row) => `and(session_id.eq.${row.id},turn_number.eq.${row.last_turn_number})`).join(",")),
+            db.from("session_events").select("session_id, input:payload->>input_text")
+                .eq("event_type", "turn.started").eq("turn_number", 1)
+                .in("session_id", lastTurns.map((row) => row.id)),
+        ])
+        : [{ data: [] }, { data: [] }];
     const bySession = new Map<string, EventRow[]>();
     for (const event of (events ?? []) as EventRow[]) bySession.set(event.session_id, [...(bySession.get(event.session_id) ?? []), event]);
+    const firstMessage = new Map(((firsts ?? []) as Array<{ session_id: string; input: string | null }>).map((event) => [event.session_id, event.input ? withoutCatchUpNote(event.input) : null]));
 
     return sessions.map((row) => {
         const turn = bySession.get(row.id) ?? [];
@@ -123,7 +163,7 @@ export async function listConversations(db: Admin, projectId: string, opts: { ch
         // A message sent while the assistant was paused, if it's the newest.
         const manual = manualMessages(row.metadata).at(-1);
         const manualIsLast = !!manual && new Date(manual.at).getTime() > turnAt;
-        const { name, number } = nameOf(row);
+        const { name, number, named } = nameOf(row);
         // Every turn starts with the customer's message.
         const started = turn.find((event) => event.event_type === "turn.started");
         const manualAt = manualTimes(row.metadata);
@@ -131,8 +171,10 @@ export async function listConversations(db: Admin, projectId: string, opts: { ch
             id: row.id,
             channel: channelOf(row.metadata),
             name,
+            named,
+            topic: topicOf(firstMessage.get(row.id) ?? manualMessages(row.metadata).find((message) => message.from === "customer")?.text),
             number,
-            last_message: manualIsLast ? manual!.text : reply || asked,
+            last_message: previewText(manualIsLast ? manual!.text : reply || asked),
             last_from: manualIsLast ? manual!.from : reply ? "assistant" : asked ? "customer" : null,
             updated_at: row.updated_at,
             open: row.status === "active",
@@ -169,14 +211,15 @@ export async function getConversation(db: Admin, projectId: string, sessionId: s
     for (const message of manualMessages(row.metadata)) messages.push({ id: message.id, from: message.from, text: message.text, at: message.at });
     messages.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
 
-    const { name, number } = nameOf(row);
+    const { name, number, named } = nameOf(row);
     const last = messages[messages.length - 1];
     const channel = channelOf(row.metadata);
     const lastFromCustomer = [...messages].reverse().find((message) => message.from === "customer");
     const windowOpen = !!lastFromCustomer && Date.now() - new Date(lastFromCustomer.at).getTime() < REPLY_WINDOW_MS;
     return {
         conversation: {
-            id: row.id, channel, name, number,
+            id: row.id, channel, name, named, number,
+            topic: topicOf(messages.find((message) => message.from === "customer")?.text),
             last_message: last?.text ?? null, last_from: last?.from ?? null,
             updated_at: row.updated_at, open: row.status === "active",
             needs_owner: needsOwner(row.metadata), owner_active: isOwnerActive(row.metadata),

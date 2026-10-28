@@ -767,3 +767,18 @@ html[data-toast-preview="true"] [data-cookie-consent] {
         padding-bottom: 0.75rem !important;
     }
 }
+
+/*
+ * Studio has no scrollbars, as a native app has none: the page, its sheets
+ * (portalled outside the app, so the rule is on the whole document) and any
+ * list that scrolls sideways still scroll by touch, trackpad and wheel; only
+ * the bars are gone. `data-studio` is set on Studio's pages only.
+ */
+html[data-studio],
+html[data-studio] * {
+    scrollbar-width: none;
+}
+html[data-studio]::-webkit-scrollbar,
+html[data-studio] *::-webkit-scrollbar {
+    display: none;
+}

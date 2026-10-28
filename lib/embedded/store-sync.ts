@@ -19,10 +19,11 @@ import { productKey } from '@/lib/embedded/catalog-merge';
 type Admin = ReturnType<typeof createAdminClient>;
 
 export const STORE_SYNC_SLUG = 'store_sync';
-export type StoreProvider = 'shopify' | 'woocommerce' | 'whatsapp';
+export type StoreProvider = 'shopify' | 'woocommerce' | 'square' | 'whatsapp';
 export const STORES: Record<StoreProvider, { label: string }> = {
     shopify: { label: 'Shopify' },
     woocommerce: { label: 'WooCommerce' },
+    square: { label: 'Square' },
     whatsapp: { label: 'WhatsApp catalog' },
 };
 /** A store is synced again after this long (the hourly job runs a little more often). */
@@ -151,9 +152,59 @@ async function whatsappProducts(db: Admin, channelId: string): Promise<StoreProd
     });
 }
 
-/** `integration`/`connectionId`: the Nango app and connection, or for WhatsApp 'meta' and the channel id. */
-export async function readStore(db: Admin, provider: StoreProvider, integration: string, connectionId: string): Promise<StoreProduct[]> {
+type SquareObject = { id: string; is_deleted?: boolean; item_data?: { name?: string; description?: string; variations?: Array<{ id: string; item_variation_data?: { name?: string; price_money?: { amount?: number; currency?: string } } }> } };
+
+/** A Square catalog (through Composio): items, their variations as options, prices (minor units) and stock. */
+async function squareProducts(projectId: string, connectionId: string): Promise<StoreProduct[]> {
+    const { composioProxy } = await import('@/lib/integrations/composio');
+    const items: SquareObject[] = [];
+    let cursor: string | null = null;
+    do {
+        const page: { objects?: SquareObject[]; cursor?: string } = await composioProxy(projectId, connectionId, 'GET', `/v2/catalog/list?types=ITEM${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`);
+        items.push(...(page.objects ?? []).filter((item) => !item.is_deleted && item.item_data?.name));
+        cursor = page.cursor ?? null;
+    } while (cursor && items.length < PRODUCTS_MAX);
+
+    // Stock, per variation, summed per item (Square counts only what's tracked).
+    const variationIds = items.flatMap((item) => (item.item_data?.variations ?? []).map((variation) => variation.id));
+    const stock = new Map<string, number>();
+    for (let index = 0; index < variationIds.length; index += 100) {
+        type Counts = { counts?: Array<{ catalog_object_id: string; quantity?: string; state?: string }> };
+        const counts = await composioProxy<Counts>(projectId, connectionId, 'POST', '/v2/inventory/counts/batch-retrieve', { catalog_object_ids: variationIds.slice(index, index + 100), states: ['IN_STOCK'] })
+            .catch((): Counts => ({ counts: [] }));
+        for (const count of counts.counts ?? []) stock.set(count.catalog_object_id, (stock.get(count.catalog_object_id) ?? 0) + Number(count.quantity ?? 0));
+    }
+
+    return items.slice(0, PRODUCTS_MAX).flatMap((item) => {
+        const variations = (item.item_data?.variations ?? []).filter((variation) => typeof variation.item_variation_data?.price_money?.amount === 'number');
+        if (!variations.length) return [];
+        // Square keeps money in the currency's smallest unit (kobo, cents).
+        const prices = variations.map((variation) => variation.item_variation_data!.price_money!.amount! / 100);
+        const low = Math.min(...prices);
+        const named = variations.filter((variation) => variation.item_variation_data?.name && !/^regular$/i.test(variation.item_variation_data.name));
+        const tracked = variations.some((variation) => stock.has(variation.id));
+        return [{
+            externalId: item.id,
+            name: item.item_data!.name!.trim().slice(0, 120),
+            price: low,
+            description: strip(item.item_data!.description),
+            options: named.map((variation) => {
+                const price = prices[variations.indexOf(variation)];
+                const currency = variation.item_variation_data!.price_money!.currency ?? 'NGN';
+                return prices.every((each) => each === low) ? variation.item_variation_data!.name! : `${variation.item_variation_data!.name} ${currency === 'NGN' ? '₦' : `${currency} `}${price.toLocaleString('en-NG')}`;
+            }).join(', ').slice(0, 200),
+            stock: tracked ? variations.reduce((sum, variation) => sum + (stock.get(variation.id) ?? 0), 0) : null,
+        }];
+    });
+}
+
+/**
+ * `integration`/`connectionId`: the Nango app and connection; for Square
+ * 'composio' and the Composio connection; for WhatsApp 'meta' and the channel id.
+ */
+export async function readStore(db: Admin, provider: StoreProvider, integration: string, connectionId: string, projectId = ''): Promise<StoreProduct[]> {
     if (provider === 'whatsapp') return whatsappProducts(db, connectionId);
+    if (provider === 'square') return squareProducts(projectId, connectionId);
     return provider === 'shopify' ? shopifyProducts(integration, connectionId) : wooProducts(integration, connectionId);
 }
 
@@ -238,7 +289,7 @@ export async function removeStoreLink(db: Admin, projectId: string, provider: St
 /** Sync one store into the catalog now. */
 export async function syncStore(db: Admin, projectId: string, link: StoreLink): Promise<StoreLink> {
     try {
-        const [store, catalog] = await Promise.all([readStore(db, link.provider, link.integration, link.connection_id), getCatalog(db, projectId)]);
+        const [store, catalog] = await Promise.all([readStore(db, link.provider, link.integration, link.connection_id, projectId), getCatalog(db, projectId)]);
         const result = applyStoreSync(catalog?.metadata.products ?? [], store, link.links);
         if (result.added || result.updated || result.hidden) {
             const saved = await saveProducts(db, projectId, { products: result.products, currency: catalog?.metadata.currency });

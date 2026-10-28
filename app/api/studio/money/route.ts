@@ -7,6 +7,8 @@
  * sellers, the bank account customers transfer to, and transfers to confirm.
  */
 
+import { bankLogo } from '@/lib/payouts/name-enquiry';
+import { accountsOf } from '@/lib/embedded/transfers';
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { requireProjectAccess } from '@/lib/require-project-access';
@@ -48,7 +50,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
         ...summary,
         payments: payments ? { provider: payments.metadata.provider, mode: payments.metadata.mode } : null,
-        bank_account: transfers?.metadata.account ?? null,
+        bank_account: transfers?.metadata.account ? { ...transfers.metadata.account, logo: await bankLogo(transfers.metadata.account.bank) } : null,
+        // Every account, the main one (the one customers are given) first, with its bank's logo.
+        bank_accounts: await Promise.all(accountsOf(transfers?.metadata).map(async (account) => ({ ...account, logo: await bankLogo(account.bank) }))),
         // Customers who said they've sent money, newest first, then ones asked to pay in the last week.
         transfers_to_confirm: history
             .filter((t) => t.status === 'claimed' || (t.status === 'awaiting' && Date.now() - Date.parse(t.created_at) < 7 * 86_400_000))

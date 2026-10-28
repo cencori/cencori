@@ -31,13 +31,14 @@ export const viewport: Viewport = {
 };
 
 /**
+ * Marks the page as Studio (no scrollbars anywhere: globals.css), and
  * Studio follows the phone's light or dark setting: the site-wide default is
  * dark, and Studio's origin has its own stored theme, so a first visit stores
  * "system" before anything paints (next-themes then reads it like any saved
  * choice). Studio used to store "light" here; that one-time default goes back
  * to "system" once (studio-theme-v2), so only a choice made since stays.
  */
-const SYSTEM_BY_DEFAULT = `try{var s=localStorage,t=s.getItem("theme");if(!s.getItem("studio-theme-v2")){s.setItem("studio-theme-v2","1");if(t==="light")t=null}if(!t){s.setItem("theme","system");var k=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light",d=document.documentElement;d.classList.remove("dark","light");d.classList.add(k);d.style.colorScheme=k}}catch(e){}`;
+const SYSTEM_BY_DEFAULT = `document.documentElement.setAttribute("data-studio","");try{var s=localStorage,t=s.getItem("theme");if(!s.getItem("studio-theme-v2")){s.setItem("studio-theme-v2","1");if(t==="light")t=null}if(!t){s.setItem("theme","system");var k=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light",d=document.documentElement;d.classList.remove("dark","light");d.classList.add(k);d.style.colorScheme=k}}catch(e){}`;
 
 function SystemByDefault() {
     return <script dangerouslySetInnerHTML={{ __html: SYSTEM_BY_DEFAULT }} />;

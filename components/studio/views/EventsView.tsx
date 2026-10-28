@@ -19,11 +19,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 
-function soldLine(summary: StudioEventSummary): string {
-    const sold = summary.capacity ? `${summary.sold} of ${summary.capacity} sold` : `${summary.sold} sold`;
-    return summary.earned ? `${sold} · ${formatMoney(summary.earned, summary.event.currency)}` : sold;
-}
-
 /** Guests shown at a time on an event's page. */
 const GUESTS_PER_PAGE = 10;
 
@@ -362,25 +357,5 @@ function CheckInSheet({ open, onOpenChange, eventId, onCheckedIn }: { open: bool
                 </Drawer.Content>
             </Drawer.Portal>
         </Drawer.Root>
-    );
-}
-
-/** Home: the next event in the coming two weeks, how it's selling, and the way in on the night. */
-export function NextEventCard() {
-    const events = useEvents();
-    const now = Date.now();
-    const next = (events.data?.events ?? [])
-        .filter((summary) => summary.event.status === "live" && Date.parse(summary.event.ends_at ?? summary.event.starts_at) + 6 * 3_600_000 > now && Date.parse(summary.event.starts_at) - now < 14 * 86_400_000)
-        .sort((a, b) => Date.parse(a.event.starts_at) - Date.parse(b.event.starts_at))[0];
-    if (!next) return null;
-    return (
-        <StudioLink href={`/sales/events/${next.event.id}`} className="mt-3 flex items-center gap-3 rounded-2xl border border-border/60 px-4 py-3.5">
-            <CalendarIcon size={28} className="shrink-0" />
-            <span className="min-w-0 flex-1">
-                <span className="block truncate text-[15px] font-semibold">{next.event.name}</span>
-                <span className="block truncate text-[13px] text-muted-foreground">{eventWhen(next.event.starts_at)} · {soldLine(next)}</span>
-            </span>
-            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-        </StudioLink>
     );
 }

@@ -4,14 +4,16 @@ import { useState } from "react";
 import { StudioLoadError, studioFetch } from "@/components/studio/studio-data";
 import { useQuery } from "@tanstack/react-query";
 import { useStudio } from "@/components/studio/StudioShell";
-import { useStudioCopilot } from "@/components/studio/StudioCopilot";
+import { useStudioTasks } from "@/components/studio/StudioTasks";
 import { formatMoney } from "@/components/studio/useStudioOverview";
-import { BankAccountCard, TransfersToConfirm, type BankAccount, type TransferToConfirm } from "@/components/studio/StudioTransfers";
+import { GetPaidCard, TransfersToConfirm, type BankAccount, type TransferToConfirm } from "@/components/studio/StudioTransfers";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { getMainSiteUrl } from "@/lib/main-site-url";
+import { ChevronRight } from "lucide-react";
 import type { MoneyPeriod, MoneySummary } from "@/lib/studio/money";
 
-type Money = MoneySummary & { payments: { provider: string; mode: string } | null; bank_account: BankAccount | null; transfers_to_confirm: TransferToConfirm[] };
+type Money = MoneySummary & { payments: { provider: string; mode: string } | null; bank_account: BankAccount | null; bank_accounts?: BankAccount[]; transfers_to_confirm: TransferToConfirm[] };
 
 const PERIODS: Array<{ id: MoneyPeriod; label: string; caption: string; previous: string }> = [
     { id: "week", label: "Week", caption: "Last 7 days", previous: "the 7 days before" },
@@ -19,12 +21,10 @@ const PERIODS: Array<{ id: MoneyPeriod; label: string; caption: string; previous
     { id: "year", label: "Year", caption: "This year so far", previous: "the same time last year" },
 ];
 
-const PROVIDER: Record<string, string> = { paystack: "Paystack", flutterwave: "Flutterwave", stripe: "Stripe" };
-
 /** What came in through the assistant: totals, a bar chart, where it came from and what sold. */
 export default function StudioMoneyPage() {
     const { project } = useStudio();
-    const { ask } = useStudioCopilot();
+    const tasks = useStudioTasks();
     const [period, setPeriod] = useState<MoneyPeriod>("week");
     const meta = PERIODS.find((p) => p.id === period)!;
     const money = useQuery({
@@ -83,11 +83,11 @@ export default function StudioMoneyPage() {
                         ))}
                     </div>
 
-                    <div className="mt-6 overflow-hidden rounded-2xl border border-border/60 text-[15px]">
+                    <div className="mt-6 divide-y divide-border/60 overflow-hidden rounded-2xl bg-muted/60 text-[15px]">
                         <div className="flex justify-between px-4 py-3"><span>Paid by link</span><span className="font-semibold">{formatMoney(data.by_link, data.currency)}</span></div>
-                        {(data.by_transfer > 0 || data.bank_account) && <div className="flex justify-between border-t border-border/60 px-4 py-3"><span>By transfer, confirmed</span><span className="font-semibold">{formatMoney(data.by_transfer, data.currency)}</span></div>}
-                        <div className="flex justify-between border-t border-border/60 px-4 py-3"><span>{data.bank_account ? "Cash, marked paid" : "Cash and transfer, marked paid"}</span><span className="font-semibold">{formatMoney(data.marked_paid, data.currency)}</span></div>
-                        {data.to_collect > 0 && <div className="flex justify-between border-t border-border/60 px-4 py-3 text-amber-800 dark:text-amber-400"><span>Still to collect</span><span className="font-semibold">{formatMoney(data.to_collect, data.currency)}</span></div>}
+                        {(data.by_transfer > 0 || data.bank_account) && <div className="flex justify-between px-4 py-3"><span>By transfer, confirmed</span><span className="font-semibold">{formatMoney(data.by_transfer, data.currency)}</span></div>}
+                        <div className="flex justify-between px-4 py-3"><span>{data.bank_account ? "Cash, marked paid" : "Cash and transfer, marked paid"}</span><span className="font-semibold">{formatMoney(data.marked_paid, data.currency)}</span></div>
+                        {data.to_collect > 0 && <div className="flex justify-between px-4 py-3 text-amber-800 dark:text-amber-400"><span>Still to collect</span><span className="font-semibold">{formatMoney(data.to_collect, data.currency)}</span></div>}
                     </div>
 
                     {data.top_items.length > 0 && (
@@ -104,15 +104,10 @@ export default function StudioMoneyPage() {
                         </section>
                     )}
 
-                    {data.payments ? (
-                        <p className="mt-6 rounded-2xl bg-muted px-4 py-3.5 text-[13px] leading-5">
-                            Payments by link go straight to your <span className="font-semibold">{PROVIDER[data.payments.provider] ?? "payment"}</span> account{data.payments.mode === "test" ? " (test mode: no real money yet)" : ""}. Cencori never holds your money.
-                        </p>
-                    ) : (
-                        // No payment provider: customers pay by transfer to the business's own account.
-                        <BankAccountCard account={data.bank_account} onUseProvider={() => ask("Help me connect payments so customers can pay by link")} />
-                    )}
-                    <p className="mt-3 px-1 text-xs leading-5 text-muted-foreground">Counts payments through your assistant, transfers you confirm and orders you mark paid. Sales made elsewhere aren&apos;t included.</p>
+                    <GetPaidCard accounts={data.bank_accounts ?? (data.bank_account ? [data.bank_account] : [])} payments={data.payments} onConnectProvider={() => tasks.open("payments")} />
+                    <a href={getMainSiteUrl("/docs/agents/payments-and-products#your-money-in-studio")} target="_blank" rel="noreferrer" className="mt-6 inline-flex items-center gap-1 px-1 text-[13px] font-medium text-muted-foreground">
+                        How we handle your money<ChevronRight className="h-3.5 w-3.5" />
+                    </a>
                 </>
             )}
         </div>

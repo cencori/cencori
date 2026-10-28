@@ -52,9 +52,15 @@ export interface TransferEntry {
     paid_at: string | null;
 }
 
+/** One of the business's accounts, with an id to edit or remove it by. */
+export type StoredAccount = BankAccount & { id: string };
+
 export interface TransfersMetadata {
     kind: 'bank_transfer';
+    /** The main account: the one customers are given (and what every reader of the account uses). */
     account: BankAccount;
+    /** Every account, the main one first. Absent before a business had more than one. */
+    accounts?: StoredAccount[];
     currency: string;
     transfers: TransferEntry[];
     updated_at: string;
@@ -110,11 +116,22 @@ export function cleanBankAccount(input: { bank?: unknown; account_number?: unkno
     return { ok: true, account: { bank, account_number: number, account_name: name } };
 }
 
-export async function saveBankAccount(db: Admin, projectId: string, account: BankAccount): Promise<TransfersConnection | null> {
-    const existing = await getTransfers(db, projectId);
+const ACCOUNTS_MAX = 10;
+const newAccountId = () => `a_${Math.random().toString(36).slice(2, 10)}`;
+
+/** The business's accounts, the main one first (one account, from before there could be more, included). */
+export function accountsOf(metadata: TransfersMetadata | null | undefined): StoredAccount[] {
+    if (!metadata?.account) return [];
+    if (metadata.accounts?.length) return metadata.accounts;
+    return [{ ...metadata.account, id: 'a_main' }];
+}
+
+async function writeAccounts(db: Admin, projectId: string, existing: TransfersConnection | null, accounts: StoredAccount[]): Promise<TransfersConnection | null> {
+    const [main] = accounts;
     const metadata: TransfersMetadata = {
         kind: 'bank_transfer',
-        account,
+        account: { bank: main.bank, account_number: main.account_number, account_name: main.account_name },
+        accounts,
         currency: 'NGN',
         transfers: existing?.metadata.transfers ?? [],
         updated_at: new Date().toISOString(),
@@ -124,6 +141,43 @@ export async function saveBankAccount(db: Admin, projectId: string, account: Ban
         : db.from('tool_connections').insert({ project_id: projectId, connector_slug: TRANSFERS_SLUG, owner_type: 'platform', status: 'active', metadata }).select('id, project_id, metadata').single();
     const { data } = await write;
     return toConnection(data as Record<string, unknown> | null);
+}
+
+/**
+ * Add an account, or change one (by id). The first account is the main one;
+ * `main` makes this one the main one. Up to ten.
+ */
+export async function saveBankAccount(db: Admin, projectId: string, account: BankAccount, opts: { id?: string; main?: boolean } = {}): Promise<TransfersConnection | { error: string } | null> {
+    const existing = await getTransfers(db, projectId);
+    const list = accountsOf(existing?.metadata);
+    const index = opts.id ? list.findIndex((item) => item.id === opts.id) : -1;
+    if (index < 0 && list.length >= ACCOUNTS_MAX) return { error: `Up to ${ACCOUNTS_MAX} accounts.` };
+    const saved: StoredAccount = { ...account, id: index >= 0 ? list[index].id : newAccountId() };
+    const next = index >= 0 ? list.map((item, i) => (i === index ? saved : item)) : [...list, saved];
+    // The main one goes first.
+    const ordered = opts.main ? [saved, ...next.filter((item) => item.id !== saved.id)] : next;
+    return writeAccounts(db, projectId, existing, ordered);
+}
+
+/** Make an account the main one (the one customers are given). */
+export async function setMainAccount(db: Admin, projectId: string, id: string): Promise<TransfersConnection | null> {
+    const existing = await getTransfers(db, projectId);
+    const list = accountsOf(existing?.metadata);
+    const chosen = list.find((item) => item.id === id);
+    if (!existing || !chosen) return null;
+    return writeAccounts(db, projectId, existing, [chosen, ...list.filter((item) => item.id !== id)]);
+}
+
+/** Remove one account; removing the last one stops transfers. A removed main account hands over to the next. */
+export async function removeAccount(db: Admin, projectId: string, id: string): Promise<TransfersConnection | null> {
+    const existing = await getTransfers(db, projectId);
+    const rest = accountsOf(existing?.metadata).filter((item) => item.id !== id);
+    if (!existing) return null;
+    if (!rest.length) {
+        await removeBankAccount(db, projectId);
+        return null;
+    }
+    return writeAccounts(db, projectId, existing, rest);
 }
 
 /** Stop offering transfers. The history stays (Money still counts what came in). */

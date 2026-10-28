@@ -5,16 +5,13 @@ import { cn } from "@/lib/utils";
 import { StudioLoadError } from "@/components/studio/studio-data";
 import { StudioLink } from "@/components/studio/studio-nav";
 import { useRouter } from "next/navigation";
-import { ChevronRight } from "lucide-react";
 import { UserRoundedIcon } from "@solar-icons/react/bold-duotone/user-rounded";
 import { useStudio } from "@/components/studio/StudioShell";
-import { useStudioCopilot } from "@/components/studio/StudioCopilot";
-import { taskForStep, useStudioTasks } from "@/components/studio/StudioTasks";
-import { formatMoney, setupSteps, useStudioOverview } from "@/components/studio/useStudioOverview";
+import { useStudioTasks } from "@/components/studio/StudioTasks";
+import { setupSteps, useStudioOverview } from "@/components/studio/useStudioOverview";
 import { StudioProfile } from "@/components/studio/StudioProfile";
 import { StudioNotificationBell } from "@/components/studio/StudioNotificationBell";
-import { BriefListen } from "@/components/studio/BriefListen";
-import { NextEventCard } from "@/components/studio/views/EventsView";
+import { BriefSection, NeedsYouSection, QuickActions, SetupSection, TodayCard, UpNextSection } from "@/components/studio/HomeSections";
 import { Skeleton } from "@/components/ui/skeleton";
 
 function greeting(): string {
@@ -25,7 +22,6 @@ function greeting(): string {
 /** Home: today at a glance. */
 export default function StudioHomePage() {
     const { user, organization, agents } = useStudio();
-    const { ask } = useStudioCopilot();
     const tasks = useStudioTasks();
     const overview = useStudioOverview();
     const data = overview.data;
@@ -105,63 +101,12 @@ export default function StudioHomePage() {
             ) : (
                 <>
 
-                    <div className="mt-5 rounded-2xl bg-foreground p-5 text-background">
-                        {data?.today.earned ? (
-                            <>
-                                <p className="text-[13px] opacity-70">Earned today</p>
-                                <p className="mt-1 text-[34px] font-semibold leading-none tracking-tight">{formatMoney(data.today.earned.amount, data.currency)}</p>
-                                <p className="mt-3 flex gap-4 text-[13px] opacity-80">
-                                    <span>{data.today.earned.count} paid</span>
-                                    <span>{data.today.chats} {data.today.chats === 1 ? "chat" : "chats"}</span>
-                                </p>
-                            </>
-                        ) : (
-                            <>
-                                <p className="text-[13px] opacity-70">Chats today</p>
-                                <p className="mt-1 text-[34px] font-semibold leading-none tracking-tight">{data?.today.chats ?? 0}</p>
-                                <p className="mt-3 text-[13px] opacity-80">{data?.month.chats ?? 0} this month</p>
-                            </>
-                        )}
-                    </div>
-
-                    <NextEventCard />
-
-                    {/* This morning's brief: yesterday, and what to do about it. */}
-                    {data?.brief && (
-                        <section className="mt-3 rounded-2xl border border-border/60 px-4 py-3.5">
-                            <p className="text-[13px] text-muted-foreground">This morning</p>
-                            <p className="mt-0.5 text-[17px] font-semibold leading-snug">{data.brief.headline}</p>
-                            <ul className="mt-2 space-y-1.5">
-                                {data.brief.points.map((point) => (
-                                    <li key={point} className="flex gap-2 text-[14px] leading-5"><span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-muted-foreground" />{point}</li>
-                                ))}
-                            </ul>
-                            <BriefListen at={data.brief.at} />
-                        </section>
-                    )}
-
-                    {steps.length > 0 && (
-                        <section className="mt-6">
-                            <h2 className="mb-2 text-[15px] font-semibold">Finish setting up</h2>
-                            <ul className="overflow-hidden rounded-2xl border border-border/60">
-                                {steps.map((step) => (
-                                    <li key={step} className="border-b border-border/60 last:border-0">
-                                        <button type="button" onClick={() => {
-                                            // Done right here in a sheet; Copilot helps with anything else.
-                                            const task = taskForStep(step);
-                                            if (task) tasks.open(task);
-                                            else ask(`Help me ${step.charAt(0).toLowerCase()}${step.slice(1)}`);
-                                        }} className="flex w-full items-center gap-3 px-4 py-3.5 text-left">
-                                            <span className="h-4 w-4 shrink-0 rounded-full border-2 border-muted-foreground/40" />
-                                            <span className="min-w-0 flex-1 text-[15px]">{step}</span>
-                                            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-                                        </button>
-                                    </li>
-                                ))}
-                            </ul>
-                        </section>
-                    )}
-
+                    <TodayCard data={data!} />
+                    <NeedsYouSection />
+                    <UpNextSection />
+                    {data?.brief && <BriefSection brief={data.brief} />}
+                    <QuickActions data={data!} />
+                    <SetupSection steps={steps} />
                 </>
             )}
         </div>

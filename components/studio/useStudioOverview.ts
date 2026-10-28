@@ -27,6 +27,7 @@ export interface StudioOverview {
     brief: { headline: string; points: string[]; at: string } | null;
     today: { chats: number; earned?: { amount: number; count: number } };
     month: { chats: number; earned?: { amount: number; count: number } };
+    all_time?: { earned: { amount: number; count: number } };
     currency: string;
     payments_connected: boolean;
     plan: {

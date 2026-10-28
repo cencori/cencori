@@ -10,6 +10,10 @@ export interface InboxConversation {
     id: string;
     channel: InboxChannel;
     name: string;
+    /** A real name (WhatsApp gives one), not a stand-in like "Website visitor". */
+    named: boolean;
+    /** What they came for, from their first message; null when it was only a greeting. */
+    topic: string | null;
     number: string | null;
     last_message: string | null;
     last_from: "customer" | "assistant" | "owner" | null;
@@ -129,4 +133,16 @@ export function initials(name: string): string {
     const words = name.replace(/[^\p{L}\p{N}\s]/gu, "").trim().split(/\s+/).filter(Boolean);
     if (words.length === 0) return "?";
     return (words[0][0] + (words[1]?.[0] ?? "")).toUpperCase();
+}
+
+/** What a conversation is called in Studio: the customer's name, else what they came for, else where they came from. */
+export function conversationTitle(conversation: Pick<InboxConversation, "named" | "name" | "topic">): string {
+    return conversation.named ? conversation.name : conversation.topic ?? conversation.name;
+}
+
+/** "Wants a call back: …" → "Wants a callback": the short tag for why a chat needs the owner. */
+export function needsOwnerLabel(reason: string): string {
+    if (/^wants a call ?back/i.test(reason)) return "Wants a callback";
+    if (/^says they('|’)ve paid/i.test(reason)) return "Says they've paid";
+    return "Asked for you";
 }

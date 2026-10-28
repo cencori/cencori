@@ -1,7 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Check, ChevronRight, X } from "lucide-react";
+import { DocumentTextIcon } from "@solar-icons/react/bold-duotone/document-text";
+import { GalleryIcon } from "@solar-icons/react/bold-duotone/gallery";
+import { PenIcon } from "@solar-icons/react/bold-duotone/pen";
+import { WhatsAppMark } from "@/components/studio/ConversationAvatar";
 import { Spinner } from "@/components/ui/spinner";
 import { useStudio } from "@/components/studio/StudioShell";
 import { studioFetch } from "@/components/studio/studio-data";
@@ -21,6 +25,19 @@ import { cn } from "@/lib/utils";
  */
 
 const PICTURES_PER_CALL = 6;
+
+/** Online stores' marks (Simple Icons, CC0, in each brand's colour); the WhatsApp catalog uses WhatsApp's glyph. */
+const STORE_LOGOS: Record<string, string> = { woocommerce: "/stores/woocommerce.svg", shopify: "/stores/shopify.svg", square: "/stores/square.svg" };
+
+/** A small spaced-capitals label over a part of the sheet. */
+function SheetLabel({ children, action, first }: { children: ReactNode; action?: string; first?: boolean }) {
+    return (
+        <div className={cn("mb-2.5 flex items-baseline justify-between px-1", first ? "mt-1" : "mt-6")}>
+            <h3 className="text-[12px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{children}</h3>
+            {action && <span className="text-[13px] text-muted-foreground">{action}</span>}
+        </div>
+    );
+}
 
 type Source = { label: string; count: number };
 
@@ -267,23 +284,33 @@ export function ProductsTask({ onDone }: { onDone: () => void }) {
 
     return (
         <>
-            <p className="text-[15px] leading-6 text-muted-foreground">
-                {catalog.products.length ? `${catalog.products.length} saved. ` : ""}Add from as many places as you like.
-            </p>
             <input ref={files} type="file" accept=".csv,.tsv,.txt,.xlsx,text/csv" multiple hidden onChange={(event) => void readFiles(event.target.files)} />
             <input ref={pictures} type="file" accept="image/*" multiple hidden onChange={(event) => void readPictures(event.target.files)} />
-            <div className="mt-4 grid grid-cols-3 gap-2">
+            <SheetLabel first action={catalog.products.length ? `${catalog.products.length} saved` : undefined}>Add from</SheetLabel>
+            <ul className="divide-y divide-border/60 overflow-hidden rounded-2xl bg-muted">
                 {[
-                    { label: "Spreadsheet", hint: "Shopify, Bumpa", onClick: () => files.current?.click() },
-                    { label: "Screenshots", hint: "WhatsApp, Instagram", onClick: () => pictures.current?.click() },
-                    { label: "Type or paste", hint: "A price list", onClick: () => setPasting(true) },
+                    { label: "Spreadsheet", hint: "Shopify, Bumpa, Excel", icon: <DocumentTextIcon size={20} />, tone: "bg-emerald-400/15 text-emerald-500 dark:text-emerald-400", onClick: () => files.current?.click() },
+                    { label: "Screenshots", hint: "WhatsApp, Instagram", icon: <GalleryIcon size={20} />, tone: "bg-violet-400/15 text-violet-500 dark:text-violet-400", onClick: () => pictures.current?.click() },
+                    { label: "Type or paste", hint: "A price list", icon: <PenIcon size={20} />, tone: "bg-orange-400/15 text-orange-500 dark:text-orange-400", onClick: () => setPasting((open) => !open) },
                 ].map((option) => (
-                    <button key={option.label} type="button" disabled={!!reading} onClick={option.onClick} className="flex flex-col items-start rounded-2xl bg-muted px-3 py-3 text-left disabled:opacity-50">
-                        <span className="text-[14px] font-semibold">{option.label}</span>
-                        <span className="mt-0.5 text-[12px] text-muted-foreground">{option.hint}</span>
-                    </button>
+                    <li key={option.label}>
+                        <button type="button" disabled={!!reading} onClick={option.onClick} className="flex w-full items-center gap-3 px-4 py-3 text-left disabled:opacity-50">
+                            <span className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-full", option.tone)}>{option.icon}</span>
+                            <span className="min-w-0 flex-1">
+                                <span className="block text-[15px] font-semibold">{option.label}</span>
+                                <span className="block truncate text-[13px] text-muted-foreground">{option.hint}</span>
+                            </span>
+                            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        </button>
+                    </li>
                 ))}
-            </div>
+            </ul>
+            {pasting && (
+                <div className="mt-2.5">
+                    <textarea value={pasted} onChange={(event) => setPasted(event.target.value)} rows={5} placeholder={"Jollof rice ₦4,000\nChapman ₦2,500"} className="w-full resize-none rounded-2xl bg-muted px-4 py-3 text-[15px] outline-none placeholder:text-muted-foreground" />
+                    <button type="button" disabled={!pasted.trim() || !!reading} onClick={() => void readText()} className="mt-2 h-10 w-full rounded-full border border-border/60 text-sm font-semibold disabled:opacity-50">Add this list</button>
+                </div>
+            )}
             <StoreSection
                 disabled={!!reading}
                 onProducts={(provider, label, products) => {
@@ -292,32 +319,29 @@ export function ProductsTask({ onDone }: { onDone: () => void }) {
                 }}
                 onError={setError}
             />
-            {pasting && (
-                <div className="mt-3">
-                    <textarea value={pasted} onChange={(event) => setPasted(event.target.value)} rows={5} placeholder={"Jollof rice ₦4,000\nChapman ₦2,500"} className="w-full rounded-2xl bg-muted px-4 py-3 text-[15px] outline-none placeholder:text-muted-foreground" />
-                    <button type="button" disabled={!pasted.trim() || !!reading} onClick={() => void readText()} className="mt-2 h-10 w-full rounded-full border border-border/60 text-sm font-semibold disabled:opacity-50">Add this list</button>
-                </div>
-            )}
-            {reading && <p className="mt-4 flex items-center gap-2 text-[13px] text-muted-foreground"><Spinner className="h-4 w-4 animate-spin" />{reading}</p>}
+            {reading && <p className="mt-4 flex items-center gap-2 px-1 text-[13px] text-muted-foreground"><Spinner className="h-4 w-4" />{reading}</p>}
             {sources.length > 0 && (
-                <ul className="mt-4 space-y-1.5">
-                    {sources.map((source) => (
-                        <li key={source.label} className="flex items-center justify-between gap-3 text-[14px]">
-                            <span className="flex items-center gap-2"><Check className="h-4 w-4 text-emerald-600" />{source.label}</span>
-                            <span className="flex items-center gap-2 text-muted-foreground">
-                                {source.count}
-                                <button type="button" aria-label={`Remove ${source.label}`} onClick={() => {
+                <>
+                    <SheetLabel>Added</SheetLabel>
+                    <ul className="divide-y divide-border/60 overflow-hidden rounded-2xl bg-muted">
+                        {sources.map((source) => (
+                            <li key={source.label} className="flex items-center gap-3 px-4 py-3">
+                                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-400/15 text-emerald-500 dark:text-emerald-400"><Check className="h-4 w-4" /></span>
+                                <span className="min-w-0 flex-1 truncate text-[15px] font-medium">{source.label}</span>
+                                <span className="shrink-0 text-[13px] text-muted-foreground">{source.count}</span>
+                                <button type="button" aria-label={`Remove ${source.label}`} className="-mr-1 flex h-8 w-8 shrink-0 items-center justify-center text-muted-foreground" onClick={() => {
                                     setIncoming((current) => current.filter((item) => item.source !== source.label));
                                     setSources((current) => current.filter((item) => item !== source));
                                     setFromStores((current) => Object.fromEntries(Object.entries(current).filter(([, label]) => label !== source.label)));
                                 }}><X className="h-4 w-4" /></button>
-                            </span>
-                        </li>
-                    ))}
-                </ul>
+                            </li>
+                        ))}
+                    </ul>
+                </>
             )}
             {error && <p role="alert" className="mt-3 text-[13px] leading-5 text-destructive">{error}</p>}
-            <button type="button" disabled={incoming.length === 0 || !!reading} onClick={() => { setChoices({}); setStep("review"); }} className="mt-5 h-12 w-full rounded-full bg-foreground text-[15px] font-semibold text-background disabled:opacity-50">
+            <span aria-hidden className="block h-5 shrink-0" />
+            <button type="button" disabled={incoming.length === 0 || !!reading} onClick={() => { setChoices({}); setStep("review"); }} className="mt-auto h-12 w-full shrink-0 rounded-full bg-foreground text-[15px] font-semibold text-background disabled:opacity-50">
                 {incoming.length ? `Review ${incoming.length} products` : "Review"}
             </button>
         </>
@@ -355,7 +379,10 @@ function StoreSection({ disabled, onProducts, onError }: { disabled: boolean; on
         return () => document.removeEventListener("visibilitychange", again);
     }, [load]);
 
-    if (!stores?.length) return null;
+    // Shown straight away (WooCommerce and Square are always on); the real list, with each store's state, follows.
+    const placeholder = (provider: string, label: string) => ({ provider, label, connected: false, broken: false, syncing: false, last_synced_at: null, last_error: null, products: 0, loading: true });
+    const shown: Array<StoreState & { loading?: boolean }> = stores ?? [placeholder("woocommerce", "WooCommerce"), placeholder("square", "Square")];
+    if (!shown.length) return null;
 
     const act = async (store: StoreState, action: "connect" | "fetch" | "sync" | "disconnect") => {
         setBusy(`${store.provider}:${action}`);
@@ -381,31 +408,40 @@ function StoreSection({ disabled, onProducts, onError }: { disabled: boolean; on
     const button = "flex h-9 items-center gap-1.5 rounded-full border border-border/60 px-3.5 text-[13px] font-semibold disabled:opacity-50";
 
     return (
-        <ul className="mt-2 space-y-2">
-            {stores.map((store) => (
-                <li key={store.provider} className="flex items-center gap-3 rounded-2xl bg-muted px-4 py-3">
-                    <span className="min-w-0 flex-1">
-                        <span className="block text-[14px] font-semibold">{store.label}</span>
-                        <span className="block truncate text-[12px] text-muted-foreground">
-                            {store.syncing
-                                ? store.last_error ? "Last sync failed" : `${store.products} products · synced ${store.last_synced_at ? ago(store.last_synced_at) : ""}`
-                                : store.broken ? "Sign in again" : store.connected ? "Connected" : "Stays in sync by itself"}
+        <>
+            <SheetLabel>Online stores</SheetLabel>
+            <ul className="divide-y divide-border/60 overflow-hidden rounded-2xl bg-muted">
+                {shown.map((store) => (
+                    <li key={store.provider} className="flex items-center gap-3 px-4 py-3">
+                        {STORE_LOGOS[store.provider]
+                            // eslint-disable-next-line @next/next/no-img-element -- our own small static file
+                            ? <img src={STORE_LOGOS[store.provider]} alt="" className="h-10 w-10 shrink-0 rounded-full bg-white object-contain" />
+                            : <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#25D366]/15 text-[#25D366]"><WhatsAppMark className="h-5 w-5" /></span>}
+                        <span className="min-w-0 flex-1">
+                            <span className="block text-[15px] font-semibold">{store.label}</span>
+                            <span className="block truncate text-[13px] text-muted-foreground">
+                                {store.syncing
+                                    ? store.last_error ? "Last sync failed" : `${store.products} products · synced ${store.last_synced_at ? ago(store.last_synced_at) : ""}`
+                                    : store.broken ? "Sign in again" : store.connected ? "Connected" : "Stays in sync by itself"}
+                            </span>
                         </span>
-                    </span>
-                    {store.syncing ? (
-                        <>
-                            <button type="button" disabled={disabled || !!busy} onClick={() => void act(store, "sync")} className={button}>{busy === `${store.provider}:sync` && <Spinner className="h-3.5 w-3.5 animate-spin" />}Sync now</button>
-                            <button type="button" disabled={disabled || !!busy} onClick={() => void act(store, "disconnect")} aria-label={`Stop syncing ${store.label}`} className="text-muted-foreground disabled:opacity-50"><X className="h-4 w-4" /></button>
-                        </>
-                    ) : store.connected && !store.broken ? (
-                        <button type="button" disabled={disabled || !!busy || brought[store.provider]} onClick={() => void act(store, "fetch")} className={button}>
-                            {busy === `${store.provider}:fetch` && <Spinner className="h-3.5 w-3.5 animate-spin" />}{brought[store.provider] ? "Added" : "Bring in products"}
-                        </button>
-                    ) : (
-                        <button type="button" disabled={disabled || !!busy} onClick={() => void act(store, "connect")} className={button}>{busy === `${store.provider}:connect` && <Spinner className="h-3.5 w-3.5 animate-spin" />}Connect</button>
-                    )}
-                </li>
-            ))}
-        </ul>
+                        {store.loading ? (
+                            <Spinner className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        ) : store.syncing ? (
+                            <>
+                                <button type="button" disabled={disabled || !!busy} onClick={() => void act(store, "sync")} className={button}>{busy === `${store.provider}:sync` && <Spinner className="h-3.5 w-3.5" />}Sync now</button>
+                                <button type="button" disabled={disabled || !!busy} onClick={() => void act(store, "disconnect")} aria-label={`Stop syncing ${store.label}`} className="text-muted-foreground disabled:opacity-50"><X className="h-4 w-4" /></button>
+                            </>
+                        ) : store.connected && !store.broken ? (
+                            <button type="button" disabled={disabled || !!busy || brought[store.provider]} onClick={() => void act(store, "fetch")} className={button}>
+                                {busy === `${store.provider}:fetch` && <Spinner className="h-3.5 w-3.5" />}{brought[store.provider] ? "Added" : "Bring in"}
+                            </button>
+                        ) : (
+                            <button type="button" disabled={disabled || !!busy} onClick={() => void act(store, "connect")} className={button}>{busy === `${store.provider}:connect` && <Spinner className="h-3.5 w-3.5" />}Connect</button>
+                        )}
+                    </li>
+                ))}
+            </ul>
+        </>
     );
 }

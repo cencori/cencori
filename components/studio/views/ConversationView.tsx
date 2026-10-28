@@ -6,7 +6,8 @@ import { StudioLink, useStudioNavigate } from "@/components/studio/studio-nav";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowUp, ChevronLeft, MailWarning } from "lucide-react";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
-import { CHANNEL_LABEL, initials, useConversation, useConversationAction, useMarkRead } from "@/components/studio/useInbox";
+import { ConversationAvatar } from "@/components/studio/ConversationAvatar";
+import { CHANNEL_LABEL, conversationTitle, useConversation, useConversationAction, useMarkRead } from "@/components/studio/useInbox";
 import { useStudio } from "@/components/studio/StudioShell";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -56,9 +57,9 @@ export default function StudioConversationPage({ id }: { id: string }) {
                 </StudioLink>
                 {conversation ? (
                     <>
-                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-semibold text-muted-foreground">{initials(conversation.name)}</span>
+                        <ConversationAvatar conversation={conversation} className="h-10 w-10" />
                         <div className="min-w-0 flex-1">
-                            <p className="truncate text-base font-semibold">{conversation.name}</p>
+                            <p className="truncate text-base font-semibold">{conversationTitle(conversation)}</p>
                             <p className="truncate text-xs text-muted-foreground">{CHANNEL_LABEL[conversation.channel]}{conversation.number && conversation.number !== conversation.name ? ` · ${conversation.number}` : ""}</p>
                         </div>
                         <button type="button" onClick={keepUnread} disabled={markRead.isPending} aria-label="Mark as unread" title="Mark as unread" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted-foreground disabled:opacity-50">

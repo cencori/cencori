@@ -70,6 +70,9 @@ async function send<T = unknown>(url: string, method: string, body?: unknown): P
     return json as T;
 }
 
+/** Sheets that open at half the screen, with their main button at the bottom. */
+const HALF_SCREEN = new Set<StudioTask>(["payments", "products"]);
+
 const TITLES: Record<StudioTask, string> = {
     knowledge: "Add knowledge",
     products: "Add products",
@@ -154,14 +157,14 @@ export function StudioTasksProvider({ children }: { children: ReactNode }) {
             <Drawer.Root repositionInputs={false} open={!!task} onOpenChange={(next) => { if (!next) setTask(null); }}>
                 <Drawer.Portal>
                     <Drawer.Overlay className={`fixed inset-0 z-[60] bg-black/30 ${SHEET_OVERLAY_PHONE_ONLY}`} />
-                    <Drawer.Content className={`dashboard-theme fixed inset-x-0 bottom-0 z-[60] mx-auto flex max-h-[92svh] max-w-md lg:left-[var(--studio-sidebar,0px)] flex-col rounded-t-3xl border-t border-border/60 bg-background font-sans text-foreground outline-none ${SHEET_AS_PAGE}`}>
+                    <Drawer.Content className={`dashboard-theme fixed inset-x-0 bottom-0 z-[60] mx-auto flex ${task === "products" ? "min-h-[85svh]" : HALF_SCREEN.has(task ?? "later") ? "min-h-[55svh]" : ""} max-h-[92svh] max-w-md lg:left-[var(--studio-sidebar,0px)] flex-col rounded-t-3xl border-t border-border/60 bg-background font-sans text-foreground outline-none ${SHEET_AS_PAGE}`}>
                         <SheetPageBack />
                         <div className="flex items-center justify-between px-5 pt-3">
                             <Drawer.Title className="min-w-0 truncate text-[17px] font-semibold">{task === "business" ? target?.name ?? "" : task === "event" && eventId ? "Edit event" : task ? TITLES[task] : ""}</Drawer.Title>
                             <button type="button" onClick={() => setTask(null)} aria-label="Close" className="-mr-2 flex h-10 w-10 items-center justify-center rounded-full"><X className="h-5 w-5" /></button>
                         </div>
                         <Drawer.Description className="sr-only">Set up your assistant without leaving Studio.</Drawer.Description>
-                        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-1">
+                        <div className={cn("min-h-0 flex-1 overflow-y-auto px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-1", HALF_SCREEN.has(task ?? "later") && "flex flex-col")}>
                             {task === "business" && target
                                 ? <BusinessTask target={target} onDone={() => { setTask(null); void queryClient.invalidateQueries(); }} />
                                 : task && task !== "business" && <TaskBody task={task} agentId={agentId} eventId={eventId} onDone={() => { setTask(null); void queryClient.invalidateQueries(); }} />}
@@ -499,6 +502,14 @@ function AlertsTask({ agentBase, email, onDone }: { agentBase: string; email: st
     );
 }
 
+/** Each provider's mark (public/payments) and what customers pay with through it. */
+const PROVIDER_LOGOS: Record<string, string> = { paystack: "/payments/paystack.svg", flutterwave: "/payments/flutterwave.png", stripe: "/payments/stripe.png" };
+/** Paystack's and Flutterwave's marks fill their icons edge to edge: a little room so they sit like the others. */
+const PROVIDER_LOGO_INSET: Record<string, string> = { paystack: "p-1.5", flutterwave: "p-1.5" };
+/** Shown straight away; the server's list (which ones are available, each key's format) replaces it when it comes. */
+const KNOWN_PROVIDERS = [{ id: "paystack", name: "Paystack" }, { id: "flutterwave", name: "Flutterwave" }, { id: "stripe", name: "Stripe" }];
+const PROVIDER_PAYS_WITH: Record<string, string> = { paystack: "Cards, transfer, USSD", flutterwave: "Cards, transfer, mobile money", stripe: "Cards from anywhere" };
+
 /** A payment provider account, by its secret key, so the assistant can send payment links. */
 function PaymentsTask({ projectId, onDone }: { projectId: string; onDone: () => void }) {
     const [providers, setProviders] = useState<Array<{ id: string; name: string; key_help: string; key_placeholder: string; available: boolean }>>([]);
@@ -525,15 +536,31 @@ function PaymentsTask({ projectId, onDone }: { projectId: string; onDone: () => 
     };
     return (
         <>
-            <div className="mt-4 flex flex-wrap gap-2">
-                {(providers.length ? providers : [{ id: "paystack", name: "Paystack" }]).map((item) => (
-                    <button key={item.id} type="button" onClick={() => setProvider(item.id)} className={cn("h-10 rounded-full border px-4 text-sm", provider === item.id ? "border-foreground bg-foreground text-background" : "border-border/60")}>{item.name}</button>
-                ))}
-            </div>
-            <input value={key} onChange={(event) => setKey(event.target.value)} autoCapitalize="none" autoComplete="off" spellCheck={false} placeholder={chosen?.key_placeholder || "Secret key"} className={cn(field, "mt-4 h-12 font-mono text-sm")} />
-            {chosen?.key_help && <p className="mt-2 text-[13px] leading-5 text-muted-foreground">{chosen.key_help}</p>}
+            <ul className="mt-2 divide-y divide-border/60 overflow-hidden rounded-2xl bg-muted">
+                {(providers.length ? providers : KNOWN_PROVIDERS).map((item) => {
+                    const chosenRow = provider === item.id;
+                    return (
+                        <li key={item.id}>
+                            <button type="button" aria-pressed={chosenRow} onClick={() => setProvider(item.id)} className="flex w-full items-center gap-3 px-4 py-3 text-left">
+                                {/* eslint-disable-next-line @next/next/no-img-element -- our own small static files */}
+                                <img src={PROVIDER_LOGOS[item.id] ?? ""} alt="" className={cn("h-10 w-10 shrink-0 rounded-full bg-white object-contain", PROVIDER_LOGO_INSET[item.id])} />
+                                <span className="min-w-0 flex-1">
+                                    <span className="block text-[15px] font-semibold">{item.name}</span>
+                                    <span className="block truncate text-[13px] text-muted-foreground">{PROVIDER_PAYS_WITH[item.id] ?? ""}</span>
+                                </span>
+                                <span className={cn("flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2", chosenRow ? "border-foreground" : "border-muted-foreground/40")}>
+                                    {chosenRow && <span className="h-2.5 w-2.5 rounded-full bg-foreground" />}
+                                </span>
+                            </button>
+                        </li>
+                    );
+                })}
+            </ul>
+            <input value={key} onChange={(event) => setKey(event.target.value)} autoCapitalize="none" autoComplete="off" spellCheck={false} placeholder={chosen?.key_placeholder || "Secret key"} aria-label="Secret key" className={cn(field, "mt-3 h-12 rounded-full px-5 font-mono text-sm")} />
             <ErrorLine error={error} />
-            <Primary busy={busy} disabled={!key.trim()} onClick={() => void save()}>Connect</Primary>
+            <div className="mt-auto">
+                <Primary busy={busy} disabled={!key.trim()} onClick={() => void save()}>Connect</Primary>
+            </div>
         </>
     );
 }
