@@ -28,14 +28,16 @@ export const viewport: Viewport = {
 };
 
 /**
- * Studio opens light: the site-wide default is dark, and Studio's origin has
- * its own stored theme, so a first visit stores "light" before anything
- * paints (next-themes then reads it like any saved choice).
+ * Studio follows the phone's light or dark setting: the site-wide default is
+ * dark, and Studio's origin has its own stored theme, so a first visit stores
+ * "system" before anything paints (next-themes then reads it like any saved
+ * choice). Studio used to store "light" here; that one-time default goes back
+ * to "system" once (studio-theme-v2), so only a choice made since stays.
  */
-const LIGHT_BY_DEFAULT = `try{if(!localStorage.getItem("theme")){localStorage.setItem("theme","light");var d=document.documentElement;d.classList.remove("dark");d.classList.add("light");d.style.colorScheme="light"}}catch(e){}`;
+const SYSTEM_BY_DEFAULT = `try{var s=localStorage,t=s.getItem("theme");if(!s.getItem("studio-theme-v2")){s.setItem("studio-theme-v2","1");if(t==="light")t=null}if(!t){s.setItem("theme","system");var k=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light",d=document.documentElement;d.classList.remove("dark","light");d.classList.add(k);d.style.colorScheme=k}}catch(e){}`;
 
-function LightByDefault() {
-    return <script dangerouslySetInnerHTML={{ __html: LIGHT_BY_DEFAULT }} />;
+function SystemByDefault() {
+    return <script dangerouslySetInnerHTML={{ __html: SYSTEM_BY_DEFAULT }} />;
 }
 
 // Every page reads the signed-in user's business; none of it is static.
@@ -50,7 +52,7 @@ export default async function StudioLayout({ children }: { children: React.React
         const origin = `${host.includes("localhost") ? "http" : "https"}://${host.replace(/^studio\./, "")}`;
         return (
             <>
-            <LightByDefault />
+            <SystemByDefault />
             <div className="dashboard-theme flex min-h-svh flex-col items-center justify-center bg-background px-6 text-center font-sans text-foreground">
                 <h1 className="text-2xl font-semibold tracking-tight">Let&apos;s set up your business</h1>
                 <p className="mt-2 max-w-xs text-sm leading-6 text-muted-foreground">Tell us what you do and your assistant will be ready to answer customers in a few minutes.</p>
@@ -63,7 +65,7 @@ export default async function StudioLayout({ children }: { children: React.React
     }
     return (
         <>
-            <LightByDefault />
+            <SystemByDefault />
             <StudioShell workspace={workspace}>{children}</StudioShell>
         </>
     );
