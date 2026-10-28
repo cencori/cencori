@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { extractGatewayCallerIdentity, logApiGatewayRequest } from "@/lib/api-gateway-logs";
 import {
@@ -739,6 +739,14 @@ export async function POST(
             const counted = await consumeConversation(adminClient as never, session.organization_id as string);
             if (!counted.ok) {
                 return respondError(402, 'This chat isn’t taking new conversations right now. Please contact the business directly.', counted.reason === 'limit' ? 'plan_conversations_used' : 'plan_inactive');
+            }
+            if (counted.mark) {
+                const organizationId = session.organization_id as string;
+                const mark = counted.mark;
+                after(async () => {
+                    const [{ remindOwners }, { getOrganizationPlan }] = await Promise.all([import('@/lib/business/reminders'), import('@/lib/business/plans')]);
+                    await remindOwners(adminClient as never, organizationId, await getOrganizationPlan(adminClient as never, organizationId), mark);
+                });
             }
         }
 

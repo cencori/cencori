@@ -10,7 +10,7 @@ import { getConsoleUrl } from "@/lib/auth-redirect";
 const DESCRIPTIONS: Record<(typeof PAID_BUSINESS_PLANS)[number], string> = {
     starter: "For one location getting started on WhatsApp.",
     growth: "For busy businesses answering customers all day.",
-    business: "For several locations or teams, with every model.",
+    business: "For several branches and the busiest places.",
 };
 
 /**
@@ -37,13 +37,14 @@ export function BusinessPricing({ signupHref, title = "For your business" }: { s
                             <p className="text-sm font-semibold">{plan.name}</p>
                             <p className="mt-1 text-xs text-muted-foreground">{DESCRIPTIONS[id]}</p>
                             <p className="mt-5"><span className="text-3xl font-semibold tracking-tight">₦{plan.priceNgn.toLocaleString("en-NG")}</span> <span className="text-xs text-muted-foreground">/ month</span></p>
+                            <p className="mt-1 text-xs text-muted-foreground">₦{(plan.priceNgn / plan.conversations).toLocaleString("en-NG", { maximumFractionDigits: 2 })} a conversation</p>
                             <ul className="mt-5 flex-1 space-y-2 text-sm">
                                 {[
                                     `${plan.conversations.toLocaleString()} conversations a month`,
                                     `${plan.agents} agent${plan.agents === 1 ? "" : "s"}`,
                                     "WhatsApp, website chat and share link",
                                     "Bookings, payments and orders",
-                                    plan.allModels ? "Every AI model" : "DeepSeek V4.1 Flash",
+                                    ...plan.extras,
                                 ].map((feature) => (
                                     <li key={feature} className="flex items-start gap-2"><Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />{feature}</li>
                                 ))}
@@ -55,7 +56,7 @@ export function BusinessPricing({ signupHref, title = "For your business" }: { s
                     );
                 })}
             </div>
-            <p className="mt-4 text-center text-xs text-muted-foreground">A conversation is one customer chat: up to 40 messages, or until a day of quiet.</p>
+            <p className="mt-4 text-center text-xs text-muted-foreground">A conversation is one customer chat: up to 40 messages, or until a day of quiet. Run out, and your agent keeps answering 20% more while you renew.</p>
         </div>
     );
 }

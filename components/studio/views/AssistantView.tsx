@@ -6,7 +6,7 @@ import { StudioLink } from "@/components/studio/studio-nav";
 import { useAssistants, type StudioAssistantRow } from "@/components/studio/useAssistants";
 import { useStudioOverview } from "@/components/studio/useStudioOverview";
 import { useStudioTasks } from "@/components/studio/StudioTasks";
-import { initials } from "@/components/studio/useInbox";
+import { AgentOrb } from "@/components/agents/AgentOrb";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
@@ -45,7 +45,7 @@ export default function StudioAssistantsPage() {
                             return (
                                 <li key={assistant.id}>
                                     <StudioLink href={`/assistant/${assistant.id}`} className="flex items-center gap-3 rounded-2xl border border-border/60 px-4 py-3.5 active:bg-muted/60">
-                                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-semibold">{initials(assistant.name)}</span>
+                                        <AgentOrb seed={assistant.id} className="h-11 w-11" />
                                         <span className="min-w-0 flex-1">
                                             <span className="flex items-center gap-2">
                                                 <span className="min-w-0 truncate text-[15px] font-semibold">{assistant.name}</span>

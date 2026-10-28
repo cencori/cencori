@@ -56,21 +56,27 @@ export default function StudioHomePage() {
                 {setUp && <StudioNotificationBell className="size-10" />}
             </div>
 
-            {/* The trial's last days, or a plan that has run out: say so, with the way to pay. */}
+            {/* A plan's last days, its grace days, its extras, or a plan that has stopped: say so, with the way to pay. */}
             {setUp && data?.plan && (() => {
                 const plan = data.plan;
                 const daysLeft = plan.period_end ? Math.ceil((Date.parse(plan.period_end) - Date.now()) / 86_400_000) : null;
-                const ending = plan.active && plan.name === "Free trial" && daysLeft !== null && daysLeft <= 3;
-                if (plan.active && !ending) return null;
+                const graceDays = plan.grace_end ? Math.max(1, Math.ceil((Date.parse(plan.grace_end) - Date.now()) / 86_400_000)) : null;
+                const name = plan.name === "Free trial" ? "free trial" : `${plan.name} plan`;
+                const ending = plan.active && !plan.in_grace && daysLeft !== null && daysLeft <= 3;
+                const overChats = plan.active && plan.used >= plan.conversations;
+                if (plan.active && !plan.in_grace && !ending && !overChats) return null;
+                const [title, body] = !plan.active
+                    ? ["Your assistant has stopped", "Choose a plan to switch it back on."]
+                    : plan.in_grace
+                        ? [`Your ${name} has ended`, `Still answering for ${graceDays} more day${graceDays === 1 ? "" : "s"}.`]
+                        : overChats
+                            ? ["All your chats used", `${Math.max(0, plan.capacity - plan.used)} extra left.`]
+                            : [daysLeft! <= 1 ? `Your ${name} ends today` : `Your ${name} ends in ${daysLeft} days`, "Renew to keep your assistant answering."];
                 return (
                     <div className={cn("mt-5 rounded-2xl px-4 py-3.5", plan.active ? "bg-amber-50 text-amber-900 dark:bg-amber-500/10 dark:text-amber-200" : "bg-destructive/10 text-destructive")}>
-                        <p className="text-[15px] font-semibold">
-                            {plan.active ? (daysLeft! <= 1 ? "Your free trial ends today" : `Your free trial ends in ${daysLeft} days`) : `Your ${plan.name.toLowerCase()} has ended`}
-                        </p>
-                        <p className="mt-0.5 text-[13px] leading-5 opacity-90">
-                            {plan.active ? "Choose a plan so your assistant keeps answering customers." : "Your assistant isn't starting new chats. Choose a plan to switch it back on."}
-                        </p>
-                        <button type="button" onClick={() => tasks.open("plans")} className="mt-3 h-10 rounded-full bg-foreground px-5 text-sm font-semibold text-background">Choose a plan</button>
+                        <p className="text-[15px] font-semibold">{title}</p>
+                        <p className="mt-0.5 text-[13px] leading-5 opacity-90">{body}</p>
+                        <button type="button" onClick={() => tasks.open("plans")} className="mt-3 h-10 rounded-full bg-foreground px-5 text-sm font-semibold text-background">{plan.name === "Free trial" || !plan.active ? "Choose a plan" : "Renew"}</button>
                     </div>
                 );
             })()}

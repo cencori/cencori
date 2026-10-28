@@ -89,6 +89,12 @@ export function StudioTasksProvider({ children }: { children: ReactNode }) {
     // itself switches on when Bachs tells us (the billing webhook), moments later.
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
+        // From a plan reminder (push or email): open the plans.
+        if (params.get("plan") === "choose") {
+            window.history.replaceState(null, "", window.location.pathname);
+            open("plans");
+            return;
+        }
         if (params.get("plan") !== "paid") return;
         window.history.replaceState(null, "", window.location.pathname);
         setNotice("Payment received. Your plan is on: thank you!");
@@ -96,7 +102,7 @@ export function StudioTasksProvider({ children }: { children: ReactNode }) {
         refresh();
         const later = window.setTimeout(refresh, 5000);
         return () => window.clearTimeout(later);
-    }, [queryClient]);
+    }, [queryClient, open]);
 
     // Back from connecting WhatsApp (Kapso returns here with ?whatsapp=…).
     useEffect(() => {
@@ -378,7 +384,7 @@ function PaymentsTask({ projectId, onDone }: { projectId: string; onDone: () => 
     );
 }
 
-interface BusinessPlanOption { id: string; name: string; price_ngn: number; conversations: number; agents: number; all_models: boolean }
+interface BusinessPlanOption { id: string; name: string; price_ngn: number; conversations: number; agents: number; extras?: string[] }
 
 /** Starter, Growth or Business: a 30-day pass, paid through Bachs, back to Studio after. */
 function PlansTask({ organizationId }: { organizationId: string }) {
@@ -412,11 +418,11 @@ function PlansTask({ organizationId }: { organizationId: string }) {
                     return (
                         <div key={option.id} className={cn("rounded-2xl border px-4 py-3.5", current ? "border-foreground" : "border-border/60")}>
                             <div className="flex items-baseline justify-between gap-3">
-                                <span className="text-[15px] font-semibold">{option.name}</span>
+                                <span className="text-[15px] font-semibold">{option.name} <span className="text-xs font-normal text-muted-foreground">{naira(Math.round((option.price_ngn / option.conversations) * 100) / 100)} a chat</span></span>
                                 <span className="text-[15px] font-semibold">{naira(option.price_ngn)}<span className="text-xs font-normal text-muted-foreground"> / 30 days</span></span>
                             </div>
                             <p className="mt-1 text-[13px] leading-5 text-muted-foreground">
-                                {option.conversations.toLocaleString("en-NG")} customer chats · {option.agents} {option.agents === 1 ? "assistant" : "assistants"}{option.all_models ? " · every AI model" : ""}
+                                {option.conversations.toLocaleString("en-NG")} chats · {option.agents} {option.agents === 1 ? "assistant" : "assistants"}{option.extras?.length ? ` · ${option.extras.join(" · ")}` : ""}
                             </p>
                             <button type="button" disabled={busy !== null} onClick={() => void choose(option.id)} className={cn("mt-3 flex h-10 w-full items-center justify-center gap-2 rounded-full text-sm font-semibold disabled:opacity-60", current ? "border border-border/60" : "bg-foreground text-background")}>
                                 {busy === option.id && <Loader2 className="h-4 w-4 animate-spin" />}{current ? "Pay for another 30 days" : `Choose ${option.name}`}

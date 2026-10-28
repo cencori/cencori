@@ -343,6 +343,11 @@ async function customerSession(db: Admin, channel: WhatsAppChannel, customer: st
     const { consumeConversation } = await import('@/lib/business/plans');
     const counted = await consumeConversation(db as never, organizationId);
     if (!counted.ok) throw new PlanClosedError(counted.message);
+    if (counted.mark) {
+        // The runner already runs after the webhook has answered: send it inline.
+        const [{ remindOwners }, { getOrganizationPlan }] = await Promise.all([import('@/lib/business/reminders'), import('@/lib/business/plans')]);
+        await remindOwners(db as never, organizationId, await getOrganizationPlan(db as never, organizationId), counted.mark);
+    }
     const { data: created, error } = await db.from('sessions').insert({
         project_id: projectId,
         organization_id: organizationId || null,

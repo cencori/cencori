@@ -107,7 +107,8 @@ function Group({ title, children }: { title?: string; children: ReactNode }) {
 export function StudioProfile({ className }: { className?: string }) {
     const { user, organization, organizations } = useStudio();
     // The business's plan and how much of it is used (moved here from Home).
-    const plan = useStudioOverview().data?.plan ?? null;
+    const overview = useStudioOverview().data;
+    const plan = overview?.plan ?? null;
     const tasks = useStudioTasks();
     const push = useStudioPush();
     const [open, setOpen] = useState(false);
@@ -297,19 +298,28 @@ export function StudioProfile({ className }: { className?: string }) {
                                     <div className="flex items-baseline justify-between gap-3">
                                         <span className="text-[15px] font-medium">{plan.name}</span>
                                         {plan.active && plan.period_end && (
-                                            <span className="text-xs text-muted-foreground">
-                                                {plan.name === "Free trial" ? "Ends" : "Renews"} {new Date(plan.period_end).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                                            <span className={cn("text-xs", plan.in_grace ? "text-destructive" : "text-muted-foreground")}>
+                                                {plan.in_grace ? "Ended" : plan.name === "Free trial" ? "Ends" : "Renews"} {new Date(plan.period_end).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
                                             </span>
                                         )}
                                     </div>
                                     <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-background">
-                                        <span className="block h-full rounded-full bg-foreground" style={{ width: `${Math.min(100, Math.round((plan.used / Math.max(1, plan.conversations)) * 100))}%` }} />
+                                        <span className={cn("block h-full rounded-full", plan.used > plan.conversations ? "bg-amber-500" : "bg-foreground")} style={{ width: `${Math.min(100, Math.round((plan.used / Math.max(1, plan.conversations)) * 100))}%` }} />
                                     </div>
                                     <p className="mt-2 text-[13px] text-muted-foreground">
-                                        {plan.active ? `${plan.used} of ${plan.conversations} chats used` : "Your plan has ended. Your assistant isn't starting new chats."}
+                                        {!plan.active
+                                            ? "Ended. Your assistant has stopped."
+                                            : plan.in_grace && plan.grace_end
+                                                ? `Still answering until ${new Date(plan.grace_end).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`
+                                                : plan.used > plan.conversations
+                                                    ? `All ${plan.conversations} used · ${plan.used - plan.conversations} of ${plan.capacity - plan.conversations} extra`
+                                                    : `${plan.used} of ${plan.conversations} chats used`}
                                     </p>
-                                    <button type="button" onClick={() => tasks.open("plans")} className={cn("mt-3 h-10 w-full rounded-full text-sm font-semibold", plan.name === "Free trial" || !plan.active ? "bg-foreground text-background" : "border border-border/60")}>
-                                        {plan.name === "Free trial" || !plan.active ? "Choose a plan" : "Change or renew"}
+                                    {!!plan.earned?.amount && overview?.currency === "NGN" && (
+                                        <p className="mt-1 text-[13px] font-medium">₦{Math.round(plan.earned.amount).toLocaleString("en-NG")} earned on this plan</p>
+                                    )}
+                                    <button type="button" onClick={() => tasks.open("plans")} className={cn("mt-3 h-10 w-full rounded-full text-sm font-semibold", plan.name === "Free trial" || !plan.active || plan.in_grace ? "bg-foreground text-background" : "border border-border/60")}>
+                                        {plan.name === "Free trial" || !plan.active ? "Choose a plan" : plan.in_grace ? "Renew" : "Change or renew"}
                                     </button>
                                 </div>
                             </Group>

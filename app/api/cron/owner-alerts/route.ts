@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { sendDueSummaries } from '@/lib/embedded/owner-alerts';
+import { sendPlanReminders } from '@/lib/business/reminders';
 import { cronDisabled } from '@/lib/cron';
 
-/** Hourly: send each agent owner's morning summary once it's 8am where they are. */
+/**
+ * Hourly: send each agent owner's morning summary once it's 8am where they
+ * are, and each business plan's reminders (ending soon, ended, stopped).
+ */
 async function run(req: NextRequest) {
     const off = cronDisabled();
     if (off) return off;
@@ -17,8 +21,9 @@ async function run(req: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     try {
-        const result = await sendDueSummaries(createAdminClient());
-        return NextResponse.json({ success: true, ...result, timestamp: new Date().toISOString() });
+        const db = createAdminClient();
+        const [result, reminders] = await Promise.all([sendDueSummaries(db), sendPlanReminders(db)]);
+        return NextResponse.json({ success: true, ...result, plan_reminders: reminders.sent, timestamp: new Date().toISOString() });
     } catch (error) {
         console.error('[Cron] Error sending owner summaries:', error);
         return NextResponse.json({ success: false, error: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });

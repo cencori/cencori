@@ -11,13 +11,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { requireProjectAccess } from '@/lib/require-project-access';
 import { runAgentReadTool } from '@/lib/copilot/agent-tools';
-import { getPaymentsConnection } from '@/lib/embedded/payments';
 import { getOwnerAlerts } from '@/lib/embedded/owner-alerts';
-import { conversationsUsed, getOrganizationPlan } from '@/lib/business/plans';
+import { conversationCapacity, conversationsUsed, getOrganizationPlan } from '@/lib/business/plans';
 import { periodStarts, safeTimeZone } from '@/lib/studio/time';
 import { mintWidgetShareToken } from '@/lib/embedded/widget';
-import { transferHistory } from '@/lib/embedded/transfers';
-import { getCatalog } from '@/lib/embedded/catalog';
+import { earnedSince, paidThroughAssistant } from '@/lib/studio/earned';
 
 const fail = (message: string, status = 400) => NextResponse.json({ error: message }, { status });
 
@@ -50,35 +48,21 @@ export async function GET(req: NextRequest) {
         .or('metadata->>preview.is.null,metadata->>preview.eq.false')
         .or('last_turn_number.gt.0,metadata->manual_messages.not.is.null');
 
-    const [summary, today, month, payments, plan, widget] = await Promise.all([
+    const [summary, today, month, money, plan, widget] = await Promise.all([
         agent
             ? runAgentReadTool('get_agent', { agent: agent.id }, { admin: db, organization: organization as { id: string; name: string; slug: string }, project: project as { id: string; name: string; slug: string } })
             : Promise.resolve(null),
         chats(starts.day),
         chats(starts.month),
-        getPaymentsConnection(db, projectId).catch(() => null),
+        paidThroughAssistant(db, projectId),
         getOrganizationPlan(db as never, access.organizationId),
         agent
             ? db.from('agent_widgets').select('id, public_key').eq('project_id', projectId).eq('agent_id', agent.id).maybeSingle().then(({ data }) => data as { id: string; public_key: string } | null)
             : Promise.resolve(null),
     ]);
 
-    // Money that came in through the assistant, counted like the Money tab: paid
-    // links, confirmed transfers, and orders the owner marked paid (cash).
-    const currency = payments?.metadata.currency ?? 'NGN';
-    const [transfers, catalog] = await Promise.all([
-        transferHistory(db, projectId).catch(() => []),
-        getCatalog(db, projectId).catch(() => null),
-    ]);
-    const paid = [
-        ...(payments?.metadata.payments ?? []).filter((entry) => entry.status === 'paid' && entry.paid_at && entry.currency === currency).map((entry) => ({ amount: entry.amount, at: entry.paid_at! })),
-        ...transfers.filter((entry) => entry.status === 'paid' && entry.paid_at && entry.currency === currency).map((entry) => ({ amount: entry.amount, at: entry.paid_at! })),
-        ...(catalog?.metadata.orders ?? []).filter((order) => order.paid_by === 'owner' && order.paid_at && order.status !== 'cancelled' && order.currency === currency).map((order) => ({ amount: order.total, at: order.paid_at! })),
-    ];
-    const earned = (since: Date) => {
-        const inPeriod = paid.filter((entry) => new Date(entry.at).getTime() >= since.getTime());
-        return { amount: inPeriod.reduce((sum, entry) => sum + entry.amount, 0), count: inPeriod.length };
-    };
+    const { currency, paid } = money;
+    const earned = (since: Date) => earnedSince(paid, since);
 
     const used = plan.accountType === 'business' && plan.periodStart ? await conversationsUsed(db as never, access.organizationId, plan.periodStart) : null;
 
@@ -90,9 +74,9 @@ export async function GET(req: NextRequest) {
         today: { chats: today.count ?? 0, earned: earned(starts.day) },
         month: { chats: month.count ?? 0, earned: earned(starts.month) },
         currency,
-        payments_connected: !!payments,
+        payments_connected: money.connected,
         plan: plan.accountType === 'business' && plan.plan
-            ? { name: plan.plan.name, conversations: plan.plan.conversations, agents: plan.plan.agents, used: used ?? 0, active: plan.active, period_end: plan.periodEnd }
+            ? { name: plan.plan.name, conversations: plan.plan.conversations, capacity: conversationCapacity(plan.plan), agents: plan.plan.agents, used: used ?? 0, active: plan.active, in_grace: plan.inGrace, period_end: plan.periodEnd, grace_end: plan.graceEnd, earned: plan.periodStart ? earned(new Date(plan.periodStart)) : null }
             : null,
     }, { headers: { 'Cache-Control': 'no-store' } });
 }

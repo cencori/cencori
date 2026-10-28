@@ -28,7 +28,21 @@ export interface StudioOverview {
     month: { chats: number; earned?: { amount: number; count: number } };
     currency: string;
     payments_connected: boolean;
-    plan: { name: string; conversations: number; agents: number; used: number; active: boolean; period_end: string | null } | null;
+    plan: {
+        name: string;
+        conversations: number;
+        /** Chats answered before the assistant stops: the plan's, plus the extras. */
+        capacity: number;
+        agents: number;
+        used: number;
+        active: boolean;
+        /** Past its end date, still answering until grace_end. */
+        in_grace: boolean;
+        period_end: string | null;
+        grace_end: string | null;
+        /** What came in through the assistant since this plan started. */
+        earned: { amount: number; count: number } | null;
+    } | null;
 }
 
 /** Home's data (and one assistant's, with agentId): one request, refreshed when the owner comes back to the app. */

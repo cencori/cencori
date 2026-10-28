@@ -96,11 +96,11 @@ export async function POST(req: NextRequest) {
         // sent (the turns route), so a chat opened and never used costs nothing. A
         // plan that's used up or inactive still says so before anyone types.
         if (!preview && project?.organization_id) {
-            const { getOrganizationPlan, conversationsUsed } = await import('@/lib/business/plans');
+            const { getOrganizationPlan, conversationsUsed, conversationCapacity } = await import('@/lib/business/plans');
             const plan = await getOrganizationPlan(db as never, project.organization_id as string);
             if (plan.accountType === 'business') {
                 const closed = !plan.active || !plan.plan || !plan.periodStart
-                    || await conversationsUsed(db as never, project.organization_id as string, plan.periodStart) >= plan.plan.conversations;
+                    || await conversationsUsed(db as never, project.organization_id as string, plan.periodStart) >= conversationCapacity(plan.plan);
                 if (closed) return fail(402, plan.active ? 'plan_conversations_used' : 'plan_inactive', 'This chat isn’t taking new conversations right now. Please contact the business directly.');
             }
         }

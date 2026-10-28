@@ -24,16 +24,35 @@ export interface BusinessPlan {
     priceNgn: number;
     conversations: number;
     agents: number;
-    /** Every model, or only the default one. */
+    /** Every model, or only the default one. Not sold as a feature: owners don't pick models. */
     allModels: boolean;
+    /** What else the plan includes, as owners would say it. */
+    extras: string[];
 }
 
+// Each step up costs less per chat: ₦150, ₦70, ₦37.50.
 export const BUSINESS_PLANS: Record<BusinessPlanId, BusinessPlan> = {
-    trial: { id: 'trial', name: 'Free trial', priceNgn: 0, conversations: 50, agents: 1, allModels: false },
-    starter: { id: 'starter', name: 'Starter', priceNgn: 15_000, conversations: 100, agents: 1, allModels: false },
-    growth: { id: 'growth', name: 'Growth', priceNgn: 35_000, conversations: 500, agents: 3, allModels: false },
-    business: { id: 'business', name: 'Business', priceNgn: 75_000, conversations: 1_000, agents: 10, allModels: true },
+    trial: { id: 'trial', name: 'Free trial', priceNgn: 0, conversations: 50, agents: 1, allModels: false, extras: [] },
+    starter: { id: 'starter', name: 'Starter', priceNgn: 15_000, conversations: 100, agents: 1, allModels: false, extras: [] },
+    growth: { id: 'growth', name: 'Growth', priceNgn: 35_000, conversations: 500, agents: 3, allModels: false, extras: ['An assistant for each branch'] },
+    business: { id: 'business', name: 'Business', priceNgn: 75_000, conversations: 2_000, agents: 10, allModels: true, extras: ['An assistant for each branch', 'Priority support', 'Setup done with you'] },
 };
+
+/**
+ * A plan never cuts a business off mid-evening. Past its chats, the assistant
+ * keeps answering this share more; past its end date, it keeps answering for
+ * the grace days, while Studio and the reminders ask the owner to renew.
+ */
+export const BUSINESS_EXTRA_SHARE = 0.2;
+export const BUSINESS_GRACE_DAYS = 3;
+
+/** Chats the plan answers in a period, extras included. */
+export function conversationCapacity(plan: BusinessPlan): number {
+    return Math.ceil(plan.conversations * (1 + BUSINESS_EXTRA_SHARE));
+}
+
+const PASS_DAYS = 30;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 export const PAID_BUSINESS_PLANS: PaidBusinessPlanId[] = ['starter', 'growth', 'business'];
 export const BUSINESS_TRIAL_DAYS = 14;
@@ -57,11 +76,14 @@ export interface OrganizationPlan {
     status: 'active' | 'past_due' | 'canceled' | null;
     periodStart: string | null;
     periodEnd: string | null;
-    /** On a business plan that's paid up (or in trial) and inside its period. */
+    /** On a business plan that's paid up (or in trial), inside its period or its grace days. */
     active: boolean;
+    /** Past the period's end, still answering for the grace days. */
+    inGrace: boolean;
+    graceEnd: string | null;
 }
 
-const DEVELOPER: OrganizationPlan = { accountType: 'developer', plan: null, status: null, periodStart: null, periodEnd: null, active: false };
+const DEVELOPER: OrganizationPlan = { accountType: 'developer', plan: null, status: null, periodStart: null, periodEnd: null, active: false, inGrace: false, graceEnd: null };
 
 /**
  * The organization's track and business plan. Anything unreadable (including
@@ -88,9 +110,11 @@ export function readPlan(row: Record<string, unknown>, now = Date.now()): Organi
     const periodStart = typeof row.business_period_start === 'string' ? row.business_period_start : null;
     const periodEnd = typeof row.business_period_end === 'string' ? row.business_period_end : null;
     const inPeriod = !!periodStart && !!periodEnd && Date.parse(periodStart) <= now && now < Date.parse(periodEnd);
-    // A failed renewal keeps the plan running until its period ends; a cancelled one too.
-    const active = !!plan && inPeriod && status !== null;
-    return { accountType: 'business', plan, status, periodStart, periodEnd, active };
+    const graceEndMs = periodEnd ? Date.parse(periodEnd) + BUSINESS_GRACE_DAYS * DAY_MS : NaN;
+    const inGrace = !!plan && status !== null && !!periodEnd && Date.parse(periodEnd) <= now && now < graceEndMs;
+    // A failed renewal keeps the plan running until its period (and grace) ends; a cancelled one too.
+    const active = !!plan && (inPeriod || inGrace) && status !== null;
+    return { accountType: 'business', plan, status, periodStart, periodEnd, active, inGrace, graceEnd: Number.isFinite(graceEndMs) ? new Date(graceEndMs).toISOString() : null };
 }
 
 /** Can this organization's agents use `model`? Developer organizations can use any. */
@@ -101,7 +125,7 @@ export function modelAllowed(plan: OrganizationPlan, model: string | null | unde
 }
 
 export type ConversationCheck =
-    | { ok: true; used: number | null; limit: number | null }
+    | { ok: true; used: number | null; limit: number | null; mark?: 'chats_most' | 'chats_all' | null }
     | { ok: false; reason: 'inactive' | 'limit'; message: string };
 
 /**
@@ -118,13 +142,22 @@ export async function consumeConversation(db: Admin, organizationId: string): Pr
     const { data, error } = await db.rpc('consume_business_conversation' as never, {
         p_organization_id: organizationId,
         p_period_start: plan.periodStart,
-        p_limit: plan.plan.conversations,
+        p_limit: conversationCapacity(plan.plan),
     } as never);
     // Fail open on a counting error: a customer mid-question shouldn't pay for our outage.
     if (error) return { ok: true, used: null, limit: plan.plan.conversations };
     const used = Number(data);
     if (used < 0) return { ok: false, reason: 'limit', message: 'This business has used all its conversations for this month.' };
-    return { ok: true, used, limit: plan.plan.conversations };
+    // The count is atomic, so exactly one chat lands on each mark; the caller
+    // sends that reminder (lib/business/reminders is server-only, this file isn't).
+    return { ok: true, used, limit: plan.plan.conversations, mark: usageMark(plan.plan.conversations, used) };
+}
+
+/** The usage reminder a chat's count lands on: most of the chats used, or all of them. */
+export function usageMark(conversations: number, used: number): 'chats_most' | 'chats_all' | null {
+    if (used === Math.ceil(conversations * 0.8)) return 'chats_most';
+    if (used === conversations + 1) return 'chats_all';
+    return null;
 }
 
 /** Conversations used in the current period. */
@@ -136,9 +169,6 @@ export async function conversationsUsed(db: Admin, organizationId: string, perio
         .maybeSingle();
     return Number((data as { conversations?: number } | null)?.conversations ?? 0);
 }
-
-const PASS_DAYS = 30;
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
  * A paid 30-day pass: start the plan now with a fresh count of conversations.

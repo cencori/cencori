@@ -61,7 +61,7 @@ export async function GET(req: NextRequest) {
         period_start: plan.periodStart,
         period_end: plan.periodEnd,
         conversations_used: used,
-        plans: PAID_BUSINESS_PLANS.map((id) => ({ id, name: BUSINESS_PLANS[id].name, price_ngn: BUSINESS_PLANS[id].priceNgn, conversations: BUSINESS_PLANS[id].conversations, agents: BUSINESS_PLANS[id].agents, all_models: BUSINESS_PLANS[id].allModels })),
+        plans: PAID_BUSINESS_PLANS.map((id) => ({ id, name: BUSINESS_PLANS[id].name, price_ngn: BUSINESS_PLANS[id].priceNgn, conversations: BUSINESS_PLANS[id].conversations, agents: BUSINESS_PLANS[id].agents, extras: BUSINESS_PLANS[id].extras, all_models: BUSINESS_PLANS[id].allModels })),
     }, { headers: { "Cache-Control": "no-store" } });
 }
 
