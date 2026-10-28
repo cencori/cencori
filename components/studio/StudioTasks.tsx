@@ -9,6 +9,7 @@ import { useStudio } from "@/components/studio/StudioShell";
 import { studioFetch } from "@/components/studio/studio-data";
 import { resizePhoto } from "@/lib/studio/resize-photo";
 import { cn } from "@/lib/utils";
+import { getMainSiteUrl } from "@/lib/main-site-url";
 
 /**
  * Setting the assistant up, in Studio: each "Finish setting up" step (and
@@ -17,7 +18,7 @@ import { cn } from "@/lib/utils";
  * signs in there sees everything done from Studio.
  */
 
-export type StudioTask = "knowledge" | "whatsapp" | "golive" | "alerts" | "payments" | "plans" | "business" | "newbusiness" | "later";
+export type StudioTask = "knowledge" | "whatsapp" | "website" | "golive" | "alerts" | "payments" | "plans" | "business" | "newbusiness" | "later";
 
 /** Another business the ⋯ menu acts on (never the open one). */
 export type BusinessTarget = { id: string; name: string; isBusiness: boolean };
@@ -48,6 +49,7 @@ export function taskForStep(step: string): StudioTask | null {
 export function taskForCopilotPage(title: string): StudioTask {
     const text = title.toLowerCase();
     if (text.includes("whatsapp")) return "whatsapp";
+    if (text.includes("website")) return "website";
     if (text.includes("payment")) return "payments";
     return "later";
 }
@@ -62,6 +64,7 @@ async function send<T = unknown>(url: string, method: string, body?: unknown): P
 const TITLES: Record<StudioTask, string> = {
     knowledge: "Add knowledge",
     whatsapp: "Connect WhatsApp",
+    website: "Chat on your website",
     golive: "Go live",
     alerts: "Get told when someone needs you",
     payments: "Get paid by link",
@@ -174,6 +177,7 @@ function TaskBody({ task, agentId: chosen, onDone }: { task: StudioTask; agentId
     const agentBase = `/api/projects/${project.id}/embedded-agents/${agentId}`;
     if (task === "knowledge") return <KnowledgeTask agentBase={agentBase} projectId={project.id} onDone={onDone} />;
     if (task === "whatsapp") return <WhatsAppTask agentBase={agentBase} />;
+    if (task === "website") return <WebsiteTask agentBase={agentBase} />;
     if (task === "golive") return <GoLiveTask projectId={project.id} agentId={agentId} agentBase={agentBase} onDone={onDone} />;
     if (task === "alerts") return <AlertsTask agentBase={agentBase} email={user.email} onDone={onDone} />;
     return <PaymentsTask projectId={project.id} onDone={onDone} />;
@@ -321,6 +325,89 @@ function GoLiveTask({ projectId, agentId, agentBase, onDone }: { projectId: stri
 }
 
 /** Who gets emailed about bookings, callbacks and payments. */
+type WidgetState = { enabled: boolean; allowed_origins: string[]; public_key: string } | null;
+
+/** The chat bubble on the owner's own website: their address, then the code to paste (or send to whoever built the site). */
+function WebsiteTask({ agentBase }: { agentBase: string }) {
+    const { agents } = useStudio();
+    const [widget, setWidget] = useState<WidgetState | undefined>(undefined);
+    const [site, setSite] = useState("");
+    const [busy, setBusy] = useState(false);
+    const [copied, setCopied] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    useEffect(() => {
+        send<{ widget: WidgetState }>(`${agentBase}/widget`, "GET")
+            .then((body) => {
+                setWidget(body.widget ?? null);
+                setSite(body.widget?.allowed_origins[0]?.replace(/^https?:\/\//, "") ?? "");
+            })
+            .catch((cause) => setError(cause instanceof Error ? cause.message : "Couldn't load it."));
+    }, [agentBase]);
+
+    const save = async (body: Record<string, unknown>) => {
+        setBusy(true);
+        setError(null);
+        try {
+            const result = await send<{ widget: WidgetState }>(`${agentBase}/widget`, "PUT", body);
+            setWidget(result.widget);
+            setSite("");
+        } catch (cause) {
+            setError(cause instanceof Error ? cause.message : "That didn't work.");
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    if (widget === undefined) {
+        return error ? <ErrorLine error={error} /> : <div className="mt-5 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
+    }
+
+    const on = !!widget?.enabled;
+    const snippet = widget ? `<script src="${new URL(getMainSiteUrl("/")).origin}/widget.js" data-key="${widget.public_key}" async></script>` : "";
+    const forDeveloper = `Please add this to every page of our website, just before </body>. It adds the chat bubble for our assistant.\n\n${snippet}`;
+    const copy = async () => {
+        await navigator.clipboard?.writeText(snippet).catch(() => undefined);
+        setCopied(true);
+        window.setTimeout(() => setCopied(false), 2000);
+    };
+    const shareWithDeveloper = async () => {
+        if (navigator.share) {
+            await navigator.share({ title: `${agents[0]?.name ?? "Our"} chat for the website`, text: forDeveloper }).catch(() => undefined);
+            return;
+        }
+        await navigator.clipboard?.writeText(forDeveloper).catch(() => undefined);
+        setCopied(true);
+        window.setTimeout(() => setCopied(false), 2000);
+    };
+
+    if (!on) {
+        const known = widget?.allowed_origins ?? [];
+        return (
+            <>
+                <p className="text-[15px] leading-6 text-muted-foreground">Your website&apos;s address.</p>
+                <input value={site} onChange={(event) => setSite(event.target.value)} inputMode="url" autoCapitalize="none" autoCorrect="off" placeholder="yourbusiness.com" className={cn(field, "mt-4 h-12")} />
+                <ErrorLine error={error} />
+                <Primary busy={busy} disabled={!site.trim()} onClick={() => void save({ allowed_origins: [...new Set([...known, site.trim()])], enabled: true })}>Turn on</Primary>
+            </>
+        );
+    }
+
+    return (
+        <>
+            <p className="text-[15px] leading-6 text-muted-foreground">On for {widget!.allowed_origins.map((origin) => origin.replace(/^https?:\/\//, "")).join(", ")}. Paste this on your site, before &lt;/body&gt;.</p>
+            <pre className="mt-4 overflow-x-auto whitespace-pre-wrap break-all rounded-2xl bg-muted px-4 py-3 font-mono text-[12px] leading-5">{snippet}</pre>
+            <div className="mt-3 flex gap-2.5">
+                <button type="button" onClick={() => void copy()} className="flex h-12 flex-1 items-center justify-center gap-2 rounded-full border border-border/60 text-[15px] font-medium">
+                    {copied ? <><Check className="h-4 w-4" />Copied</> : "Copy code"}
+                </button>
+                <button type="button" onClick={() => void shareWithDeveloper()} className="h-12 flex-1 rounded-full bg-foreground text-[15px] font-semibold text-background">Send to developer</button>
+            </div>
+            <ErrorLine error={error} />
+            <button type="button" disabled={busy} onClick={() => void save({ enabled: false })} className="mt-4 w-full text-center text-[13px] text-muted-foreground disabled:opacity-50">Turn off</button>
+        </>
+    );
+}
+
 function AlertsTask({ agentBase, email, onDone }: { agentBase: string; email: string | null; onDone: () => void }) {
     const [emails, setEmails] = useState(email ?? "");
     const [busy, setBusy] = useState(false);
