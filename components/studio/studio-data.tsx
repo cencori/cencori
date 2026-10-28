@@ -82,7 +82,7 @@ export function StudioOfflineStrip() {
     useEffect(() => setShown(!online), [online]);
     if (!shown) return null;
     return (
-        <div role="status" className="fixed inset-x-0 top-0 z-50 mx-auto max-w-md bg-muted px-4 pb-1.5 pt-[calc(0.375rem+env(safe-area-inset-top))] text-center text-xs font-medium text-muted-foreground">
+        <div role="status" className="fixed inset-x-0 top-0 z-50 mx-auto max-w-md lg:left-[var(--studio-sidebar,0px)] bg-muted px-4 pb-1.5 pt-[calc(0.375rem+env(safe-area-inset-top))] text-center text-xs font-medium text-muted-foreground">
             You&apos;re offline. Showing what was loaded before.
         </div>
     );

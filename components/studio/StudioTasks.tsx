@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { Drawer } from "vaul";
+import { SHEET_AS_PAGE, SHEET_OVERLAY_PHONE_ONLY, SheetPageBack } from "@/components/studio/studio-sheet";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { Camera, Check, Loader2, X } from "lucide-react";
@@ -133,8 +134,9 @@ export function StudioTasksProvider({ children }: { children: ReactNode }) {
             {children}
             <Drawer.Root open={!!task} onOpenChange={(next) => { if (!next) setTask(null); }}>
                 <Drawer.Portal>
-                    <Drawer.Overlay className="fixed inset-0 z-[60] bg-black/30" />
-                    <Drawer.Content className="dashboard-theme fixed inset-x-0 bottom-0 z-[60] mx-auto flex max-h-[92svh] max-w-md flex-col rounded-t-3xl border-t border-border/60 bg-background font-sans text-foreground outline-none">
+                    <Drawer.Overlay className={`fixed inset-0 z-[60] bg-black/30 ${SHEET_OVERLAY_PHONE_ONLY}`} />
+                    <Drawer.Content className={`dashboard-theme fixed inset-x-0 bottom-0 z-[60] mx-auto flex max-h-[92svh] max-w-md lg:left-[var(--studio-sidebar,0px)] flex-col rounded-t-3xl border-t border-border/60 bg-background font-sans text-foreground outline-none ${SHEET_AS_PAGE}`}>
+                        <SheetPageBack />
                         <div className="flex items-center justify-between px-5 pt-3">
                             <Drawer.Title className="min-w-0 truncate text-[17px] font-semibold">{task === "business" ? target?.name ?? "" : task ? TITLES[task] : ""}</Drawer.Title>
                             <button type="button" onClick={() => setTask(null)} aria-label="Close" className="-mr-2 flex h-10 w-10 items-center justify-center rounded-full"><X className="h-5 w-5" /></button>
@@ -149,7 +151,7 @@ export function StudioTasksProvider({ children }: { children: ReactNode }) {
                 </Drawer.Portal>
             </Drawer.Root>
             {notice && (
-                <div role="status" className="fixed inset-x-4 top-[calc(0.75rem+env(safe-area-inset-top))] z-[70] mx-auto flex max-w-md items-start gap-3 rounded-2xl border border-border/60 bg-background px-4 py-3 text-sm shadow-sm">
+                <div role="status" className="fixed inset-x-4 top-[calc(0.75rem+env(safe-area-inset-top))] z-[70] mx-auto flex max-w-md lg:left-[var(--studio-sidebar,0px)] items-start gap-3 rounded-2xl border border-border/60 bg-background px-4 py-3 text-sm shadow-sm">
                     <span className="flex-1">{notice}</span>
                     <button type="button" onClick={() => setNotice(null)} aria-label="Dismiss"><X className="h-4 w-4" /></button>
                 </div>
