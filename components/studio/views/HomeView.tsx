@@ -45,9 +45,9 @@ export default function StudioHomePage() {
     return (
         // Nothing set up yet: the page fills the space above the tabs so the
         // setup card can sit in the middle of it.
-        <div className={!setUp ? "flex min-h-[calc(100svh-7.25rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] flex-col" : undefined}>
+        <div className={!setUp ? "flex min-h-[calc(100svh-7.25rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] flex-col lg:min-h-[calc(100svh-5.5rem)]" : undefined}>
             <div className="flex items-center gap-3">
-                <StudioProfile className="size-10" />
+                <StudioProfile className="size-10 lg:hidden" />
                 <div className="min-w-0 flex-1">
                     <p className="truncate text-xs text-muted-foreground">{organization.name}</p>
                     <h1 className="text-xl font-semibold leading-tight tracking-tight">
