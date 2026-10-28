@@ -39,9 +39,9 @@ import {
     Users,
     ChevronDown,
     Search,
-    Loader2,
     X,
 } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 
 interface PageProps {
     params: Promise<{ orgSlug: string }>;
@@ -330,7 +330,7 @@ export default function TeamsPage({ params }: PageProps) {
                                     <Button size="sm" onClick={handleInvite} disabled={!inviteEmail || isInviting}>
                                         {isInviting ? (
                                             <>
-                                                <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                                                <Spinner className="h-3.5 w-3.5 mr-1.5 animate-spin" />
                                                 Sending...
                                             </>
                                         ) : (
@@ -504,7 +504,7 @@ export default function TeamsPage({ params }: PageProps) {
                             className="gap-1.5"
                         >
                             {leaveTeamMutation.isPending ? (
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                <Spinner className="h-3.5 w-3.5 animate-spin" />
                             ) : (
                                 <X className="h-3.5 w-3.5" />
                             )}

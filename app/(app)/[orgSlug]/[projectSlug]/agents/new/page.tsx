@@ -4,7 +4,8 @@ import { use, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight, Loader2, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, X } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
 import { ModelSelect } from "@/components/dashboard/embedded-agents/ModelSelect";
@@ -144,7 +145,7 @@ export default function NewAgentPage({ params }: { params: Promise<{ orgSlug: st
                                     <ArrowLeft className="h-3.5 w-3.5" /> Back
                                 </Button>
                                 <Button type="submit" size="sm" className="h-8 gap-1.5 text-xs" disabled={!form.name.trim() || busy || !projectId}>
-                                    {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                                    {busy && <Spinner className="h-3.5 w-3.5 animate-spin" />}
                                     Create agent
                                 </Button>
                             </div>

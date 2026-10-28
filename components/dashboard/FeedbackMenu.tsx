@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "@/components/ui/toast";
-import { Loader2 } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { HugeiconsIcon } from "@hugeicons/react";
 import ThumbsUpIcon from "@hugeicons/core-free-icons/ThumbsUpIcon";
 import ThumbsDownIcon from "@hugeicons/core-free-icons/ThumbsDownIcon";
@@ -89,7 +89,7 @@ export function FeedbackMenu() {
                             disabled={!text.trim() || sending}
                             onClick={handleSubmit}
                         >
-                            {sending && <Loader2 className="size-3 animate-spin" />}
+                            {sending && <Spinner className="size-3 animate-spin" />}
                             {sending ? "Sending" : "Send"}
                         </button>
                     </div>

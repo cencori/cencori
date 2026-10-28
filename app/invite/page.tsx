@@ -7,7 +7,8 @@ import { supabase } from "@/lib/supabaseClient";
 import { getConsoleUrl } from "@/lib/auth-redirect";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
-import { Loader2, CheckCircle, XCircle, Mail } from "lucide-react";
+import { CheckCircle, XCircle, Mail } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import Link from "next/link";
 
 interface InviteDetails {
@@ -128,7 +129,7 @@ function InvitePageContent() {
         return (
             <div className="min-h-screen flex items-center justify-center bg-background">
                 <div className="text-center">
-                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto" />
+                    <Spinner className="h-8 w-8 animate-spin text-muted-foreground mx-auto" />
                     <p className="mt-4 text-sm text-muted-foreground">Loading invite...</p>
                 </div>
             </div>
@@ -201,7 +202,7 @@ function InvitePageContent() {
 
                     {!authChecked ? (
                         <div className="flex items-center justify-center py-4">
-                            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                            <Spinner className="h-5 w-5 animate-spin text-muted-foreground" />
                         </div>
                     ) : user ? (
                         user.email.toLowerCase() === inviteDetails?.email.toLowerCase() ? (
@@ -212,7 +213,7 @@ function InvitePageContent() {
                             >
                                 {isAccepting ? (
                                     <>
-                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                        <Spinner className="h-4 w-4 mr-2 animate-spin" />
                                         Accepting...
                                     </>
                                 ) : (
@@ -257,7 +258,7 @@ export default function InvitePage() {
         <Suspense fallback={
             <div className="min-h-screen flex items-center justify-center bg-background">
                 <div className="text-center">
-                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto" />
+                    <Spinner className="h-8 w-8 animate-spin text-muted-foreground mx-auto" />
                     <p className="mt-4 text-sm text-muted-foreground">Loading...</p>
                 </div>
             </div>

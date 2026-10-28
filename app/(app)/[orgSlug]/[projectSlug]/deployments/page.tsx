@@ -44,7 +44,6 @@ import {
     GitBranch,
     GitCommitHorizontal,
     KeyRound,
-    Loader2,
     MoreVertical,
     Plus,
     ScanSearch,
@@ -52,6 +51,7 @@ import {
     Settings2,
     Trash2,
 } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { AccessIcon, AlertCircleIcon, CheckmarkBadge02Icon, UploadCircle01Icon, UserCircleIcon, ViewIcon } from "@hugeicons/core-free-icons";
 import { LogoGitlab } from "@carbon/icons-react";
@@ -989,7 +989,7 @@ export default function DeploymentsPage({ params }: PageProps) {
                                 onClick={() => rollbackTarget && deploymentActionMutation.mutate({ sourceDeploymentId: rollbackTarget.id })}
                                 disabled={!rollbackTarget || deploymentActionMutation.isPending}
                             >
-                                {deploymentActionMutation.isPending && <Loader2 className="size-4 animate-spin" />}
+                                {deploymentActionMutation.isPending && <Spinner className="size-4 animate-spin" />}
                                 Roll back
                             </Button>
                         </DialogFooter>
@@ -1010,7 +1010,7 @@ export default function DeploymentsPage({ params }: PageProps) {
                         <DialogFooter>
                             <Button variant="outline" size="sm" className="h-8 text-xs" disabled={deleteAgent.isPending} onClick={() => setConfirmDelete(false)}>Cancel</Button>
                             <Button size="sm" className="h-8 text-xs bg-red-600 text-white hover:bg-red-600/90" disabled={deleteAgent.isPending} onClick={() => deleteAgent.mutate()}>
-                                {deleteAgent.isPending ? (<><Loader2 className="h-3 w-3 mr-1.5 animate-spin" />Deleting…</>) : "Delete agent"}
+                                {deleteAgent.isPending ? (<><Spinner className="h-3 w-3 mr-1.5 animate-spin" />Deleting…</>) : "Delete agent"}
                             </Button>
                         </DialogFooter>
                     </DialogContent>
@@ -1368,7 +1368,7 @@ export default function DeploymentsPage({ params }: PageProps) {
                                     </Select>
                                     <p className="mt-1.5 text-[9px] leading-4 text-muted-foreground">
                                         {detecting ? (
-                                            <span className="inline-flex items-center gap-1.5"><Loader2 className="h-2.5 w-2.5 animate-spin" />Detecting framework…</span>
+                                            <span className="inline-flex items-center gap-1.5"><Spinner className="h-2.5 w-2.5 animate-spin" />Detecting framework…</span>
                                         ) : detected?.framework ? (
                                             <>Detected <span className="text-emerald-400 font-medium">{detected.displayName}</span>{detected.compatibility ? ` (${detected.compatibility})` : ""} — override if needed.</>
                                         ) : detected ? (

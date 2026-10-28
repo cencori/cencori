@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Copy, Check, Trash2, Globe, Clock, Webhook, Server, AlertTriangle, Plus, MoreHorizontal, RefreshCw, DollarSign, Bell, Loader2 } from "lucide-react";
+import { Copy, Check, Trash2, Globe, Clock, Webhook, Server, AlertTriangle, Plus, MoreHorizontal, RefreshCw, DollarSign, Bell } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { ArrowPathIcon } from "@heroicons/react/24/outline";
 import { toast } from "@/components/ui/toast";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -1311,7 +1312,7 @@ export default function ProjectSettingsPage({ params }: PageProps) {
             >
               {isSavingProviders ? (
                 <>
-                  <RefreshCw className="h-3 w-3 mr-1.5 animate-spin" />
+                  <Spinner className="h-3 w-3 mr-1.5" />
                   Saving...
                 </>
               ) : (
@@ -2144,7 +2145,7 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                 }
               }}
             >
-              {isSubmittingSuggestion ? <Loader2 className="mr-1.5 h-3 w-3 animate-spin" /> : null}
+              {isSubmittingSuggestion ? <Spinner className="mr-1.5 h-3 w-3 animate-spin" /> : null}
               {isSubmittingSuggestion ? "Submitting..." : "Submit Suggestion"}
             </Button>
           </DialogFooter>

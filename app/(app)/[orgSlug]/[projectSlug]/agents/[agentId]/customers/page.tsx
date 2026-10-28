@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
@@ -71,7 +72,7 @@ export default function AgentCustomersPage() {
                                                     <Status status={installation.status} />
                                                 ) : canManage && published && tenant.status === "active" ? (
                                                     <Button size="sm" variant="outline" className="h-6 gap-1 px-2 text-xs" onClick={() => void install(tenant.id, tenant.name)} disabled={!!busy}>
-                                                        {busy === "install_agent" ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+                                                        {busy === "install_agent" ? <Spinner className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
                                                         Install
                                                     </Button>
                                                 ) : (
@@ -96,7 +97,7 @@ export default function AgentCustomersPage() {
                         <Input value={externalId} onChange={(event) => setExternalId(event.target.value)} placeholder="Customer ID, e.g. northstar-health" className="h-9 font-mono text-sm shadow-none" />
                     </div>
                     <Button type="submit" size="sm" className="mt-4 h-7 gap-1 text-xs" disabled={!name.trim() || !externalId.trim() || !!busy}>
-                        {busy === "create_tenant" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                        {busy === "create_tenant" ? <Spinner className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
                         Add customer
                     </Button>
                 </form>

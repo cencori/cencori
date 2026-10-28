@@ -10,7 +10,8 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/components/ui/toast";
-import { Check, ChevronRight, Eye, EyeOff, Loader2, Plus, Trash2, X } from "lucide-react";
+import { Check, ChevronRight, Eye, EyeOff, Plus, Trash2, X } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { SUPPORTED_PROVIDERS, type AIProviderConfig } from "@/lib/providers/config";
 import { getProviderLogoMark } from "@/components/dashboard/ProviderLogo";
 import { Button } from "@/components/ui/button";
@@ -431,7 +432,7 @@ export function ProviderKeyManager({ projectId }: ProviderKeyManagerProps) {
                                         className="h-7 px-3 rounded-lg text-[11px] text-destructive hover:text-destructive hover:bg-destructive/10"
                                     >
                                         {deleteKeyMutation.isPending ? (
-                                            <Loader2 className="h-3 w-3 animate-spin" />
+                                            <Spinner className="h-3 w-3 animate-spin" />
                                         ) : (
                                             <>
                                                 <Trash2 className="h-3 w-3 mr-1" />
@@ -452,7 +453,7 @@ export function ProviderKeyManager({ projectId }: ProviderKeyManagerProps) {
                                     className="h-7 px-3 rounded-lg text-[11px] bg-foreground text-background hover:bg-foreground/90"
                                 >
                                     {addKeyMutation.isPending || updateKeyMutation.isPending ? (
-                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                        <Spinner className="h-3 w-3 animate-spin" />
                                     ) : (
                                         'Save'
                                     )}

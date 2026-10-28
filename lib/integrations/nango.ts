@@ -135,6 +135,40 @@ export async function createConnectLink(projectId: string, integration: string):
     return { url: data.connect_link ?? `https://connect.nango.dev/?session_token=${encodeURIComponent(data.token)}`, expiresAt: data.expires_at };
 }
 
+/**
+ * A call to a connected app's own API, through Nango, which adds the
+ * connection's credentials (and the store's address, for Shopify and
+ * WooCommerce). `path` is the app's path, e.g. `/wp-json/wc/v3/products`.
+ */
+export async function nangoProxy<T>(integration: string, connectionId: string, method: string, path: string, body?: unknown): Promise<T> {
+    const key = process.env.NANGO_SECRET_KEY;
+    if (!key) throw new NangoError('Integrations aren\'t set up on this server (NANGO_SECRET_KEY).', 503, 'not_configured');
+    const response = await safeOutboundFetch(`${NANGO_API}/proxy${path.startsWith('/') ? path : `/${path}`}`, {
+        method,
+        headers: {
+            Authorization: `Bearer ${key}`,
+            'Connection-Id': connectionId,
+            'Provider-Config-Key': integration,
+            Accept: 'application/json',
+            ...(body ? { 'Content-Type': 'application/json' } : {}),
+        },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+    const text = await response.text();
+    let json: unknown = null;
+    try {
+        json = text ? JSON.parse(text) : null;
+    } catch {
+        json = null;
+    }
+    if (!response.ok) {
+        const message = (json as { message?: string; error?: { message?: string } } | null)?.error?.message ?? (json as { message?: string } | null)?.message;
+        throw new NangoError(message || `The store didn't answer (${response.status})`, response.status);
+    }
+    return json as T;
+}
+
 export async function deleteConnection(integration: string, connectionId: string): Promise<void> {
     await nango('DELETE', `/connections/${encodeURIComponent(connectionId)}?provider_config_key=${encodeURIComponent(integration)}`);
 }

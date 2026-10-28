@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowUp, Camera, Check, ChevronLeft, Link2, Loader2, QrCode } from "lucide-react";
+import { ArrowUp, Camera, Check, ChevronLeft, Link2, QrCode } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { StudioLinkQr } from "@/components/studio/StudioLinkQr";
 import { useStudio } from "@/components/studio/StudioShell";
 import { BUSINESS_KINDS, setupInstructions, setupKnowledge, setupQuestions, type AnswerKey, type BusinessKind } from "@/lib/studio/setup";
@@ -137,7 +138,12 @@ export default function StudioSetupPage() {
         }
         if (!saved?.built) return;
         if (outcome !== "connected") {
-            setError("WhatsApp didn't finish connecting. You can try again, or do it later.");
+            setError(params.get("message") || "WhatsApp didn't finish connecting. You can try again, or do it later.");
+            return;
+        }
+        // Meta's own signup: already connected on the server on the way back.
+        if (params.get("via") === "meta") {
+            setState((current) => ({ ...current, step: 5 }));
             return;
         }
         setBusy(true);
@@ -282,6 +288,13 @@ export default function StudioSetupPage() {
         setBusy(true);
         setError(null);
         try {
+            // Meta's own signup when it's set up (a full page, back to /setup); Kapso's otherwise.
+            const { signup } = await call<{ signup: unknown }>(`/api/projects/${project.id}/embedded-agents/${state.built.agentId}/whatsapp`, "GET");
+            // Meta only returns to https addresses; the local dev server (http) uses Kapso.
+            if (signup && window.location.protocol === "https:") {
+                window.location.assign(`/api/studio/whatsapp/start?project_id=${project.id}&agent_id=${state.built.agentId}&coexistence=1&return=/setup`);
+                return;
+            }
             const { url } = await call<{ url: string }>(`/api/projects/${project.id}/embedded-agents/${state.built.agentId}/whatsapp`, "POST", { action: "kapso_link", return_path: "/setup" });
             window.location.assign(url);
         } catch (cause) {
@@ -356,7 +369,7 @@ export default function StudioSetupPage() {
                                 <p className="text-[15px] font-semibold">Setting up your assistant…</p>
                                 <ul className="mt-2 space-y-1.5">
                                     {building.map((line) => <li key={line} className="flex items-center gap-2 text-sm"><Check className="h-4 w-4 text-emerald-600" />{line}</li>)}
-                                    <li className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Working…</li>
+                                    <li className="flex items-center gap-2 text-sm text-muted-foreground"><Spinner className="h-4 w-4 animate-spin" />Working…</li>
                                 </ul>
                             </div>
                         )}
@@ -372,7 +385,7 @@ export default function StudioSetupPage() {
                         <div className={cn("shrink-0 border-t border-border/60 bg-background px-5 pt-3", viewport.keyboard ? "pb-3" : "pb-[calc(0.75rem+env(safe-area-inset-bottom))]")}>
                             {current.key === "list" && reading && (
                                 <p className={cn("mb-2 flex items-center gap-2 text-[13px] leading-5", reading === "read" ? "text-foreground" : "text-muted-foreground")}>
-                                    {reading === "reading" ? <><Loader2 className="h-4 w-4 animate-spin" />Reading your photo…</> : <><Check className="h-4 w-4 text-emerald-600" />Here&apos;s what I read. Fix anything that&apos;s off, then send.</>}
+                                    {reading === "reading" ? <><Spinner className="h-4 w-4 animate-spin" />Reading your photo…</> : <><Check className="h-4 w-4 text-emerald-600" />Here&apos;s what I read. Fix anything that&apos;s off, then send.</>}
                                 </p>
                             )}
                             {current.key === "list" && error && <p role="alert" className="mb-2 text-[13px] leading-5 text-destructive">{error}</p>}

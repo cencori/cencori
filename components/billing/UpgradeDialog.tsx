@@ -11,12 +11,12 @@ import {
   useCheckoutElements,
 } from "@stripe/react-stripe-js/checkout";
 import {
-  ArrowRight,
-  Check,
-  CreditCard,
-  Loader2,
-  LockKeyhole,
+    ArrowRight,
+    Check,
+    CreditCard,
+    LockKeyhole,
 } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import {
@@ -293,7 +293,7 @@ function PaymentForm({
         >
           {submitting ? (
             <>
-              <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+              <Spinner className="size-3.5 animate-spin" aria-hidden="true" />
               Processing
             </>
           ) : (

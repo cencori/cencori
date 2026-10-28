@@ -14,7 +14,7 @@
  *   POST    { action: 'kapso_finish', phone_number_id? }
  *           After that: save the number Kapso connected (the one it named on
  *           the way back) and have Kapso forward its messages here.
- *   POST    { code, phone_number_id, waba_id, coexistence? }
+ *   POST    { code, phone_number_id?, waba_id?, coexistence? }
  *           Finish Embedded Signup ("Connect WhatsApp"): swap the code for the
  *           business's token, subscribe Cencori's app to their WhatsApp
  *           account, turn the number on for the Cloud API and save it.
@@ -28,35 +28,21 @@ import type { SubscriptionTier } from '@/lib/entitlements';
 import { ensureWidgetInstallation } from '@/lib/embedded/widget';
 import { getMainSiteUrl } from '@/lib/main-site-url';
 import { resolvePublicOrigin } from '@/lib/public-origin';
-import { randomInt } from 'crypto';
-import { encryptApiKey } from '@/lib/encryption';
 import { createKapsoSetupLink, ensureKapsoCustomer, ensureKapsoWebhook, kapsoConfigured, listKapsoNumbers } from '@/lib/channels/kapso';
 import { getOwnerAlerts } from '@/lib/embedded/owner-alerts';
 import {
-    META_GRAPH_VERSION,
-    assignSystemUserToWaba,
-    exchangeSignupCode,
     getAgentChannel,
     publicChannel,
-    registerPhoneNumber,
     saveChannel,
     saveKapsoChannel,
-    saveSignupChannel,
-    subscribeAppToWaba,
     type WhatsAppChannel,
 } from '@/lib/channels/whatsapp';
+import { finishSignup, signupConfig } from '@/lib/channels/whatsapp-signup';
 
 type Admin = ReturnType<typeof createAdminClient>;
 type Context = { params: Promise<{ projectId: string; agentId: string }> };
 
 const fail = (message: string, status = 400) => NextResponse.json({ error: message }, { status });
-
-/** What the console needs to open Meta's sign-up popup; null until Cencori's Meta app is configured. */
-function signupConfig() {
-    const appId = process.env.META_APP_ID;
-    const configId = process.env.META_EMBEDDED_SIGNUP_CONFIG_ID;
-    return appId && configId && process.env.META_APP_SECRET ? { app_id: appId, config_id: configId, graph_version: META_GRAPH_VERSION } : null;
-}
 
 async function role(db: Admin, organizationId: string, userId: string) {
     const { data: organization } = await db.from('organizations').select('owner_id,subscription_tier').eq('id', organizationId).maybeSingle();
@@ -166,57 +152,15 @@ export async function POST(req: NextRequest, ctx: Context) {
     const phoneNumberId = typeof body?.phone_number_id === 'string' ? body.phone_number_id.trim() : '';
     const wabaId = typeof body?.waba_id === 'string' ? body.waba_id.trim() : '';
     const coexistence = body?.coexistence === true;
-    if (!code || !/^\d{5,25}$/.test(phoneNumberId) || !/^\d{5,25}$/.test(wabaId)) return fail('The WhatsApp sign-up didn\'t finish. Try again.');
+    if (!code) return fail('The WhatsApp sign-up didn\'t finish. Try again.');
+    // Without the number (the popup's message never came), the token says which it was.
+    const reported = /^\d{5,25}$/.test(phoneNumberId) && /^\d{5,25}$/.test(wabaId);
 
-    const installed = await ensureWidgetInstallation(db, { projectId, agentId, agentName: agent.name, tier, audience: 'whatsapp' });
-    if (!installed.ok) return fail(installed.message, installed.status);
-
-    let token: string;
-    try {
-        token = await exchangeSignupCode(code, config.app_id, process.env.META_APP_SECRET!);
-        await subscribeAppToWaba(wabaId, token);
-    } catch (error) {
-        return fail(`Meta didn't finish connecting the number: ${error instanceof Error ? error.message : 'unknown error'}`, 502);
-    }
-    // A new number has to be turned on for the Cloud API, with a two-step PIN we keep.
-    let pinEncrypted: string | null = null;
-    if (!coexistence) {
-        const pin = String(randomInt(0, 1_000_000)).padStart(6, '0');
-        try {
-            await registerPhoneNumber(phoneNumberId, token, pin);
-            pinEncrypted = encryptApiKey(pin, access.organizationId);
-        } catch (error) {
-            // Already registered (a reconnect) is fine; anything else is surfaced.
-            const message = error instanceof Error ? error.message : 'unknown error';
-            if (!/already registered|registered/i.test(message)) return fail(`Meta didn't turn the number on: ${message}`, 502);
-        }
-    }
-
-    const existing = await getAgentChannel(db, projectId, agentId);
-    const saved = await saveSignupChannel(db, { projectId, organizationId: access.organizationId, agentId, existing, phoneNumberId, wabaId, accessToken: token, coexistence });
+    const saved = await finishSignup(db, {
+        projectId, organizationId: access.organizationId, agentId, agentName: agent.name, tier, code, coexistence,
+        ...(reported ? { phoneNumberId, wabaId } : {}),
+    });
     if (!saved.ok) return fail(saved.message, saved.status);
-    // The signup token lasts 60 days; Cencori's system user doesn't expire. Best-effort:
-    // without it the stored token is used, and the console shows when it runs out.
-    let systemUserAssigned = false;
-    const systemUserId = process.env.META_SYSTEM_USER_ID;
-    const systemUserToken = process.env.META_SYSTEM_USER_TOKEN;
-    if (systemUserId && systemUserToken) {
-        try {
-            await assignSystemUserToWaba(wabaId, systemUserId, systemUserToken);
-            systemUserAssigned = true;
-        } catch (error) {
-            console.error('[whatsapp] system user assignment failed', error instanceof Error ? error.message : error);
-        }
-    }
-    await db.from('tool_connections').update({
-        metadata: {
-            ...saved.channel.metadata,
-            system_user_assigned: systemUserAssigned,
-            token_expires_at: new Date(Date.now() + 60 * 86_400_000).toISOString(),
-            ...(pinEncrypted ? { registration_pin_encrypted: pinEncrypted } : {}),
-        },
-    }).eq('id', saved.channel.id);
-    saved.channel.metadata.system_user_assigned = systemUserAssigned;
     return NextResponse.json({ channel: serialize(req, saved.channel), can_manage: true, signup: config });
 }
 

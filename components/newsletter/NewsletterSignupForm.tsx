@@ -1,6 +1,7 @@
 "use client";
 
-import { Check, Loader2 } from "lucide-react";
+import { Check } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { FormEvent, useId, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -104,7 +105,7 @@ export function NewsletterSignupForm({
         <Button type="submit" disabled={isSubmitting || !email.trim()}>
           {isSubmitting ? (
             <>
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Spinner className="h-4 w-4 animate-spin" />
               Sending
             </>
           ) : (

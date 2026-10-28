@@ -121,6 +121,14 @@ export async function getAgentChannel(db: Admin, projectId: string, agentId: str
 }
 
 /** What the console may see: no token, no secret. */
+/** The project's connected WhatsApp number with a business account, if any (for its catalog). */
+export async function getProjectChannel(db: Admin, projectId: string): Promise<WhatsAppChannel | null> {
+    const { data } = await db.from('tool_connections').select(COLUMNS)
+        .eq('project_id', projectId).eq('connector_slug', WHATSAPP_CHANNEL_SLUG).not('metadata->>waba_id', 'is', null)
+        .order('created_at', { ascending: true }).limit(1).maybeSingle();
+    return toChannel(data as Record<string, unknown> | null);
+}
+
 export function publicChannel(channel: WhatsAppChannel, webhookUrl: string) {
     const m = channel.metadata;
     return {
@@ -365,9 +373,31 @@ export async function registerPhoneNumber(phoneNumberId: string, accessToken: st
     await graph('POST', `/${encodeURIComponent(phoneNumberId)}/register`, accessToken, { messaging_product: 'whatsapp', pin });
 }
 
+/**
+ * Which WhatsApp account and number a signup token was granted for, from the
+ * token itself. The popup reports them by message; the redirect version of the
+ * signup doesn't, so the server asks Meta. The number is the one onboarded
+ * most recently (a business may have others on the same account).
+ */
+export async function signupTargets(accessToken: string, appId: string, appSecret: string): Promise<{ wabaId: string; phoneNumberId: string }> {
+    const params = new URLSearchParams({ input_token: accessToken, access_token: `${appId}|${appSecret}` });
+    // The app's own token goes in the address; no Authorization header (Meta refuses both at once).
+    const response = await safeOutboundFetch(`${GRAPH}/debug_token?${params}`, { signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS) });
+    const debug = await response.json().catch(() => null) as { data?: { granular_scopes?: Array<{ scope: string; target_ids?: string[] }> }; error?: { message?: string } } | null;
+    if (!response.ok || !debug) throw new Error(debug?.error?.message ?? `Meta didn't describe the sign-up (${response.status})`);
+    const scopes = debug.data?.granular_scopes ?? [];
+    const wabaId = (scopes.find((s) => s.scope === 'whatsapp_business_management')?.target_ids ?? scopes.find((s) => s.scope === 'whatsapp_business_messaging')?.target_ids ?? []).at(-1);
+    if (!wabaId) throw new Error('Meta didn\'t say which WhatsApp account was connected.');
+    const numbers = await graph<{ data?: Array<{ id: string; last_onboarded_time?: string }> }>('GET', `/${encodeURIComponent(wabaId)}/phone_numbers?fields=id,last_onboarded_time`, accessToken);
+    const list = [...(numbers.data ?? [])].sort((a, b) => Date.parse(b.last_onboarded_time ?? '0') - Date.parse(a.last_onboarded_time ?? '0'));
+    if (!list[0]) throw new Error('No number was added in the sign-up.');
+    return { wabaId, phoneNumberId: list[0].id };
+}
+
 /** Swap the code from Embedded Signup for a business token (needs Cencori's app secret, so server-side only). */
-export async function exchangeSignupCode(code: string, appId: string, appSecret: string): Promise<string> {
-    const params = new URLSearchParams({ client_id: appId, client_secret: appSecret, code });
+export async function exchangeSignupCode(code: string, appId: string, appSecret: string, redirectUri?: string): Promise<string> {
+    // The redirect version of the signup (no popup) must name the same address it came back to.
+    const params = new URLSearchParams({ client_id: appId, client_secret: appSecret, code, ...(redirectUri ? { redirect_uri: redirectUri } : {}) });
     const response = await safeOutboundFetch(`${GRAPH}/oauth/access_token?${params}`, { signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS) });
     const json = await response.json().catch(() => null) as { access_token?: string; error?: { message?: string } } | null;
     if (!response.ok || !json?.access_token) throw new Error(json?.error?.message ?? `Meta didn't accept the sign-up (${response.status})`);
@@ -543,5 +573,47 @@ export async function sendText(channel: WhatsAppChannel, accessToken: string, to
             // The first part quotes the customer's message, so a reply after a pause is clearly an answer.
             ...(index === 0 && replyTo ? { context: { message_id: replyTo } } : {}),
         }, viaOf(channel));
+    }
+}
+
+export interface WhatsAppCatalogProduct { id: string; name: string; price: string; description: string; inventory: number | null; availability: string }
+
+/**
+ * The products in the catalog connected to the business's WhatsApp account
+ * (Commerce Manager), up to 500. Needs the catalog_management permission on
+ * the token; Meta refuses with code 10 or 200 without it.
+ */
+export async function readWhatsAppCatalog(channel: WhatsAppChannel, accessToken: string): Promise<WhatsAppCatalogProduct[]> {
+    const wabaId = channel.metadata.waba_id;
+    if (!wabaId) throw new Error('This number has no WhatsApp business account.');
+    // Kapso's copy of the Graph API doesn't carry catalogs (404).
+    if (channel.metadata.provider === 'kapso') throw new Error('To sync your WhatsApp catalog, connect WhatsApp again with Meta (Connect WhatsApp), then try again.');
+    const via = viaOf(channel);
+    try {
+        const catalogs = await graph<{ data?: Array<{ id: string }> }>('GET', `/${encodeURIComponent(wabaId)}/product_catalogs`, accessToken, undefined, via);
+        const catalogId = catalogs.data?.[0]?.id;
+        if (!catalogId) throw new Error('No catalog is connected to this WhatsApp number yet.');
+        const products: WhatsAppCatalogProduct[] = [];
+        let after: string | null = null;
+        do {
+            const params = new URLSearchParams({ fields: 'id,retailer_id,name,price,description,inventory,availability', limit: '100', ...(after ? { after } : {}) });
+            const page: { data?: Array<Record<string, unknown>>; paging?: { cursors?: { after?: string }; next?: string } } = await graph('GET', `/${encodeURIComponent(catalogId)}/products?${params}`, accessToken, undefined, via);
+            for (const item of page.data ?? []) {
+                products.push({
+                    id: String(item.retailer_id ?? item.id),
+                    name: String(item.name ?? ''),
+                    price: String(item.price ?? ''),
+                    description: String(item.description ?? ''),
+                    inventory: typeof item.inventory === 'number' ? item.inventory : null,
+                    availability: String(item.availability ?? 'in stock'),
+                });
+            }
+            after = page.paging?.next ? page.paging.cursors?.after ?? null : null;
+        } while (after && products.length < 500);
+        return products.slice(0, 500);
+    } catch (error) {
+        const code = (error as { code?: number }).code;
+        if (code === 10 || code === 200 || code === 100) throw new Error('Meta hasn\'t let Cencori read WhatsApp catalogs yet. Use screenshots of your catalog for now.');
+        throw error;
     }
 }

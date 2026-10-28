@@ -14,7 +14,6 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-    Loader2,
     CheckCircle,
     AlertTriangle,
     ExternalLink,
@@ -25,6 +24,7 @@ import {
     ChevronDown,
     ChevronUp,
 } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
@@ -415,7 +415,7 @@ export function FixPreviewSheet({
                     {state === "generating" && (
                         <div className="space-y-3 pt-4">
                             <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                                <Loader2 className="h-4 w-4 animate-spin text-emerald-400" />
+                                <Spinner className="h-4 w-4 animate-spin text-emerald-400" />
                                 Analyzing issues and generating fixes...
                             </div>
                             {[1, 2, 3].map((i) => (
@@ -501,7 +501,7 @@ export function FixPreviewSheet({
                     {/* ─── Creating PR State ───────────────────────────── */}
                     {state === "creating" && (
                         <div className="text-center py-12">
-                            <Loader2 className="h-8 w-8 animate-spin text-emerald-400 mx-auto mb-3" />
+                            <Spinner className="h-8 w-8 animate-spin text-emerald-400 mx-auto mb-3" />
                             <p className="text-sm font-medium">Creating Pull Request</p>
                             <p className="text-xs text-muted-foreground mt-1">
                                 Creating branch, committing fixes, and opening PR...

@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
-import { Loader2 } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 
 interface WaitlistModalProps {
   productName: string;
@@ -83,7 +83,7 @@ export function WaitlistModal({ productName, children }: WaitlistModalProps) {
               />
             </div>
             <Button type="submit" disabled={loading} className="w-full">
-              {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              {loading ? <Spinner className="h-4 w-4 animate-spin mr-2" /> : null}
               {loading ? "Joining..." : "Join Waitlist"}
             </Button>
           </form>

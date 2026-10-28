@@ -18,7 +18,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, Search, Upload, Loader2, ArrowRightLeft } from "lucide-react";
+import { Plus, Trash2, Search, Upload, ArrowRightLeft } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { toast } from "@/components/ui/toast";
 
 interface ModelMapping {
@@ -166,7 +167,7 @@ export default function ModelMappingsPage() {
                         disabled={seedMutation.isPending}
                     >
                         {seedMutation.isPending ? (
-                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                            <Spinner className="h-3 w-3 mr-1 animate-spin" />
                         ) : (
                             <Upload className="h-3 w-3 mr-1" />
                         )}
@@ -244,7 +245,7 @@ export default function ModelMappingsPage() {
                                     }
                                 >
                                     {createMutation.isPending ? (
-                                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                        <Spinner className="h-3 w-3 mr-1 animate-spin" />
                                     ) : null}
                                     Create Mapping
                                 </Button>

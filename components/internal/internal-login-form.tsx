@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Loader2, Lock } from 'lucide-react';
+import { Lock } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 
 // Signs in through /api/auth/login for the same reason the main login form
 // does: Set-Cookie sessions aren't subject to Safari's 7-day cap on
@@ -130,7 +131,7 @@ export function InternalLoginForm() {
                     >
                         {loading ? (
                             <>
-                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                <Spinner className="h-4 w-4 animate-spin mr-2" />
                                 {isSignUp ? 'Creating account...' : 'Signing in...'}
                             </>
                         ) : (

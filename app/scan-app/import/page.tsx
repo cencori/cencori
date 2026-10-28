@@ -22,11 +22,11 @@ import {
 import {
     GitBranch,
     Search,
-    Loader2,
     ArrowLeft,
     Check,
-    PlusIcon
+    PlusIcon,
 } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 
 // GitHub Octocat icon
 const GitHubIcon = ({ className }: { className?: string }) => (
@@ -331,7 +331,7 @@ export default function ImportRepoPage() {
                             disabled={isConnectingGitHub}
                         >
                             {isConnectingGitHub ? (
-                                <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Redirecting...</>
+                                <><Spinner className="h-3 w-3 mr-1 animate-spin" /> Redirecting...</>
                             ) : (
                                 "Install GitHub App"
                             )}
@@ -454,7 +454,7 @@ export default function ImportRepoPage() {
                                             {repo.already_imported ? (
                                                 <><Check className="h-3 w-3 mr-1" /> Imported</>
                                             ) : importingRepoId === repo.id ? (
-                                                <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Importing...</>
+                                                <><Spinner className="h-3 w-3 mr-1 animate-spin" /> Importing...</>
                                             ) : (
                                                 "Import"
                                             )}

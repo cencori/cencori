@@ -20,7 +20,8 @@
 'use client';
 
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { AlertCircle, Loader2, Upload, X } from 'lucide-react';
+import { AlertCircle, Upload, X } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { VisionFormatBanner, type VisionProvider } from './vision-format-banner';
 import { canDownscale, downscaleImage } from './downscale';
 
@@ -305,7 +306,7 @@ export function VisionUploader({
 
             {loading && (
                 <div className="inline-flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400">
-                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                    <Spinner className="h-4 w-4 animate-spin" aria-hidden />
                     Analyzing…
                 </div>
             )}

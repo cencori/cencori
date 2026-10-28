@@ -9,7 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Search, AlertCircle, Loader2, ExternalLink, X } from 'lucide-react';
+import { Search, AlertCircle, ExternalLink, X } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { toast } from '@/components/ui/toast';
 import { GitHubInstallDialog } from '@/components/github/GitHubInstallDialog';
 import { UpgradeDialog } from '@/components/billing/UpgradeDialog';
@@ -327,7 +328,7 @@ export default function GitHubImportPage({ params }: PageProps) {
                 className="p-1 text-muted-foreground hover:text-red-500 disabled:opacity-50"
               >
                 {disconnectingId === acct.installationId ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
+                  <Spinner className="h-3 w-3 animate-spin" />
                 ) : (
                   <X className="h-3 w-3" />
                 )}
@@ -391,7 +392,7 @@ export default function GitHubImportPage({ params }: PageProps) {
                     >
                       {importingRepoId === repo.id ? (
                         <>
-                          <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
+                          <Spinner className="mr-1.5 h-3 w-3 animate-spin" />
                           Importing
                         </>
                       ) : (

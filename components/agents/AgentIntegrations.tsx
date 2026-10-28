@@ -18,6 +18,7 @@ import { applyStudioResult, postStudioAction } from "@/components/agents/studio"
 import { readJson } from "@/components/agents/widget-preview";
 import { cn } from "@/lib/utils";
 import { AppTilesSkeleton } from "@/components/agents/AgentSkeletons";
+import { Spinner } from "@/components/ui/spinner";
 
 type AppTool = { name: string; description: string; readOnly: boolean; destructive: boolean };
 /** A connected app as stored on the agent. */
@@ -468,7 +469,7 @@ export function AgentIntegrations({ adding, onAddingChange }: { adding: boolean;
                                                 </Button>
                                             )}
                                             <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={() => void refresh(app)} disabled={locked} aria-label={`Refresh ${app.name} tools`} title="Refresh tools">
-                                                <RefreshCw className={cn("h-3.5 w-3.5", working === app.id && "animate-spin")} />
+                                                {working === app.id ? <Spinner className="h-3.5 w-3.5" /> : <RefreshCw className="h-3.5 w-3.5" />}
                                             </Button>
                                             <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => void saveApps(apps.filter((a) => a.id !== app.id), `${app.name} removed`)} disabled={locked} aria-label={`Remove ${app.name}`} title="Remove from this agent">
                                                 <Trash2 className="h-3.5 w-3.5" />

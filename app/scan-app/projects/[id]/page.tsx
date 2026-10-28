@@ -22,13 +22,13 @@ import {
     FileText,
     ChevronRight,
     ChevronDown,
-    Loader2,
     ArrowLeft,
     Trash2,
     Copy,
     Download,
     ExternalLink,
 } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import Link from "next/link";
 
 interface ScanProject {
@@ -1050,10 +1050,7 @@ export default function ProjectDetailPage() {
                 >
                     {isScanning ? (
                         <>
-                            <span
-                                aria-hidden="true"
-                                className="mr-1.5 h-3 w-3 animate-spin rounded-full border border-current border-t-transparent"
-                            />
+                            <Spinner className="mr-1.5 h-3 w-3" />
                             Scanning...
                         </>
                     ) : (
@@ -1341,7 +1338,7 @@ export default function ProjectDetailPage() {
                                                 onClick={() => updateFixStatus("done")}
                                                 disabled={isUpdatingFixStatus}
                                             >
-                                                {isUpdatingFixStatus ? <Loader2 className="h-3 w-3 animate-spin" /> : "Done"}
+                                                {isUpdatingFixStatus ? <Spinner className="h-3 w-3 animate-spin" /> : "Done"}
                                             </Button>
                                         </>
                                     ) : (
@@ -1353,7 +1350,7 @@ export default function ProjectDetailPage() {
                                                 onClick={() => updateFixStatus("dismiss")}
                                                 disabled={isUpdatingFixStatus}
                                             >
-                                                {isUpdatingFixStatus ? <Loader2 className="h-3 w-3 animate-spin" /> : "Dismiss"}
+                                                {isUpdatingFixStatus ? <Spinner className="h-3 w-3 animate-spin" /> : "Dismiss"}
                                             </Button>
                                             <Button
                                                 size="sm"
@@ -1762,7 +1759,7 @@ export default function ProjectDetailPage() {
                                 disabled={isGeneratingChangelog}
                             >
                                 {isGeneratingChangelog ? (
-                                    <><Loader2 className="h-3 w-3 mr-1.5 animate-spin" /> Generating...</>
+                                    <><Spinner className="h-3 w-3 mr-1.5 animate-spin" /> Generating...</>
                                 ) : (
                                     "Generate Changelog"
                                 )}
@@ -1961,7 +1958,7 @@ export default function ProjectDetailPage() {
                                         disabled={isDeleting}
                                     >
                                         {isDeleting ? (
-                                            <><Loader2 className="h-3 w-3 mr-1.5 animate-spin" /> Deleting...</>
+                                            <><Spinner className="h-3 w-3 mr-1.5 animate-spin" /> Deleting...</>
                                         ) : (
                                             <>Confirm Delete</>
                                         )}

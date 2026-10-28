@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
-import { Loader2 } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { CONTACT_BUDGETS, CONTACT_INDUSTRIES } from "@/lib/industries";
 
 export default function ContactPage() {
@@ -319,7 +319,7 @@ export default function ContactPage() {
             <Button type="submit" disabled={isSubmitting} className="flex h-9 w-full max-w-28 rounded-full text-sm">
               {isSubmitting ? (
                 <>
-                  <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                  <Spinner className="mr-2 h-3 w-3 animate-spin" />
                   Sending...
                 </>
               ) : (

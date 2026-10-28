@@ -8,7 +8,8 @@ import { UserAvatar } from "@/components/ui/user-avatar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Camera, Loader2, Trash2, X } from "lucide-react";
+import { Camera, Trash2, X } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { toast } from "@/components/ui/toast";
 import {
     Dialog,
@@ -173,7 +174,7 @@ export default function ProfilePage() {
     if (isLoading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                <Spinner className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
         );
     }
@@ -211,7 +212,7 @@ export default function ProfilePage() {
                             disabled={isUploading}
                         >
                             {isUploading ? (
-                                <Loader2 className="h-5 w-5 text-white animate-spin" />
+                                <Spinner className="h-5 w-5 text-white animate-spin" />
                             ) : (
                                 <Camera className="h-5 w-5 text-white" />
                             )}
@@ -320,7 +321,7 @@ export default function ProfilePage() {
                     >
                         {isSaving ? (
                             <>
-                                <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
+                                <Spinner className="h-3 w-3 mr-1.5 animate-spin" />
                                 Saving...
                             </>
                         ) : (

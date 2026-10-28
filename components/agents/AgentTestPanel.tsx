@@ -7,7 +7,8 @@ import PencilEdit02Icon from "@hugeicons/core-free-icons/PencilEdit02Icon";
 import ToolsIcon from "@hugeicons/core-free-icons/ToolsIcon";
 import ArrowRight01Icon from "@hugeicons/core-free-icons/ArrowRight01Icon";
 import ArrowDown01Icon from "@hugeicons/core-free-icons/ArrowDown01Icon";
-import { ArrowUp, CircleAlert, Copy, Loader2, X } from "lucide-react";
+import { ArrowUp, CircleAlert, Copy, X } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
@@ -169,7 +170,7 @@ export function AgentTestPanel({ onClose }: { onClose: () => void }) {
                             />
                             <div className="flex justify-end px-1">
                                 <Button type="button" size="icon" onClick={send} disabled={!canSend} aria-label="Send message" className="h-8 w-8 rounded-full bg-foreground text-background hover:bg-foreground/90 disabled:opacity-25">
-                                    {testing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ArrowUp className={cn("h-4 w-4")} />}
+                                    {testing ? <Spinner className="h-3.5 w-3.5 animate-spin" /> : <ArrowUp className={cn("h-4 w-4")} />}
                                 </Button>
                             </div>
                         </div>

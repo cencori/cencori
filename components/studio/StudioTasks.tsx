@@ -4,12 +4,14 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { Drawer } from "vaul";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { Camera, Check, Loader2, X } from "lucide-react";
+import { Camera, Check, X } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { useStudio } from "@/components/studio/StudioShell";
 import { studioFetch } from "@/components/studio/studio-data";
 import { resizePhoto } from "@/lib/studio/resize-photo";
 import { cn } from "@/lib/utils";
 import { getMainSiteUrl } from "@/lib/main-site-url";
+import { ProductsTask } from "@/components/studio/StudioProducts";
 
 /**
  * Setting the assistant up, in Studio: each "Finish setting up" step (and
@@ -18,7 +20,7 @@ import { getMainSiteUrl } from "@/lib/main-site-url";
  * signs in there sees everything done from Studio.
  */
 
-export type StudioTask = "knowledge" | "whatsapp" | "website" | "golive" | "alerts" | "payments" | "plans" | "business" | "newbusiness" | "later";
+export type StudioTask = "knowledge" | "products" | "whatsapp" | "website" | "golive" | "alerts" | "payments" | "plans" | "business" | "newbusiness" | "later";
 
 /** Another business the ⋯ menu acts on (never the open one). */
 export type BusinessTarget = { id: string; name: string; isBusiness: boolean };
@@ -38,6 +40,7 @@ export function useStudioTasks() {
 export function taskForStep(step: string): StudioTask | null {
     const text = step.toLowerCase();
     if (text.startsWith("add knowledge")) return "knowledge";
+    if (text.startsWith("add products")) return "products";
     if (text.startsWith("go live")) return "golive";
     if (text.startsWith("connect whatsapp")) return "whatsapp";
     if (text.startsWith("set owner alerts")) return "alerts";
@@ -50,6 +53,7 @@ export function taskForCopilotPage(title: string): StudioTask {
     const text = title.toLowerCase();
     if (text.includes("whatsapp")) return "whatsapp";
     if (text.includes("website")) return "website";
+    if (text.includes("product")) return "products";
     if (text.includes("payment")) return "payments";
     return "later";
 }
@@ -63,6 +67,7 @@ async function send<T = unknown>(url: string, method: string, body?: unknown): P
 
 const TITLES: Record<StudioTask, string> = {
     knowledge: "Add knowledge",
+    products: "Add products",
     whatsapp: "Connect WhatsApp",
     website: "Chat on your website",
     golive: "Go live",
@@ -114,6 +119,13 @@ export function StudioTasksProvider({ children }: { children: ReactNode }) {
         const agentId = agents[0]?.id;
         if (!outcome || !agentId || finishing.current || window.location.pathname.startsWith("/setup")) return;
         finishing.current = true;
+        // Meta's own signup: the server already connected it on the way back.
+        if (params.get("via") === "meta") {
+            window.history.replaceState(null, "", window.location.pathname);
+            setNotice(outcome === "connected" ? "WhatsApp is connected. Your assistant answers there now." : (params.get("message") || "WhatsApp didn't finish connecting. Try again."));
+            void queryClient.invalidateQueries();
+            return;
+        }
         const phoneNumberId = params.get("phone_number_id");
         window.history.replaceState(null, "", window.location.pathname);
         if (outcome !== "connected") {
@@ -163,6 +175,7 @@ function TaskBody({ task, agentId: chosen, onDone }: { task: StudioTask; agentId
     const agentId = chosen ?? agents[0]?.id ?? null;
     if (task === "plans") return <PlansTask organizationId={organization.id} />;
     if (task === "newbusiness") return <NewBusinessTask />;
+    if (task === "products") return <ProductsTask onDone={onDone} />;
     if (task === "later") {
         return (
             <>
@@ -176,7 +189,7 @@ function TaskBody({ task, agentId: chosen, onDone }: { task: StudioTask; agentId
     }
     const agentBase = `/api/projects/${project.id}/embedded-agents/${agentId}`;
     if (task === "knowledge") return <KnowledgeTask agentBase={agentBase} projectId={project.id} onDone={onDone} />;
-    if (task === "whatsapp") return <WhatsAppTask agentBase={agentBase} />;
+    if (task === "whatsapp") return <WhatsAppTask agentBase={agentBase} projectId={project.id} agentId={agentId} />;
     if (task === "website") return <WebsiteTask agentBase={agentBase} />;
     if (task === "golive") return <GoLiveTask projectId={project.id} agentId={agentId} agentBase={agentBase} onDone={onDone} />;
     if (task === "alerts") return <AlertsTask agentBase={agentBase} email={user.email} onDone={onDone} />;
@@ -186,7 +199,7 @@ function TaskBody({ task, agentId: chosen, onDone }: { task: StudioTask; agentId
 function Primary({ children, busy, disabled, onClick }: { children: ReactNode; busy?: boolean; disabled?: boolean; onClick: () => void }) {
     return (
         <button type="button" onClick={onClick} disabled={busy || disabled} className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground text-[15px] font-semibold text-background disabled:opacity-50">
-            {busy && <Loader2 className="h-4 w-4 animate-spin" />}{children}
+            {busy && <Spinner className="h-4 w-4 animate-spin" />}{children}
         </button>
     );
 }
@@ -252,7 +265,7 @@ function KnowledgeTask({ agentBase, projectId, onDone }: { agentBase: string; pr
                     <textarea value={text} onChange={(event) => setText(event.target.value)} rows={8} placeholder="Jollof rice ₦6,500…" className={cn(field, "mt-2 resize-none py-3 leading-6")} />
                     <input ref={photo} type="file" accept="image/*" multiple hidden onChange={(event) => void readPhotos(event.target.files)} />
                     <button type="button" onClick={() => photo.current?.click()} disabled={busy !== null} className="mt-2 flex h-10 items-center gap-1.5 rounded-full border border-border/60 px-4 text-sm disabled:opacity-60">
-                        {busy === "reading" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}{busy === "reading" ? "Reading your photo…" : "Take a photo instead"}
+                        {busy === "reading" ? <Spinner className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}{busy === "reading" ? "Reading your photo…" : "Take a photo instead"}
                     </button>
                 </>
             ) : (
@@ -265,10 +278,28 @@ function KnowledgeTask({ agentBase, projectId, onDone }: { agentBase: string; pr
 }
 
 /** The WhatsApp Business number they already use (Kapso's setup page, then back to Studio). */
-function WhatsAppTask({ agentBase }: { agentBase: string }) {
+type WhatsAppState = { channel: { display_phone_number?: string | null } | null; signup: { app_id: string } | null; kapso: boolean };
+
+/**
+ * Connect WhatsApp: Meta's own signup as a full page (it works from an app
+ * installed on the phone, where popups can't report back), or Kapso's.
+ */
+function WhatsAppTask({ agentBase, projectId, agentId }: { agentBase: string; projectId: string; agentId: string }) {
+    const [state, setState] = useState<WhatsAppState | null>(null);
+    const [keepApp, setKeepApp] = useState(true);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const connect = async () => {
+    useEffect(() => {
+        send<WhatsAppState>(`${agentBase}/whatsapp`, "GET")
+            .then(setState)
+            .catch((cause) => setError(cause instanceof Error ? cause.message : "Couldn't load it."));
+    }, [agentBase]);
+
+    const withMeta = () => {
+        setBusy(true);
+        window.location.assign(`/api/studio/whatsapp/start?project_id=${projectId}&agent_id=${agentId}&coexistence=${keepApp ? 1 : 0}`);
+    };
+    const withKapso = async () => {
         setBusy(true);
         setError(null);
         try {
@@ -279,10 +310,36 @@ function WhatsAppTask({ agentBase }: { agentBase: string }) {
             setBusy(false);
         }
     };
+
+    if (!state) return error ? <ErrorLine error={error} /> : <div className="mt-5 flex justify-center"><Spinner className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
+    if (state.channel) {
+        return <p className="flex items-center gap-2 text-[15px] leading-6"><Check className="h-4 w-4 text-emerald-600" />Connected{state.channel.display_phone_number ? `: ${state.channel.display_phone_number}` : ""}</p>;
+    }
+    // Meta only returns to https addresses, so the local dev server (http) uses Kapso.
+    if (!state.signup || window.location.protocol !== "https:") {
+        return (
+            <>
+                <ErrorLine error={error} />
+                <Primary busy={busy} disabled={!state.kapso} onClick={() => void withKapso()}>Connect WhatsApp</Primary>
+            </>
+        );
+    }
     return (
         <>
+            <button type="button" onClick={() => setKeepApp((value) => !value)} className="flex w-full items-center gap-3 rounded-2xl bg-muted px-4 py-3.5 text-left">
+                <span className="min-w-0 flex-1">
+                    <span className="block text-[15px] font-medium">Keep the WhatsApp Business app</span>
+                    <span className="block text-[13px] leading-5 text-muted-foreground">Same number. You can still reply from your phone.</span>
+                </span>
+                <span className={cn("flex h-7 w-12 shrink-0 items-center rounded-full p-0.5 transition-colors", keepApp ? "bg-emerald-600" : "bg-muted-foreground/30")}>
+                    <span className={cn("h-6 w-6 rounded-full bg-white shadow transition-transform", keepApp && "translate-x-5")} />
+                </span>
+            </button>
             <ErrorLine error={error} />
-            <Primary busy={busy} onClick={() => void connect()}>Connect WhatsApp</Primary>
+            <Primary busy={busy} onClick={withMeta}>Connect WhatsApp</Primary>
+            {state.kapso && (
+                <button type="button" disabled={busy} onClick={() => void withKapso()} className="mt-4 w-full text-center text-[13px] text-muted-foreground disabled:opacity-50">Other way to connect</button>
+            )}
         </>
     );
 }
@@ -359,7 +416,7 @@ function WebsiteTask({ agentBase }: { agentBase: string }) {
     };
 
     if (widget === undefined) {
-        return error ? <ErrorLine error={error} /> : <div className="mt-5 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
+        return error ? <ErrorLine error={error} /> : <div className="mt-5 flex justify-center"><Spinner className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
     }
 
     const on = !!widget?.enabled;
@@ -498,7 +555,7 @@ function PlansTask({ organizationId }: { organizationId: string }) {
     return (
         <>
             <p className="text-[15px] leading-6 text-muted-foreground">30 days each. Card, transfer or USSD.</p>
-            {!data && !error && <div className="mt-5 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>}
+            {!data && !error && <div className="mt-5 flex justify-center"><Spinner className="h-5 w-5 animate-spin text-muted-foreground" /></div>}
             <div className="mt-4 flex flex-col gap-2.5">
                 {data?.plans.map((option) => {
                     const current = data.active && data.plan?.id === option.id;
@@ -512,7 +569,7 @@ function PlansTask({ organizationId }: { organizationId: string }) {
                                 {option.conversations.toLocaleString("en-NG")} chats · {option.agents} {option.agents === 1 ? "assistant" : "assistants"}{option.extras?.length ? ` · ${option.extras.join(" · ")}` : ""}
                             </p>
                             <button type="button" disabled={busy !== null} onClick={() => void choose(option.id)} className={cn("mt-3 flex h-10 w-full items-center justify-center gap-2 rounded-full text-sm font-semibold disabled:opacity-60", current ? "border border-border/60" : "bg-foreground text-background")}>
-                                {busy === option.id && <Loader2 className="h-4 w-4 animate-spin" />}{current ? "Pay for another 30 days" : `Choose ${option.name}`}
+                                {busy === option.id && <Spinner className="h-4 w-4 animate-spin" />}{current ? "Pay for another 30 days" : `Choose ${option.name}`}
                             </button>
                         </div>
                     );
@@ -582,7 +639,7 @@ function BusinessTask({ target, onDone }: { target: BusinessTarget; onDone: () =
                 onClick={() => void run("DELETE", { confirm: confirm.trim() })}
                 className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-destructive text-[15px] font-semibold text-white disabled:opacity-40"
             >
-                {busy && <Loader2 className="h-4 w-4 animate-spin" />}Delete business
+                {busy && <Spinner className="h-4 w-4 animate-spin" />}Delete business
             </button>
         </>
     );

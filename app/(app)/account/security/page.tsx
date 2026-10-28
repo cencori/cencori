@@ -2,7 +2,8 @@
 import { browserAuth } from "@/lib/auth/browser-auth";
 
 import React, { useState, useEffect } from "react";
-import { ShieldCheck, Key, Smartphone, Monitor, Laptop, Tablet, Globe, LogOut, Loader2 } from "lucide-react";
+import { ShieldCheck, Key, Smartphone, Monitor, Laptop, Tablet, Globe, LogOut } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
 import { supabase } from "@/lib/supabaseClient";
@@ -178,7 +179,7 @@ export default function SecurityPage() {
                         >
                             {isSigningOut ? (
                                 <>
-                                    <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
+                                    <Spinner className="h-3 w-3 mr-1.5 animate-spin" />
                                     Signing out...
                                 </>
                             ) : (

@@ -8,7 +8,8 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Download, FileText, FileJson, Loader2 } from 'lucide-react';
+import { Download, FileText, FileJson } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { toast } from '@/components/ui/toast';
 
 interface ExportButtonProps {
@@ -95,7 +96,7 @@ export function ExportButton({ projectId, filters, environment = 'production' }:
                 <Button variant="outline" size="sm" className="h-7 text-xs shadow-none dark:shadow-xs" disabled={isExporting}>
                     {isExporting ? (
                         <>
-                            <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
+                            <Spinner className="mr-1.5 h-3 w-3 animate-spin" />
                             Exporting...
                         </>
                     ) : (

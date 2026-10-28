@@ -20,12 +20,12 @@ import {
     ChevronDown,
     Copy,
     GitPullRequest,
-    Loader2,
     RotateCcw,
     Square,
     ThumbsDown,
     ThumbsUp,
 } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { toast } from "@/components/ui/toast";
 
 interface ScanIssue {
@@ -989,7 +989,7 @@ export default function FixWorkspacePage() {
                                 title={selectedFixes.length === 0 ? "No fixes available to create a PR" : undefined}
                             >
                                 {creatingPr ? (
-                                    <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                                    <Spinner className="h-3.5 w-3.5 mr-1.5 animate-spin" />
                                 ) : (
                                     <GitPullRequest className="h-3.5 w-3.5 mr-1.5" />
                                 )}

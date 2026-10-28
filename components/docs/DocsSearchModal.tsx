@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { FileText, Search, ArrowRight, Hash, Loader2 } from "lucide-react";
+import { FileText, Search, ArrowRight, Hash } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import {
     CommandDialog,
     CommandEmpty,
@@ -106,7 +107,7 @@ export function DocsSearchModal({ open, onOpenChange }: DocsSearchModalProps) {
             <CommandList>
                 {loading && (
                     <div className="flex items-center justify-center py-6">
-                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                        <Spinner className="h-5 w-5 animate-spin text-muted-foreground" />
                     </div>
                 )}
 

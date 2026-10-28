@@ -21,7 +21,6 @@ import {
     ImageIcon,
     Send,
     TestTube,
-    Loader2,
     Plus,
     Trash2,
     Clock,
@@ -36,7 +35,8 @@ import {
     Eye,
     UserCircle,
     Camera,
-} from 'lucide-react';
+} from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -260,7 +260,7 @@ function EditorToolbar({ editor }: { editor: ReturnType<typeof useEditor> | null
                             disabled={isUploadingImage}
                             onClick={() => fileInputRef.current?.click()}
                         >
-                            {isUploadingImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}
+                            {isUploadingImage ? <Spinner className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}
                             {isUploadingImage ? 'Uploading...' : 'Choose Image File'}
                         </Button>
                     </div>
@@ -832,7 +832,7 @@ export default function InternalEmailsPage() {
                                             onClick={() => handleSend(false)}
                                             disabled={isSending || !subject.trim() || (audienceType === 'newsletter' && !newsletterCount)}
                                         >
-                                            {isSending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : audienceType === 'newsletter' ? <Megaphone className="h-3.5 w-3.5" /> : <Send className="h-3.5 w-3.5" />}
+                                            {isSending ? <Spinner className="h-3.5 w-3.5 animate-spin" /> : audienceType === 'newsletter' ? <Megaphone className="h-3.5 w-3.5" /> : <Send className="h-3.5 w-3.5" />}
                                             {audienceType === 'newsletter'
                                                 ? `Send to Newsletter (${newsletterCount ?? '…'})`
                                                 : `Send to All (${audienceCount ?? '…'})`}
@@ -972,7 +972,7 @@ export default function InternalEmailsPage() {
                                     disabled={savingProfile || !newProfileName.trim() || !newProfileHandle.trim()}
                                     className="h-8 px-3 rounded-lg bg-foreground text-background text-xs font-medium hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
                                 >
-                                    {savingProfile ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                                    {savingProfile ? <Spinner className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
                                     Add Profile
                                 </button>
                             </div>
@@ -1123,7 +1123,7 @@ export default function InternalEmailsPage() {
                                 className="h-8 px-3.5 rounded-lg bg-foreground text-background text-xs font-medium hover:bg-foreground/90 transition-colors flex items-center gap-1.5 disabled:opacity-50"
                             >
                                 {isSending ? (
-                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                    <Spinner className="h-3 w-3 animate-spin" />
                                 ) : (
                                     <Send className="h-3 w-3" />
                                 )}

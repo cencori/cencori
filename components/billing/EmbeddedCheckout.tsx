@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 
 interface EmbeddedCheckoutProps {
   checkoutUrl: string;
@@ -31,7 +31,7 @@ export function EmbeddedCheckout({
   return (
     <div className="flex items-center justify-center p-8">
       <div className="flex flex-col items-center gap-3 text-center">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <Spinner className="h-6 w-6 animate-spin text-muted-foreground" />
         <p className="text-sm text-muted-foreground">
           Redirecting to secure checkout...
         </p>

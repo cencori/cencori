@@ -23,7 +23,8 @@ import {
 } from "@/components/ui/select";
 import { toast } from "@/components/ui/toast";
 import { FrameworkLogo } from "@/components/icons/FrameworkLogo";
-import { Loader2, Search } from "lucide-react";
+import { Search } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { deployAgentProject } from "./actions";
 
 interface PageProps {
@@ -150,7 +151,7 @@ export default function NewAgentPage({ params }: PageProps) {
 
             {isLoading ? (
                 <div className="flex items-center justify-center py-16 border border-border/40 rounded-lg bg-card">
-                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                    <Spinner className="h-4 w-4 animate-spin text-muted-foreground" />
                 </div>
             ) : notInstalled ? (
                 <div className="text-center py-16 border border-border/40 rounded-lg bg-card">
@@ -262,7 +263,7 @@ export default function NewAgentPage({ params }: PageProps) {
                             </Select>
                             <p className="text-[10px] text-muted-foreground">
                                 {detecting ? (
-                                    <span className="inline-flex items-center gap-1.5"><Loader2 className="h-2.5 w-2.5 animate-spin" />Detecting framework…</span>
+                                    <span className="inline-flex items-center gap-1.5"><Spinner className="h-2.5 w-2.5 animate-spin" />Detecting framework…</span>
                                 ) : detected?.framework ? (
                                     <>Detected <span className="text-emerald-400 font-medium">{detected.displayName}</span>{detected.compatibility ? ` (${detected.compatibility})` : ""} — override if needed.</>
                                 ) : detected ? (
@@ -276,7 +277,7 @@ export default function NewAgentPage({ params }: PageProps) {
                     <DialogFooter>
                         <Button variant="outline" size="sm" className="h-8 text-xs" disabled={pending} onClick={() => setConfigRepo(null)}>Cancel</Button>
                         <Button size="sm" className="h-8 text-xs" disabled={pending || !form.name.trim()} onClick={onDeploy}>
-                            {pending ? (<><Loader2 className="h-3 w-3 mr-1.5 animate-spin" />Creating…</>) : "Create & deploy"}
+                            {pending ? (<><Spinner className="h-3 w-3 mr-1.5 animate-spin" />Creating…</>) : "Create & deploy"}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

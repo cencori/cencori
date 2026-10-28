@@ -17,6 +17,7 @@ import {
     Radio,
     Clock,
 } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 
 interface PageProps {
     params: Promise<{ orgSlug: string; projectSlug: string; agentId: string }>;
@@ -126,7 +127,7 @@ export default function AgentDetailPage({ params }: PageProps) {
                                         disabled={redeploy.isPending || agent.status === "building"}
                                         onClick={() => redeploy.mutate()}
                                     >
-                                        <RotateCw className={`h-3 w-3 mr-1.5 ${redeploy.isPending ? "animate-spin" : ""}`} />
+                                        {redeploy.isPending ? <Spinner className="h-3 w-3 mr-1.5" /> : <RotateCw className="h-3 w-3 mr-1.5" />}
                                         Redeploy
                                     </Button>
                                 </div>

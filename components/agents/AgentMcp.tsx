@@ -14,6 +14,7 @@ import { useAgentWorkspace } from "@/components/agents/AgentWorkspace";
 import { DockedPanel } from "@/components/agents/DockedPanel";
 import { applyStudioResult } from "@/components/agents/studio";
 import { cn } from "@/lib/utils";
+import { Spinner } from "@/components/ui/spinner";
 
 type McpTool = { name: string; description: string; readOnly: boolean; destructive: boolean };
 type McpServer = { id: string; name: string; url: string; headers: Array<{ name: string }>; tools: McpTool[]; enabled: string[]; signed_in?: { issuer: string }; icon?: string };
@@ -332,7 +333,7 @@ export function AgentMcp({ adding, onAddingChange }: { adding: boolean; onAdding
                                                     </Button>
                                                 )}
                                                 <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={() => void connect({ serverId: server.id })} disabled={locked} aria-label={`Refresh ${server.name} tools`} title="Refresh tools">
-                                                    <RefreshCw className={cn("h-3.5 w-3.5", connecting === server.id && "animate-spin")} />
+                                                    {connecting === server.id ? <Spinner className="h-3.5 w-3.5" /> : <RefreshCw className="h-3.5 w-3.5" />}
                                                 </Button>
                                                 <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => void saveServers(servers.filter((s) => s.id !== server.id), `${server.name} removed`)} disabled={locked} aria-label={`Remove ${server.name}`} title="Remove">
                                                     <Trash2 className="h-3.5 w-3.5" />

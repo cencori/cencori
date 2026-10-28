@@ -16,7 +16,8 @@ import {
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/components/ui/toast";
-import { Plus, Loader2, Globe, Trash2, MoreHorizontal, Zap } from "lucide-react";
+import { Plus, Globe, Trash2, MoreHorizontal, Zap } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -232,7 +233,7 @@ export function WebhooksManager({ orgSlug, projectSlug }: { orgSlug: string; pro
                             >
                                 {createMutation.isPending ? (
                                     <>
-                                        <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
+                                        <Spinner className="h-3 w-3 mr-1.5 animate-spin" />
                                         Creating...
                                     </>
                                 ) : (
@@ -299,7 +300,7 @@ export function WebhooksManager({ orgSlug, projectSlug }: { orgSlug: string; pro
                                             disabled={testingWebhook === webhook.id}
                                         >
                                             {testingWebhook === webhook.id ? (
-                                                <Loader2 className="h-3 w-3 mr-2 animate-spin" />
+                                                <Spinner className="h-3 w-3 mr-2 animate-spin" />
                                             ) : (
                                                 <Zap className="h-3 w-3 mr-2" />
                                             )}

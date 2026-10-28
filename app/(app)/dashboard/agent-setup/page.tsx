@@ -15,7 +15,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { Check, Loader2, Terminal, Shield } from "lucide-react";
+import { Check, Terminal, Shield } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { Logo } from "@/components/logo";
 import { toast } from "@/components/ui/toast";
 
@@ -133,7 +134,7 @@ export default function AgentSetupPage() {
     if (step === "auth_check") {
         return (
             <div className="min-h-screen flex items-center justify-center">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                <Spinner className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
         );
     }
@@ -344,7 +345,7 @@ export default function AgentSetupPage() {
 
                 {step === "creating" && (
                     <div className="bg-card border rounded-lg p-8 text-center space-y-4">
-                        <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+                        <Spinner className="h-8 w-8 animate-spin mx-auto text-primary" />
                         <div>
                             <p className="text-sm font-medium">Setting up your agent...</p>
                             <p className="text-xs text-muted-foreground mt-1">Creating agent and generating API key</p>

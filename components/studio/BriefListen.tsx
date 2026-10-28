@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Pause, Play } from "lucide-react";
+import { Pause, Play } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { useStudio } from "@/components/studio/StudioShell";
 
 /**
@@ -37,7 +38,7 @@ export function BriefListen({ at }: { at: string }) {
 
     return (
         <button type="button" onClick={toggle} disabled={state === "loading"} className="mt-3 flex h-10 items-center gap-2 rounded-full bg-muted px-4 text-sm font-semibold disabled:opacity-70">
-            {state === "loading" ? <Loader2 className="h-4 w-4 animate-spin" /> : state === "playing" ? <Pause className="h-4 w-4 fill-current" /> : <Play className="h-4 w-4 fill-current" />}
+            {state === "loading" ? <Spinner className="h-4 w-4 animate-spin" /> : state === "playing" ? <Pause className="h-4 w-4 fill-current" /> : <Play className="h-4 w-4 fill-current" />}
             {state === "playing" ? "Pause" : state === "paused" ? "Resume" : state === "error" ? "Try again" : "Listen"}
         </button>
     );

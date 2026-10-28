@@ -13,7 +13,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Loader2 } from 'lucide-react';
+import { Spinner } from "@/components/ui/spinner";
 import { toast } from '@/components/ui/toast';
 
 interface Organization {
@@ -377,7 +377,7 @@ export default function UsagePage({ params }: PageProps) {
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="outline" size="sm" className="h-8 rounded-md border-border/30 bg-transparent px-3 text-[10px] shadow-none transition-colors hover:bg-muted/50 active:scale-[0.98]" disabled={isExporting}>
-                                {isExporting && <Loader2 className="mr-1 size-3 animate-spin" />}
+                                {isExporting && <Spinner className="mr-1 size-3 animate-spin" />}
                                 Export data
                             </Button>
                         </DropdownMenuTrigger>

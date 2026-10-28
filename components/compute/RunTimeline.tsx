@@ -11,7 +11,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Play, Square, Loader2, CircleCheck, CircleAlert, Hand, CornerDownRight } from "lucide-react";
+import { Play, Square, CircleCheck, CircleAlert, Hand, CornerDownRight } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 
 type RunStatus = "idle" | "running" | "suspended" | "completed" | "failed" | "canceled";
 
@@ -235,7 +236,7 @@ function EventRow({ e }: { e: RunEvent }) {
 function rowMeta(e: RunEvent): { icon: React.ReactNode; color: string; label: string; body?: string } {
     switch (e.type) {
         case "run.started":
-            return { icon: <Loader2 className="h-3.5 w-3.5 animate-spin" />, color: "text-sky-400", label: "started" };
+            return { icon: <Spinner className="h-3.5 w-3.5 animate-spin" />, color: "text-sky-400", label: "started" };
         case "message":
             return { icon: <CornerDownRight className="h-3.5 w-3.5" />, color: "text-muted-foreground", label: "message", body: preview(e.data) };
         case "run.suspended":

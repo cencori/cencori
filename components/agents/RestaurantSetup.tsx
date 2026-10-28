@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
 import { ModelSelect } from "@/components/dashboard/embedded-agents/ModelSelect";
@@ -160,7 +161,7 @@ export function RestaurantSetup({ projectId, basePath, models, onBack }: { proje
                         <ArrowLeft className="h-3.5 w-3.5" /> Back
                     </Button>
                     <Button type="submit" size="sm" className="h-8 gap-1.5 text-xs" disabled={!details.venueName.trim() || disabled || !projectId}>
-                        {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                        {busy && <Spinner className="h-3.5 w-3.5 animate-spin" />}
                         {busy ?? "Create host"}
                     </Button>
                 </div>

@@ -2,7 +2,8 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, Loader2 } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { siteConfig } from "@/config/site";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -192,7 +193,7 @@ export default function SalesContactPage() {
                                             <Button type="submit" disabled={isSubmitting} className="w-full h-9 text-sm">
                                                 {isSubmitting ? (
                                                     <>
-                                                        <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                                                        <Spinner className="mr-2 h-3 w-3 animate-spin" />
                                                         Sending...
                                                     </>
                                                 ) : (

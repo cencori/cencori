@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { gateReply, quickGateEmail } from "@/lib/tensor-email-quick";
+import { Spinner } from "@/components/ui/spinner";
 
 const DONE_KEY = "tensor-waitlist-email-v1";
 const LEGACY_KEY = "tensor-waitlist-progress-v1";
@@ -171,7 +172,7 @@ export function TensorWaitlistChat({ onClose }: { onClose: () => void }) {
                 className="grid h-[2.25rem] w-[2.25rem] shrink-0 place-items-center rounded-full bg-[#f0f0f2] text-[#1c1c1e] transition-transform hover:scale-105 active:scale-95 disabled:opacity-30 disabled:hover:scale-100"
               >
                 {state === "submitting" ? (
-                  <span className="h-3.5 w-3.5 animate-spin rounded-full border border-black/20 border-t-black/80" aria-hidden="true" />
+                  <Spinner className="h-3.5 w-3.5 text-black/80" />
                 ) : (
                   <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" width="14" height="14" stroke="currentColor" strokeWidth={1.65} strokeLinecap="round" strokeLinejoin="round">
                     <path d="m5 11 7-7 7 7M12 4v16" />

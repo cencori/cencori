@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import { Loader2, Check, ArrowRight } from "lucide-react";
+import { Check, ArrowRight } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { toast } from "@/components/ui/toast";
 
 export function NewsletterForm() {
@@ -77,7 +78,7 @@ export function NewsletterForm() {
                 className="shrink-0 inline-flex items-center justify-center w-5 h-5 rounded text-muted-foreground hover:text-foreground hover:bg-foreground/[0.06] transition-colors disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
             >
                 {isSubmitting ? (
-                    <Loader2 className="w-3 h-3 animate-spin" />
+                    <Spinner className="w-3 h-3 animate-spin" />
                 ) : (
                     <ArrowRight className="w-3 h-3" />
                 )}

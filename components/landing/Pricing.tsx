@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/currency";
 import { CENCORI_PAID_PLANS } from "@/lib/billing/plans";
 import { BusinessPricing } from "@/components/landing/BusinessPricing";
+import { Spinner } from "@/components/ui/spinner";
 
 type Tier = "free" | "pro" | "team" | "enterprise";
 type BillingPeriod = "monthly" | "annual";
@@ -529,7 +530,7 @@ export function Pricing() {
                                     >
                                         {loadingTier === tier.name ? (
                                             <span className="inline-flex items-center gap-1.5">
-                                                <span className="h-3 w-3 animate-spin rounded-full border border-current border-t-transparent" />
+                                                <Spinner className="h-3 w-3" />
                                                 Redirecting...
                                             </span>
                                         ) : (

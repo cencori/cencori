@@ -101,7 +101,7 @@ focus-visible:ring-2 focus-visible:ring-white/20`} />
 
 // Loading states
 <Button disabled aria-busy="true">
-  <Loader2 className="animate-spin" aria-hidden="true" />
+  <Spinner />
   Loading
 </Button>
 

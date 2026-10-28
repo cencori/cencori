@@ -5,7 +5,8 @@ import { Drawer } from "vaul";
 import { HugeiconsIcon } from "@hugeicons/react";
 import Loading03Icon from "@hugeicons/core-free-icons/Loading03Icon";
 import { useQueryClient } from "@tanstack/react-query";
-import { Check, ChevronLeft, ChevronRight, Loader2, QrCode, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, QrCode, X } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { useStudio } from "@/components/studio/StudioShell";
 import { StudioLoadError, studioFetch } from "@/components/studio/studio-data";
 import { StudioLink } from "@/components/studio/studio-nav";
@@ -160,7 +161,7 @@ export default function StudioAssistantDetailPage({ id }: { id: string }) {
                                         detail={doc.status === "ready" ? null : "Reading…"}
                                         right={doc.id ? (
                                             <button type="button" onClick={() => void removeKnowledge(doc.id!)} disabled={removing !== null} aria-label={`Remove ${doc.name}`} className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground disabled:opacity-50">
-                                                {removing === doc.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
+                                                {removing === doc.id ? <Spinner className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
                                             </button>
                                         ) : <span />}
                                     />

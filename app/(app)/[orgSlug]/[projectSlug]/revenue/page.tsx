@@ -51,18 +51,18 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  Download,
-  Search,
-  ChevronLeft,
-  ChevronRight,
-  ShieldBan,
-  ShieldCheck,
-  MoreHorizontal,
-  Loader2,
-  Layers,
-  Trash2,
-  CheckCircle2,
+    Download,
+    Search,
+    ChevronLeft,
+    ChevronRight,
+    ShieldBan,
+    ShieldCheck,
+    MoreHorizontal,
+    Layers,
+    Trash2,
+    CheckCircle2,
 } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 import { formatCurrency as globalFormatCurrency } from "@/lib/currency";
 import { useProjectIdBySlug } from "@/lib/hooks/useQueries";
@@ -1840,7 +1840,7 @@ export default function UsageBillingPage({ params }: PageProps) {
                 <Button variant="outline" size="sm" className="h-8 text-xs" onClick={closeRpDialog}>Cancel</Button>
                 <Button size="sm" className="h-8 text-xs" onClick={handleRpSubmit} disabled={rpIsSaving || !rpForm.name.trim() || !rpForm.slug.trim()}>
                   {rpIsSaving ? (
-                    <><Loader2 className="h-3 w-3 mr-1.5 animate-spin" />{rpEditingPlan ? "Saving..." : "Creating..."}</>
+                    <><Spinner className="h-3 w-3 mr-1.5 animate-spin" />{rpEditingPlan ? "Saving..." : "Creating..."}</>
                   ) : (
                     rpEditingPlan ? "Save changes" : "Create plan"
                   )}
@@ -1867,7 +1867,7 @@ export default function UsageBillingPage({ params }: PageProps) {
                 <AlertDialogCancel className="h-7 text-xs">Cancel</AlertDialogCancel>
                 <AlertDialogAction className="h-7 text-xs bg-red-500 hover:bg-red-600"
                   onClick={() => rpDeleteTarget && rpDeleteMutation.mutate(rpDeleteTarget.id)} disabled={rpDeleteMutation.isPending}>
-                  {rpDeleteMutation.isPending ? <><Loader2 className="h-3 w-3 mr-1.5 animate-spin" />Deleting...</> : "Delete plan"}
+                  {rpDeleteMutation.isPending ? <><Spinner className="h-3 w-3 mr-1.5 animate-spin" />Deleting...</> : "Delete plan"}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
@@ -2111,7 +2111,7 @@ export default function UsageBillingPage({ params }: PageProps) {
                     <Button variant="outline" size="sm" onClick={() => setInvoiceDialogOpen(false)}>Cancel</Button>
                     <Button size="sm" onClick={handleGenerateInvoices} disabled={generateInvoicesMutation.isPending}>
                       {generateInvoicesMutation.isPending ? (
-                        <><Loader2 className="h-3 w-3 animate-spin mr-1.5" /> Generating...</>
+                        <><Spinner className="h-3 w-3 animate-spin mr-1.5" /> Generating...</>
                       ) : (
                         "Generate"
                       )}

@@ -3,7 +3,8 @@ import { getBrowserAuthUser } from "@/lib/auth/get-browser-auth-user";
 
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Loader2, CheckCircle2, XCircle, LogIn } from 'lucide-react';
+import { CheckCircle2, XCircle, LogIn } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabaseClient';
 
@@ -80,7 +81,7 @@ function InviteAcceptContent() {
         <div className="w-full max-w-sm text-center">
             {status === 'loading' || status === 'checking_auth' || status === 'accepting' ? (
                 <div className="space-y-4">
-                    <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
+                    <Spinner className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
                     <p className="text-sm text-muted-foreground">
                         {status === 'loading' && 'Loading...'}
                         {status === 'checking_auth' && 'Checking authentication...'}
@@ -128,7 +129,7 @@ export default function TeamInviteAcceptPage() {
         <div className="min-h-screen bg-background flex items-center justify-center px-4">
             <Suspense fallback={
                 <div className="w-full max-w-sm text-center">
-                    <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
+                    <Spinner className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
                     <p className="text-sm text-muted-foreground mt-4">Loading...</p>
                 </div>
             }>
