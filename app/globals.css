@@ -1,4 +1,11 @@
 @import "tailwindcss";
+/* Tailwind scans every file it doesn't think is ignored. On Vercel that
+   included the restored build cache (.next/cache: gigabytes of webpack packs),
+   and the CSS step ran out of memory on any build machine. None of these hold
+   our class names. */
+@source not "../.next";
+@source not "../public";
+@source not "../examples";
 @import "tw-animate-css";
 
 /* Patch: fumadocs-ui uses @apply -inset-s-4 but Tailwind v4 doesn't auto-generate
