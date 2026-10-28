@@ -56,7 +56,8 @@ const nextConfig: NextConfig = {
     // icon plus antd and @lobehub/ui; loading only the icons we use keeps the
     // webpack build small enough for the build machine's memory.
     optimizePackageImports: ["lucide-react", "@lobehub/icons"],
-    // Lower peak memory during the webpack compile (Vercel builds were OOMing).
+    // Lower peak memory during the webpack compile (Vercel builds were OOMing
+    // on the 16GB machine).
     webpackMemoryOptimizations: true,
     staleTimes: {
       dynamic: 300,
