@@ -13,6 +13,7 @@ import { taskForStep, useStudioTasks } from "@/components/studio/StudioTasks";
 import { formatMoney, setupSteps, useStudioOverview } from "@/components/studio/useStudioOverview";
 import { StudioProfile } from "@/components/studio/StudioProfile";
 import { StudioNotificationBell } from "@/components/studio/StudioNotificationBell";
+import { BriefListen } from "@/components/studio/BriefListen";
 import { Skeleton } from "@/components/ui/skeleton";
 
 function greeting(): string {
@@ -121,6 +122,20 @@ export default function StudioHomePage() {
                             </>
                         )}
                     </div>
+
+                    {/* This morning's brief: yesterday, and what to do about it. */}
+                    {data?.brief && (
+                        <section className="mt-3 rounded-2xl border border-border/60 px-4 py-3.5">
+                            <p className="text-[13px] text-muted-foreground">This morning</p>
+                            <p className="mt-0.5 text-[17px] font-semibold leading-snug">{data.brief.headline}</p>
+                            <ul className="mt-2 space-y-1.5">
+                                {data.brief.points.map((point) => (
+                                    <li key={point} className="flex gap-2 text-[14px] leading-5"><span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-muted-foreground" />{point}</li>
+                                ))}
+                            </ul>
+                            <BriefListen at={data.brief.at} />
+                        </section>
+                    )}
 
                     {steps.length > 0 && (
                         <section className="mt-6">

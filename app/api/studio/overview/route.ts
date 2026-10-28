@@ -16,6 +16,7 @@ import { conversationCapacity, conversationsUsed, getOrganizationPlan } from '@/
 import { periodStarts, safeTimeZone } from '@/lib/studio/time';
 import { mintWidgetShareToken } from '@/lib/embedded/widget';
 import { earnedSince, paidThroughAssistant } from '@/lib/studio/earned';
+import { latestBrief } from '@/lib/studio/brief';
 
 const fail = (message: string, status = 400) => NextResponse.json({ error: message }, { status });
 
@@ -48,7 +49,7 @@ export async function GET(req: NextRequest) {
         .or('metadata->>preview.is.null,metadata->>preview.eq.false')
         .or('last_turn_number.gt.0,metadata->manual_messages.not.is.null');
 
-    const [summary, today, month, money, plan, widget] = await Promise.all([
+    const [summary, today, month, money, plan, widget, brief] = await Promise.all([
         agent
             ? runAgentReadTool('get_agent', { agent: agent.id }, { admin: db, organization: organization as { id: string; name: string; slug: string }, project: project as { id: string; name: string; slug: string } })
             : Promise.resolve(null),
@@ -59,6 +60,7 @@ export async function GET(req: NextRequest) {
         agent
             ? db.from('agent_widgets').select('id, public_key').eq('project_id', projectId).eq('agent_id', agent.id).maybeSingle().then(({ data }) => data as { id: string; public_key: string } | null)
             : Promise.resolve(null),
+        latestBrief(db, projectId, timeZone).catch(() => null),
     ]);
 
     const { currency, paid } = money;
@@ -71,6 +73,8 @@ export async function GET(req: NextRequest) {
         // The customer link (/talk/<token>), for sharing and its QR code.
         share_token: widget ? mintWidgetShareToken(widget) : null,
         time_zone: timeZone,
+        // This morning's brief (covering yesterday), if one went out.
+        brief: brief ? { headline: brief.headline, points: brief.points, at: brief.at } : null,
         today: { chats: today.count ?? 0, earned: earned(starts.day) },
         month: { chats: month.count ?? 0, earned: earned(starts.month) },
         currency,
