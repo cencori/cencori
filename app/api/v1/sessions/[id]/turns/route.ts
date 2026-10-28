@@ -64,6 +64,31 @@ export async function OPTIONS() {
     return handleCorsPreFlight();
 }
 
+/**
+ * A published version's config, reused for a minute: published versions don't
+ * change (a new release is a new version), so a conversation's every turn
+ * needn't read it again. The status is kept with it, so a retired version
+ * still stops turns within the minute.
+ */
+const PUBLISHED_VERSION_TTL_MS = 60_000;
+const publishedVersions = new Map<string, { value: { config_json: Record<string, unknown> | null; status: string } | null; expiresAt: number }>();
+
+async function publishedVersion(db: ReturnType<typeof createAdminClient>, projectId: string, versionId: string): Promise<{ config_json: Record<string, unknown> | null; status: string } | null> {
+    const key = `${projectId}:${versionId}`;
+    const cached = publishedVersions.get(key);
+    if (cached && cached.expiresAt > Date.now()) return cached.value;
+    const { data } = await db.from('agent_versions').select('config_json, status').eq('project_id', projectId).eq('id', versionId).maybeSingle();
+    const value = data as { config_json: Record<string, unknown> | null; status: string } | null;
+    if (value?.status === 'published') {
+        publishedVersions.set(key, { value, expiresAt: Date.now() + PUBLISHED_VERSION_TTL_MS });
+        if (publishedVersions.size > 2_000) {
+            const oldest = publishedVersions.keys().next().value;
+            if (oldest !== undefined) publishedVersions.delete(oldest);
+        }
+    }
+    return value;
+}
+
 export async function POST(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> },
@@ -272,7 +297,10 @@ export async function POST(
                     headers: { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-store' },
                 });
             }
-            const missed = await takeover.takeUnseenManualMessages(adminClient as never, sessionId).catch(() => null);
+            // Only when the conversation has something the assistant hasn't seen: no query otherwise.
+            const missed = takeover.manualMessages(session.metadata as Record<string, unknown> | null).some((message) => !message.seen)
+                ? await takeover.takeUnseenManualMessages(adminClient as never, sessionId).catch(() => null)
+                : null;
             if (missed) body.input = `${missed}\n\n${body.input}`;
         }
 
@@ -299,20 +327,24 @@ export async function POST(
                     return respondError(403, 'Agent installation is not active', 'installation_inactive');
                 }
                 // Pause is an agent-level flag: a paused agent admits no turns
-                // even through an otherwise active installation.
+                // even through an otherwise active installation. The pause check, the
+                // published version and the business's payment options are independent,
+                // so they're read together rather than one after another.
                 const insAgentId = (ins as { agent_id?: string | null } | null)?.agent_id ?? null;
-                if (insAgentId) {
-                    const { checkAgentActivity } = await import('@/lib/embedded/agents');
-                    const activity = await checkAgentActivity(adminClient as never, (gatewayCtx as GatewayContext).projectId, insAgentId);
-                    if ('unavailable' in activity) {
-                        return respondError(503, 'Agent pause check unavailable; retry shortly', 'activity_check_unavailable');
-                    }
-                    if (!activity.active) {
-                        return respondError(403, 'Agent is disabled', 'agent_disabled');
-                    }
+                const [activity, version, takesTransfers] = await Promise.all([
+                    insAgentId
+                        ? import('@/lib/embedded/agents').then(({ checkAgentActivity }) => checkAgentActivity(adminClient as never, (gatewayCtx as GatewayContext).projectId, insAgentId))
+                        : Promise.resolve(null),
+                    publishedVersion(adminClient, (gatewayCtx as GatewayContext).projectId, versionId),
+                    import('@/lib/embedded/transfers').then(({ takesTransfersCached }) => takesTransfersCached(adminClient as never, session.project_id as string)),
+                ]);
+                if (activity && 'unavailable' in activity) {
+                    return respondError(503, 'Agent pause check unavailable; retry shortly', 'activity_check_unavailable');
+                }
+                if (activity && !activity.active) {
+                    return respondError(403, 'Agent is disabled', 'agent_disabled');
                 }
                 if (versionId) {
-                    const { data: version } = await adminClient.from('agent_versions').select('config_json, status').eq('project_id', (gatewayCtx as GatewayContext).projectId).eq('id', versionId).maybeSingle();
                     if (!version || version.status !== 'published') return respondError(409, 'Installed agent version is unavailable', 'version_unavailable');
                     const config = ((version as { config_json?: Record<string, unknown> } | null)?.config_json ?? {}) as Record<string, unknown>;
                     const { normalizeManifest } = await import('@/lib/embedded/manifest');
@@ -331,7 +363,6 @@ export async function POST(
                     } else return respondError(409, 'Installed agent has no published model', 'version_unavailable');
                     installedManifest = manifest;
                     // A business that takes bank transfers (Studio → Money) gets the payment tools without republishing.
-                    const takesTransfers = await (await import('@/lib/embedded/transfers')).takesTransfers(adminClient as never, session.project_id as string);
                     installedToolset = (await import('@/lib/embedded/agent-tools')).agentToolset(config, { takesTransfers });
                     installedToolset.warm(session.project_id as string);
                     effectiveNetworkPolicy = intersectNetworkPolicy(manifest.policy, (ins as { overlay_config?: unknown }).overlay_config);

@@ -82,6 +82,21 @@ export async function takesTransfers(db: Admin, projectId: string): Promise<bool
     return !!(await getTransfers(db, projectId).catch(() => null));
 }
 
+const takesTransfersCache = new Map<string, { value: boolean; expiresAt: number }>();
+
+/** takesTransfers, reused for 30 seconds: it's read on every customer turn. */
+export async function takesTransfersCached(db: Admin, projectId: string): Promise<boolean> {
+    const cached = takesTransfersCache.get(projectId);
+    if (cached && cached.expiresAt > Date.now()) return cached.value;
+    const value = await takesTransfers(db, projectId);
+    takesTransfersCache.set(projectId, { value, expiresAt: Date.now() + 30_000 });
+    if (takesTransfersCache.size > 5_000) {
+        const oldest = takesTransfersCache.keys().next().value;
+        if (oldest !== undefined) takesTransfersCache.delete(oldest);
+    }
+    return value;
+}
+
 /** The account as typed, checked; or what's wrong with it. */
 export function cleanBankAccount(input: { bank?: unknown; account_number?: unknown; account_name?: unknown }): { ok: true; account: BankAccount } | { ok: false; message: string } {
     const text = (value: unknown, max: number) => (typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, max) : '');
