@@ -746,3 +746,24 @@ html[data-toast-preview="true"] [data-cookie-consent] {
     font-size: 16px !important;
   }
 }
+
+/*
+ * Studio's sheets ride on the keyboard, as a native app's do: the keyboard
+ * covers the page (interactive-widget=overlays-content), and an open bottom
+ * sheet's bottom edge sits on the keyboard's top (--keyboard, kept by
+ * useKeyboardInset), shrinking to fit what's left above it. Phones only:
+ * on desktop the sheets are pages.
+ */
+@media (max-width: 1023px) {
+    [data-vaul-drawer][data-vaul-drawer-direction="bottom"] {
+        bottom: var(--keyboard, 0px) !important;
+        max-height: calc(100svh - var(--keyboard, 0px) - env(safe-area-inset-top) - 0.75rem) !important;
+        transition-property: transform, bottom, max-height;
+        transition-duration: 0.5s, 0.25s, 0.25s;
+        transition-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+    }
+    /* While typing, the sheet's own bottom padding for the home indicator isn't needed: the keyboard is there. */
+    html[data-keyboard] [data-vaul-drawer][data-vaul-drawer-direction="bottom"] {
+        padding-bottom: 0.75rem !important;
+    }
+}

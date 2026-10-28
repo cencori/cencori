@@ -30,7 +30,7 @@ export function StudioNotificationBell({ className }: { className?: string }) {
     const count = waiting.length;
 
     return (
-        <Drawer.Root
+        <Drawer.Root repositionInputs={false}
             open={open}
             onOpenChange={(next) => { setOpen(next); if (next) setSnap(SNAPS[0]); }}
             snapPoints={[...SNAPS]}

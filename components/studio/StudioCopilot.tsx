@@ -187,7 +187,7 @@ export function StudioCopilotProvider({ workspace, children }: { workspace: Stud
     return (
         <StudioCopilotContext.Provider value={{ ask }}>
             {children}
-            <Drawer.Root open={open} onOpenChange={setOpen}>
+            <Drawer.Root repositionInputs={false} open={open} onOpenChange={setOpen}>
                 <Drawer.Portal>
                     <Drawer.Overlay className={`fixed inset-0 z-50 bg-transparent ${SHEET_OVERLAY_PHONE_ONLY}`} />
                     <Drawer.Content className={`dashboard-theme fixed inset-x-0 bottom-0 z-50 mx-auto flex h-[88svh] max-w-md lg:left-[var(--studio-sidebar,0px)] flex-col rounded-t-3xl border-t border-border/60 bg-background font-sans text-foreground outline-none ${SHEET_AS_PAGE}`}>

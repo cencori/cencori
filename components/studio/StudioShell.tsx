@@ -15,6 +15,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import AirdropIcon from "@hugeicons/core-free-icons/AirdropIcon";
 import { StudioTasksProvider } from "@/components/studio/StudioTasks";
 import { useStudioServiceWorker } from "@/components/studio/StudioNotifications";
+import { useKeyboardInset } from "@/components/studio/use-keyboard-inset";
 import { useUnreadCount } from "@/components/studio/useInbox";
 import { StudioProfile, switchStudioBusiness } from "@/components/studio/StudioProfile";
 import { useStudioTasks } from "@/components/studio/StudioTasks";
@@ -56,6 +57,7 @@ export function StudioShell({ workspace, children }: { workspace: StudioContextV
     // Studio is served at the subdomain's root; the internal prefix never shows.
     // Installable app and push notifications.
     useStudioServiceWorker();
+    useKeyboardInset();
     const pathname = useStudioPath();
     // A conversation, setup and getting the app take the whole screen: their own controls, no tabs.
     const focused = /^\/(inbox|assistant)\/[^/]+/.test(pathname) || pathname.startsWith("/setup") || pathname.startsWith("/get-app");

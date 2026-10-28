@@ -14,6 +14,7 @@ import { CalendarIcon } from "@solar-icons/react/bold-duotone/calendar";
 import { STUDIO_FILL_PAGE, StudioEmptyCard } from "@/components/studio/StudioEmptyCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { EventsList } from "@/components/studio/views/EventsView";
 
 const tag = {
     good: "bg-emerald-50 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300",
@@ -45,9 +46,10 @@ function SmallButton({ children, onClick, disabled, strong }: { children: React.
     );
 }
 
-/** Orders and bookings: what, who, when, paid or not. */
+/** Orders, bookings and events: what, who, when, paid or not. */
 export default function StudioSalesPage() {
-    const [view, setView] = useState<"orders" | "bookings">("orders");
+    // A ticket notification opens ?view=events.
+    const [view, setView] = useState<"orders" | "bookings" | "events">(() => (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("view") === "events" ? "events" : "orders"));
     const sales = useSales();
     const act = useSalesAction();
     const tasks = useStudioTasks();
@@ -55,24 +57,30 @@ export default function StudioSalesPage() {
     const orders = data?.orders ?? [];
     const bookings = data?.bookings ?? [];
     const toCollect = orders.filter((o) => o.status === "new" || o.status === "awaiting_payment");
-    const empty = !!sales.data && (view === "orders" ? orders : bookings).length === 0;
+    const empty = view !== "events" && !!sales.data && (view === "orders" ? orders : bookings).length === 0;
 
     return (
         <div className={empty ? STUDIO_FILL_PAGE : undefined}>
             {/* The title and switcher stay put while the page scrolls under them. */}
             <div className="sticky top-0 z-30 -mx-4 -mt-[calc(1.25rem+env(safe-area-inset-top))] bg-background px-4 pb-3 pt-[calc(1.25rem+env(safe-area-inset-top))] lg:-mx-10 lg:-mt-10 lg:px-10 lg:pt-10">
                 <h1 className="text-[26px] font-semibold leading-tight tracking-tight">Sales</h1>
-                <div role="tablist" aria-label="Show" className="mt-4 grid grid-cols-2 gap-1 rounded-full bg-muted p-1">
-                    {(["orders", "bookings"] as const).map((id) => (
+                <div role="tablist" aria-label="Show" className="mt-4 grid grid-cols-3 gap-1 rounded-full bg-muted p-1">
+                    {(["orders", "bookings", "events"] as const).map((id) => (
                         <button key={id} type="button" role="tab" aria-selected={view === id} onClick={() => setView(id)} className={cn("h-9 rounded-full text-sm font-medium", view === id ? "bg-background text-foreground" : "text-muted-foreground")}>
-                            {id === "orders" ? `Orders${orders.length ? ` · ${orders.length}` : ""}` : `Bookings${bookings.length ? ` · ${bookings.length}` : ""}`}
+                            {id === "orders" ? `Orders${orders.length ? ` · ${orders.length}` : ""}` : id === "bookings" ? `Bookings${bookings.length ? ` · ${bookings.length}` : ""}` : "Events"}
                         </button>
                     ))}
                 </div>
+                {/* Stays put with the title while the events scroll under it. */}
+                {view === "events" && (
+                    <button type="button" onClick={() => tasks.open("event")} className="mt-3 h-11 w-full rounded-full bg-foreground text-[15px] font-semibold text-background">New event</button>
+                )}
             </div>
             {act.error && <p role="alert" className="mt-3 text-[13px] text-destructive">{act.error.message}</p>}
 
-            {sales.isLoading ? (
+            {view === "events" ? (
+                <EventsList />
+            ) : sales.isLoading ? (
                 <div className="mt-4 space-y-3">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-20 w-full rounded-2xl" />)}</div>
             ) : !sales.data ? (
                 <StudioLoadError error={sales.error} fallback="Couldn't load your sales." onRetry={() => void sales.refetch()} />

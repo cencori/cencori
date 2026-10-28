@@ -275,6 +275,9 @@ async function tellOwner(db: Admin, projectId: string, payment: PaymentEntry): P
     const [{ notifyOrder, notifyPayment }, { describeOrder, markOrderPaid }] = await Promise.all([import('./owner-alerts'), import('./catalog')]);
     const { data: agent } = await db.from('agents').select('name').eq('id', payment.agent_id).maybeSingle();
     const ctx = { db, projectId, agentId: payment.agent_id, agentName: (agent?.name as string | undefined) ?? undefined, surface: 'conversation', conversationId: payment.conversation_id };
+    // A payment for event tickets: they're paid, the buyer gets them, the owner is told.
+    const { markTicketsPaid } = await import('@/lib/studio/events');
+    if (await markTicketsPaid(db, { paymentReference: payment.reference })) return;
     // A payment for an order: the order is marked paid and the owner gets it to fulfil.
     const order = await markOrderPaid(db, projectId, payment.reference, payment.paid_at ?? new Date().toISOString());
     if (order) return notifyOrder(ctx, describeOrder(order), true);

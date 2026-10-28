@@ -16,8 +16,8 @@ export function isStudioHostname(domain: string): boolean {
     return process.env.NODE_ENV !== "production" && host.startsWith("studio.") && host.endsWith(".sslip.io");
 }
 
-/** Paths Studio serves as they are: sign-in, its callback, password reset, the API. */
-const PASS_THROUGH = ["/login", "/signup", "/auth", "/forgot", "/reset-password", "/api"];
+/** Paths Studio serves as they are: sign-in, its callback, password reset, the API, and public event pages (no sign-in). */
+const PASS_THROUGH = ["/login", "/signup", "/auth", "/forgot", "/reset-password", "/api", "/e"];
 
 export function isStudioPassThrough(pathname: string): boolean {
     return PASS_THROUGH.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));

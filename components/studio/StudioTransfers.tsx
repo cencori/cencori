@@ -143,7 +143,7 @@ function BankAccountSheet({ account, open, onOpenChange }: { account: BankAccoun
     const field = "h-12 w-full rounded-2xl bg-muted px-4 text-[15px] outline-none placeholder:text-muted-foreground";
 
     return (
-        <Drawer.Root open={open} onOpenChange={(next) => { if (next) setForm(account ?? { bank: "", account_number: "", account_name: "" }); onOpenChange(next); }}>
+        <Drawer.Root repositionInputs={false} open={open} onOpenChange={(next) => { if (next) setForm(account ?? { bank: "", account_number: "", account_name: "" }); onOpenChange(next); }}>
             <Drawer.Portal>
                 <Drawer.Overlay className={`fixed inset-0 z-50 bg-black/30 ${SHEET_OVERLAY_PHONE_ONLY}`} />
                 <Drawer.Content className={`dashboard-theme fixed inset-x-0 bottom-0 z-50 mx-auto max-h-[92svh] max-w-md lg:left-[var(--studio-sidebar,0px)] overflow-y-auto rounded-t-3xl border-t border-border/60 bg-background px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-3 font-sans text-foreground outline-none ${SHEET_AS_PAGE}`}>

@@ -14,6 +14,7 @@ import { formatMoney, setupSteps, useStudioOverview } from "@/components/studio/
 import { StudioProfile } from "@/components/studio/StudioProfile";
 import { StudioNotificationBell } from "@/components/studio/StudioNotificationBell";
 import { BriefListen } from "@/components/studio/BriefListen";
+import { NextEventCard } from "@/components/studio/views/EventsView";
 import { Skeleton } from "@/components/ui/skeleton";
 
 function greeting(): string {
@@ -122,6 +123,8 @@ export default function StudioHomePage() {
                             </>
                         )}
                     </div>
+
+                    <NextEventCard />
 
                     {/* This morning's brief: yesterday, and what to do about it. */}
                     {data?.brief && (

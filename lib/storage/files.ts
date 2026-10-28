@@ -5,13 +5,13 @@ import { isBetterAuthEnabled } from "@/lib/auth/flags";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { ensureStorageBucket } from "@/lib/storage-buckets";
 
-// Uploaded files (avatars, email images). Supabase Storage until the RFC-0001
+// Uploaded files (avatars, email images, event banners). Supabase Storage until the RFC-0001
 // cutover, then one private Brimble bucket in Lagos (FILES_S3_*), where each
 // logical bucket below is a key prefix. Files are served by the app at
 // /api/files/<bucket>/<key>, so stored URLs stay on our own domain whichever
 // store is behind them.
 
-export const FILE_BUCKETS = ["avatars", "email-images", "sender-avatars"] as const;
+export const FILE_BUCKETS = ["avatars", "email-images", "sender-avatars", "event-banners"] as const;
 export type FileBucket = (typeof FILE_BUCKETS)[number];
 
 export function isFileBucket(value: string): value is FileBucket {

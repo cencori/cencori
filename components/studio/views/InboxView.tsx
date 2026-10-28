@@ -130,7 +130,7 @@ export default function StudioInboxPage() {
                 </ul>
             )}
 
-            <Drawer.Root open={!!held} onOpenChange={(open) => { if (!open) setHeld(null); }}>
+            <Drawer.Root repositionInputs={false} open={!!held} onOpenChange={(open) => { if (!open) setHeld(null); }}>
                 <Drawer.Portal>
                     <Drawer.Overlay className="fixed inset-0 z-50 bg-black/30" />
                     <Drawer.Content className="dashboard-theme fixed inset-x-0 bottom-0 z-50 mx-auto max-w-md lg:left-[var(--studio-sidebar,0px)] rounded-t-3xl border-t border-border/60 bg-background px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3 font-sans text-foreground outline-none">

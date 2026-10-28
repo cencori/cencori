@@ -237,7 +237,11 @@ export async function confirmTransfer(db: Admin, projectId: string, reference: s
     }));
     const paid: TransferEntry = { ...transfer, status: 'paid', paid_at: paidAt };
     if (confirmed) {
-        if (transfer.order_id) {
+        if (transfer.order_id?.startsWith('EVT-')) {
+            // Event tickets: paid, and the buyer gets them.
+            const { markTicketsPaid } = await import('@/lib/studio/events');
+            await markTicketsPaid(db, { orderRef: transfer.order_id });
+        } else if (transfer.order_id) {
             const { markOrderPaidByTransfer } = await import('./catalog');
             await markOrderPaidByTransfer(db, projectId, transfer.order_id, paidAt);
         }

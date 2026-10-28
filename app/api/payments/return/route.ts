@@ -31,6 +31,12 @@ export async function GET(req: NextRequest) {
     try {
         const payment = await settlePayment(db, found.connection, found.payment);
         if (payment.status === 'paid') {
+            // Event tickets: straight to them.
+            const { data: ticket } = await db.from('studio_tickets' as never).select('order_ref, event_id').eq('payment_reference', payment.reference).limit(1).maybeSingle();
+            if (ticket) {
+                const { data: event } = await db.from('studio_events' as never).select('slug').eq('id', (ticket as { event_id: string }).event_id).maybeSingle();
+                if (event) return NextResponse.redirect(`https://studio.cencori.com/e/${(event as { slug: string }).slug}/order/${(ticket as { order_ref: string }).order_ref}`);
+            }
             return page('Payment received', `${formatMoney(payment.amount, payment.currency)} for ${payment.description}. You can close this page and go back to your chat.`, true);
         }
         return page('Payment not completed', 'It hasn\'t gone through yet. If you just paid, wait a moment and refresh, or go back to your chat for a new link.', false);

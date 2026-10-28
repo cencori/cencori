@@ -28,6 +28,14 @@ export const AGENT_READ_TOOLS: ChatCompletionFunctionTool[] = [
     {
         type: "function",
         function: {
+            name: "list_events",
+            description: "The business's events (parties, shows, dinners it sells tickets for in Studio): name, when, venue, ticket types with prices, tickets sold of how many, money in, how many checked in, whether still selling, and the public ticket link.",
+            parameters: { type: "object", properties: {} },
+        },
+    },
+    {
+        type: "function",
+        function: {
             name: "list_agents",
             description: "The current project's embedded agents (the ones businesses deploy to WhatsApp, their website and so on): name, whether published, template, model, and how busy each is (runs in the last 7 days, last run). Sorted busiest first.",
             parameters: { type: "object", properties: {} },
@@ -57,6 +65,66 @@ const restaurantProps = {
 } as const;
 
 export const AGENT_ACTIONS: ChatCompletionFunctionTool[] = [
+    {
+        type: "function",
+        function: {
+            name: "update_event",
+            description: "Propose changing an event (list_events first to find it): its name, date and time, end, venue, description or ticket types, or stop and restart its ticket sales. Send only what changes. Ticket holders are emailed when the date, time or venue changes. Ticket types with tickets sold can't be removed or cut below what's sold; new prices are for new sales only. The ticket link doesn't change.",
+            parameters: {
+                type: "object",
+                properties: {
+                    event: { type: "string", description: "The event's id or name." },
+                    name: { type: "string" },
+                    starts_at: { type: "string", description: "ISO 8601 with offset; Lagos time (+01:00) unless they say otherwise." },
+                    ends_at: { type: "string" },
+                    venue: { type: "string" },
+                    description: { type: "string" },
+                    tiers: {
+                        type: "array",
+                        description: "The full list of ticket types after the change: existing ones under the same name (so they keep their sales), plus new ones; one left out is removed.",
+                        items: {
+                            type: "object",
+                            properties: { name: { type: "string" }, price: { type: "number" }, capacity: { type: "integer" } },
+                            required: ["name", "price"],
+                        },
+                    },
+                    selling: { type: "boolean", description: "false stops ticket sales, true starts them again." },
+                },
+                required: ["event"],
+            },
+        },
+    },
+    {
+        type: "function",
+        function: {
+            name: "create_event",
+            description: "Propose an event the business sells tickets for (a party, show, dinner, class) from what the owner said, e.g. \"party Dec 20, 8pm, ₦10k regular, ₦50k VIP, 300 people\". Makes a public ticket page (studio.cencori.com/e/…) where guests pay by the business's payment link or by transfer and get QR tickets; the owner checks them in from Studio. Ask only for what's missing: the name, the date and start time, and at least one ticket type with its price.",
+            parameters: {
+                type: "object",
+                properties: {
+                    name: { type: "string" },
+                    starts_at: { type: "string", description: "ISO 8601 with offset. Times the owner gives are Lagos time unless they say otherwise: 8pm on 20 Dec is 2026-12-20T20:00:00+01:00. Use now_utc to work out the year and relative dates (\"next Saturday\")." },
+                    ends_at: { type: "string", description: "ISO 8601 with offset, if they said when it ends." },
+                    venue: { type: "string" },
+                    description: { type: "string", description: "One or two lines about it, in the owner's words; empty if they gave none." },
+                    tiers: {
+                        type: "array",
+                        description: "Ticket types. A total headcount with one type goes on that type.",
+                        items: {
+                            type: "object",
+                            properties: {
+                                name: { type: "string", description: "Regular, VIP, Table for 6…" },
+                                price: { type: "number", description: "In naira (main unit): ₦10k is 10000. 0 for free." },
+                                capacity: { type: "integer", description: "How many of this type; omit for no limit." },
+                            },
+                            required: ["name", "price"],
+                        },
+                    },
+                },
+                required: ["name", "starts_at", "tiers"],
+            },
+        },
+    },
     {
         type: "function",
         function: {
@@ -190,6 +258,9 @@ export const AGENT_ACTIONS: ChatCompletionFunctionTool[] = [
 
 export const AGENT_TOOL_STATUS: Record<string, string> = {
     list_agents: "Listing agents",
+    list_events: "Reading your events",
+    create_event: "Preparing the event",
+    update_event: "Preparing the change",
     get_agent: "Reading the agent",
     create_agent: "Preparing the agent",
     update_agent_instructions: "Preparing instruction changes",
@@ -248,6 +319,27 @@ async function channelState(ctx: CopilotToolContext, agentId: string) {
 
 export async function runAgentReadTool(name: string, args: Args, ctx: CopilotToolContext): Promise<unknown> {
     if (!ctx.project) return { error: "No project is selected, so agents aren't available." };
+    if (name === "list_events") {
+        const { eventSummaries } = await import("@/lib/studio/events");
+        const events = await eventSummaries(ctx.admin as never, ctx.project.id);
+        return {
+            events: events.map((item) => ({
+                id: item.event.id,
+                name: item.event.name,
+                starts_at: item.event.starts_at,
+                venue: item.event.venue,
+                selling: item.event.status === "live",
+                link: `https://studio.cencori.com/e/${item.event.slug}`,
+                sold: item.sold,
+                of: item.capacity,
+                earned: item.earned,
+                currency: item.event.currency,
+                checked_in: item.checked_in,
+                tickets: item.by_tier.map((tier) => ({ name: tier.name, price: tier.price, sold: tier.sold, of: tier.capacity })),
+            })),
+        };
+    }
+
     if (name === "list_agents") {
         const { data } = await ctx.admin.from("agents").select("id, name, description, is_active, stable_version_id, created_at").eq("project_id", ctx.project.id).order("created_at", { ascending: false }).limit(50);
         const agents = (data ?? []) as AgentRow[];
@@ -397,6 +489,70 @@ export async function prepareAgentAction(name: string, args: Args, ctx: CopilotT
                 request: steps[0],
                 steps,
                 doneMessage: `Created the agent "${agentName}" as a draft${knowledgeText ? ", added its knowledge" : ""}${emails.length ? ", set up owner alerts" : ""}.`,
+            },
+        };
+    }
+
+    if (name === "update_event") {
+        const { cleanEvent, eventSummaries } = await import("@/lib/studio/events");
+        const ref = text(args.event, 120).toLowerCase();
+        const events = await eventSummaries(ctx.admin as never, project.id);
+        const found = events.find((item) => item.event.id === ref) ?? events.find((item) => item.event.name.toLowerCase() === ref) ?? events.find((item) => item.event.name.toLowerCase().includes(ref));
+        if (!ref || !found) return { error: "Say which event (list_events shows them)." };
+        const current = found.event;
+        const fields = Object.fromEntries((["name", "starts_at", "ends_at", "venue", "description", "tiers"] as const).filter((key) => args[key] !== undefined).map((key) => [key, args[key]]));
+        if (!Object.keys(fields).length && typeof args.selling !== "boolean") return { error: "Say what to change." };
+        const merged = cleanEvent({ ...current, ...fields });
+        if (!merged.ok) return { error: merged.message };
+        const sold = Object.fromEntries(found.by_tier.map((tier) => [tier.name.toLowerCase(), tier.sold]));
+        if (fields.tiers) {
+            for (const tier of found.by_tier) {
+                const kept = merged.event.tiers.find((item) => item.name.toLowerCase() === tier.name.toLowerCase());
+                if (!kept && tier.sold > 0) return { error: `${tier.name} has ${tier.sold} sold, so it can't be removed.` };
+                if (kept && kept.capacity !== null && kept.capacity < tier.sold) return { error: `${tier.name} has ${tier.sold} sold already, so it needs at least ${tier.sold}.` };
+            }
+        }
+        const price = (amount: number) => (amount === 0 ? "Free" : `₦${amount.toLocaleString("en-NG")}`);
+        const when = (iso: string) => new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Lagos", weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true }).format(new Date(iso));
+        const moved = (fields.starts_at !== undefined && merged.event.starts_at !== current.starts_at) || (fields.venue !== undefined && merged.event.venue !== current.venue);
+        const details = [
+            ...(fields.name !== undefined && merged.event.name !== current.name ? [{ label: "Name", value: merged.event.name }] : []),
+            ...(fields.starts_at !== undefined && merged.event.starts_at !== current.starts_at ? [{ label: "When", value: `${when(current.starts_at)} → ${when(merged.event.starts_at)}` }] : []),
+            ...(fields.venue !== undefined && merged.event.venue !== current.venue ? [{ label: "Where", value: merged.event.venue || "No venue" }] : []),
+            ...(fields.description !== undefined ? [{ label: "About", value: merged.event.description || "None" }] : []),
+            ...(fields.tiers ? [{ label: "Tickets", value: merged.event.tiers.map((tier) => `${tier.name} ${price(tier.price)}${tier.capacity ? ` × ${tier.capacity}` : ""}${sold[tier.name.toLowerCase()] ? ` (${sold[tier.name.toLowerCase()]} sold)` : ""}`).join(", ") }] : []),
+            ...(typeof args.selling === "boolean" ? [{ label: "Selling", value: args.selling ? "Start again" : "Stop" }] : []),
+            ...(moved && found.sold > 0 ? [{ label: "Ticket holders", value: `${found.sold} emailed about the change` }] : []),
+        ];
+        return {
+            proposal: {
+                id, kind: name, tier: "normal",
+                title: `Change "${current.name}"`,
+                details,
+                request: { method: "POST", path: "/api/studio/events", body: { project_id: project.id, action: "update", event_id: current.id, ...fields, ...(typeof args.selling === "boolean" ? { status: args.selling ? "live" : "closed" } : {}) } },
+                doneMessage: `Updated "${merged.event.name}".${moved && found.sold > 0 ? " Ticket holders have been emailed." : ""}`,
+            },
+        };
+    }
+
+    if (name === "create_event") {
+        const { cleanEvent } = await import("@/lib/studio/events");
+        const cleaned = cleanEvent(args);
+        if (!cleaned.ok) return { error: cleaned.message };
+        const event = cleaned.event;
+        const price = (amount: number) => (amount === 0 ? "Free" : `₦${amount.toLocaleString("en-NG")}`);
+        const when = new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Lagos", weekday: "short", day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true }).format(new Date(event.starts_at));
+        return {
+            proposal: {
+                id, kind: name, tier: "normal",
+                title: `Make "${event.name}"`,
+                details: [
+                    { label: "When", value: when },
+                    ...(event.venue ? [{ label: "Where", value: event.venue }] : []),
+                    { label: "Tickets", value: event.tiers.map((tier) => `${tier.name} ${price(tier.price)}${tier.capacity ? ` × ${tier.capacity}` : ""}`).join(", ") },
+                ],
+                request: { method: "POST", path: "/api/studio/events", body: { project_id: project.id, action: "create", ...event } },
+                doneMessage: `Made "${event.name}". It's in Sales → Events, with its ticket link to share.`,
             },
         };
     }

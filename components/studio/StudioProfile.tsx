@@ -222,7 +222,7 @@ export function StudioProfile({ className, variant = "avatar" }: {
     );
 
     return (
-        <Drawer.Root open={open} onOpenChange={(next) => { setOpen(next); if (!next) setScreen("profile"); }}>
+        <Drawer.Root repositionInputs={false} open={open} onOpenChange={(next) => { setOpen(next); if (!next) setScreen("profile"); }}>
             <Drawer.Trigger asChild>
                 {variant === "row" ? (
                     <button

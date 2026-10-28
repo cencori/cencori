@@ -394,9 +394,14 @@ export async function POST(
         const model = normalizeGatewayModelId(configuredModel.trim());
 
         const input = body.input;
-        // Installed agents get today's date: they look things up by date through their tools.
+        // Installed agents get today's date (they look things up by date through their tools)
+        // and the business's events on sale, with their ticket links.
         const instructions = installedManifest
-            ? [installedManifest.instructions ?? '', (await import('@/lib/embedded/agent-tools')).agentClock()].filter(Boolean).join('\n\n')
+            ? [
+                installedManifest.instructions ?? '',
+                (await import('@/lib/embedded/agent-tools')).agentClock(),
+                await import('@/lib/studio/events').then(({ eventsBriefing }) => eventsBriefing(adminClient as never, session.project_id as string)).catch(() => ''),
+            ].filter(Boolean).join('\n\n')
             : (agentConfig?.system_prompt || body.instructions);
 
         if (!input || (Array.isArray(input) && input.length === 0)) {

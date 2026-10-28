@@ -122,7 +122,7 @@ export default function StudioConversationPage({ id }: { id: string }) {
                 <div ref={endRef} />
             </div>
 
-            <div className="sticky bottom-0 border-t border-border/60 bg-background px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3">
+            <div className="sticky bottom-[var(--keyboard,0px)] border-t border-border/60 bg-background px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3 transition-[bottom] duration-200 [html[data-keyboard]_&]:pb-3">
                 {act.error && <p role="alert" className="mb-2 text-[13px] leading-5 text-destructive">{act.error.message}</p>}
                 {!conversation || !reply ? null : reply.reason === "website" ? (
                     <p className="text-[13px] leading-5 text-muted-foreground">Your assistant is handling this chat. Replying yourself works on WhatsApp, website and link chats.</p>

@@ -13,6 +13,10 @@ import { resizePhoto } from "@/lib/studio/resize-photo";
 import { cn } from "@/lib/utils";
 import { getMainSiteUrl } from "@/lib/main-site-url";
 import { ProductsTask } from "@/components/studio/StudioProducts";
+import { useStudioNavigate } from "@/components/studio/studio-nav";
+import { fromLagosInput, lagosInput } from "@/components/studio/useEvents";
+import { EventDateTimePicker } from "@/components/studio/EventDateTimePicker";
+import { TicketTierIcon } from "@/components/studio/TicketTierIcon";
 
 /**
  * Setting the assistant up, in Studio: each "Finish setting up" step (and
@@ -21,13 +25,13 @@ import { ProductsTask } from "@/components/studio/StudioProducts";
  * signs in there sees everything done from Studio.
  */
 
-export type StudioTask = "knowledge" | "products" | "whatsapp" | "website" | "golive" | "alerts" | "payments" | "plans" | "business" | "newbusiness" | "later";
+export type StudioTask = "knowledge" | "products" | "event" | "whatsapp" | "website" | "golive" | "alerts" | "payments" | "plans" | "business" | "newbusiness" | "later";
 
 /** Another business the ⋯ menu acts on (never the open one). */
 export type BusinessTarget = { id: string; name: string; isBusiness: boolean };
 
 /** business: the business the ⋯ menu acts on. agentId: which assistant (else the first). */
-type TaskOptions = { business?: BusinessTarget; agentId?: string };
+type TaskOptions = { business?: BusinessTarget; agentId?: string; eventId?: string };
 
 const TasksContext = createContext<{ open: (task: StudioTask, options?: TaskOptions) => void } | null>(null);
 
@@ -69,6 +73,7 @@ async function send<T = unknown>(url: string, method: string, body?: unknown): P
 const TITLES: Record<StudioTask, string> = {
     knowledge: "Add knowledge",
     products: "Add products",
+    event: "New event",
     whatsapp: "Connect WhatsApp",
     website: "Chat on your website",
     golive: "Go live",
@@ -84,9 +89,11 @@ export function StudioTasksProvider({ children }: { children: ReactNode }) {
     const [task, setTask] = useState<StudioTask | null>(null);
     const [target, setTarget] = useState<BusinessTarget | null>(null);
     const [agentId, setAgentId] = useState<string | null>(null);
+    const [eventId, setEventId] = useState<string | null>(null);
     const open = useCallback((next: StudioTask, options?: TaskOptions) => {
         setTarget(options?.business ?? null);
         setAgentId(options?.agentId ?? null);
+        setEventId(options?.eventId ?? null);
         setTask(next);
     }, []);
     const [notice, setNotice] = useState<string | null>(null);
@@ -144,20 +151,20 @@ export function StudioTasksProvider({ children }: { children: ReactNode }) {
     return (
         <TasksContext.Provider value={{ open }}>
             {children}
-            <Drawer.Root open={!!task} onOpenChange={(next) => { if (!next) setTask(null); }}>
+            <Drawer.Root repositionInputs={false} open={!!task} onOpenChange={(next) => { if (!next) setTask(null); }}>
                 <Drawer.Portal>
                     <Drawer.Overlay className={`fixed inset-0 z-[60] bg-black/30 ${SHEET_OVERLAY_PHONE_ONLY}`} />
                     <Drawer.Content className={`dashboard-theme fixed inset-x-0 bottom-0 z-[60] mx-auto flex max-h-[92svh] max-w-md lg:left-[var(--studio-sidebar,0px)] flex-col rounded-t-3xl border-t border-border/60 bg-background font-sans text-foreground outline-none ${SHEET_AS_PAGE}`}>
                         <SheetPageBack />
                         <div className="flex items-center justify-between px-5 pt-3">
-                            <Drawer.Title className="min-w-0 truncate text-[17px] font-semibold">{task === "business" ? target?.name ?? "" : task ? TITLES[task] : ""}</Drawer.Title>
+                            <Drawer.Title className="min-w-0 truncate text-[17px] font-semibold">{task === "business" ? target?.name ?? "" : task === "event" && eventId ? "Edit event" : task ? TITLES[task] : ""}</Drawer.Title>
                             <button type="button" onClick={() => setTask(null)} aria-label="Close" className="-mr-2 flex h-10 w-10 items-center justify-center rounded-full"><X className="h-5 w-5" /></button>
                         </div>
                         <Drawer.Description className="sr-only">Set up your assistant without leaving Studio.</Drawer.Description>
                         <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-1">
                             {task === "business" && target
                                 ? <BusinessTask target={target} onDone={() => { setTask(null); void queryClient.invalidateQueries(); }} />
-                                : task && task !== "business" && <TaskBody task={task} agentId={agentId} onDone={() => { setTask(null); void queryClient.invalidateQueries(); }} />}
+                                : task && task !== "business" && <TaskBody task={task} agentId={agentId} eventId={eventId} onDone={() => { setTask(null); void queryClient.invalidateQueries(); }} />}
                         </div>
                     </Drawer.Content>
                 </Drawer.Portal>
@@ -172,12 +179,13 @@ export function StudioTasksProvider({ children }: { children: ReactNode }) {
     );
 }
 
-function TaskBody({ task, agentId: chosen, onDone }: { task: StudioTask; agentId: string | null; onDone: () => void }) {
+function TaskBody({ task, agentId: chosen, eventId, onDone }: { task: StudioTask; agentId: string | null; eventId: string | null; onDone: () => void }) {
     const { project, agents, user, organization } = useStudio();
     const agentId = chosen ?? agents[0]?.id ?? null;
     if (task === "plans") return <PlansTask organizationId={organization.id} />;
     if (task === "newbusiness") return <NewBusinessTask />;
     if (task === "products") return <ProductsTask onDone={onDone} />;
+    if (task === "event") return <NewEventTask projectId={project.id} eventId={eventId} onDone={onDone} />;
     if (task === "later") {
         return (
             <>
@@ -578,6 +586,173 @@ function PlansTask({ organizationId }: { organizationId: string }) {
                 })}
             </div>
             <ErrorLine error={error} />
+        </>
+    );
+}
+
+type TierDraft = { id?: string; name: string; price: string; capacity: string };
+
+type EventForm = { name: string; starts_at: string; venue: string; description: string; banner_url: string | null; tiers: Array<{ id: string; name: string; price: number; capacity: number | null }>; sold: Record<string, number> };
+
+/**
+ * A party, a show, a dinner: what, when, where, and the tickets. New, or
+ * (with eventId) the same form filled in to change it; ticket types that have
+ * sold can't be removed or cut below what's sold, and moving the date or place
+ * emails everyone who has a ticket.
+ */
+function NewEventTask({ projectId, eventId, onDone }: { projectId: string; eventId: string | null; onDone: () => void }) {
+    const navigate = useStudioNavigate();
+    const [loaded, setLoaded] = useState<EventForm | null>(null);
+    const [name, setName] = useState("");
+    const [startsAt, setStartsAt] = useState("");
+    const [venue, setVenue] = useState("");
+    const [description, setDescription] = useState("");
+    const [tiers, setTiers] = useState<TierDraft[]>([{ name: "Regular", price: "", capacity: "" }]);
+    const [busy, setBusy] = useState(false);
+    const [cancelling, setCancelling] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    /** The banner: the one saved, or a new picture chosen (resized, uploaded when the event is saved). */
+    const [banner, setBanner] = useState<{ preview: string; upload: { data: string; mime_type: string } | null } | null>(null);
+    const [bannerRemoved, setBannerRemoved] = useState(false);
+    const bannerInput = useRef<HTMLInputElement>(null);
+    const setTier = (index: number, patch: Partial<TierDraft>) => setTiers((current) => current.map((tier, i) => (i === index ? { ...tier, ...patch } : tier)));
+
+    useEffect(() => {
+        if (!eventId) return;
+        send<{ event: { event: Omit<EventForm, "sold">; by_tier: Array<{ id: string; sold: number }> } }>(`/api/studio/events?project_id=${projectId}&event_id=${eventId}`, "GET")
+            .then(({ event }) => {
+                setLoaded({ ...event.event, sold: Object.fromEntries(event.by_tier.map((tier) => [tier.id, tier.sold])) });
+                setName(event.event.name);
+                setStartsAt(lagosInput(event.event.starts_at));
+                setVenue(event.event.venue);
+                setDescription(event.event.description);
+                if (event.event.banner_url) setBanner({ preview: event.event.banner_url, upload: null });
+                setTiers(event.event.tiers.map((tier) => ({ id: tier.id, name: tier.name, price: String(tier.price), capacity: tier.capacity === null ? "" : String(tier.capacity) })));
+            })
+            .catch((cause) => setError(cause instanceof Error ? cause.message : "Couldn't load the event."));
+    }, [eventId, projectId]);
+
+    const save = async () => {
+        setBusy(true);
+        setError(null);
+        const fields = {
+            name,
+            venue,
+            description,
+            // Typed as Lagos time, whatever zone the phone or laptop is in.
+            starts_at: fromLagosInput(startsAt),
+            tiers: tiers.map((tier) => ({ ...(tier.id ? { id: tier.id } : {}), name: tier.name, price: Number(tier.price.replace(/[^\d.]/g, "") || 0), capacity: tier.capacity.trim() ? Number(tier.capacity.replace(/\D/g, "")) : null })),
+        };
+        try {
+            // The banner goes up once the event exists (a new one has no id before it's made).
+            const saveBanner = async (id: string) => {
+                if (banner?.upload) await send("/api/studio/events/banner", "POST", { project_id: projectId, event_id: id, ...banner.upload });
+                else if (bannerRemoved && !banner) await send("/api/studio/events/banner", "DELETE", { project_id: projectId, event_id: id });
+            };
+            if (eventId) {
+                await send("/api/studio/events", "POST", { project_id: projectId, action: "update", event_id: eventId, ...fields });
+                await saveBanner(eventId);
+                onDone();
+            } else {
+                const { event } = await send<{ event: { id: string } }>("/api/studio/events", "POST", { project_id: projectId, action: "create", ...fields });
+                await saveBanner(event.id).catch(() => undefined);
+                onDone();
+                navigate(`/sales/events/${event.id}`);
+            }
+        } catch (cause) {
+            setError(cause instanceof Error ? cause.message : "Couldn't save the event.");
+            setBusy(false);
+        }
+    };
+
+    const cancel = async () => {
+        if (!eventId) return;
+        if (!cancelling) {
+            setCancelling(true);
+            return;
+        }
+        setBusy(true);
+        setError(null);
+        try {
+            await send("/api/studio/events", "POST", { project_id: projectId, action: "update", event_id: eventId, status: "cancelled" });
+            onDone();
+            navigate("/sales?view=events");
+        } catch (cause) {
+            setError(cause instanceof Error ? cause.message : "Couldn't cancel it.");
+            setBusy(false);
+        }
+    };
+
+    if (eventId && !loaded) return error ? <ErrorLine error={error} /> : <div className="mt-5 flex justify-center"><Spinner className="h-5 w-5 text-muted-foreground" /></div>;
+    const soldOf = (tier: TierDraft) => (tier.id ? loaded?.sold[tier.id] ?? 0 : 0);
+    const anySold = Object.values(loaded?.sold ?? {}).some((n) => n > 0);
+
+    return (
+        <>
+            <input ref={bannerInput} type="file" accept="image/*" hidden onChange={async (event) => {
+                const file = event.target.files?.[0];
+                event.target.value = "";
+                if (!file) return;
+                setError(null);
+                try {
+                    // Big enough for a flyer's small print, small enough to load on a phone.
+                    const resized = await resizePhoto(file, 1600, 0.88);
+                    setBanner({ preview: `data:${resized.mime_type};base64,${resized.data}`, upload: resized });
+                } catch {
+                    setError("Couldn't read that picture. Try another.");
+                }
+            }} />
+            {banner ? (
+                <div className="relative mb-3">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- a local preview or the owner's upload */}
+                    <img src={banner.preview} alt="" className="max-h-56 w-full rounded-2xl object-cover object-top" />
+                    <div className="absolute bottom-2 right-2 flex gap-1.5">
+                        <button type="button" onClick={() => bannerInput.current?.click()} className="h-8 rounded-full bg-black/60 px-3 text-[13px] font-semibold text-white backdrop-blur">Change</button>
+                        <button type="button" onClick={() => { setBanner(null); setBannerRemoved(true); }} className="h-8 rounded-full bg-black/60 px-3 text-[13px] font-semibold text-white backdrop-blur">Remove</button>
+                    </div>
+                </div>
+            ) : (
+                <button type="button" onClick={() => bannerInput.current?.click()} className="mb-3 flex h-28 w-full flex-col items-center justify-center rounded-2xl border border-dashed border-border text-muted-foreground">
+                    <Camera className="h-5 w-5" />
+                    <span className="mt-1.5 text-[13px] font-medium">Add your banner or flyer</span>
+                </button>
+            )}
+            <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Name (Rooftop Party)" className={cn(field, "h-12 rounded-full px-5")} />
+            <div className="mt-2.5">
+                <span className="mb-1 block pl-5 text-[12px] text-muted-foreground">Starts (Lagos time)</span>
+                <EventDateTimePicker value={startsAt} onChange={setStartsAt} />
+            </div>
+            <input value={venue} onChange={(event) => setVenue(event.target.value)} placeholder="Where" className={cn(field, "mt-2.5 h-12 rounded-full px-5")} />
+            <textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={4} placeholder="About it (optional)" className={cn(field, "mt-2.5 resize-none py-3.5")} />
+            <p className="mt-4 text-[13px] font-medium text-muted-foreground">Tickets</p>
+            <ul className="mt-2 space-y-2">
+                {tiers.map((tier, index) => (
+                    <li key={tier.id ?? index}>
+                        <div className="flex items-center gap-2">
+                            {/* One pill: the type, its price and how many, split by thin lines. */}
+                            <div className="flex h-11 min-w-0 flex-1 divide-x divide-border/60 overflow-hidden rounded-full bg-muted">
+                                <span className="flex min-w-0 flex-[1.4] items-center gap-2 pl-1.5">
+                                    <TicketTierIcon name={tier.name} index={index} />
+                                    <input value={tier.name} onChange={(event) => setTier(index, { name: event.target.value })} placeholder="Type" className="min-w-0 flex-1 bg-transparent pr-3 text-[15px] outline-none placeholder:text-muted-foreground" />
+                                </span>
+                                <input value={tier.price} onChange={(event) => setTier(index, { price: event.target.value })} inputMode="numeric" placeholder="₦ price" aria-label="Price" className="min-w-0 flex-1 bg-transparent px-2 text-center text-[15px] outline-none placeholder:text-muted-foreground" />
+                                <input value={tier.capacity} onChange={(event) => setTier(index, { capacity: event.target.value })} inputMode="numeric" placeholder="How many" aria-label="How many" className="min-w-0 flex-1 bg-transparent px-2 text-center text-[15px] outline-none placeholder:text-muted-foreground" />
+                            </div>
+                            {tiers.length > 1 && soldOf(tier) === 0 && <button type="button" aria-label="Remove" onClick={() => setTiers((current) => current.filter((_, i) => i !== index))} className="text-muted-foreground"><X className="h-4 w-4" /></button>}
+                        </div>
+                        {soldOf(tier) > 0 && <p className="mt-1 pl-1 text-[12px] text-muted-foreground">{soldOf(tier)} sold</p>}
+                    </li>
+                ))}
+            </ul>
+            {tiers.length < 8 && <button type="button" onClick={() => setTiers((current) => [...current, { name: current.length === 1 ? "VIP" : "", price: "", capacity: "" }])} className="mt-2 text-[13px] font-semibold">+ Another type</button>}
+            {eventId && anySold && <p className="mt-3 text-[12px] leading-5 text-muted-foreground">Ticket holders get an email if the date, time or place changes. New prices are for new sales only.</p>}
+            <ErrorLine error={error} />
+            <Primary busy={busy && !cancelling} disabled={!name.trim() || !startsAt || tiers.some((tier) => !tier.name.trim())} onClick={() => void save()}>{eventId ? "Save" : "Make the event"}</Primary>
+            {eventId && (
+                <button type="button" disabled={busy} onClick={() => void cancel()} className="mt-4 w-full text-center text-[13px] text-destructive disabled:opacity-50">
+                    {cancelling ? (anySold ? "Tap again to cancel. Ticket holders get an email." : "Tap again to cancel the event") : "Cancel event"}
+                </button>
+            )}
         </>
     );
 }

@@ -25,6 +25,9 @@ export const viewport: Viewport = {
     ],
     colorScheme: "light dark",
     viewportFit: "cover",
+    // The keyboard covers the page instead of squashing it (Android; iOS always does), and
+    // Studio moves what's being typed in above it (useKeyboardInset), as a native app does.
+    interactiveWidget: "overlays-content",
 };
 
 /**

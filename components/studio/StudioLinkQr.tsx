@@ -43,7 +43,7 @@ export function StudioLinkQr({ url, name, open, onOpenChange }: { url: string; n
     };
 
     return (
-        <Drawer.Root open={open} onOpenChange={onOpenChange}>
+        <Drawer.Root repositionInputs={false} open={open} onOpenChange={onOpenChange}>
             <Drawer.Portal>
                 <Drawer.Overlay className={`fixed inset-0 z-50 bg-black/30 ${SHEET_OVERLAY_PHONE_ONLY}`} />
                 <Drawer.Content className={`dashboard-theme fixed inset-x-0 bottom-0 z-50 mx-auto flex max-w-md lg:left-[var(--studio-sidebar,0px)] flex-col rounded-t-3xl border-t border-border/60 bg-background px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-3 font-sans text-foreground outline-none ${SHEET_AS_PAGE}`}>
