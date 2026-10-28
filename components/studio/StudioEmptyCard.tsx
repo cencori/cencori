@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
  * so a StudioEmptyCard inside it sits in the middle (matches the main
  * column's top and bottom padding in StudioShell).
  */
-export const STUDIO_FILL_PAGE = "flex min-h-[calc(100svh-7.25rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] flex-col";
+export const STUDIO_FILL_PAGE = "flex min-h-[calc(100svh-7.25rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] flex-col lg:min-h-[calc(100svh-5.5rem)]";
 
 interface StudioEmptyCardProps {
     icon: Icon;

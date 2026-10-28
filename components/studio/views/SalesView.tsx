@@ -60,7 +60,7 @@ export default function StudioSalesPage() {
     return (
         <div className={empty ? STUDIO_FILL_PAGE : undefined}>
             {/* The title and switcher stay put while the page scrolls under them. */}
-            <div className="sticky top-0 z-30 -mx-4 -mt-[calc(1.25rem+env(safe-area-inset-top))] bg-background px-4 pb-3 pt-[calc(1.25rem+env(safe-area-inset-top))]">
+            <div className="sticky top-0 z-30 -mx-4 -mt-[calc(1.25rem+env(safe-area-inset-top))] bg-background px-4 pb-3 pt-[calc(1.25rem+env(safe-area-inset-top))] lg:-mx-10 lg:-mt-10 lg:px-10 lg:pt-10">
                 <h1 className="text-[26px] font-semibold leading-tight tracking-tight">Sales</h1>
                 <div role="tablist" aria-label="Show" className="mt-4 grid grid-cols-2 gap-1 rounded-full bg-muted p-1">
                     {(["orders", "bookings"] as const).map((id) => (
@@ -92,7 +92,7 @@ export default function StudioSalesPage() {
                                 {formatMoney(toCollect.reduce((sum, o) => sum + o.total, 0), data!.currency)} still to collect from {toCollect.length} {toCollect.length === 1 ? "order" : "orders"}
                             </p>
                         )}
-                        <ul className="-mx-4 mt-2">
+                        <ul className="-mx-4 mt-2 lg:mx-0">
                             {orders.map((order) => {
                                 const status = orderStatus(order);
                                 const unpaid = order.status === "new" || order.status === "awaiting_payment";
@@ -126,7 +126,7 @@ export default function StudioSalesPage() {
             ) : bookings.length === 0 ? (
                 <StudioEmptyCard icon={CalendarIcon} title="No bookings yet" description="When your assistant books a table or an appointment, it shows up here." />
             ) : (
-                <ul className="-mx-4 mt-3">
+                <ul className="-mx-4 mt-3 lg:mx-0">
                     {bookings.map((booking) => {
                         const status = bookingStatus(booking);
                         return (

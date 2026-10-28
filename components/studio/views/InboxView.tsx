@@ -47,9 +47,9 @@ export default function StudioInboxPage() {
     return (
         <div className={empty ? STUDIO_FILL_PAGE : undefined}>
             {/* The title and filters stay put while the chats scroll under them. */}
-            <div className="sticky top-0 z-30 -mx-4 -mt-[calc(1.25rem+env(safe-area-inset-top))] bg-background px-4 pb-3 pt-[calc(1.25rem+env(safe-area-inset-top))]">
+            <div className="sticky top-0 z-30 -mx-4 -mt-[calc(1.25rem+env(safe-area-inset-top))] bg-background px-4 pb-3 pt-[calc(1.25rem+env(safe-area-inset-top))] lg:-mx-10 lg:-mt-10 lg:px-10 lg:pt-10">
                 <h1 className="text-[26px] font-semibold leading-tight tracking-tight">Inbox</h1>
-                <div role="tablist" aria-label="Show" className="-mx-4 mt-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none]">
+                <div role="tablist" aria-label="Show" className="-mx-4 mt-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] lg:-mx-10 lg:px-10">
                     {FILTERS.map((filter) => (
                         <button
                             key={filter.label}
@@ -90,7 +90,7 @@ export default function StudioInboxPage() {
                     />
                 )
             ) : (
-                <ul className="-mx-4 mt-3">
+                <ul className="-mx-4 mt-3 lg:mx-0">
                     {conversations.map((conversation) => (
                         <li key={conversation.id}>
                             <StudioLink
@@ -133,7 +133,7 @@ export default function StudioInboxPage() {
             <Drawer.Root open={!!held} onOpenChange={(open) => { if (!open) setHeld(null); }}>
                 <Drawer.Portal>
                     <Drawer.Overlay className="fixed inset-0 z-50 bg-black/30" />
-                    <Drawer.Content className="dashboard-theme fixed inset-x-0 bottom-0 z-50 mx-auto max-w-md rounded-t-3xl border-t border-border/60 bg-background px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3 font-sans text-foreground outline-none">
+                    <Drawer.Content className="dashboard-theme fixed inset-x-0 bottom-0 z-50 mx-auto max-w-md lg:left-[var(--studio-sidebar,0px)] rounded-t-3xl border-t border-border/60 bg-background px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3 font-sans text-foreground outline-none">
                         <Drawer.Title className="truncate px-1 text-[15px] font-semibold">{held?.name}</Drawer.Title>
                         <Drawer.Description className="sr-only">Chat options</Drawer.Description>
                         <button

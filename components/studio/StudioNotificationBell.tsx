@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Drawer } from "vaul";
+import { SHEET_AS_PAGE, SHEET_OVERLAY_PHONE_ONLY, SheetPageBack } from "@/components/studio/studio-sheet";
 import { BellIcon } from "@solar-icons/react/bold-duotone/bell";
 import { ChatRoundCheckIcon } from "@solar-icons/react/bold-duotone/chat-round-check";
 import { StudioLink } from "@/components/studio/studio-nav";
@@ -52,10 +53,11 @@ export function StudioNotificationBell({ className }: { className?: string }) {
                 </button>
             </Drawer.Trigger>
             <Drawer.Portal>
-                <Drawer.Overlay className="fixed inset-0 z-50 bg-black/40" />
-                <Drawer.Content className="dashboard-theme fixed inset-x-0 bottom-0 z-50 mx-auto flex h-[calc(100svh-env(safe-area-inset-top)-0.75rem)] max-w-md flex-col rounded-t-3xl border-t border-border/60 bg-background font-sans text-foreground outline-none">
+                <Drawer.Overlay className={`fixed inset-0 z-50 bg-black/40 ${SHEET_OVERLAY_PHONE_ONLY}`} />
+                <Drawer.Content className={`dashboard-theme fixed inset-x-0 bottom-0 z-50 mx-auto flex h-[calc(100svh-env(safe-area-inset-top)-0.75rem)] max-w-md lg:left-[var(--studio-sidebar,0px)] flex-col rounded-t-3xl border-t border-border/60 bg-background font-sans text-foreground outline-none ${SHEET_AS_PAGE}`}>
+                    <SheetPageBack />
                     <div className="flex justify-center pt-3">
-                        <span aria-hidden className="h-1 w-10 rounded-full bg-muted-foreground/30" />
+                        <span aria-hidden className="h-1 w-10 rounded-full bg-muted-foreground/30 lg:hidden" />
                     </div>
                     <div className="px-4 pt-3">
                         <Drawer.Title className="text-center text-[15px] font-semibold">Notifications</Drawer.Title>

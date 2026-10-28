@@ -6,6 +6,7 @@ import { useStudioOverview } from "@/components/studio/useStudioOverview";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Drawer } from "vaul";
+import { SHEET_AS_PAGE, SHEET_OVERLAY_PHONE_ONLY, SheetPageBack } from "@/components/studio/studio-sheet";
 import posthog from "posthog-js";
 import { useTheme } from "next-themes";
 import { BellIcon } from "@solar-icons/react/bold-duotone/bell";
@@ -47,6 +48,21 @@ async function squareJpeg(file: File, size = 512): Promise<Blob> {
     context.drawImage(bitmap, (bitmap.width - side) / 2, (bitmap.height - side) / 2, side, side, 0, 0, canvas.width, canvas.height);
     bitmap.close();
     return new Promise((resolve, reject) => canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("Couldn't read that photo."))), "image/jpeg", 0.88));
+}
+
+/**
+ * Show another business in Studio: remembered on this device, then a full
+ * load, since every tab's data belongs to the old business. Throws with a
+ * reason the owner can read.
+ */
+export async function switchStudioBusiness(organizationId: string): Promise<void> {
+    const response = await fetch("/api/studio/workspace", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ organization_id: organizationId }),
+    });
+    if (!response.ok) throw new Error(((await response.json().catch(() => null)) as { error?: string } | null)?.error ?? "Couldn't switch business.");
+    window.location.assign("/");
 }
 
 function Avatar({ url, name, className }: { url: string | null; name: string; className?: string }) {
@@ -104,7 +120,11 @@ function Group({ title, children }: { title?: string; children: ReactNode }) {
  * The avatar beside the home greeting, and the sheet it opens: who's
  * signed in, which business, this device's settings, help, and sign out.
  */
-export function StudioProfile({ className }: { className?: string }) {
+export function StudioProfile({ className, variant = "avatar" }: {
+    className?: string;
+    /** "avatar": the round photo (Home on phones). "row": photo and full name (the desktop sidebar's foot). */
+    variant?: "avatar" | "row";
+}) {
     const { user, organization, organizations } = useStudio();
     // The business's plan and how much of it is used (moved here from Home).
     const overview = useStudioOverview().data;
@@ -158,14 +178,7 @@ export function StudioProfile({ className }: { className?: string }) {
         setSwitching(organizationId);
         setError(null);
         try {
-            const response = await fetch("/api/studio/workspace", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ organization_id: organizationId }),
-            });
-            if (!response.ok) throw new Error(((await response.json().catch(() => null)) as { error?: string } | null)?.error ?? "Couldn't switch business.");
-            // A full load: every tab's data belongs to the old business.
-            window.location.assign("/");
+            await switchStudioBusiness(organizationId);
         } catch (cause) {
             setError(cause instanceof Error ? cause.message : "Couldn't switch business.");
             setSwitching(null);
@@ -211,21 +224,33 @@ export function StudioProfile({ className }: { className?: string }) {
     return (
         <Drawer.Root open={open} onOpenChange={(next) => { setOpen(next); if (!next) setScreen("profile"); }}>
             <Drawer.Trigger asChild>
-                <button
-                    type="button"
-                    aria-label="Your profile"
-                    className={cn("shrink-0 rounded-full border border-border/60 p-0.5", className)}
-                >
-                    <Avatar key={avatarUrl ?? "none"} url={avatarUrl} name={name} className="size-full text-xs" />
-                </button>
+                {variant === "row" ? (
+                    <button
+                        type="button"
+                        aria-label="Your profile"
+                        className={cn("flex h-11 w-full items-center gap-3 rounded-lg px-2 text-left transition-colors hover:bg-sidebar-accent/60", className)}
+                    >
+                        <Avatar key={avatarUrl ?? "none"} url={avatarUrl} name={name} className="size-7 text-[10px]" />
+                        <span className="min-w-0 flex-1 truncate text-sm font-medium">{name}</span>
+                    </button>
+                ) : (
+                    <button
+                        type="button"
+                        aria-label="Your profile"
+                        className={cn("shrink-0 rounded-full border border-border/60 p-0.5", className)}
+                    >
+                        <Avatar key={avatarUrl ?? "none"} url={avatarUrl} name={name} className="size-full text-xs" />
+                    </button>
+                )}
             </Drawer.Trigger>
             <Drawer.Portal>
-                <Drawer.Overlay className="fixed inset-0 z-50 bg-black/40" />
-                <Drawer.Content className="dashboard-theme fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[92svh] max-w-md flex-col rounded-t-3xl border-t border-border/60 bg-background font-sans text-foreground outline-none">
+                <Drawer.Overlay className={`fixed inset-0 z-50 bg-black/40 ${SHEET_OVERLAY_PHONE_ONLY}`} />
+                <Drawer.Content className={`dashboard-theme fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[92svh] max-w-md lg:left-[var(--studio-sidebar,0px)] flex-col rounded-t-3xl border-t border-border/60 bg-background font-sans text-foreground outline-none ${SHEET_AS_PAGE}`}>
+                    <SheetPageBack />
                     <Drawer.Title className="sr-only">Your profile</Drawer.Title>
                     <Drawer.Description className="sr-only">Your account, your business and this device&apos;s settings.</Drawer.Description>
                     <div className="flex justify-center pt-3">
-                        <span aria-hidden className="h-1 w-10 rounded-full bg-muted-foreground/30" />
+                        <span aria-hidden className="h-1 w-10 rounded-full bg-muted-foreground/30 lg:hidden" />
                     </div>
                     {screen === "businesses" ? (
                     <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">

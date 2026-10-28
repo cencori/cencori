@@ -44,7 +44,7 @@ export default function StudioMoneyPage() {
     return (
         <div>
             {/* The title and switcher stay put while the page scrolls under them. */}
-            <div className="sticky top-0 z-30 -mx-4 -mt-[calc(1.25rem+env(safe-area-inset-top))] bg-background px-4 pb-3 pt-[calc(1.25rem+env(safe-area-inset-top))]">
+            <div className="sticky top-0 z-30 -mx-4 -mt-[calc(1.25rem+env(safe-area-inset-top))] bg-background px-4 pb-3 pt-[calc(1.25rem+env(safe-area-inset-top))] lg:-mx-10 lg:-mt-10 lg:px-10 lg:pt-10">
                 <h1 className="text-[26px] font-semibold leading-tight tracking-tight">Money</h1>
                 <div role="tablist" aria-label="Period" className="mt-4 grid grid-cols-3 gap-1 rounded-full bg-muted p-1">
                     {PERIODS.map((item) => (

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Drawer } from "vaul";
+import { SHEET_AS_PAGE, SHEET_OVERLAY_PHONE_ONLY, SheetPageBack } from "@/components/studio/studio-sheet";
 import QRCode from "qrcode";
 import { Download, Share2, X } from "lucide-react";
 
@@ -44,8 +45,9 @@ export function StudioLinkQr({ url, name, open, onOpenChange }: { url: string; n
     return (
         <Drawer.Root open={open} onOpenChange={onOpenChange}>
             <Drawer.Portal>
-                <Drawer.Overlay className="fixed inset-0 z-50 bg-black/30" />
-                <Drawer.Content className="dashboard-theme fixed inset-x-0 bottom-0 z-50 mx-auto flex max-w-md flex-col rounded-t-3xl border-t border-border/60 bg-background px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-3 font-sans text-foreground outline-none">
+                <Drawer.Overlay className={`fixed inset-0 z-50 bg-black/30 ${SHEET_OVERLAY_PHONE_ONLY}`} />
+                <Drawer.Content className={`dashboard-theme fixed inset-x-0 bottom-0 z-50 mx-auto flex max-w-md lg:left-[var(--studio-sidebar,0px)] flex-col rounded-t-3xl border-t border-border/60 bg-background px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-3 font-sans text-foreground outline-none ${SHEET_AS_PAGE}`}>
+                    <SheetPageBack />
                     <div className="flex h-10 items-center justify-between">
                         <Drawer.Title className="text-[17px] font-semibold">Your QR code</Drawer.Title>
                         <button type="button" onClick={() => onOpenChange(false)} aria-label="Close" className="-mr-2 flex h-10 w-10 items-center justify-center rounded-full"><X className="h-5 w-5" /></button>
