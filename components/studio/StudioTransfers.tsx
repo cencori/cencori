@@ -4,6 +4,7 @@ import { useState } from "react";
 import { studioFetch } from "@/components/studio/studio-data";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Drawer } from "vaul";
+import { SHEET_AS_PAGE, SHEET_OVERLAY_PHONE_ONLY, SheetPageBack } from "@/components/studio/studio-sheet";
 import { Landmark, X } from "lucide-react";
 import { useStudio } from "@/components/studio/StudioShell";
 import { formatMoney } from "@/components/studio/useStudioOverview";
@@ -144,8 +145,9 @@ function BankAccountSheet({ account, open, onOpenChange }: { account: BankAccoun
     return (
         <Drawer.Root open={open} onOpenChange={(next) => { if (next) setForm(account ?? { bank: "", account_number: "", account_name: "" }); onOpenChange(next); }}>
             <Drawer.Portal>
-                <Drawer.Overlay className="fixed inset-0 z-50 bg-black/30" />
-                <Drawer.Content className="dashboard-theme fixed inset-x-0 bottom-0 z-50 mx-auto max-h-[92svh] max-w-md overflow-y-auto rounded-t-3xl border-t border-border/60 bg-background px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-3 font-sans text-foreground outline-none">
+                <Drawer.Overlay className={`fixed inset-0 z-50 bg-black/30 ${SHEET_OVERLAY_PHONE_ONLY}`} />
+                <Drawer.Content className={`dashboard-theme fixed inset-x-0 bottom-0 z-50 mx-auto max-h-[92svh] max-w-md lg:left-[var(--studio-sidebar,0px)] overflow-y-auto rounded-t-3xl border-t border-border/60 bg-background px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-3 font-sans text-foreground outline-none ${SHEET_AS_PAGE}`}>
+                    <SheetPageBack />
                     <div className="flex h-10 items-center justify-between">
                         <Drawer.Title className="text-[17px] font-semibold">{account ? "Your account" : "Add your account"}</Drawer.Title>
                         <button type="button" onClick={() => onOpenChange(false)} aria-label="Close" className="-mr-2 flex h-10 w-10 items-center justify-center rounded-full"><X className="h-5 w-5" /></button>

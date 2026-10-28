@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { Drawer } from "vaul";
+import { SHEET_AS_PAGE, SHEET_OVERLAY_PHONE_ONLY, SheetPageBack } from "@/components/studio/studio-sheet";
 import { HugeiconsIcon } from "@hugeicons/react";
 import Loading03Icon from "@hugeicons/core-free-icons/Loading03Icon";
 import { useQueryClient } from "@tanstack/react-query";
@@ -216,8 +217,9 @@ function TrySheet({ projectId, agentId, name, origin, open, onOpenChange }: { pr
     return (
         <Drawer.Root open={open} onOpenChange={onOpenChange}>
             <Drawer.Portal>
-                <Drawer.Overlay className="fixed inset-0 z-50 bg-black/30" />
-                <Drawer.Content className="dashboard-theme fixed inset-x-0 bottom-0 z-50 mx-auto flex h-[88svh] max-w-md flex-col rounded-t-3xl border-t border-border/60 bg-background font-sans text-foreground outline-none">
+                <Drawer.Overlay className={`fixed inset-0 z-50 bg-black/30 ${SHEET_OVERLAY_PHONE_ONLY}`} />
+                <Drawer.Content className={`dashboard-theme fixed inset-x-0 bottom-0 z-50 mx-auto flex h-[88svh] max-w-md lg:left-[var(--studio-sidebar,0px)] flex-col rounded-t-3xl border-t border-border/60 bg-background font-sans text-foreground outline-none ${SHEET_AS_PAGE}`}>
+                    <SheetPageBack />
                     <div className="flex items-center justify-between px-5 pt-3">
                         <Drawer.Title className="min-w-0 truncate text-[17px] font-semibold">Try it</Drawer.Title>
                         <button type="button" onClick={() => onOpenChange(false)} aria-label="Close" className="-mr-2 flex h-10 w-10 items-center justify-center rounded-full"><X className="h-5 w-5" /></button>

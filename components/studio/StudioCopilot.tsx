@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { Drawer } from "vaul";
+import { SHEET_AS_PAGE, SHEET_OVERLAY_PHONE_ONLY } from "@/components/studio/studio-sheet";
 import { ArrowUp, Square, X } from "lucide-react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import AirdropIcon from "@hugeicons/core-free-icons/AirdropIcon";
@@ -188,13 +189,13 @@ export function StudioCopilotProvider({ workspace, children }: { workspace: Stud
             {children}
             <Drawer.Root open={open} onOpenChange={setOpen}>
                 <Drawer.Portal>
-                    <Drawer.Overlay className="fixed inset-0 z-50 bg-transparent" />
-                    <Drawer.Content className="dashboard-theme fixed inset-x-0 bottom-0 z-50 mx-auto flex h-[88svh] max-w-md flex-col rounded-t-3xl border-t border-border/60 bg-background font-sans text-foreground outline-none">
+                    <Drawer.Overlay className={`fixed inset-0 z-50 bg-transparent ${SHEET_OVERLAY_PHONE_ONLY}`} />
+                    <Drawer.Content className={`dashboard-theme fixed inset-x-0 bottom-0 z-50 mx-auto flex h-[88svh] max-w-md lg:left-[var(--studio-sidebar,0px)] flex-col rounded-t-3xl border-t border-border/60 bg-background font-sans text-foreground outline-none ${SHEET_AS_PAGE}`}>
                         <Drawer.Title className="sr-only">Change something</Drawer.Title>
                         <Drawer.Description className="sr-only">Ask Copilot to change your assistant or answer a question about your business.</Drawer.Description>
                         <div className="flex items-center justify-between px-4 pt-3">
                             <span className="w-9" />
-                            <span aria-hidden className="h-1 w-10 rounded-full bg-muted-foreground/30" />
+                            <span aria-hidden className="h-1 w-10 rounded-full bg-muted-foreground/30 lg:hidden" />
                             <button type="button" onClick={() => setOpen(false)} aria-label="Close" className="flex h-9 w-9 items-center justify-center rounded-full border border-border/60">
                                 <X className="h-4 w-4" />
                             </button>
