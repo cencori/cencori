@@ -81,5 +81,7 @@ region = "afr-west"
 cpu = 2
 memory = "8gb"
 disk = "50gb"
-public = false
+# Open to the operator's IP only for the cutover data copy; set back to false after.
+public = true
+allow_ips = ["102.88.114.239/32"]
 backups = { schedule = "0 2 * * *", timezone = "Africa/Lagos", keep = "30d" }
