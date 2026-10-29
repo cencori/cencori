@@ -222,6 +222,8 @@ export async function POST(request: Request, ctx: Context) {
             const { BUSINESS_DEFAULT_MODEL, getOrganizationPlan, modelAllowed } = await import('@/lib/business/plans');
             const plan = await getOrganizationPlan(db as never, access.organizationId);
             if (plan.accountType === 'business') {
+                // A trial whose welcome credit never landed gets it now, at setup.
+                await import('@/lib/business/trial-credit').then(({ ensureTrialCredit }) => ensureTrialCredit(db as never, access.organizationId)).catch(() => undefined);
                 const limit = plan.plan?.agents ?? 0;
                 const { data: orgProjects } = await db.from('projects').select('id').eq('organization_id', access.organizationId);
                 const { count } = await db.from('agents').select('id', { count: 'exact', head: true }).in('project_id', (orgProjects ?? []).map((p) => p.id as string));

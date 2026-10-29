@@ -20,10 +20,9 @@ import {
     conversationsUsed,
     getOrganizationPlan,
     startBusinessTrial,
-    BUSINESS_TRIAL_CREDITS_USD,
     type PaidBusinessPlanId,
 } from "@/lib/business/plans";
-import { addCredits } from "@/lib/credits";
+import { grantTrialCredit } from "@/lib/business/trial-credit";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -78,8 +77,7 @@ export async function POST(req: NextRequest) {
     if (body?.action === "start_trial") {
         // Every new business gets a little credit with its trial, once (setup tests on the plan's model).
         if (await startBusinessTrial(db, organizationId)) {
-            await addCredits(organizationId, BUSINESS_TRIAL_CREDITS_USD, 'adjustment', 'Free trial credit', { reason: 'business_trial_welcome' })
-                .catch((creditError) => console.error('[business] trial credit failed', organizationId, creditError));
+            await grantTrialCredit(organizationId);
         }
         return NextResponse.json({ ok: true });
     }

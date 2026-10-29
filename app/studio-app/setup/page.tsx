@@ -210,6 +210,8 @@ export default function StudioSetupPage() {
             const next = partial;
             setState((s) => ({ ...s, partial: next }));
         };
+        // The step under way, for the error if it fails.
+        let stage = "creating your assistant";
         try {
             if (!partial) {
                 const name = answers.name?.trim() || organization.name;
@@ -243,12 +245,14 @@ export default function StudioSetupPage() {
             const knowledge = setupKnowledge(businessKind, answers);
             const agentBase = `/api/projects/${project.id}/embedded-agents/${agentId}`;
             if (knowledge) {
+                stage = businessKind === "restaurant" ? "adding your menu" : "adding your prices";
                 if (!finished("knowledge")) {
                     await call(`${agentBase}/knowledge`, "POST", knowledge);
                     mark("knowledge");
                 }
                 tick(businessKind === "restaurant" ? "Added your menu" : "Added your prices");
             }
+            stage = "setting up what it can do";
             if (!finished("tools")) {
                 await call(studio, "POST", { action: "save_tools", agent_id: agentId, version_id: versionId, system_tools: { end_conversation: {}, request_callback: {} } });
                 mark("tools");
@@ -258,15 +262,18 @@ export default function StudioSetupPage() {
                 mark("alerts");
             }
             tick("Set it to tell you when someone needs you");
+            stage = "testing it";
             if (!finished("tested")) {
                 await call(studio, "POST", { action: "test_version", agent_id: agentId, version_id: versionId, input: "Hello" });
                 mark("tested");
             }
+            stage = "making it live";
             if (!finished("published")) {
                 await call(studio, "POST", { action: "publish_version", agent_id: agentId, version_id: versionId });
                 mark("published");
             }
             tick("Tested it and made it live");
+            stage = "making your link";
             const widget = await call<{ widget: { public_key: string }; preview_token: string; share_token: string | null }>(`${agentBase}/widget`, "PUT", {});
             tick("Made your link");
             void queryClient.invalidateQueries();
@@ -274,11 +281,12 @@ export default function StudioSetupPage() {
             setBuilding(null);
             router.refresh();
         } catch (cause) {
-            // The server's reasons are written for developers; the owner gets a plain one.
-            console.error("Studio setup failed", cause);
+            // Which step and the server's reason, so the owner (and support) can see what broke.
+            console.error("Studio setup failed", stage, cause);
             // The half-built assistant is gone (deleted in the console, say): the next try starts over.
             if (cause instanceof Error && /not found/i.test(cause.message)) setState((s) => ({ ...s, partial: null }));
-            setError("We couldn't finish setting up your assistant. Try again, and if it keeps happening, email support@cencori.com.");
+            const reason = cause instanceof Error && cause.message ? ` ${cause.message.replace(/\.?$/, ".")}` : "";
+            setError(`We couldn't finish setting up your assistant (stopped at ${stage}).${reason} Try again, and if it keeps happening, email support@cencori.com.`);
             setBuilding(null);
         }
     };
