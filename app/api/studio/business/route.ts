@@ -17,8 +17,8 @@ import { getAuthUser } from '@/lib/auth/get-auth-user';
 import { createServerClient } from '@/lib/supabaseServer';
 import { randomBytes } from 'crypto';
 import { createAdminClient } from '@/lib/supabaseAdmin';
-import { addCredits } from '@/lib/credits';
-import { BUSINESS_TRIAL_CREDITS_USD, startBusinessTrial } from '@/lib/business/plans';
+import { startBusinessTrial } from '@/lib/business/plans';
+import { grantTrialCredit } from '@/lib/business/trial-credit';
 
 const fail = (message: string, status = 400) => NextResponse.json({ error: message }, { status });
 
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
     }
     try {
         if (await startBusinessTrial(db as never, organizationId)) {
-            await addCredits(organizationId, BUSINESS_TRIAL_CREDITS_USD, 'adjustment', 'Free trial credit', { reason: 'business_trial_welcome' }).catch(() => undefined);
+            await grantTrialCredit(organizationId);
         }
     } catch {
         await undo();
