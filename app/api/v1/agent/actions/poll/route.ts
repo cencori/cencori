@@ -20,6 +20,7 @@ import crypto from "crypto";
 import { addGatewayHeaders } from "@/lib/gateway-middleware";
 import { extractGatewayCallerIdentity, logApiGatewayRequest } from "@/lib/api-gateway-logs";
 import { extractCencoriApiKeyFromHeaders } from "@/lib/api-keys";
+import { requestCountry } from '@/lib/geo/ip-country';
 
 export async function GET(req: NextRequest) {
     const requestId = crypto.randomUUID();
@@ -42,7 +43,7 @@ export async function GET(req: NextRequest) {
                 startedAt,
                 environment: apiLogContext.environment,
                 ipAddress: clientIp,
-                countryCode: req.headers.get('x-vercel-ip-country') || req.headers.get('x-cencori-user-country'),
+                countryCode: requestCountry(req.headers) || req.headers.get('x-cencori-user-country'),
                 userAgent: req.headers.get('user-agent'),
                 callerOrigin: callerIdentity.callerOrigin,
                 clientApp: callerIdentity.clientApp,

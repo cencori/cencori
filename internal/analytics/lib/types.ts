@@ -158,3 +158,30 @@ export interface PlatformOverviewMetrics {
     generatedAt: string;
 }
 
+
+// Gateway latency by country, before and after the move to Lagos
+export interface LatencyByCountry {
+    country: string;
+    requests: number;
+    errors: number;
+    preflightP50: number | null;
+    providerTtftP50: number | null;
+    clientTtftP50: number | null;
+    clientTtftP90: number | null;
+    latencyP50: number | null;
+    latencyP90: number | null;
+}
+
+export interface LatencyWindow {
+    label: string;
+    from: string;
+    to: string;
+    countries: LatencyByCountry[];
+}
+
+/** A window is null when its query failed (not "no traffic"). */
+export interface LatencyBenchmark {
+    before: LatencyWindow | null;
+    after: LatencyWindow | null;
+    generatedAt: string;
+}

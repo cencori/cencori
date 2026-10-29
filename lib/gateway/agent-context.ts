@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import type { createAdminClient } from '@/lib/supabaseAdmin';
 import type { GatewayContext } from '@/lib/gateway-middleware';
 import { getCachedAgentConfig, setCachedAgentConfig } from '@/lib/config-cache';
+import { requestCountry } from '@/lib/geo/ip-country';
 
 type SupabaseAdmin = ReturnType<typeof createAdminClient>;
 
@@ -240,7 +241,7 @@ export async function resolveAgentContext(params: {
                 requestId: crypto.randomUUID(),
                 startTime: startedAt,
                 clientIp: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || req.headers.get('x-real-ip') || '',
-                countryCode: req.headers.get('x-vercel-ip-country') || null,
+                countryCode: requestCountry(req.headers),
                 projectName: '',
                 defaultModel: null,
                 defaultProvider: null,

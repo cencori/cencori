@@ -11,7 +11,7 @@ import { readProxiedTensorTurn } from '@/lib/tensor-entitlement';
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import crypto from 'crypto';
-import { geolocation, ipAddress, waitUntil } from '@vercel/functions';
+import { ipAddress, waitUntil } from '@vercel/functions';
 import { checkRateLimit, classifyRateLimitTier, MAX_READ_REQUESTS_PER_WINDOW, READ_BUCKET_SUFFIX, type RateLimitResult } from '@/lib/rate-limit';
 import { checkSpendCap } from '@/lib/budgets';
 import { deductCredits, isCreditBalanceExhausted } from '@/lib/credits';
@@ -27,6 +27,7 @@ import {
     isProjectIngressAllowed,
     loadProjectNetworkPolicy,
 } from '@/lib/networking/project-network-policy';
+import { requestCountry } from '@/lib/geo/ip-country';
 
 // ──────────────────────────────────────────────
 // Types
@@ -161,8 +162,9 @@ function validateDomain(origin: string | null, allowedDomains: string[] | null):
 
 // NOTE: lookupCountryFromIp was removed — it made external HTTP calls to
 // ipinfo.io and ipapi.co with 3s timeouts each, adding 0-6s of latency
-// per request. We now rely on Vercel's geolocation() (free, zero-latency)
-// and customer-provided X-Cencori-User-Country headers instead.
+// per request. We now rely on the platform's country header where there is one,
+// a local IP table otherwise (lib/geo/ip-country.ts, no network call), and
+// customer-provided X-Cencori-User-Country headers.
 
 async function enforceProjectIngressPolicy(params: {
     supabase: ReturnType<typeof createAdminClient>;
@@ -278,14 +280,10 @@ export async function validateGatewayRequest(
     const fallbackIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
     const requestSourceIp = vercelIp || fallbackIp || req.headers.get('x-real-ip');
     const clientIp = customerProvidedIp || vercelIp || fallbackIp || 'unknown';
-    // Use customer-provided country header first, then the platform's free geolocation:
-    // Vercel's headers on Vercel, Cloudflare's (in front of Brimble) elsewhere.
-    let countryCode = req.headers.get('x-cencori-user-country');
-    if (!countryCode) {
-        const geo = geolocation(req);
-        const cfCountry = req.headers.get('cf-ipcountry');
-        countryCode = geo.country || (cfCountry && cfCountry !== 'XX' ? cfCountry : null);
-    }
+    // Use customer-provided country header first, then the platform's header
+    // (Vercel, Cloudflare), then a lookup of the client IP (Brimble's Lagos edge
+    // only forwards the IP).
+    const countryCode = req.headers.get('x-cencori-user-country') || requestCountry(req.headers);
 
     // ── Public Playground (no auth required) ──
     const publicPlaygroundHeader = req.headers.get('x-public-playground');

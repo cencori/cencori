@@ -3,10 +3,10 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Activity, Shield, Building2, FolderOpen, Key, Users, DollarSign, Zap, Settings, ScanSearch, Radio, Database, Bot } from 'lucide-react';
-import { usePlatformMetrics } from '../hooks/useMetrics';
+import { useGatewayLatency, usePlatformMetrics } from '../hooks/useMetrics';
 import { MetricsCard, MetricsGrid, MetricsSection } from '../components/MetricsCard';
 import { TimeRangeSelector } from '../components/TimeRangeSelector';
-import type { CaptureMetrics, TimePeriod } from '../lib/types';
+import type { CaptureMetrics, LatencyByCountry, LatencyWindow, TimePeriod } from '../lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -181,6 +181,14 @@ export function AdminDashboard() {
                                 total={data.aiGateway.totalRequests}
                             />
                         </div>
+                    </MetricsSection>
+
+                    {/* Gateway latency by country, before and after the move to Lagos */}
+                    <MetricsSection
+                        title="Latency by country"
+                        description="Median time to first token and to completion, Vercel (14 days before the move) vs Lagos (since)"
+                    >
+                        <LatencyComparison />
                     </MetricsSection>
 
                     {/* Security Section */}
@@ -491,6 +499,80 @@ function ThroughputHero({
                 </div>
             </div>
         </div>
+    );
+}
+
+const LATENCY_COUNTRIES = 8;
+
+function ms(value: number | null | undefined): string {
+    if (value === null || value === undefined) return UNAVAILABLE;
+    return value >= 1000 ? `${(value / 1000).toFixed(1)}s` : `${value}ms`;
+}
+
+function LatencyComparison() {
+    const { data, isLoading, error } = useGatewayLatency();
+    if (isLoading) return <Skeleton className="h-48 rounded-xl" />;
+    if (error || !data) return <p className="text-xs text-red-500">Failed to load latency</p>;
+
+    const after = new Map((data.after?.countries ?? []).map((row) => [row.country, row]));
+    const countries = [...new Set([
+        ...(data.before?.countries ?? []).map((row) => row.country),
+        ...(data.after?.countries ?? []).map((row) => row.country),
+    ])].slice(0, LATENCY_COUNTRIES);
+    const before = new Map((data.before?.countries ?? []).map((row) => [row.country, row]));
+
+    return (
+        <div className="rounded-xl border border-border/50 bg-card overflow-x-auto">
+            <table className="w-full text-xs">
+                <thead>
+                    <tr className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                        <th className="text-left font-medium px-4 py-3">Country</th>
+                        <th className="text-right font-medium px-3 py-3">Requests</th>
+                        <th className="text-right font-medium px-3 py-3">Preflight</th>
+                        <th className="text-right font-medium px-3 py-3">Provider TTFT</th>
+                        <th className="text-right font-medium px-3 py-3">Client TTFT</th>
+                        <th className="text-right font-medium px-3 py-3">TTFT p90</th>
+                        <th className="text-right font-medium px-4 py-3">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {countries.map((country) => (
+                        <LatencyRows key={country} country={country} before={before.get(country)} after={after.get(country)} windows={[data.before, data.after]} />
+                    ))}
+                </tbody>
+            </table>
+            {countries.length === 0 && <p className="text-xs text-muted-foreground px-4 pb-4">No data</p>}
+        </div>
+    );
+}
+
+function LatencyRows({ country, before, after, windows }: {
+    country: string;
+    before?: LatencyByCountry;
+    after?: LatencyByCountry;
+    windows: [LatencyWindow | null, LatencyWindow | null];
+}) {
+    const rows: Array<[string, LatencyByCountry | undefined, boolean]> = [
+        [windows[0]?.label ?? 'Vercel', before, windows[0] === null],
+        [windows[1]?.label ?? 'Lagos', after, windows[1] === null],
+    ];
+    return (
+        <>
+            {rows.map(([label, row, failed], index) => (
+                <tr key={label} className={cn(index === 0 && 'border-t border-border/50')}>
+                    <td className="px-4 py-1.5">
+                        {index === 0 && <span className="font-mono font-medium mr-2">{country}</span>}
+                        <span className={cn('text-muted-foreground', index === 1 && 'ml-[calc(2ch+0.5rem)]')}>{label}</span>
+                    </td>
+                    <td className="text-right px-3 py-1.5 tabular-nums">{failed ? UNAVAILABLE : (row?.requests ?? 0).toLocaleString()}</td>
+                    <td className="text-right px-3 py-1.5 tabular-nums">{ms(row?.preflightP50)}</td>
+                    <td className="text-right px-3 py-1.5 tabular-nums">{ms(row?.providerTtftP50)}</td>
+                    <td className="text-right px-3 py-1.5 tabular-nums font-medium">{ms(row?.clientTtftP50)}</td>
+                    <td className="text-right px-3 py-1.5 tabular-nums">{ms(row?.clientTtftP90)}</td>
+                    <td className="text-right px-4 py-1.5 tabular-nums">{ms(row?.latencyP50)}</td>
+                </tr>
+            ))}
+        </>
     );
 }
 

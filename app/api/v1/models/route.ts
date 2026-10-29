@@ -7,6 +7,7 @@ import { extractGatewayCallerIdentity, logApiGatewayRequest } from '@/lib/api-ga
 import { extractCencoriApiKeyFromHeaders } from '@/lib/api-keys';
 import { buildUnifiedModelRegistry } from '@/lib/embedded/model-registry';
 import type { ModelSource } from '@/lib/embedded/types';
+import { requestCountry } from '@/lib/geo/ip-country';
 
 /**
  * GET /api/v1/models — single unified model registry (M0 ADR-002).
@@ -68,7 +69,7 @@ export async function GET(req: NextRequest) {
                 startedAt,
                 environment: apiLogContext.environment,
                 ipAddress: clientIp,
-                countryCode: req.headers.get('x-vercel-ip-country') || req.headers.get('x-cencori-user-country'),
+                countryCode: requestCountry(req.headers) || req.headers.get('x-cencori-user-country'),
                 userAgent: req.headers.get('user-agent'),
                 callerOrigin: callerIdentity.callerOrigin,
                 clientApp: callerIdentity.clientApp,

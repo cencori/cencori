@@ -73,6 +73,7 @@
     "@hugeicons/core-free-icons": "^4.3.5",
     "@hugeicons/react": "^1.1.10",
     "@huggingface/transformers": "^3.8.1",
+    "@ip-location-db/geo-whois-asn-country": "2.3.2026061719",
     "@lobehub/icons": "^2.48.0",
     "@mantine/hooks": "^9.3.1",
     "@octokit/app": "^16.1.2",

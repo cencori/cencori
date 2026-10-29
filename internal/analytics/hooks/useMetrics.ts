@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import type { PlatformOverviewMetrics, PlatformEventEntry, TimePeriod } from '../lib/types';
+import type { LatencyBenchmark, PlatformOverviewMetrics, PlatformEventEntry, TimePeriod } from '../lib/types';
 
 // Helper to get admin email from sessionStorage
 function getAdminEmail(): string | null {
@@ -21,6 +21,20 @@ export function usePlatformMetrics(period: TimePeriod = '7d') {
 
             const response = await fetch(`/api/internal/metrics/overview?period=${period}`, { headers });
             if (!response.ok) throw new Error('Failed to fetch platform metrics');
+            return response.json();
+        },
+        staleTime: 2 * 60 * 1000,
+        refetchInterval: 5 * 60 * 1000,
+    });
+}
+
+/** Gateway latency by country, Vercel (before the move) vs Lagos (after). */
+export function useGatewayLatency() {
+    return useQuery<LatencyBenchmark>({
+        queryKey: ['gatewayLatency'],
+        queryFn: async () => {
+            const response = await fetch('/api/internal/metrics/latency');
+            if (!response.ok) throw new Error('Failed to fetch gateway latency');
             return response.json();
         },
         staleTime: 2 * 60 * 1000,
