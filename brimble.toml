@@ -83,5 +83,5 @@ memory = "8gb"
 disk = "50gb"
 # Open to the operator's IP only for the cutover data copy; set back to false after.
 public = true
-allow_ips = ["105.113.98.207/32"]
+allow_ips = ["102.89.68.179/32"]
 backups = { schedule = "0 2 * * *", timezone = "Africa/Lagos", keep = "30d" }
