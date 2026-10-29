@@ -15,6 +15,7 @@ import {
   resolveAuthRedirectTargets,
   getOAuthCallbackBase,
   getOAuthDefaultNext,
+  absoluteOnStudio,
   getPostLoginDefault,
   resolvePostAuthDestination,
   sanitizeAuthRedirectTarget,
@@ -202,9 +203,10 @@ export function SignupForm({ className, ...props }: SignupFormProps) {
     setLoading(true);
     try {
       const defaultNext = redirectParam ? getPostLoginDefault(window.location.origin) : getOAuthDefaultNext(window.location.origin);
-      const { navigationTarget } = resolveAuthRedirectTargets(redirectParam, {
+      // On Studio the return must name Studio's host, or it can land on the console.
+      const navigationTarget = absoluteOnStudio(resolveAuthRedirectTargets(redirectParam, {
         defaultPath: defaultNext,
-      });
+      }).navigationTarget, window.location.origin);
       // Default sign-ins run on the console callback; explicit redirect flows
       // keep the current host (see login-form handleOAuth).
       const callbackBase = redirectParam ? window.location.origin : getOAuthCallbackBase(window.location.origin);

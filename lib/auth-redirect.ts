@@ -1,3 +1,6 @@
+import { isStudioHostname } from "@/lib/studio/routing";
+
+
 interface ResolveAuthRedirectOptions {
     currentOrigin?: string;
     fallbackOrigin?: string;
@@ -137,6 +140,22 @@ function isConsoleHostname(hostname: string): boolean {
  * host has no console counterpart (product subdomains, unknown hosts).
  * Port is preserved so local dev maps :3000 → console.localhost:3000.
  */
+/**
+ * On Studio, a relative post-auth target made absolute on Studio's host. The
+ * OAuth return can come back through another host (Better Auth's base URL),
+ * where a relative "/" would land on the console instead of Studio.
+ * Anywhere else the target is returned unchanged.
+ */
+export function absoluteOnStudio(target: string, currentOrigin: string): string {
+    try {
+        const url = new URL(currentOrigin);
+        if (isStudioHostname(url.hostname) && target.startsWith("/") && !target.startsWith("//")) return new URL(target, url.origin).toString();
+    } catch {
+        // Not a URL: leave the target as it is.
+    }
+    return target;
+}
+
 export function getConsoleOrigin(currentOrigin: string): string | null {
     let url: URL;
     try {
@@ -192,6 +211,8 @@ export function getPostLoginDefault(currentOrigin: string): string {
         return "/dashboard";
     }
     if (isConsoleHostname(hostname)) return "/home";
+    // Studio (studio.cencori.com): its home is its own root, never the console.
+    if (isStudioHostname(hostname)) return "/";
     return getConsoleOrigin(currentOrigin)?.concat("/home") ?? "/dashboard";
 }
 
@@ -228,6 +249,9 @@ export function getOAuthDefaultNext(currentOrigin: string): string {
         const url = new URL(currentOrigin);
         if (isConsoleHostname(url.hostname)) {
             return new URL("/home", url.origin).toString();
+        }
+        if (isStudioHostname(url.hostname)) {
+            return new URL("/", url.origin).toString();
         }
     } catch {
         // Fall through to console resolution below.

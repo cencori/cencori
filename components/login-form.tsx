@@ -14,6 +14,7 @@ import {
   resolveAuthRedirectTargets,
   getOAuthCallbackBase,
   getOAuthDefaultNext,
+  absoluteOnStudio,
   getPostLoginDefault,
   resolvePostAuthDestination,
   sanitizeAuthRedirectTarget,
@@ -238,9 +239,10 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
       // instead of the console callback. Explicit ?redirect= targets are
       // honored as-is via resolveAuthRedirectTargets.
       const defaultNext = redirectParam ? getPostLoginDefault(window.location.origin) : getOAuthDefaultNext(window.location.origin);
-      const { navigationTarget } = resolveAuthRedirectTargets(redirectParam, {
+      // On Studio the return must name Studio's host, or it can land on the console.
+      const navigationTarget = absoluteOnStudio(resolveAuthRedirectTargets(redirectParam, {
         defaultPath: defaultNext,
-      });
+      }).navigationTarget, window.location.origin);
       // Default sign-ins run the server callback on the console host so the
       // session is exchanged and cookie-set where it will be used (prevents
       // the login bounce and the cencori.com landing). Explicit redirect
