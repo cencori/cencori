@@ -276,7 +276,7 @@ class UsageModule:
         agent_id: Optional[str] = None,
     ) -> str:
         """Invoice CSV export (raw text)."""
-        import httpx
+        from contextlib import nullcontext
 
         params: Dict[str, Any] = {"format": "csv", "days": days}
         if tenant_id:
@@ -286,7 +286,7 @@ class UsageModule:
 
         url = f"{self._client._base_url}/v1/usage/export"
         headers = {"CENCORI_API_KEY": self._client._api_key}
-        with httpx.Client(timeout=self._client._timeout) as client:
+        with nullcontext(self._client._http_client()) as client:
             response = client.request("GET", url, params=params, headers=headers)
             response.raise_for_status()
             return response.text

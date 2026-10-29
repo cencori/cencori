@@ -1,5 +1,6 @@
 """Cencori SDK client."""
 
+import asyncio
 import math
 import re
 from datetime import datetime, timezone
@@ -118,6 +119,9 @@ class Cencori:
         self._api_key = resolved_api_key
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout
+        self._http: Optional[httpx.Client] = None
+        self._async_http: Optional[httpx.AsyncClient] = None
+        self._async_http_loop: Optional[asyncio.AbstractEventLoop] = None
 
         # Initialize modules
         self.ai = AIModule(self)
@@ -136,6 +140,53 @@ class Cencori:
         self.compute = ComputeModule()
         self.workflow = WorkflowModule()
         self.storage = StorageModule()
+
+    # =========================================================================
+    # Connection pooling
+    # =========================================================================
+
+    def _http_client(self) -> httpx.Client:
+        """The shared HTTP client. Reusing it keeps connections open, so calls
+        after the first skip the TCP and TLS handshakes (two to three round
+        trips, which is most of the overhead for callers far from the API)."""
+        if self._http is None or self._http.is_closed:
+            self._http = httpx.Client(timeout=self._timeout)
+        return self._http
+
+    def _async_http_client(self) -> httpx.AsyncClient:
+        """The shared async HTTP client for the running event loop. An
+        AsyncClient is tied to the loop it first ran on, so a new loop (a
+        second asyncio.run, say) gets its own."""
+        loop = asyncio.get_running_loop()
+        if self._async_http is None or self._async_http.is_closed or self._async_http_loop is not loop:
+            self._async_http = httpx.AsyncClient(timeout=self._timeout)
+            self._async_http_loop = loop
+        return self._async_http
+
+    def close(self) -> None:
+        """Close pooled connections. Optional; they also close on exit."""
+        if self._http is not None:
+            self._http.close()
+            self._http = None
+
+    async def aclose(self) -> None:
+        """Close pooled connections, sync and async."""
+        self.close()
+        if self._async_http is not None:
+            await self._async_http.aclose()
+            self._async_http = None
+
+    def __enter__(self) -> "Cencori":
+        return self
+
+    def __exit__(self, *exc: Any) -> None:
+        self.close()
+
+    async def __aenter__(self) -> "Cencori":
+        return self
+
+    async def __aexit__(self, *exc: Any) -> None:
+        await self.aclose()
 
     # =========================================================================
     # Synchronous Request Methods
@@ -158,13 +209,12 @@ class Cencori:
         if headers:
             request_headers.update(headers)
 
-        with httpx.Client(timeout=self._timeout) as client:
-            response = client.request(
-                method=method,
-                url=url,
-                json=json,
-                headers=request_headers,
-            )
+        response = self._http_client().request(
+            method=method,
+            url=url,
+            json=json,
+            headers=request_headers,
+        )
 
         return self._handle_response(response)
 
@@ -213,13 +263,12 @@ class Cencori:
         if headers:
             request_headers.update(headers)
 
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
-            response = await client.request(
-                method=method,
-                url=url,
-                json=json,
-                headers=request_headers,
-            )
+        response = await self._async_http_client().request(
+            method=method,
+            url=url,
+            json=json,
+            headers=request_headers,
+        )
 
         return self._handle_response(response)
 

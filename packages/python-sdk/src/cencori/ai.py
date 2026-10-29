@@ -1,9 +1,8 @@
 """AI module for chat completions, embeddings, and streaming."""
 
 import json
+from contextlib import nullcontext
 from typing import Any, Dict, Iterator, List, Optional, Union, TYPE_CHECKING
-
-import httpx
 
 from .errors import AuthenticationError, CencoriError, RateLimitError
 from .types import (
@@ -171,8 +170,8 @@ class AIModule:
             "CENCORI_API_KEY": self._client._api_key,
         }
 
-        with httpx.Client(timeout=60.0) as http_client:
-            with http_client.stream("POST", url, json=payload, headers=headers) as response:
+        with nullcontext(self._client._http_client()) as http_client:
+            with http_client.stream("POST", url, json=payload, headers=headers, timeout=60.0) as response:
                 if response.status_code == 401:
                     raise AuthenticationError()
                 if response.status_code == 429:
@@ -446,8 +445,8 @@ class AIModule:
             "CENCORI_API_KEY": self._client._api_key,
         }
 
-        with httpx.Client(timeout=60.0) as http_client:
-            with http_client.stream("POST", url, json=payload, headers=headers) as response:
+        with nullcontext(self._client._http_client()) as http_client:
+            with http_client.stream("POST", url, json=payload, headers=headers, timeout=60.0) as response:
                 if response.status_code == 401:
                     raise AuthenticationError()
                 if response.status_code == 429:
@@ -545,8 +544,8 @@ class AIModule:
             "CENCORI_API_KEY": self._client._api_key,
         }
 
-        with httpx.Client(timeout=60.0) as http_client:
-            with http_client.stream("POST", url, json=payload, headers=headers) as response:
+        with nullcontext(self._client._http_client()) as http_client:
+            with http_client.stream("POST", url, json=payload, headers=headers, timeout=60.0) as response:
                 if response.status_code == 401:
                     raise AuthenticationError()
                 if response.status_code == 429:

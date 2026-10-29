@@ -23,6 +23,8 @@ Example:
 import os
 from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Union
 
+from contextlib import nullcontext
+
 import httpx
 
 from .errors import (
@@ -73,7 +75,7 @@ class VoiceModule:
         result straight to a file, e.g. ``open("out.mp3", "wb").write(audio)``.
         """
         body = _speak_body(input, model, voice, provider, response_format, speed, language)
-        with httpx.Client(timeout=self._timeout) as client:
+        with nullcontext(self._client._http_client()) as client:
             response = client.post(self._url("/api/ai/audio/speech"), json=body, headers=self._headers(json=True))
         return self._audio_bytes(response)
 
@@ -99,7 +101,7 @@ class VoiceModule:
         files, data = _transcribe_payload(
             file, model, provider, language, prompt, temperature, diarize, response_format, filename
         )
-        with httpx.Client(timeout=self._timeout) as client:
+        with nullcontext(self._client._http_client()) as client:
             response = client.post(self._url("/api/ai/audio/transcriptions"), files=files, data=data, headers=self._headers())
         return self._transcript(response, response_format)
 
@@ -112,7 +114,7 @@ class VoiceModule:
 
     def list_models(self) -> Dict[str, Any]:
         """Return ``{'tts': [...], 'stt': [...]}`` of available voice models."""
-        with httpx.Client(timeout=self._timeout) as client:
+        with nullcontext(self._client._http_client()) as client:
             tts = client.get(self._url("/api/ai/audio/speech"), headers=self._headers())
             stt = client.get(self._url("/api/ai/audio/transcriptions"), headers=self._headers())
         return {
@@ -125,14 +127,14 @@ class VoiceModule:
     async def a_speak(self, input: str, **kwargs: Any) -> bytes:
         """Async version of :meth:`speak`."""
         body = _speak_body(input, **kwargs)
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
+        async with nullcontext(self._client._async_http_client()) as client:
             response = await client.post(self._url("/api/ai/audio/speech"), json=body, headers=self._headers(json=True))
         return self._audio_bytes(response)
 
     async def a_transcribe(self, file: AudioInput, response_format: str = "json", **kwargs: Any) -> Dict[str, Any]:
         """Async version of :meth:`transcribe`."""
         files, data = _transcribe_payload(file, response_format=response_format, **kwargs)
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
+        async with nullcontext(self._client._async_http_client()) as client:
             response = await client.post(self._url("/api/ai/audio/transcriptions"), files=files, data=data, headers=self._headers())
         return self._transcript(response, response_format)
 

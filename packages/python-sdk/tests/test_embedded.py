@@ -130,14 +130,14 @@ class TestEmbeddedUsage:
         """Test CSV export filter parity with the TypeScript SDK."""
         client = Cencori(api_key=api_key)
 
-        with patch("httpx.Client") as http_client:
-            response = http_client.return_value.__enter__.return_value.request.return_value
+        with patch.object(client, "_http_client") as http_client:
+            response = http_client.return_value.request.return_value
             response.text = "tenant_id,agent_id\nten_1,agt_1\n"
 
             result = client.embedded.usage.export_csv(days=7, tenant_id="ten_1", agent_id="agt_1")
 
             assert result == "tenant_id,agent_id\nten_1,agt_1\n"
-            http_client.return_value.__enter__.return_value.request.assert_called_once_with(
+            http_client.return_value.request.assert_called_once_with(
                 "GET",
                 "https://cencori.com/v1/usage/export",
                 params={"format": "csv", "days": 7, "tenant_id": "ten_1", "agent_id": "agt_1"},

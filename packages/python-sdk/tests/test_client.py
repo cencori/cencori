@@ -144,3 +144,62 @@ class TestUtilityMethods:
         assert "api_key_hint" in config
         assert "..." in config["api_key_hint"]
         assert api_key not in config["api_key_hint"]
+
+
+class TestConnectionReuse:
+    """The client keeps one pooled connection instead of reconnecting per call."""
+
+    def test_requests_share_one_http_client(self, api_key: str) -> None:
+        from cencori import Cencori
+
+        client = Cencori(api_key=api_key)
+        assert client._http_client() is client._http_client()
+
+    def test_close_then_reuse_opens_a_new_client(self, api_key: str) -> None:
+        from cencori import Cencori
+
+        client = Cencori(api_key=api_key)
+        first = client._http_client()
+        client.close()
+        assert first.is_closed
+        assert client._http_client() is not first
+
+    def test_context_manager_closes_connections(self, api_key: str) -> None:
+        from cencori import Cencori
+
+        with Cencori(api_key=api_key) as client:
+            http = client._http_client()
+        assert http.is_closed
+
+    def test_async_client_is_per_event_loop(self, api_key: str) -> None:
+        import asyncio
+
+        from cencori import Cencori
+
+        client = Cencori(api_key=api_key)
+
+        async def grab() -> object:
+            return client._async_http_client()
+
+        async def grab_twice() -> bool:
+            return client._async_http_client() is client._async_http_client()
+
+        assert asyncio.run(grab_twice())
+        first = asyncio.run(grab())
+        second = asyncio.run(grab())
+        assert first is not second
+
+    def test_requests_reuse_the_pool(self, api_key: str) -> None:
+        import httpx
+
+        from cencori import Cencori
+
+        from conftest import MockTransport
+
+        transport = MockTransport({"/api/v1/ping": {"ok": True}})
+        client = Cencori(api_key=api_key)
+        client._http = httpx.Client(transport=transport)
+        client.request("/api/v1/ping")
+        client.request("/api/v1/ping")
+        assert len(transport.requests) == 2
+        assert client._http is not None and not client._http.is_closed

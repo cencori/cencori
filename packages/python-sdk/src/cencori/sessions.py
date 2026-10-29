@@ -128,7 +128,7 @@ class SessionsModule:
         }
 
         payload = self._turn_params_to_dict(params)
-        client = httpx.Client(timeout=self._client._timeout)
+        client = self._client._http_client()
         response = client.request("POST", url, json=payload, headers=headers)
         return response
 
@@ -208,7 +208,7 @@ class SessionsModule:
         if params.tool_results is not None:
             payload["tool_results"] = params.tool_results
 
-        client = httpx.Client(timeout=self._client._timeout)
+        client = self._client._http_client()
         response = client.request("POST", url, json=payload, headers=headers)
         return response
 
