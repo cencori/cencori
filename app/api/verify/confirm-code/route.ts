@@ -3,6 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { resolveAuthRedirectTargets } from "@/lib/auth-redirect";
 import { isBetterAuthEnabled } from "@/lib/auth/flags";
+import { resolvePublicOrigin } from '@/lib/public-origin';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!;
@@ -24,7 +25,7 @@ const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!;
 export async function POST(req: NextRequest) {
   try {
     const { email, code, redirect: redirectParam, userId } = await req.json();
-    const origin = req.nextUrl.origin;
+    const origin = resolvePublicOrigin(req);
     const { navigationTarget } = resolveAuthRedirectTargets(
       typeof redirectParam === "string" ? redirectParam : null,
       { currentOrigin: origin, defaultPath: "/onboarding" },

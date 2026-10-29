@@ -198,12 +198,35 @@ async function bachsFetch<T>(path: string, options: RequestInit = {}): Promise<T
   return res.json();
 }
 
+/**
+ * Bachs rejects localhost return URLs, so a checkout opened from local dev
+ * returns to the same path on the public site (console.localhost →
+ * console.cencori.com, localhost → cencori.com). The webhook grants the
+ * purchase either way; only where the browser lands afterwards changes.
+ */
+function publicReturnUrl(value: string): string {
+  try {
+    const url = new URL(value);
+    const host = url.hostname;
+    const local = host === 'localhost' || host === '127.0.0.1' || host === '[::1]';
+    if (!local && !host.endsWith('.localhost')) return value;
+    const sub = host.endsWith('.localhost') ? host.slice(0, -'.localhost'.length) : '';
+    return `https://${sub ? `${sub}.` : ''}cencori.com${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return value;
+  }
+}
+
 export async function createCheckoutSession(
   input: CreateCheckoutSessionInput
 ): Promise<BachsCheckoutSession> {
   return bachsFetch<BachsCheckoutSession>('/checkout-sessions', {
     method: 'POST',
-    body: JSON.stringify(input),
+    body: JSON.stringify({
+      ...input,
+      success_url: publicReturnUrl(input.success_url),
+      cancel_url: publicReturnUrl(input.cancel_url),
+    }),
   });
 }
 

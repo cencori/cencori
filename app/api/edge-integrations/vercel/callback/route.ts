@@ -23,6 +23,7 @@ import {
     normalizeVercelDomains,
 } from '@/lib/edge-integrations/vercel';
 import { parseVercelInstallState } from '@/lib/vercel-install-state';
+import { resolvePublicOrigin } from '@/lib/public-origin';
 
 function sanitizeRedirectPath(path: string | undefined, fallbackPath: string): string {
     if (!path) {
@@ -37,7 +38,7 @@ function sanitizeRedirectPath(path: string | undefined, fallbackPath: string): s
 }
 
 function buildRedirectUrl(req: NextRequest, path: string, params?: Record<string, string>) {
-    const url = new URL(path, req.url);
+    const url = new URL(path, resolvePublicOrigin(req));
 
     for (const [key, value] of Object.entries(params || {})) {
         url.searchParams.set(key, value);
@@ -121,7 +122,7 @@ export async function GET(req: NextRequest) {
         const tokenResponse = await exchangeVercelCodeForToken({
             code,
             teamId,
-            originFallback: req.nextUrl.origin,
+            originFallback: resolvePublicOrigin(req),
         });
 
         const resolvedTeamId = teamId || tokenResponse.team_id || null;
@@ -192,7 +193,7 @@ export async function GET(req: NextRequest) {
             accessToken: tokenResponse.access_token,
             teamId: resolvedTeamId,
             projectId: vercelProject.id,
-            endpoint: buildVercelLogIngestUrl(integration.id, req.nextUrl.origin),
+            endpoint: buildVercelLogIngestUrl(integration.id, resolvePublicOrigin(req)),
             ingestSecret,
         });
 
@@ -200,7 +201,7 @@ export async function GET(req: NextRequest) {
             accessToken: tokenResponse.access_token,
             teamId: resolvedTeamId,
             projectId: vercelProject.id,
-            url: buildVercelWebhookUrl(integration.id, req.nextUrl.origin),
+            url: buildVercelWebhookUrl(integration.id, resolvePublicOrigin(req)),
         });
 
         await saveEdgeIntegrationCredentials({

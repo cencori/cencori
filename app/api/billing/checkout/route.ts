@@ -9,6 +9,7 @@ import {
   getStripeBillingClient,
   getStripePlanPriceId,
 } from "@/lib/stripe-billing";
+import { resolvePublicOrigin } from '@/lib/public-origin';
 
 type CheckoutRequestBody = {
   orgId?: unknown;
@@ -20,7 +21,7 @@ function getAppBaseUrl(req: NextRequest): string {
   // Stripe return URLs land in the dashboard, which is console-only.
   // Resolve the console origin so customers return to console.cencori.com
   // (scoped URL seeds the active workspace via the console canonical redirect).
-  return resolveConsoleBaseUrl(req.nextUrl.origin);
+  return resolveConsoleBaseUrl(resolvePublicOrigin(req));
 }
 
 function getIdempotencyKey(req: NextRequest, orgId: string): string | undefined {

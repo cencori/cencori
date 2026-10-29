@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveConsoleBaseUrl } from '@/lib/auth-redirect';
+import { resolvePublicOrigin } from '@/lib/public-origin';
 
 const SENDBYTE_API_KEY = process.env.SENDBYTE_API_KEY || process.env.RESEND_API_KEY;
 const FROM_EMAIL = process.env.RESEND_BUDGET_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || '';
@@ -32,7 +33,7 @@ export async function POST(req: NextRequest) {
         const subject = isOverBudget
             ? `Budget exceeded for ${projectName}`
             : `Budget alert: ${projectName} at ${threshold}%`;
-        const consoleBaseUrl = resolveConsoleBaseUrl(req.nextUrl.origin);
+        const consoleBaseUrl = resolveConsoleBaseUrl(resolvePublicOrigin(req));
 
         const html = `
 <!DOCTYPE html>

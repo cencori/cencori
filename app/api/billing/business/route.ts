@@ -12,6 +12,7 @@ import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { createServerClient } from "@/lib/supabaseServer";
 import { resolveConsoleBaseUrl } from "@/lib/auth-redirect";
+import { resolvePublicOrigin } from "@/lib/public-origin";
 import { isStudioHostname } from "@/lib/studio/routing";
 import { createCheckoutSession, getBusinessPassProductId } from "@/lib/bachsClient";
 import {
@@ -89,8 +90,8 @@ export async function POST(req: NextRequest) {
         // Bought from Studio (studio.cencori.com): back to Studio, which says the plan is on.
         const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? req.nextUrl.host;
         const fromStudio = isStudioHostname(host);
-        const studio = fromStudio ? `${req.nextUrl.protocol}//${host}` : null;
-        const base = resolveConsoleBaseUrl(req.nextUrl.origin);
+        const studio = fromStudio ? resolvePublicOrigin(req) : null;
+        const base = resolveConsoleBaseUrl(resolvePublicOrigin(req));
         try {
             const session = await createCheckoutSession({
                 product_cart: [{ product_id: getBusinessPassProductId(plan), quantity: 1 }],

@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { listEdgeIntegrationRecordsByProviderAndConfigurationId } from '@/lib/edge-integrations/repository';
+import { resolvePublicOrigin } from '@/lib/public-origin';
 
 function getAppBaseUrl(req: NextRequest): string {
     return (
         process.env.VERCEL_INTEGRATION_PUBLIC_BASE_URL?.replace(/\/$/, '')
         || process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '')
         || process.env.NEXT_PUBLIC_URL?.replace(/\/$/, '')
-        || req.nextUrl.origin
+        || resolvePublicOrigin(req)
     );
 }
 

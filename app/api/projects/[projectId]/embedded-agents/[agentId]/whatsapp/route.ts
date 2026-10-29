@@ -192,7 +192,7 @@ async function kapso(
         // Back to the page they started on, in the console.
         const returnPath = typeof body.return_path === 'string' && /^\/[^/\\]/.test(body.return_path) ? body.return_path.split('?')[0].split('#')[0] : '/';
         // No fragment: Kapso adds its own query parameters to these.
-        const back = (outcome: string) => `${req.nextUrl.origin}${returnPath}?whatsapp=${outcome}`;
+        const back = (outcome: string) => `${resolvePublicOrigin(req)}${returnPath}?whatsapp=${outcome}`;
         try {
             const url = await createKapsoSetupLink(customer.id, { successUrl: back('connected'), failureUrl: back('failed') });
             return NextResponse.json({ url });

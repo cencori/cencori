@@ -5,6 +5,7 @@ import { createServerClient } from '@/lib/supabaseServer';
 import { createPaymentSession } from '@/lib/coincircuit';
 import { CREDIT_TOPUP_PACKS } from '@/lib/bachsClient';
 import { resolveConsoleBaseUrl } from '@/lib/auth-redirect';
+import { resolvePublicOrigin } from '@/lib/public-origin';
 
 type CreditPack = 'starter' | 'growth' | 'scale';
 
@@ -86,8 +87,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const apiBaseUrl = (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_URL || req.nextUrl.origin).replace(/\/$/, '');
-    const consoleBaseUrl = resolveConsoleBaseUrl(req.nextUrl.origin);
+    const apiBaseUrl = (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_URL || resolvePublicOrigin(req)).replace(/\/$/, '');
+    const consoleBaseUrl = resolveConsoleBaseUrl(resolvePublicOrigin(req));
     const amount = String(PACK_DOLLAR_AMOUNTS[pack]);
     const customerEmail = org.billing_email || user.email || '';
 

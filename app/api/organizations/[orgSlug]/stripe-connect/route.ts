@@ -4,6 +4,7 @@ import { createServerClient } from "@/lib/supabaseServer";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { writeAuditLog, getAuditActor } from "@/lib/audit-log";
 import { resolveConsoleBaseUrl } from "@/lib/auth-redirect";
+import { resolvePublicOrigin } from '@/lib/public-origin';
 
 async function getOrgAsAdmin(orgSlug: string) {
     const supabase = await createServerClient();
@@ -78,7 +79,7 @@ export async function POST(
     try {
         const { createConnectAccount } = await import("@/lib/stripe-connect");
         const body = await req.json();
-        const consoleBase = resolveConsoleBaseUrl(req.nextUrl.origin);
+        const consoleBase = resolveConsoleBaseUrl(resolvePublicOrigin(req));
         const returnUrl = body.return_url || `${consoleBase}/${orgSlug}/~/billing`;
         const refreshUrl = body.refresh_url || returnUrl;
 

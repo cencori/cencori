@@ -5,6 +5,8 @@ import {
   createCheckoutSession,
   CREDIT_TOPUP_PACKS,
 } from '@/lib/bachsClient';
+import { resolvePublicOrigin } from '@/lib/public-origin';
+import { resolveConsoleBaseUrl } from '@/lib/auth-redirect';
 
 const PACK_TO_ID: Record<string, string> = {
   starter: CREDIT_TOPUP_PACKS[0].productId,
@@ -57,7 +59,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
   }
 
-  const successUrl = new URL(`/${organization.slug}/~/billing`, req.url);
+  const successUrl = new URL(`/${organization.slug}/~/billing`, resolveConsoleBaseUrl(resolvePublicOrigin(req)));
   const cancelUrl = new URL(successUrl);
   cancelUrl.searchParams.set('checkout', 'cancelled');
 
@@ -80,7 +82,7 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error('[Credits Checkout] Bachs API error:', err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Checkout creation failed' },
+      { error: "Couldn't open checkout. Try again in a moment." },
       { status: 502 }
     );
   }
