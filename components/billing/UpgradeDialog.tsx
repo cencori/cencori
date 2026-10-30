@@ -648,8 +648,9 @@ export function UpgradeDialog({
     if (!open) event.preventDefault();
   };
 
-  // Desktop: a centered modal. The header, scrolling body and pinned footer
-  // stack in a flex column capped at the viewport height.
+  // Desktop: a centered modal. Mobile (below sm): a bottom sheet pinned to
+  // the bottom edge, full width, rounded only at the top. Either way the
+  // scrolling body and pinned footer stack in a flex column capped in height.
   const checkoutModal = (
     <Dialog open={open} onOpenChange={handleOpenChange} modal={false}>
       <DialogContent
@@ -662,8 +663,13 @@ export function UpgradeDialog({
         onOpenAutoFocus={(event) => event.preventDefault()}
         onEscapeKeyDown={ignoreWhileHidden}
         onInteractOutside={ignoreWhileHidden}
-        className="flex data-[state=closed]:pointer-events-none data-[state=closed]:invisible max-h-[min(52rem,calc(100%-4rem-var(--maintenance-banner-height,0px)))] flex-col gap-0 overflow-hidden border-border/60 p-0 shadow-2xl sm:max-w-[400px]"
+        className="flex max-h-[min(52rem,calc(100%-4rem-var(--maintenance-banner-height,0px)))] flex-col gap-0 overflow-hidden border-border/60 p-0 shadow-2xl data-[state=closed]:pointer-events-none data-[state=closed]:invisible sm:max-w-[400px] max-sm:top-auto max-sm:bottom-0 max-sm:left-0 max-sm:max-h-[90dvh] max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-b-none max-sm:border-x-0 max-sm:border-b-0"
       >
+        {/* Grab handle on the bottom sheet; tapping outside or Escape closes it. */}
+        <div
+          aria-hidden="true"
+          className="mx-auto mt-2.5 h-1 w-9 shrink-0 rounded-full bg-muted-foreground/30 sm:hidden"
+        />
         <DialogTitle className="sr-only">Checkout</DialogTitle>
         <DialogDescription className="sr-only">
           Upgrade {organizationLabel} to {plan.name}
@@ -771,7 +777,7 @@ function PlanPrice({
   planName: string;
 }) {
   return (
-    <div className="px-5 pt-8 text-center sm:px-8 lg:px-10 lg:pt-10">
+    <div className="px-5 pt-6 text-center sm:px-8 sm:pt-8 lg:px-10 lg:pt-10">
       <p className="text-sm text-muted-foreground">
         Upgrade {organizationLabel} to {planName}
       </p>
@@ -996,7 +1002,7 @@ function PanelFooter({
   children: ReactNode;
 }) {
   return (
-    <div className="sticky bottom-0 flex items-center justify-between gap-6 border-t border-border/30 bg-background px-5 py-3 sm:px-8 lg:px-10">
+    <div className="sticky bottom-0 flex items-center justify-between gap-6 border-t border-border/30 bg-background px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-8 lg:px-10">
       <p className="text-[11px] leading-4 text-muted-foreground">{children}</p>
       <div className="shrink-0">{action}</div>
     </div>
