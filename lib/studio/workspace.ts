@@ -5,6 +5,9 @@ import { cookies } from "next/headers";
 import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { createServerClient } from "@/lib/supabaseServer";
 import { withSupabaseRetry } from "@/lib/supabase-retry";
+import type { User } from "@supabase/supabase-js";
+
+type ServerClient = Awaited<ReturnType<typeof createServerClient>>;
 
 export interface StudioAgent {
     id: string;
@@ -32,12 +35,19 @@ export interface StudioWorkspace {
  * user's business organization (else their first one), its first project, and that project's agents. All
  * reads go through the user's own access rules. Null when they have no
  * project yet, which is what setup is for.
+ *
+ * On the web the pick is the STUDIO_ORG_COOKIE; the mobile app keeps its own
+ * and sends it to GET /api/studio/workspace.
  */
 export const getStudioWorkspace = cache(async (): Promise<StudioWorkspace | null> => {
     const supabase = await createServerClient();
     const { data: { user } } = await withSupabaseRetry(() => getAuthUser(supabase), { operation: "studio auth.getUser" });
     if (!user) return null;
+    return loadStudioWorkspace(supabase, user, (await cookies()).get(STUDIO_ORG_COOKIE)?.value ?? null);
+});
 
+/** getStudioWorkspace for a user already signed in, with the business they picked (or null). */
+export async function loadStudioWorkspace(supabase: ServerClient, user: User, picked: string | null): Promise<StudioWorkspace | null> {
     const { data: organizations } = await withSupabaseRetry(
         () => supabase.from("organizations").select("id, name, slug, account_type, created_at").order("created_at", { ascending: true }),
         { operation: "studio organizations" },
@@ -56,7 +66,6 @@ export const getStudioWorkspace = cache(async (): Promise<StudioWorkspace | null
     }
     const list = all.filter((item) => firstProject.has(item.id));
 
-    const picked = (await cookies()).get(STUDIO_ORG_COOKIE)?.value;
     const organization = list.find((item) => item.id === picked)
         ?? list.find((item) => item.account_type === "business")
         ?? list[0];
@@ -87,4 +96,4 @@ export const getStudioWorkspace = cache(async (): Promise<StudioWorkspace | null
             published: !!agent.stable_version_id,
         })),
     };
-});
+}
