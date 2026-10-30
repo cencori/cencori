@@ -108,6 +108,14 @@ export const auth = betterAuth({
         ...(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET
             ? { github: { clientId: process.env.GITHUB_CLIENT_ID, clientSecret: process.env.GITHUB_CLIENT_SECRET } }
             : {}),
+        // Sign in with Apple from the Studio iOS app: the phone signs in natively and posts Apple's
+        // ID token to /sign-in/social, checked against Apple's keys with the app's bundle ID as the
+        // audience. That needs no client secret; only the web redirect flow would (APPLE_CLIENT_SECRET).
+        apple: {
+            clientId: process.env.APPLE_CLIENT_ID || "com.cencori.studio",
+            clientSecret: process.env.APPLE_CLIENT_SECRET || "",
+            appBundleIdentifier: "com.cencori.studio",
+        },
     },
 
     databaseHooks: {
