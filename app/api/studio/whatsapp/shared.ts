@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabaseAdmin';
 import type { SubscriptionTier } from '@/lib/entitlements';
 import { finishSignup, type SignupState } from '@/lib/channels/whatsapp-signup';
 import { studioOrigin } from '@/lib/studio/routing';
+import { appLink } from '@/lib/studio/app-link';
 
 /** Where Meta returns to: Studio's own address, so the owner's sign-in comes along. */
 export function studioCallbackUrl(req: NextRequest): string {
@@ -24,21 +25,11 @@ export function studioHome(req: NextRequest, path: '/' | '/setup' = '/') {
     };
 }
 
-/**
- * The mobile app's link scheme. Meta only returns to https addresses, so the
- * callback sends the phone on to `<scheme>://whatsapp?…`, which the app's
- * sign-in window is waiting for. Set STUDIO_APP_SCHEME once the app's name is settled.
- */
-export function appScheme(): string {
-    return process.env.STUDIO_APP_SCHEME || 'cencori-studio';
-}
-
 /** Back to the app with how it went: failed (and why), or a handoff for it to finish with. */
 export function appReturn(outcome: 'failed' | 'handoff', value?: string): string {
-    const params = new URLSearchParams(outcome === 'failed'
+    return appLink('whatsapp', outcome === 'failed'
         ? { outcome, ...(value ? { message: value.slice(0, 200) } : {}) }
         : { outcome, handoff: value ?? '' });
-    return `${appScheme()}://whatsapp?${params}`;
 }
 
 /**

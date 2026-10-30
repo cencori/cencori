@@ -4,7 +4,9 @@
  * The business's online store (Shopify, WooCommerce through Nango; Square
  * through Composio) or WhatsApp catalog, for product sync.
  *   GET   which stores can be connected, which are, and how their last sync went
- *   POST  { project_id, action: 'connect', provider }     a sign-in link (Nango)
+ *   POST  { project_id, action: 'connect', provider }     a sign-in link (Nango, or Composio for Square);
+ *         with app: true (the mobile app), Square comes back to the app; Nango's
+ *         page doesn't come back anywhere, so the app looks again when it closes
  *         { project_id, action: 'fetch', provider }       its products, for the review
  *         { project_id, action: 'link', provider, links } after the review: keep it in sync
  *         { project_id, action: 'sync', provider }        sync now
@@ -99,7 +101,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-    const body = await req.json().catch(() => null) as { project_id?: unknown; action?: unknown; provider?: unknown; links?: unknown } | null;
+    const body = await req.json().catch(() => null) as { project_id?: unknown; action?: unknown; provider?: unknown; links?: unknown; app?: unknown } | null;
     if (typeof body?.project_id !== 'string' || !isProvider(body.provider)) return fail('Say which store.');
     const projectId = body.project_id;
     const provider = body.provider;
@@ -135,7 +137,9 @@ export async function POST(req: NextRequest) {
             if (!composioConfigured()) return fail(`${STORES[provider].label} isn't available yet.`, 404);
             if (body.action === 'connect') {
                 // Back to Studio after signing in; the sheet looks again when it's in view.
-                const back = `${studioOrigin(req.headers.get('host') ?? 'studio.cencori.com')}/?store=${provider}`;
+                // The app's way back goes through /api/studio/stores/return, since Composio returns to https only.
+                const origin = studioOrigin(req.headers.get('host') ?? 'studio.cencori.com');
+                const back = body.app === true ? `${origin}/api/studio/stores/return?provider=${provider}` : `${origin}/?store=${provider}`;
                 const link = await createComposioLink(projectId, provider, back);
                 return NextResponse.json({ url: link.url });
             }
