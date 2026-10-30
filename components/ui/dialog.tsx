@@ -55,15 +55,18 @@ function DialogContent({
   children,
   showCloseButton = true,
   animated = true,
+  showOverlay = true,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean;
   /** False opens and closes instantly, with no fade or zoom. */
   animated?: boolean;
+  /** False leaves the page behind undimmed. */
+  showOverlay?: boolean;
 }) {
   return (
-    <DialogPortal>
-      <DialogOverlay animated={animated} />
+    <DialogPortal forceMount={props.forceMount}>
+      {showOverlay && <DialogOverlay animated={animated} />}
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(

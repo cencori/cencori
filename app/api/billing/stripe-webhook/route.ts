@@ -1,68 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
-import { isPaidPlanTier, type PaidPlanTier } from "@/lib/billing/plans";
 import {
   buildStripeOrganizationSubscriptionUpdate,
-  type StripeSubscriptionSnapshot,
+  getExpandableId,
+  toSubscriptionSnapshot,
 } from "@/lib/billing/stripe-subscription-reconciliation";
 import {
   getStripeBillingClient,
   getStripeBillingWebhookSecret,
-  getStripePlanFromPriceId,
 } from "@/lib/stripe-billing";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 
 export const runtime = "nodejs";
 
 type AdminClient = ReturnType<typeof createAdminClient>;
-
-function getExpandableId(
-  value: string | { id: string } | null | undefined,
-): string | null {
-  if (!value) return null;
-  return typeof value === "string" ? value : value.id;
-}
-
-function getSubscriptionPeriod(subscription: Stripe.Subscription) {
-  const firstItem = subscription.items.data[0];
-  return {
-    start: firstItem?.current_period_start
-      ? new Date(firstItem.current_period_start * 1_000).toISOString()
-      : null,
-    end: firstItem?.current_period_end
-      ? new Date(firstItem.current_period_end * 1_000).toISOString()
-      : null,
-  };
-}
-
-function getSubscriptionTier(subscription: Stripe.Subscription): PaidPlanTier | null {
-  const priceId = subscription.items.data[0]?.price.id;
-  const configuredPlan = priceId ? getStripePlanFromPriceId(priceId) : null;
-  if (configuredPlan) return configuredPlan.tier;
-
-  return isPaidPlanTier(subscription.metadata.tier)
-    ? subscription.metadata.tier
-    : null;
-}
-
-function toSubscriptionSnapshot(
-  subscription: Stripe.Subscription,
-): StripeSubscriptionSnapshot {
-  const customerId = getExpandableId(subscription.customer);
-  if (!customerId) {
-    throw new Error(`Subscription ${subscription.id} has no Stripe customer`);
-  }
-
-  const period = getSubscriptionPeriod(subscription);
-  return {
-    subscriptionId: subscription.id,
-    customerId,
-    status: subscription.status,
-    tier: getSubscriptionTier(subscription),
-    currentPeriodStart: period.start,
-    currentPeriodEnd: period.end,
-  };
-}
 
 async function resolveOrganizationId(
   admin: AdminClient,

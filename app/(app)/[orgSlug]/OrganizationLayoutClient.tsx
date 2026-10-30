@@ -36,18 +36,14 @@ import { COPILOT_CONVERSATION_COOKIE, COPILOT_NEW_CHAT_EVENT } from "@/lib/conso
 import ChartRelationshipIcon from "@hugeicons/core-free-icons/ChartRelationshipIcon";
 import ThreeDRotateIcon from "@hugeicons/core-free-icons/ThreeDRotateIcon";
 import Settings02Icon from "@hugeicons/core-free-icons/Settings02Icon";
-import Configuration02Icon from "@hugeicons/core-free-icons/Configuration02Icon";
 import ThreeDMoveIcon from "@hugeicons/core-free-icons/ThreeDMoveIcon";
 import GameController03Icon from "@hugeicons/core-free-icons/GameController03Icon";
 import LeftToRightListDashIcon from "@hugeicons/core-free-icons/LeftToRightListDashIcon";
 import KeySquareIcon from "@hugeicons/core-free-icons/KeySquareIcon";
 import BadgeDollarSignIcon from "@hugeicons/core-free-icons/BadgeDollarSignIcon";
 import Blockchain01Icon from "@hugeicons/core-free-icons/Blockchain01Icon";
-import DollarCircleIcon from "@hugeicons/core-free-icons/DollarCircleIcon";
 import Chart01Icon from "@hugeicons/core-free-icons/Chart01Icon";
 import Loading03Icon from "@hugeicons/core-free-icons/Loading03Icon";
-import UserMultipleIcon from "@hugeicons/core-free-icons/UserMultipleIcon";
-import DocumentValidationIcon from "@hugeicons/core-free-icons/DocumentValidationIcon";
 import { useMobileSheet } from "@/lib/contexts/MobileSheetContext";
 import { useSession } from "@/lib/contexts/SessionContext";
 import { isAuthExpiredError } from "@/lib/auth/auth-errors";
@@ -505,12 +501,12 @@ export default function OrganizationLayoutClient({
     ];
 
     const organizationSettingsItems = [
-        { section: "general", href: consoleMode ? "/organization/settings" : `${orgBase}/~/settings`, icon: <HugeiconsIcon icon={Settings02Icon} className="!h-5 !w-5" />, label: "General" },
-        { section: "advanced", href: consoleMode ? "/organization/settings?section=advanced" : `${orgBase}/~/settings?section=advanced`, icon: <HugeiconsIcon icon={Configuration02Icon} className="!h-5 !w-5" />, label: "Advanced" },
-        { section: "teams", href: consoleMode ? "/teams" : `${orgBase}/~/teams`, icon: <HugeiconsIcon icon={UserMultipleIcon} className="!h-5 !w-5" />, label: "Teams" },
-        { section: "billing", href: consoleMode ? "/billing" : `${orgBase}/~/billing`, icon: <HugeiconsIcon icon={DollarCircleIcon} className="!h-5 !w-5" />, label: "Billing" },
-        { section: "usage", href: consoleMode ? "/usage" : `${orgBase}/~/usage`, icon: <HugeiconsIcon icon={Chart01Icon} className="!h-5 !w-5" />, label: "Usage" },
-        { section: "audit-log", href: consoleMode ? "/audit-log" : `${orgBase}/~/audit-log`, icon: <HugeiconsIcon icon={DocumentValidationIcon} className="!h-5 !w-5" />, label: "Audit Log" },
+        { section: "general", href: consoleMode ? "/organization/settings" : `${orgBase}/~/settings`, label: "General" },
+        { section: "advanced", href: consoleMode ? "/organization/settings?section=advanced" : `${orgBase}/~/settings?section=advanced`, label: "Advanced" },
+        { section: "teams", href: consoleMode ? "/teams" : `${orgBase}/~/teams`, label: "Teams" },
+        { section: "billing", href: consoleMode ? "/billing" : `${orgBase}/~/billing`, label: "Billing" },
+        { section: "usage", href: consoleMode ? "/usage" : `${orgBase}/~/usage`, label: "Usage" },
+        { section: "audit-log", href: consoleMode ? "/audit-log" : `${orgBase}/~/audit-log`, label: "Audit Log" },
     ];
 
     const projectSettingsItems = [
@@ -695,7 +691,6 @@ export default function OrganizationLayoutClient({
                             size="sm"
                         >
                             <Link href={item.href} prefetch={true} onMouseEnter={() => prefetchRoute(item.href)}>
-                                {item.icon}
                                 <span className="text-sm">{item.label}</span>
                             </Link>
                         </SidebarMenuButton>

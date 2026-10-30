@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import Link from "next/link";
 import { useTheme } from "next-themes";
 import { loadStripe } from "@stripe/stripe-js";
@@ -10,23 +17,15 @@ import {
   PaymentElement,
   useCheckoutElements,
 } from "@stripe/react-stripe-js/checkout";
-import {
-    ArrowRight,
-    Check,
-    CreditCard,
-    LockKeyhole,
-} from "lucide-react";
+import { ArrowRight, CreditCard } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
-import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   CENCORI_PAID_PLANS,
@@ -45,12 +44,21 @@ interface UpgradeDialogProps {
   orgSlug: string;
   orgName?: string;
   currentTier?: "free" | PaidPlanTier;
+  /** Kept so existing callers compile; the checkout no longer shows it. */
   reason?: string;
   recommendedTier?: PaidPlanTier;
   checkoutMode?: "review" | "direct";
   preload?: boolean;
   returnPath?: string;
 }
+
+type PlanChangePreview = {
+  amountDue: number;
+  currency: string;
+  interval: PlanBillingInterval;
+  prorationDate: number;
+  card: { brand: string; last4: string } | null;
+};
 
 type CheckoutResponse = {
   clientSecret?: string;
@@ -77,15 +85,22 @@ function getInitialTier(
   const availablePlans = getAvailableUpgradePlans(currentTier);
   return availablePlans.includes(recommendedTier)
     ? recommendedTier
-    : availablePlans[0] ?? "pro";
+    : (availablePlans[0] ?? "pro");
 }
 
-function getReturnUrl(orgSlug: string, sessionId: string, returnPath?: string): string {
-  const safeReturnPath = returnPath?.startsWith("/") && !returnPath.startsWith("//")
+function getSafeReturnPath(orgSlug: string, returnPath?: string): string {
+  return returnPath?.startsWith("/") && !returnPath.startsWith("//")
     ? returnPath
     : `/${encodeURIComponent(orgSlug)}/~/billing`;
+}
+
+function getReturnUrl(
+  orgSlug: string,
+  sessionId: string,
+  returnPath?: string,
+): string {
   const returnUrl = new URL(
-    safeReturnPath,
+    getSafeReturnPath(orgSlug, returnPath),
     window.location.origin,
   );
   returnUrl.searchParams.set("checkout_session_id", sessionId);
@@ -93,23 +108,21 @@ function getReturnUrl(orgSlug: string, sessionId: string, returnPath?: string): 
 }
 
 function PaymentForm({
-  children,
   error,
   orgSlug,
-  paymentFirst,
   returnPath,
   sessionId,
   onError,
   onSubmittingChange,
+  totals,
 }: {
-  children: ReactNode;
   error: string | null;
   orgSlug: string;
-  paymentFirst: boolean;
   returnPath?: string;
   sessionId: string;
   onError: (message: string | null) => void;
   onSubmittingChange: (submitting: boolean) => void;
+  totals: ReactNode;
 }) {
   const checkoutState = useCheckoutElements();
   const [paymentReady, setPaymentReady] = useState(false);
@@ -146,14 +159,18 @@ function PaymentForm({
       const result = await Promise.race([confirmRequest, timeout]);
 
       if (result.type === "error") {
-        onError(result.error.message || "Payment could not be completed. Try again.");
+        onError(
+          result.error.message || "Payment could not be completed. Try again.",
+        );
         setSubmitting(false);
         onSubmittingChange(false);
         return;
       }
 
       try {
-        window.location.assign(getReturnUrl(orgSlug, result.session.id || sessionId, returnPath));
+        window.location.assign(
+          getReturnUrl(orgSlug, result.session.id || sessionId, returnPath),
+        );
       } catch (redirectError) {
         onError(
           redirectError instanceof Error
@@ -189,105 +206,16 @@ function PaymentForm({
     billingAddressReady &&
     !submitting;
 
-  const paymentSection = (
-    <section
-      aria-labelledby="payment-heading"
-      className={paymentFirst ? undefined : "border-t border-border/50 pt-6"}
-    >
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <CreditCard className="size-3.5 text-muted-foreground" aria-hidden="true" />
-          <h3 id="payment-heading" className="text-xs font-medium">
-            Payment details
-          </h3>
-        </div>
-        <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
-          <LockKeyhole className="size-3" aria-hidden="true" />
-          Encrypted
-        </span>
-      </div>
-
-      {checkoutState.type === "loading" && (
-        <div className="space-y-3" aria-label="Loading payment form">
-          <Skeleton className="h-11 w-full rounded-md" />
-          <div className="grid grid-cols-2 gap-3">
-            <Skeleton className="h-11 rounded-md" />
-            <Skeleton className="h-11 rounded-md" />
-          </div>
-        </div>
-      )}
-
-      {checkoutState.type === "success" && (
-        <PaymentElement
-          options={{
-            layout: "tabs",
-            paymentMethodOrder: ["card"],
-            fields: {
-              billingDetails: "never",
-            },
-            wallets: {
-              applePay: "never",
-              googlePay: "never",
-              link: "never",
-            },
-          }}
-          onReady={() => setPaymentReady(true)}
-          onChange={() => onError(null)}
-          onLoadError={(event) =>
-            onError(event.error.message || "The payment form could not be loaded.")
-          }
-        />
-      )}
-
-      <div className="-mx-5 mt-6 border-t border-border/50 px-5 pt-6 sm:-mx-7 sm:px-7">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <h3 className="text-xs font-medium">Billing details</h3>
-          <span className="text-[10px] text-muted-foreground">Required</span>
-        </div>
-        {checkoutState.type === "loading" && (
-          <div className="space-y-3" aria-label="Loading billing address form">
-            <Skeleton className="h-11 w-full rounded-md" />
-            <Skeleton className="h-11 w-full rounded-md" />
-            <Skeleton className="h-11 w-full rounded-md" />
-            <div className="grid grid-cols-2 gap-3">
-              <Skeleton className="h-11 rounded-md" />
-              <Skeleton className="h-11 rounded-md" />
-            </div>
-          </div>
-        )}
-        {checkoutState.type === "success" && (
-          <BillingAddressElement
-            options={{
-              display: { name: "full" },
-            }}
-            onReady={() => setBillingAddressReady(true)}
-            onChange={() => onError(null)}
-            onLoadError={(event) =>
-              onError(event.error.message || "The billing address form could not be loaded.")
-            }
-          />
-        )}
-      </div>
-    </section>
-  );
-
   return (
-    <>
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="space-y-7 px-5 py-6 sm:px-7">
-          {paymentFirst && paymentSection}
-          {children}
-          {!paymentFirst && paymentSection}
-
-          {error && <CheckoutError message={error} />}
-        </div>
-      </div>
-
-      <SheetFooter className="gap-3 border-t border-border/50 bg-background px-5 py-5 sm:px-7">
+    <PaymentPanel
+      error={error}
+      loading={checkoutState.type === "loading"}
+      totals={totals}
+      action={
         <Button
           type="button"
           size="sm"
-          className="h-10 w-full rounded-md text-xs font-medium transition-transform active:scale-[0.99]"
+          className="h-7 text-xs"
           onClick={confirmPayment}
           disabled={!canConfirm}
         >
@@ -297,75 +225,116 @@ function PaymentForm({
               Processing
             </>
           ) : (
-            "Upgrade"
+            "Subscribe"
           )}
         </Button>
-
-        <SecureCheckoutNotice />
-      </SheetFooter>
-    </>
+      }
+    >
+      {checkoutState.type === "success" && (
+        <>
+          <PaymentElement
+            options={{
+              layout: "tabs",
+              paymentMethodOrder: ["card"],
+              fields: {
+                billingDetails: "never",
+              },
+              wallets: {
+                applePay: "never",
+                googlePay: "never",
+                link: "never",
+              },
+              // The panel has its own authorization note above the button.
+              terms: { card: "never" },
+            }}
+            onReady={() => setPaymentReady(true)}
+            onChange={() => onError(null)}
+            onLoadError={(event) =>
+              onError(
+                event.error.message || "The payment form could not be loaded.",
+              )
+            }
+          />
+          <BillingAddressElement
+            options={{
+              display: { name: "full" },
+            }}
+            onReady={() => setBillingAddressReady(true)}
+            onChange={() => onError(null)}
+            onLoadError={(event) =>
+              onError(
+                event.error.message ||
+                  "The billing address form could not be loaded.",
+              )
+            }
+          />
+        </>
+      )}
+    </PaymentPanel>
   );
 }
 
-function SecureCheckoutNotice() {
+/**
+ * The right half of the checkout card: the card and billing fields, the
+ * totals, and the footer with the authorization note and the button. Rendered with skeletons while the Stripe session is being created.
+ */
+function PaymentPanel({
+  action,
+  children,
+  error,
+  loading,
+  totals,
+}: {
+  action: ReactNode;
+  children?: ReactNode;
+  error: string | null;
+  loading: boolean;
+  totals: ReactNode;
+}) {
   return (
-    <div className="text-center text-[10px] leading-4 text-muted-foreground">
-      <p>
-        Your payment details are encrypted. By upgrading, you agree to Cencori&apos;s{" "}
-        <Link href="/terms-of-service" className="underline underline-offset-2 hover:text-foreground">
+    <div className="flex flex-1 flex-col">
+      <div className="flex-1 space-y-8 px-5 py-8 sm:px-8 lg:px-10 lg:py-10">
+        <section aria-label="Payment details">
+          <div className="space-y-5">
+            {loading ? (
+              <div className="space-y-4" aria-label="Loading payment form">
+                <Skeleton className="h-11 w-full rounded-md" />
+                <div className="grid grid-cols-2 gap-3">
+                  <Skeleton className="h-11 rounded-md" />
+                  <Skeleton className="h-11 rounded-md" />
+                </div>
+                <Skeleton className="h-11 w-full rounded-md" />
+                <Skeleton className="h-11 w-full rounded-md" />
+              </div>
+            ) : (
+              children
+            )}
+          </div>
+        </section>
+
+        {totals}
+
+        {error && <CheckoutError message={error} />}
+      </div>
+
+      <PanelFooter action={action}>
+        By subscribing, you authorize Cencori to charge you according to the{" "}
+        <Link
+          href="/terms-of-service"
+          className="underline underline-offset-2 hover:text-foreground"
+        >
           terms
         </Link>{" "}
-        and{" "}
-        <Link href="/privacy-policy" className="underline underline-offset-2 hover:text-foreground">
+        until you cancel. See our{" "}
+        <Link
+          href="/privacy-policy"
+          className="underline underline-offset-2 hover:text-foreground"
+        >
           privacy policy
         </Link>
         .
-      </p>
+      </PanelFooter>
     </div>
-  );
-}
-
-function PaymentFormSkeleton({ bordered = false }: { bordered?: boolean }) {
-  return (
-    <section
-      className={cn(bordered && "border-t border-border/50 pt-6")}
-      aria-label="Preparing payment form"
-    >
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <CreditCard className="size-3.5 text-muted-foreground" aria-hidden="true" />
-          <span className="text-xs font-medium">Payment details</span>
-        </div>
-        <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
-          <LockKeyhole className="size-3" aria-hidden="true" />
-          Encrypted
-        </span>
-      </div>
-
-      <div className="space-y-3">
-        <Skeleton className="h-11 w-full rounded-md" />
-        <div className="grid grid-cols-2 gap-3">
-          <Skeleton className="h-11 rounded-md" />
-          <Skeleton className="h-11 rounded-md" />
-        </div>
-      </div>
-
-      <div className="-mx-5 mt-6 border-t border-border/50 px-5 pt-6 sm:-mx-7 sm:px-7">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <span className="text-xs font-medium">Billing details</span>
-          <span className="text-[10px] text-muted-foreground">Required</span>
-        </div>
-        <div className="space-y-3">
-          <Skeleton className="h-11 w-full rounded-md" />
-          <Skeleton className="h-11 w-full rounded-md" />
-          <Skeleton className="h-11 w-full rounded-md" />
-          <div className="grid grid-cols-2 gap-3">
-            <Skeleton className="h-11 rounded-md" />
-            <Skeleton className="h-11 rounded-md" />
-          </div>
-        </div>
-      </div>
-    </section>
   );
 }
 
@@ -376,7 +345,6 @@ export function UpgradeDialog({
   orgSlug,
   orgName,
   currentTier = "free",
-  reason,
   recommendedTier = "pro",
   checkoutMode = "review",
   preload = false,
@@ -395,15 +363,26 @@ export function UpgradeDialog({
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [hasOpened, setHasOpened] = useState(false);
   const directCheckoutStartedRef = useRef(false);
   const checkoutIdempotencyKeyRef = useRef<string | null>(null);
   const checkoutOrgIdRef = useRef(orgId);
 
-  const checkoutTier = checkoutMode === "direct" ? directTier : selectedTier;
-  const checkoutInterval = checkoutMode === "direct" ? "month" : interval;
+  // Already paying: the existing subscription moves to the new plan (charged
+  // to the card on file) instead of starting a second one through Checkout.
+  const changingPlan = currentTier !== "free";
+  const [planChange, setPlanChange] = useState<PlanChangePreview | null>(null);
+  const [planChangeLoading, setPlanChangeLoading] = useState(false);
+
+  const checkoutTier =
+    checkoutMode === "direct" || changingPlan ? directTier : selectedTier;
+  const checkoutInterval = changingPlan
+    ? (planChange?.interval ?? "month")
+    : checkoutMode === "direct"
+      ? "month"
+      : interval;
   const plan = CENCORI_PAID_PLANS[checkoutTier];
   const dueNow = plan.prices[checkoutInterval];
-  const monthlyEquivalent = getMonthlyEquivalentCents(checkoutTier, checkoutInterval);
   const organizationLabel = orgName || orgSlug || "your organization";
 
   const resetCheckout = useCallback(() => {
@@ -422,6 +401,10 @@ export function UpgradeDialog({
     if (checkoutMode === "direct") setInterval("month");
     setError(null);
   }, [checkoutMode, directTier, open]);
+
+  useEffect(() => {
+    if (open) setHasOpened(true);
+  }, [open]);
 
   useEffect(() => {
     checkoutIdempotencyKeyRef.current = null;
@@ -450,7 +433,9 @@ export function UpgradeDialog({
       return;
     }
     if (!orgId) {
-      setError("We couldn't identify this organization. Refresh and try again.");
+      setError(
+        "We couldn't identify this organization. Refresh and try again.",
+      );
       return;
     }
 
@@ -480,7 +465,10 @@ export function UpgradeDialog({
       const contentType = response.headers.get("content-type") || "";
       const data: CheckoutResponse = contentType.includes("application/json")
         ? await response.json()
-        : { error: "Checkout returned an unexpected response. Please try again." };
+        : {
+            error:
+              "Checkout returned an unexpected response. Please try again.",
+          };
 
       if (!response.ok || !data.clientSecret || !data.sessionId) {
         throw new Error(data.error || "Secure checkout could not be started.");
@@ -505,10 +493,78 @@ export function UpgradeDialog({
 
   useEffect(() => {
     if (!open && !preload) return;
-    if (checkoutMode !== "direct" || directCheckoutStartedRef.current) return;
+    if (
+      checkoutMode !== "direct" ||
+      changingPlan ||
+      directCheckoutStartedRef.current
+    )
+      return;
     directCheckoutStartedRef.current = true;
     void startCheckout();
-  }, [checkoutMode, open, preload, startCheckout]);
+  }, [changingPlan, checkoutMode, open, preload, startCheckout]);
+
+  const loadPlanChange = useCallback(async () => {
+    setPlanChangeLoading(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/billing/subscription/upgrade", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orgId, tier: checkoutTier }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok)
+        throw new Error(
+          data.error || "The upgrade couldn't be priced. Try again.",
+        );
+      setPlanChange(data as PlanChangePreview);
+    } catch (previewError) {
+      setError(
+        previewError instanceof Error
+          ? previewError.message
+          : "The upgrade couldn't be priced. Try again.",
+      );
+    } finally {
+      setPlanChangeLoading(false);
+    }
+  }, [checkoutTier, orgId]);
+
+  useEffect(() => {
+    if (!open || !changingPlan) return;
+    setPlanChange(null);
+    void loadPlanChange();
+  }, [changingPlan, loadPlanChange, open]);
+
+  const confirmPlanChange = async () => {
+    if (!planChange || paymentSubmitting) return;
+    setPaymentSubmitting(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/billing/subscription/upgrade", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orgId,
+          tier: checkoutTier,
+          confirm: true,
+          prorationDate: planChange.prorationDate,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok)
+        throw new Error(
+          data.error || "The upgrade couldn't be completed. Try again.",
+        );
+      window.location.assign(getSafeReturnPath(orgSlug, returnPath));
+    } catch (upgradeError) {
+      setError(
+        upgradeError instanceof Error
+          ? upgradeError.message
+          : "The upgrade couldn't be completed. Try again.",
+      );
+      setPaymentSubmitting(false);
+    }
+  };
 
   const checkoutOptions = useMemo(
     () =>
@@ -517,16 +573,45 @@ export function UpgradeDialog({
             clientSecret,
             elementsOptions: {
               appearance: {
-                theme: resolvedTheme === "light" ? ("stripe" as const) : ("night" as const),
+                theme:
+                  resolvedTheme === "light"
+                    ? ("stripe" as const)
+                    : ("night" as const),
+                // Joined fields in one rounded block (card number over expiry |
+                // CVC; name over country over address): faint lines between
+                // fields, a label over each block and grey placeholders inside.
+                inputs: "condensed" as const,
+                labels: "above" as const,
                 variables: {
-                  colorPrimary: resolvedTheme === "light" ? "#111111" : "#ffffff",
-                  colorBackground: resolvedTheme === "light" ? "#ffffff" : "#050505",
+                  colorPrimary:
+                    resolvedTheme === "light" ? "#111111" : "#ffffff",
+                  colorBackground:
+                    resolvedTheme === "light" ? "#ffffff" : "#0f0f0f",
                   colorText: resolvedTheme === "light" ? "#111111" : "#f5f5f5",
                   colorDanger: "#ef4444",
-                  borderRadius: "6px",
-                  fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+                  borderRadius: "10px",
+                  fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
                   fontSizeBase: "13px",
                   spacingUnit: "4px",
+                  colorTextPlaceholder:
+                    resolvedTheme === "light" ? "#8a8a8a" : "#636363",
+                },
+                rules: {
+                  ".Input": {
+                    backgroundColor:
+                      resolvedTheme === "light" ? "#f5f5f5" : "#0f0f0f",
+                    // Stripe draws the outer edge and the lines between fields
+                    // as one border, so one faint shade for both.
+                    borderColor:
+                      resolvedTheme === "light" ? "#e5e5e5" : "#222222",
+                    boxShadow: "none",
+                    padding: "9px 14px",
+                  },
+                  ".Input:focus": {
+                    borderColor:
+                      resolvedTheme === "light" ? "#a3a3a3" : "#404040",
+                    boxShadow: "none",
+                  },
                 },
               },
             },
@@ -535,251 +620,294 @@ export function UpgradeDialog({
     [clientSecret, resolvedTheme],
   );
 
-  const checkoutSheet = (
-    <Sheet open={open} onOpenChange={handleOpenChange}>
-      <SheetContent
-        side="right"
-        className="w-full gap-0 overflow-hidden border-border/60 p-0 shadow-2xl sm:max-w-[36rem]"
-      >
-        <SheetHeader className="border-b border-border/50 px-5 pb-5 pt-6 sm:px-7 sm:pt-7">
-          <div className="mb-4 flex items-center gap-2.5">
-            <div className="flex size-8 items-center justify-center rounded-lg border border-border/60 bg-secondary/30">
-              <Logo variant="mark" className="h-3.5" />
-            </div>
-            <div>
-              <p className="text-xs font-medium text-foreground">Cencori checkout</p>
-              <p className="text-[11px] text-muted-foreground">
-                {checkoutMode === "direct" || clientSecret ? "Secure payment" : "Plan review"}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-start justify-between gap-6 pr-7">
-            <SheetTitle className="max-w-sm text-xl font-semibold tracking-[-0.025em] text-balance">
-              Upgrade {organizationLabel} to {plan.name}
-            </SheetTitle>
-            {checkoutMode === "direct" && (
-              <div className="shrink-0 text-right">
-                <p className="font-mono text-xl font-semibold tracking-[-0.04em] tabular-nums">
-                  {formatCents(dueNow)}
-                </p>
-                <p className="mt-0.5 text-[10px] text-muted-foreground">per month</p>
-              </div>
-            )}
-          </div>
-          <SheetDescription className="max-w-md text-xs leading-5">
-            {checkoutMode === "direct"
-              ? "Your subscription starts after payment confirmation and renews monthly."
-              : "Review the plan, then enter your payment details without leaving Cencori."}
-          </SheetDescription>
-
-          {reason && (
-            <div className="mt-3 rounded-md border border-border/50 bg-secondary/25 px-3 py-2.5 text-xs leading-5 text-muted-foreground">
-              {reason}
-            </div>
-          )}
-        </SheetHeader>
-
-        {checkoutOptions && sessionId ? (
-          <CheckoutElementsProvider
-            key={clientSecret}
-            stripe={stripePromise}
-            options={checkoutOptions}
-          >
-            <PaymentForm
-              error={error}
-              orgSlug={orgSlug}
-              paymentFirst={checkoutMode === "direct"}
-              returnPath={returnPath}
-              sessionId={sessionId}
-              onError={setError}
-              onSubmittingChange={setPaymentSubmitting}
-            >
-              <CheckoutDetails
-                availablePlans={availablePlans}
-                checkoutMode={checkoutMode}
-                clientSecret={clientSecret}
-                dueNow={dueNow}
-                interval={interval}
-                monthlyEquivalent={monthlyEquivalent}
-                plan={plan}
-                selectedTier={selectedTier}
-                setInterval={setInterval}
-                setSelectedTier={setSelectedTier}
-              />
-            </PaymentForm>
-          </CheckoutElementsProvider>
-        ) : (
-          <>
-            <div className="min-h-0 flex-1 overflow-y-auto">
-              <div className="space-y-7 px-5 py-6 sm:px-7">
-                {creatingSession && checkoutMode === "direct" && (
-                  <PaymentFormSkeleton />
-                )}
-
-                <CheckoutDetails
-                  availablePlans={availablePlans}
-                  checkoutMode={checkoutMode}
-                  clientSecret={clientSecret}
-                  dueNow={dueNow}
-                  interval={interval}
-                  monthlyEquivalent={monthlyEquivalent}
-                  plan={plan}
-                  selectedTier={selectedTier}
-                  setInterval={setInterval}
-                  setSelectedTier={setSelectedTier}
-                />
-
-                {creatingSession && checkoutMode === "review" && (
-                  <PaymentFormSkeleton bordered />
-                )}
-
-                {error && <CheckoutError message={error} />}
-              </div>
-            </div>
-
-            <SheetFooter className="gap-3 border-t border-border/50 bg-background px-5 py-5 sm:px-7">
-              <Button
-                type="button"
-                size="sm"
-                className="h-10 w-full rounded-md text-xs font-medium transition-transform active:scale-[0.99]"
-                onClick={startCheckout}
-                disabled={creatingSession || availablePlans.length === 0}
-              >
-                {creatingSession ? (
-                  checkoutMode === "review" ? "Continue to payment" : "Upgrade"
-                ) : checkoutMode === "review" ? (
-                  <>
-                    Continue to payment
-                    <ArrowRight className="size-3.5" aria-hidden="true" />
-                  </>
-                ) : (
-                  "Try again"
-                )}
-              </Button>
-              <SecureCheckoutNotice />
-            </SheetFooter>
-          </>
-        )}
-      </SheetContent>
-    </Sheet>
+  const summary = (
+    <CheckoutSummary
+      availablePlans={availablePlans}
+      clientSecret={clientSecret}
+      interval={checkoutInterval}
+      selectedTier={selectedTier}
+      setInterval={setInterval}
+      setSelectedTier={setSelectedTier}
+    />
   );
 
-  return checkoutSheet;
+  const totals = (
+    <OrderTotals
+      dueNow={dueNow}
+      dueToday={changingPlan ? (planChange?.amountDue ?? null) : dueNow}
+      interval={checkoutInterval}
+    />
+  );
+
+  // Once a Stripe session is loaded, the modal stays mounted (just hidden)
+  // when closed, so reopening shows the card form instantly instead of
+  // reloading Stripe's fields. Non-modal, because a mounted modal dialog
+  // would keep the rest of the page hidden from screen readers.
+  const keepMounted = hasOpened && Boolean(clientSecret);
+  const ignoreWhileHidden = (event: Event) => {
+    if (!open) event.preventDefault();
+  };
+
+  // Desktop: a centered modal. The header, scrolling body and pinned footer
+  // stack in a flex column capped at the viewport height.
+  const checkoutModal = (
+    <Dialog open={open} onOpenChange={handleOpenChange} modal={false}>
+      <DialogContent
+        animated={false}
+        showOverlay={false}
+        showCloseButton={false}
+        forceMount={keepMounted || undefined}
+        // Opening focuses the close button by default, drawing a focus ring
+        // around it; leave focus where it was instead.
+        onOpenAutoFocus={(event) => event.preventDefault()}
+        onEscapeKeyDown={ignoreWhileHidden}
+        onInteractOutside={ignoreWhileHidden}
+        className="flex data-[state=closed]:pointer-events-none data-[state=closed]:invisible max-h-[min(52rem,calc(100%-4rem-var(--maintenance-banner-height,0px)))] flex-col gap-0 overflow-hidden border-border/60 p-0 shadow-2xl sm:max-w-[400px]"
+      >
+        <DialogTitle className="sr-only">Checkout</DialogTitle>
+        <DialogDescription className="sr-only">
+          Upgrade {organizationLabel} to {plan.name}
+        </DialogDescription>
+
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+          <PlanPrice
+            amount={dueNow}
+            interval={checkoutInterval}
+            organizationLabel={organizationLabel}
+            planName={plan.name}
+          />
+          {!changingPlan && checkoutMode === "review" && summary}
+          {changingPlan ? (
+            <CardOnFilePanel
+              card={planChange?.card ?? null}
+              error={error}
+              loading={planChangeLoading}
+              totals={totals}
+              action={
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={planChange ? confirmPlanChange : loadPlanChange}
+                  disabled={planChangeLoading || paymentSubmitting}
+                >
+                  {paymentSubmitting ? (
+                    <>
+                      <Spinner
+                        className="size-3.5 animate-spin"
+                        aria-hidden="true"
+                      />
+                      Upgrading
+                    </>
+                  ) : planChange || planChangeLoading ? (
+                    `Upgrade to ${plan.name}`
+                  ) : (
+                    "Try again"
+                  )}
+                </Button>
+              }
+            />
+          ) : checkoutOptions && sessionId ? (
+            <CheckoutElementsProvider
+              key={clientSecret}
+              stripe={stripePromise}
+              options={checkoutOptions}
+            >
+              <PaymentForm
+                error={error}
+                orgSlug={orgSlug}
+                returnPath={returnPath}
+                sessionId={sessionId}
+                onError={setError}
+                onSubmittingChange={setPaymentSubmitting}
+                totals={totals}
+              />
+            </CheckoutElementsProvider>
+          ) : (
+            <PaymentPanel
+              error={error}
+              loading={creatingSession || checkoutMode === "review"}
+              totals={totals}
+              action={
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={startCheckout}
+                  disabled={creatingSession || availablePlans.length === 0}
+                >
+                  {checkoutMode === "review" ? (
+                    <>
+                      Continue to payment
+                      <ArrowRight className="size-3.5" aria-hidden="true" />
+                    </>
+                  ) : creatingSession ? (
+                    "Subscribe"
+                  ) : (
+                    "Try again"
+                  )}
+                </Button>
+              }
+            />
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+
+  return checkoutModal;
 }
 
-function CheckoutDetails({
-  availablePlans,
-  checkoutMode,
-  clientSecret,
-  dueNow,
+/** "Upgrade {org} to {plan}" and the price, at the top of the payment panel. */
+function PlanPrice({
+  amount,
   interval,
-  monthlyEquivalent,
-  plan,
+  organizationLabel,
+  planName,
+}: {
+  amount: number;
+  interval: PlanBillingInterval;
+  organizationLabel: string;
+  planName: string;
+}) {
+  return (
+    <div className="px-5 pt-8 text-center sm:px-8 lg:px-10 lg:pt-10">
+      <p className="text-sm text-muted-foreground">
+        Upgrade {organizationLabel} to {planName}
+      </p>
+      <div className="mt-1.5 flex items-center justify-center gap-3">
+        <span className="text-4xl font-semibold tracking-[-0.035em] tabular-nums">
+          {formatCents(amount)}
+        </span>
+        <span className="text-left text-xs font-medium leading-4 text-muted-foreground">
+          per
+          <br />
+          {interval}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/** The right half when changing plan: the card already on file and the button. */
+function CardOnFilePanel({
+  action,
+  card,
+  error,
+  loading,
+  totals,
+}: {
+  action: ReactNode;
+  card: { brand: string; last4: string } | null;
+  error: string | null;
+  loading: boolean;
+  totals: ReactNode;
+}) {
+  return (
+    <div className="flex flex-1 flex-col">
+      <div className="flex-1 space-y-8 px-5 py-8 sm:px-8 lg:px-10 lg:py-10">
+        <section aria-label="Payment method">
+          <div className="flex items-center gap-3 rounded-lg border border-border/60 p-4 text-sm">
+            <CreditCard className="size-4 shrink-0" aria-hidden="true" />
+            {loading ? (
+              <Skeleton className="h-4 w-36" />
+            ) : card ? (
+              <span>
+                <span className="capitalize">{card.brand}</span>
+                <span className="text-muted-foreground"> ending in </span>
+                <span className="tabular-nums">{card.last4}</span>
+              </span>
+            ) : (
+              <span className="text-muted-foreground">
+                The card on your current subscription
+              </span>
+            )}
+          </div>
+          <p className="mt-3 text-xs leading-5 text-muted-foreground">
+            To use a different card, update it in Billing first.
+          </p>
+        </section>
+
+        {totals}
+
+        {error && <CheckoutError message={error} />}
+      </div>
+
+      <PanelFooter action={action}>
+        By upgrading, you authorize Cencori to charge this card according to the{" "}
+        <Link
+          href="/terms-of-service"
+          className="underline underline-offset-2 hover:text-foreground"
+        >
+          terms
+        </Link>{" "}
+        until you cancel. See our{" "}
+        <Link
+          href="/privacy-policy"
+          className="underline underline-offset-2 hover:text-foreground"
+        >
+          privacy policy
+        </Link>
+        .
+      </PanelFooter>
+    </div>
+  );
+}
+
+/** Review mode only: the billing-cycle toggle and plan picker, under the price. */
+function CheckoutSummary({
+  availablePlans,
+  clientSecret,
+  interval,
   selectedTier,
   setInterval,
   setSelectedTier,
 }: {
   availablePlans: PaidPlanTier[];
-  checkoutMode: "review" | "direct";
   clientSecret: string | null;
-  dueNow: number;
   interval: PlanBillingInterval;
-  monthlyEquivalent: number;
-  plan: (typeof CENCORI_PAID_PLANS)[PaidPlanTier];
   selectedTier: PaidPlanTier;
   setInterval: (interval: PlanBillingInterval) => void;
   setSelectedTier: (tier: PaidPlanTier) => void;
 }) {
-  const selectedInterval = checkoutMode === "direct" ? "month" : interval;
-
-  if (checkoutMode === "direct") {
-    return (
-      <section
-        aria-labelledby="plan-summary-heading"
-        className="-mx-5 border-t border-border/50 px-5 pt-6 sm:-mx-7 sm:px-7"
-      >
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h3 id="plan-summary-heading" className="text-xs font-medium">
-              Your {plan.name} plan
-            </h3>
-            <p className="mt-1 text-[11px] leading-4 text-muted-foreground">
-              {plan.description}
-            </p>
-          </div>
-          <span className="shrink-0 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-            Monthly
+  return (
+    <div className="space-y-8 px-5 pt-8 sm:px-8 lg:px-10">
+      <section aria-labelledby="billing-cycle-heading">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 id="billing-cycle-heading" className="text-xs font-medium">
+            Billing cycle
+          </h3>
+          <span className="text-[11px] text-emerald-500">
+            Two months free annually
           </span>
         </div>
-
-        <dl className="-mx-5 mt-6 border-t border-border/50 text-xs sm:-mx-7">
-          <div className="flex items-center justify-between gap-4 border-b border-border/40 px-5 py-4 sm:px-7">
-            <dt className="text-muted-foreground">{plan.name} plan</dt>
-            <dd className="font-mono tabular-nums">{formatCents(dueNow)}</dd>
-          </div>
-          <div className="flex items-center justify-between gap-4 border-b border-border/40 px-5 py-4 sm:px-7">
-            <dt className="text-muted-foreground">Billing cycle</dt>
-            <dd>Monthly</dd>
-          </div>
-          <div className="flex items-center justify-between gap-4 border-b border-border/50 px-5 py-4 sm:px-7">
-            <dt className="text-muted-foreground">Renewal</dt>
-            <dd>Automatic until canceled</dd>
-          </div>
-          <div className="flex items-end justify-between gap-4 px-5 py-4 sm:px-7">
-            <dt>
-              <span className="block font-medium">Due today</span>
-              <span className="mt-0.5 block text-[10px] text-muted-foreground">
-                Taxes, if applicable, are calculated during payment
-              </span>
-            </dt>
-            <dd className="font-mono text-base font-semibold tabular-nums">
-              {formatCents(dueNow)}
-            </dd>
-          </div>
-        </dl>
+        <div className="grid grid-cols-2 rounded-md border border-border/60 bg-secondary/20 p-1">
+          {(["month", "year"] as const).map((value) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={interval === value}
+              onClick={() => setInterval(value)}
+              disabled={Boolean(clientSecret)}
+              className={cn(
+                "h-8 rounded text-xs font-medium transition-[background-color,color,box-shadow,transform] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 active:scale-[0.99] disabled:cursor-default",
+                interval === value
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {value === "month" ? "Monthly" : "Annual"}
+            </button>
+          ))}
+        </div>
       </section>
-    );
-  }
 
-  return (
-    <>
-      {checkoutMode === "review" && (
-        <section aria-labelledby="billing-cycle-heading">
-          <div className="mb-3 flex items-center justify-between">
-            <h3 id="billing-cycle-heading" className="text-xs font-medium">
-              Billing cycle
-            </h3>
-            <span className="text-[11px] text-emerald-500">Two months free annually</span>
-          </div>
-          <div className="grid grid-cols-2 rounded-md border border-border/60 bg-secondary/20 p-1">
-            {(["month", "year"] as const).map((value) => (
-              <button
-                key={value}
-                type="button"
-                aria-pressed={interval === value}
-                onClick={() => setInterval(value)}
-                disabled={Boolean(clientSecret)}
-                className={cn(
-                  "h-8 rounded text-xs font-medium transition-[background-color,color,box-shadow,transform] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 active:scale-[0.99] disabled:cursor-default",
-                  interval === value
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {value === "month" ? "Monthly" : "Annual"}
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {checkoutMode === "review" && (
+      {availablePlans.length > 1 && (
         <section aria-labelledby="plan-heading">
           <h3 id="plan-heading" className="mb-3 text-xs font-medium">
             Plan
           </h3>
-          <div className={cn("grid gap-2", availablePlans.length > 1 && "sm:grid-cols-2")}>
+          <div className="grid gap-2 sm:grid-cols-2">
             {availablePlans.map((tier) => {
               const option = CENCORI_PAID_PLANS[tier];
               const selected = selectedTier === tier;
@@ -800,18 +928,14 @@ function CheckoutDetails({
                   )}
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-medium">{option.name}</p>
-                      <p className="mt-1 text-[11px] leading-4 text-muted-foreground">
-                        {option.description}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-mono text-sm font-medium tabular-nums">
-                        {formatCents(optionMonthly)}
-                      </p>
-                      <p className="text-[10px] text-muted-foreground">per month</p>
-                    </div>
+                    <p className="text-sm font-medium">{option.name}</p>
+                    <p className="text-sm font-medium tabular-nums">
+                      {formatCents(optionMonthly)}
+                      <span className="text-[10px] font-normal text-muted-foreground">
+                        {" "}
+                        /mo
+                      </span>
+                    </p>
                   </div>
                 </button>
               );
@@ -819,56 +943,63 @@ function CheckoutDetails({
           </div>
         </section>
       )}
+    </div>
+  );
+}
 
-      <section aria-labelledby="included-heading">
-        <div className="mb-3">
-          <h3 id="included-heading" className="text-xs font-medium">
-            Included with {plan.name}
-          </h3>
-          <p className="mt-1 text-[11px] text-muted-foreground">{plan.description}</p>
-        </div>
-        <ul className="grid gap-x-5 gap-y-2.5 sm:grid-cols-2">
-          {plan.features.map((feature) => (
-            <li key={feature} className="flex items-start gap-2 text-xs leading-5 text-muted-foreground">
-              <Check className="mt-1 size-3 shrink-0 text-emerald-500" aria-hidden="true" />
-              <span>{feature}</span>
-            </li>
-          ))}
-        </ul>
-      </section>
+/** The subtotal and total due today, under the payment fields. */
+function OrderTotals({
+  dueNow,
+  dueToday,
+  interval,
+}: {
+  dueNow: number;
+  /** What's charged now: the price, or the prorated difference when changing plan. null while it loads. */
+  dueToday: number | null;
+  interval: PlanBillingInterval;
+}) {
+  const prorated = dueToday !== dueNow;
+  const total =
+    dueToday === null ? (
+      <Skeleton className="inline-block h-5 w-14 align-middle" />
+    ) : (
+      formatCents(dueToday)
+    );
 
-      <section aria-labelledby="summary-heading" className="border-t border-border/50 pt-6">
-        <div className="mb-4 flex items-center gap-2">
-          <CreditCard className="size-3.5 text-muted-foreground" aria-hidden="true" />
-          <h3 id="summary-heading" className="text-xs font-medium">
-            Order summary
-          </h3>
-        </div>
-        <dl className="space-y-3 text-xs">
-          <div className="flex items-center justify-between gap-4">
-            <dt className="text-muted-foreground">{plan.name} plan</dt>
-            <dd className="font-mono tabular-nums">
-              {formatCents(dueNow)} / {selectedInterval}
-            </dd>
-          </div>
-          {selectedInterval === "year" && (
-            <div className="flex items-center justify-between gap-4">
-              <dt className="text-muted-foreground">Monthly equivalent</dt>
-              <dd className="font-mono tabular-nums">{formatCents(monthlyEquivalent)} / month</dd>
-            </div>
-          )}
-          <div className="flex items-end justify-between gap-4 border-t border-border/50 pt-3">
-            <dt>
-              <span className="block font-medium">Due now</span>
-              <span className="mt-0.5 block text-[10px] text-muted-foreground">
-                Taxes, if applicable, are calculated during payment
-              </span>
-            </dt>
-            <dd className="font-mono text-base font-semibold tabular-nums">{formatCents(dueNow)}</dd>
-          </div>
-        </dl>
-      </section>
-    </>
+  return (
+    <dl className="text-sm">
+      <div className="flex items-center justify-between gap-6 pb-3">
+        <dt>Subtotal</dt>
+        <dd className="tabular-nums">{total}</dd>
+      </div>
+      <div className="flex items-end justify-between gap-6 border-t border-border/50 pt-3">
+        <dt>
+          <span className="block font-medium">Total due today</span>
+          <span className="mt-0.5 block text-xs text-muted-foreground">
+            {prorated
+              ? `Prorated for the rest of your current billing period, then ${formatCents(dueNow)} per ${interval}`
+              : "Taxes, if applicable, are calculated during payment"}
+          </span>
+        </dt>
+        <dd className="text-lg font-semibold tabular-nums">{total}</dd>
+      </div>
+    </dl>
+  );
+}
+
+/** The bar pinned to the bottom of the payment panel: the authorization note and the button. */
+function PanelFooter({
+  action,
+  children,
+}: {
+  action: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <div className="sticky bottom-0 flex items-center justify-between gap-6 border-t border-border/30 bg-background px-5 py-3 sm:px-8 lg:px-10">
+      <p className="text-[11px] leading-4 text-muted-foreground">{children}</p>
+      <div className="shrink-0">{action}</div>
+    </div>
   );
 }
 
