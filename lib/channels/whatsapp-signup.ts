@@ -107,7 +107,7 @@ export async function finishSignup(db: Admin, opts: {
  * so it can't be swapped: project, assistant, user, coexistence, where to
  * return to in Studio, and expiry.
  */
-export type SignupState = { p: string; a: string; u: string; c: boolean; e: number; /** Studio page to return to: Home or setup. */ r?: "/" | "/setup" };
+export type SignupState = { p: string; a: string; u: string; c: boolean; e: number; /** Studio page to return to: Home or setup. */ r?: "/" | "/setup"; /** Started from the mobile app: return to it, which finishes connecting. */ m?: "app" };
 
 function sign(body: string): string {
     return createHmac("sha256", `whatsapp-signup:${process.env.META_APP_SECRET ?? ""}`).update(body).digest("base64url");

@@ -4,46 +4,38 @@
  * Meta's signup comes back here (Studio's redirect version). The signed state
  * says which assistant, and who started it; it must be the same person, still
  * signed in. Then the number is connected like the console's popup does it.
+ *
+ * Started from the mobile app (state.m), the sign-in is in the app, not this
+ * browser: the code goes back to the app sealed, and the app finishes with
+ * POST /api/studio/whatsapp/finish, where the same-person check happens.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabaseAdmin';
 import { requireProjectAccess } from '@/lib/require-project-access';
-import type { SubscriptionTier } from '@/lib/entitlements';
-import { finishSignup, readState } from '@/lib/channels/whatsapp-signup';
-import { returnPath, studioCallbackUrl, studioHome } from '@/app/api/studio/whatsapp/shared';
+import { readState } from '@/lib/channels/whatsapp-signup';
+import { appReturn, connectFromSignup, returnPath, sealHandoff, studioCallbackUrl, studioHome } from '@/app/api/studio/whatsapp/shared';
 
 export async function GET(req: NextRequest) {
     const params = req.nextUrl.searchParams;
     const state = readState(params.get('state'));
-    const home = studioHome(req, returnPath(state?.r));
-    // Cancelled on Meta's side: Meta sends error_reason instead of a code.
-    if (params.get('error') || params.get('error_reason')) return NextResponse.redirect(home('failed', 'Connecting WhatsApp was cancelled.'));
+    const cancelled = !!(params.get('error') || params.get('error_reason'));
     const code = params.get('code')?.trim();
+
+    if (state?.m === 'app') {
+        // Cancelled on Meta's side: Meta sends error_reason instead of a code.
+        if (cancelled) return NextResponse.redirect(appReturn('failed', 'Connecting WhatsApp was cancelled.'));
+        if (!code) return NextResponse.redirect(appReturn('failed', 'That sign-up link expired. Try again.'));
+        const handoff = sealHandoff({ code, state: params.get('state')!, redirectUri: studioCallbackUrl(req) });
+        return NextResponse.redirect(handoff ? appReturn('handoff', handoff) : appReturn('failed', 'Connecting WhatsApp isn’t set up yet.'));
+    }
+
+    const home = studioHome(req, returnPath(state?.r));
+    if (cancelled) return NextResponse.redirect(home('failed', 'Connecting WhatsApp was cancelled.'));
     if (!state || !code) return NextResponse.redirect(home('failed', 'That sign-up link expired. Try again.'));
 
     const access = await requireProjectAccess(state.p);
     if (!access.ok || access.userId !== state.u) return NextResponse.redirect(home('failed', 'Sign in to Studio as the person who started connecting, then try again.'));
-    const db = createAdminClient();
-    const [{ data: agent }, { data: organization }, { data: membership }] = await Promise.all([
-        db.from('agents').select('id, name').eq('project_id', state.p).eq('id', state.a).maybeSingle(),
-        db.from('organizations').select('owner_id, subscription_tier').eq('id', access.organizationId).maybeSingle(),
-        db.from('organization_members').select('role').eq('organization_id', access.organizationId).eq('user_id', access.userId).maybeSingle(),
-    ]);
-    if (!agent) return NextResponse.redirect(home('failed', 'That assistant isn’t in this business any more.'));
-    const canManage = organization?.owner_id === access.userId || ['owner', 'admin'].includes((membership?.role as string) ?? '');
-    if (!canManage) return NextResponse.redirect(home('failed', 'Only owners and admins can connect WhatsApp.'));
-
-    const saved = await finishSignup(db, {
-        projectId: state.p,
-        organizationId: access.organizationId,
-        agentId: state.a,
-        agentName: agent.name as string,
-        tier: ((organization?.subscription_tier as string) || 'free') as SubscriptionTier,
-        code,
-        coexistence: state.c,
-        redirectUri: studioCallbackUrl(req),
-    });
+    const saved = await connectFromSignup({ state, userId: access.userId, organizationId: access.organizationId, code, redirectUri: studioCallbackUrl(req) });
     if (!saved.ok) return NextResponse.redirect(home('failed', saved.message));
     return NextResponse.redirect(home('connected'));
 }
