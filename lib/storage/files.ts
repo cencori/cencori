@@ -86,7 +86,12 @@ export async function putFile(
         body: body as Uint8Array<ArrayBuffer>,
         headers: { "content-type": contentType },
     });
-    return { error: response.ok ? null : `Upload failed (${response.status})` };
+    if (response.ok) return { error: null };
+    // Log what storage said (its <Code>, e.g. AccessDenied): the routes answer a bare 502, and
+    // without this a failing bucket left nothing to go on (event banners, 2026-10-30).
+    const detail = (await response.text().catch(() => "")).match(/<Code>([^<]+)<\/Code>/)?.[1] ?? "";
+    console.error(`[files] PUT ${bucket}/${key} failed: ${response.status} ${detail}`.trim());
+    return { error: `Upload failed (${response.status}${detail ? ` ${detail}` : ""})` };
 }
 
 /** Keys of the files directly under `folder`, e.g. a user's id. */
@@ -133,7 +138,10 @@ export async function ensureFileBucket(
 /** The stored object, for app/api/files. null when it doesn't exist. */
 export async function getFile(bucket: FileBucket, key: string): Promise<Response | null> {
     const response = await s3Config().client.fetch(objectUrl(bucket, key));
-    return response.ok ? response : null;
+    if (response.ok) return response;
+    // A missing file is a 404 here too, so say when it was storage failing instead.
+    if (response.status !== 404) console.error(`[files] GET ${bucket}/${key} failed: ${response.status}`);
+    return null;
 }
 
 function decodeXml(value: string): string {
