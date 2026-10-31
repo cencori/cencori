@@ -1,6 +1,8 @@
 import type { ChatCompletionFunctionTool } from "openai/resources/chat/completions";
 import type { createAdminClient } from "@/lib/supabaseAdmin";
 import { AGENT_READ_NAMES, AGENT_READ_TOOLS, AGENT_TOOL_STATUS, runAgentReadTool } from "@/lib/copilot/agent-tools";
+import { BUSINESS_TOOLS, BUSINESS_TOOL_NAMES, BUSINESS_TOOL_STATUS, runBusinessTool } from "@/lib/copilot/business-tools";
+import { REMEMBER_TOOLS, REMEMBER_TOOL_NAMES, REMEMBER_TOOL_STATUS, runRememberTool } from "@/lib/copilot/remember";
 
 /**
  * Read-only tools for Cencori Copilot (app/api/agent).
@@ -16,6 +18,10 @@ export type CopilotToolContext = {
     admin: ReturnType<typeof createAdminClient>;
     organization: { id: string; name: string; slug: string };
     project: { id: string; name: string; slug: string } | null;
+    /** Who's asking: chats are unread or not for them. */
+    userId?: string;
+    /** A business account (Studio): its owner's employee also reads money, orders, bookings, customers and chats. */
+    business?: boolean;
 };
 
 type Range = "24h" | "7d" | "30d";
@@ -75,6 +81,8 @@ const PROJECT_TOOLS = new Set([
     "get_memory_stats",
     "search_memories",
     ...AGENT_READ_NAMES,
+    ...BUSINESS_TOOL_NAMES,
+    ...REMEMBER_TOOL_NAMES,
 ]);
 
 export const COPILOT_TOOLS: ChatCompletionFunctionTool[] = [
@@ -208,9 +216,10 @@ export const COPILOT_TOOLS: ChatCompletionFunctionTool[] = [
 
 COPILOT_TOOLS.push(...AGENT_READ_TOOLS);
 
-/** The tools available for this context (project-only tools need a project). */
+/** The tools available for this context (project-only tools need a project; the business's own data is for business accounts). */
 export function toolsFor(ctx: CopilotToolContext): ChatCompletionFunctionTool[] {
-    return ctx.project ? COPILOT_TOOLS : COPILOT_TOOLS.filter((t) => !PROJECT_TOOLS.has(t.function.name));
+    if (!ctx.project) return COPILOT_TOOLS.filter((t) => !PROJECT_TOOLS.has(t.function.name));
+    return ctx.business ? [...COPILOT_TOOLS, ...BUSINESS_TOOLS, ...REMEMBER_TOOLS] : COPILOT_TOOLS;
 }
 
 /** Short label shown in the panel while a tool runs. */
@@ -226,6 +235,8 @@ export const TOOL_STATUS: Record<string, string> = {
     get_memory_stats: "Checking memory",
     search_memories: "Searching memories",
     ...AGENT_TOOL_STATUS,
+    ...BUSINESS_TOOL_STATUS,
+    ...REMEMBER_TOOL_STATUS,
 };
 
 type Args = Record<string, unknown>;
@@ -237,6 +248,8 @@ export async function runCopilotTool(name: string, args: Args, ctx: CopilotToolC
     }
 
     if (AGENT_READ_NAMES.has(name)) return runAgentReadTool(name, args, ctx);
+    if (BUSINESS_TOOL_NAMES.has(name)) return ctx.business ? runBusinessTool(name, args, ctx) : { error: "That's only for business accounts." };
+    if (REMEMBER_TOOL_NAMES.has(name)) return ctx.business ? runRememberTool(name, args, ctx) : { error: "That's only for business accounts." };
 
     switch (name) {
         case "get_usage_summary": {

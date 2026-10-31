@@ -9,8 +9,11 @@ import { createAdminClient } from "@/lib/supabaseAdmin";
 import { createServerClient } from "@/lib/supabaseServer";
 import { runCopilotTool, toolsFor, TOOL_STATUS, type CopilotToolContext } from "@/lib/copilot/tools";
 import { ACTION_NAMES, ACTION_STATUS, COPILOT_ACTIONS, prepareCopilotAction } from "@/lib/copilot/actions";
+import { BUSINESS_ACTIONS, BUSINESS_ACTION_NAMES } from "@/lib/copilot/business-actions";
 import { verifyOrganizationAccess } from "@/lib/copilot/access";
 import { findAgent } from "@/lib/copilot/agent-tools";
+import { employeePrompt } from "@/lib/copilot/employee";
+import type { Remembered } from "@/lib/copilot/remember";
 import { DOCS_TOOL_NAMES, DOCS_TOOL_STATUS, DOCS_TOOLS, runDocsTool } from "@/lib/copilot/docs";
 import { COPILOT_MENUS, NAVIGATE_TOOL, OPEN_MENU_TOOL, prepareNavigation, type CopilotMenu } from "@/lib/copilot/navigation";
 import { COPILOT_FILES_REQUEST_BUDGET, sanitizeFiles, sanitizeImages, withFiles, type CopilotFile } from "@/lib/copilot/files";
@@ -54,6 +57,8 @@ Rules:
   2. Propose create_agent once with everything (template 'restaurant' where it fits, the menu as knowledge_text, alert_emails).
   3. Then carry on step by step, one proposal at a time, reporting after each: for restaurants open_agent_page 'calendar' (bookings need Google Calendar, which they connect themselves); if they take deposits, open_agent_page 'payments' (they connect Paystack, Flutterwave or Stripe with their secret key; money goes straight to their account); then publish_agent, then open_agent_page 'whatsapp'. get_agent's still_to_do says what's left.
   Business accounts (page context account: 'business'): the user runs a business (a restaurant, shop, salon, clinic), not software. Talk like a helpful colleague, never about APIs, tokens, keys or models. If they have no agent yet, your job is to build their first one with them: ask what the business is and what customers usually ask, then follow the steps above. Their plan (business_plan) sets how many agents they can have and their monthly conversations; if they're at the agent limit, say so and point them to Billing to upgrade.
+  A business account can also read its own business: get_money (what it earned, how it was paid, what's left to collect, best sellers, transfers to confirm), list_orders, list_bookings, list_customers, list_chats and read_chat. Answer every question about money, sales, orders, bookings, customers or chats from these, never from memory or guesswork, and say the period you looked at. The business's money is in its own currency (₦ for NGN), not USD; the USD rule below is for Cencori costs only.
+  A business account's employee can also act for the owner, each one confirmed by them like any action: message_customer (from you, for the owner; it doesn't pause you), send_payment_link, step_in / hand_back, update_order (paid, done, cancelled), update_booking (done, cancelled) and confirm_transfer (only on the owner's word that the money arrived). Look the target up first (list_chats, list_orders, list_bookings, get_money) and never invent ids.
   For shops and anyone selling products (fashion, food, beauty, gadgets…): put their price list in the catalog with add_products (not as knowledge: the agent quotes prices and stock from the catalog and takes orders from it), switch sell_products on with set_agent_system_tools, and offer open_agent_page 'payments' so orders are paid by link. Big lists or Bumpa/Selar/Shopify exports: open_agent_page 'products', where they import the spreadsheet.
   For changes ("mention the live band on Fridays", "stop taking bookings over 8"), use update_agent_instructions (append for small additions), then offer publish_agent, since edits only go live once published. Connecting WhatsApp, Google Calendar or other apps needs the user's own sign-in: offer open_agent_page, never claim you connected it.
 - You can take the user around the dashboard with navigate: it opens the page in the same tab and you stay open beside it. Use it when they ask to go somewhere or be shown something ("take me to…", "show me…", "open my billing"), or when a page shows the answer better than words (the full log, a chart). Look up first when the target depends on data (e.g. list_agents for their busiest agent, which comes sorted by recent runs), then navigate once. Don't navigate for questions you can just answer, and never more than once per reply. current_path in the dashboard context is the page they're on now. For "where do I…" / "where is…" questions about a setting or button, navigate with highlight so it's outlined on screen. After navigating, say in one short line where you took them and what to look at (with highlight: "the part I've outlined"); don't say "click" or describe links. If navigate is awaiting confirmation (unsaved changes), say so in one line instead. open_menu opens the command palette, their account menu or the organization switcher on screen, when they ask for one.
@@ -226,7 +231,7 @@ export async function POST(request: NextRequest) {
                 console.error("[Cencori Agent] Usage cap unavailable:", usageError.message);
             } else if (usage && (usage as { allowed?: boolean }).allowed === false) {
                 return NextResponse.json({
-                    error: `You've asked Copilot ${BUSINESS_COPILOT_DAILY_LIMIT} questions today. It resets at midnight UTC.`,
+                    error: `You've sent ${BUSINESS_COPILOT_DAILY_LIMIT} messages today. Talk again after midnight UTC.`,
                     code: "copilot_daily_limit",
                 }, { status: 429 });
             }
@@ -251,6 +256,16 @@ export async function POST(request: NextRequest) {
                 }
                 billed = true;
             }
+        }
+
+        // Studio, for a business: who the owner is talking to (their main agent, as the AI tab shows it).
+        let employee: string | null = null;
+        if (isBusiness && currentPath === "studio" && project) {
+            const { data: agents } = await admin.from("agents").select("name, is_active, stable_version_id, created_at").eq("project_id", project.id).order("created_at", { ascending: true });
+            const staff = ((agents ?? []) as Array<{ name: string; is_active: boolean; stable_version_id: string | null }>)
+                .map((agent) => ({ name: agent.name, live: !!agent.stable_version_id && agent.is_active }))
+                .sort((a, b) => Number(b.live) - Number(a.live));
+            employee = employeePrompt(organization?.name ?? null, userName ?? null, staff);
         }
 
         const pageContext = {
@@ -331,6 +346,7 @@ export async function POST(request: NextRequest) {
                 : `CURRENT DASHBOARD CONTEXT\n${JSON.stringify(pageContext, null, 2)}\n\nLATEST USER MESSAGE\n${question}`;
             return [
                 { role: "system", content: SYSTEM_PROMPT },
+                ...(employee ? [{ role: "system" as const, content: employee }] : []),
                 ...(lightweightConversation
                     ? []
                     : messages.slice(0, -1).map((message): ChatCompletionMessageParam => ({
@@ -347,11 +363,13 @@ export async function POST(request: NextRequest) {
                 admin,
                 organization: { id: organization.id, name: organization.name, slug: organization.slug },
                 project: project ? { id: project.id, name: project.name, slug: project.slug } : null,
+                userId: user.id,
+                business: isBusiness,
             }
             : null;
         // Read tools always; action tools only inside a project.
         const tools = !lightweightConversation && toolContext
-            ? [...toolsFor(toolContext), ...DOCS_TOOLS, NAVIGATE_TOOL, OPEN_MENU_TOOL, ...(toolContext.project ? COPILOT_ACTIONS : [])]
+            ? [...toolsFor(toolContext), ...DOCS_TOOLS, NAVIGATE_TOOL, OPEN_MENU_TOOL, ...(toolContext.project ? COPILOT_ACTIONS : []), ...(toolContext.project && toolContext.business ? BUSINESS_ACTIONS : [])]
             : undefined;
         const encoder = new TextEncoder();
 
@@ -438,7 +456,7 @@ export async function POST(request: NextRequest) {
                         agentMessages.push({ role: "assistant", content: content || null, tool_calls: toolCalls });
 
                         for (const call of toolCalls) {
-                            const isAction = ACTION_NAMES.has(call.function.name);
+                            const isAction = ACTION_NAMES.has(call.function.name) || (!!toolContext.business && BUSINESS_ACTION_NAMES.has(call.function.name));
                             const isNavigate = call.function.name === NAVIGATE_TOOL.function.name;
                             const isMenu = call.function.name === OPEN_MENU_TOOL.function.name;
                             send({ status: DOCS_TOOL_STATUS[call.function.name] ?? (isNavigate ? "Opening the page" : isMenu ? "Opening the menu" : (isAction ? ACTION_STATUS : TOOL_STATUS)[call.function.name] ?? "Looking it up") });
@@ -484,6 +502,9 @@ export async function POST(request: NextRequest) {
                                     }
                                 } else {
                                     output = await runCopilotTool(call.function.name, args, toolContext);
+                                    // Saved without a card: the panel shows it with an Undo.
+                                    const remembered = (output as { remembered?: Remembered } | null)?.remembered;
+                                    if (call.function.name === "remember" && remembered) send({ remembered });
                                 }
                             } catch (toolError) {
                                 console.error("[Cencori Agent] Tool error:", call.function.name, toolError);

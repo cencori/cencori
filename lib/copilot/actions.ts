@@ -1,6 +1,7 @@
 import type { ChatCompletionFunctionTool } from "openai/resources/chat/completions";
 import type { CopilotToolContext } from "@/lib/copilot/tools";
 import { AGENT_ACTIONS, AGENT_ACTION_NAMES, AGENT_TOOL_STATUS, prepareAgentAction } from "@/lib/copilot/agent-tools";
+import { BUSINESS_ACTION_NAMES, BUSINESS_ACTION_STATUS, prepareBusinessAction } from "@/lib/copilot/business-actions";
 
 /**
  * Write actions for Cencori Copilot.
@@ -164,6 +165,7 @@ COPILOT_ACTIONS.push(...AGENT_ACTIONS);
 export const ACTION_NAMES = new Set(COPILOT_ACTIONS.map((a) => a.function.name));
 
 export const ACTION_STATUS: Record<string, string> = {
+    ...BUSINESS_ACTION_STATUS,
     create_api_key: "Preparing a new key",
     update_api_key: "Preparing key changes",
     revoke_api_key: "Preparing to revoke",
@@ -202,6 +204,7 @@ async function findKey(ctx: CopilotToolContext, ref: unknown) {
 
 export async function prepareCopilotAction(name: string, args: Args, ctx: CopilotToolContext): Promise<PrepareResult> {
     if (AGENT_ACTION_NAMES.has(name)) return prepareAgentAction(name, args, ctx);
+    if (BUSINESS_ACTION_NAMES.has(name)) return prepareBusinessAction(name, args, ctx);
     const project = ctx.project;
     if (!project) return { error: "Select a project first; actions apply to a project." };
     const base = `/api/projects/${project.id}`;
