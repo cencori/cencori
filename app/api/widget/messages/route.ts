@@ -3,8 +3,11 @@
  *
  * What the business owner said in this conversation from Studio, after
  * `since`, and whether they're handling it right now (the assistant is
- * paused). The widget polls this while it's open. Authorized by the
- * conversation's client token, so it only ever reads that one session.
+ * paused). Also what the assistant passed on for the owner (Copilot's
+ * message_customer and payment links: from "assistant"), which arrives this
+ * way too, not as a reply to the visitor. The widget polls this while it's
+ * open. Authorized by the conversation's client token, so it only ever reads
+ * that one session.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -29,8 +32,8 @@ export async function GET(req: NextRequest) {
     const metadata = data.metadata as Record<string, unknown> | null;
     const since = Date.parse(req.nextUrl.searchParams.get('since') ?? '');
     const messages = manualMessages(metadata)
-        .filter((m) => m.from === 'owner' && (!Number.isFinite(since) || Date.parse(m.at) > since))
+        .filter((m) => (m.from === 'owner' || m.from === 'assistant') && (!Number.isFinite(since) || Date.parse(m.at) > since))
         .slice(-20)
-        .map((m) => ({ id: m.id, text: m.text, at: m.at }));
+        .map((m) => ({ id: m.id, from: m.from, text: m.text, at: m.at }));
     return NextResponse.json({ owner_active: isOwnerActive(metadata), messages }, { headers: { 'Cache-Control': 'no-store' } });
 }

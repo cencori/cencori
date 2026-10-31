@@ -316,8 +316,9 @@
                     return !state.messages.some(function (x) { return x.id === m.id; });
                 });
                 var changed = fresh.length > 0 || body.owner_active !== state.ownerActive;
-                if (fresh.length && !state.ownerActive) joined();
-                fresh.forEach(function (m) { state.messages.push({ role: "owner", id: m.id, text: m.text }); });
+                // Someone joined only when the owner wrote; the assistant passing something on for them is just the assistant.
+                if (fresh.some(function (m) { return m.from !== "assistant"; }) && !state.ownerActive) joined();
+                fresh.forEach(function (m) { state.messages.push({ role: m.from === "assistant" ? "assistant" : "owner", id: m.id, text: m.text }); });
                 if (fresh.length) {
                     state.ownerSince = fresh[fresh.length - 1].at;
                     state.lastActive = Date.now();
@@ -371,6 +372,7 @@
     });
 
     render(false);
-    schedulePoll();
+    // Coming back to a conversation: catch up once (the owner, or the assistant for them, may have written since), then poll as usual.
+    if (state.sessionId) poll(); else schedulePoll();
     parent.postMessage({ type: "cencori:ready", key: cfg.key }, "*");
 })();

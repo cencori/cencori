@@ -24,7 +24,8 @@ const MANUAL_MESSAGES_MAX = 200;
 
 export interface ManualMessage {
     id: string;
-    from: "customer" | "owner";
+    /** "assistant": something the owner asked their employee to pass on (Copilot's message_customer); it doesn't pause anything. */
+    from: "customer" | "owner" | "assistant";
     text: string;
     at: string;
     seen?: boolean;
@@ -55,7 +56,7 @@ export function needsOwner(metadata: Record<string, unknown> | null | undefined)
 
 export function manualMessages(metadata: Record<string, unknown> | null | undefined): ManualMessage[] {
     const list = (metadata as Metadata | null | undefined)?.manual_messages;
-    return Array.isArray(list) ? list.filter((m) => m && typeof m.text === "string" && (m.from === "customer" || m.from === "owner")) : [];
+    return Array.isArray(list) ? list.filter((m) => m && typeof m.text === "string" && (m.from === "customer" || m.from === "owner" || m.from === "assistant")) : [];
 }
 
 /** Read, change and write one conversation's metadata. */
@@ -127,7 +128,8 @@ export async function markUnread(db: Admin, sessionId: string, userId: string): 
     });
 }
 
-const CATCH_UP_NOTE = /^\[While you were paused, the business owner talked with the customer directly:[\s\S]*?don't repeat what the owner already said\.\]\n\n/;
+// Both wordings: notes already stored in turns used the first.
+const CATCH_UP_NOTE = /^\[(?:While you were paused, the business owner talked with the customer directly|Since your last reply, these messages were sent in this chat):[\s\S]*?don't repeat what (?:the owner already said|was already said)\.\]\n\n/;
 
 /** A customer message without the catch-up note the assistant was given with it. */
 export function withoutCatchUpNote(text: string): string {
@@ -144,7 +146,8 @@ export async function takeUnseenManualMessages(db: Admin, sessionId: string): Pr
         const list = manualMessages(metadata);
         const unseen = list.filter((m) => !m.seen);
         if (unseen.length === 0) return metadata;
-        note = `[While you were paused, the business owner talked with the customer directly:\n${unseen.slice(-20).map((m) => `${m.from === "owner" ? "Owner" : "Customer"}: ${m.text}`).join("\n")}\nCarry on from there; don't repeat what the owner already said.]`;
+        // Owner replies happen while it's paused; what it passed on for the owner (from "assistant") is its own words.
+        note = `[Since your last reply, these messages were sent in this chat:\n${unseen.slice(-20).map((m) => `${m.from === "owner" ? "Owner" : m.from === "assistant" ? "You (passed on for the owner)" : "Customer"}: ${m.text}`).join("\n")}\nCarry on from there; don't repeat what was already said.]`;
         return { ...metadata, manual_messages: list.map((m) => ({ ...m, seen: true })) };
     });
     return note;
