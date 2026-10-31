@@ -1,4 +1,6 @@
 import type { ChatCompletionFunctionTool } from "openai/resources/chat/completions";
+import { businessTimeZone } from "@/lib/studio/business-zone";
+import { zonedInstant } from "@/lib/studio/time";
 import type { CopilotToolContext } from "@/lib/copilot/tools";
 import type { PrepareResult } from "@/lib/copilot/actions";
 import { readSystemTools } from "@/lib/embedded/agent-tools";
@@ -56,7 +58,7 @@ const restaurantProps = {
     address: { type: "string" },
     opening_hours: { type: "string", description: "e.g. 'Mon–Thu 12pm–11pm, Fri–Sun 12pm–2am'." },
     phone: { type: "string", description: "The number guests can call." },
-    time_zone: { type: "string", description: "IANA time zone. Defaults to Africa/Lagos." },
+    time_zone: { type: "string", description: "IANA time zone. Defaults to the business's (business_time_zone in the context)." },
     max_party_size: { type: "number" },
     table_minutes: { type: "number", description: "How long a table is held. Default 120." },
     bookings_at_once: { type: "number", description: "Bookings that may overlap. Default 5." },
@@ -75,8 +77,8 @@ export const AGENT_ACTIONS: ChatCompletionFunctionTool[] = [
                 properties: {
                     event: { type: "string", description: "The event's id or name." },
                     name: { type: "string" },
-                    starts_at: { type: "string", description: "ISO 8601 with offset; Lagos time (+01:00) unless they say otherwise." },
-                    ends_at: { type: "string" },
+                    starts_at: { type: "string", description: "The new start as the owner said it, in the business's own time zone and without an offset: 8pm on 20 Dec is 2026-12-20T20:00. Add an offset only if they named another zone." },
+                    ends_at: { type: "string", description: "Like starts_at." },
                     venue: { type: "string" },
                     description: { type: "string" },
                     tiers: {
@@ -103,8 +105,8 @@ export const AGENT_ACTIONS: ChatCompletionFunctionTool[] = [
                 type: "object",
                 properties: {
                     name: { type: "string" },
-                    starts_at: { type: "string", description: "ISO 8601 with offset. Times the owner gives are Lagos time unless they say otherwise: 8pm on 20 Dec is 2026-12-20T20:00:00+01:00. Use now_utc to work out the year and relative dates (\"next Saturday\")." },
-                    ends_at: { type: "string", description: "ISO 8601 with offset, if they said when it ends." },
+                    starts_at: { type: "string", description: "When it starts, as the owner said it, in the business's own time zone and without an offset: 8pm on 20 Dec is 2026-12-20T20:00 (it's converted with the business's zone, daylight saving included). Add an offset only if they named another zone. Use business_time_zone.today in the context to work out the year and relative dates (\"next Saturday\")." },
+                    ends_at: { type: "string", description: "Like starts_at, if they said when it ends." },
                     venue: { type: "string" },
                     description: { type: "string", description: "One or two lines about it, in the owner's words; empty if they gave none." },
                     tiers: {
@@ -423,6 +425,14 @@ function emailsFrom(value: unknown): string[] | { error: string } {
     return emails.slice(0, 5);
 }
 
+/** A time the owner gave without an offset ("2026-12-20T20:00") is the business's wall clock: the instant it is there. */
+function inZone(value: unknown, zone: string): unknown {
+    const match = typeof value === "string" ? /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?$/.exec(value.trim()) : null;
+    if (!match) return value;
+    const [, year, month, day, hour, minute] = match.map(Number);
+    return zonedInstant(zone, year, month, day, hour, minute).toISOString();
+}
+
 export async function prepareAgentAction(name: string, args: Args, ctx: CopilotToolContext): Promise<PrepareResult> {
     const project = ctx.project;
     if (!project) return { error: "Select a project first; agents belong to a project." };
@@ -445,7 +455,7 @@ export async function prepareAgentAction(name: string, args: Args, ctx: CopilotT
                 address: text(args.address, 200),
                 hours: text(args.opening_hours, 200),
                 phone: text(args.phone, 40),
-                timeZone: text(args.time_zone, 60) || "Africa/Lagos",
+                timeZone: text(args.time_zone, 60) || await businessTimeZone(ctx.admin as never, project.id),
                 maxPartySize: num(args.max_party_size, RESTAURANT_DEFAULTS.maxPartySize),
                 slotMinutes: num(args.table_minutes, RESTAURANT_DEFAULTS.slotMinutes),
                 tablesPerSlot: num(args.bookings_at_once, RESTAURANT_DEFAULTS.tablesPerSlot),
@@ -478,7 +488,7 @@ export async function prepareAgentAction(name: string, args: Args, ctx: CopilotT
         const emails = emailsFrom(args.alert_emails);
         if ("error" in emails) return emails;
         if (emails.length) {
-            steps.push({ method: "PUT", path: `/api/projects/${project.id}/embedded-agents/{{agent_id}}/alerts`, body: { emails, ...(restaurant ? { time_zone: text(args.time_zone, 60) || "Africa/Lagos" } : {}) } });
+            steps.push({ method: "PUT", path: `/api/projects/${project.id}/embedded-agents/{{agent_id}}/alerts`, body: { emails, ...(restaurant ? { time_zone: text(args.time_zone, 60) || await businessTimeZone(ctx.admin as never, project.id) } : {}) } });
             details.push({ label: "Alerts to", value: emails.join(", ") });
         }
         return {
@@ -500,7 +510,8 @@ export async function prepareAgentAction(name: string, args: Args, ctx: CopilotT
         const found = events.find((item) => item.event.id === ref) ?? events.find((item) => item.event.name.toLowerCase() === ref) ?? events.find((item) => item.event.name.toLowerCase().includes(ref));
         if (!ref || !found) return { error: "Say which event (list_events shows them)." };
         const current = found.event;
-        const fields = Object.fromEntries((["name", "starts_at", "ends_at", "venue", "description", "tiers"] as const).filter((key) => args[key] !== undefined).map((key) => [key, args[key]]));
+        const zone = await businessTimeZone(ctx.admin as never, project.id);
+        const fields = Object.fromEntries((["name", "starts_at", "ends_at", "venue", "description", "tiers"] as const).filter((key) => args[key] !== undefined).map((key) => [key, key === "starts_at" || key === "ends_at" ? inZone(args[key], zone) : args[key]]));
         if (!Object.keys(fields).length && typeof args.selling !== "boolean") return { error: "Say what to change." };
         const merged = cleanEvent({ ...current, ...fields });
         if (!merged.ok) return { error: merged.message };
@@ -513,7 +524,7 @@ export async function prepareAgentAction(name: string, args: Args, ctx: CopilotT
             }
         }
         const price = (amount: number) => (amount === 0 ? "Free" : `₦${amount.toLocaleString("en-NG")}`);
-        const when = (iso: string) => new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Lagos", weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true }).format(new Date(iso));
+        const when = (iso: string) => new Intl.DateTimeFormat("en-GB", { timeZone: zone, weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true }).format(new Date(iso));
         const moved = (fields.starts_at !== undefined && merged.event.starts_at !== current.starts_at) || (fields.venue !== undefined && merged.event.venue !== current.venue);
         const details = [
             ...(fields.name !== undefined && merged.event.name !== current.name ? [{ label: "Name", value: merged.event.name }] : []),
@@ -537,11 +548,12 @@ export async function prepareAgentAction(name: string, args: Args, ctx: CopilotT
 
     if (name === "create_event") {
         const { cleanEvent } = await import("@/lib/studio/events");
-        const cleaned = cleanEvent(args);
+        const zone = await businessTimeZone(ctx.admin as never, project.id);
+        const cleaned = cleanEvent({ ...args, starts_at: inZone(args.starts_at, zone), ends_at: inZone(args.ends_at, zone) });
         if (!cleaned.ok) return { error: cleaned.message };
         const event = cleaned.event;
         const price = (amount: number) => (amount === 0 ? "Free" : `₦${amount.toLocaleString("en-NG")}`);
-        const when = new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Lagos", weekday: "short", day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true }).format(new Date(event.starts_at));
+        const when = new Intl.DateTimeFormat("en-GB", { timeZone: zone, weekday: "short", day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true }).format(new Date(event.starts_at));
         return {
             proposal: {
                 id, kind: name, tier: "normal",

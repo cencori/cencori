@@ -7,7 +7,8 @@ import { ChatRoundLineIcon } from "@solar-icons/react/bold-duotone/chat-round-li
 import { Bag4Icon } from "@solar-icons/react/bold-duotone/bag-4";
 import { WalletIcon } from "@solar-icons/react/bold-duotone/wallet";
 import { StarsMinimalisticIcon } from "@solar-icons/react/bold-duotone/stars-minimalistic";
-import { StudioDataProvider, StudioOfflineStrip } from "@/components/studio/studio-data";
+import { StudioDataProvider, StudioOfflineStrip, studioFetch } from "@/components/studio/studio-data";
+import { useQueryClient } from "@tanstack/react-query";
 import { ThemeScope } from "@/components/theme-scope";
 import { cn } from "@/lib/utils";
 import { StudioAskBar, StudioCopilotProvider, useStudioCopilot } from "@/components/studio/StudioCopilot";
@@ -64,6 +65,7 @@ export function StudioShell({ workspace, children }: { workspace: StudioContextV
     return (
         <StudioDataProvider>
             <StudioContext.Provider value={workspace}>
+                <AdoptTimeZone projectId={workspace.project.id} />
                 <StudioTasksProvider>
                 <StudioCopilotProvider workspace={workspace}>
                 <ThemeScope name="dashboard-theme" />
@@ -111,6 +113,28 @@ export function StudioShell({ workspace, children }: { workspace: StudioContextV
             </StudioContext.Provider>
         </StudioDataProvider>
     );
+}
+
+/**
+ * Once per business per visit: a business nobody chose a time zone for takes this browser's
+ * (lib/studio/business-zone.ts), so its days, events and alerts run on the owner's clock.
+ */
+function AdoptTimeZone({ projectId }: { projectId: string }) {
+    const queryClient = useQueryClient();
+    useEffect(() => {
+        let zone: string | undefined;
+        try {
+            zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        } catch {
+            return;
+        }
+        if (!zone) return;
+        void studioFetch("/api/studio/time-zone", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ project_id: projectId, time_zone: zone }) })
+            .then((response) => (response.ok ? response.json() : null))
+            .then((body: { adopted?: boolean } | null) => { if (body?.adopted) void queryClient.invalidateQueries(); })
+            .catch(() => undefined);
+    }, [projectId, queryClient]);
+    return null;
 }
 
 /** Desktop only: the business at the top, then the tabs and Copilot, and you at the foot. */

@@ -16,6 +16,15 @@ import { useVisualViewport } from "@/components/studio/use-visual-viewport";
 import { getMainSiteUrl } from "@/lib/main-site-url";
 import { cn } from "@/lib/utils";
 
+/** This browser's IANA time zone ("Europe/London"): the business's, set at setup. */
+function browserTimeZone(): string | undefined {
+    try {
+        return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined;
+    } catch {
+        return undefined;
+    }
+}
+
 type Answers = Partial<Record<AnswerKey, string>>;
 type Built = { agentId: string; publicKey: string; previewToken: string; shareToken: string | null };
 /** The build's steps, in order. A failed build keeps the ones that finished so "Try again" carries on from there. */
@@ -219,7 +228,7 @@ export default function StudioSetupPage() {
                     action: "create_agent",
                     name,
                     description: BUSINESS_KINDS.find((item) => item.id === businessKind)?.name ?? "",
-                    instructions: setupInstructions(businessKind, answers),
+                    instructions: setupInstructions(businessKind, answers, browserTimeZone()),
                     ...(businessKind === "restaurant" ? { template: "restaurant" } : {}),
                 });
                 partial = { agentId: created.agent_id, versionId: created.version_id, done: [] };
@@ -234,7 +243,7 @@ export default function StudioSetupPage() {
                     version_id: partial.versionId,
                     name: answers.name?.trim() || organization.name,
                     description: BUSINESS_KINDS.find((item) => item.id === businessKind)?.name ?? "",
-                    instructions: setupInstructions(businessKind, answers),
+                    instructions: setupInstructions(businessKind, answers, browserTimeZone()),
                 });
                 partial = { ...partial, done: partial.done.filter((step) => step !== "tested") };
                 const next = partial;
@@ -258,7 +267,7 @@ export default function StudioSetupPage() {
                 mark("tools");
             }
             if (!finished("alerts")) {
-                if (user.email) await call(`${agentBase}/alerts`, "PUT", { emails: [user.email], ...(businessKind === "restaurant" ? { time_zone: "Africa/Lagos" } : {}) }).catch(() => undefined);
+                if (user.email) await call(`${agentBase}/alerts`, "PUT", { emails: [user.email], ...(browserTimeZone() ? { time_zone: browserTimeZone() } : {}) }).catch(() => undefined);
                 mark("alerts");
             }
             tick("Set it to tell you when someone needs you");

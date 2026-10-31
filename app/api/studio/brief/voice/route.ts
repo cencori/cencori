@@ -7,12 +7,11 @@
  * and replaying it doesn't make (or pay for) it again.
  */
 
+import { businessTimeZone } from '@/lib/studio/business-zone';
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { requireProjectAccess } from '@/lib/require-project-access';
-import { getOwnerAlerts } from '@/lib/embedded/owner-alerts';
 import { latestBrief, briefScript } from '@/lib/studio/brief';
-import { safeTimeZone } from '@/lib/studio/time';
 import { generateSpeech, SpeechRequestError } from '@/lib/audio/speech';
 import type { GatewayContext } from '@/lib/gateway-middleware';
 
@@ -25,9 +24,7 @@ export async function GET(req: NextRequest) {
     if (!access.ok) return access.response;
     const db = createAdminClient();
 
-    const { data: agent } = await db.from('agents').select('id').eq('project_id', projectId).order('created_at', { ascending: true }).limit(1).maybeSingle();
-    const alerts = agent ? await getOwnerAlerts(db, projectId, agent.id as string).catch(() => null) : null;
-    const brief = await latestBrief(db, projectId, safeTimeZone(alerts?.settings.time_zone));
+    const brief = await latestBrief(db, projectId, await businessTimeZone(db, projectId));
     if (!brief) return NextResponse.json({ error: 'No brief this morning.' }, { status: 404 });
 
     try {

@@ -14,7 +14,7 @@ import { useStudioTasks } from "@/components/studio/StudioTasks";
 import { StudioEmptyCard } from "@/components/studio/StudioEmptyCard";
 import { SHEET_AS_PAGE, SHEET_OVERLAY_PHONE_ONLY, SheetPageBack } from "@/components/studio/studio-sheet";
 import { formatMoney } from "@/components/studio/useStudioOverview";
-import { eventLink, eventWhen, useEvent, useEvents, type StudioEventSummary, type StudioGuest } from "@/components/studio/useEvents";
+import { eventLink, eventWhen, useBusinessTimeZone, useEvent, useEvents, type StudioEventSummary, type StudioGuest } from "@/components/studio/useEvents";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
@@ -52,6 +52,7 @@ export function EventsList() {
  */
 function EventPoster({ summary }: { summary: StudioEventSummary }) {
     const { event } = summary;
+    const timeZone = useBusinessTimeZone();
     return (
         <StudioLink href={`/sales/events/${event.id}`} className={cn("block overflow-hidden rounded-2xl bg-[#262626] text-white transition active:scale-[0.98]", past(summary) && "opacity-60")}>
             <div className="relative aspect-square w-full overflow-hidden bg-[#1a1a1a]">
@@ -66,7 +67,7 @@ function EventPoster({ summary }: { summary: StudioEventSummary }) {
             </div>
             <div className="px-3 pb-3 pt-2.5">
                 <p className="truncate text-[14px] font-medium leading-tight">{event.name}</p>
-                <p className="mt-0.5 truncate text-[12px] text-white/55">{eventWhen(event.starts_at)}</p>
+                <p className="mt-0.5 truncate text-[12px] text-white/55">{eventWhen(event.starts_at, timeZone)}</p>
             </div>
         </StudioLink>
     );
@@ -74,6 +75,7 @@ function EventPoster({ summary }: { summary: StudioEventSummary }) {
 
 /** One event: how it's selling, the link to share, the guest list, and check-in at the door. */
 export default function StudioEventPage({ id }: { id: string }) {
+    const timeZone = useBusinessTimeZone();
     const { project } = useStudio();
     const tasks = useStudioTasks();
     const query = useEvent(id);
@@ -139,7 +141,7 @@ export default function StudioEventPage({ id }: { id: string }) {
                         {summary.event.venue && (
                             <li className="flex gap-3"><MapPointIcon size={20} className="mt-0.5 shrink-0 text-muted-foreground" /><span>{summary.event.venue}</span></li>
                         )}
-                        <li className="flex gap-3"><CalendarLinearIcon size={20} className="mt-0.5 shrink-0 text-muted-foreground" /><span>{eventWhen(summary.event.starts_at)}</span></li>
+                        <li className="flex gap-3"><CalendarLinearIcon size={20} className="mt-0.5 shrink-0 text-muted-foreground" /><span>{eventWhen(summary.event.starts_at, timeZone)}</span></li>
                     </ul>
 
                     <div className="mt-6 grid grid-cols-3 divide-x divide-border/60 overflow-hidden rounded-2xl bg-muted/60">

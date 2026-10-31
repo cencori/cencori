@@ -60,7 +60,8 @@ export function setupQuestions(kind: BusinessKind): SetupQuestion[] {
 const VENUE: Record<string, "restaurant" | "lounge" | "bar" | "cafe"> = { restaurant: "restaurant", lounge: "lounge", bar: "bar", café: "cafe", cafe: "cafe" };
 
 /** The assistant's instructions from the answers. */
-export function setupInstructions(kind: BusinessKind, answers: Partial<Record<AnswerKey, string>>): string {
+/** timeZone: the owner's (their phone or browser's), for a restaurant's bookings; Lagos without one. */
+export function setupInstructions(kind: BusinessKind, answers: Partial<Record<AnswerKey, string>>, timeZone?: string): string {
     const name = answers.name?.trim() || "the business";
     if (kind === "restaurant") {
         const deposit = answers.deposit?.trim();
@@ -71,6 +72,7 @@ export function setupInstructions(kind: BusinessKind, answers: Partial<Record<An
             address: answers.address?.trim() ?? "",
             hours: answers.hours?.trim() ?? "",
             phone: answers.phone?.trim() ?? "",
+            ...(timeZone ? { timeZone } : {}),
             deposit: deposit && !/^no\b/i.test(deposit) ? deposit : "",
         });
     }

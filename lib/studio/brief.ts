@@ -270,7 +270,11 @@ export async function sendMorningBriefs(db: Admin, now = new Date()): Promise<{ 
         db.from("tool_connections").select("project_id, metadata").eq("connector_slug", OWNER_ALERTS_SLUG).limit(10_000),
         db.from("tool_connections").select("project_id, metadata").eq("connector_slug", BRIEF_SLUG).limit(10_000),
     ]);
-    const zones = new Map(((alertRows ?? []) as Array<{ project_id: string; metadata: { time_zone?: string } | null }>).map((row) => [row.project_id, safeTimeZone(row.metadata?.time_zone)]));
+    // The business's zone: a chosen one over a row never set (lib/studio/business-zone.ts).
+    const zones = new Map<string, string>();
+    for (const row of (alertRows ?? []) as Array<{ project_id: string; metadata: { time_zone?: string; time_zone_source?: string } | null }>) {
+        if (!zones.has(row.project_id) || row.metadata?.time_zone_source) zones.set(row.project_id, safeTimeZone(row.metadata?.time_zone));
+    }
     const lastFor = new Map(((briefRows ?? []) as Array<{ project_id: string; metadata: { last_for?: string } | null }>).map((row) => [row.project_id, row.metadata?.last_for ?? null]));
 
     const due = [...projects.entries()].filter(([projectId]) => {

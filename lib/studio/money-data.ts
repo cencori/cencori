@@ -4,22 +4,20 @@
  * payments by link, transfers the owner confirmed and orders marked paid,
  * summed over the period in the business's own time zone.
  */
+import { businessTimeZone } from '@/lib/studio/business-zone';
 import type { createAdminClient } from '@/lib/supabaseAdmin';
 import { getCatalog } from '@/lib/embedded/catalog';
 import { getPaymentsConnection } from '@/lib/embedded/payments';
-import { getOwnerAlerts } from '@/lib/embedded/owner-alerts';
 import { getTransfers, transferHistory } from '@/lib/embedded/transfers';
 import { summarizeMoney, type MoneyPeriod } from '@/lib/studio/money';
-import { safeTimeZone } from '@/lib/studio/time';
 
 type Admin = ReturnType<typeof createAdminClient>;
 
 export async function loadMoney(db: Admin, projectId: string, period: MoneyPeriod) {
-    const { data: agent } = await db.from('agents').select('id').eq('project_id', projectId).order('created_at', { ascending: true }).limit(1).maybeSingle();
-    const [payments, catalog, alerts, transfers, history] = await Promise.all([
+    const [payments, catalog, timeZone, transfers, history] = await Promise.all([
         getPaymentsConnection(db, projectId).catch(() => null),
         getCatalog(db, projectId),
-        agent ? getOwnerAlerts(db, projectId, agent.id as string).catch(() => null) : Promise.resolve(null),
+        businessTimeZone(db, projectId),
         getTransfers(db, projectId).catch(() => null),
         transferHistory(db, projectId).catch(() => []),
     ]);
@@ -29,7 +27,7 @@ export async function loadMoney(db: Admin, projectId: string, period: MoneyPerio
         transfers: history,
         orders: catalog?.metadata.orders ?? [],
         period,
-        timeZone: safeTimeZone(alerts?.settings.time_zone),
+        timeZone,
         currency,
     });
     // Customers who said they've sent money, newest first, then ones asked to pay in the last week.

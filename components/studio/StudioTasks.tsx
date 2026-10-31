@@ -14,7 +14,9 @@ import { cn } from "@/lib/utils";
 import { getMainSiteUrl } from "@/lib/main-site-url";
 import { ProductsTask } from "@/components/studio/StudioProducts";
 import { useStudioNavigate } from "@/components/studio/studio-nav";
-import { fromLagosInput, lagosInput } from "@/components/studio/useEvents";
+import { fromZoneInput, zoneInput } from "@/components/studio/useEvents";
+import { useStudioOverview } from "@/components/studio/useStudioOverview";
+import { zoneCity } from "@/lib/studio/time";
 import { EventDateTimePicker } from "@/components/studio/EventDateTimePicker";
 import { TicketTierIcon } from "@/components/studio/TicketTierIcon";
 
@@ -629,6 +631,8 @@ type EventForm = { name: string; starts_at: string; venue: string; description: 
  */
 function NewEventTask({ projectId, eventId, onDone }: { projectId: string; eventId: string | null; onDone: () => void }) {
     const navigate = useStudioNavigate();
+    // Times are typed on the business's clock: the form waits for it, so nothing is read or saved on the wrong one.
+    const timeZone = useStudioOverview().data?.time_zone ?? null;
     const [loaded, setLoaded] = useState<EventForm | null>(null);
     const [name, setName] = useState("");
     const [startsAt, setStartsAt] = useState("");
@@ -645,29 +649,30 @@ function NewEventTask({ projectId, eventId, onDone }: { projectId: string; event
     const setTier = (index: number, patch: Partial<TierDraft>) => setTiers((current) => current.map((tier, i) => (i === index ? { ...tier, ...patch } : tier)));
 
     useEffect(() => {
-        if (!eventId) return;
+        if (!eventId || !timeZone) return;
         send<{ event: { event: Omit<EventForm, "sold">; by_tier: Array<{ id: string; sold: number }> } }>(`/api/studio/events?project_id=${projectId}&event_id=${eventId}`, "GET")
             .then(({ event }) => {
                 setLoaded({ ...event.event, sold: Object.fromEntries(event.by_tier.map((tier) => [tier.id, tier.sold])) });
                 setName(event.event.name);
-                setStartsAt(lagosInput(event.event.starts_at));
+                setStartsAt(zoneInput(event.event.starts_at, timeZone));
                 setVenue(event.event.venue);
                 setDescription(event.event.description);
                 if (event.event.banner_url) setBanner({ preview: event.event.banner_url, upload: null });
                 setTiers(event.event.tiers.map((tier) => ({ id: tier.id, name: tier.name, price: String(tier.price), capacity: tier.capacity === null ? "" : String(tier.capacity) })));
             })
             .catch((cause) => setError(cause instanceof Error ? cause.message : "Couldn't load the event."));
-    }, [eventId, projectId]);
+    }, [eventId, projectId, timeZone]);
 
     const save = async () => {
+        if (!timeZone) return;
         setBusy(true);
         setError(null);
         const fields = {
             name,
             venue,
             description,
-            // Typed as Lagos time, whatever zone the phone or laptop is in.
-            starts_at: fromLagosInput(startsAt),
+            // Typed on the business's clock, whatever zone the phone or laptop is in.
+            starts_at: fromZoneInput(startsAt, timeZone),
             tiers: tiers.map((tier) => ({ ...(tier.id ? { id: tier.id } : {}), name: tier.name, price: Number(tier.price.replace(/[^\d.]/g, "") || 0), capacity: tier.capacity.trim() ? Number(tier.capacity.replace(/\D/g, "")) : null })),
         };
         try {
@@ -710,7 +715,7 @@ function NewEventTask({ projectId, eventId, onDone }: { projectId: string; event
         }
     };
 
-    if (eventId && !loaded) return error ? <ErrorLine error={error} /> : <div className="mt-5 flex justify-center"><Spinner className="h-5 w-5 text-muted-foreground" /></div>;
+    if ((eventId && !loaded) || !timeZone) return error ? <ErrorLine error={error} /> : <div className="mt-5 flex justify-center"><Spinner className="h-5 w-5 text-muted-foreground" /></div>;
     const soldOf = (tier: TierDraft) => (tier.id ? loaded?.sold[tier.id] ?? 0 : 0);
     const anySold = Object.values(loaded?.sold ?? {}).some((n) => n > 0);
 
@@ -746,8 +751,8 @@ function NewEventTask({ projectId, eventId, onDone }: { projectId: string; event
             )}
             <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Name (Rooftop Party)" className={cn(field, "h-12 rounded-full px-5")} />
             <div className="mt-2.5">
-                <span className="mb-1 block pl-5 text-[12px] text-muted-foreground">Starts (Lagos time)</span>
-                <EventDateTimePicker value={startsAt} onChange={setStartsAt} />
+                <span className="mb-1 block pl-5 text-[12px] text-muted-foreground">Starts ({zoneCity(timeZone)} time)</span>
+                <EventDateTimePicker value={startsAt} onChange={setStartsAt} timeZone={timeZone} />
             </div>
             <input value={venue} onChange={(event) => setVenue(event.target.value)} placeholder="Where" className={cn(field, "mt-2.5 h-12 rounded-full px-5")} />
             <textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={4} placeholder="About it (optional)" className={cn(field, "mt-2.5 resize-none py-3.5")} />

@@ -7,13 +7,13 @@
  * business's own (its owner-alerts time zone, Lagos otherwise).
  */
 
+import { businessTimeZone } from '@/lib/studio/business-zone';
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { requireProjectAccess } from '@/lib/require-project-access';
 import { runAgentReadTool } from '@/lib/copilot/agent-tools';
-import { getOwnerAlerts } from '@/lib/embedded/owner-alerts';
 import { conversationCapacity, conversationsUsed, getOrganizationPlan } from '@/lib/business/plans';
-import { periodStarts, safeTimeZone } from '@/lib/studio/time';
+import { periodStarts } from '@/lib/studio/time';
 import { mintWidgetShareToken } from '@/lib/embedded/widget';
 import { earnedSince, paidThroughAssistant } from '@/lib/studio/earned';
 import { latestBrief } from '@/lib/studio/brief';
@@ -39,8 +39,7 @@ export async function GET(req: NextRequest) {
     const wanted = req.nextUrl.searchParams.get('agent_id');
     const agent = list.find((item) => item.id === wanted) ?? list.find((item) => item.is_active && item.stable_version_id) ?? list[0] ?? null;
 
-    const alerts = agent ? await getOwnerAlerts(db, projectId, agent.id).catch(() => null) : null;
-    const timeZone = safeTimeZone(alerts?.settings.time_zone);
+    const timeZone = await businessTimeZone(db, projectId);
     const starts = periodStarts(timeZone);
 
     const chats = (since: Date) => db.from('sessions').select('id', { count: 'exact', head: true })

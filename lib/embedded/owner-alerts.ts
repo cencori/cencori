@@ -40,7 +40,14 @@ export interface OwnerAlertSettings {
     bookings: boolean;
     callbacks: boolean;
     daily_summary: boolean;
+    /** The business's time zone: the same on every agent's row (lib/studio/business-zone.ts). */
     time_zone: string;
+    /**
+     * Where the zone came from: 'owner' chose it, 'device' was taken from the owner's phone or
+     * browser the first time they opened Studio. Absent: never set (Lagos by default), so the next
+     * open of Studio adopts the owner's own zone.
+     */
+    time_zone_source?: 'owner' | 'device';
     /** The local date (YYYY-MM-DD) the last morning summary covered. */
     last_summary_for: string | null;
     log: OwnerAlertEntry[];
@@ -91,14 +98,19 @@ export function validTimeZone(zone: string): boolean {
 
 export async function saveOwnerAlerts(
     db: Admin,
-    opts: { projectId: string; agentId: string; existing: OwnerAlerts | null; emails: unknown; bookings?: unknown; callbacks?: unknown; dailySummary?: unknown; timeZone?: unknown },
+    opts: { projectId: string; agentId: string; existing: OwnerAlerts | null; emails: unknown; bookings?: unknown; callbacks?: unknown; dailySummary?: unknown; timeZone?: unknown; timeZoneSource?: 'owner' | 'device' },
 ): Promise<{ ok: true; alerts: OwnerAlerts } | { ok: false; message: string }> {
     const list = Array.isArray(opts.emails) ? opts.emails : [];
     const emails = [...new Set(list.filter((e): e is string => typeof e === 'string').map((e) => e.trim().toLowerCase()).filter(Boolean))];
     if (emails.length > MAX_EMAILS) return { ok: false, message: `Up to ${MAX_EMAILS} email addresses.` };
     const bad = emails.find((e) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
     if (bad) return { ok: false, message: `${bad} isn't an email address.` };
-    const timeZone = typeof opts.timeZone === 'string' && validTimeZone(opts.timeZone) ? opts.timeZone : opts.existing?.settings.time_zone ?? 'Africa/Lagos';
+    const given = typeof opts.timeZone === 'string' && validTimeZone(opts.timeZone) ? opts.timeZone : null;
+    const timeZone = given ?? opts.existing?.settings.time_zone ?? 'Africa/Lagos';
+    // A zone counts as chosen when it's new: saving alerts with the zone the form showed unchanged
+    // (Lagos, by default) isn't a choice, and leaves the owner's own zone to be adopted.
+    const chose = !!given && (!opts.existing || given !== opts.existing.settings.time_zone);
+    const timeZoneSource = chose ? opts.timeZoneSource ?? 'owner' : opts.existing?.settings.time_zone_source;
     const flag = (value: unknown, current: boolean | undefined) => (typeof value === 'boolean' ? value : current ?? true);
     const settings: OwnerAlertSettings = {
         kind: 'owner_alerts',
@@ -108,6 +120,7 @@ export async function saveOwnerAlerts(
         callbacks: flag(opts.callbacks, opts.existing?.settings.callbacks),
         daily_summary: flag(opts.dailySummary, opts.existing?.settings.daily_summary),
         time_zone: timeZone,
+        ...(timeZoneSource ? { time_zone_source: timeZoneSource } : {}),
         last_summary_for: opts.existing?.settings.last_summary_for ?? null,
         log: opts.existing?.settings.log ?? [],
     };
@@ -118,7 +131,21 @@ export async function saveOwnerAlerts(
     const { data, error } = await write;
     const alerts = toAlerts(data as Record<string, unknown> | null);
     if (error || !alerts) return { ok: false, message: 'Couldn\'t save the alerts. Try again.' };
+    // One zone for the business: a chosen one goes on every agent's row.
+    if (chose) await setProjectTimeZone(db, opts.projectId, timeZone, timeZoneSource!, alerts.id).catch(() => undefined);
     return { ok: true, alerts };
+}
+
+/** All of a project's alert rows (one per agent). */
+export async function projectAlerts(db: Admin, projectId: string): Promise<OwnerAlerts[]> {
+    const { data } = await db.from('tool_connections').select(COLUMNS).eq('project_id', projectId).eq('connector_slug', OWNER_ALERTS_SLUG).order('created_at', { ascending: true });
+    return ((data ?? []) as Record<string, unknown>[]).map(toAlerts).filter((alerts): alerts is OwnerAlerts => !!alerts);
+}
+
+/** Put the business's zone on every agent's row (but the one just saved). */
+export async function setProjectTimeZone(db: Admin, projectId: string, timeZone: string, source: 'owner' | 'device', except?: string): Promise<void> {
+    const rows = (await projectAlerts(db, projectId)).filter((row) => row.id !== except);
+    await Promise.all(rows.map((row) => db.from('tool_connections').update({ metadata: { ...row.settings, time_zone: timeZone, time_zone_source: source } }).eq('id', row.id)));
 }
 
 /** A tool that books something: a calendar event, an appointment, a reservation. */

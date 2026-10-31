@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { businessTimeZone } from "@/lib/studio/business-zone";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { eventBySlug, type Ticket } from "@/lib/studio/events";
 import { EventFrame } from "@/app/e/shared";
@@ -18,7 +19,7 @@ export default async function TicketPage({ params }: { params: Promise<{ slug: s
     if (!ticket || ticket.status !== "paid") notFound();
     return (
         <EventFrame>
-            <TicketCard event={event} ticket={ticket} />
+            <TicketCard event={event} ticket={ticket} timeZone={await businessTimeZone(db, event.project_id)} />
         </EventFrame>
     );
 }

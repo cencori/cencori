@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { businessTimeZone } from "@/lib/studio/business-zone";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { eventBySlug, eventHost, orderTickets } from "@/lib/studio/events";
 import { findPayment, settlePayment } from "@/lib/embedded/payments";
@@ -38,7 +39,7 @@ export default async function OrderPage({ params }: { params: Promise<{ slug: st
     }
 
     const total = tickets.reduce((sum, ticket) => sum + Number(ticket.price), 0);
-    const host = await eventHost(db, event);
+    const [host, timeZone] = await Promise.all([eventHost(db, event), businessTimeZone(db, event.project_id)]);
     const status = tickets[0].status;
     return (
         <EventFrame>
@@ -47,7 +48,7 @@ export default async function OrderPage({ params }: { params: Promise<{ slug: st
                 <>
                     <p className="mt-1 text-[15px] text-white/60">Show the QR code at the door. Screenshot it, or keep this page.</p>
                     <div className="mt-5 space-y-4">
-                        {tickets.map((ticket) => <TicketCard key={ticket.id} event={event} ticket={ticket} />)}
+                        {tickets.map((ticket) => <TicketCard key={ticket.id} event={event} ticket={ticket} timeZone={timeZone} />)}
                     </div>
                 </>
             ) : status === "cancelled" ? (

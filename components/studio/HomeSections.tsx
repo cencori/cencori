@@ -20,7 +20,7 @@ import { taskForStep, useStudioTasks } from "@/components/studio/StudioTasks";
 import { formatMoney, type StudioOverview } from "@/components/studio/useStudioOverview";
 import { conversationTitle, needsOwnerLabel, shortTime, useInbox, type InboxConversation } from "@/components/studio/useInbox";
 import { useSales } from "@/components/studio/useSales";
-import { eventWhen, useEvents } from "@/components/studio/useEvents";
+import { eventWhen, useBusinessTimeZone, useEvents } from "@/components/studio/useEvents";
 import { ConversationAvatar, WhatsAppMark } from "@/components/studio/ConversationAvatar";
 import { BriefListen } from "@/components/studio/BriefListen";
 import { StudioLinkQr } from "@/components/studio/StudioLinkQr";
@@ -123,6 +123,7 @@ const sameDay = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.g
 
 /** Today's bookings and the next event in the coming two weeks. */
 export function UpNextSection() {
+    const timeZone = useBusinessTimeZone();
     const sales = useSales();
     const events = useEvents();
     const now = new Date();
@@ -158,7 +159,7 @@ export function UpNextSection() {
                                 : <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-violet-400/15 text-violet-500 dark:text-violet-400"><CalendarIcon size={20} /></span>}
                             <span className="min-w-0 flex-1">
                                 <span className="block truncate text-[15px] font-semibold">{event.event.name}</span>
-                                <span className="block truncate text-[13px] text-muted-foreground">{eventWhen(event.event.starts_at)} · {event.sold} sold</span>
+                                <span className="block truncate text-[13px] text-muted-foreground">{eventWhen(event.event.starts_at, timeZone)} · {event.sold} sold</span>
                             </span>
                             <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                         </StudioLink>
