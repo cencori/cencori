@@ -1,15 +1,17 @@
 /**
  * GET /api/studio/whatsapp/start?project_id=&agent_id=&coexistence=1&return=/setup
  *
- * Studio's "Connect WhatsApp": off to Meta's signup as a full page, not the
- * console's popup (an app installed on a phone can't be reported back to by a
- * popup). Meta comes back to /api/studio/whatsapp/callback.
+ * Studio's "Connect WhatsApp" through Cencori's own Meta app: off to Meta's
+ * signup as a full page, not the console's popup (an app installed on a phone
+ * can't be reported back to by a popup). Meta comes back to
+ * /api/studio/whatsapp/callback. Only for those META_SIGNUP_ALLOWLIST lets in
+ * until App Review approves it; everyone else connects through Kapso.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { requireProjectAccess } from '@/lib/require-project-access';
-import { signState, signupDialogUrl } from '@/lib/channels/whatsapp-signup';
+import { signState, signupAllowed, signupDialogUrl } from '@/lib/channels/whatsapp-signup';
 import { returnPath, studioCallbackUrl, studioHome } from '@/app/api/studio/whatsapp/shared';
 
 const isId = (value: unknown): value is string => typeof value === 'string' && /^[0-9a-f-]{36}$/i.test(value);
@@ -26,6 +28,8 @@ export async function GET(req: NextRequest) {
     const db = createAdminClient();
     const { data: agent } = await db.from('agents').select('id').eq('project_id', projectId).eq('id', agentId).maybeSingle();
     if (!agent) return NextResponse.redirect(home('failed', 'That assistant isn’t in this business.'));
+    // Our own Meta signup is only open to some, until Meta's App Review approves it (META_SIGNUP_ALLOWLIST).
+    if (!await signupAllowed()) return NextResponse.redirect(home('failed', 'Connect WhatsApp with the other option for now.'));
 
     const url = signupDialogUrl({
         redirectUri: studioCallbackUrl(req),
@@ -46,6 +50,7 @@ export async function POST(req: NextRequest) {
     const db = createAdminClient();
     const { data: agent } = await db.from('agents').select('id').eq('project_id', projectId).eq('id', agentId).maybeSingle();
     if (!agent) return fail('That assistant isn’t in this business.', 404);
+    if (!await signupAllowed()) return fail('Connect WhatsApp with the other option for now.', 403);
 
     const coexistence = body.coexistence !== false;
     const url = signupDialogUrl({

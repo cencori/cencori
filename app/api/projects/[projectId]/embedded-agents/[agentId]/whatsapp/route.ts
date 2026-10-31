@@ -37,7 +37,7 @@ import {
     saveKapsoChannel,
     type WhatsAppChannel,
 } from '@/lib/channels/whatsapp';
-import { finishSignup, signupConfig } from '@/lib/channels/whatsapp-signup';
+import { finishSignup, signupConfigFor } from '@/lib/channels/whatsapp-signup';
 
 type Admin = ReturnType<typeof createAdminClient>;
 type Context = { params: Promise<{ projectId: string; agentId: string }> };
@@ -95,7 +95,7 @@ export async function GET(req: NextRequest, ctx: Context) {
         role(db, access.organizationId, access.userId),
         kapso ? businessDetails(db, projectId, agent, access.userId) : Promise.resolve(null),
     ]);
-    return NextResponse.json({ channel: serialize(req, channel), can_manage: canManage, signup: signupConfig(), kapso, details }, { headers: { 'Cache-Control': 'no-store' } });
+    return NextResponse.json({ channel: serialize(req, channel), can_manage: canManage, signup: await signupConfigFor(), kapso, details }, { headers: { 'Cache-Control': 'no-store' } });
 }
 
 export async function PUT(req: NextRequest, ctx: Context) {
@@ -131,7 +131,7 @@ export async function PUT(req: NextRequest, ctx: Context) {
         dailySessionCap: typeof body.daily_session_cap === 'number' ? body.daily_session_cap : undefined,
     });
     if (!saved.ok) return fail(saved.message, saved.status);
-    return NextResponse.json({ channel: serialize(req, saved.channel), can_manage: true, signup: signupConfig() });
+    return NextResponse.json({ channel: serialize(req, saved.channel), can_manage: true, signup: await signupConfigFor() });
 }
 
 export async function POST(req: NextRequest, ctx: Context) {
@@ -140,8 +140,9 @@ export async function POST(req: NextRequest, ctx: Context) {
     if (!access.ok) return access.response;
     const body = await req.json().catch(() => null) as Record<string, unknown> | null;
     if (body?.action === 'kapso_link' || body?.action === 'kapso_finish') return kapso(req, projectId, agentId, access, body);
-    const config = signupConfig();
-    if (!config) return fail('Connecting WhatsApp isn\'t set up on this server yet.', 503);
+    // Our own Meta signup only for those it's open to (META_SIGNUP_ALLOWLIST); everyone else connects through Kapso.
+    const config = await signupConfigFor();
+    if (!config) return fail('Connect WhatsApp with the other option for now.', 403);
     const db = createAdminClient();
     const agent = await scopedAgent(db, projectId, agentId);
     if (!agent) return fail('Agent not found in this project.', 404);
@@ -226,7 +227,7 @@ async function kapso(
     const existing = await getAgentChannel(db, projectId, agentId);
     const saved = await saveKapsoChannel(db, { projectId, agentId, existing, customerId: customer.id, number });
     if (!saved.ok) return fail(saved.message, saved.status);
-    return NextResponse.json({ channel: serialize(req, saved.channel), can_manage: true, signup: signupConfig(), kapso: true });
+    return NextResponse.json({ channel: serialize(req, saved.channel), can_manage: true, signup: await signupConfigFor(), kapso: true });
 }
 
 export async function DELETE(_req: NextRequest, ctx: Context) {
@@ -238,5 +239,5 @@ export async function DELETE(_req: NextRequest, ctx: Context) {
     if (!canManage) return fail('Only owners and admins can disconnect WhatsApp.', 403);
     const existing = await getAgentChannel(db, projectId, agentId);
     if (existing) await db.from('tool_connections').delete().eq('id', existing.id).eq('project_id', projectId);
-    return NextResponse.json({ channel: null, can_manage: true, signup: signupConfig(), kapso: kapsoConfigured() });
+    return NextResponse.json({ channel: null, can_manage: true, signup: await signupConfigFor(), kapso: kapsoConfigured() });
 }

@@ -25,6 +25,36 @@ import {
 
 type Admin = ReturnType<typeof createAdminClient>;
 
+/**
+ * Who may connect through Cencori's own Meta app (Embedded Signup) rather than
+ * Kapso. Until Meta's App Review grants the WhatsApp permissions advanced
+ * access, our signup only works for people with a role on the app, so it's
+ * kept to the emails in META_SIGNUP_ALLOWLIST (comma-separated; for recording
+ * the review). "*" opens it to everyone once approved; unset, no one.
+ */
+export function signupAllowlist(): "everyone" | Set<string> {
+    const raw = (process.env.META_SIGNUP_ALLOWLIST ?? "").trim();
+    if (raw === "*") return "everyone";
+    return new Set(raw.split(",").map((email) => email.trim().toLowerCase()).filter(Boolean));
+}
+
+/** Whether the signed-in user gets our own signup: the allow-list, checked against their email. */
+export async function signupAllowed(): Promise<boolean> {
+    const allowed = signupAllowlist();
+    if (allowed === "everyone") return true;
+    if (allowed.size === 0) return false;
+    const [{ getAuthUser }, { createServerClient }] = await Promise.all([import("@/lib/auth/get-auth-user"), import("@/lib/supabaseServer")]);
+    const { data } = await getAuthUser(await createServerClient()).catch(() => ({ data: { user: null } }));
+    const email = data.user?.email?.toLowerCase();
+    return !!email && allowed.has(email);
+}
+
+/** Our signup's settings, for those it's open to (signupAllowed); null for everyone else, who connect through Kapso. */
+export async function signupConfigFor(): Promise<ReturnType<typeof signupConfig>> {
+    const config = signupConfig();
+    return config && await signupAllowed() ? config : null;
+}
+
 export function signupConfig() {
     const appId = process.env.META_APP_ID;
     const configId = process.env.META_EMBEDDED_SIGNUP_CONFIG_ID;
