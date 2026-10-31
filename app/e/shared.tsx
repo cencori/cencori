@@ -6,9 +6,9 @@ export function money(amount: number, currency: string): string {
     return currency === "NGN" ? `₦${Number(amount).toLocaleString("en-NG")}` : `${currency} ${Number(amount).toLocaleString("en-NG")}`;
 }
 
-/** "Sat 20 Dec, 8:00 pm", in Lagos time (where these events are). */
-export function when(event: Pick<StudioEvent, "starts_at" | "ends_at">): string {
-    const format = (iso: string, withDate: boolean) => new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Lagos", ...(withDate ? { weekday: "short", day: "numeric", month: "short" } : {}), hour: "numeric", minute: "2-digit", hour12: true }).format(new Date(iso));
+/** "Sat 20 Dec, 8:00 pm", in the business's time zone (where its events are: lib/studio/business-zone.ts). */
+export function when(event: Pick<StudioEvent, "starts_at" | "ends_at">, timeZone: string): string {
+    const format = (iso: string, withDate: boolean) => new Intl.DateTimeFormat("en-GB", { timeZone, ...(withDate ? { weekday: "short", day: "numeric", month: "short" } : {}), hour: "numeric", minute: "2-digit", hour12: true }).format(new Date(iso));
     return `${format(event.starts_at, true)}${event.ends_at ? ` – ${format(event.ends_at, new Date(event.ends_at).toDateString() !== new Date(event.starts_at).toDateString())}` : ""}`;
 }
 

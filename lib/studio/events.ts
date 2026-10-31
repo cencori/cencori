@@ -1,5 +1,7 @@
 import "server-only";
 
+import { businessTimeZone } from "@/lib/studio/business-zone";
+import { zoneCity } from "@/lib/studio/time";
 import { randomBytes, randomInt } from "crypto";
 import type { createAdminClient } from "@/lib/supabaseAdmin";
 import { escapeHtml, sendEmail } from "@/lib/email/sendbyte";
@@ -176,7 +178,8 @@ async function tellTicketHolders(db: Admin, event: StudioEvent, what: "moved" | 
     const { data } = await db.from("studio_tickets" as never).select("buyer_email, buyer_name, order_ref").eq("event_id", event.id).eq("status", "paid").not("buyer_email", "is", null).limit(5_000);
     const byEmail = new Map<string, { name: string; order: string }>();
     for (const row of (data ?? []) as Array<{ buyer_email: string; buyer_name: string; order_ref: string }>) byEmail.set(row.buyer_email.toLowerCase(), { name: row.buyer_name, order: row.order_ref });
-    const date = new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Lagos", weekday: "long", day: "numeric", month: "long", hour: "numeric", minute: "2-digit", hour12: true }).format(new Date(event.starts_at));
+    const timeZone = await businessTimeZone(db, event.project_id);
+    const date = new Intl.DateTimeFormat("en-GB", { timeZone, weekday: "long", day: "numeric", month: "long", hour: "numeric", minute: "2-digit", hour12: true }).format(new Date(event.starts_at));
     let sent = 0;
     for (const [email, holder] of byEmail) {
         const link = `https://studio.cencori.com/e/${event.slug}/order/${holder.order}`;
@@ -414,15 +417,16 @@ export async function eventsBriefing(db: Admin, projectId: string, now = Date.no
             .gte("starts_at", new Date(now - 12 * 3_600_000).toISOString()).order("starts_at", { ascending: true }).limit(5);
         const events = (data ?? []) as StudioEvent[];
         if (events.length) {
+            const timeZone = await businessTimeZone(db, projectId);
             const lines = await Promise.all(events.map(async (event) => {
                 const left = await seatsLeft(db, event);
-                const date = new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Lagos", weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true }).format(new Date(event.starts_at));
+                const date = new Intl.DateTimeFormat("en-GB", { timeZone, weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true }).format(new Date(event.starts_at));
                 const tiers = event.tiers.map((tier) => {
                     const price = tier.price === 0 ? "free" : event.currency === "NGN" ? `₦${tier.price.toLocaleString("en-NG")}` : `${event.currency} ${tier.price}`;
                     const seats = left[tier.id];
                     return `${tier.name} ${price}${seats === 0 ? " (sold out)" : seats !== null && seats <= 30 ? ` (${seats} left)` : ""}`;
                 }).join(", ");
-                return `- ${event.name}: ${date} (Lagos time)${event.venue ? `, ${event.venue}` : ""}. Tickets: ${tiers}. Buy here: https://studio.cencori.com/e/${event.slug}${event.description ? `\n  ${event.description.replace(/\s+/g, " ").slice(0, 300)}` : ""}`;
+                return `- ${event.name}: ${date} (${zoneCity(timeZone)} time)${event.venue ? `, ${event.venue}` : ""}. Tickets: ${tiers}. Buy here: https://studio.cencori.com/e/${event.slug}${event.description ? `\n  ${event.description.replace(/\s+/g, " ").slice(0, 300)}` : ""}`;
             }));
             text = `Events this business is selling tickets for. When someone asks about one, or wants to come, answer from this and send the ticket link: tickets are chosen and paid for on that page, and the QR ticket comes right after. Don't take ticket payments in the chat.\n${lines.join("\n")}`;
         }

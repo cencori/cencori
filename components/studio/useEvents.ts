@@ -1,5 +1,7 @@
 "use client";
 
+import { DEFAULT_TIME_ZONE, zonedInstant } from "@/lib/studio/time";
+import { useStudioOverview } from "@/components/studio/useStudioOverview";
 import { useQuery } from "@tanstack/react-query";
 import { studioFetch } from "@/components/studio/studio-data";
 import { useStudio } from "@/components/studio/StudioShell";
@@ -44,26 +46,34 @@ export function useEvent(eventId: string) {
     });
 }
 
-/** Events happen in Lagos: their times are shown and typed in Lagos time, whatever the device's own zone. */
-export const EVENT_TIME_ZONE = "Africa/Lagos";
+/**
+ * The business's time zone (overview's time_zone, lib/studio/business-zone.ts): event times are
+ * shown and typed in it, whatever zone this phone or laptop is in. Lagos until the overview loads.
+ */
+export function useBusinessTimeZone(): string {
+    return useStudioOverview().data?.time_zone ?? DEFAULT_TIME_ZONE;
+}
 
-/** "Sat 20 Dec · 8:00 pm", in Lagos time. */
-export function eventWhen(iso: string): string {
+/** "Sat 20 Dec · 8:00 pm", in the business's zone. */
+export function eventWhen(iso: string, timeZone: string): string {
     const date = new Date(iso);
-    const day = date.toLocaleDateString("en-GB", { timeZone: EVENT_TIME_ZONE, weekday: "short", day: "numeric", month: "short" });
-    const time = date.toLocaleTimeString("en-GB", { timeZone: EVENT_TIME_ZONE, hour: "numeric", minute: "2-digit", hour12: true });
+    const day = date.toLocaleDateString("en-GB", { timeZone, weekday: "short", day: "numeric", month: "short" });
+    const time = date.toLocaleTimeString("en-GB", { timeZone, hour: "numeric", minute: "2-digit", hour12: true });
     return `${day} · ${time}`;
 }
 
-/** An instant as a datetime-local value ("2026-12-20T20:00") in Lagos time. */
-export function lagosInput(iso: string): string {
-    const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone: EVENT_TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(new Date(iso)).map((part) => [part.type, part.value]));
+/** An instant as a datetime-local value ("2026-12-20T20:00") on the business's clock. */
+export function zoneInput(iso: string, timeZone: string): string {
+    const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(new Date(iso)).map((part) => [part.type, part.value]));
     return `${parts.year}-${parts.month}-${parts.day}T${parts.hour === "24" ? "00" : parts.hour}:${parts.minute}`;
 }
 
-/** A datetime-local value typed as Lagos time, as an instant (Lagos is UTC+1 all year, no daylight saving). */
-export function fromLagosInput(value: string): string {
-    return value ? new Date(`${value}:00+01:00`).toISOString() : "";
+/** A datetime-local value typed on the business's clock, as an instant (daylight saving included). */
+export function fromZoneInput(value: string, timeZone: string): string {
+    const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value);
+    if (!match) return "";
+    const [, year, month, day, hour, minute] = match.map(Number);
+    return zonedInstant(timeZone, year, month, day, hour, minute).toISOString();
 }
 
 export function eventLink(slug: string): string {

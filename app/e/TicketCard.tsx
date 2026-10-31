@@ -8,13 +8,13 @@ export function ticketUrl(slug: string, code: string): string {
 }
 
 /** One ticket: the QR the door scans, and the code to type if it can't. White on the black page: QR codes scan best dark on light. */
-export async function TicketCard({ event, ticket }: { event: StudioEvent; ticket: Ticket }) {
+export async function TicketCard({ event, ticket, timeZone }: { event: StudioEvent; ticket: Ticket; timeZone: string }) {
     const qr = await QRCode.toDataURL(ticketUrl(event.slug, ticket.code), { margin: 1, width: 440, errorCorrectionLevel: "M" });
     const tier = event.tiers.find((item) => item.id === ticket.tier_id)?.name ?? "Ticket";
     return (
         <div className="overflow-hidden rounded-3xl bg-white text-zinc-900">
             <div className="px-5 pt-5">
-                <p className="text-[13px] font-medium text-zinc-500">{when(event)}</p>
+                <p className="text-[13px] font-medium text-zinc-500">{when(event, timeZone)}</p>
                 <p className="mt-0.5 text-lg font-semibold leading-tight">{event.name}</p>
                 <p className="mt-1 text-[14px] text-zinc-600">{tier} · {ticket.buyer_name}</p>
             </div>

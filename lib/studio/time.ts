@@ -42,6 +42,28 @@ export function periodStarts(timeZone: string, now = new Date()): { day: Date; m
     };
 }
 
+/** "Africa/Lagos" → "Lagos", "America/New_York" → "New York": how people name a zone. */
+export function zoneCity(timeZone: string): string {
+    if (timeZone === "UTC" || timeZone === "Etc/UTC") return "UTC";
+    return (timeZone.split("/").pop() ?? timeZone).replace(/_/g, " ");
+}
+
+/** The instant a wall-clock time in a zone is ("20:00 on 20 Dec in London"), daylight saving included. */
+export function zonedInstant(timeZone: string, year: number, month: number, day: number, hour: number, minute: number): Date {
+    const guess = new Date(Date.UTC(year, month - 1, day, hour, minute));
+    const first = new Date(guess.getTime() - offsetAt(timeZone, guess));
+    // Once more from the first answer, for the hours either side of a clock change.
+    return new Date(guess.getTime() - offsetAt(timeZone, first));
+}
+
+/** A zone's offset from UTC at a moment, as in ISO times: "+01:00", "-05:00", "+00:00". */
+export function utcOffset(timeZone: string, at = new Date()): string {
+    const minutes = Math.round(offsetAt(timeZone, at) / 60_000);
+    const sign = minutes < 0 ? "-" : "+";
+    const abs = Math.abs(minutes);
+    return `${sign}${String(Math.floor(abs / 60)).padStart(2, "0")}:${String(abs % 60).padStart(2, "0")}`;
+}
+
 /** A usable zone: the one given if the runtime knows it, else Lagos. */
 export function safeTimeZone(timeZone: string | null | undefined): string {
     if (!timeZone) return DEFAULT_TIME_ZONE;

@@ -63,12 +63,12 @@ Rules:
   For shops and anyone selling products (fashion, food, beauty, gadgets…): put their price list in the catalog with add_products (not as knowledge: the agent quotes prices and stock from the catalog and takes orders from it), switch sell_products on with set_agent_system_tools, and offer open_agent_page 'payments' so orders are paid by link. Big lists or Bumpa/Selar/Shopify exports: open_agent_page 'products', where they import the spreadsheet.
   For changes ("mention the live band on Fridays", "stop taking bookings over 8"), use update_agent_instructions (append for small additions), then offer publish_agent, since edits only go live once published. Connecting WhatsApp, Google Calendar or other apps needs the user's own sign-in: offer open_agent_page, never claim you connected it.
 - You can take the user around the dashboard with navigate: it opens the page in the same tab and you stay open beside it. Use it when they ask to go somewhere or be shown something ("take me to…", "show me…", "open my billing"), or when a page shows the answer better than words (the full log, a chart). Look up first when the target depends on data (e.g. list_agents for their busiest agent, which comes sorted by recent runs), then navigate once. Don't navigate for questions you can just answer, and never more than once per reply. current_path in the dashboard context is the page they're on now. For "where do I…" / "where is…" questions about a setting or button, navigate with highlight so it's outlined on screen. After navigating, say in one short line where you took them and what to look at (with highlight: "the part I've outlined"); don't say "click" or describe links. If navigate is awaiting confirmation (unsaved changes), say so in one line instead. open_menu opens the command palette, their account menu or the organization switcher on screen, when they ask for one.
-- You cannot delete agents, change billing, payment providers or plans, or delete projects or organizations; point the user to the right page instead. (A business's own accounts that customers pay into by transfer are fine: list_bank_accounts and save_bank_account.)
+- You cannot delete agents, change billing, payment providers or plans, or delete projects or organizations; point the user to the right page instead. (A business's own accounts that customers pay into by transfer are fine: list_bank_accounts, save_bank_account and remove_bank_account.)
 `;
 
 /** Studio threads: how to read the stamps on the owner's messages. */
 const TIME_NOTE = `TIME
-This is one long conversation with the owner that carries on across days. Each of the owner's messages starts with when they sent it, in [brackets], in the business's time zone (now_local in the context is the time now). Use it: know what "today", "yesterday" and "last week" mean, notice when time has passed since something was said ("you mentioned Kemi's order on Tuesday"), and don't treat old instructions as just said. Never write a [time] stamp yourself.`;
+This is one long conversation with the owner that carries on across days. Each of the owner's messages starts with when they sent it, in [brackets], in the business's time zone (now_local in the context is the time now). Use it: know what "today", "yesterday" and "last week" mean, notice when time has passed since something was said ("you mentioned Kemi's order on Tuesday"), and don't treat old instructions as just said. Never write a [time] stamp yourself. Asked the time or the date, answer from now_local, the owner's own time: "It's 9:00 am." Never in UTC, and don't name the time zone unless they ask.`;
 
 // Copilot runs through Cencori's own gateway (dogfooding): its requests are
 // logged in ai_requests, billed to the owning project's credits, and get the
@@ -290,13 +290,22 @@ export async function POST(request: NextRequest) {
         const sentAt = new Date().toISOString();
         const incomingId = typeof body.messageId === "string" && UUID_PATTERN.test(body.messageId) ? body.messageId : crypto.randomUUID();
         if (employee && body.thread === true && project) {
-            const [{ getOwnerAlerts }, { safeTimeZone }] = await Promise.all([import("@/lib/embedded/owner-alerts"), import("@/lib/studio/time")]);
-            const { data: firstAgent } = await admin.from("agents").select("id").eq("project_id", project.id).order("created_at", { ascending: true }).limit(1).maybeSingle();
-            const alerts = firstAgent ? await getOwnerAlerts(admin as never, project.id, (firstAgent as { id: string }).id).catch(() => null) : null;
-            timeZone = safeTimeZone(alerts?.settings.time_zone);
+            const [{ businessTimeZone }, { safeTimeZone }] = await Promise.all([import("@/lib/studio/business-zone"), import("@/lib/studio/time")]);
+            // The owner's own clock first (the app sends its phone's zone), so "what time is it" and the
+            // stamps are theirs wherever they are; else the business's zone, Lagos by default.
+            const ownerZone = typeof body.timeZone === "string" && body.timeZone.length <= 64 ? body.timeZone : null;
+            timeZone = ownerZone ? safeTimeZone(ownerZone) : await businessTimeZone(admin as never, project.id);
             thread = await getThread(admin as never, project.id, user.id, threadKey);
         }
         const history = thread ? threadContext(thread, timeZone) : null;
+        // A business's own zone, for the times the owner gives (events, bookings): "8pm" is 8pm there.
+        let businessZone: { time_zone: string; utc_offset: string; today: string } | null = null;
+        if (isBusiness && project) {
+            const [{ businessTimeZone }, { localDate, utcOffset }] = await Promise.all([import("@/lib/studio/business-zone"), import("@/lib/studio/time")]);
+            const zone = await businessTimeZone(admin as never, project.id);
+            const today = localDate(zone, new Date());
+            businessZone = { time_zone: zone, utc_offset: utcOffset(zone), today: `${today.year}-${String(today.month).padStart(2, "0")}-${String(today.day).padStart(2, "0")}` };
+        }
 
         const pageContext = {
             current_surface: currentSurface,
@@ -305,8 +314,9 @@ export async function POST(request: NextRequest) {
             project: project ? { name: project.name, slug: project.slug } : null,
             environment,
             user_first_name: userName,
-            now_utc: new Date().toISOString(),
-            ...(thread ? { now_local: stamp(sentAt, timeZone), time_zone: timeZone } : {}),
+            // In the owner's thread only their local time: given UTC too, the model answered "what time is it" in UTC.
+            ...(thread ? { now_local: `${stamp(sentAt, timeZone)} ${new Date(sentAt).getUTCFullYear()}`, time_zone: timeZone } : { now_utc: new Date().toISOString() }),
+            ...(businessZone ? { business_time_zone: businessZone } : {}),
             // Studio (the business owner's phone app) has no console: everything happens in it.
             ...(currentPath === "studio" ? {
                 studio: "The user is in Cencori Studio, the business app on their phone. Never send them to the console, a dashboard or a computer. open_agent_page opens a sheet right here in Studio (WhatsApp, payments). Adding knowledge, going live and owner alerts are also sheets here: under Finish setting up on Home.",

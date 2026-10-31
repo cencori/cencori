@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 
 /**
  * Studio's own date and time picker for events (the browser's is grey boxes
- * and blue squares). Works in the same "YYYY-MM-DDTHH:MM" Lagos-time value a
+ * and blue squares). Works in the same "YYYY-MM-DDTHH:MM" business-time value a
  * datetime-local field gives, so the form around it doesn't change. Opens in
  * place in the sheet, not as a popup.
  */
@@ -27,21 +27,21 @@ function parse(value: string): Parts | null {
 const pad = (n: number) => String(n).padStart(2, "0");
 const format = (parts: Parts) => `${parts.year}-${pad(parts.month)}-${pad(parts.day)}T${pad(parts.hour)}:${pad(parts.minute)}`;
 
-/** Today in Lagos, so "today" and "past" mean the same on any device. */
-function lagosToday(): { year: number; month: number; day: number } {
-    const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Lagos", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date()).map((part) => [part.type, part.value]));
+/** Today on the business's clock, so "today" and "past" mean the same on any device. */
+function zoneToday(timeZone: string): { year: number; month: number; day: number } {
+    const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date()).map((part) => [part.type, part.value]));
     return { year: Number(parts.year), month: Number(parts.month), day: Number(parts.day) };
 }
 
-function label(parts: Parts): string {
+function label(parts: Parts, timeZone: string): string {
     const date = new Date(Date.UTC(parts.year, parts.month - 1, parts.day));
-    const day = date.toLocaleDateString("en-GB", { timeZone: "UTC", weekday: "short", day: "numeric", month: "short", year: parts.year === lagosToday().year ? undefined : "numeric" });
+    const day = date.toLocaleDateString("en-GB", { timeZone: "UTC", weekday: "short", day: "numeric", month: "short", year: parts.year === zoneToday(timeZone).year ? undefined : "numeric" });
     const hour12 = parts.hour % 12 || 12;
     return `${day} · ${hour12}:${pad(parts.minute)} ${parts.hour < 12 ? "am" : "pm"}`;
 }
 
-export function EventDateTimePicker({ value, onChange }: { value: string; onChange: (value: string) => void }) {
-    const today = lagosToday();
+export function EventDateTimePicker({ value, onChange, timeZone }: { value: string; onChange: (value: string) => void; timeZone: string }) {
+    const today = zoneToday(timeZone);
     const current = parse(value);
     const [open, setOpen] = useState(false);
     const [view, setView] = useState(() => ({ year: current?.year ?? today.year, month: current?.month ?? today.month }));
@@ -69,7 +69,7 @@ export function EventDateTimePicker({ value, onChange }: { value: string; onChan
         <div>
             <button type="button" onClick={() => setOpen((was) => !was)} className="flex h-12 w-full items-center gap-3 rounded-full bg-muted px-5 text-left text-[15px]">
                 <CalendarIcon size={20} className="shrink-0 text-muted-foreground" />
-                <span className={cn("min-w-0 flex-1 truncate", !current && "text-muted-foreground")}>{current ? label(current) : "Pick a date and time"}</span>
+                <span className={cn("min-w-0 flex-1 truncate", !current && "text-muted-foreground")}>{current ? label(current, timeZone) : "Pick a date and time"}</span>
             </button>
 
             {open && (

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { eventBySlug, eventHost, seatsLeft } from "@/lib/studio/events";
+import { businessTimeZone } from "@/lib/studio/business-zone";
 import { EventFrame, money, when } from "@/app/e/shared";
 import { BuyTickets } from "@/app/e/[slug]/BuyTickets";
 import { MapPointIcon } from "@solar-icons/react/linear/map-point";
@@ -15,9 +16,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const db = createAdminClient();
     const event = await eventBySlug(db, (await params).slug);
     if (!event) return { title: "Event not found" };
-    const host = await eventHost(db, event);
+    const [host, timeZone] = await Promise.all([eventHost(db, event), businessTimeZone(db, event.project_id)]);
     const from = Math.min(...event.tiers.map((tier) => tier.price));
-    const description = `${host ? `Hosted by ${host} · ` : ""}${when(event)}${event.venue ? ` · ${event.venue}` : ""} · ${from === 0 ? "Free" : `From ${money(from, event.currency)}`}`;
+    const description = `${host ? `Hosted by ${host} · ` : ""}${when(event, timeZone)}${event.venue ? ` · ${event.venue}` : ""} · ${from === 0 ? "Free" : `From ${money(from, event.currency)}`}`;
     // The flyer is what people recognise when the link lands in a WhatsApp chat.
     const images = event.banner_url ? [{ url: event.banner_url }] : undefined;
     return { title: event.name, description, openGraph: { title: event.name, description, images }, twitter: { card: event.banner_url ? "summary_large_image" : "summary", images: event.banner_url ? [event.banner_url] : undefined }, robots: { index: false } };
@@ -28,7 +29,7 @@ export default async function EventPage({ params }: Props) {
     const db = createAdminClient();
     const event = await eventBySlug(db, (await params).slug);
     if (!event || event.status === "cancelled") notFound();
-    const [left, host] = await Promise.all([seatsLeft(db, event), eventHost(db, event)]);
+    const [left, host, timeZone] = await Promise.all([seatsLeft(db, event), eventHost(db, event), businessTimeZone(db, event.project_id)]);
     const over = Date.parse(event.ends_at ?? event.starts_at) + 6 * 3_600_000 < Date.now();
     return (
         <EventFrame>
@@ -48,7 +49,7 @@ export default async function EventPage({ params }: Props) {
                     )}
                     <li className="flex gap-3">
                         <CalendarIcon size={20} className="mt-0.5 shrink-0 text-white/50" />
-                        <span>{when(event)}</span>
+                        <span>{when(event, timeZone)}</span>
                     </li>
                 </ul>
             </header>
