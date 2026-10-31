@@ -75,7 +75,7 @@ async function staffMember(ctx: CopilotToolContext, name: unknown): Promise<Agen
 }
 
 /** Only an organization's owner or admins change what an employee knows, as on the knowledge route. */
-async function canManage(ctx: CopilotToolContext): Promise<boolean> {
+export async function canManage(ctx: CopilotToolContext): Promise<boolean> {
     if (!ctx.userId) return false;
     const { data: organization } = await ctx.admin.from("organizations").select("owner_id").eq("id", ctx.organization.id).maybeSingle();
     if ((organization as { owner_id?: string } | null)?.owner_id === ctx.userId) return true;

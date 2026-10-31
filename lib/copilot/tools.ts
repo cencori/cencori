@@ -3,6 +3,7 @@ import type { createAdminClient } from "@/lib/supabaseAdmin";
 import { AGENT_READ_NAMES, AGENT_READ_TOOLS, AGENT_TOOL_STATUS, runAgentReadTool } from "@/lib/copilot/agent-tools";
 import { BUSINESS_TOOLS, BUSINESS_TOOL_NAMES, BUSINESS_TOOL_STATUS, runBusinessTool } from "@/lib/copilot/business-tools";
 import { REMEMBER_TOOLS, REMEMBER_TOOL_NAMES, REMEMBER_TOOL_STATUS, runRememberTool } from "@/lib/copilot/remember";
+import { BANK_ACCOUNT_TOOLS, BANK_ACCOUNT_TOOL_NAMES, BANK_ACCOUNT_TOOL_STATUS, runBankAccountTool } from "@/lib/copilot/bank-accounts";
 
 /**
  * Read-only tools for Cencori Copilot (app/api/agent).
@@ -85,6 +86,7 @@ const PROJECT_TOOLS = new Set([
     ...AGENT_READ_NAMES,
     ...BUSINESS_TOOL_NAMES,
     ...REMEMBER_TOOL_NAMES,
+    ...BANK_ACCOUNT_TOOL_NAMES,
 ]);
 
 export const COPILOT_TOOLS: ChatCompletionFunctionTool[] = [
@@ -221,7 +223,7 @@ COPILOT_TOOLS.push(...AGENT_READ_TOOLS);
 /** The tools available for this context (project-only tools need a project; the business's own data is for business accounts). */
 export function toolsFor(ctx: CopilotToolContext): ChatCompletionFunctionTool[] {
     if (!ctx.project) return COPILOT_TOOLS.filter((t) => !PROJECT_TOOLS.has(t.function.name));
-    return ctx.business ? [...COPILOT_TOOLS, ...BUSINESS_TOOLS, ...REMEMBER_TOOLS] : COPILOT_TOOLS;
+    return ctx.business ? [...COPILOT_TOOLS, ...BUSINESS_TOOLS, ...REMEMBER_TOOLS, ...BANK_ACCOUNT_TOOLS] : COPILOT_TOOLS;
 }
 
 /** Short label shown in the panel while a tool runs. */
@@ -239,6 +241,7 @@ export const TOOL_STATUS: Record<string, string> = {
     ...AGENT_TOOL_STATUS,
     ...BUSINESS_TOOL_STATUS,
     ...REMEMBER_TOOL_STATUS,
+    ...BANK_ACCOUNT_TOOL_STATUS,
 };
 
 type Args = Record<string, unknown>;
@@ -252,6 +255,7 @@ export async function runCopilotTool(name: string, args: Args, ctx: CopilotToolC
     if (AGENT_READ_NAMES.has(name)) return runAgentReadTool(name, args, ctx);
     if (BUSINESS_TOOL_NAMES.has(name)) return ctx.business ? runBusinessTool(name, args, ctx) : { error: "That's only for business accounts." };
     if (REMEMBER_TOOL_NAMES.has(name)) return ctx.business ? runRememberTool(name, args, ctx) : { error: "That's only for business accounts." };
+    if (BANK_ACCOUNT_TOOL_NAMES.has(name)) return ctx.business ? runBankAccountTool(name, args, ctx) : { error: "That's only for business accounts." };
 
     switch (name) {
         case "get_usage_summary": {
