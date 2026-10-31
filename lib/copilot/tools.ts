@@ -22,6 +22,8 @@ export type CopilotToolContext = {
     userId?: string;
     /** A business account (Studio): its owner's employee also reads money, orders, bookings, customers and chats. */
     business?: boolean;
+    /** In Studio, the employee the owner is talking to: what they're told to remember goes to them. */
+    employeeId?: string;
 };
 
 type Range = "24h" | "7d" | "30d";

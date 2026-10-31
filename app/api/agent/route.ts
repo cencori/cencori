@@ -14,6 +14,7 @@ import { verifyOrganizationAccess } from "@/lib/copilot/access";
 import { findAgent } from "@/lib/copilot/agent-tools";
 import { employeePrompt } from "@/lib/copilot/employee";
 import type { Remembered } from "@/lib/copilot/remember";
+import { applySummary, getThread, saveThread, stamp, studioStaff, summaryPrompt, threadContext, toSummarize, type StoredAction, type StoredMessage, type Thread, type ThreadKey } from "@/lib/studio/owner-chat";
 import { DOCS_TOOL_NAMES, DOCS_TOOL_STATUS, DOCS_TOOLS, runDocsTool } from "@/lib/copilot/docs";
 import { COPILOT_MENUS, NAVIGATE_TOOL, OPEN_MENU_TOOL, prepareNavigation, type CopilotMenu } from "@/lib/copilot/navigation";
 import { COPILOT_FILES_REQUEST_BUDGET, sanitizeFiles, sanitizeImages, withFiles, type CopilotFile } from "@/lib/copilot/files";
@@ -64,6 +65,10 @@ Rules:
 - You can take the user around the dashboard with navigate: it opens the page in the same tab and you stay open beside it. Use it when they ask to go somewhere or be shown something ("take me to…", "show me…", "open my billing"), or when a page shows the answer better than words (the full log, a chart). Look up first when the target depends on data (e.g. list_agents for their busiest agent, which comes sorted by recent runs), then navigate once. Don't navigate for questions you can just answer, and never more than once per reply. current_path in the dashboard context is the page they're on now. For "where do I…" / "where is…" questions about a setting or button, navigate with highlight so it's outlined on screen. After navigating, say in one short line where you took them and what to look at (with highlight: "the part I've outlined"); don't say "click" or describe links. If navigate is awaiting confirmation (unsaved changes), say so in one line instead. open_menu opens the command palette, their account menu or the organization switcher on screen, when they ask for one.
 - You cannot delete agents, change billing, payments or plans, or delete projects or organizations; point the user to the right page instead.
 `;
+
+/** Studio threads: how to read the stamps on the owner's messages. */
+const TIME_NOTE = `TIME
+This is one long conversation with the owner that carries on across days. Each of the owner's messages starts with when they sent it, in [brackets], in the business's time zone (now_local in the context is the time now). Use it: know what "today", "yesterday" and "last week" mean, notice when time has passed since something was said ("you mentioned Kemi's order on Tuesday"), and don't treat old instructions as just said. Never write a [time] stamp yourself.`;
 
 // Copilot runs through Cencori's own gateway (dogfooding): its requests are
 // logged in ai_requests, billed to the owning project's credits, and get the
@@ -260,16 +265,38 @@ export async function POST(request: NextRequest) {
 
         // Studio, for a business: who the owner is talking to (their main agent, as the AI tab shows it).
         let employee: string | null = null;
+        // Which employee is talking: the one the owner picked (agentId), else the main one.
+        let speakerId: string | null = null;
+        let threadKey: ThreadKey | undefined;
         if (isBusiness && currentPath === "studio" && project) {
-            const { data: agents } = await admin.from("agents").select("id, name, is_active, stable_version_id, created_at").eq("project_id", project.id).order("created_at", { ascending: true });
-            const staff = ((agents ?? []) as Array<{ id: string; name: string; is_active: boolean; stable_version_id: string | null }>)
-                .map((agent) => ({ id: agent.id, name: agent.name, live: !!agent.stable_version_id && agent.is_active }))
-                .sort((a, b) => Number(b.live) - Number(a.live));
-            // The main one's personality, so the owner meets the same person customers do.
+            const everyone = await studioStaff(admin as never, project.id);
+            const requested = typeof body.agentId === "string" && UUID_PATTERN.test(body.agentId) ? body.agentId : null;
+            const speaker = requested ? everyone.find((agent) => agent.id === requested) : everyone[0];
+            if (requested && !speaker) return NextResponse.json({ error: "That employee isn't in this business." }, { status: 404 });
+            // The speaker first: employeePrompt makes the first one "you" and the rest colleagues.
+            const staff = speaker ? [speaker, ...everyone.filter((agent) => agent.id !== speaker.id)] : everyone;
+            speakerId = speaker?.id ?? null;
+            threadKey = speaker ? { agentId: speaker.id, main: speaker.id === everyone[0]?.id } : undefined;
+            // Their personality, so the owner meets the same person customers do.
             const { getPersona, personaInstructions } = await import("@/lib/studio/persona");
-            const persona = staff[0] ? await getPersona(admin as never, project.id, staff[0].id).catch(() => null) : null;
-            employee = employeePrompt(organization?.name ?? null, userName ?? null, staff, persona ? personaInstructions(staff[0].name, persona.settings) : null);
+            const persona = speaker ? await getPersona(admin as never, project.id, speaker.id).catch(() => null) : null;
+            employee = employeePrompt(organization?.name ?? null, userName ?? null, staff, persona && speaker ? personaInstructions(speaker.name, persona.settings) : null);
         }
+
+        // Studio, for a business: the owner's one conversation with their employee, kept on the
+        // server with every message's time (lib/studio/owner-chat.ts). The app sends only the new message.
+        let thread: Thread | null = null;
+        let timeZone = "Africa/Lagos";
+        const sentAt = new Date().toISOString();
+        const incomingId = typeof body.messageId === "string" && UUID_PATTERN.test(body.messageId) ? body.messageId : crypto.randomUUID();
+        if (employee && body.thread === true && project) {
+            const [{ getOwnerAlerts }, { safeTimeZone }] = await Promise.all([import("@/lib/embedded/owner-alerts"), import("@/lib/studio/time")]);
+            const { data: firstAgent } = await admin.from("agents").select("id").eq("project_id", project.id).order("created_at", { ascending: true }).limit(1).maybeSingle();
+            const alerts = firstAgent ? await getOwnerAlerts(admin as never, project.id, (firstAgent as { id: string }).id).catch(() => null) : null;
+            timeZone = safeTimeZone(alerts?.settings.time_zone);
+            thread = await getThread(admin as never, project.id, user.id, threadKey);
+        }
+        const history = thread ? threadContext(thread, timeZone) : null;
 
         const pageContext = {
             current_surface: currentSurface,
@@ -279,6 +306,7 @@ export async function POST(request: NextRequest) {
             environment,
             user_first_name: userName,
             now_utc: new Date().toISOString(),
+            ...(thread ? { now_local: stamp(sentAt, timeZone), time_zone: timeZone } : {}),
             // Studio (the business owner's phone app) has no console: everything happens in it.
             ...(currentPath === "studio" ? {
                 studio: "The user is in Cencori Studio, the business app on their phone. Never send them to the console, a dashboard or a computer. open_agent_page opens a sheet right here in Studio (WhatsApp, payments). Adding knowledge, going live and owner alerts are also sheets here: under Finish setting up on Home.",
@@ -347,16 +375,20 @@ export async function POST(request: NextRequest) {
             const prompt = lightweightConversation
                 ? `CURRENT DASHBOARD CONTEXT\n${JSON.stringify(pageContext, null, 2)}\n\nLATEST USER MESSAGE\n${question}\n\nThis is a conversational turn. Reply naturally and do not restate or re-analyze earlier workspace findings.`
                 : `CURRENT DASHBOARD CONTEXT\n${JSON.stringify(pageContext, null, 2)}\n\nLATEST USER MESSAGE\n${question}`;
+            const earlier = history
+                ? [
+                    ...(history.summary ? [{ role: "system" as const, content: `EARLIER IN YOUR CONVERSATION WITH THE OWNER (a summary, oldest first)\n${history.summary}` }] : []),
+                    ...history.messages.map((message): ChatCompletionMessageParam => ({ role: message.role, content: message.content })),
+                ]
+                : lightweightConversation
+                    ? []
+                    : messages.slice(0, -1).map((message): ChatCompletionMessageParam => ({ role: message.role, content: message.content }));
             return [
                 { role: "system", content: SYSTEM_PROMPT },
                 ...(employee ? [{ role: "system" as const, content: employee }] : []),
-                ...(lightweightConversation
-                    ? []
-                    : messages.slice(0, -1).map((message): ChatCompletionMessageParam => ({
-                        role: message.role,
-                        content: message.content,
-                    }))),
-                { role: "user", content: prompt },
+                ...(thread ? [{ role: "system" as const, content: TIME_NOTE }] : []),
+                ...earlier,
+                { role: "user", content: thread ? `[${stamp(sentAt, timeZone)}]${body.hidden === true ? " (from the app, not typed by the owner)" : ""} ${prompt}` : prompt },
             ];
         };
 
@@ -368,6 +400,7 @@ export async function POST(request: NextRequest) {
                 project: project ? { id: project.id, name: project.name, slug: project.slug } : null,
                 userId: user.id,
                 business: isBusiness,
+                ...(speakerId ? { employeeId: speakerId } : {}),
             }
             : null;
         // Read tools always; action tools only inside a project.
@@ -380,6 +413,12 @@ export async function POST(request: NextRequest) {
             async start(controller) {
                 const send = (payload: Record<string, unknown>) =>
                     controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`));
+                // What this reply proposed, saved and said, for the thread.
+                const assistantId = crypto.randomUUID();
+                const proposedActions: StoredAction[] = [];
+                const savedNotes: Remembered[] = [];
+                let answer = "";
+                if (thread) send({ message_id: assistantId, at: sentAt });
                 // Summed across describing images and every tool round.
                 let inputTokens = 0;
                 let outputTokens = 0;
@@ -448,7 +487,10 @@ export async function POST(request: NextRequest) {
                             }
                         }
 
-                        if (calls.size === 0 || !toolContext) break;
+                        if (calls.size === 0 || !toolContext) {
+                            answer = content;
+                            break;
+                        }
 
                         if (content) send({ discard: true });
                         const toolCalls: ChatCompletionMessageFunctionToolCall[] = [...calls.values()].map((call, i) => ({
@@ -495,6 +537,7 @@ export async function POST(request: NextRequest) {
                                     const prepared = await prepareCopilotAction(call.function.name, args, toolContext);
                                     if ("proposal" in prepared) {
                                         send({ action: prepared.proposal });
+                                        proposedActions.push({ id: prepared.proposal.id, title: prepared.proposal.title, state: "pending", proposal: prepared.proposal as unknown as Record<string, unknown> });
                                         output = {
                                             status: "awaiting_user_confirmation",
                                             action: prepared.proposal.title,
@@ -507,7 +550,10 @@ export async function POST(request: NextRequest) {
                                     output = await runCopilotTool(call.function.name, args, toolContext);
                                     // Saved without a card: the panel shows it with an Undo.
                                     const remembered = (output as { remembered?: Remembered } | null)?.remembered;
-                                    if (call.function.name === "remember" && remembered) send({ remembered });
+                                    if (call.function.name === "remember" && remembered) {
+                                        send({ remembered });
+                                        savedNotes.push(remembered);
+                                    }
                                 }
                             } catch (toolError) {
                                 console.error("[Cencori Agent] Tool error:", call.function.name, toolError);
@@ -528,6 +574,38 @@ export async function POST(request: NextRequest) {
                     send({ error: "The agent could not finish this response." });
                     controller.close();
                 } finally {
+                    // The owner's message and the reply join the thread, even when the reply failed
+                    // (the message was still said); older messages fold into the summary afterwards.
+                    if (thread && project) {
+                        const said: StoredMessage[] = [
+                            { id: incomingId, role: "user", content: latestQuestion.slice(0, 20_000), at: sentAt, ...(body.hidden === true ? { hidden: true } : {}) },
+                            ...(answer || proposedActions.length || savedNotes.length ? [{
+                                id: assistantId, role: "assistant" as const, content: answer, at: new Date().toISOString(),
+                                ...(proposedActions.length ? { actions: proposedActions } : {}),
+                                ...(savedNotes.length ? { notes: savedNotes.map((note) => ({ ...note, state: "saved" as const })) } : {}),
+                            }] : []),
+                        ];
+                        const projectId = project.id;
+                        waitUntil((async () => {
+                            // Re-read: another message may have landed while this one was answered.
+                            const latest = await getThread(admin as never, projectId, user.id, threadKey);
+                            const saved = await saveThread(admin as never, { ...latest, settings: { ...latest.settings, messages: [...latest.settings.messages, ...said] } });
+                            const batch = toSummarize(saved);
+                            if (!batch.length) return;
+                            const folded = await gateway.chat.completions.create({
+                                model: agentModel,
+                                messages: [{ role: "user", content: summaryPrompt(saved.settings.summary, batch, timeZone) }],
+                                max_tokens: 1200,
+                                temperature: 0.2,
+                                ...(/^deepseek-v4(\.\d+)?-flash$/.test(agentModel) ? { reasoning_effort: "none" as never } : {}),
+                            });
+                            const summary = folded.choices[0]?.message?.content ?? "";
+                            const current = await getThread(admin as never, projectId, user.id, threadKey);
+                            // Only if nothing was folded meanwhile.
+                            if (current.settings.summarized !== saved.settings.summarized) return;
+                            await saveThread(admin as never, applySummary(current, batch, summary));
+                        })().catch((threadError) => console.error("[Cencori Agent] Thread save failed:", threadError)));
+                    }
                     // Record the answer's usage and, past the free allowance, charge
                     // it. After the response, so it never delays or breaks it.
                     if (organization && inputTokens + outputTokens > 0) {

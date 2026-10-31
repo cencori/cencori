@@ -69,6 +69,11 @@ describe("remember", () => {
         expect(await runRememberTool("remember", { fact: "x", title: "x", staff: "Bisi" }, ctx())).toEqual({ error: 'No one on the staff is called "Bisi". The staff: Tolu, Ada.' });
     });
 
+    it("goes to the employee the owner is talking to when none is named", async () => {
+        const result = await runRememberTool("remember", { fact: "Tolu does deliveries on Saturdays.", title: "Saturday deliveries" }, { ...ctx(), employeeId: "a1" }) as { remembered: Record<string, string> };
+        expect(result.remembered.agent_name).toBe("Tolu");
+    });
+
     it("is for the owner and admins only, and needs an employee to exist", async () => {
         expect(await runRememberTool("remember", { fact: "x", title: "x" }, { ...ctx(), userId: "helper" })).toEqual({ error: "Only the business's owner or admins can change what the employee tells customers." });
         tables.agents = [];

@@ -57,7 +57,7 @@ export const REMEMBER_TOOL_STATUS: Record<string, string> = {
 type Agent = { id: string; name: string };
 type OwnerNote = { id: string; title: string; fact: string };
 
-/** The employee it's for: the one named, else the main one (the oldest live one, as the AI tab shows it). */
+/** The employee it's for: the one named, else the one the owner is talking to, else the main one (the oldest live one, as the AI tab shows it). */
 async function staffMember(ctx: CopilotToolContext, name: unknown): Promise<Agent | { error: string }> {
     const { data } = await ctx.admin.from("agents").select("id, name, is_active, stable_version_id, created_at").eq("project_id", ctx.project!.id).order("created_at", { ascending: true });
     const staff = (data ?? []) as Array<Agent & { is_active: boolean; stable_version_id: string | null }>;
@@ -68,6 +68,8 @@ async function staffMember(ctx: CopilotToolContext, name: unknown): Promise<Agen
         if (!match) return { error: `No one on the staff is called "${name}". The staff: ${staff.map((agent) => agent.name).join(", ")}.` };
         return { id: match.id, name: match.name };
     }
+    const talking = ctx.employeeId ? staff.find((agent) => agent.id === ctx.employeeId) : null;
+    if (talking) return { id: talking.id, name: talking.name };
     const main = staff.find((agent) => agent.is_active && agent.stable_version_id) ?? staff[0];
     return { id: main.id, name: main.name };
 }
