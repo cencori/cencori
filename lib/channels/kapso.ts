@@ -71,15 +71,17 @@ const SETUP_THEME = {
 /**
  * A link the business opens to connect its number. It sends them back to
  * `successUrl` (Kapso adds phone_number_id and the rest) or `failureUrl`
- * (with error_code). Coexistence only for now: the WhatsApp Business app
- * number they already use, which also skips Kapso's choice screen.
+ * (with error_code). One connection type, which also skips Kapso's choice
+ * screen: coexistence (the WhatsApp Business app number they already use, by
+ * default) or dedicated (a number of the assistant's own, API only: a SIM that
+ * isn't on WhatsApp, answered from Studio).
  */
-export async function createKapsoSetupLink(customerId: string, opts: { successUrl: string; failureUrl: string }): Promise<string> {
+export async function createKapsoSetupLink(customerId: string, opts: { successUrl: string; failureUrl: string; connection?: 'coexistence' | 'dedicated' }): Promise<string> {
     const created = await platform<{ data: { url: string } }>('POST', `/customers/${encodeURIComponent(customerId)}/setup_links`, {
         setup_link: {
             success_redirect_url: opts.successUrl,
             failure_redirect_url: opts.failureUrl,
-            allowed_connection_types: ['coexistence'],
+            allowed_connection_types: [opts.connection ?? 'coexistence'],
             theme_config: SETUP_THEME,
             language: 'en',
         },

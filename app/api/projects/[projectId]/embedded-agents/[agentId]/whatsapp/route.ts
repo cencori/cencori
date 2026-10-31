@@ -8,7 +8,7 @@
  *           Checks the credentials with Meta and saves them. A blank token or
  *           secret keeps the stored one. Turning it on sets up the WhatsApp
  *           customers installation of the published agent.
- *   POST    { action: 'kapso_link', return_path }
+ *   POST    { action: 'kapso_link', return_path, own_number? }
  *           Start "Connect WhatsApp" through Kapso: a setup link the business
  *           opens; it comes back to return_path with ?whatsapp=connected.
  *   POST    { action: 'kapso_finish', phone_number_id? }
@@ -195,7 +195,8 @@ async function kapso(
         // No fragment: Kapso adds its own query parameters to these.
         const back = (outcome: string) => `${resolvePublicOrigin(req)}${returnPath}?whatsapp=${outcome}`;
         try {
-            const url = await createKapsoSetupLink(customer.id, { successUrl: back('connected'), failureUrl: back('failed') });
+            // own_number: a number just for the assistant (dedicated), not the owner's WhatsApp Business app number.
+            const url = await createKapsoSetupLink(customer.id, { successUrl: back('connected'), failureUrl: back('failed'), connection: body.own_number === true ? 'dedicated' : 'coexistence' });
             return NextResponse.json({ url });
         } catch (error) {
             return fail(`Couldn't start connecting WhatsApp: ${error instanceof Error ? error.message : 'unknown error'}`, 502);
