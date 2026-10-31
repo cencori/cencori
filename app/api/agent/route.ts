@@ -261,11 +261,14 @@ export async function POST(request: NextRequest) {
         // Studio, for a business: who the owner is talking to (their main agent, as the AI tab shows it).
         let employee: string | null = null;
         if (isBusiness && currentPath === "studio" && project) {
-            const { data: agents } = await admin.from("agents").select("name, is_active, stable_version_id, created_at").eq("project_id", project.id).order("created_at", { ascending: true });
-            const staff = ((agents ?? []) as Array<{ name: string; is_active: boolean; stable_version_id: string | null }>)
-                .map((agent) => ({ name: agent.name, live: !!agent.stable_version_id && agent.is_active }))
+            const { data: agents } = await admin.from("agents").select("id, name, is_active, stable_version_id, created_at").eq("project_id", project.id).order("created_at", { ascending: true });
+            const staff = ((agents ?? []) as Array<{ id: string; name: string; is_active: boolean; stable_version_id: string | null }>)
+                .map((agent) => ({ id: agent.id, name: agent.name, live: !!agent.stable_version_id && agent.is_active }))
                 .sort((a, b) => Number(b.live) - Number(a.live));
-            employee = employeePrompt(organization?.name ?? null, userName ?? null, staff);
+            // The main one's personality, so the owner meets the same person customers do.
+            const { getPersona, personaInstructions } = await import("@/lib/studio/persona");
+            const persona = staff[0] ? await getPersona(admin as never, project.id, staff[0].id).catch(() => null) : null;
+            employee = employeePrompt(organization?.name ?? null, userName ?? null, staff, persona ? personaInstructions(staff[0].name, persona.settings) : null);
         }
 
         const pageContext = {

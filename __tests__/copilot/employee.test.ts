@@ -33,3 +33,11 @@ describe("employeePrompt and the business", () => {
         expect(prompt).toContain("never guess a figure");
     });
 });
+
+describe("employeePrompt and the personality", () => {
+    it("carries the employee's personality to the owner's side", () => {
+        const prompt = employeePrompt("Mama Put", "Bola", [{ name: "Ada", live: true }], "WHO YOU ARE\nYour name is Ada.\nPersonality: Playful");
+        expect(prompt).toContain("you're the same person customers meet");
+        expect(prompt.endsWith("Personality: Playful")).toBe(true);
+    });
+});

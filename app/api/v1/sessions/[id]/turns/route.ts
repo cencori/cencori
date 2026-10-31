@@ -395,10 +395,12 @@ export async function POST(
 
         const input = body.input;
         // Installed agents get today's date (they look things up by date through their tools)
-        // and the business's events on sale, with their ticket links.
+        // and the business's events on sale, with their ticket links; Studio's employees, who they are.
         const instructions = installedManifest
             ? [
                 installedManifest.instructions ?? '',
+                // Studio: the name and personality the owner set, live (lib/studio/persona.ts); nothing for agents without one.
+                agentId ? await import('@/lib/studio/persona').then(({ personaBlock }) => personaBlock(adminClient as never, session.project_id as string, agentId)).catch(() => '') : '',
                 (await import('@/lib/embedded/agent-tools')).agentClock(),
                 await import('@/lib/studio/events').then(({ eventsBriefing }) => eventsBriefing(adminClient as never, session.project_id as string)).catch(() => ''),
             ].filter(Boolean).join('\n\n')
