@@ -6,12 +6,16 @@ const save = vi.fn();
 const resolve = vi.fn();
 
 vi.mock("@/lib/copilot/remember", () => ({ canManage: vi.fn(async (ctx: { userId?: string }) => ctx.userId === "owner") }));
-vi.mock("@/lib/payouts/name-enquiry", () => ({ resolveAccountName: (...args: unknown[]) => resolve(...args) }));
+vi.mock("@/lib/payouts/name-enquiry", async (importOriginal) => ({ ...await importOriginal<typeof import("@/lib/payouts/name-enquiry")>(), resolveAccountName: (...args: unknown[]) => resolve(...args) }));
 vi.mock("@/lib/embedded/transfers", async (importOriginal) => {
     const real = await importOriginal<typeof import("@/lib/embedded/transfers")>();
     return {
         ...real,
         getTransfers: vi.fn(async () => (accounts.length ? { id: "c", projectId: "proj", metadata: { kind: "bank_transfer", account: accounts[0], accounts, currency: "NGN", transfers: [], updated_at: "" } } : null)),
+        removeAccount: vi.fn(async (_db: unknown, _project: string, id: string) => {
+            accounts = accounts.filter((item) => item.id !== id);
+            return accounts.length ? { id: "c", projectId: "proj", metadata: { kind: "bank_transfer", account: accounts[0], accounts, currency: "NGN", transfers: [], updated_at: "" } } : null;
+        }),
         saveBankAccount: vi.fn(async (_db: unknown, _project: string, account: { bank: string; account_number: string; account_name: string }, opts: { id?: string; main?: boolean }) => {
             save(account, opts);
             const stored = { ...account, id: opts.id ?? `a${accounts.length + 1}` };
@@ -87,5 +91,32 @@ describe("save_bank_account", () => {
         expect(await runBankAccountTool("save_bank_account", { bank: "GTBank", account_number: "0123456789" }, ctx("helper"))).toMatchObject({ error: expect.stringContaining("owner or admins") });
         accounts = [{ id: "a1", bank: "OPay", account_number: "8012345678", account_name: "A" }];
         expect(await runBankAccountTool("list_bank_accounts", {}, ctx("helper"))).toEqual({ pay_by_transfer: true, accounts: [{ bank: "OPay", account_number: "8012345678", account_name: "A", main: true }] });
+    });
+});
+
+describe("remove_bank_account", () => {
+    beforeEach(() => {
+        accounts = [
+            { id: "a1", bank: "Guaranty Trust Bank", account_number: "0123456789", account_name: "BOLA BANJO" },
+            { id: "a2", bank: "OPay", account_number: "8012345678", account_name: "BOLA BANJO" },
+        ];
+    });
+
+    it("removes one straight away, the next becoming the one customers are given", async () => {
+        const result = await runBankAccountTool("remove_bank_account", { account: "6789" }, ctx());
+        expect(result).toMatchObject({ removed: { bank: "Guaranty Trust Bank" }, pay_by_transfer: true, customers_now_given: { bank: "OPay", main: true } });
+        expect(accounts.map((item) => item.id)).toEqual(["a2"]);
+    });
+
+    it("says transfers stop when the last one goes", async () => {
+        await runBankAccountTool("remove_bank_account", { account: "GTBank" }, ctx());
+        const result = await runBankAccountTool("remove_bank_account", { account: "opay" }, ctx());
+        expect(result).toMatchObject({ pay_by_transfer: false, accounts: [], note: expect.stringContaining("last account") });
+    });
+
+    it("removes nothing it can't pin down, and only for the owner or admins", async () => {
+        expect(await runBankAccountTool("remove_bank_account", { account: "Kuda" }, ctx())).toMatchObject({ error: expect.stringContaining("No account matches") });
+        expect(await runBankAccountTool("remove_bank_account", { account: "OPay" }, ctx("helper"))).toMatchObject({ error: expect.stringContaining("owner or admins") });
+        expect(accounts).toHaveLength(2);
     });
 });

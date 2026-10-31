@@ -44,6 +44,15 @@ const ALIASES: Record<string, string> = {
 
 const norm = (value: string) => value.toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
 
+/** Whether what the owner calls a bank ("GTB", "opay") is the bank an account was saved under ("Guaranty Trust Bank"). */
+export function bankMatches(saved: string, said: string): boolean {
+    const name = norm(saved);
+    const wanted = norm(said);
+    if (!name || !wanted) return false;
+    const target = ALIASES[wanted] ?? wanted;
+    return name.includes(target) || target.includes(name);
+}
+
 /**
  * Every bank and app the network knows, for the bank field's suggestions:
  * names, what people call them (GTB, UBA), and whether it's one most people

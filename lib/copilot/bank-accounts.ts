@@ -1,13 +1,14 @@
 import type { ChatCompletionFunctionTool } from "openai/resources/chat/completions";
-import { accountsOf, cleanBankAccount, getTransfers, saveBankAccount, type StoredAccount } from "@/lib/embedded/transfers";
-import { resolveAccountName } from "@/lib/payouts/name-enquiry";
+import { accountsOf, cleanBankAccount, getTransfers, removeAccount, saveBankAccount, type StoredAccount } from "@/lib/embedded/transfers";
+import { bankMatches, resolveAccountName } from "@/lib/payouts/name-enquiry";
 import { canManage } from "@/lib/copilot/remember";
 import type { CopilotToolContext } from "@/lib/copilot/tools";
 
 /**
  * The accounts customers pay into by transfer (Studio, business accounts),
  * kept by the owner's employee in chat: "add my GTBank account, 0123456789",
- * "make OPay the main one", "the Moniepoint number is wrong, it's …". Saved
+ * "make OPay the main one", "the Moniepoint number is wrong, it's …", "remove
+ * the OPay one". Saved
  * straight away (no card), like remember: the reply says what was saved. The
  * same accounts and code as Money's Transfers screen (lib/embedded/transfers.ts).
  * The name on the account comes from the bank (Paystack's name enquiry), so a
@@ -41,6 +42,20 @@ export const BANK_ACCOUNT_TOOLS: ChatCompletionFunctionTool[] = [
             },
         },
     },
+    {
+        type: "function",
+        function: {
+            name: "remove_bank_account",
+            description: "Remove an account customers pay into (\"remove the OPay account\", \"delete 6789\"). Done straight away, no confirmation: then say what was removed and which account customers are given now. Removing the main one makes the next the main one; removing the last one stops pay-by-transfer (what already came in stays in Money).",
+            parameters: {
+                type: "object",
+                properties: {
+                    account: { type: "string", description: "Which account, by its bank or number (\"OPay\", \"0123456789\", \"6789\")." },
+                },
+                required: ["account"],
+            },
+        },
+    },
 ];
 
 export const BANK_ACCOUNT_TOOL_NAMES = new Set(BANK_ACCOUNT_TOOLS.map((tool) => tool.function.name));
@@ -48,6 +63,7 @@ export const BANK_ACCOUNT_TOOL_NAMES = new Set(BANK_ACCOUNT_TOOLS.map((tool) => 
 export const BANK_ACCOUNT_TOOL_STATUS: Record<string, string> = {
     list_bank_accounts: "Checking your accounts",
     save_bank_account: "Saving the account",
+    remove_bank_account: "Removing the account",
 };
 
 const text = (value: unknown) => (typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "");
@@ -63,10 +79,9 @@ const accountOut = (account: StoredAccount, index: number) => ({
 /** The account the owner means, by bank or number (or its last digits); several matching is a question back. */
 function findAccount(accounts: StoredAccount[], which: string): StoredAccount | { error: string } {
     const number = which.replace(/\D/g, "");
-    const name = which.toLowerCase();
     const matches = number.length >= 4
         ? accounts.filter((account) => account.account_number.endsWith(number))
-        : accounts.filter((account) => account.bank.toLowerCase().includes(name) || name.includes(account.bank.toLowerCase()));
+        : accounts.filter((account) => bankMatches(account.bank, which));
     if (matches.length === 1) return matches[0];
     const list = accounts.map((account) => `${account.bank} ${account.account_number}`).join(", ") || "none yet";
     return { error: matches.length ? `More than one account matches "${which}": ${list}. Ask which.` : `No account matches "${which}". The accounts: ${list}.` };
@@ -83,6 +98,20 @@ export async function runBankAccountTool(name: string, args: Record<string, unkn
 
     if (!await canManage(ctx)) return { error: "Only the business's owner or admins can change the accounts customers pay into." };
 
+    if (name === "remove_bank_account") {
+        const which = text(args.account);
+        if (!which) return { error: "Ask which account to remove." };
+        const gone = findAccount(accounts, which);
+        if ("error" in gone) return gone;
+        const left = accountsOf((await removeAccount(ctx.admin, project.id, gone.id))?.metadata);
+        return {
+            removed: { bank: gone.bank, account_number: gone.account_number, account_name: gone.account_name },
+            pay_by_transfer: left.length > 0,
+            ...(left.length ? { customers_now_given: accountOut(left[0], 0) } : { note: "That was the last account: customers can't pay by transfer until one is added." }),
+            accounts: left.map(accountOut),
+        };
+    }
+
     const which = text(args.change);
     const existing = which ? findAccount(accounts, which) : null;
     if (existing && "error" in existing) return existing;
@@ -91,7 +120,7 @@ export async function runBankAccountTool(name: string, args: Record<string, unkn
     const number = digits(args.account_number) || existing?.account_number || "";
     if (!bank) return { error: "Ask which bank or app the account is with." };
     if (number.length !== 10) return { error: "Account numbers are 10 digits. Ask the owner for the full number." };
-    if (!existing && accounts.some((account) => account.account_number === number && account.bank.toLowerCase() === bank.toLowerCase())) {
+    if (!existing && accounts.some((account) => account.account_number === number && bankMatches(account.bank, bank))) {
         return { error: `${bank} ${number} is already saved. To change it, use change.` };
     }
 
