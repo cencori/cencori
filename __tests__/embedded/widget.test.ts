@@ -7,6 +7,8 @@ import {
     mintWidgetPreviewToken,
     normalizeWidgetOrigin,
     originAllowed,
+    normalizePagePath,
+    pageAllowed,
     sanitizeAppearance,
     verifyWidgetPreviewToken,
 } from '@/lib/embedded/widget';
@@ -90,6 +92,8 @@ describe('sanitizeAppearance', () => {
             theme: 'auto',
             position: 'right',
             launcher_style: 'card',
+            pages: 'only',
+            page_paths: ['/'],
         });
     });
 
@@ -105,5 +109,40 @@ describe('sanitizeAppearance', () => {
 describe('checkWidgetTurn', () => {
     it('stops a conversation at its turn limit', async () => {
         await expect(checkWidgetTurn('s1', WIDGET_MAX_TURNS)).resolves.toMatchObject({ code: 'widget_conversation_limit' });
+    });
+});
+
+describe('widget pages', () => {
+    it('defaults to the landing page only', () => {
+        const look = sanitizeAppearance(null);
+        expect(look.pages).toBe('only');
+        expect(look.page_paths).toEqual(['/']);
+        expect(pageAllowed('/', look.pages, look.page_paths)).toBe(true);
+        expect(pageAllowed('/dashboard', look.pages, look.page_paths)).toBe(false);
+    });
+
+    it('normalizes what people type', () => {
+        expect(normalizePagePath('pricing')).toBe('/pricing');
+        expect(normalizePagePath('/docs/')).toBe('/docs');
+        expect(normalizePagePath('https://example.com/blog/*?x=1')).toBe('/blog/*');
+        expect(normalizePagePath('*')).toBe('/*');
+        expect(normalizePagePath('/a*b')).toBeNull();
+        expect(normalizePagePath('  ')).toBeNull();
+    });
+
+    it('matches exact pages and whole sections', () => {
+        expect(pageAllowed('/pricing/', 'only', ['/', '/pricing'])).toBe(true);
+        expect(pageAllowed('/blog', 'only', ['/blog/*'])).toBe(true);
+        expect(pageAllowed('/blog/post-1', 'only', ['/blog/*'])).toBe(true);
+        expect(pageAllowed('/blogger', 'only', ['/blog/*'])).toBe(false);
+        expect(pageAllowed('/dashboard/projects', 'except', ['/dashboard/*'])).toBe(false);
+        expect(pageAllowed('/pricing', 'except', ['/dashboard/*'])).toBe(true);
+        expect(pageAllowed('/anything', 'all', [])).toBe(true);
+    });
+
+    it('never saves an empty "only" list, and keeps chosen modes', () => {
+        expect(sanitizeAppearance({ pages: 'only', page_paths: [] }).page_paths).toEqual(['/']);
+        expect(sanitizeAppearance({ pages: 'except', page_paths: ['dashboard/*', 'dashboard/*', 7] })).toMatchObject({ pages: 'except', page_paths: ['/dashboard/*'] });
+        expect(sanitizeAppearance({ pages: 'all' }).pages).toBe('all');
     });
 });

@@ -2,6 +2,9 @@ import crypto from 'crypto';
 import type { createAdminClient } from '@/lib/supabaseAdmin';
 import type { SubscriptionTier } from '@/lib/entitlements';
 import { tokenSecret } from './client-tokens';
+import { WIDGET_DEFAULT_PAGE_PATHS, WIDGET_MAX_PAGE_PATHS, normalizePagePath, type WidgetPages } from './widget-pages';
+
+export { WIDGET_DEFAULT_PAGE_PATHS, WIDGET_MAX_PAGE_PATHS, normalizePagePath, pageAllowed, type WidgetPages } from './widget-pages';
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -30,6 +33,14 @@ export interface WidgetAppearance {
     position: 'right' | 'left';
     /** Card: the orb and heading in one button. Pill: an icon and text in the accent colour. */
     launcher_style: 'card' | 'pill';
+    /**
+     * Which pages of the site the launcher shows on. The loader follows
+     * in-app navigation, so a multi-page app's dashboard stays clear.
+     * Default: the landing page only.
+     */
+    pages: WidgetPages;
+    /** Paths for "only"/"except": "/pricing" exactly, "/blog/*" for a section. */
+    page_paths: string[];
 }
 
 export interface WidgetRow {
@@ -77,7 +88,18 @@ export function sanitizeAppearance(raw: unknown, agentName = 'Assistant'): Widge
         theme: input.theme === 'light' || input.theme === 'dark' ? input.theme : 'auto',
         position: input.position === 'left' ? 'left' : 'right',
         launcher_style: input.launcher_style === 'pill' ? 'pill' : 'card',
+        ...sanitizePages(input),
     };
+}
+
+function sanitizePages(input: Record<string, unknown>): Pick<WidgetAppearance, 'pages' | 'page_paths'> {
+    const pages: WidgetPages = input.pages === 'all' || input.pages === 'except' || input.pages === 'only' ? input.pages : 'only';
+    const raw = Array.isArray(input.page_paths) ? input.page_paths : [];
+    const paths = [...new Set(raw.filter((item): item is string => typeof item === 'string').map(normalizePagePath).filter((item): item is string => !!item))].slice(0, WIDGET_MAX_PAGE_PATHS);
+    if (pages === 'all') return { pages, page_paths: paths };
+    // "Only" with nothing listed would hide it everywhere: fall back to the landing page.
+    if (pages === 'only' && paths.length === 0) return { pages, page_paths: [...WIDGET_DEFAULT_PAGE_PATHS] };
+    return { pages, page_paths: paths };
 }
 
 /**

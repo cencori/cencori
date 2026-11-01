@@ -23,6 +23,8 @@ export type WidgetAppearance = {
     theme: "light" | "dark" | "auto";
     position: "right" | "left";
     launcher_style: "card" | "pill";
+    pages: "only" | "except" | "all";
+    page_paths: string[];
 };
 export type Widget = { id: string; public_key: string; enabled: boolean; allowed_origins: string[]; appearance: WidgetAppearance; daily_session_cap: number; ready: boolean; updated_at: string };
 export type WidgetPayload = { ready: boolean; message?: string; can_manage: boolean; published?: boolean; defaults?: WidgetAppearance; widget: Widget | null; preview_token: string | null; share_token?: string | null };

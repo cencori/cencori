@@ -23,9 +23,10 @@ import {
 } from "@/components/agents/widget-preview";
 import { Segmented, SettingsCard, SettingsFooter, SettingsRow, SettingsSection, settingsInputClass } from "@/components/agents/settings-layout";
 import { cn } from "@/lib/utils";
+import { WIDGET_MAX_PAGE_PATHS, normalizePagePath } from "@/lib/embedded/widget-pages";
 import { SettingsCardSkeleton } from "@/components/agents/AgentSkeletons";
 
-const FALLBACK_LOOK: WidgetAppearance = { title: "Assistant", greeting: "Hi! How can I help?", launcher_text: "Need help?", accent: "#111111", theme: "auto", position: "right", launcher_style: "card" };
+const FALLBACK_LOOK: WidgetAppearance = { title: "Assistant", greeting: "Hi! How can I help?", launcher_text: "Need help?", accent: "#111111", theme: "auto", position: "right", launcher_style: "card", pages: "only", page_paths: ["/"] };
 
 type Form = { origins: string[]; appearance: WidgetAppearance; cap: string };
 
@@ -56,6 +57,7 @@ export function AgentWidget() {
     const [originInput, setOriginInput] = useState("");
     const [busy, setBusy] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [pathInput, setPathInput] = useState("");
     const [snippetMode, setSnippetMode] = useState<"widget" | "inline">("widget");
 
     // Load the saved settings into the form whenever they change on the server.
@@ -94,6 +96,25 @@ export function AgentWidget() {
         if (!value) return;
         if (!form.origins.includes(value)) setForm((current) => ({ ...current, origins: [...current.origins, value] }));
         setOriginInput("");
+    };
+
+    const addPath = () => {
+        const value = normalizePagePath(pathInput);
+        if (!value) { setError("Enter a page path like /pricing, or /blog/* for a whole section."); return; }
+        setError(null);
+        setForm((current) => current.appearance.page_paths.includes(value) || current.appearance.page_paths.length >= WIDGET_MAX_PAGE_PATHS
+            ? current
+            : { ...current, appearance: { ...current.appearance, page_paths: [...current.appearance.page_paths, value] } });
+        setPathInput("");
+    };
+
+    const setPages = (pages: WidgetAppearance["pages"]) => {
+        const paths = form.appearance.page_paths;
+        const onlyHome = paths.length === 1 && paths[0] === "/";
+        // Don't carry "/" from "only" into "except" (it would mean everywhere but home), or vice versa leave nothing.
+        if (pages === "except" && onlyHome) update({ pages, page_paths: [] });
+        else if (pages === "only" && paths.length === 0) update({ pages, page_paths: ["/"] });
+        else update({ pages });
     };
 
     const save = async (extra: Record<string, unknown> = {}, label = "save") => {
@@ -182,6 +203,29 @@ export function AgentWidget() {
                             <input value={originInput} onChange={(event) => setOriginInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addOrigin(); } }} placeholder="example.com" inputMode="url" disabled={disabled} className={settingsInputClass} />
                             <Button type="button" variant="outline" size="sm" className="h-10 shrink-0 text-xs md:h-8" onClick={addOrigin} disabled={disabled || !originInput.trim()}>Add</Button>
                         </div>
+                    </SettingsRow>
+                    <SettingsRow label="Pages" description={form.appearance.pages === "all" ? "Every page of your site, including signed-in areas like a dashboard." : form.appearance.pages === "only" ? "Only these pages. / is your landing page; /blog/* covers a whole section." : "Every page except these, e.g. /dashboard/* to keep it out of your app."} stacked>
+                        <Segmented value={form.appearance.pages} disabled={disabled} onChange={setPages} options={[{ value: "only", label: "Only these" }, { value: "except", label: "All except" }, { value: "all", label: "All pages" }]} />
+                        {form.appearance.pages !== "all" && (
+                            <div className="mt-2">
+                                {form.appearance.page_paths.length > 0 && (
+                                    <div className="mb-2 flex flex-wrap gap-1.5">
+                                        {form.appearance.page_paths.map((path) => (
+                                            <span key={path} className="inline-flex items-center gap-1 rounded-full bg-background px-2.5 py-1 font-mono text-[11px] ring-1 ring-border/40">
+                                                {path}
+                                                <button type="button" disabled={disabled} aria-label={`Remove ${path}`} onClick={() => update({ page_paths: form.appearance.page_paths.filter((item) => item !== path) })} className="text-muted-foreground hover:text-foreground">
+                                                    <HugeiconsIcon icon={Cancel01Icon} className="h-3 w-3" />
+                                                </button>
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
+                                <div className="flex gap-2">
+                                    <input value={pathInput} onChange={(event) => setPathInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addPath(); } }} placeholder={form.appearance.pages === "only" ? "/pricing" : "/dashboard/*"} disabled={disabled} className={settingsInputClass} />
+                                    <Button type="button" variant="outline" size="sm" className="h-10 shrink-0 text-xs md:h-8" onClick={addPath} disabled={disabled || !pathInput.trim()}>Add</Button>
+                                </div>
+                            </div>
+                        )}
                     </SettingsRow>
                     <SettingsRow label="Launcher" description="A card with the agent's orb and heading, or a pill with an icon and text.">
                         <Segmented value={form.appearance.launcher_style} disabled={disabled} onChange={(launcher_style) => update({ launcher_style })} options={[{ value: "card", label: "Card" }, { value: "pill", label: "Pill" }]} />

@@ -6,6 +6,12 @@
  *   data-mode="inline"     render the chat in the page instead of a launcher
  *   data-target="#chat"    inline only: element to render into (default: after the script)
  *   data-height="600px"    inline only: frame height
+ *   data-pages="/,/pricing,/blog/*"
+ *                          launcher only: the pages it shows on ("*" for all),
+ *                          overriding the dashboard setting (default: "/" only)
+ *
+ * The launcher follows in-app navigation (pushState, back/forward), so on a
+ * single-page app it leaves the pages it isn't meant for, like a dashboard.
  */
 (function () {
     "use strict";
@@ -56,6 +62,71 @@
         gloss.style.cssText = "position:absolute;inset:0;border-radius:50%;background:" + HIGHLIGHT + ";box-shadow:inset 0 -2px 4px rgba(0,0,0,.25)";
         el.appendChild(gloss);
         return el;
+    }
+
+    // Mirrors pageAllowed() in lib/embedded/widget.ts.
+    function cleanPath(path) {
+        path = String(path || "").trim();
+        if (!path) return null;
+        if (path === "*" || path === "/*") return "/*";
+        if (/^https?:\/\//i.test(path)) { try { path = new URL(path).pathname; } catch (err) { return null; } }
+        path = path.split(/[?#]/)[0];
+        if (path.charAt(0) !== "/") path = "/" + path;
+        path = path.replace(/\/{2,}/g, "/");
+        if (path.length > 1) path = path.replace(/\/+$/, "");
+        return path;
+    }
+
+    function pageRules(look) {
+        var attr = script.getAttribute("data-pages");
+        if (attr !== null) {
+            var listed = attr.split(",").map(cleanPath).filter(Boolean);
+            if (listed.indexOf("/*") !== -1) return { pages: "all", paths: [] };
+            return { pages: "only", paths: listed.length ? listed : ["/"] };
+        }
+        var pages = look.pages === "all" || look.pages === "except" ? look.pages : "only";
+        var paths = (look.page_paths || []).map(cleanPath).filter(Boolean);
+        if (pages === "only" && !paths.length) paths = ["/"];
+        return { pages: pages, paths: paths };
+    }
+
+    function allowedHere(rules) {
+        if (rules.pages === "all") return true;
+        var path = location.pathname.length > 1 ? location.pathname.replace(/\/+$/, "") : location.pathname;
+        var hit = false;
+        for (var i = 0; i < rules.paths.length && !hit; i++) {
+            var rule = rules.paths[i];
+            if (rule === "/*") hit = true;
+            else if (rule.slice(-2) === "/*") {
+                var section = rule.slice(0, -2);
+                hit = path === section || path.indexOf(section + "/") === 0;
+            } else hit = path === rule;
+        }
+        return rules.pages === "only" ? hit : !hit;
+    }
+
+    /** Calls back whenever the page's path changes without a reload. */
+    function onNavigate(callback) {
+        var last = location.pathname;
+        function check() {
+            if (location.pathname === last) return;
+            last = location.pathname;
+            callback();
+        }
+        ["pushState", "replaceState"].forEach(function (name) {
+            var original = history[name];
+            if (typeof original !== "function") return;
+            history[name] = function () {
+                var result = original.apply(this, arguments);
+                setTimeout(check, 0);
+                return result;
+            };
+        });
+        window.addEventListener("popstate", check);
+        window.addEventListener("hashchange", check);
+        // Routers that keep their own reference to pushState slip past the
+        // wrapper; a cheap poll catches those.
+        setInterval(check, 700);
     }
 
     function mountInline(look) {
@@ -210,6 +281,17 @@
         root.appendChild(panel);
         root.appendChild(button);
         document.body.appendChild(root);
+
+        var rules = pageRules(look);
+        function place() {
+            var here = allowedHere(rules);
+            // Leaving a page it isn't on closes the chat; the conversation
+            // stays in the frame for when the visitor comes back.
+            if (!here && open) toggle(false);
+            root.style.display = here ? "flex" : "none";
+        }
+        place();
+        if (rules.pages !== "all") onNavigate(place);
     }
 
     function start() {
