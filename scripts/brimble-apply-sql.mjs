@@ -43,6 +43,23 @@ try {
         await client.query(`alter role authenticator with login password ${client.escapeLiteral(authenticatorPassword)}`);
         console.log("[brimble-apply-sql] set authenticator password");
     }
+
+    // Long-open transactions hold locks that stall DDL and the queries queued
+    // behind it (2026-11-01). The database is private, so report them here,
+    // where the deploy log can show them. No query text: it can hold data.
+    const { rows: longTransactions } = await client.query(`
+        select a.pid, a.usename, a.application_name, a.client_addr::text as client_addr, a.state,
+               a.wait_event_type, round(extract(epoch from now() - a.xact_start)) as xact_seconds,
+               round(extract(epoch from now() - a.state_change)) as state_seconds,
+               (select string_agg(distinct c.relname || ':' || l.mode, ', ')
+                  from pg_locks l join pg_class c on c.oid = l.relation
+                 where l.pid = a.pid and l.granted and c.relkind = 'r') as table_locks
+        from pg_stat_activity a
+        where a.xact_start < now() - interval '2 minutes' and a.pid <> pg_backend_pid()
+        order by a.xact_start
+    `);
+    console.log(`[brimble-apply-sql] transactions open > 2 min: ${longTransactions.length}`);
+    for (const row of longTransactions) console.log(`[brimble-apply-sql] long transaction ${JSON.stringify(row)}`);
 } finally {
     await client.end();
 }
