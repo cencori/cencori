@@ -13,8 +13,19 @@ declare
     t text;
 begin
     foreach t in array array['auth_users', 'auth_sessions', 'auth_accounts', 'auth_verifications'] loop
-        if to_regclass('public.' || t) is not null then
+        if to_regclass('public.' || t) is null then
+            continue;
+        end if;
+        -- Only what's missing: ALTER TABLE takes an exclusive lock even when
+        -- RLS is already on, and a deploy waiting for it stalls sign-ins.
+        if not (select relrowsecurity from pg_class where oid = ('public.' || t)::regclass) then
             execute format('alter table public.%I enable row level security', t);
+        end if;
+        if exists (
+            select 1 from information_schema.role_table_grants
+            where table_schema = 'public' and table_name = t
+              and grantee in ('anon', 'authenticated', 'service_role')
+        ) then
             execute format('revoke all on public.%I from anon, authenticated, service_role', t);
         end if;
     end loop;
