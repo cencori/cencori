@@ -233,16 +233,14 @@ function OnboardingContent() {
           return null;
         }
 
-        // Paid onboarding starts as Free and is upgraded only after Stripe confirms payment.
-        const initialTier = "free";
+        // Paid onboarding starts as Free (the column defaults) and is upgraded
+        // only after Stripe confirms payment. The browser can't write plan or
+        // billing columns at all (database/brimble/0300_lock_down_billing.sql).
         const { data: orgData, error } = await supabase
           .from("organizations")
           .insert({
             name: organizationName,
             slug: newSlug,
-            subscription_tier: initialTier,
-            subscription_status: "active",
-            monthly_requests_used: 0,
             owner_id: user.id,
           })
           .select("id, slug, name")
