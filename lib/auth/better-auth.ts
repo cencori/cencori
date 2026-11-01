@@ -3,7 +3,7 @@ import "server-only";
 import { betterAuth } from "better-auth";
 import { hashPassword, verifyPassword } from "better-auth/crypto";
 import { nextCookies } from "better-auth/next-js";
-import { bearer, emailOTP } from "better-auth/plugins";
+import { bearer, emailOTP, phoneNumber } from "better-auth/plugins";
 import { dash } from "@better-auth/infra";
 import { sendVerificationCodeEmail } from "@/lib/email/verification-code-email";
 import { sendPasswordResetEmail } from "@/lib/email/password-reset-email";
@@ -158,6 +158,37 @@ export const auth = betterAuth({
             storeOTP: "hashed",
             sendVerificationOTP: async ({ email, otp }) => {
                 await sendVerificationCodeEmail({ to: email, code: otp });
+            },
+        }),
+        // Sign up and sign in with a phone number (Studiowave): the 6-digit code goes out on WhatsApp
+        // from Studiowave's own number (lib/channels/whatsapp-otp.ts). A new number becomes a new
+        // account with a placeholder email it can swap for a real one later. Codes are capped per
+        // number and per address, since each one costs a WhatsApp message.
+        phoneNumber({
+            otpLength: 6,
+            expiresIn: 600,
+            allowedAttempts: 5,
+            phoneNumberValidator: (value) => /^\+[1-9]\d{7,14}$/.test(value),
+            sendOTP: async ({ phoneNumber: number, code }, ctx) => {
+                const { checkCustomRateLimit } = await import("@/lib/rate-limit");
+                const address = ctx?.request?.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+                const [perNumber, perAddress] = await Promise.all([
+                    checkCustomRateLimit(`phone-code:${number}`, 5, 3_600).catch(() => ({ allowed: true })),
+                    checkCustomRateLimit(`phone-code-ip:${address}`, 15, 3_600).catch(() => ({ allowed: true })),
+                ]);
+                // APIError carries the reason to the app ("That number isn't on WhatsApp"); a plain Error would be a 500.
+                const { APIError } = await import("better-auth/api");
+                if (!perNumber.allowed || !perAddress.allowed) throw new APIError("TOO_MANY_REQUESTS", { message: "Too many codes for now. Try again in an hour." });
+                const { sendWhatsAppCode } = await import("@/lib/channels/whatsapp-otp");
+                try {
+                    await sendWhatsAppCode(number, code);
+                } catch (error) {
+                    throw new APIError("BAD_REQUEST", { message: error instanceof Error ? error.message : "Couldn't send the code. Try again." });
+                }
+            },
+            signUpOnVerification: {
+                getTempEmail: (number) => `p${number.replace(/\D/g, "")}@phone.invalid`,
+                getTempName: (number) => number,
             },
         }),
         // Must stay last so auth calls made from server actions can set cookies.

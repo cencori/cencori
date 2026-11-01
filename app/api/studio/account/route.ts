@@ -4,8 +4,9 @@
  * GET   /api/studio/account
  *       Their name, email, how they sign in, and the businesses deleting
  *       the account would take with it.
- * PATCH /api/studio/account  { full_name }
- *       Change their name.
+ * PATCH /api/studio/account  { full_name, contact_email?, marketing? }
+ *       Change their name; from phone sign-up also an email to reach them on
+ *       (kept until they verify it as their sign-in email) and marketing consent.
  * POST  /api/studio/account  { action: 'email_code', email }
  *       Send a 6-digit code to a new address.
  * POST  /api/studio/account  { action: 'email_confirm', code }
@@ -58,14 +59,23 @@ export async function GET() {
     if (!user) return fail('Unauthorized', 401);
     const metadata = (user.user_metadata ?? {}) as Record<string, unknown>;
     let methods: string[] = [];
+    let phone: string | null = null;
     if (isBetterAuthEnabled()) {
-        const accounts = await (await authContext()).internalAdapter.findAccounts(user.id).catch(() => []);
+        const ctx = await authContext();
+        const [accounts, record] = await Promise.all([ctx.internalAdapter.findAccounts(user.id).catch(() => []), ctx.internalAdapter.findUserById(user.id).catch(() => null)]);
         methods = [...new Set((accounts as Array<{ providerId: string }>).map((account) => (account.providerId === 'credential' ? 'email' : account.providerId)))];
+        phone = ((record as { phoneNumber?: string | null } | null)?.phoneNumber) ?? null;
+        // Signed up with a phone number: there's no account row for it, only the verified number.
+        if (phone && !methods.includes('phone')) methods.push('phone');
     }
+    const placeholder = !!user.email && /@phone\.invalid$/i.test(user.email);
     const { businesses, developer } = await owned(user.id);
     return NextResponse.json({
         full_name: (metadata.full_name as string | undefined) || (metadata.name as string | undefined) || null,
-        email: user.email ?? null,
+        // A phone-only account's placeholder email isn't shown: they can add a real one.
+        email: placeholder ? null : user.email ?? null,
+        phone_number: phone,
+        contact_email: typeof metadata.contact_email === 'string' ? metadata.contact_email : null,
         sign_in: methods,
         businesses: businesses.map((business) => business.name),
         owns_developer_organizations: developer.length > 0,
@@ -75,12 +85,21 @@ export async function GET() {
 export async function PATCH(req: NextRequest) {
     const user = await signedIn();
     if (!user) return fail('Unauthorized', 401);
-    const body = await req.json().catch(() => null) as { full_name?: unknown } | null;
+    const body = await req.json().catch(() => null) as { full_name?: unknown; contact_email?: unknown; marketing?: unknown } | null;
     const name = typeof body?.full_name === 'string' ? body.full_name.replace(/\s+/g, ' ').trim() : '';
     if (!name) return fail('Give your name.');
     if (name.length > 80) return fail('Keep your name under 80 characters.');
     const [first, ...rest] = name.split(' ');
-    const metadata = { ...(user.user_metadata ?? {}), full_name: name, name, first_name: first, last_name: rest.join(' ') || null };
+    // From phone sign-up: an email to reach them on (not a sign-in address until they verify it in
+    // Edit profile, so nobody can claim someone else's), and whether they want marketing.
+    const contact = typeof body?.contact_email === 'string' ? body.contact_email.trim().toLowerCase() : '';
+    if (contact && (!EMAIL_PATTERN.test(contact) || contact.endsWith('@phone.invalid'))) return fail('That doesn\'t look like an email address.');
+    const metadata = {
+        ...(user.user_metadata ?? {}),
+        full_name: name, name, first_name: first, last_name: rest.join(' ') || null,
+        ...(contact ? { contact_email: contact } : {}),
+        ...(typeof body?.marketing === 'boolean' ? { marketing_opted_out_at: body.marketing ? null : new Date().toISOString() } : {}),
+    };
     const { error } = await adminUsers.updateUserById(user.id, { user_metadata: metadata });
     if (error) return fail('Couldn\'t change your name. Try again.', 502);
     // The console's profile reads these.
@@ -105,6 +124,7 @@ export async function POST(req: NextRequest) {
         if (body.action === 'email_code') {
             const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
             if (!EMAIL_PATTERN.test(email)) return fail('That doesn\'t look like an email address.');
+            if (email.endsWith('@phone.invalid')) return fail('That doesn\'t look like an email address.');
             if (email === (user.email ?? '').toLowerCase()) return fail('That\'s already your email.');
             const limited = await checkCustomRateLimit(`studio-email-code:${user.id}`, 5, 3_600).catch(() => ({ allowed: true }));
             if (!limited.allowed) return fail('Too many codes for now. Try again in an hour.', 429);
@@ -136,7 +156,7 @@ export async function POST(req: NextRequest) {
         await ctx.internalAdapter.updateUser(user.id, { email: pending.email, emailVerified: true });
         await ctx.internalAdapter.deleteVerificationByIdentifier(identifier).catch(() => undefined);
         // The old address hears about it, in case it wasn't them.
-        if (previous) {
+        if (previous && !/@phone\.invalid$/i.test(previous)) {
             await sendEmail({
                 to: [previous],
                 subject: 'Your email was changed',

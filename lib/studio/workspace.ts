@@ -85,7 +85,8 @@ export async function loadStudioWorkspace(supabase: ServerClient, user: User, pi
     const fullName = metadata.full_name || metadata.name || [metadata.first_name, metadata.last_name].filter(Boolean).join(" ") || null;
     const firstName = metadata.first_name || metadata.given_name || fullName?.split(" ")[0] || null;
     return {
-        user: { id: user.id, firstName, fullName, email: user.email ?? null, avatarUrl: (profile?.avatar_url as string | null | undefined) || metadata.avatar_url || metadata.picture || null },
+        // A phone-only account's placeholder email (…@phone.invalid) isn't theirs to see.
+        user: { id: user.id, firstName, fullName, email: user.email && !/@phone\.invalid$/i.test(user.email) ? user.email : null, avatarUrl: (profile?.avatar_url as string | null | undefined) || metadata.avatar_url || metadata.picture || null },
         organization: { id: organization.id, name: organization.name, slug: organization.slug, isBusiness: organization.account_type === "business" },
         organizations: list.map((item) => ({ id: item.id, name: item.name, isBusiness: item.account_type === "business" })),
         project,
