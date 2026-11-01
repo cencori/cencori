@@ -279,6 +279,11 @@ export async function POST(request: Request, ctx: Context) {
                     ? fail('Another agent uses this one as a sub-agent. Remove it there first.', 409)
                     : fail('Could not delete the agent. Try again.', 502);
             }
+            // What hung off them goes too: their WhatsApp number (or it would route to no one), personality and
+            // the owner's chat with them. Owner alerts stay (they hold the business's time zone), and so do
+            // business-wide records (bookings, orders).
+            const { OWNER_ALERTS_SLUG } = await import('@/lib/embedded/owner-alerts');
+            await db.from('tool_connections').delete().eq('project_id', projectId).eq('metadata->>agent_id', agentId).neq('connector_slug', OWNER_ALERTS_SLUG).then(() => undefined, () => undefined);
             await invalidateAgentConfig(agentId).catch(() => undefined);
             return NextResponse.json({ deleted: agentId });
         }
