@@ -393,6 +393,18 @@ export async function findPhoneNumber(wabaId: string, accessToken: string, digit
     return found ? { id: found.id, status: found.status ?? null, verifiedName: found.verified_name ?? null } : null;
 }
 
+/**
+ * Let go of a number on Cencori's own account: off the Cloud API (so it can go back on the
+ * WhatsApp app, or to another employee), then off the account itself where Meta allows it.
+ */
+export async function releasePhoneNumber(phoneNumberId: string, accessToken: string): Promise<void> {
+    await graph('POST', `/${encodeURIComponent(phoneNumberId)}/deregister`, accessToken, {});
+    await graph('DELETE', `/${encodeURIComponent(phoneNumberId)}`, accessToken).catch((error) => {
+        // Deregistered is what matters; a number Meta won't delete outright just stays listed, unused.
+        console.warn('[whatsapp] number deregistered but not deleted', phoneNumberId, error instanceof Error ? error.message : error);
+    });
+}
+
 export async function requestVerificationCode(phoneNumberId: string, accessToken: string, method: 'SMS' | 'VOICE'): Promise<void> {
     await graph('POST', `/${encodeURIComponent(phoneNumberId)}/request_code?${new URLSearchParams({ code_method: method, language: 'en' })}`, accessToken);
 }

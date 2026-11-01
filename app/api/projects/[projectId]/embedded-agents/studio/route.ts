@@ -273,6 +273,18 @@ export async function POST(request: Request, ctx: Context) {
         if (body.action === 'delete_agent') {
             const agentId = cleanText(body.agent_id, 100);
             if (!agentId || !await scopedAgent(db, projectId, agentId)) return fail('Agent not found in this project.', 404);
+            // A number we put on our own WhatsApp account for this employee (Studiowave's "give your employee a
+            // number") is released with them, so its owner can use it again. A number on the owner's own
+            // WhatsApp account (their signup, or Kapso) is only disconnected below: their account isn't ours.
+            const { getAgentChannel, releasePhoneNumber } = await import('@/lib/channels/whatsapp');
+            const channel = await getAgentChannel(db, projectId, agentId).catch(() => null);
+            const ourWaba = process.env.STUDIO_WABA_ID;
+            const systemToken = process.env.META_SYSTEM_USER_TOKEN;
+            if (channel && ourWaba && systemToken && channel.metadata.waba_id === ourWaba && channel.metadata.provider !== 'kapso') {
+                await releasePhoneNumber(channel.metadata.phone_number_id, systemToken).catch((error) => {
+                    console.error('[studio] releasing the employee\'s number failed', channel.metadata.phone_number_id, error instanceof Error ? error.message : error);
+                });
+            }
             const { error } = await db.from('agents').delete().eq('project_id', projectId).eq('id', agentId);
             if (error) {
                 return error.code === '23503'
