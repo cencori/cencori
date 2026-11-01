@@ -88,6 +88,8 @@ function isChatMessage(value: unknown): value is ChatMessage {
     return (candidate.role === "user" || candidate.role === "assistant") && typeof candidate.content === "string";
 }
 
+const LIGHTWEIGHT_MAX_CHARS = 2000;
+
 function isLightweightConversation(content: string) {
     const normalized = content
         .toLowerCase()
@@ -191,8 +193,12 @@ export async function POST(request: NextRequest) {
         // The page they're on has edits that leaving would lose.
         const unsavedChanges = body.unsavedChanges === true;
         const latestQuestion = messages[messages.length - 1].content;
+        // Small talk is free only when the whole request is small: a closing
+        // "thanks" after long earlier messages still makes the model read
+        // (and us pay for) all of them.
         const lightweightConversation = !messages[messages.length - 1].hasFiles
             && pendingImages.length === 0
+            && messages.reduce((total, message) => total + message.content.length, 0) <= LIGHTWEIGHT_MAX_CHARS
             && isLightweightConversation(latestQuestion);
         const admin = createAdminClient();
 

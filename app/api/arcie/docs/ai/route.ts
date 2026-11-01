@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { limitPublicAi, trimPublicAiMessages } from "@/lib/public-ai-guard";
 import fs from "fs";
 import path from "path";
 import matter from "gray-matter";
@@ -124,11 +125,16 @@ Do not hallucinate content that isn't in the provided page.`;
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const { messages, currentPage, userName, scope = "global" } = body;
+        const { messages: rawMessages, currentPage, userName, scope = "global" } = body;
 
-        if (!messages || !Array.isArray(messages) || messages.length === 0) {
+        const limited = await limitPublicAi(request, "arcie_docs");
+        if (limited) return limited;
+
+        const trimmed = trimPublicAiMessages(rawMessages);
+        if (!trimmed) {
             return NextResponse.json({ error: "Messages are required" }, { status: 400 });
         }
+        const messages = trimmed;
 
         const currentPageDoc = getCurrentPageDoc(currentPage);
 

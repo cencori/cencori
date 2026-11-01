@@ -71,6 +71,20 @@ vi.mock('@/lib/supabaseAdmin', () => ({
     })),
 }));
 
+const mockSessionUser = vi.fn();
+const mockSessionProject = vi.fn();
+
+// The dashboard-session path: a signed-in user, no API key.
+vi.mock('@/lib/supabaseServer', () => ({
+    createServerClient: vi.fn(async () => ({
+        from: () => ({ select: () => ({ eq: () => ({ single: async () => mockSessionProject() }) }) }),
+    })),
+}));
+
+vi.mock('@/lib/auth/get-auth-user', () => ({
+    getAuthUser: async () => ({ data: { user: mockSessionUser() } }),
+}));
+
 import { validateGatewayRequest } from '@/lib/gateway-middleware';
 
 const TEST_API_KEY = 'cenc_live_test_key_abc123';
@@ -180,6 +194,75 @@ describe('validateGatewayRequest', () => {
             const body = await result.response.json();
             expect(body.error).toMatch(/Missing API key/i);
         }
+    });
+
+    describe('signed-in session without an API key', () => {
+        function sessionProject(org: { credits?: number; tier?: string; frozen?: boolean }) {
+            return {
+                data: {
+                    id: 'proj-session-1',
+                    name: 'Session project',
+                    organization_id: 'org-session-1',
+                    default_model: null,
+                    default_provider: null,
+                    end_user_billing_enabled: false,
+                    organizations: {
+                        id: 'org-session-1',
+                        subscription_tier: org.tier ?? 'free',
+                        monthly_requests_used: 0,
+                        credits_balance: org.credits ?? 0,
+                        billing_frozen: org.frozen ?? false,
+                    },
+                },
+                error: null,
+            };
+        }
+        const sessionRequest = () => new NextRequest('http://localhost/api/ai/chat', {
+            method: 'POST',
+            headers: { 'x-playground-project-id': 'proj-session-1', 'content-type': 'application/json' },
+            body: JSON.stringify({ messages: [{ role: 'user', content: 'hi' }] }),
+        });
+
+        beforeEach(() => {
+            mockSessionUser.mockReturnValue({ id: 'user-session-1', email: 'someone@example.com' });
+            // Any admin query chain (the logging-key lookup, refusal logs) ends in an empty result.
+            const chain: Record<string, unknown> = new Proxy({}, {
+                get: (_target, prop) => prop === 'then'
+                    ? (resolve: (value: unknown) => void) => resolve({ data: null, error: null })
+                    : () => chain,
+            });
+            mockSupabaseFrom.mockImplementation(() => chain);
+        });
+
+        it('refuses a zero-balance org on a metered call', async () => {
+            mockSessionProject.mockReturnValue(sessionProject({ credits: 0 }));
+            mockGetCreditsBalance.mockResolvedValue(0);
+            const result = await validateGatewayRequest(sessionRequest());
+            expect(result.success).toBe(false);
+            if (!result.success) {
+                expect(result.response.status).toBe(403);
+                expect((await result.response.json()).code).toBe('credit_balance_exhausted');
+            }
+        });
+
+        it('refuses a frozen org', async () => {
+            mockSessionProject.mockReturnValue(sessionProject({ credits: 50, frozen: true }));
+            const result = await validateGatewayRequest(sessionRequest());
+            expect(result.success).toBe(false);
+            if (!result.success) {
+                expect(result.response.status).toBe(403);
+                expect((await result.response.json()).code).toBe('billing_frozen');
+            }
+        });
+
+        it('applies the project rate limit', async () => {
+            mockSessionProject.mockReturnValue(sessionProject({ credits: 50 }));
+            mockCheckRateLimit.mockResolvedValue({ allowed: false, status: 'limited', limit: 60, remaining: 0, reset: Date.now() + 60_000 });
+            const result = await validateGatewayRequest(sessionRequest());
+            expect(result.success).toBe(false);
+            if (!result.success) expect(result.response.status).toBe(429);
+            expect(mockCheckRateLimit).toHaveBeenCalledWith('proj-session-1', expect.anything());
+        });
     });
 
     it('rejects keyless public-playground requests, whatever IP header they send', async () => {

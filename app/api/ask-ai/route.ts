@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sendChatRequest } from '@/lib/gemini';
+import { limitPublicAi, PUBLIC_AI_MAX_CHARS } from '@/lib/public-ai-guard';
 
 const SYSTEM_PROMPT = `You are Cencori AI, an intelligent assistant for the Cencori platform.
 
@@ -20,9 +21,12 @@ Keep responses concise, helpful, and focused on Cencori. If asked about unrelate
 
 export async function POST(req: NextRequest) {
     try {
+        const limited = await limitPublicAi(req, 'ask_ai');
+        if (limited) return limited;
+
         const { question } = await req.json();
 
-        if (!question || typeof question !== 'string') {
+        if (!question || typeof question !== 'string' || question.length > PUBLIC_AI_MAX_CHARS) {
             return NextResponse.json(
                 { error: 'Question is required' },
                 { status: 400 }

@@ -372,6 +372,41 @@ export async function validateGatewayRequest(
                         const organizationId = organization.id;
                         const tier = organization.subscription_tier || 'free';
 
+                        // A signed-in session pays like an API key: this path
+                        // used to skip every money gate, so anyone could sign
+                        // up and call any model on a zero-balance project.
+                        const deny = (status: number, code: string, error: string, message: string) => ({
+                            success: false as const,
+                            response: addGatewayHeaders(
+                                NextResponse.json({ error, message, code }, { status }),
+                                { requestId }
+                            ),
+                        });
+                        if (organization.billing_frozen) {
+                            return deny(403, 'billing_frozen', 'Billing account frozen', 'Billing is currently frozen for this organization. Contact support.');
+                        }
+                        const route = req.nextUrl.pathname;
+                        if (tier !== 'enterprise' && isMeteredGatewayRequest(req.method, route)) {
+                            const { getCreditsBalanceForGate } = await import('@/lib/credits');
+                            const balance = await getCreditsBalanceForGate(organizationId);
+                            if (isCreditBalanceExhausted(balance) && !await isProvenByokRequest({
+                                req,
+                                supabase,
+                                projectId: project.id,
+                                organizationId,
+                                defaultModel: project.default_model,
+                                agentId: null,
+                            })) {
+                                return deny(403, 'credit_balance_exhausted', 'Credit balance exhausted', 'Your organization has run out of credits. Top up to continue.');
+                            }
+                        }
+                        const sessionRateLimit = await checkRateLimit(project.id, { requestId, route });
+                        if (!sessionRateLimit.allowed) {
+                            return sessionRateLimit.reason === 'backend_unavailable'
+                                ? deny(503, 'rate_limit_unavailable', 'Rate limit unavailable', 'Try again shortly.')
+                                : deny(429, 'rate_limit_exceeded', 'Rate limit exceeded', 'Too many requests. Try again shortly.');
+                        }
+
                         const context: GatewayContext = {
                             supabase,
                             projectId: project.id,
@@ -392,10 +427,10 @@ export async function validateGatewayRequest(
                             defaultProvider: project.default_provider,
                             endUserBillingEnabled: Boolean(project.end_user_billing_enabled),
                             rateLimit: {
-                                status: 'ok',
-                                limit: 120,
-                                remaining: 119,
-                                reset: Date.now() + 60000,
+                                status: sessionRateLimit.status,
+                                limit: sessionRateLimit.limit,
+                                remaining: sessionRateLimit.remaining,
+                                reset: sessionRateLimit.reset,
                             },
                         };
 

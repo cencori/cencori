@@ -1,44 +1,13 @@
-import { adminUsers } from "@/lib/auth/admin-users";
-import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabaseAdmin';
-import { isCencoriEmail } from '@/lib/internal-access';
-import { trackEvent } from '@/lib/track-event';
+import { NextResponse } from 'next/server';
 
-export async function POST(req: NextRequest) {
-    const { email, password } = await req.json();
-
-    if (!email || !password) {
-        return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
-    }
-
-    const trimmed = email.trim().toLowerCase();
-
-    if (!isCencoriEmail(trimmed)) {
-        return NextResponse.json({ error: 'Only @cencori.com emails allowed' }, { status: 403 });
-    }
-
-    if (password.length < 6) {
-        return NextResponse.json({ error: 'Password must be at least 6 characters' }, { status: 400 });
-    }
-
-    const admin = createAdminClient();
-
-    // Create user with auto-confirmed email (no verification needed)
-    const { data, error } = await adminUsers.createUser({
-        email: trimmed,
-        password,
-        email_confirm: true,
-    });
-
-    if (error) {
-        // User might already exist
-        if (error.message?.includes('already been registered')) {
-            return NextResponse.json({ error: 'An account with this email already exists. Try signing in.' }, { status: 409 });
-        }
-        return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    trackEvent({ event_type: 'user.signup', product: 'dashboard', user_id: data.user.id, metadata: { email: trimmed } });
-
-    return NextResponse.json({ success: true, userId: data.user.id });
+// Closed 2026-10-31. It created a pre-confirmed account for any @cencori.com
+// address without proving the caller owned it, and checkInternalAccess grants
+// staff access to every @cencori.com email, so anyone could make themselves
+// staff. Staff now sign up through the normal flow (email verified) or are
+// invited from /internal/settings.
+export async function POST() {
+    return NextResponse.json(
+        { error: 'Internal signup is closed. Sign up normally or ask for an invite.' },
+        { status: 410 }
+    );
 }
