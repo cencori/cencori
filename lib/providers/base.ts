@@ -475,8 +475,22 @@ export function attemptSignal(
 }
 
 /**
+ * The signal a provider stream runs under: the caller's, and no deadline of its own.
+ *
+ * Streams used to take {@link transportSignal}, an `AbortSignal.timeout` over the whole
+ * response, so every stream ended at 55s (120s on Maximo) however steadily it was producing. A
+ * long tool call, such as a whole file written in one patch, could never finish: the client
+ * retried from the start and was cut at the same point each time. The gateway already bounds
+ * streams the right way, in `streamWithTimeout`, which limits silence between chunks and not total
+ * length; the SDK's own `timeout` still bounds the wait for response headers.
+ */
+export function streamSignal(signal?: AbortSignal | null): AbortSignal | undefined {
+    return signal ?? undefined;
+}
+
+/**
  * Backwards-compatible convenience over {@link attemptSignal} for call sites
- * (streams) that only need the combined signal.
+ * that only need the combined signal. Not for streams: see {@link streamSignal}.
  */
 export function transportSignal(signal?: AbortSignal | null, timeoutMs: number = DEFAULT_PROVIDER_TIMEOUT_MS): AbortSignal | undefined {
     return attemptSignal(signal, timeoutMs).signal;

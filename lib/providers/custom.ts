@@ -18,7 +18,7 @@ import {
     enforceRequestBudget,
     resolveProviderTransport,
     runWithProviderRetry,
-    transportSignal,
+    streamSignal,
 } from './base';
 import { toOpenAIMessages, toAnthropicMessages, estimateTokenCount } from './utils';
 import { normalizeProviderError, ServiceUnavailableError } from './errors';
@@ -119,7 +119,7 @@ export class CustomProvider extends AIProvider {
                     ...(this.config.apiKey ? { 'Authorization': `Bearer ${this.config.apiKey}` } : {}),
                 },
                 body: JSON.stringify(body),
-                signal: transportSignal(request.signal, transport.timeoutMs),
+                signal: streamSignal(request.signal),
             });
 
             if (!response.ok) {

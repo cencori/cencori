@@ -21,7 +21,7 @@ import {
     enforceRequestBudget,
     resolveProviderTransport,
     runWithProviderRetry,
-    transportSignal,
+    streamSignal,
 } from './base';
 import { getPricingFromDB } from './pricing';
 import { toOpenAIMessages, estimateTokenCount } from './utils';
@@ -276,7 +276,7 @@ export class OpenAIProvider extends AIProvider {
                 // the gateway has to fall back to estimating tokens from text.
                 stream_options: { include_usage: true },
             }, {
-                signal: transportSignal(request.signal, transport.timeoutMs),
+                signal: streamSignal(request.signal),
                 timeout: transport.timeoutMs,
                 maxRetries: 0,
             });
@@ -414,7 +414,7 @@ export class OpenAIProvider extends AIProvider {
             const stream = await this.clientFor(transport).responses.create(
                 { ...toResponsesParams(request), stream: true },
                 {
-                    signal: transportSignal(request.signal, transport.timeoutMs),
+                    signal: streamSignal(request.signal),
                     timeout: transport.timeoutMs,
                     maxRetries: 0,
                 },

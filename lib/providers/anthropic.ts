@@ -18,7 +18,7 @@ import {
     enforceRequestBudget,
     resolveProviderTransport,
     runWithProviderRetry,
-    transportSignal,
+    streamSignal,
 } from './base';
 import { getPricingFromDB } from './pricing';
 import { toAnthropicMessages, type AnthropicMessage } from './utils';
@@ -435,7 +435,7 @@ export class AnthropicProvider extends AIProvider {
                 ...(toolChoice ? { tool_choice: toolChoice } : {}),
                 stream: true,
             }, {
-                signal: transportSignal(request.signal, transport.timeoutMs),
+                signal: streamSignal(request.signal),
                 timeout: transport.timeoutMs,
                 maxRetries: 0,
             });

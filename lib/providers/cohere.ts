@@ -18,7 +18,7 @@ import {
     enforceRequestBudget,
     resolveProviderTransport,
     runWithProviderRetry,
-    transportSignal,
+    streamSignal,
 } from './base';
 import { getPricingFromDB } from './pricing';
 import { estimateTokenCount } from './utils';
@@ -228,7 +228,7 @@ export class CohereProvider extends AIProvider {
                     max_tokens: request.maxTokens,
                     stream: true,
                 }),
-                signal: transportSignal(request.signal, transport.timeoutMs),
+                signal: streamSignal(request.signal),
             });
 
             if (!response.ok) {

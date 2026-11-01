@@ -76,6 +76,35 @@ describe('compatible provider SSE transport', () => {
         await vi.waitFor(() => expect(cancel).toHaveBeenCalledOnce());
     });
 
+    /**
+     * The transport timeout bounds the wait for headers, not the response. Streams used to run
+     * under an `AbortSignal.timeout` of the whole call, so a reply still producing tokens was cut
+     * at 55s (120s on Maximo), and a long tool call never finished: the client retried and was cut
+     * at the same point again. Silence between chunks is bounded by `streamWithTimeout` instead.
+     */
+    it('keeps a steadily producing stream open past the transport timeout', async () => {
+        const words = Array.from({ length: 8 }, (_, index) => `w${index} `);
+        // Like a real fetch, an abort errors the body mid-stream.
+        safeFetch.mockImplementation(async (_url: unknown, init?: RequestInit) => new Response(new ReadableStream<Uint8Array>({
+            async start(controller) {
+                init?.signal?.addEventListener('abort', () => controller.error(init.signal?.reason), { once: true });
+                for (const word of words) {
+                    if (init?.signal?.aborted) return;
+                    await new Promise(resolve => setTimeout(resolve, 25));
+                    controller.enqueue(frame({ content: word }));
+                }
+                controller.enqueue(frame({}, 'stop'));
+                controller.close();
+            },
+        }), { headers: { 'Content-Type': 'text/event-stream' } }));
+        const provider = new OpenAICompatibleProvider('maximo', 'synthetic-key');
+        const chunks = [];
+        // 8 chunks 25ms apart is 200ms of output against an 80ms transport timeout.
+        for await (const chunk of provider.stream({ ...request, timeoutMs: 80 })) chunks.push(chunk);
+        expect(chunks.map(chunk => chunk.delta).join('')).toBe(words.join(''));
+        expect(chunks.at(-1)?.finishReason).toBe('stop');
+    });
+
     it('feeds comment-only SSE heartbeats into the gateway idle deadline', async () => {
         vi.useFakeTimers();
         let controller!: ReadableStreamDefaultController<Uint8Array>;
