@@ -88,6 +88,14 @@ export const BUSINESS_TOOLS: ChatCompletionFunctionTool[] = [
     {
         type: "function",
         function: {
+            name: "owner_whatsapp",
+            description: "Let the owner text you on WhatsApp (\"here's my WhatsApp, send me a text\", \"can I talk to you on WhatsApp?\") or stop it. link: returns a link that opens WhatsApp to your number with a code typed in; the owner taps it and presses send, which links their number (a number they type could be mistyped, and you'll be talking money, so this is how it's done: explain it in a line if they gave you a number). Give them the link as it is. Then they can ask you anything there, and you'll message them there when something needs them. unlink: stop.",
+            parameters: { type: "object", properties: { action: { type: "string", enum: ["link", "unlink"] } }, required: ["action"] },
+        },
+    },
+    {
+        type: "function",
+        function: {
             name: "list_customers",
             description: "The business's customers: everyone who chatted (WhatsApp, link, website) with their name or number and channel, joined to what they ordered and booked: orders, total paid, bookings, last contact. Most recent first, or biggest spenders first.",
             parameters: {
@@ -135,6 +143,7 @@ export const BUSINESS_TOOL_STATUS: Record<string, string> = {
     get_schedule: "Opening the schedule",
     client_card: "Looking up the client",
     note_client: "Making a note",
+    owner_whatsapp: "Getting WhatsApp ready",
     list_customers: "Looking up customers",
     list_chats: "Going through the chats",
     read_chat: "Reading the chat",
@@ -296,6 +305,22 @@ export async function runBusinessTool(name: string, args: Record<string, unknown
             }
             const card = await clients.clientCard(db, project.id, phone);
             return card ?? { error: `No history with +${phone} yet.` };
+        }
+
+        case "owner_whatsapp": {
+            if (!ctx.userId) return { error: "That's only for the owner, in Studio." };
+            const owner = await import("@/lib/studio/owner-whatsapp");
+            const { studioStaff } = await import("@/lib/studio/owner-chat");
+            const staff = await studioStaff(db as never, project.id);
+            const employee = (ctx.employeeId ? staff.find((agent) => agent.id === ctx.employeeId) : null) ?? staff[0];
+            if (!employee) return { error: "There's no employee yet." };
+            if (args.action === "unlink") {
+                const removed = await owner.unlinkOwner(db, project.id, ctx.userId, employee.id);
+                return removed ? { unlinked: true } : { error: "They weren't texting you on WhatsApp." };
+            }
+            const started = await owner.startOwnerLink(db, { projectId: project.id, userId: ctx.userId, agentId: employee.id });
+            if (!started.ok) return { error: started.message };
+            return { link: started.link, your_number: started.number, code: started.code, already_linked_on: started.linked_phone, note: "Tap the link on the phone with their WhatsApp; it opens a chat with you with the code typed in; they press send and you reply there. The code lasts 15 minutes." };
         }
 
         case "list_customers": {

@@ -147,6 +147,18 @@ export async function sendExpo(devices: ExpoPushDevice[], message: PushMessage, 
 
 /** Tell everyone on the project who turned notifications on. Never throws. */
 export async function pushToOwners(db: Admin, projectId: string, message: PushMessage): Promise<void> {
+    // Owners who text their employee on WhatsApp hear it there too (lib/studio/owner-whatsapp.ts).
+    const onWhatsApp = import("@/lib/studio/owner-whatsapp")
+        .then(({ tellOwnersOnWhatsApp }) => tellOwnersOnWhatsApp(db, projectId, message))
+        .catch((error) => console.error("[studio-push] whatsapp failed", error instanceof Error ? error.message : error));
+    try {
+        await pushToDevices(db, projectId, message);
+    } finally {
+        await onWhatsApp;
+    }
+}
+
+async function pushToDevices(db: Admin, projectId: string, message: PushMessage): Promise<void> {
     try {
         const row = await devicesRow(db, projectId);
         if (!row || row.devices.length === 0) return;

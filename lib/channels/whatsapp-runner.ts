@@ -174,6 +174,19 @@ async function answer(db: Admin, channel: WhatsAppChannel, customer: string, nam
             else unheard++;
         }
     }
+    // The owner texting their own employee (a linked number, or the "Link 4831" that links it): answered
+    // as their employee, from the owner's chat in Studio, never as a customer (lib/studio/owner-whatsapp.ts).
+    if (texts.length) {
+        const { answerOwnerOnWhatsApp } = await import('@/lib/studio/owner-whatsapp');
+        const handled = await answerOwnerOnWhatsApp(db, channel, customer, texts, token).catch((error) => {
+            console.error('[whatsapp] owner message failed', error instanceof Error ? error.message : error);
+            return false;
+        });
+        if (handled) {
+            await Promise.all(billing);
+            return;
+        }
+    }
     if (paused && open) {
         // Kept for the owner to read in Studio, and for the assistant once it's handed back.
         const said = texts.length ? texts : [unheard ? "[Sent a voice note that couldn't be heard]" : '[Sent something the assistant can\'t read]'];
