@@ -219,6 +219,17 @@ export async function POST(request: Request, ctx: Context) {
             const description = cleanText(body.description, 500);
             const instructions = cleanText(body.instructions, 20_000);
             if (!name) return fail('Give your agent a name.');
+            // Studio picks the id up front (its avatar is drawn from it while the owner names it). Sending
+            // it again after a dropped reply hands back the same agent instead of making a second one.
+            const chosenId = typeof body.agent_id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.agent_id) ? body.agent_id.toLowerCase() : null;
+            if (chosenId) {
+                const { data: existing } = await db.from('agents').select('id, project_id').eq('id', chosenId).maybeSingle();
+                if (existing && existing.project_id !== projectId) return fail('Pick another id.', 409);
+                if (existing) {
+                    const { data: draft } = await db.from('agent_versions').select('id').eq('agent_id', chosenId).eq('project_id', projectId).order('created_at', { ascending: false }).limit(1).maybeSingle();
+                    if (draft) return NextResponse.json({ agent_id: chosenId, version_id: draft.id }, { status: 200 });
+                }
+            }
             const { BUSINESS_DEFAULT_MODEL, getOrganizationPlan, modelAllowed } = await import('@/lib/business/plans');
             const plan = await getOrganizationPlan(db as never, access.organizationId);
             if (plan.accountType === 'business') {
@@ -240,6 +251,7 @@ export async function POST(request: Request, ctx: Context) {
                 config.system_tools = { end_conversation: {}, request_callback: {}, take_payments: {} };
             }
             const { data: agent, error: agentError } = await db.from('agents').insert({
+                ...(chosenId ? { id: chosenId } : {}),
                 project_id: projectId, name, description: description || null,
                 blueprint: 'custom', is_active: true, shadow_mode: true,
             }).select('id').single();
@@ -347,6 +359,17 @@ export async function POST(request: Request, ctx: Context) {
             const model = cleanText(body.model, 200);
             const instructions = cleanText(body.instructions, 20_000);
             if (!name) return fail('Give your agent a name.');
+            // Studio picks the id up front (its avatar is drawn from it while the owner names it). Sending
+            // it again after a dropped reply hands back the same agent instead of making a second one.
+            const chosenId = typeof body.agent_id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.agent_id) ? body.agent_id.toLowerCase() : null;
+            if (chosenId) {
+                const { data: existing } = await db.from('agents').select('id, project_id').eq('id', chosenId).maybeSingle();
+                if (existing && existing.project_id !== projectId) return fail('Pick another id.', 409);
+                if (existing) {
+                    const { data: draft } = await db.from('agent_versions').select('id').eq('agent_id', chosenId).eq('project_id', projectId).order('created_at', { ascending: false }).limit(1).maybeSingle();
+                    if (draft) return NextResponse.json({ agent_id: chosenId, version_id: draft.id }, { status: 200 });
+                }
+            }
             const { BUSINESS_DEFAULT_MODEL, getOrganizationPlan, modelAllowed } = await import('@/lib/business/plans');
             if (!modelAllowed(await getOrganizationPlan(db as never, access.organizationId), model)) {
                 return fail('Your plan uses DeepSeek V4.1 Flash. Upgrade to Business to choose other models.', 402);

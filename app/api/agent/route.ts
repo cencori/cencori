@@ -236,6 +236,10 @@ export async function POST(request: NextRequest) {
         const businessPlan = organization ? await getOrganizationPlan(admin as never, organization.id) : null;
         const isBusiness = businessPlan?.accountType === "business";
         if (isBusiness) agentModel = BUSINESS_DEFAULT_MODEL as typeof agentModel;
+        // Studiowave is the business app: whoever opens it there is running a business, whatever
+        // their organization's track, so they meet their employee and its business tools. Billing
+        // and the plan still follow the organization's track (isBusiness).
+        const runsBusiness = isBusiness || (currentPath === "studio" && !!project);
         if (isBusiness && !lightweightConversation) {
             const { data: usage, error: usageError } = await admin.rpc("copilot_consume", { p_subject: usageSubject, p_limit: BUSINESS_COPILOT_DAILY_LIMIT });
             if (usageError) {
@@ -274,7 +278,7 @@ export async function POST(request: NextRequest) {
         // Which employee is talking: the one the owner picked (agentId), else the main one.
         let speakerId: string | null = null;
         let threadKey: ThreadKey | undefined;
-        if (isBusiness && currentPath === "studio" && project) {
+        if (runsBusiness && currentPath === "studio" && project) {
             const everyone = await studioStaff(admin as never, project.id);
             const requested = typeof body.agentId === "string" && UUID_PATTERN.test(body.agentId) ? body.agentId : null;
             const speaker = requested ? everyone.find((agent) => agent.id === requested) : everyone[0];
@@ -306,7 +310,7 @@ export async function POST(request: NextRequest) {
         const history = thread ? threadContext(thread, timeZone) : null;
         // A business's own zone, for the times the owner gives (events, bookings): "8pm" is 8pm there.
         let businessZone: { time_zone: string; utc_offset: string; today: string } | null = null;
-        if (isBusiness && project) {
+        if (runsBusiness && project) {
             const [{ businessTimeZone }, { localDate, utcOffset }] = await Promise.all([import("@/lib/studio/business-zone"), import("@/lib/studio/time")]);
             const zone = await businessTimeZone(admin as never, project.id);
             const today = localDate(zone, new Date());
@@ -325,10 +329,10 @@ export async function POST(request: NextRequest) {
             ...(businessZone ? { business_time_zone: businessZone } : {}),
             // Studio (the business owner's phone app) has no console: everything happens in it.
             ...(currentPath === "studio" ? {
-                studio: "The user is in Cencori Studio, the business app on their phone. Never send them to the console, a dashboard or a computer. open_agent_page opens a sheet right here in Studio (WhatsApp, payments). Adding knowledge, going live and owner alerts are also sheets here: under Finish setting up on Home.",
+                studio: "The user is in Studiowave, the business app on their phone. Never send them to the console, a dashboard or a computer. open_agent_page opens a sheet right here in Studio (WhatsApp, payments). Adding knowledge, going live and owner alerts are also sheets here: under Finish setting up on Home.",
             } : {}),
             // A business owner (not a developer): keep it plain, and build their agent with them.
-            ...(isBusiness ? {
+            ...(runsBusiness ? {
                 account: "business",
                 business_plan: businessPlan?.plan ? { name: businessPlan.plan.name, conversations_per_month: businessPlan.plan.conversations, agents: businessPlan.plan.agents, active: businessPlan.active } : null,
             } : {}),
@@ -415,7 +419,7 @@ export async function POST(request: NextRequest) {
                 organization: { id: organization.id, name: organization.name, slug: organization.slug },
                 project: project ? { id: project.id, name: project.name, slug: project.slug } : null,
                 userId: user.id,
-                business: isBusiness,
+                business: runsBusiness,
                 ...(speakerId ? { employeeId: speakerId } : {}),
             }
             : null;
