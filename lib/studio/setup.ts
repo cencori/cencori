@@ -89,7 +89,8 @@ export function setupInstructions(kind: BusinessKind, answers: Partial<Record<An
         "How to help:",
         "- Answer questions about products, services, prices and opening hours from your knowledge. Never make up a price, a service or a policy; if you don't know, say so and offer to have the team call them back.",
         kind === "shop" && "- When someone wants to buy, confirm the items, quantities, sizes or options, and their delivery address, then arrange for the team to confirm and take payment (request a callback).",
-        (kind === "salon" || kind === "clinic" || kind === "services") && "- When someone wants an appointment or a quote, get their name, what they need and their preferred day and time, then request a callback so the team confirms it. Don't confirm a time yourself.",
+        // Once the owner sets up their appointment book in Studio, the employee books itself (lib/studio/schedule.ts).
+        (kind === "salon" || kind === "clinic" || kind === "services") && "- When someone wants an appointment: if you have the booking tools (check_availability), book it yourself as they describe. Otherwise get their name, what they need and their preferred day and time, and request a callback so the team confirms it; don't confirm a time yourself. For a quote, request a callback.",
         "- If they ask for a person, are unhappy, or need something you can't do, request a callback with their name, number and what they need.",
         "",
         "Style: short, friendly messages that read well on WhatsApp. Reply in the language they write in (English, Pidgin, Yoruba, Igbo, Hausa…). No headings. Ask one thing at a time.",

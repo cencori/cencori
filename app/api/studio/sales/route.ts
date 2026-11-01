@@ -3,7 +3,7 @@
  *      Studio's Sales tab: orders from the product list and bookings the
  *      assistant made, newest first, with each booking's deposit if one was
  *      paid in the same chat.
- * POST /api/studio/sales  { project_id, kind: 'order' | 'booking', id, action: 'paid' | 'done' | 'cancelled' }
+ * POST /api/studio/sales  { project_id, kind: 'order' | 'booking', id, action: 'paid' | 'done' | 'cancelled' | 'no_show' }
  *      The owner's changes: an order paid another way (cash, transfer), or an
  *      order or booking done or cancelled.
  */
@@ -42,7 +42,8 @@ async function sales(projectId: string) {
             paid_at: order.paid_at,
         })),
         bookings: bookings.slice(-200).reverse().map((booking) => {
-            const deposit = booking.conversation_id ? paid.find((p) => p.conversation_id === booking.conversation_id) : null;
+            // An appointment from the book knows its own deposit; a calendar booking's is the one paid in its chat.
+            const deposit = booking.deposit_due ? (booking.deposit_due.paid_at ? booking.deposit_due : null) : booking.conversation_id ? paid.find((p) => p.conversation_id === booking.conversation_id) : null;
             return { ...booking, deposit: deposit ? { amount: deposit.amount, currency: deposit.currency } : null };
         }),
     };
@@ -73,7 +74,7 @@ export async function POST(req: NextRequest) {
             : !!await markOrderPaidByOwner(db, body.project_id, body.id);
     }
     else if (body.kind === 'order' && (body.action === 'done' || body.action === 'cancelled')) ok = !!await setOrderStatus(db, body.project_id, body.id, body.action);
-    else if (body.kind === 'booking' && (body.action === 'done' || body.action === 'cancelled')) ok = await setBookingStatus(db, body.project_id, body.id, body.action);
+    else if (body.kind === 'booking' && (body.action === 'done' || body.action === 'cancelled' || body.action === 'no_show')) ok = await setBookingStatus(db, body.project_id, body.id, body.action);
     else return fail('Unknown change.');
     if (!ok) return fail('That one isn\'t there any more. Refresh and try again.', 404);
     return NextResponse.json(await sales(body.project_id), { headers: { 'Cache-Control': 'no-store' } });

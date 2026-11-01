@@ -20,7 +20,8 @@ export function StudioRouter() {
     const event = /^\/sales\/events\/([^/]+)$/.exec(path);
     if (event) return <StudioEventPage key={event[1]} id={decodeURIComponent(event[1])} />;
     if (path === "/inbox") return <StudioInboxPage />;
-    if (path === "/sales") return <StudioSalesPage />;
+    // The schedule lives in the phone app; on the web, bookings are under Sales.
+    if (path === "/sales" || path === "/schedule") return <StudioSalesPage />;
     if (path === "/money") return <StudioMoneyPage />;
     if (path === "/assistant") return <StudioAssistantPage />;
     if (path === "/") return <StudioHomePage />;

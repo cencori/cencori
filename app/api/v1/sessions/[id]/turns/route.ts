@@ -331,12 +331,13 @@ export async function POST(
                 // published version and the business's payment options are independent,
                 // so they're read together rather than one after another.
                 const insAgentId = (ins as { agent_id?: string | null } | null)?.agent_id ?? null;
-                const [activity, version, takesTransfers] = await Promise.all([
+                const [activity, version, takesTransfers, takesBookings] = await Promise.all([
                     insAgentId
                         ? import('@/lib/embedded/agents').then(({ checkAgentActivity }) => checkAgentActivity(adminClient as never, (gatewayCtx as GatewayContext).projectId, insAgentId))
                         : Promise.resolve(null),
                     publishedVersion(adminClient, (gatewayCtx as GatewayContext).projectId, versionId),
                     import('@/lib/embedded/transfers').then(({ takesTransfersCached }) => takesTransfersCached(adminClient as never, session.project_id as string)),
+                    import('@/lib/studio/schedule').then(({ takesBookingsCached }) => takesBookingsCached(adminClient as never, session.project_id as string)).catch(() => false),
                 ]);
                 if (activity && 'unavailable' in activity) {
                     return respondError(503, 'Agent pause check unavailable; retry shortly', 'activity_check_unavailable');
@@ -362,8 +363,9 @@ export async function POST(
                         }
                     } else return respondError(409, 'Installed agent has no published model', 'version_unavailable');
                     installedManifest = manifest;
-                    // A business that takes bank transfers (Studio → Money) gets the payment tools without republishing.
-                    installedToolset = (await import('@/lib/embedded/agent-tools')).agentToolset(config, { takesTransfers });
+                    // A business that takes bank transfers (Studio → Money) gets the payment tools without republishing;
+                    // one with its appointment book set up (Studio → Schedule), the appointment tools.
+                    installedToolset = (await import('@/lib/embedded/agent-tools')).agentToolset(config, { takesTransfers, takesBookings });
                     installedToolset.warm(session.project_id as string);
                     effectiveNetworkPolicy = intersectNetworkPolicy(manifest.policy, (ins as { overlay_config?: unknown }).overlay_config);
                     effectiveBrowserEnabled = intersectBrowserEnabled(manifest.policy, (ins as { overlay_config?: unknown }).overlay_config);
@@ -397,13 +399,16 @@ export async function POST(
         // Installed agents get today's date (they look things up by date through their tools)
         // and the business's events on sale, with their ticket links; Studio's employees, who they are.
         const instructions = installedManifest
-            ? [
+            ? (await Promise.all([
                 installedManifest.instructions ?? '',
                 // Studio: the name and personality the owner set, live (lib/studio/persona.ts); nothing for agents without one.
-                agentId ? await import('@/lib/studio/persona').then(({ personaBlock }) => personaBlock(adminClient as never, session.project_id as string, agentId)).catch(() => '') : '',
-                (await import('@/lib/embedded/agent-tools')).agentClock(),
-                await import('@/lib/studio/events').then(({ eventsBriefing }) => eventsBriefing(adminClient as never, session.project_id as string)).catch(() => ''),
-            ].filter(Boolean).join('\n\n')
+                agentId ? import('@/lib/studio/persona').then(({ personaBlock }) => personaBlock(adminClient as never, session.project_id as string, agentId)).catch(() => '') : '',
+                import('@/lib/embedded/agent-tools').then(({ agentClock }) => agentClock()),
+                import('@/lib/studio/events').then(({ eventsBriefing }) => eventsBriefing(adminClient as never, session.project_id as string)).catch(() => ''),
+                // Studio's appointment book (services, hours, how to book) and what the business knows about this client.
+                import('@/lib/studio/schedule').then(({ scheduleBriefing }) => scheduleBriefing(adminClient as never, session.project_id as string)).catch(() => ''),
+                import('@/lib/studio/clients').then(({ clientBriefing }) => clientBriefing(adminClient as never, session.project_id as string, session.metadata as Record<string, unknown> | null)).catch(() => ''),
+            ])).filter(Boolean).join('\n\n')
             : (agentConfig?.system_prompt || body.instructions);
 
         if (!input || (Array.isArray(input) && input.length === 0)) {

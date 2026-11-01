@@ -22,6 +22,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { ownNumberAvailable } from '@/lib/channels/whatsapp-own-number';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { requireProjectAccess } from '@/lib/require-project-access';
 import type { SubscriptionTier } from '@/lib/entitlements';
@@ -95,7 +96,8 @@ export async function GET(req: NextRequest, ctx: Context) {
         role(db, access.organizationId, access.userId),
         kapso ? businessDetails(db, projectId, agent, access.userId) : Promise.resolve(null),
     ]);
-    return NextResponse.json({ channel: serialize(req, channel), can_manage: canManage, signup: await signupConfigFor(), kapso, details }, { headers: { 'Cache-Control': 'no-store' } });
+    // own_number: "give your employee a number" (a code by SMS or call, no Facebook) is switched on here.
+    return NextResponse.json({ channel: serialize(req, channel), can_manage: canManage, signup: await signupConfigFor(), kapso, own_number: ownNumberAvailable(), details }, { headers: { 'Cache-Control': 'no-store' } });
 }
 
 export async function PUT(req: NextRequest, ctx: Context) {

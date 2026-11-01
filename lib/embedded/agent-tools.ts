@@ -14,6 +14,7 @@ import { safeOutboundFetch } from '@/lib/security/outbound-url';
 import { isBookingTool } from './owner-alerts';
 import { executeWebhookTool, readWebhookTools, webhookToolDefinitions, type WebhookTool } from './webhook-tools';
 import { agentMcpBindings, readAgentIntegrations, readAgentMcpServers, runAgentMcpTool, warmAgentMcpSessions } from './agent-mcp';
+import { APPOINTMENT_DEFINITIONS, APPOINTMENT_TOOL_NAMES, runAppointmentTool } from './appointment-tools';
 import {
     CHECK_PAYMENT_TOOL,
     END_CONVERSATION_TOOL,
@@ -32,7 +33,7 @@ import {
 
 export { END_CONVERSATION_TOOL, REQUEST_CALLBACK_TOOL, TRANSFER_TO_HUMAN_TOOL };
 /** Names webhook tools can't take: the model would see two tools with one name. */
-export const SYSTEM_TOOL_NAMES = [END_CONVERSATION_TOOL, TRANSFER_TO_HUMAN_TOOL, REQUEST_CALLBACK_TOOL, REQUEST_PAYMENT_TOOL, CHECK_PAYMENT_TOOL, FIND_PRODUCTS_TOOL, PLACE_ORDER_TOOL] as const;
+export const SYSTEM_TOOL_NAMES = [END_CONVERSATION_TOOL, TRANSFER_TO_HUMAN_TOOL, REQUEST_CALLBACK_TOOL, REQUEST_PAYMENT_TOOL, CHECK_PAYMENT_TOOL, FIND_PRODUCTS_TOOL, PLACE_ORDER_TOOL, ...APPOINTMENT_TOOL_NAMES] as const;
 
 const TRANSFER_TIMEOUT_MS = 10_000;
 
@@ -250,8 +251,10 @@ export interface AgentToolset {
  * The version's tools: its webhook tools, the MCP tools switched on, and the
  * system tools switched on. `takesTransfers`: the business added a bank account
  * in Studio, so the payment tools are on even if the version didn't switch them on.
+ * `takesBookings`: the business set up its appointment book in Studio, so the
+ * appointment tools are on, also without republishing.
  */
-export function agentToolset(config: Record<string, unknown> | null | undefined, opts: { takesTransfers?: boolean } = {}): AgentToolset {
+export function agentToolset(config: Record<string, unknown> | null | undefined, opts: { takesTransfers?: boolean; takesBookings?: boolean } = {}): AgentToolset {
     const webhooks = readWebhookTools(config).filter((tool) => !(SYSTEM_TOOL_NAMES as readonly string[]).includes(tool.name));
     const system = readSystemTools(config);
     if (opts.takesTransfers && !system.take_payments) {
@@ -264,7 +267,9 @@ export function agentToolset(config: Record<string, unknown> | null | undefined,
         ...(system.request_callback ? [systemDefinition(REQUEST_CALLBACK_TOOL, system)] : []),
         ...(system.take_payments ? paymentDefinitions(system) : []),
         ...(system.sell_products ? catalogDefinitions(system) : []),
+        ...(opts.takesBookings ? APPOINTMENT_DEFINITIONS : []),
     ];
+    const appointmentTools = new Set<string>(opts.takesBookings ? APPOINTMENT_TOOL_NAMES : []);
     // MCP and connected-app tool names never shadow the agent's own tools.
     const mcp = agentMcpBindings([...readAgentMcpServers(config), ...readAgentIntegrations(config)], new Set(local.map((d) => d.function.name)));
     const definitions = [...local, ...mcp.map((binding) => binding.definition)];
@@ -293,6 +298,7 @@ export function agentToolset(config: Record<string, unknown> | null | undefined,
             if (call.name === CHECK_PAYMENT_TOOL && (system.take_payments || system.sell_products)) return checkPaymentTool(call.args, context);
             if (call.name === FIND_PRODUCTS_TOOL && system.sell_products) return findProductsTool(call.args, context);
             if (call.name === PLACE_ORDER_TOOL && system.sell_products) return placeOrderTool(call.args, context);
+            if (appointmentTools.has(call.name)) return runAppointmentTool(call.name, call.args, context);
             const webhook = byName.get(call.name);
             if (webhook) return executeWebhookTool(webhook, call.args, { organizationId: context.organizationId, signal: context.signal });
             const binding = mcpByName.get(call.name);

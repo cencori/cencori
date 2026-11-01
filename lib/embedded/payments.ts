@@ -278,6 +278,9 @@ async function tellOwner(db: Admin, projectId: string, payment: PaymentEntry): P
     // A payment for event tickets: they're paid, the buyer gets them, the owner is told.
     const { markTicketsPaid } = await import('@/lib/studio/events');
     if (await markTicketsPaid(db, { paymentReference: payment.reference })) return;
+    // A deposit for an appointment: it's confirmed, the customer hears they're booked, the owner is told.
+    const { markAppointmentPaid } = await import('@/lib/studio/schedule');
+    if (await markAppointmentPaid(db, projectId, payment.reference)) return;
     // A payment for an order: the order is marked paid and the owner gets it to fulfil.
     const order = await markOrderPaid(db, projectId, payment.reference, payment.paid_at ?? new Date().toISOString());
     if (order) return notifyOrder(ctx, describeOrder(order), true);

@@ -234,11 +234,13 @@ function push(ctx: AlertContext, message: { title: string; body: string; url: st
 }
 
 /** Email the owner about a booking the agent just made. Best-effort; never throws. */
-export async function notifyBooking(ctx: AlertContext, argsJson: string): Promise<void> {
+/** `where`: "studio" for a booking in Studio's own appointment book, not the owner's calendar. */
+export async function notifyBooking(ctx: AlertContext, argsJson: string, opts: { where?: 'calendar' | 'studio'; timeZone?: string } = {}): Promise<void> {
     try {
         const alerts = await getOwnerAlerts(ctx.db, ctx.projectId, ctx.agentId);
         const booking = bookingFromArgs(argsJson);
-        await push(ctx, { title: 'New booking', body: [booking.title, formatWhen(booking.start, alerts?.settings.time_zone ?? 'Africa/Lagos')].filter(Boolean).join(', '), url: '/sales', tag: 'booking' });
+        const studio = opts.where === 'studio';
+        await push(ctx, { title: 'New booking', body: [booking.title, formatWhen(booking.start, opts.timeZone ?? alerts?.settings.time_zone ?? 'Africa/Lagos')].filter(Boolean).join(', '), url: studio ? '/schedule' : '/sales', tag: 'booking' });
         if (!alerts) return;
         const when = formatWhen(booking.start, alerts.settings.time_zone);
         const source = await conversationSource(ctx.db, ctx.surface, ctx.conversationId);
@@ -249,7 +251,7 @@ export async function notifyBooking(ctx: AlertContext, argsJson: string): Promis
         await sendEmail({
             to: alerts.settings.emails,
             subject: `${test}New booking: ${booking.title}${when ? `, ${when}` : ''}`,
-            html: emailLayout(`${name} made a booking`, [['Booking', booking.title], ['When', when], ['Details', booking.detail], ['From', source]], 'It\'s on your calendar too. You get this because owner alerts are on for this agent in Cencori.'),
+            html: emailLayout(`${name} made a booking`, [['Booking', booking.title], ['When', when], ['Details', booking.detail], ['From', source]], studio ? 'It\'s in your schedule in Studio. You get this because owner alerts are on for this agent in Cencori.' : 'It\'s on your calendar too. You get this because owner alerts are on for this agent in Cencori.'),
         });
     } catch (error) {
         console.error('[owner-alerts] booking alert failed', error instanceof Error ? error.message : error);

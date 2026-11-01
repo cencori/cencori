@@ -72,8 +72,54 @@ export const BUSINESS_ACTIONS: ChatCompletionFunctionTool[] = [
         type: "function",
         function: {
             name: "update_booking",
-            description: "Mark a booking done (they came) or cancelled. Look it up with list_bookings first.",
-            parameters: { type: "object", properties: { booking_id: { type: "string" }, change: { type: "string", enum: ["done", "cancelled"] } }, required: ["booking_id", "change"] },
+            description: "Change a booking: done (they came), no_show (they didn't come), cancelled, or move (an appointment in the book, to a new start: \"move Tolu to 3pm\"). Look it up with get_schedule or list_bookings first. Moving or cancelling an appointment tells the customer in their chat.",
+            parameters: {
+                type: "object",
+                properties: {
+                    booking_id: { type: "string" },
+                    change: { type: "string", enum: ["done", "no_show", "cancelled", "move"] },
+                    start: { type: "string", description: "For move: the new start, YYYY-MM-DDTHH:MM in the business's local time." },
+                },
+                required: ["booking_id", "change"],
+            },
+        },
+    },
+    {
+        type: "function",
+        function: {
+            name: "book_appointment",
+            description: "Book someone into the appointment book for the owner (a walk-in, someone who called). No deposit is asked for. It may be outside opening hours; only a full house stops it.",
+            parameters: {
+                type: "object",
+                properties: {
+                    service: { type: "string", description: "The service, as the book names it." },
+                    start: { type: "string", description: "YYYY-MM-DDTHH:MM in the business's local time." },
+                    name: { type: "string", description: "Who it's for." },
+                    phone: { type: "string", description: "Their number, so reminders reach them. Optional." },
+                    note: { type: "string" },
+                },
+                required: ["service", "start", "name"],
+            },
+        },
+    },
+    {
+        type: "function",
+        function: {
+            name: "update_schedule",
+            description: "Set up or change the appointment book from what the owner tells you: services (name, minutes, price, optional own deposit), opening hours per day, chairs (how many clients at once), the deposit rule, how long a slot is held for its deposit, and reminders. Send only what changes; services you send replace the list unless add_services is true. Call get_schedule first to see what's there.",
+            parameters: {
+                type: "object",
+                properties: {
+                    services: { type: "array", items: { type: "object", properties: { name: { type: "string" }, minutes: { type: "number" }, price: { type: "number" }, deposit: { type: "number" } }, required: ["name", "minutes"] } },
+                    add_services: { type: "boolean", description: "Add these services to the list (or update ones with the same name) instead of replacing it." },
+                    remove_services: { type: "array", items: { type: "string" }, description: "Names of services to take off." },
+                    hours: { type: "object", description: "By day name (monday…sunday): {open:\"09:00\", close:\"18:00\"}, or null for closed.", additionalProperties: true },
+                    chairs: { type: "number" },
+                    deposit: { type: "object", properties: { kind: { type: "string", enum: ["none", "fixed", "percent"] }, amount: { type: "number" }, percent: { type: "number" } } },
+                    hold_minutes: { type: "number" },
+                    reminders: { type: "boolean" },
+                },
+            },
         },
     },
     {
@@ -102,6 +148,8 @@ export const BUSINESS_ACTION_STATUS: Record<string, string> = {
     hand_back: "Getting the chat ready",
     update_order: "Finding the order",
     update_booking: "Finding the booking",
+    book_appointment: "Checking the schedule",
+    update_schedule: "Preparing the schedule",
     confirm_transfer: "Finding the transfer",
 };
 
@@ -221,17 +269,119 @@ export async function prepareBusinessAction(name: string, args: Record<string, u
 
         case "update_booking": {
             const booking = (await listBookings(db, project.id)).find((item) => item.id === clean(args.booking_id, 64));
-            if (!booking) return { error: "That booking wasn't found. Look it up with list_bookings." };
-            const change = args.change === "done" || args.change === "cancelled" ? args.change : null;
-            if (!change) return { error: "Say done or cancelled." };
-            if (booking.status === change) return { error: `That booking is already ${change}.` };
+            if (!booking) return { error: "That booking wasn't found. Look it up with get_schedule or list_bookings." };
+            const change = args.change === "done" || args.change === "cancelled" || args.change === "no_show" || args.change === "move" ? args.change : null;
+            if (!change) return { error: "Say done, no_show, cancelled or move." };
+            if (booking.status === change) return { error: `That booking is already ${change.replace("_", " ")}.` };
+            const inBook = booking.source === "schedule" || booking.source === "owner";
+            const [{ businessTimeZone }, slots] = await Promise.all([import("@/lib/studio/business-zone"), import("@/lib/studio/schedule-slots")]);
+            const timeZone = await businessTimeZone(db, project.id);
+            const when = booking.starts_at ? slots.describeStart(timeZone, new Date(booking.starts_at)) : booking.start ?? "Not given";
+            if (change === "move") {
+                if (!inBook) return { error: "Only appointments in Studio's appointment book can be moved here; this one is on the owner's calendar." };
+                const start = slots.parseStart(args.start, timeZone);
+                if (!start) return { error: "Give the new start as YYYY-MM-DDTHH:MM in the business's local time." };
+                return {
+                    proposal: {
+                        id, kind: name, tier: "normal",
+                        title: `Move ${booking.title} to ${slots.describeStart(timeZone, start)}`,
+                        details: [{ label: "Booking", value: booking.title }, { label: "Was", value: when }, { label: "Now", value: slots.describeStart(timeZone, start) }, { label: "Then", value: "They're told in their chat." }],
+                        request: { method: "PATCH", path: "/api/studio/schedule/appointments", body: { project_id: project.id, id: booking.id, action: "move", start: args.start } },
+                        doneMessage: "Moved, and they've been told.",
+                    },
+                };
+            }
+            const label = { done: "Mark done", no_show: "Mark no-show", cancelled: "Cancel" }[change];
+            return {
+                proposal: {
+                    id, kind: name, tier: change === "cancelled" ? "destructive" : "normal",
+                    title: `${label}: ${booking.title}`,
+                    details: [{ label: "Booking", value: booking.title }, { label: "When", value: when }, { label: "Now", value: booking.status.replace("_", " ") }, ...(inBook && change === "cancelled" ? [{ label: "Then", value: "They're told in their chat." }] : [])],
+                    request: inBook
+                        ? { method: "PATCH", path: "/api/studio/schedule/appointments", body: { project_id: project.id, id: booking.id, action: change } }
+                        : { method: "POST", path: "/api/studio/sales", body: { project_id: project.id, kind: "booking", id: booking.id, action: change } },
+                    doneMessage: change === "done" ? "Booking marked done." : change === "no_show" ? "Marked as a no-show." : "Booking cancelled.",
+                },
+            };
+        }
+
+        case "book_appointment": {
+            const [{ getSchedule, appointmentsOf }, slots, { businessTimeZone }] = await Promise.all([import("@/lib/studio/schedule"), import("@/lib/studio/schedule-slots"), import("@/lib/studio/business-zone")]);
+            const [schedule, timeZone] = await Promise.all([getSchedule(db, project.id), businessTimeZone(db, project.id)]);
+            if (!schedule?.settings.services.length) return { error: "There's no appointment book yet. Set up the services first (update_schedule)." };
+            const service = slots.findService(schedule.settings.services, args.service);
+            if (!service) return { error: `No service called "${String(args.service ?? "")}". Services: ${schedule.settings.services.map((item) => item.name).join(", ")}.` };
+            const start = slots.parseStart(args.start, timeZone);
+            if (!start) return { error: "Give the start as YYYY-MM-DDTHH:MM in the business's local time." };
+            const who = clean(args.name, 100);
+            if (!who) return { error: "Who is it for?" };
+            const problem = slots.slotProblem({ settings: schedule.settings, service, start, timeZone, appointments: appointmentsOf(await listBookings(db, project.id)), byOwner: true });
+            if (problem) return { error: problem };
+            const phone = clean(args.phone, 30);
+            const note = clean(args.note, 500);
             return {
                 proposal: {
                     id, kind: name, tier: "normal",
-                    title: `${change === "done" ? "Mark done" : "Cancel"}: ${booking.title}`,
-                    details: [{ label: "Booking", value: booking.title }, { label: "When", value: booking.start ?? "Not given" }, { label: "Now", value: booking.status }],
-                    request: { method: "POST", path: "/api/studio/sales", body: { project_id: project.id, kind: "booking", id: booking.id, action: change } },
-                    doneMessage: change === "done" ? "Booking marked done." : "Booking cancelled.",
+                    title: `Book ${who}: ${service.name}, ${slots.describeStart(timeZone, start)}`,
+                    details: [{ label: "Service", value: `${service.name} (${slots.describeMinutes(service.minutes)})` }, { label: "When", value: slots.describeStart(timeZone, start) }, { label: "For", value: who }, ...(phone ? [{ label: "Phone", value: phone }] : []), ...(note ? [{ label: "Note", value: note }] : [])],
+                    request: { method: "POST", path: "/api/studio/schedule/appointments", body: { project_id: project.id, service: service.id, start: args.start, name: who, ...(phone ? { phone } : {}), ...(note ? { note } : {}) } },
+                    doneMessage: `Booked ${who} in.`,
+                },
+            };
+        }
+
+        case "update_schedule": {
+            const [{ getSchedule }, slots] = await Promise.all([import("@/lib/studio/schedule"), import("@/lib/studio/schedule-slots")]);
+            const current = (await getSchedule(db, project.id))?.settings ?? slots.DEFAULT_SETTINGS;
+            const next = { ...current, services: [...current.services], hours: [...current.hours] };
+            const changes: Array<{ label: string; value: string }> = [];
+            if (Array.isArray(args.services)) {
+                const cleaned = args.services.map((item) => (item && typeof item === "object" ? slots.cleanService(item as Record<string, unknown>) : null));
+                const bad = cleaned.find((result) => !result?.ok);
+                if (bad && !bad.ok) return { error: bad.message };
+                const services = cleaned.flatMap((result) => (result?.ok ? [result.service] : []));
+                if (args.add_services === true) {
+                    for (const service of services) {
+                        const index = next.services.findIndex((item) => item.name.toLowerCase() === service.name.toLowerCase());
+                        if (index >= 0) next.services[index] = { ...service, id: next.services[index].id };
+                        else next.services.push(service);
+                    }
+                } else next.services = services;
+                changes.push({ label: args.add_services === true ? "Services added" : "Services", value: services.map((service) => `${service.name} (${slots.describeMinutes(service.minutes)}${service.price !== null ? `, ${money(service.price, "NGN")}` : ""})`).join("; ") });
+            }
+            if (Array.isArray(args.remove_services) && args.remove_services.length) {
+                const names = args.remove_services.map((item) => String(item).toLowerCase());
+                next.services = next.services.filter((service) => !names.includes(service.name.toLowerCase()));
+                changes.push({ label: "Services removed", value: args.remove_services.join(", ") });
+            }
+            if (args.hours && typeof args.hours === "object") {
+                const days = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+                for (const [key, value] of Object.entries(args.hours as Record<string, unknown>)) {
+                    const index = days.indexOf(key.toLowerCase());
+                    if (index < 0) continue;
+                    const day = value as { open?: unknown; close?: unknown } | null;
+                    next.hours[index] = day && typeof day.open === "string" && typeof day.close === "string" ? { open: day.open, close: day.close } : null;
+                }
+                changes.push({ label: "Hours", value: slots.describeHours(slots.readSettings(next).hours) });
+            }
+            if (typeof args.chairs === "number") { next.chairs = args.chairs; changes.push({ label: "At once", value: `${Math.round(args.chairs)}` }); }
+            if (args.deposit && typeof args.deposit === "object") {
+                next.deposit = args.deposit as typeof next.deposit;
+                const rule = slots.readSettings(next).deposit;
+                changes.push({ label: "Deposit", value: rule.kind === "fixed" ? money(rule.amount, "NGN") : rule.kind === "percent" ? `${rule.percent}% of the price` : "None" });
+            }
+            if (typeof args.hold_minutes === "number") { next.hold_minutes = args.hold_minutes; changes.push({ label: "Hold for deposit", value: slots.describeMinutes(Math.round(args.hold_minutes)) }); }
+            if (typeof args.reminders === "boolean") { next.reminders = args.reminders; changes.push({ label: "Reminders", value: args.reminders ? "On" : "Off" }); }
+            if (!changes.length) return { error: "Nothing to change. Say what to set." };
+            const settings = slots.readSettings(next);
+            if (!settings.services.length) return { error: "The book needs at least one service (name and how long it takes)." };
+            return {
+                proposal: {
+                    id, kind: name, tier: "normal",
+                    title: current.services.length ? "Update the appointment book" : "Set up the appointment book",
+                    details: changes,
+                    request: { method: "PUT", path: "/api/studio/schedule", body: { project_id: project.id, settings } },
+                    doneMessage: current.services.length ? "Schedule updated." : "Your appointment book is set up. I'll book customers into it from now on.",
                 },
             };
         }

@@ -374,6 +374,34 @@ export async function registerPhoneNumber(phoneNumberId: string, accessToken: st
 }
 
 /**
+ * Numbers on Cencori's own WhatsApp account ("give your employee a number"):
+ * add one, have Meta text or call it a code, check the code. Then
+ * registerPhoneNumber turns it on. No Facebook login for the owner: the
+ * account is ours, acted on with our system user's token.
+ */
+export async function addPhoneNumber(wabaId: string, accessToken: string, number: { cc: string; phoneNumber: string; verifiedName: string }): Promise<string> {
+    const params = new URLSearchParams({ cc: number.cc, phone_number: number.phoneNumber, verified_name: number.verifiedName });
+    const added = await graph<{ id?: string }>('POST', `/${encodeURIComponent(wabaId)}/phone_numbers?${params}`, accessToken);
+    if (!added.id) throw new Error('Meta didn\'t add the number.');
+    return added.id;
+}
+
+/** A number already on the account (added before, by a retry or another try), by its digits. */
+export async function findPhoneNumber(wabaId: string, accessToken: string, digits: string): Promise<{ id: string; status: string | null; verifiedName: string | null } | null> {
+    const listed = await graph<{ data?: Array<{ id: string; display_phone_number?: string; status?: string; verified_name?: string }> }>('GET', `/${encodeURIComponent(wabaId)}/phone_numbers?fields=id,display_phone_number,status,verified_name&limit=200`, accessToken);
+    const found = listed.data?.find((number) => (number.display_phone_number ?? '').replace(/\D/g, '') === digits);
+    return found ? { id: found.id, status: found.status ?? null, verifiedName: found.verified_name ?? null } : null;
+}
+
+export async function requestVerificationCode(phoneNumberId: string, accessToken: string, method: 'SMS' | 'VOICE'): Promise<void> {
+    await graph('POST', `/${encodeURIComponent(phoneNumberId)}/request_code?${new URLSearchParams({ code_method: method, language: 'en' })}`, accessToken);
+}
+
+export async function verifyPhoneCode(phoneNumberId: string, accessToken: string, code: string): Promise<void> {
+    await graph('POST', `/${encodeURIComponent(phoneNumberId)}/verify_code?${new URLSearchParams({ code })}`, accessToken);
+}
+
+/**
  * Which WhatsApp account and number a signup token was granted for, from the
  * token itself. The popup reports them by message; the redirect version of the
  * signup doesn't, so the server asks Meta. The number is the one onboarded
@@ -574,6 +602,58 @@ export async function sendText(channel: WhatsAppChannel, accessToken: string, to
             ...(index === 0 && replyTo ? { context: { message_id: replyTo } } : {}),
         }, viaOf(channel));
     }
+}
+
+/**
+ * A message template, for writing first or after WhatsApp's 24-hour window
+ * (an appointment reminder): Meta has to approve it on the number's WhatsApp
+ * account before it can be sent, and charges for each one sent.
+ */
+export interface TemplateSpec {
+    name: string;
+    language: string;
+    category: 'UTILITY' | 'MARKETING';
+    /** The body with {{1}}, {{2}}… for the values filled in per message. */
+    body: string;
+    /** Sample values for Meta's review, one per placeholder. */
+    example: string[];
+}
+
+export type TemplateStatus = 'APPROVED' | 'PENDING' | 'REJECTED' | 'PAUSED' | 'DISABLED' | 'MISSING';
+
+/** Where a template stands on the number's WhatsApp account. */
+export async function templateStatus(channel: WhatsAppChannel, accessToken: string, name: string): Promise<TemplateStatus> {
+    const wabaId = channel.metadata.waba_id;
+    if (!wabaId) return 'MISSING';
+    const found = await graph<{ data?: Array<{ name?: string; status?: string }> }>('GET', `/${encodeURIComponent(wabaId)}/message_templates?name=${encodeURIComponent(name)}&fields=name,status`, accessToken, undefined, viaOf(channel));
+    const status = found.data?.find((template) => template.name === name)?.status?.toUpperCase();
+    return (status && ['APPROVED', 'PENDING', 'REJECTED', 'PAUSED', 'DISABLED'].includes(status) ? status : status ? 'PENDING' : 'MISSING') as TemplateStatus;
+}
+
+/** Submit a template for Meta's approval, unless the account already has it. Returns where it stands. */
+export async function ensureTemplate(channel: WhatsAppChannel, accessToken: string, spec: TemplateSpec): Promise<TemplateStatus> {
+    const current = await templateStatus(channel, accessToken, spec.name);
+    if (current !== 'MISSING' || !channel.metadata.waba_id) return current;
+    const created = await graph<{ status?: string }>('POST', `/${encodeURIComponent(channel.metadata.waba_id)}/message_templates`, accessToken, {
+        name: spec.name,
+        language: spec.language,
+        category: spec.category,
+        components: [{ type: 'BODY', text: spec.body, example: { body_text: [spec.example] } }],
+    }, viaOf(channel));
+    const status = created.status?.toUpperCase();
+    return (status === 'APPROVED' || status === 'REJECTED' ? status : 'PENDING') as TemplateStatus;
+}
+
+/** Send an approved template with its values filled in. */
+export async function sendTemplate(channel: WhatsAppChannel, accessToken: string, to: string, spec: Pick<TemplateSpec, 'name' | 'language'>, values: string[]): Promise<void> {
+    await graph('POST', `/${encodeURIComponent(channel.metadata.phone_number_id)}/messages`, accessToken, {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to,
+        type: 'template',
+        // Meta rejects empty or multi-line values in a template.
+        template: { name: spec.name, language: { code: spec.language }, components: [{ type: 'body', parameters: values.map((value) => ({ type: 'text', text: value.replace(/\s+/g, ' ').trim() || '-' })) }] },
+    }, viaOf(channel));
 }
 
 export interface WhatsAppCatalogProduct { id: string; name: string; price: string; description: string; inventory: number | null; availability: string }

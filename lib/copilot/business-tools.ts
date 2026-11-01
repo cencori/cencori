@@ -9,8 +9,9 @@ import type { CopilotToolContext } from "@/lib/copilot/tools";
 /**
  * The business, as its owner's employee sees it (Studio, business accounts):
  * money, orders, bookings, customers and chats, read through the same code as
- * the Money, Sales and Inbox tabs so the numbers always match. Read-only, and
- * pinned to ctx.project like every Copilot tool. This is the owner's side: the
+ * the Money, Sales and Inbox tabs so the numbers always match. Read-only
+ * (except note_client, which keeps the owner's note about a client straight
+ * away, like remember), and pinned to ctx.project like every Copilot tool. This is the owner's side: the
  * customer-facing agent never gets these.
  */
 
@@ -52,6 +53,36 @@ export const BUSINESS_TOOLS: ChatCompletionFunctionTool[] = [
                     limit: { type: "number", description: "1-50, default 20." },
                 },
             },
+        },
+    },
+    {
+        type: "function",
+        function: {
+            name: "get_schedule",
+            description: "The appointment book: whether it's set up, the services (length, price, deposit), opening hours, chairs (how many at once), deposit and reminder settings, and the appointments on a day or the next few days with their ids, customers, deposit and whether reminders went out. Times are the business's local time.",
+            parameters: {
+                type: "object",
+                properties: {
+                    from: { type: "string", description: "First day, YYYY-MM-DD. Defaults to today." },
+                    days: { type: "number", description: "How many days, 1-14. Defaults to 1 (just that day)." },
+                },
+            },
+        },
+    },
+    {
+        type: "function",
+        function: {
+            name: "client_card",
+            description: "Everything about one client, by phone number or name: visits, missed and cancelled appointments, what's coming up, recent services, orders, what they've spent, and the notes kept about them.",
+            parameters: { type: "object", properties: { client: { type: "string", description: "Their phone number, or their name as it shows in chats." } }, required: ["client"] },
+        },
+    },
+    {
+        type: "function",
+        function: {
+            name: "note_client",
+            description: "Keep a note about a client the owner tells you (\"Tolu is allergic to latex\", \"Kemi always wants Ada as her stylist\"). Saved straight away; you see it when that client writes. By phone number or name.",
+            parameters: { type: "object", properties: { client: { type: "string", description: "Their phone number, or their name as it shows in chats." }, note: { type: "string" } }, required: ["client", "note"] },
         },
     },
     {
@@ -101,6 +132,9 @@ export const BUSINESS_TOOL_STATUS: Record<string, string> = {
     get_money: "Checking the money",
     list_orders: "Looking at orders",
     list_bookings: "Looking at bookings",
+    get_schedule: "Opening the schedule",
+    client_card: "Looking up the client",
+    note_client: "Making a note",
     list_customers: "Looking up customers",
     list_chats: "Going through the chats",
     read_chat: "Reading the chat",
@@ -193,8 +227,75 @@ export async function runBusinessTool(name: string, args: Record<string, unknown
                 .sort((a, b) => (when === "upcoming" ? 1 : -1) * ((startOf(a) ?? Number.MAX_SAFE_INTEGER) - (startOf(b) ?? Number.MAX_SAFE_INTEGER)));
             return {
                 total_matching: chosen.length,
-                bookings: chosen.slice(0, limitOf(args.limit, 20, 50)).map(({ id, title, start, detail, status, conversation_id, created_at }) => ({ id, what: title, when: start, detail, status, chat_id: conversation_id, booked_at: created_at })),
+                bookings: chosen.slice(0, limitOf(args.limit, 20, 50)).map(({ id, title, start, detail, status, conversation_id, created_at, customer_phone, deposit_due }) => ({
+                    id, what: title, when: start, detail, status, chat_id: conversation_id, booked_at: created_at,
+                    ...(customer_phone ? { phone: `+${customer_phone}` } : {}),
+                    ...(deposit_due ? { deposit: { amount: deposit_due.amount, paid: !!deposit_due.paid_at } } : {}),
+                })),
             };
+        }
+
+        case "get_schedule": {
+            const [{ getSchedule, appointmentsOf }, slots, { businessTimeZone }, { localDate, localMidnight }] = await Promise.all([
+                import("@/lib/studio/schedule"), import("@/lib/studio/schedule-slots"), import("@/lib/studio/business-zone"), import("@/lib/studio/time"),
+            ]);
+            const [schedule, bookings, timeZone] = await Promise.all([getSchedule(db, project.id), listBookings(db, project.id), businessTimeZone(db, project.id)]);
+            if (!schedule?.settings.services.length) return { set_up: false, note: "No appointment book yet: the owner adds services (name, how long, price) and hours in Studio's Schedule, or tells you and you set it up with update_schedule." };
+            const day = slots.parseDay(args.from) ?? localDate(timeZone, new Date());
+            const days = limitOf(args.days, 1, 14);
+            const from = localMidnight(timeZone, day.year, day.month, day.day).getTime();
+            const to = localMidnight(timeZone, day.year, day.month, day.day + days).getTime();
+            const { settings } = schedule;
+            return {
+                set_up: true,
+                time_zone: timeZone,
+                services: settings.services.map((service) => ({ name: service.name, minutes: service.minutes, price: service.price, deposit: slots.depositFor(settings, service) || null })),
+                hours: slots.describeHours(settings.hours),
+                chairs: settings.chairs,
+                deposit: settings.deposit,
+                hold_minutes: settings.hold_minutes,
+                reminders: settings.reminders,
+                appointments: appointmentsOf(bookings)
+                    .filter((booking) => booking.starts_at && Date.parse(booking.starts_at) >= from && Date.parse(booking.starts_at) < to)
+                    .sort((a, b) => Date.parse(a.starts_at!) - Date.parse(b.starts_at!))
+                    .map((booking) => ({
+                        id: booking.id,
+                        when: slots.describeStart(timeZone, new Date(booking.starts_at!)),
+                        service: booking.service,
+                        customer: booking.customer_name,
+                        phone: booking.customer_phone ? `+${booking.customer_phone}` : null,
+                        status: booking.status,
+                        deposit: booking.deposit_due ? { amount: booking.deposit_due.amount, paid: !!booking.deposit_due.paid_at } : null,
+                        customer_confirmed: !!booking.customer_confirmed_at,
+                        reminders: booking.reminders ?? {},
+                        note: booking.detail,
+                        chat_id: booking.conversation_id,
+                    })),
+            };
+        }
+
+        case "client_card":
+        case "note_client": {
+            const who = typeof args.client === "string" ? args.client.trim() : "";
+            if (!who) return { error: "Say which client: a phone number or name." };
+            const { phoneDigits } = await import("@/lib/studio/schedule");
+            let phone = /\d{7,}/.test(who.replace(/\D/g, "")) ? phoneDigits(who) : null;
+            if (!phone && ctx.userId) {
+                // By name: the WhatsApp chats with that name.
+                const chats = (await listConversations(db, project.id, { limit: 500, userId: ctx.userId })).filter((chat) => chat.number && has(who.toLowerCase(), chat.name));
+                const numbers = [...new Set(chats.map((chat) => chat.number!))];
+                if (numbers.length > 1) return { error: `More than one client matches "${who}": ${chats.slice(0, 8).map((chat) => `${chat.name} (${chat.number})`).join(", ")}. Ask which.` };
+                phone = numbers[0] ? phoneDigits(numbers[0]) : null;
+            }
+            if (!phone) return { error: `No WhatsApp client called "${who}". Ask for their number.` };
+            const clients = await import("@/lib/studio/clients");
+            if (name === "note_client") {
+                const note = typeof args.note === "string" ? args.note : "";
+                const saved = await clients.addClientNote(db, project.id, phone, note, "owner");
+                return saved.ok ? { saved: true, client: `+${phone}`, note: saved.note.text } : { error: saved.message };
+            }
+            const card = await clients.clientCard(db, project.id, phone);
+            return card ?? { error: `No history with +${phone} yet.` };
         }
 
         case "list_customers": {

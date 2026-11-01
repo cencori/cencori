@@ -261,6 +261,10 @@ export async function claimTransfer(db: Admin, connection: TransfersConnection, 
         return { ...t, status: 'claimed', claimed_at: claimedAt };
     }));
     const updated: TransferEntry = { ...transfer, status: 'claimed', claimed_at: claimedAt };
+    // An appointment's deposit: the slot stays held until the owner checks.
+    if (claimed && transfer.order_id?.startsWith('APT-')) {
+        await import('@/lib/studio/schedule').then(({ markAppointmentClaimed }) => markAppointmentClaimed(db, connection.projectId, transfer.reference, true)).catch(() => undefined);
+    }
     if (claimed && !opts.preview) {
         const amount = formatMoney(transfer.amount, transfer.currency);
         const who = transfer.customer?.split(/[·,]/)[0]?.trim() || 'A customer';
@@ -291,7 +295,11 @@ export async function confirmTransfer(db: Admin, projectId: string, reference: s
     }));
     const paid: TransferEntry = { ...transfer, status: 'paid', paid_at: paidAt };
     if (confirmed) {
-        if (transfer.order_id?.startsWith('EVT-')) {
+        if (transfer.order_id?.startsWith('APT-')) {
+            // An appointment's deposit: confirmed, and the customer hears they're booked.
+            const { markAppointmentPaid } = await import('@/lib/studio/schedule');
+            await markAppointmentPaid(db, projectId, reference);
+        } else if (transfer.order_id?.startsWith('EVT-')) {
             // Event tickets: paid, and the buyer gets them.
             const { markTicketsPaid } = await import('@/lib/studio/events');
             await markTicketsPaid(db, { orderRef: transfer.order_id });
@@ -310,6 +318,9 @@ export async function rejectTransfer(db: Admin, projectId: string, reference: st
     const transfer = connection?.metadata.transfers.find((t) => t.reference === reference);
     if (!connection || !transfer || transfer.status !== 'claimed') return transfer ?? null;
     await updateTransfers(db, connection.id, (transfers) => transfers.map((t) => (t.reference === reference && t.status === 'claimed' ? { ...t, status: 'awaiting', claimed_at: null } : t)));
+    if (transfer.order_id?.startsWith('APT-')) {
+        await import('@/lib/studio/schedule').then(({ markAppointmentClaimed }) => markAppointmentClaimed(db, projectId, reference, false)).catch(() => undefined);
+    }
     await clearNeedsOwner(db, transfer.conversation_id).catch(() => undefined);
     return { ...transfer, status: 'awaiting', claimed_at: null };
 }
