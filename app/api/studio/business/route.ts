@@ -1,8 +1,12 @@
 /**
- * POST   /api/studio/business  { name }
+ * POST   /api/studio/business  { name, profile? }
  *        A new business for the signed-in person, set up like signup's business
  *        track: a business account on the free trial (with its trial credit),
- *        its project, and them as owner. Up to MAX_BUSINESSES each.
+ *        its project, and them as owner. Up to MAX_BUSINESSES each. `profile`
+ *        (categories, hours, address, website, description) is what its staff
+ *        are told about it (lib/studio/business-profile.ts).
+ * GET    /api/studio/business?project_id=   The business's profile, to edit.
+ * PUT    /api/studio/business  { project_id, profile }   Change the profile.
  * PATCH  /api/studio/business  { organization_id, name }
  *        Rename a business (the organization): owners and admins, 1–48
  *        characters. The slug and everything else stay as they are.
@@ -19,6 +23,8 @@ import { randomBytes } from 'crypto';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { startBusinessTrial } from '@/lib/business/plans';
 import { grantTrialCredit } from '@/lib/business/trial-credit';
+import { requireProjectAccess } from '@/lib/require-project-access';
+import { BUSINESS_CATEGORIES, getBusinessProfile, saveBusinessProfile } from '@/lib/studio/business-profile';
 
 const fail = (message: string, status = 400) => NextResponse.json({ error: message }, { status });
 
@@ -34,7 +40,7 @@ const randomSlug = () => Array.from(randomBytes(20), (byte) => 'abcdefghijklmnop
 export async function POST(req: NextRequest) {
     const { data: { user } } = await getAuthUser(await createServerClient());
     if (!user) return fail('Unauthorized', 401);
-    const body = await req.json().catch(() => null) as { name?: unknown } | null;
+    const body = await req.json().catch(() => null) as { name?: unknown; profile?: unknown } | null;
     const name = cleanName(body?.name);
     if (!name) return fail('Give your business a name.');
     if (name.length > 48) return fail('Keep it to 48 characters or fewer.');
@@ -63,12 +69,35 @@ export async function POST(req: NextRequest) {
         await undo();
         return fail('Couldn\'t start the free trial. Try again.', 502);
     }
-    const { error: projectError } = await db.from('projects').insert({ name, slug: 'main', organization_id: organizationId, visibility: 'private', region: 'europe' });
-    if (projectError) {
+    const { data: project, error: projectError } = await db.from('projects').insert({ name, slug: 'main', organization_id: organizationId, visibility: 'private', region: 'europe' }).select('id').single();
+    if (projectError || !project) {
         await undo();
         return fail('Couldn\'t create the business. Try again.', 502);
     }
-    return NextResponse.json({ organization_id: organizationId, name }, { status: 201 });
+    // The profile is a bonus: the business exists without it, and it can be filled in later.
+    if (body?.profile) await saveBusinessProfile(db, project.id as string, body.profile).catch(() => null);
+    return NextResponse.json({ organization_id: organizationId, project_id: project.id, name }, { status: 201 });
+}
+
+export async function GET(req: NextRequest) {
+    const projectId = req.nextUrl.searchParams.get('project_id') ?? '';
+    if (!/^[0-9a-f-]{36}$/i.test(projectId)) return fail('Say which business.');
+    const access = await requireProjectAccess(projectId);
+    if (!access.ok) return access.response;
+    const found = await getBusinessProfile(createAdminClient(), projectId);
+    return NextResponse.json({ profile: found?.profile ?? null, categories: BUSINESS_CATEGORIES }, { headers: { 'Cache-Control': 'no-store' } });
+}
+
+export async function PUT(req: NextRequest) {
+    const body = await req.json().catch(() => null) as { project_id?: unknown; profile?: unknown } | null;
+    const projectId = typeof body?.project_id === 'string' && /^[0-9a-f-]{36}$/i.test(body.project_id) ? body.project_id : null;
+    if (!projectId) return fail('Say which business.');
+    const access = await requireProjectAccess(projectId);
+    if (!access.ok) return access.response;
+    if (!['owner', 'admin'].includes(access.role)) return fail('Only owners and admins can change the business profile.', 403);
+    const profile = await saveBusinessProfile(createAdminClient(), projectId, body?.profile);
+    if (!profile) return fail('Couldn\'t save it. Try again.', 502);
+    return NextResponse.json({ profile });
 }
 
 export async function PATCH(req: NextRequest) {

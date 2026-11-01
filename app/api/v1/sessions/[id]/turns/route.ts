@@ -405,6 +405,8 @@ export async function POST(
                 agentId ? import('@/lib/studio/persona').then(({ personaBlock }) => personaBlock(adminClient as never, session.project_id as string, agentId)).catch(() => '') : '',
                 import('@/lib/embedded/agent-tools').then(({ agentClock }) => agentClock()),
                 import('@/lib/studio/events').then(({ eventsBriefing }) => eventsBriefing(adminClient as never, session.project_id as string)).catch(() => ''),
+                // The business itself (what it is, hours, where, website), as its owner set it up.
+                import('@/lib/studio/business-profile').then(({ businessBriefing }) => businessBriefing(adminClient as never, session.project_id as string)).catch(() => ''),
                 // Studio's appointment book (services, hours, how to book) and what the business knows about this client.
                 import('@/lib/studio/schedule').then(({ scheduleBriefing }) => scheduleBriefing(adminClient as never, session.project_id as string)).catch(() => ''),
                 import('@/lib/studio/clients').then(({ clientBriefing }) => clientBriefing(adminClient as never, session.project_id as string, session.metadata as Record<string, unknown> | null)).catch(() => ''),
