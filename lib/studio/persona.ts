@@ -34,6 +34,7 @@ export const LANGUAGES = {
 export type Language = keyof typeof LANGUAGES;
 
 const STYLE_MAX = 500;
+const FORMER_NAMES_MAX = 5;
 
 export interface PersonaSettings {
     kind: 'persona';
@@ -43,6 +44,8 @@ export interface PersonaSettings {
     style: string;
     language: Language;
     emoji: boolean;
+    /** Names it went by before the owner renamed it, latest first: old messages still use them. */
+    former_names?: string[];
 }
 
 export interface Persona {
@@ -64,6 +67,7 @@ function toPersona(row: Record<string, unknown> | null): Persona | null {
             language: settings.language in LANGUAGES ? settings.language : DEFAULT_PERSONA.language,
             style: typeof settings.style === 'string' ? settings.style : '',
             emoji: settings.emoji === true,
+            former_names: Array.isArray(settings.former_names) ? settings.former_names.filter((n) => typeof n === 'string' && n.trim()).slice(0, FORMER_NAMES_MAX) : [],
         },
     };
 }
@@ -83,7 +87,11 @@ export function publicPersona(persona: Persona | null) {
 
 export async function savePersona(
     db: Admin,
-    opts: { projectId: string; agentId: string; existing: Persona | null; tone?: unknown; style?: unknown; language?: unknown; emoji?: unknown },
+    opts: {
+        projectId: string; agentId: string; existing: Persona | null; tone?: unknown; style?: unknown; language?: unknown; emoji?: unknown;
+        /** Being renamed: from this name to `name`. */
+        rename?: { from: string; to: string };
+    },
 ): Promise<{ ok: true; persona: Persona } | { ok: false; message: string }> {
     const current = publicPersona(opts.existing);
     if (opts.tone !== undefined && !(typeof opts.tone === 'string' && opts.tone in TONES)) return { ok: false, message: 'Choose a tone.' };
@@ -98,6 +106,7 @@ export async function savePersona(
         style,
         language: (opts.language as Language | undefined) ?? current.language,
         emoji: typeof opts.emoji === 'boolean' ? opts.emoji : current.emoji,
+        former_names: formerNames(opts.existing?.settings.former_names ?? [], opts.rename),
     };
     const write = opts.existing
         ? db.from('tool_connections').update({ metadata: settings }).eq('id', opts.existing.id).select(COLUMNS).single()
@@ -108,10 +117,27 @@ export async function savePersona(
     return { ok: true, persona };
 }
 
+/** The names it went by, after a rename: the old one first, never the new one, no repeats. */
+export function formerNames(previous: string[], rename?: { from: string; to: string }): string[] {
+    const list = rename ? [rename.from, ...previous] : previous;
+    const to = rename?.to.toLowerCase();
+    const seen = new Set<string>();
+    return list.filter((name) => {
+        const key = name.trim().toLowerCase();
+        if (!key || key === to || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    }).slice(0, FORMER_NAMES_MAX);
+}
+
 /** How the employee comes across, for its instructions: name, tone, how they talk, language, emoji. */
-export function personaInstructions(name: string, settings: Pick<PersonaSettings, 'tone' | 'style' | 'language' | 'emoji'>): string {
+export function personaInstructions(name: string, settings: Pick<PersonaSettings, 'tone' | 'style' | 'language' | 'emoji' | 'former_names'>): string {
+    const former = settings.former_names ?? [];
     return [
         `WHO YOU ARE\nYour name is ${name}. Use this name; it replaces any other name for you above.`,
+        former.length
+            ? `You were renamed: you used to be called ${former[0]}${former.length > 1 ? ` (and before that ${former.slice(1).join(', ')})` : ''}, and the owner changed your name to ${name}. Earlier messages, notes and summaries may still say ${former[0]}: that was you. From now on you're ${name} only: introduce yourself, sign off and refer to yourself as ${name}, never as ${former[0]}. If someone uses the old name, answer naturally (it's you) and you may mention you go by ${name} now.`
+            : null,
         `Personality: ${TONES[settings.tone]}`,
         settings.style ? `How you talk, in the owner's words: ${settings.style}` : null,
         LANGUAGES[settings.language],
