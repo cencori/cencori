@@ -285,138 +285,24 @@ export async function validateGatewayRequest(
     // only forwards the IP).
     const countryCode = req.headers.get('x-cencori-user-country') || requestCountry(req.headers);
 
-    // ── Public Playground (no auth required) ──
-    const publicPlaygroundHeader = req.headers.get('x-public-playground');
-    const playgroundProjectId = req.headers.get('x-playground-project-id');
-
-    if (publicPlaygroundHeader === 'true' && playgroundProjectId) {
-        const demoProjectId = process.env.NEXT_PUBLIC_DEMO_PROJECT_ID;
-        if (!demoProjectId || playgroundProjectId !== demoProjectId) {
-            return {
-                success: false,
-                response: addGatewayHeaders(
-                    NextResponse.json(
-                        { error: 'Invalid or missing public playground configuration', code: 'invalid_playground_config' },
-                        { status: 403 }
-                    ),
-                    { requestId }
+    // ── Public Playground: closed ──
+    // This used to serve keyless requests against the demo project, billed to
+    // Cencori and limited only per client IP, which the caller could set via
+    // X-Cencori-User-IP. With the free catalog retired (2026-09-23) the public
+    // /playground page can't send anything (every model is gated behind the
+    // Pro dialog), so the path only served direct API callers. Closed
+    // 2026-10-31 after an external report of free usage.
+    if (req.headers.get('x-public-playground') === 'true') {
+        return {
+            success: false,
+            response: addGatewayHeaders(
+                NextResponse.json(
+                    { error: 'The public playground is not available. Use an API key.', code: 'public_playground_closed' },
+                    { status: 403 }
                 ),
-            };
-        }
-
-        const { data: project, error: pError } = await supabase
-            .from('projects')
-            .select(`
-                id,
-                name,
-                organization_id,
-                default_model,
-                default_provider,
-                end_user_billing_enabled,
-                organizations!inner(
-                    id,
-                    subscription_tier,
-                    monthly_requests_used,
-                    credits_balance,
-                    billing_frozen
-                )
-            `)
-            .eq('id', demoProjectId)
-            .single();
-
-        if (!project || pError) {
-            return {
-                success: false,
-                response: addGatewayHeaders(
-                    NextResponse.json(
-                        { error: 'Public playground demo project not found' },
-                        { status: 500 }
-                    ),
-                    { requestId }
-                ),
-            };
-        }
-
-        const networkDenial = await enforceProjectIngressPolicy({
-            supabase,
-            projectId: project.id,
-            sourceIp: requestSourceIp,
-            requestId,
-        });
-        if (networkDenial) return { success: false, response: networkDenial };
-
-        const organization = project.organizations as unknown as {
-            id: string;
-            subscription_tier: string;
-            monthly_requests_used: number;
-            credits_balance: string | number | null;
-            billing_frozen: boolean | null;
+                { requestId }
+            ),
         };
-
-        // IP-based rate limiting for public playground (per IP, not per project)
-        const ipRateLimit = await checkRateLimit(`public_playground:${clientIp}`, {
-            requestId,
-            route: req.nextUrl.pathname,
-        });
-
-        if (!ipRateLimit.allowed) {
-            if (ipRateLimit.reason === 'backend_unavailable') {
-return {
-                success: false,
-                response: addGatewayHeaders(
-                    NextResponse.json(
-                        { error: 'Rate limit unavailable', code: 'rate_limit_unavailable' },
-                        { status: 503 }
-                    ),
-                    { requestId }
-                ),
-            };
-            }
-            return {
-                success: false,
-                response: addGatewayHeaders(
-                    NextResponse.json(
-                        {
-                            error: 'Rate limit exceeded',
-                            message: 'Too many requests. Sign up for a free account to increase your limits.',
-                            code: 'rate_limit_exceeded',
-                            retry_after_ms: ipRateLimit.reset - Date.now(),
-                        },
-                        { status: 429, headers: { 'Retry-After': String(Math.max(1, Math.round((ipRateLimit.reset - Date.now()) / 1000))) } }
-                    ),
-                    { requestId, rateLimit: ipRateLimit }
-                ),
-            };
-        }
-
-        const context: GatewayContext = {
-            supabase,
-            projectId: project.id,
-            organizationId: organization.id,
-            apiKeyId: null,
-            allowedModels: null,
-            sponsoredModels: null,
-            fullySponsoredKey: false,
-            environment: 'production',
-            keyType: 'public_playground',
-            tier: 'free',
-            requestId,
-            startTime,
-            clientIp,
-            countryCode,
-            projectName: project.name,
-            defaultModel: project.default_model,
-            defaultProvider: project.default_provider,
-            endUserBillingEnabled: Boolean(project.end_user_billing_enabled),
-            rateLimit: {
-                status: ipRateLimit.status,
-                limit: ipRateLimit.limit,
-                remaining: ipRateLimit.remaining,
-                reset: ipRateLimit.reset,
-            },
-        };
-
-        return { success: true, context };
     }
 
     // ── Extract API Key ──

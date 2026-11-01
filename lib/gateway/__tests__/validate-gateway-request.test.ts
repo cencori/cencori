@@ -182,6 +182,27 @@ describe('validateGatewayRequest', () => {
         }
     });
 
+    it('rejects keyless public-playground requests, whatever IP header they send', async () => {
+        const result = await validateGatewayRequest(
+            new NextRequest('http://localhost/api/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'x-public-playground': 'true',
+                    'x-playground-project-id': process.env.NEXT_PUBLIC_DEMO_PROJECT_ID ?? 'demo-project',
+                    'x-cencori-user-ip': '203.0.113.7',
+                },
+            })
+        );
+        expect(result.success).toBe(false);
+        if (!result.success) {
+            expect(result.response.status).toBe(403);
+            const body = await result.response.json();
+            expect(body.code).toBe('public_playground_closed');
+        }
+        expect(mockSupabaseFrom).not.toHaveBeenCalled();
+        expect(mockCheckRateLimit).not.toHaveBeenCalled();
+    });
+
     /**
      * `is` is the live-key lookup; `not` is the second one, which asks whether the same hash
      * belongs to a key that was revoked. `revoked` decides what that second lookup finds.
