@@ -89,8 +89,16 @@ export const BUSINESS_TOOLS: ChatCompletionFunctionTool[] = [
         type: "function",
         function: {
             name: "owner_whatsapp",
-            description: "Let the owner text you on WhatsApp (\"here's my WhatsApp, send me a text\", \"can I talk to you on WhatsApp?\") or stop it. link: returns a link that opens WhatsApp to your number with a code typed in; the owner taps it and presses send, which links their number (a number they type could be mistyped, and you'll be talking money, so this is how it's done: explain it in a line if they gave you a number). Give them the link as it is. Then they can ask you anything there, and you'll message them there when something needs them. unlink: stop.",
-            parameters: { type: "object", properties: { action: { type: "string", enum: ["link", "unlink"] } }, required: ["action"] },
+            description: "Let the owner text you on WhatsApp (\"here's my WhatsApp, send me a text\", \"can I talk to you on WhatsApp?\") or stop it. link with their phone: you text that number a code on WhatsApp; ask them to tell you the code (here, in this chat) and call confirm with it. That's what links the number: a code that reached a mistyped number is no use to whoever got it. If the code couldn't be sent yet, you get a link instead: give it to them as it is (it opens WhatsApp to you with the code typed in; they press send). link without a phone: just the link. confirm: the code they read back. unlink: stop. Once linked, they can ask you anything there, and you'll message them there when something needs them.",
+            parameters: {
+                type: "object",
+                properties: {
+                    action: { type: "string", enum: ["link", "confirm", "unlink"] },
+                    phone: { type: "string", description: "For link: their WhatsApp number, as they gave it." },
+                    code: { type: "string", description: "For confirm: the code from the WhatsApp message." },
+                },
+                required: ["action"],
+            },
         },
     },
     {
@@ -317,6 +325,15 @@ export async function runBusinessTool(name: string, args: Record<string, unknown
             if (args.action === "unlink") {
                 const removed = await owner.unlinkOwner(db, project.id, ctx.userId, employee.id);
                 return removed ? { unlinked: true } : { error: "They weren't texting you on WhatsApp." };
+            }
+            if (args.action === "confirm") {
+                const confirmed = await owner.confirmOwnerCode(db, { projectId: project.id, userId: ctx.userId, agentId: employee.id, code: typeof args.code === "string" ? args.code : "" });
+                return confirmed.ok ? { linked: true, phone: confirmed.phone, note: "Linked. They can text you there now; you'll message them there when something needs them." } : { error: confirmed.message };
+            }
+            if (typeof args.phone === "string" && args.phone.trim()) {
+                const texted = await owner.textOwnerCode(db, { projectId: project.id, userId: ctx.userId, agentId: employee.id, phone: args.phone });
+                if (!texted.ok) return { error: texted.message };
+                return texted.sent ? { code_sent_to: texted.to, note: "Ask them for the code from your WhatsApp message and call confirm with it. It lasts 15 minutes." } : { code_not_sent: texted.message, link: texted.link };
             }
             const started = await owner.startOwnerLink(db, { projectId: project.id, userId: ctx.userId, agentId: employee.id });
             if (!started.ok) return { error: started.message };

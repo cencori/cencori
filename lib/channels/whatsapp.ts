@@ -656,6 +656,46 @@ export async function ensureTemplate(channel: WhatsAppChannel, accessToken: stri
     return (status === 'APPROVED' || status === 'REJECTED' ? status : 'PENDING') as TemplateStatus;
 }
 
+/**
+ * An authentication template (Meta's own "<code> is your verification code"
+ * with a Copy code button) on the number's WhatsApp account: submitted when
+ * missing; returns where it stands.
+ */
+export async function ensureCodeTemplate(channel: WhatsAppChannel, accessToken: string, name: string): Promise<TemplateStatus> {
+    const current = await templateStatus(channel, accessToken, name);
+    if (current !== 'MISSING' || !channel.metadata.waba_id) return current;
+    const created = await graph<{ status?: string }>('POST', `/${encodeURIComponent(channel.metadata.waba_id)}/message_templates`, accessToken, {
+        name,
+        language: 'en',
+        category: 'AUTHENTICATION',
+        components: [
+            { type: 'BODY', add_security_recommendation: true },
+            { type: 'FOOTER', code_expiration_minutes: 15 },
+            { type: 'BUTTONS', buttons: [{ type: 'OTP', otp_type: 'COPY_CODE', text: 'Copy code' }] },
+        ],
+    }, viaOf(channel));
+    const status = created.status?.toUpperCase();
+    return (status === 'APPROVED' || status === 'REJECTED' ? status : 'PENDING') as TemplateStatus;
+}
+
+/** Send a code with an authentication template (the code goes in the body and the copy button). */
+export async function sendCodeTemplate(channel: WhatsAppChannel, accessToken: string, to: string, name: string, code: string): Promise<void> {
+    await graph('POST', `/${encodeURIComponent(channel.metadata.phone_number_id)}/messages`, accessToken, {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to,
+        type: 'template',
+        template: {
+            name,
+            language: { code: 'en' },
+            components: [
+                { type: 'body', parameters: [{ type: 'text', text: code }] },
+                { type: 'button', sub_type: 'url', index: '0', parameters: [{ type: 'text', text: code }] },
+            ],
+        },
+    }, viaOf(channel));
+}
+
 /** Send an approved template with its values filled in. */
 export async function sendTemplate(channel: WhatsAppChannel, accessToken: string, to: string, spec: Pick<TemplateSpec, 'name' | 'language'>, values: string[]): Promise<void> {
     await graph('POST', `/${encodeURIComponent(channel.metadata.phone_number_id)}/messages`, accessToken, {

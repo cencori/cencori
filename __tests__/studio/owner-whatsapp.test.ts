@@ -5,6 +5,8 @@ const wa = vi.hoisted(() => ({
     sendText: vi.fn(async () => undefined),
     sendTemplate: vi.fn(async () => undefined),
     ensureTemplate: vi.fn(async () => "APPROVED"),
+    ensureCodeTemplate: vi.fn(async () => "APPROVED"),
+    sendCodeTemplate: vi.fn(async () => undefined),
     channelAccessToken: vi.fn(() => "token"),
     getChannelById: vi.fn(),
     getAgentChannel: vi.fn(),
@@ -12,6 +14,7 @@ const wa = vi.hoisted(() => ({
 vi.mock("@/lib/channels/whatsapp", () => wa);
 vi.mock("@/lib/encryption", () => ({ decryptApiKey: () => "secret" }));
 vi.mock("@/lib/main-site-url", () => ({ getMainSiteUrl: () => "https://cencori.test/" }));
+vi.mock("@/lib/rate-limit", () => ({ checkCustomRateLimit: vi.fn(async () => ({ allowed: true })) }));
 vi.mock("@/lib/auth/admin-users", () => ({ adminUsers: { getUserById: vi.fn(async () => ({ data: { user: { user_metadata: { first_name: "Bola" } } } })) } }));
 const sessions = vi.hoisted(() => ({ created: 0, deleted: 0 }));
 vi.mock("@/lib/auth/better-auth", () => ({
@@ -21,7 +24,7 @@ vi.mock("@/lib/auth/better-auth", () => ({
     } }) },
 }));
 
-import { answerOwnerOnWhatsApp, startOwnerLink, tellOwnersOnWhatsApp } from "@/lib/studio/owner-whatsapp";
+import { answerOwnerOnWhatsApp, confirmOwnerCode, startOwnerLink, tellOwnersOnWhatsApp, textOwnerCode } from "@/lib/studio/owner-whatsapp";
 
 const PROJECT = "11111111-1111-1111-1111-111111111111";
 const AGENT = "22222222-2222-2222-2222-222222222222";
@@ -66,6 +69,7 @@ beforeEach(() => {
     Object.values(wa).forEach((fn) => (fn as ReturnType<typeof vi.fn>).mockClear());
     wa.getAgentChannel.mockResolvedValue(channel);
     wa.getChannelById.mockResolvedValue(channel);
+    wa.ensureCodeTemplate.mockResolvedValue("APPROVED");
 });
 
 async function linked() {
@@ -154,5 +158,35 @@ describe("telling the owner", () => {
         links[0].last_inbound_at = new Date(Date.now() - 30 * 3_600_000).toISOString();
         await tellOwnersOnWhatsApp(db, PROJECT, { title: "Good morning", body: "₦45k yesterday." });
         expect(wa.sendTemplate).toHaveBeenCalledWith(channel, "token", "2348031112222", expect.objectContaining({ name: "owner_update_v1" }), ["Bola", "Ada", "Good morning: ₦45k yesterday."]);
+    });
+});
+
+describe("the employee texts the owner first", () => {
+    it("texts a code to the number given, and the code typed in the app links it", async () => {
+        const { db, rows } = fakeDb();
+        const texted = await textOwnerCode(db, { projectId: PROJECT, userId: USER, agentId: AGENT, phone: "0803 111 2222" });
+        expect(texted).toMatchObject({ ok: true, sent: true, to: "+2348031112222" });
+        const [, , to, template, code] = wa.sendCodeTemplate.mock.calls[0] as unknown as [unknown, unknown, string, string, string];
+        expect(to).toBe("2348031112222");
+        expect(template).toBe("owner_link_code");
+        expect(await confirmOwnerCode(db, { projectId: PROJECT, userId: USER, agentId: AGENT, code: "0000" })).toMatchObject({ ok: false, wrong: true });
+        expect(await confirmOwnerCode(db, { projectId: PROJECT, userId: USER, agentId: AGENT, code })).toEqual({ ok: true, phone: "+2348031112222" });
+        expect(((rows[0].metadata as { links: Array<Record<string, unknown>> }).links)[0]).toMatchObject({ status: "active", phone: "2348031112222" });
+    });
+
+    it("whoever got a texted code by mistake can't link by sending it in on WhatsApp", async () => {
+        const { db } = fakeDb();
+        await textOwnerCode(db, { projectId: PROJECT, userId: USER, agentId: AGENT, phone: "08031112222" });
+        const code = (wa.sendCodeTemplate.mock.calls.at(-1) as unknown as unknown[])[4] as string;
+        expect(await answerOwnerOnWhatsApp(db, channel as never, "2348031112222", [`Link ${code}`], "token")).toBe(false);
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("falls back to the one-tap link while the code message isn't approved", async () => {
+        wa.ensureCodeTemplate.mockResolvedValueOnce("PENDING");
+        const { db } = fakeDb();
+        const texted = await textOwnerCode(db, { projectId: PROJECT, userId: USER, agentId: AGENT, phone: "08031112222" });
+        expect(texted).toMatchObject({ ok: true, sent: false, link: expect.stringMatching(/^https:\/\/wa\.me\//) });
+        expect(wa.sendCodeTemplate).not.toHaveBeenCalled();
     });
 });

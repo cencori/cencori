@@ -6,7 +6,9 @@ import { getMainSiteUrl } from "@/lib/main-site-url";
 import { decryptApiKey } from "@/lib/encryption";
 import {
     channelAccessToken,
+    ensureCodeTemplate,
     ensureTemplate,
+    sendCodeTemplate,
     getAgentChannel,
     getChannelById,
     sendTemplate,
@@ -40,6 +42,10 @@ type Admin = ReturnType<typeof createAdminClient>;
 
 export const OWNER_WHATSAPP_SLUG = "owner-whatsapp";
 const CODE_TTL_MS = 15 * 60_000;
+/** Wrong codes allowed before a new one is needed. */
+const CODE_ATTEMPTS = 5;
+/** The authentication template the link code is sent with: Meta's own words and a Copy button. */
+const CODE_TEMPLATE = "owner_link_code";
 /** A message is free and allowed within 24 hours of the owner's last one; a little margin. */
 const WINDOW_MS = 23.5 * 3_600_000;
 
@@ -76,6 +82,12 @@ export interface OwnerLink {
     linked_at: string | null;
     last_inbound_at: string | null;
     pending_action: PendingAction | null;
+    /** Wrong codes typed in the app for the code sent to the owner's number. */
+    attempts?: number;
+    /** The number a code was texted to, waiting for the code to come back in the app. */
+    pending_phone?: string | null;
+    /** The code went out by text: only the app can take it back (whoever got it can't link by sending it in). */
+    code_texted?: boolean;
 }
 
 interface Row { id: string; links: OwnerLink[]; templates: Record<string, string> }
@@ -129,7 +141,7 @@ export async function startOwnerLink(db: Admin, opts: { projectId: string; userI
         const existing = links.find((link) => link.user_id === opts.userId && link.agent_id === opts.agentId);
         const rest = links.filter((link) => link !== existing);
         const next: OwnerLink = existing
-            ? { ...existing, code, created_at: now, ...(existing.status === "active" ? {} : { status: "pending" as const }) }
+            ? { ...existing, code, created_at: now, pending_phone: null, code_texted: false, attempts: 0, ...(existing.status === "active" ? {} : { status: "pending" as const }) }
             : { user_id: opts.userId, agent_id: opts.agentId, channel_id: channel.id, phone: "", status: "pending", code, created_at: now, linked_at: null, last_inbound_at: null, pending_action: null };
         return { links: [...rest, next] };
     });
@@ -146,6 +158,60 @@ export async function startOwnerLink(db: Admin, opts: { projectId: string; userI
         link: `https://wa.me/${digits}?text=${encodeURIComponent(`Link ${code}`)}`,
         linked_phone: mine?.status === "active" && mine.phone ? `+${mine.phone}` : null,
     };
+}
+
+export type TextStart =
+    | { ok: true; sent: true; to: string }
+    | { ok: true; sent: false; to: string; link: string; message: string }
+    | { ok: false; message: string };
+
+/**
+ * The employee texts the owner first: a code goes to the number they gave, on
+ * WhatsApp, and they type it in the app (confirmOwnerCode). Typed in the
+ * signed-in app, a code that reached the wrong number by a typo is no use to
+ * whoever got it. While the code template isn't approved on the employee's
+ * WhatsApp account, the one-tap link is the way instead.
+ */
+export async function textOwnerCode(db: Admin, opts: { projectId: string; userId: string; agentId: string; phone: string }): Promise<TextStart> {
+    const digits = opts.phone.replace(/\D/g, "").replace(/^0(\d{10})$/, "234$1");
+    if (digits.length < 8 || digits.length > 15) return { ok: false, message: "That doesn't look like a WhatsApp number. Include the country code if it isn't Nigerian." };
+    const { checkCustomRateLimit } = await import("@/lib/rate-limit");
+    const limited = await checkCustomRateLimit(`owner-link-code:${opts.userId}`, 5, 3_600).catch(() => ({ allowed: true }));
+    if (!limited.allowed) return { ok: false, message: "That's a lot of codes for one hour. Try again later, or use the link instead." };
+    const started = await startOwnerLink(db, opts);
+    if (!started.ok) return started;
+    const channel = await getAgentChannel(db, opts.projectId, opts.agentId);
+    const token = channel ? await tokenFor(db, channel) : null;
+    if (!channel || !token) return { ok: false, message: "Couldn't reach this employee's WhatsApp number. Try again in a minute." };
+    // The number they gave waits with the code; it becomes theirs only when the code comes back in the app.
+    await change(db, opts.projectId, (links) => ({ links: links.map((link) => (link.user_id === opts.userId && link.agent_id === opts.agentId ? { ...link, pending_phone: digits, attempts: 0 } : link)) }));
+    const fallback = (message: string): TextStart => ({ ok: true, sent: false, to: `+${digits}`, link: started.link, message });
+    try {
+        const status = await ensureCodeTemplate(channel, token, CODE_TEMPLATE);
+        if (status !== "APPROVED") return fallback("WhatsApp is still approving the message I send codes with (usually a few minutes). Until then, tap the link instead: it opens WhatsApp to me with the code typed in.");
+        await sendCodeTemplate(channel, token, digits, CODE_TEMPLATE, started.code);
+        await change(db, opts.projectId, (links) => ({ links: links.map((link) => (link.user_id === opts.userId && link.agent_id === opts.agentId ? { ...link, code_texted: true } : link)) }));
+        return { ok: true, sent: true, to: `+${digits}` };
+    } catch (error) {
+        const reason = error instanceof Error ? error.message : "";
+        console.error("[owner-whatsapp] code send failed", reason);
+        if (/not a valid whatsapp|131026|incapable|recipient/i.test(reason)) return { ok: false, message: "That number isn't on WhatsApp." };
+        return fallback("I couldn't send the code just now. Tap the link instead: it opens WhatsApp to me with the code typed in.");
+    }
+}
+
+/** The code from WhatsApp, typed in the app: the number it went to is now the owner's. */
+export async function confirmOwnerCode(db: Admin, opts: { projectId: string; userId: string; agentId: string; code: string }): Promise<{ ok: true; phone: string } | { ok: false; message: string; wrong?: boolean }> {
+    const code = opts.code.replace(/\D/g, "");
+    const link = (await row(db, opts.projectId))?.links.find((item) => item.user_id === opts.userId && item.agent_id === opts.agentId);
+    if (!link || !link.code || !link.pending_phone || Date.now() - Date.parse(link.created_at) > CODE_TTL_MS) return { ok: false, message: "That code has expired. Send a new one." };
+    if ((link.attempts ?? 0) >= CODE_ATTEMPTS) return { ok: false, message: "Too many wrong codes. Send a new one." };
+    if (code !== link.code) {
+        await patchLink(db, opts.projectId, link, { attempts: (link.attempts ?? 0) + 1 });
+        return { ok: false, wrong: true, message: "That code isn't right." };
+    }
+    await patchLink(db, opts.projectId, link, { status: "active", phone: link.pending_phone, pending_phone: null, code_texted: false, code: null, attempts: 0, linked_at: new Date().toISOString() });
+    return { ok: true, phone: `+${link.pending_phone}` };
 }
 
 /** Stop the owner's link with an employee (or all of theirs in the business). */
@@ -181,7 +247,10 @@ async function completeLink(db: Admin, channel: WhatsAppChannel, from: string, t
     await change(db, channel.projectId, (links) => ({
         links: links.map((link) => {
             if (link.channel_id !== channel.id || link.code !== code || now - Date.parse(link.created_at) > CODE_TTL_MS) return link;
-            done = { ...link, status: "active", phone: from, code: null, linked_at: new Date().toISOString(), last_inbound_at: new Date().toISOString() };
+            // A code texted out is only taken back in the app; one meant for a number they gave only links that number.
+            if (link.code_texted) return link;
+            if (link.pending_phone && link.pending_phone !== from) return link;
+            done = { ...link, status: "active", phone: from, pending_phone: null, code: null, linked_at: new Date().toISOString(), last_inbound_at: new Date().toISOString() };
             return done;
         }),
     }));
