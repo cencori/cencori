@@ -52,7 +52,13 @@ const nextConfig: NextConfig = {
   // Keep it out of Turbopack's module graph; API routes load it in Node only.
   serverExternalPackages: ["@huggingface/transformers", "onnxruntime-node", "ioredis"],
   experimental: {
-    optimizePackageImports: ["lucide-react"],
+    // @lobehub/icons is imported from its barrel, which pulls in every brand
+    // icon plus antd and @lobehub/ui; loading only the icons we use keeps the
+    // webpack build small enough for the build machine's memory.
+    optimizePackageImports: ["lucide-react", "@lobehub/icons"],
+    // Lower peak memory during the webpack compile (Vercel builds were OOMing
+    // on the 16GB machine with webpack; Turbopack is the build now).
+    webpackMemoryOptimizations: true,
     staleTimes: {
       dynamic: 300,
       static: 300,
