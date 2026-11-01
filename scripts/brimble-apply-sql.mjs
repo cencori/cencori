@@ -23,6 +23,10 @@ try {
         const sql = await readFile(path.join(dir, file), "utf8");
         await client.query("begin");
         try {
+            // A DDL statement waiting for a lock queues every later query on
+            // that table behind it, so a stuck file must fail the deploy in
+            // seconds, not hold production for Brimble's 25-minute timeout.
+            await client.query("set local lock_timeout = '10s'");
             await client.query(sql);
             await client.query("commit");
             console.log(`[brimble-apply-sql] applied ${file}`);

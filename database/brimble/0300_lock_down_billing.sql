@@ -16,7 +16,8 @@
 --    Scan tiers). Only Cencori's billing code writes it, as the service role.
 --
 -- Idempotent: runs before every deploy, so functions added later are locked
--- too.
+-- too. Table DDL only runs when something is missing, so a deploy never
+-- queues for a lock on these hot tables once this has applied.
 
 -- 1. SECURITY DEFINER functions: server only.
 do $$
@@ -98,10 +99,20 @@ begin
 end
 $$;
 
-drop trigger if exists protect_organization_billing on public.organizations;
-create trigger protect_organization_billing
-    before insert or update on public.organizations
-    for each row execute function public.protect_organization_billing();
+-- Created once; later deploys only replace the function, which takes no
+-- lock on the table.
+do $$
+begin
+    if not exists (
+        select 1 from pg_trigger
+        where tgname = 'protect_organization_billing' and tgrelid = 'public.organizations'::regclass
+    ) then
+        create trigger protect_organization_billing
+            before insert or update on public.organizations
+            for each row execute function public.protect_organization_billing();
+    end if;
+end
+$$;
 
 -- 3. api_keys: sponsorship is granted by Cencori, never by the key's owner.
 create or replace function public.protect_api_key_sponsorship()
@@ -121,11 +132,31 @@ begin
 end
 $$;
 
-drop trigger if exists protect_api_key_sponsorship on public.api_keys;
-create trigger protect_api_key_sponsorship
-    before insert or update on public.api_keys
-    for each row execute function public.protect_api_key_sponsorship();
+-- Created once; later deploys only replace the function, which takes no
+-- lock on the table.
+do $$
+begin
+    if not exists (
+        select 1 from pg_trigger
+        where tgname = 'protect_api_key_sponsorship' and tgrelid = 'public.api_keys'::regclass
+    ) then
+        create trigger protect_api_key_sponsorship
+            before insert or update on public.api_keys
+            for each row execute function public.protect_api_key_sponsorship();
+    end if;
+end
+$$;
 
 -- 4. scan_subscriptions: written by billing code only.
-drop policy if exists "Users can insert own scan subscriptions" on public.scan_subscriptions;
-drop policy if exists "Users can update own scan subscriptions" on public.scan_subscriptions;
+do $$
+begin
+    if exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'scan_subscriptions'
+               and policyname = 'Users can insert own scan subscriptions') then
+        drop policy "Users can insert own scan subscriptions" on public.scan_subscriptions;
+    end if;
+    if exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'scan_subscriptions'
+               and policyname = 'Users can update own scan subscriptions') then
+        drop policy "Users can update own scan subscriptions" on public.scan_subscriptions;
+    end if;
+end
+$$;
