@@ -28,8 +28,11 @@ memory = "4gb"
 
 [services.cencori.env]
 NODE_ENV = "production"
-# next build --webpack needs more than Node's default heap (see next.config.ts).
-NODE_OPTIONS = "--max-old-space-size=6144"
+# Turbopack builds (2026-11-03): webpack needed >3GB of JS heap and peaked
+# ~7GB, past this 4GB container, so Brimble killed it. Turbopack does the
+# compile in native code; keep the JS heap well inside the container so the
+# native side has room.
+NODE_OPTIONS = "--max-old-space-size=3072"
 # Not read by the app yet; wired for Phase 2 of the RFC.
 MIGRATION_DATABASE_URL = "{{@db.PRIVATE_CONNECTION_STRING}}"
 # The `postgrest` project, created from the postgrest/postgrest:v16.5 image

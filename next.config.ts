@@ -18,8 +18,8 @@ const portableRedirects = onVercel ? [] : vercelConfig.redirects;
 const nextConfig: NextConfig = {
   // Exercise local subdomains with the same host-based routing as production.
   allowedDevOrigins: ["console.localhost", "pitch.localhost", "studio.localhost", "**.sslip.io", "172-20-10-5.sslip.io", "studio.172-20-10-5.sslip.io"],
-  // The Vercel build container (8GB) OOMs when Next forks tsc after a
-  // 4-minute webpack compile. The tree typechecks clean — verify with
+  // Building on a 4GB container: Next's forked tsc doesn't fit beside the
+  // compile. The tree typechecks clean — verify with
   // `npm run typecheck` locally or in CI instead of during the build.
   typescript: {
     ignoreBuildErrors: true,
@@ -52,6 +52,10 @@ const nextConfig: NextConfig = {
   // Keep it out of Turbopack's module graph; API routes load it in Node only.
   serverExternalPackages: ["@huggingface/transformers", "onnxruntime-node", "ioredis"],
   experimental: {
+    // Static generation forks one worker per CPU Node sees; in a container
+    // that can be the host's cores, not the 2 we get, and each worker holds
+    // its own copy of the app.
+    cpus: 2,
     optimizePackageImports: ["lucide-react"],
     staleTimes: {
       dynamic: 300,
