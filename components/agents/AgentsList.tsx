@@ -2,22 +2,17 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Status, agentStatus, useAgentStudio, useAgentsBasePath } from "@/components/agents/studio";
+import { agentStatus, statusTone, useAgentStudio, useAgentsBasePath } from "@/components/agents/studio";
 import { AgentsGetStarted } from "@/components/agents/AgentsGetStarted";
 import { AgentOrb } from "@/components/agents/AgentOrb";
 import { cn } from "@/lib/utils";
 
-const HEAD_CLASS = "h-8 text-[10px] font-medium uppercase tracking-wider text-muted-foreground";
-
 /** The project's agents, or a way to make the first one. */
 export function AgentsList({ projectId }: { projectId: string }) {
-    const router = useRouter();
     const basePath = useAgentsBasePath();
     const { data, isLoading, error, refetch } = useAgentStudio(projectId);
     const [search, setSearch] = useState("");
@@ -69,60 +64,68 @@ export function AgentsList({ projectId }: { projectId: string }) {
                             <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search agents…" className="h-7 pl-8 text-xs shadow-none" />
                         </div>
                     </div>
-                    <div className="overflow-hidden rounded-lg border border-border/40 bg-muted/30">
-                        {rows.length === 0 ? (
-                            <p className="px-5 py-12 text-center text-xs text-muted-foreground">No agents match that search.</p>
-                        ) : (
-                            <div className="overflow-x-auto">
-                                {/* Phones: full width for names, the table scrolls sideways instead of squeezing them. */}
-                                <Table className="min-w-[640px] lg:min-w-0">
-                                    <TableHeader>
-                                        <TableRow className="border-b border-border/40 hover:bg-transparent">
-                                            <TableHead className={cn(HEAD_CLASS, "px-3")}>Agent</TableHead>
-                                            <TableHead className={cn(HEAD_CLASS, "w-[120px]")}>Status</TableHead>
-                                            <TableHead className={cn(HEAD_CLASS, "w-[90px]")}>Version</TableHead>
-                                            <TableHead className={cn(HEAD_CLASS, "w-[100px] text-right")}>Customers</TableHead>
-                                            <TableHead className={cn(HEAD_CLASS, "w-[110px] pr-3 text-right")}>Created</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {rows.map(({ agent, version, customers }) => (
-                                            <TableRow
-                                                key={agent.id}
-                                                className="cursor-pointer border-b border-border/40 last:border-b-0 hover:bg-muted/50"
-                                                onClick={() => router.push(`${basePath}/${encodeURIComponent(agent.id)}`)}
-                                                // Load the agent's page while the pointer is on its row, so the click opens it instantly.
-                                                onMouseEnter={() => router.prefetch(`${basePath}/${encodeURIComponent(agent.id)}`)}
-                                                onTouchStart={() => router.prefetch(`${basePath}/${encodeURIComponent(agent.id)}`)}
-                                            >
-                                                <TableCell className="w-full max-w-0 px-3 py-2.5">
-                                                    <div className="flex items-center gap-2.5">
-                                                        <AgentOrb seed={agent.id} className="h-6 w-6" />
-                                                        <div className="min-w-0">
-                                                            <p className="truncate text-xs font-medium">{agent.name}</p>
-                                                            {agent.description && <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{agent.description}</p>}
-                                                        </div>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell className="py-2.5"><Status status={agentStatus(agent)} /></TableCell>
-                                                <TableCell className="py-2.5 font-mono text-xs text-muted-foreground">{version ? `v${version}` : "—"}</TableCell>
-                                                <TableCell className="py-2.5 text-right font-mono text-xs text-muted-foreground">{customers}</TableCell>
-                                                <TableCell className="whitespace-nowrap py-2.5 pr-3 text-right text-xs text-muted-foreground">{new Date(agent.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </div>
-                        )}
-                    </div>
+                    {rows.length === 0 ? (
+                        <p className="rounded-xl bg-muted/30 px-5 py-12 text-center text-xs text-muted-foreground">No agents match that search.</p>
+                    ) : (
+                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                            {rows.map(({ agent, version, customers }) => {
+                                const href = `${basePath}/${encodeURIComponent(agent.id)}`;
+                                return (
+                                    <Link
+                                        key={agent.id}
+                                        href={href}
+                                        className="group flex flex-col rounded-xl border border-border/40 bg-muted/30 p-4 transition-colors hover:border-border/70 hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                    >
+                                        <AgentOrb seed={agent.id} className="h-8 w-8" />
+                                        <div className="mt-3 flex min-w-0 items-center gap-2">
+                                            <h2 className="truncate text-sm font-medium">{agent.name}</h2>
+                                            <StatusPill status={agentStatus(agent)} />
+                                        </div>
+                                        <p className="mt-1 line-clamp-2 min-h-[2rem] text-xs leading-4 text-muted-foreground">
+                                            {agent.description || "No description yet."}
+                                        </p>
+                                        <div className="mt-4 flex items-center justify-between gap-3">
+                                            <span className="inline-flex h-7 items-center rounded-md bg-muted px-3 text-xs font-medium transition-colors group-hover:bg-muted-foreground/20">
+                                                Configure
+                                            </span>
+                                            <span className="font-mono text-[11px] text-muted-foreground">
+                                                {version ? `v${version}` : "No version"} · {customers} {customers === 1 ? "customer" : "customers"}
+                                            </span>
+                                        </div>
+                                    </Link>
+                                );
+                            })}
+                        </div>
+                    )}
                 </>
             )}
         </div>
     );
 }
 
+const PILL_BG: Record<string, string> = {
+    published: "bg-emerald-500/10",
+    draft: "bg-amber-500/10",
+};
+
+/** The agent's status as a soft tinted pill beside its name. */
+function StatusPill({ status }: { status: string }) {
+    const tone = statusTone(status);
+    return (
+        <span className={cn("shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium capitalize", tone.text, PILL_BG[status.toLowerCase()] ?? "bg-muted")}>
+            {status}
+        </span>
+    );
+}
+
 function ListSkeleton() {
-    return <Skeleton className="h-[320px] w-full rounded-lg" />;
+    return (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 6 }, (_, index) => (
+                <Skeleton key={index} className="h-[156px] w-full rounded-xl" />
+            ))}
+        </div>
+    );
 }
 
 /**
