@@ -144,24 +144,10 @@ const WEBHOOK_EVENTS = [
   { value: 'model.fallback', label: 'Model Fallback Triggered' },
 ];
 
-const REGION_MAP: Record<string, { name: string; flag: string }> = {
-  'americas': { name: 'Americas (Auto)', flag: '🌎' },
-  'europe': { name: 'Europe (Auto)', flag: '🌍' },
-  'asia-pacific': { name: 'Asia-Pacific (Auto)', flag: '🌏' },
-  'us-east-1': { name: 'US East (N. Virginia)', flag: '🇺🇸' },
-  'us-west-1': { name: 'US West (N. California)', flag: '🇺🇸' },
-  'us-west-2': { name: 'US West (Oregon)', flag: '🇺🇸' },
-  'ca-central-1': { name: 'Canada (Central)', flag: '🇨🇦' },
-  'eu-west-1': { name: 'EU West (Ireland)', flag: '🇮🇪' },
-  'eu-central-1': { name: 'EU Central (Frankfurt)', flag: '🇩🇪' },
-  'ap-southeast-1': { name: 'Asia Pacific (Singapore)', flag: '🇸🇬' },
-  'ap-northeast-1': { name: 'Asia Pacific (Tokyo)', flag: '🇯🇵' },
-  'ap-south-1': { name: 'Asia Pacific (Mumbai)', flag: '🇮🇳' },
-  'sa-east-1': { name: 'South America (São Paulo)', flag: '🇧🇷' },
-  'me-south-1': { name: 'Middle East (Bahrain)', flag: '🇧🇭' },
-  'af-south-1': { name: 'Africa (Cape Town)', flag: '🇿🇦' },
-  'default': { name: 'Americas (Auto)', flag: '🌎' },
-};
+// Every project is served from one place: the app, database, files and logs all run on
+// Brimble afr-west in Lagos. projects.region is a leftover from a multi-region picker that
+// never routed anything, so it is deliberately not read here.
+const PLATFORM_REGION = { name: 'Lagos, Nigeria', code: 'afr-west', flag: '🇳🇬' } as const;
 
 const GATEWAY_ENDPOINT = 'https://api.cencori.com/v1';
 
@@ -1353,11 +1339,11 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                   <div className="space-y-0.5">
                     <p className="text-xs font-medium">Primary Proxy</p>
                     <p className="text-[10px] text-muted-foreground">
-                      {REGION_MAP[project.region || 'default']?.name || 'US East (Virginia)'} • Edge
+                      {PLATFORM_REGION.name}
                     </p>
                   </div>
                 </div>
-                <span className="text-lg">{REGION_MAP[project.region || 'default']?.flag || '🇺🇸'}</span>
+                <span className="text-lg">{PLATFORM_REGION.flag}</span>
               </div>
             </div>
           </section>
@@ -1740,7 +1726,7 @@ export default function ProjectSettingsPage({ params }: PageProps) {
               <div className="grid border-t border-border/30 sm:grid-cols-3 sm:divide-x sm:divide-border/30">
                 <div className="px-4 py-3">
                   <p className="text-[10px] text-muted-foreground">Data-plane region</p>
-                  <p className="mt-1 font-mono text-xs">{project.region || 'us-east-1'}</p>
+                  <p className="mt-1 text-xs">{PLATFORM_REGION.name} <span className="font-mono text-muted-foreground">{PLATFORM_REGION.code}</span></p>
                 </div>
                 <div className="border-t border-border/30 px-4 py-3 sm:border-t-0">
                   <p className="text-[10px] text-muted-foreground">Transport</p>

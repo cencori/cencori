@@ -16,13 +16,6 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
 import { supabase } from "@/lib/supabaseClient";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useOrganizationProject } from "@/lib/contexts/OrganizationProjectContext";
 import { UpgradeDialog } from "@/components/billing/UpgradeDialog";
@@ -44,45 +37,17 @@ interface OrganizationData {
   subscription_tier: string;
 }
 
-// General region groups (auto-routing to nearest in group)
-const GENERAL_REGIONS = [
-  { value: "americas", label: "Americas", flag: "🌎", recommended: false },
-  { value: "europe", label: "Europe", flag: "🌍", recommended: true },
-  { value: "asia-pacific", label: "Asia-Pacific", flag: "🌏", recommended: false },
-] as const;
-
-// Specific regions with country flags and codes
-const SPECIFIC_REGIONS = [
-  { value: "us-east-1", label: "East US (N. Virginia)", code: "us-east-1", flag: "🇺🇸", recommended: true },
-  { value: "us-west-1", label: "West US (N. California)", code: "us-west-1", flag: "🇺🇸", recommended: false },
-  { value: "us-west-2", label: "West US (Oregon)", code: "us-west-2", flag: "🇺🇸", recommended: false },
-  { value: "ca-central-1", label: "Canada (Central)", code: "ca-central-1", flag: "🇨🇦", recommended: false },
-  { value: "eu-west-1", label: "West EU (Ireland)", code: "eu-west-1", flag: "🇮🇪", recommended: true },
-  { value: "eu-central-1", label: "Central EU (Frankfurt)", code: "eu-central-1", flag: "🇩🇪", recommended: false },
-  { value: "ap-southeast-1", label: "Southeast Asia (Singapore)", code: "ap-southeast-1", flag: "🇸🇬", recommended: false },
-  { value: "ap-northeast-1", label: "Northeast Asia (Tokyo)", code: "ap-northeast-1", flag: "🇯🇵", recommended: false },
-  { value: "ap-south-1", label: "South Asia (Mumbai)", code: "ap-south-1", flag: "🇮🇳", recommended: false },
-  { value: "sa-east-1", label: "South America (São Paulo)", code: "sa-east-1", flag: "🇧🇷", recommended: false },
-  { value: "me-south-1", label: "Middle East (Bahrain)", code: "me-south-1", flag: "🇧🇭", recommended: false },
-  { value: "af-south-1", label: "Africa (Cape Town)", code: "af-south-1", flag: "🇿🇦", recommended: false },
-] as const;
-
 /**
- * Every region the database will accept, which is the two lists above and nothing else. The column
- * default is 'auto' and projects_region_check rejects it, so a project created without opening the
- * dropdown used to fail on submit.
+ * Every project runs in one place: the app, database, files and logs are on Brimble afr-west in
+ * Lagos. There is no region to pick. projects.region still has a check constraint (projects_region_check)
+ * that rejects the column default, so creation sends the closest value it accepts. Nothing reads it.
  */
-const REGION_VALUES = [
-  ...GENERAL_REGIONS.map((r) => r.value),
-  ...SPECIFIC_REGIONS.map((r) => r.value),
-] as [string, ...string[]];
-
-const DEFAULT_REGION = "europe";
+const STORED_REGION = "af-south-1";
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "Project name must be at least 2 characters." }),
   description: z.string().optional(),
-  region: z.enum(REGION_VALUES),
+  region: z.literal(STORED_REGION),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -232,7 +197,7 @@ export default function OnboardingPage({ params }: PageProps) {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: { name: "", description: "", region: DEFAULT_REGION },
+    defaultValues: { name: "", description: "", region: STORED_REGION },
   });
 
   const onCreateProject = async (values: FormValues) => {
@@ -421,44 +386,13 @@ export default function OnboardingPage({ params }: PageProps) {
                     </div>
 
                     <div className="p-5 space-y-2">
-                      <label htmlFor="region" className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Region</label>
-                      <Select onValueChange={(value: string) => form.setValue("region", value)} defaultValue={form.getValues("region")}>
-                        <SelectTrigger id="region" className="h-9 max-w-sm text-xs bg-secondary/50 border-border/50">
-                          <SelectValue placeholder="Select region" />
-                        </SelectTrigger>
-                        <SelectContent className="max-h-80 w-[340px]">
-                          <div className="px-2 py-1.5">
-                            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">General Regions</span>
-                          </div>
-                          {GENERAL_REGIONS.map((region) => (
-                            <SelectItem key={region.value} value={region.value} className="text-xs py-2">
-                              <div className="flex items-center justify-between w-full gap-3">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-sm">{region.flag}</span>
-                                  <span>{region.label}</span>
-                                </div>
-                                {region.recommended && <span className="text-[9px] font-medium text-emerald-500 border border-emerald-500/30 px-1.5 py-0.5 rounded">RECOMMENDED</span>}
-                              </div>
-                            </SelectItem>
-                          ))}
-                          <div className="my-1 border-t border-border/40" />
-                          <div className="px-2 py-1.5">
-                            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Specific Regions</span>
-                          </div>
-                          {SPECIFIC_REGIONS.map((region) => (
-                            <SelectItem key={region.value} value={region.value} className="text-xs py-2">
-                              <div className="flex items-center justify-between w-full gap-3">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-sm">{region.flag}</span>
-                                  <span>{region.label}</span>
-                                  <span className="text-muted-foreground font-mono text-[10px]">{region.code}</span>
-                                </div>
-                                {region.recommended && <span className="text-[9px] font-medium text-emerald-500 border border-emerald-500/30 px-1.5 py-0.5 rounded">RECOMMENDED</span>}
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Region</span>
+                      <div className="flex h-8 items-center gap-2 text-xs">
+                        <span className="text-sm">🇳🇬</span>
+                        <span>Lagos, Nigeria</span>
+                        <span className="font-mono text-[10px] text-muted-foreground">afr-west</span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">Every project runs in Lagos. Its data and logs are stored there.</p>
                     </div>
                   </form>
                 </div>
