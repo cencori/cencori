@@ -56,6 +56,18 @@ export const RESERVED_ORG_SLUGS: ReadonlySet<string> = new Set([
     "status",
     "shipped",
     "subscribe",
+    // Unreserved until 2026-11-04, so the proxy sent every visitor to these
+    // public pages (and the nav links to them) to the console sign-in.
+    "critical-systems",
+    "edge-ai",
+    "governments",
+    "industries",
+    "infrastructure",
+    "models",
+    "research",
+    "stories",
+    "thesis",
+    "universities",
     // (products)/*
     "ai-gateway",
     "audit",
@@ -96,6 +108,13 @@ export const RESERVED_ORG_SLUGS: ReadonlySet<string> = new Set([
     "signup",
     "solutions",
     "team-invite",
+    // Public auth and share pages. Unreserved, the password-reset email link
+    // (/reset-password?token=…) and the login page's /forgot link were sent
+    // to the console home and lost their path.
+    "forgot",
+    "reset-password",
+    "e",
+    "openapi",
     "terms",
 
     // Static assets / metadata
