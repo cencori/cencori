@@ -2,7 +2,6 @@ import 'server-only';
 import fs from 'fs';
 import path from 'path';
 import matter from 'gray-matter';
-import { compileMDX } from 'next-mdx-remote/rsc';
 import readingTime from 'reading-time';
 import type { BlogCategory, BlogCategoryMeta } from './blog-categories';
 
@@ -158,9 +157,6 @@ export function getAllTags(): string[] {
   return Array.from(tags).sort();
 }
 
-import { blogMdxComponents } from '@/components/blog/mdx-components';
-import remarkGfm from 'remark-gfm';
-import rehypeSlug from 'rehype-slug';
 import GithubSlugger from 'github-slugger';
 
 /**
@@ -216,30 +212,4 @@ export function extractToc(content: string, opts: { minDepth?: number; maxDepth?
   }
 
   return entries;
-}
-
-/**
- * Parse and render MDX content for the blog.
- *
- * Uses the same MDX component set and Shiki syntax highlighter as the
- * docs so blog posts get the same rendering quality — tables, code blocks,
- * headings, links, callouts all match the docs. Blog content typically
- * uses the "prose" subset (headings, tables, code, links, lists,
- * blockquote); docs-specific structural components like Steps or ApiTable
- * are available as escape hatches but shouldn't be common.
- */
-export async function parseMDX(content: string) {
-  const { content: mdxContent } = await compileMDX({
-    source: content,
-    options: {
-      parseFrontmatter: false,
-      mdxOptions: {
-        remarkPlugins: [remarkGfm],
-        rehypePlugins: [rehypeSlug],
-      },
-    },
-    components: blogMdxComponents,
-  });
-
-  return mdxContent;
 }

@@ -1,7 +1,8 @@
 import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 
-import { getPostBySlug, getAllPosts, parseMDX } from "@/lib/blog";
+import { getPostBySlug, getAllPosts } from "@/lib/blog";
+import { parseMDX } from "@/lib/blog-mdx";
 import { NewsPostView } from "@/components/blog/NewsPostView";
 
 interface BlogPostPageProps {

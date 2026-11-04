@@ -5,9 +5,9 @@ import type { Metadata } from "next";
 import {
     getPostBySlug,
     getPostsByCategory,
-    parseMDX,
     extractToc,
 } from "@/lib/blog";
+import { parseMDX } from "@/lib/blog-mdx";
 import { PostView } from "@/components/blog/PostView";
 
 interface ChangelogPostPageProps {

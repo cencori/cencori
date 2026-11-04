@@ -4,7 +4,8 @@ import path from "path";
 import matter from "gray-matter";
 import readingTime from "reading-time";
 
-import { parseMDX, type BlogPost } from "@/lib/blog";
+import { type BlogPost } from "@/lib/blog";
+import { parseMDX } from "@/lib/blog-mdx";
 import { PostView } from "@/components/blog/PostView";
 
 const THESIS_PATH = path.join(process.cwd(), "content", "thesis.mdx");

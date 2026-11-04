@@ -1,4 +1,15 @@
-@import "tailwindcss";
+@import "tailwindcss" source(none);
+/* Scan only code that renders on the site. Letting Tailwind walk the whole
+   repo cost over a minute and ~1.4GB in every build (2026-11-04). Add a
+   folder here if components start living somewhere new. */
+@source "../app";
+@source "../components";
+@source "../content";
+@source "../lib";
+@source "../hooks";
+@source "../internal";
+@source "../config";
+@source "../assets";
 @import "tw-animate-css";
 
 /* Patch: fumadocs-ui uses @apply -inset-s-4 but Tailwind v4 doesn't auto-generate

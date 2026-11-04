@@ -50,13 +50,26 @@ const nextConfig: NextConfig = {
   },
   // Transformers.js includes native ONNX binaries and runtime model loading.
   // Keep it out of Turbopack's module graph; API routes load it in Node only.
-  serverExternalPackages: ["@huggingface/transformers", "onnxruntime-node", "ioredis"],
+  //
+  // The auth stack too: lib/auth/get-auth-user.ts reaches Better Auth, so
+  // ~420 routes each bundled its ~850 modules (kysely alone is 248), and the
+  // build needed >3GB of heap. Loaded from node_modules at runtime instead.
+  serverExternalPackages: [
+    "@huggingface/transformers", "onnxruntime-node", "ioredis",
+    "better-auth", "@better-auth/core", "@better-auth/utils", "@better-auth/infra",
+    "kysely", "pg", "jose", "libphonenumber-js", "@xmldom/xmldom",
+    // Server SDKs imported across hundreds of routes.
+    "openai", "@anthropic-ai/sdk", "@google/genai",
+    "@supabase/supabase-js", "@supabase/ssr", "@supabase/auth-js", "@supabase/realtime-js",
+    "@supabase/functions-js", "@supabase/storage-js", "@supabase/postgrest-js",
+  ],
   experimental: {
     // Static generation forks one worker per CPU Node sees; in a container
     // that can be the host's cores, not the 2 we get, and each worker holds
     // its own copy of the app.
     cpus: 2,
-    optimizePackageImports: ["lucide-react"],
+    // Packages imported by name from their index: load only what is used.
+    optimizePackageImports: ["lucide-react", "@hugeicons/core-free-icons", "@lobehub/icons"],
     staleTimes: {
       dynamic: 300,
       static: 300,
@@ -254,6 +267,16 @@ const nextConfig: NextConfig = {
     ];
   },
 };
+
+// Brimble builds in a fresh container, so webpack's persistent cache is never
+// reused there; it only holds gigabytes of buffers in memory while building.
+const brimbleBuild = Boolean(process.env.BRIMBLE_BUILD || process.env.CI);
+if (brimbleBuild) {
+  nextConfig.webpack = (config, { dev }) => {
+    if (!dev) config.cache = false;
+    return config;
+  };
+}
 
 const withMDX = createMDX();
 

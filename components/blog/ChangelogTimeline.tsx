@@ -14,7 +14,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { LinkIcon } from "lucide-react";
 
-import { parseMDX, type BlogPost } from "@/lib/blog";
+import { type BlogPost } from "@/lib/blog";
+import { parseMDX } from "@/lib/blog-mdx";
 
 interface ChangelogTimelineProps {
     posts: BlogPost[];
