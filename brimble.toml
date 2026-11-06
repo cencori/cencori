@@ -86,7 +86,5 @@ region = "afr-west"
 cpu = 2
 memory = "8gb"
 disk = "50gb"
-# Open to the operator's IP only for a one-off account fix; set back to false right after.
-public = true
-allow_ips = ["105.113.63.36/32"]
+public = false
 backups = { schedule = "0 2 * * *", timezone = "Africa/Lagos", keep = "30d" }
