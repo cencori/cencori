@@ -6,7 +6,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Github } from "@lobehub/icons";
-import { Bot } from "lucide-react";
 import {
   Add01Icon,
   AiFolder01Icon,
@@ -195,14 +194,6 @@ function CreateProjectMenu({ orgSlug, consoleMode }: { orgSlug: string; consoleM
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
-        {process.env.NODE_ENV !== "production" && (
-          <DropdownMenuItem asChild className="cursor-pointer text-xs">
-            <Link href={consoleMode ? "/projects/new-agent" : `/${orgSlug}/~/projects/new-agent`}>
-              <Bot size={14} className="mr-2" aria-hidden="true" />
-              Deploy an agent
-            </Link>
-          </DropdownMenuItem>
-        )}
         <DropdownMenuItem asChild className="cursor-pointer text-xs">
           <Link href={consoleMode ? "/projects/new" : `/${orgSlug}/~/projects/new`}>
             <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={1.7} className="mr-2" aria-hidden="true" />

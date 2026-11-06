@@ -313,7 +313,6 @@ export function getConsoleAwareNavigationTarget(
         "/ai-gateway",
         "/security",
         "/memory",
-        "/deployments",
         "/monetization",
         "/revenue",
         "/copilot",

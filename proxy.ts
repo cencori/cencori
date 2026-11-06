@@ -190,25 +190,7 @@ function isLocalHostname(domain: string): boolean {
   );
 }
 
-/**
- * Hosted-agent deployments are still an unfinished local build. Block both
- * their UI and API surface on every non-local host, including preview URLs.
- */
-function isLocalComputePath(pathname: string): boolean {
-  return (
-    pathname === "/compute" ||
-    /^\/[^/]+\/~\/deployments(?:\/|$)/.test(pathname) ||
-    /^\/[^/]+\/~\/projects\/new-agent(?:\/|$)/.test(pathname) ||
-    /^\/[^/]+\/[^/]+\/deployments(?:\/|$)/.test(pathname) ||
-    /^\/dashboard\/organizations\/[^/]+\/deployments(?:\/|$)/.test(pathname) ||
-    /^\/dashboard\/organizations\/[^/]+\/projects\/[^/]+\/deployments(?:\/|$)/.test(pathname) ||
-    /^\/api\/projects\/[^/]+\/agents(?:\/|$)/.test(pathname) ||
-    /^\/api\/organizations\/[^/]+\/agents(?:\/|$)/.test(pathname) ||
-    pathname === "/api/github/detect"
-  );
-}
-
-/** Memory shipped — see the per-item gates below (compute stays local-only). */
+/** Memory shipped — see the per-item gates below. */
 function isLocalRagPath(pathname: string): boolean {
   // /api/ai/rag was grouped with the memory block but is not part of the
   // memory contract; it stays local-only until its own launch decision.
@@ -553,7 +535,7 @@ export async function proxy(request: NextRequest) {
 
   if (
     !isLocalHostname(domain) &&
-    (isLocalComputePath(pathname) || isLocalRagPath(pathname))
+    isLocalRagPath(pathname)
   ) {
     if (pathname.startsWith("/api/")) {
       return applySecurityHeaders(

@@ -1,10 +1,7 @@
 /**
- * Keep Cencori's rates current in CostGraph's pricing marketplace.
- *
- * - Model rates: every active model_pricing row, one marketplace row per token bucket under
- *   `host: "cencori"`. Diffed, so an unchanged catalogue writes nothing.
- * - Compute rates: Compute machine tiers per runtime region, when COMPUTE_SHARED_CPU_HOURLY_USD
- *   and COMPUTE_RAM_GB_HOURLY_USD are set.
+ * Keep Cencori's model rates current in CostGraph's pricing marketplace: every active
+ * model_pricing row, one marketplace row per token bucket under `host: "cencori"`. Diffed, so
+ * an unchanged catalogue writes nothing. (Compute machine rates went with Compute, 2026-11-06.)
  *
  * Needs COSTGRAPH_API_KEY (Cencori's own key, pricing:read + pricing:write).
  *
@@ -18,7 +15,6 @@ import { cronDisabled } from '@/lib/cron';
 import { getAllActivePricing } from '@/lib/providers/pricing';
 import { getCencoriPricingClient } from '@/lib/finops/costgraph';
 import { syncModelPrices } from '@/lib/finops/costgraph-marketplace';
-import { computeRatesFromEnv, computeRegionsFromEnv, publishComputeRates } from '@/lib/compute/placement-pricing';
 
 export const maxDuration = 300;
 
@@ -52,19 +48,10 @@ async function run(req: NextRequest) {
         const catalogue = await getAllActivePricing();
         const models = await syncModelPrices({ client, catalogue, dryRun, prune: flag(url, 'prune') });
 
-        const rates = computeRatesFromEnv();
-        const regions = computeRegionsFromEnv();
-        const compute = !rates
-            ? { skipped: 'COMPUTE_SHARED_CPU_HOURLY_USD / COMPUTE_RAM_GB_HOURLY_USD not set' }
-            : dryRun
-                ? { regions, wouldPublish: regions.length }
-                : { regions, ...(await publishComputeRates(client, rates, regions)) };
-
         return NextResponse.json({
             success: true,
             dryRun,
             models: { ...models, catalogueModels: catalogue.length, changes: models.changes.slice(0, 200) },
-            compute,
             timestamp: new Date().toISOString(),
         });
     } catch (error) {

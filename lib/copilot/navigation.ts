@@ -22,7 +22,6 @@ export const COPILOT_PAGES = {
     memories: { path: "/memory/memories", label: "Memories" },
     memory_graph: { path: "/memory/graph", label: "Memory graph" },
     memory_controls: { path: "/memory/controls", label: "Memory controls" },
-    deployments: { path: "/deployments", label: "Deployments" },
     copilot_usage: { path: "/copilot/usage", label: "Copilot usage" },
     project_settings: { path: "/settings", label: "Project settings" },
     budget: { path: "/settings?tab=budget", label: "Budget settings" },
