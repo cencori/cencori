@@ -115,6 +115,12 @@ const nextConfig: NextConfig = {
         destination: "/thesis",
         permanent: true,
       },
+      // Duplicate of energy-efficient-inference-infrastructure, removed 2026-11-06.
+      {
+        source: "/:prefix(blog|newsroom)/energy-efficient-inference-infrastructure-for-africa",
+        destination: "/newsroom/energy-efficient-inference-infrastructure",
+        permanent: true,
+      },
       // Blog hub moved to /newsroom.
       {
         source: "/blog",
