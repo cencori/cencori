@@ -1,0 +1,59 @@
+---
+title: "Cencori and CostGraph: AI spend, next to the rest of your cloud bill"
+slug: "cencori-costgraph-partnership"
+date: "2026-11-06"
+excerpt: "Cencori is partnering with CostGraph, the FinOps platform. Connect them in one click and every request through the Cencori gateway shows up in CostGraph as FOCUS 1.2 cost records, broken down by project, model and customer."
+authors:
+  - bola
+tags: ["Product", "Partnership", "CostGraph", "FinOps", "FOCUS", "Integrations"]
+category: "product"
+published: true
+---
+Finance teams can see what they spend on compute, storage and Kubernetes. AI spend is harder to see. It arrives as invoices from several model providers, in tokens instead of hours, and nothing on those invoices says which team, product or customer used them.
+
+Today we're announcing a partnership with **[CostGraph](https://costgraph.ai)**, the FinOps platform that puts cloud, Kubernetes, GPU and AI spend in one place. If your AI traffic runs through Cencori, CostGraph can now show it next to the rest of your cloud bill, with the same budgets, allocation and anomaly alerts you already use there.
+
+## Connect in one click
+
+Open any project's **Settings → Integrations**, click **Connect** on the CostGraph card under FinOps, sign in to CostGraph and choose the tenant that should receive the usage. That's the whole setup. The connection covers every project in your Cencori organization.
+
+Cencori creates the connection in your CostGraph tenant and sends this month's usage straight away. After that it sends each day once the day has closed. From the 3rd of each month it also re-sends the previous month, so a request that was logged late still ends up in the right place. Re-sending the same usage updates the existing records instead of adding new ones, so nothing is counted twice.
+
+Prefer to start from CostGraph? Create a read-only **usage export key** under **Organization settings → Advanced → Usage export**, copy your organization ID, then open **Integrations → Cencori** in CostGraph and enter both. The key can read usage. It can't call models. You can also point any scheduled job at `GET /v1/usage/focus` with the same key.
+
+Pick one method per organization. Connecting the same organization both ways imports its spend twice.
+
+## What shows up in CostGraph
+
+Every request through the gateway becomes a [FOCUS 1.2](/docs/platform/usage-export) record. FOCUS is the FinOps Foundation's open format for cost data, so AI spend lines up with your cloud and SaaS spend instead of sitting in a separate spreadsheet.
+
+- **By model.** Each record carries the model as `provider/model` and the model's maker as the publisher, so you can compare what you spend on each model and with each provider.
+- **By project.** Each Cencori project shows up as its own resource, so a product or team's AI cost is one filter away.
+- **By customer.** If you resell AI to your own customers through Cencori, a pull connection can group usage by end user or embedded-agent tenant instead of by project, so you can see what each customer costs you.
+- **By kind of work.** Text generation, embeddings, images, audio and vision are reported as separate services.
+- **By token type.** Input, output, cache-read and cache-write tokens are recorded separately, so you can see what prompt caching saves you.
+- **No double counting.** Usage on your own provider keys (BYOK) is reported at zero cost, because your provider already bills you for it. If that provider's bill is also in CostGraph, the same spend won't appear twice.
+
+The costs are what Cencori actually billed, not an estimate. CostGraph puts them next to your other providers for allocation and anomaly detection, and support is included on every CostGraph plan.
+
+## Cencori's rates in CostGraph's catalogue
+
+We also publish Cencori's model prices to CostGraph's pricing catalogue under the host `cencori`, with one rate per token type for every model we serve, updated daily. When CostGraph prices AI traffic that went through Cencori, it uses the rates Cencori actually charges, not another provider's list price.
+
+## We use it ourselves
+
+Our own organization is connected. CostGraph's [launch post](https://blog.costgraph.ai/cencori-costs/) walks through what it showed for Arcie, our agent infrastructure: 4,577 model calls from September 1 to November 4, $61.07 billed, and two models making up about 93% of it. One of them had 79.6 million input tokens and no cache reads, which is the sort of thing you only spot once the breakdown is in front of you.
+
+## Why we built this
+
+"Companies already ask what the cloud costs them. AI should be no different," said Bola Banjo, CEO of Cencori. "With CostGraph, the teams paying for AI can see where every request goes and what it costs, without adding a new tool to their stack."
+
+Cencori already handles the routing, failover, security and billing for your AI requests. CostGraph is where many finance and platform teams already manage cloud spend. Together they give you one view of every request from the moment it's made until it appears on the bill.
+
+## Get started
+
+- **Connect:** any project → **Settings → Integrations → CostGraph**.
+- **Read the guide:** [CostGraph integration](/docs/integrations/costgraph) and [Usage export](/docs/platform/usage-export).
+- **New to CostGraph?** Start at [costgraph.ai](https://costgraph.ai).
+
+Questions about the integration? Email [hello@cencori.com](mailto:hello@cencori.com).
