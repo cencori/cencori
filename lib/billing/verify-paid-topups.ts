@@ -6,16 +6,24 @@ export function getBachsTopupVerificationFailure(params: {
   chargeId: string;
   organizationId: string;
   productId: string;
+  /** Pack price in US cents. */
   minimumAmountMinor: number;
+  /** Pack price in kobo, for naira checkouts. Absent = naira not accepted. */
+  minimumNgnAmountMinor?: number | null;
 }): string | null {
-  const { charge, chargeId, organizationId, productId, minimumAmountMinor } = params;
+  const { charge, chargeId, organizationId, productId } = params;
   if (!charge || charge.charge_id !== chargeId) return 'charge_id_mismatch';
 
   const status = String(charge.status ?? '').toLowerCase();
   if (!['succeeded', 'successful', 'paid'].includes(status)) return 'unsettled_status';
 
+  // Bachs lets the buyer pay in naira at the product's NGN price, so each
+  // currency is checked against its own configured price.
   const currency = String(charge.currency ?? '').toUpperCase();
-  if (currency !== 'USD') return 'currency_mismatch';
+  const minimumAmountMinor = currency === 'USD'
+    ? params.minimumAmountMinor
+    : currency === 'NGN' ? params.minimumNgnAmountMinor : null;
+  if (minimumAmountMinor == null) return 'currency_mismatch';
 
   const amountMajor = Number(String(charge.amount ?? '').replace(/,/g, '').trim());
   const amountMinor = Number.isFinite(amountMajor) ? Math.round(amountMajor * 100) : NaN;
@@ -66,6 +74,7 @@ export function isVerifiedBachsTopupCharge(params: {
   organizationId: string;
   productId: string;
   minimumAmountMinor: number;
+  minimumNgnAmountMinor?: number | null;
 }): boolean {
   return getBachsTopupVerificationFailure(params) === null;
 }

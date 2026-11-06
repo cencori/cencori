@@ -153,6 +153,7 @@ async function handleCollectionSucceeded(
           organizationId: orgId,
           productId,
           minimumAmountMinor: pack.price,
+          minimumNgnAmountMinor: pack.ngnPrice,
         });
       if (verificationFailure) {
         console.error('[Bachs Webhook] Credits top-up charge failed verification', {
@@ -162,6 +163,7 @@ async function handleCollectionSucceeded(
           currency: charge?.currency ?? null,
           amount: charge?.amount ?? null,
           minimumAmountMinor: pack?.price ?? null,
+          minimumNgnAmountMinor: pack?.ngnPrice ?? null,
           metadataPurchaseTypeEcho: charge?.metadata?.purchase_type ?? null,
           metadataOrgEchoMatches: charge?.metadata?.org_id === orgId,
           chargeProductIds: Array.isArray(charge?.product_cart)
@@ -197,6 +199,7 @@ async function handleCollectionSucceeded(
           product_id: productId,
           gross_credits_usd: grossCredits,
           ...(charge.currency === 'USD' ? { charged_usd: Number(charge.amount) } : {}),
+          ...(charge.currency === 'NGN' ? { charged_ngn: Number(charge.amount) } : {}),
         },
       });
 

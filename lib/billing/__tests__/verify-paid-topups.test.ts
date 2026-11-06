@@ -37,6 +37,30 @@ describe('paid top-up verification', () => {
     expect(isVerifiedBachsTopupCharge({ ...expected, charge: { ...bachsCharge, product_cart: [{ product_id: 'other', quantity: 1 }] } })).toBe(false);
   });
 
+  it('accepts a naira charge at the pack NGN price, and only when one is configured', () => {
+    // Regression (2026-11-04): a Growth pack paid by Nigerian card (NGN 51,000
+    // incl. fee) was rejected as currency_mismatch and never credited.
+    const ngn = { ...bachsCharge, currency: 'NGN', amount: '51000.00' } as BachsCharge;
+    const expected = {
+      charge: ngn,
+      chargeId: 'charge-1',
+      organizationId: 'org-1',
+      productId: 'starter-product',
+      minimumAmountMinor: 5000,
+      minimumNgnAmountMinor: 5_000_000,
+    };
+    expect(getBachsTopupVerificationFailure(expected)).toBeNull();
+    expect(getBachsTopupVerificationFailure({ ...expected, charge: { ...ngn, amount: '49999.99' } }))
+      .toBe('amount_below_minimum');
+    expect(getBachsTopupVerificationFailure({ ...expected, minimumNgnAmountMinor: undefined }))
+      .toBe('currency_mismatch');
+    // A naira amount must never be read against the US-cent price.
+    expect(getBachsTopupVerificationFailure({ ...expected, charge: { ...ngn, amount: '60.00' } }))
+      .toBe('amount_below_minimum');
+    expect(getBachsTopupVerificationFailure({ ...expected, charge: { ...ngn, currency: 'EUR' } }))
+      .toBe('currency_mismatch');
+  });
+
   it('trusts the signed event binding when the charge API omits the metadata/cart echo', () => {
     // Regression: Bachs does not reliably echo checkout metadata on the
     // charge object. Absence must not fail a settled payment for the pack

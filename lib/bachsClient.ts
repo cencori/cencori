@@ -340,10 +340,12 @@ export const TIER_LIMITS = {
   enterprise: { seats: Infinity, priceMonthly: null, priceAnnual: null },
 } as const;
 
+// price = US cents; ngnPrice = kobo. ngnPrice must match the NGN currency
+// option on the Bachs product, or naira checkouts fail verification.
 export const CREDIT_TOPUP_PACKS = [
-  { label: 'Starter', credits: 10, price: 1000, productId: BACHS_CONFIG.products.creditsStarter },
-  { label: 'Growth', credits: 50, price: 5000, productId: BACHS_CONFIG.products.creditsGrowth },
-  { label: 'Scale', credits: 200, price: 20000, productId: BACHS_CONFIG.products.creditsScale },
+  { label: 'Starter', credits: 10, price: 1000, ngnPrice: 1_000_000, productId: BACHS_CONFIG.products.creditsStarter },
+  { label: 'Growth', credits: 50, price: 5000, ngnPrice: 5_000_000, productId: BACHS_CONFIG.products.creditsGrowth },
+  { label: 'Scale', credits: 200, price: 20000, ngnPrice: 20_000_000, productId: BACHS_CONFIG.products.creditsScale },
 ] as const;
 
 export { CARD_TOPUP_FEE_PERCENT as PLATFORM_FEE_PERCENT } from '@/lib/billing/credit-pricing';
