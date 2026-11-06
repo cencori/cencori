@@ -2,17 +2,21 @@
 #
 # Brimble's builder can't hold `next build` (~12GB peak, killed since
 # 2026-11-03), and Brimble won't raise it. GitHub's runners have 16GB. This
-# builds deploy/app/Dockerfile, pushes ghcr.io/<repo>:<sha> and :latest, and,
-# when the repo variable BRIMBLE_IMAGE_DEPLOY is "true", tells Brimble to run
-# that exact image. Each deploy is pinned to a commit, so rolling back is
-# redeploying an older tag.
+# builds deploy/app/Dockerfile and pushes ghcr.io/<repo>:<sha> and :latest.
+# When the repo variable BRIMBLE_IMAGE_DEPLOY is "true", it then pins that
+# image in the root Dockerfile and pushes the change. Brimble watches only that
+# file (brimble.toml build.watch), so the pinned image is what deploys. Brimble
+# keeps the old deployment until the new one passes its health check. Roll back
+# by pointing the Dockerfile at an older tag.
 #
-# Needs: secret BRIMBLE_API_KEY (scopes: env read/decrypt, project.deploy).
+# Needs: secret BRIMBLE_API_KEY (reads the project's NEXT_PUBLIC_* values).
 name: Deploy
 
 on:
   push:
     branches: [master]
+    # The release commit below only changes Dockerfile; don't rebuild for it.
+    paths-ignore: [Dockerfile]
   workflow_dispatch:
 
 concurrency:
@@ -20,7 +24,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 env:
@@ -76,19 +80,30 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  deploy:
+  release:
     needs: build
     if: vars.BRIMBLE_IMAGE_DEPLOY == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          ref: master
 
-      - name: Deploy the image on Brimble
+      # Pushes made with GITHUB_TOKEN don't start workflows, so this can't loop.
+      - name: Pin the image in the root Dockerfile
         env:
-          BRIMBLE_API_KEY: ${{ secrets.BRIMBLE_API_KEY }}
-        run: node scripts/ci/brimble-deploy-image.mjs "$BRIMBLE_PROJECT_ID" "${{ needs.build.outputs.image }}"
+          IMAGE_REF: ${{ needs.build.outputs.image }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for attempt in 1 2 3; do
+            git pull --rebase --quiet origin master
+            sed -i -E "s#^FROM ghcr\.io/.*#FROM ${IMAGE_REF}#" Dockerfile
+            if git diff --quiet -- Dockerfile; then echo "Dockerfile already pins ${IMAGE_REF}"; exit 0; fi
+            git commit --quiet -m "deploy: ${IMAGE_REF##*:}" -- Dockerfile
+            git push --quiet origin HEAD:master && exit 0
+            git reset --quiet --hard origin/master
+          done
+          echo "Could not push the release commit" >&2
+          exit 1

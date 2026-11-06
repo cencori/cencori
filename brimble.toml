@@ -10,14 +10,14 @@ type = "web"
 region = "afr-west"
 
 [services.cencori.build]
-runtime = { node = "22" }
-# NODE_ENV=production (below) makes npm skip devDependencies, and next build
-# then stops to install TypeScript; the first Lagos build timed out at 25 min.
-install = "npm ci --include=dev --no-audit --no-fund"
-command = "npm run build"
+# The app is built on GitHub (.github/workflows/deploy.yml, deploy/app/Dockerfile):
+# Brimble's builder can't hold `next build`. The root Dockerfile is one line,
+# FROM the image for a commit, so Brimble only pulls it. The workflow updates
+# that line after each image push, and only that change deploys.
+watch = ["Dockerfile"]
 
 [services.cencori.deploy]
-start = "npm start"
+start = "node_modules/.bin/next start -H 0.0.0.0"
 # Creates the Better Auth tables (idempotent). Workbench is read-only.
 before_start = "node scripts/brimble-apply-sql.mjs"
 health = "/api/v1/health"
