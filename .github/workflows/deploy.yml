@@ -1,0 +1,94 @@
+# Build cencori.com on GitHub and run it on Brimble.
+#
+# Brimble's builder can't hold `next build` (~12GB peak, killed since
+# 2026-11-03), and Brimble won't raise it. GitHub's runners have 16GB. This
+# builds deploy/app/Dockerfile, pushes ghcr.io/<repo>:<sha> and :latest, and,
+# when the repo variable BRIMBLE_IMAGE_DEPLOY is "true", tells Brimble to run
+# that exact image. Each deploy is pinned to a commit, so rolling back is
+# redeploying an older tag.
+#
+# Needs: secret BRIMBLE_API_KEY (scopes: env read/decrypt, project.deploy).
+name: Deploy
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  BRIMBLE_PROJECT_ID: 6ad91578cd318e60aec7f0e1
+  IMAGE: ghcr.io/${{ github.repository }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - id: meta
+        run: |
+          image="$(echo "$IMAGE" | tr '[:upper:]' '[:lower:]')"
+          echo "image=${image}:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "latest=${image}:latest" >> "$GITHUB_OUTPUT"
+
+      # Only NEXT_PUBLIC_* values: they end up in the browser bundles anyway.
+      - name: Fetch public build variables from Brimble
+        env:
+          BRIMBLE_API_KEY: ${{ secrets.BRIMBLE_API_KEY }}
+        run: node scripts/ci/brimble-build-env.mjs "$BRIMBLE_PROJECT_ID" > "$RUNNER_TEMP/build.env"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/app/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image }}
+            ${{ steps.meta.outputs.latest }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          secret-files: |
+            buildenv=${{ runner.temp }}/build.env
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build
+    if: vars.BRIMBLE_IMAGE_DEPLOY == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Deploy the image on Brimble
+        env:
+          BRIMBLE_API_KEY: ${{ secrets.BRIMBLE_API_KEY }}
+        run: node scripts/ci/brimble-deploy-image.mjs "$BRIMBLE_PROJECT_ID" "${{ needs.build.outputs.image }}"

@@ -1,0 +1,24 @@
+# Build context for deploy/app/Dockerfile (BuildKit reads <Dockerfile>.dockerignore).
+# Kept next to the Dockerfile so Brimble's Git builds (which read a root
+# .dockerignore) are unaffected.
+.git
+node_modules
+.next
+dist-workers
+coverage
+playwright-report
+test-results
+tmp
+.cencori-web
+.venv-pdf
+tsconfig.tsbuildinfo
+examples
+packages/sdk-php
+packages/sdk-rust
+assets/imported
+.env
+.env.*
+!.env.example
+*.pem
+.vercel
+.DS_Store
