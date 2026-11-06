@@ -88,22 +88,22 @@ export function VSCodeLogo({ className, ...props }: IconProps) {
 }
 
 // Cursor AI Official Logo - Re-exported from @lobehub/icons
-export { Cursor as CursorLogo } from "@lobehub/icons";
+export { Cursor as CursorLogo } from "@/components/icons/provider-icons";
 
 // AI Editor Logos - Re-exported from @lobehub/icons
-export { Windsurf as WindsurfLogo } from "@lobehub/icons";
-export { Claude as ClaudeLogo } from "@lobehub/icons";
-export { CrewAI as CrewAILogo } from "@lobehub/icons";
-export { LangChain as LangChainLogo } from "@lobehub/icons";
-export { LangGraph as LangGraphLogo } from "@lobehub/icons";
-export { LlamaIndex as LlamaIndexLogo } from "@lobehub/icons";
-export { Dify as DifyLogo } from "@lobehub/icons";
-export { N8n as N8nLogo } from "@lobehub/icons";
+export { Windsurf as WindsurfLogo } from "@/components/icons/provider-icons";
+export { Claude as ClaudeLogo } from "@/components/icons/provider-icons";
+export { CrewAI as CrewAILogo } from "@/components/icons/provider-icons";
+export { LangChain as LangChainLogo } from "@/components/icons/provider-icons";
+export { LangGraph as LangGraphLogo } from "@/components/icons/provider-icons";
+export { LlamaIndex as LlamaIndexLogo } from "@/components/icons/provider-icons";
+export { Dify as DifyLogo } from "@/components/icons/provider-icons";
+export { N8n as N8nLogo } from "@/components/icons/provider-icons";
 
 // Vibe coding platforms - Re-exported from @lobehub/icons
-export { Lovable as LovableLogo } from "@lobehub/icons";
-export { Replit as ReplitLogo } from "@lobehub/icons";
-export { V0 as V0Logo } from "@lobehub/icons";
+export { Lovable as LovableLogo } from "@/components/icons/provider-icons";
+export { Replit as ReplitLogo } from "@/components/icons/provider-icons";
+export { V0 as V0Logo } from "@/components/icons/provider-icons";
 
 // Bolt.new Logo (custom SVG - not in @lobehub/icons)
 export function BoltLogo({ className, ...props }: IconProps) {

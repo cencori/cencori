@@ -16,7 +16,7 @@ import {
     Cloudflare, DeepInfra, Fireworks, Nvidia,
     SambaNova, Upstage, Minimax, Moonshot,
     Stepfun, Baseten, Alibaba, Baidu, ZAI,
-} from "@lobehub/icons";
+} from "@/components/icons/provider-icons";
 import { SUPPORTED_PROVIDERS, type AIModel, type ModelCapabilities } from "@/lib/providers/config";
 import { formatContextWindow, getModelDisplayPrice } from "@/lib/providers/display-pricing";
 import { CENCORI_PROVIDER_LABEL, publicProviderDisplayName, publicProviderLabel } from "@/lib/providers/branding";

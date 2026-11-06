@@ -27,7 +27,7 @@ import {
   Cohere,
   Perplexity,
   XAI,
-} from "@lobehub/icons";
+} from "@/components/icons/provider-icons";
 import { siteConfig } from "@/config/site";
 import { cn } from "@/lib/utils";
 import devStyles from "@/components/developers/DevelopersProducts.module.css";

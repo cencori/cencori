@@ -4,7 +4,7 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { cn } from '@/lib/utils';
 import { Cpu } from 'lucide-react';
-import { OpenAI, Claude, Gemini } from '@lobehub/icons';
+import { OpenAI, Claude, Gemini } from '@/components/icons/provider-icons';
 
 interface ProviderItemProps {
     name: string;

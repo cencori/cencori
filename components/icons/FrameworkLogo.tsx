@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { CrewAI, LangGraph, OpenAI } from "@lobehub/icons";
+import { CrewAI, LangGraph, OpenAI } from "@/components/icons/provider-icons";
 import { Braces } from "lucide-react";
 
 import { cn } from "@/lib/utils";

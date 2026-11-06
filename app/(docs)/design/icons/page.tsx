@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { Copy, Check, ArrowRight, Settings, User, Search, Bell, Home, Plus, Trash2, Edit, Eye, Download, Upload, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
-import { Cloudflare, Aws, Azure, Google, OpenAI, Claude, Gemini } from "@lobehub/icons";
+import { Cloudflare, Aws, Azure, Google, OpenAI, Claude, Gemini } from "@/components/icons/provider-icons";
 
 function CodeBlock({ code, language = "tsx" }: { code: string; language?: string }) {
     const [copied, setCopied] = useState(false);
@@ -108,7 +108,7 @@ export default function IconsPage() {
             <section className="space-y-4">
                 <h2 className="text-lg font-semibold">Brand Icons with Colors</h2>
                 <p className="text-xs text-muted-foreground">Use the .Color variant to display brand colors.</p>
-                <CodeBlock code={`import { Cloudflare, Aws, Azure, Google, OpenAI, Claude } from "@lobehub/icons";
+                <CodeBlock code={`import { Cloudflare, Aws, Azure, Google, OpenAI, Claude } from "@/components/icons/provider-icons";
 
 // Color variants (for cloud platforms)
 <Cloudflare.Color size={20} />

@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { OpenAI, Claude, DeepSeek } from "@lobehub/icons";
+import { OpenAI, Claude, DeepSeek } from "@/components/icons/provider-icons";
 
 /**
  * GatewayGraphic

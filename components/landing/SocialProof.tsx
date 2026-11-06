@@ -14,7 +14,7 @@ import {
     HuggingFace,
     DeepSeek,
     Gemini
-} from "@lobehub/icons";
+} from "@/components/icons/provider-icons";
 
 // Expanded list of AI providers
 const providers = [

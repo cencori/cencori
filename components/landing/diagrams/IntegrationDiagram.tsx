@@ -2,7 +2,7 @@
 
 import React from "react";
 import { useTheme } from "next-themes";
-import { OpenAI, Claude, Gemini, Meta, Groq, XAI, Aws, Azure, Cloudflare, Github } from "@lobehub/icons";
+import { OpenAI, Claude, Gemini, Meta, Groq, XAI, Aws, Azure, Cloudflare, Github } from "@/components/icons/provider-icons";
 import { VercelLogo, SupabaseLogo } from "@/components/icons/BrandIcons";
 
 /**

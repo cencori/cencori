@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Github } from "@lobehub/icons";
+import { Github } from "@/components/icons/provider-icons";
 import {
   Add01Icon,
   AiFolder01Icon,

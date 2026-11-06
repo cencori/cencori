@@ -20,7 +20,7 @@ import {
   Baidu,
   ZAI,
   Cerebras,
-} from "@lobehub/icons";
+} from "@/components/icons/provider-icons";
 import { Brain, Check, ChevronDown, Search, TriangleAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 

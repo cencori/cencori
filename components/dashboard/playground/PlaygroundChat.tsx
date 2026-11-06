@@ -23,7 +23,7 @@ import {
     Perplexity, Groq, XAI, Together, Cloudflare,
     Meta, HuggingFace, Qwen, DeepSeek,
     Minimax, Baidu, ZAI, Cerebras,
-} from "@lobehub/icons";
+} from "@/components/icons/provider-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { PlusSignIcon, Cancel01Icon } from "@hugeicons/core-free-icons";
 import { toast } from "@/components/ui/toast";

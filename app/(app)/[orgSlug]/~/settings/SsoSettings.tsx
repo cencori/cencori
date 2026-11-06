@@ -3,7 +3,7 @@
 import { type ReactNode, useRef, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Google, Microsoft } from "@lobehub/icons";
+import { Google, Microsoft } from "@/components/icons/provider-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import Key02Icon from "@hugeicons/core-free-icons/Key02Icon";
 import Building06Icon from "@hugeicons/core-free-icons/Building06Icon";

@@ -1,4 +1,4 @@
-import { Cursor } from '@lobehub/icons';
+import { Cursor } from '@/components/icons/provider-icons';
 
 /*
  * Claude Code and Codex marks, copied from @lobehub/icons v5 (MIT). Our

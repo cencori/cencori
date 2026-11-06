@@ -1,3 +1,4 @@
+import path from "node:path";
 import type { NextConfig } from "next";
 import { createMDX } from "fumadocs-mdx/next";
 import vercelConfig from "./vercel.json";
@@ -62,6 +63,10 @@ const nextConfig: NextConfig = {
     "openai", "@anthropic-ai/sdk", "@google/genai",
     "@supabase/supabase-js", "@supabase/ssr", "@supabase/auth-js", "@supabase/realtime-js",
     "@supabase/functions-js", "@supabase/storage-js", "@supabase/postgrest-js",
+    // Measured 2026-11-06: each was bundled into 140-425 server entries.
+    // puppeteer also pulled the whole TypeScript compiler in via cosmiconfig.
+    "@upstash/redis", "bcryptjs", "@sendbyte/node", "@vercel/functions", "@google/generative-ai",
+    "puppeteer", "tiktoken", "pdf-parse", "mammoth", "stripe", "resend", "@octokit/rest", "@octokit/app",
   ],
   experimental: {
     // Static generation forks one worker per CPU Node sees; in a container
@@ -69,7 +74,7 @@ const nextConfig: NextConfig = {
     // its own copy of the app.
     cpus: 2,
     // Packages imported by name from their index: load only what is used.
-    optimizePackageImports: ["lucide-react", "@hugeicons/core-free-icons", "@lobehub/icons"],
+    optimizePackageImports: ["lucide-react", "@hugeicons/core-free-icons", "@carbon/icons-react"],
     staleTimes: {
       dynamic: 300,
       static: 300,
@@ -271,12 +276,15 @@ const nextConfig: NextConfig = {
 // Brimble builds in a fresh container, so webpack's persistent cache is never
 // reused there; it only holds gigabytes of buffers in memory while building.
 const brimbleBuild = Boolean(process.env.BRIMBLE_BUILD || process.env.CI);
-if (brimbleBuild) {
-  nextConfig.webpack = (config, { dev }) => {
-    if (!dev) config.cache = false;
-    return config;
-  };
-}
+// `shiki` resolves to lib/shiki-lite.ts: the full package compiles ~300
+// grammars into the build; we ship the ~25 our pages use.
+const shikiLite = path.join(process.cwd(), "lib/shiki-lite.ts");
+nextConfig.turbopack = { resolveAlias: { shiki: "./lib/shiki-lite.ts" } };
+nextConfig.webpack = (config, { dev }) => {
+  config.resolve.alias = { ...config.resolve.alias, shiki$: shikiLite };
+  if (brimbleBuild && !dev) config.cache = false;
+  return config;
+};
 
 const withMDX = createMDX();
 
