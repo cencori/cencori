@@ -25,7 +25,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 500 });
     }
 
-    const valid = verifyWebhookSignature(rawBody, signature);
+    const valid = verifyWebhookSignature(
+      rawBody,
+      signature,
+      req.headers.get('x-coincircuit-timestamp'),
+    );
     if (!valid) {
       console.error('[CoinCircuit Webhook] Invalid signature');
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
