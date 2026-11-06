@@ -26,6 +26,8 @@ export interface BlogPostFrontmatter {
   slug: string;
   date: string;
   excerpt: string;
+  /** Optional standfirst shown under the title on the post page. */
+  subtitle?: string;
   coverImage: string;
   authors: string[];
   tags: string[];

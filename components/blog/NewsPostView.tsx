@@ -37,6 +37,11 @@ export function NewsPostView({ post, content, morePosts }: NewsPostViewProps) {
           <h1 className="mt-3 text-4xl font-semibold tracking-tight sm:text-5xl">
             {post.title}
           </h1>
+          {post.subtitle ? (
+            <p className="mx-auto mt-4 max-w-xl text-lg text-muted-foreground">
+              {post.subtitle}
+            </p>
+          ) : null}
           <p className="mt-4 text-xs tracking-wide text-muted-foreground">
             {formatMonthYear(post.date)}
           </p>
