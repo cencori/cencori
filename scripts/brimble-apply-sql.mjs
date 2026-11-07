@@ -44,6 +44,13 @@ try {
         console.log("[brimble-apply-sql] set authenticator password");
     }
 
+    // PostgREST caches the schema and only sees functions and tables added
+    // here after a reload (it isn't Supabase, so no event trigger does it).
+    // Without this, a new function answers PGRST202 "not found" until
+    // PostgREST happens to restart. It listens on the "pgrst" channel.
+    await client.query("notify pgrst, 'reload schema'");
+    console.log("[brimble-apply-sql] asked PostgREST to reload its schema");
+
     // Long-open transactions hold locks that stall DDL and the queries queued
     // behind it (2026-11-01). The database is private, so report them here,
     // where the deploy log can show them. No query text: it can hold data.
