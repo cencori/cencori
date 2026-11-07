@@ -205,7 +205,7 @@ function renderMatrixValue(value: MatrixValue) {
     if (value === false) {
         return <Minus className="mx-auto h-4 w-4 text-muted-foreground" aria-hidden="true" />;
     }
-    return <span className="text-xs md:text-sm text-foreground/90">{value}</span>;
+    return <span className="text-[11px] leading-tight text-foreground/90 sm:text-xs md:text-sm">{value}</span>;
 }
 
 function getDisplayPrice(tier: (typeof tiers)[number], currency: Currency) {
@@ -381,20 +381,20 @@ export function Pricing() {
                         })}
                     </div>
 
-                    {/* Scrolls sideways on small screens; from xl the table fits, so
-                        the wrapper stops being a scroll box and the plan header
-                        can stick under the site nav (80px) while you scroll. */}
-                    <div className="overflow-x-auto xl:overflow-visible">
-                        <table className="w-full min-w-[980px] border-collapse text-left">
+                    {/* The table fits the screen at every width (no sideways
+                        scroll box), so the plan header can stick under the
+                        site nav (80px) on phones too. */}
+                    <div>
+                        <table className="w-full table-fixed border-collapse text-left">
                             <thead>
                                 <tr className="bg-muted/15">
-                                    <th className="w-[30%] px-5 py-4 text-xs font-medium uppercase tracking-wide text-muted-foreground sticky top-20 z-30 bg-background before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-border/50 after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border/50">
+                                    <th className="w-[34%] px-3 py-3 text-[10px] font-medium sm:w-[30%] sm:px-5 sm:py-4 sm:text-xs uppercase tracking-wide text-muted-foreground sticky top-20 z-30 bg-background before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-border/50 after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border/50">
                                         Features
                                     </th>
                                     {tiers.map((tier) => (
-                                        <th key={tier.name} className="w-[17.5%] px-5 py-4 align-top text-center sticky top-20 z-30 bg-background before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-border/50 after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border/50">
+                                        <th key={tier.name} className="px-1 py-3 align-top sm:px-5 sm:py-4 text-center sticky top-20 z-30 bg-background before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-border/50 after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border/50">
                                             <div className="space-y-2">
-                                                <p className="text-sm font-bold">{tier.displayName}</p>
+                                                <p className="truncate text-xs font-bold sm:text-sm">{tier.displayName}</p>
                                             </div>
                                         </th>
                                     ))}
@@ -404,9 +404,9 @@ export function Pricing() {
                                 {matrixSections.map((section) => (
                                     <React.Fragment key={section.title}>
                                         <tr className="border-b border-border/50 bg-muted/40">
-                                            <td colSpan={tiers.length + 1} className="px-5 py-4">
+                                            <td colSpan={tiers.length + 1} className="px-3 py-3 sm:px-5 sm:py-4">
                                                 <div className="flex items-center gap-3">
-                                                    <span className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-border/50 bg-background">
+                                                    <span className="flex size-9 sm:size-10 shrink-0 items-center justify-center rounded-lg border border-border/50 bg-background">
                                                         <HugeiconsIcon icon={section.icon} size={20} strokeWidth={1.6} className="text-foreground" />
                                                     </span>
                                                     <div>
@@ -418,9 +418,9 @@ export function Pricing() {
                                         </tr>
                                         {section.rows.map((row) => (
                                             <tr key={row.feature} className="border-b border-border/40">
-                                                <td className="px-5 py-3 text-sm text-foreground">{row.feature}</td>
+                                                <td className="px-3 py-3 text-xs text-foreground sm:px-5 sm:text-sm">{row.feature}</td>
                                                 {tiers.map((tier) => (
-                                                    <td key={tier.name} className="px-5 py-3 text-center">
+                                                    <td key={tier.name} className="break-words px-1 py-3 text-center sm:px-5">
                                                         {renderMatrixValue(row.values[tier.name])}
                                                     </td>
                                                 ))}
