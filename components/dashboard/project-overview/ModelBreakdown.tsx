@@ -1,5 +1,6 @@
 "use client";
 
+import { useCostFormat } from "@/hooks/useDisplayCurrency";
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useReducedMotion } from "framer-motion";
@@ -160,11 +161,6 @@ const LATENCY_SERIES = [
 
 const compactNumber = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
 
-function formatCost(value: number): string {
-  if (value === 0) return "$0.00";
-  if (value < 0.01) return `$${value.toFixed(4)}`;
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(value);
-}
 
 function formatLatency(ms: number): string {
   if (!Number.isFinite(ms) || ms <= 0) return "0ms";
@@ -324,6 +320,7 @@ export function ModelBreakdown({
   /** The plan doesn't include analytics (or it failed); the section stays hidden. */
   gated: boolean;
 }) {
+  const { formatCost, formatCostAxis } = useCostFormat();
   const reduceMotion = useReducedMotion();
   const breakdown = data?.breakdown;
   const isLoading = loading || !breakdown;
@@ -380,7 +377,7 @@ export function ModelBreakdown({
     detail: `${providerCount} ${providerCount === 1 ? "provider" : "providers"}`,
     series: [{ key: "value", label: "Spend", color: PROVIDER_COLOR, value: formatCost(totalSpend) }],
     formatValue: formatCost,
-    formatAxis: formatCost,
+    formatAxis: formatCostAxis,
   };
   const errorsConfig: MetricCardConfig = {
     title: "Errors",

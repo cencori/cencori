@@ -93,3 +93,34 @@ export function useDisplayCurrency() {
 
     return { currency, setCurrency, formatMoney, rate };
 }
+
+/**
+ * Formatters for usage costs in the chosen display currency: exact amounts
+ * (sub-cent dollar costs keep 4 decimals) and short chart-axis labels.
+ */
+export function useCostFormat() {
+    const { currency, formatMoney, rate } = useDisplayCurrency();
+
+    const formatCost = useCallback(
+        (usd: number) => {
+            if (currency === "NGN") return formatMoney(usd);
+            if (usd === 0) return "$0.00";
+            if (Math.abs(usd) < 0.01) return `$${usd.toFixed(4)}`;
+            return formatMoney(usd);
+        },
+        [currency, formatMoney],
+    );
+
+    const formatCostAxis = useCallback(
+        (usd: number) => {
+            const symbol = currency === "NGN" ? "₦" : "$";
+            const amount = currency === "NGN" ? usd * rate : usd;
+            if (amount === 0) return `${symbol}0`;
+            if (Math.abs(amount) < 1) return `${symbol}${amount.toFixed(2)}`;
+            return `${symbol}${new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(amount)}`;
+        },
+        [currency, rate],
+    );
+
+    return { currency, formatCost, formatCostAxis };
+}

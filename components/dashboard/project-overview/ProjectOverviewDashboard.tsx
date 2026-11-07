@@ -1,5 +1,6 @@
 "use client";
 
+import { useCostFormat } from "@/hooks/useDisplayCurrency";
 import { useId, useMemo } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
@@ -85,15 +86,6 @@ const compactNumber = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 1,
 });
 
-function formatCost(value: number): string {
-  if (value === 0) return "$0.00";
-  if (value < 0.01) return `$${value.toFixed(4)}`;
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 2,
-  }).format(value);
-}
 
 function percentage(value: number, total: number): number {
   if (total <= 0) return 0;
@@ -334,6 +326,7 @@ export function ProjectOverviewCharts({
   period: string;
   loading: boolean;
 }) {
+  const { formatCost, formatCostAxis } = useCostFormat();
   const reduceMotion = useReducedMotion();
   const totalRequests = stats?.totalRequests ?? 0;
   const successRate = totalRequests
@@ -370,7 +363,7 @@ export function ProjectOverviewCharts({
       detail: `${periodLabel.toLowerCase()} total`,
       series: [{ key: "cost", label: "Spend", color: "#f97316", value: formatCost(totalCost) }],
       formatValue: formatCost,
-      formatAxis: (value) => (value === 0 ? "$0" : value < 1 ? `$${value.toFixed(2)}` : `$${compactNumber.format(value)}`),
+      formatAxis: formatCostAxis,
     },
     {
       title: "Tokens",
@@ -476,6 +469,7 @@ function ProjectState({
   monetizationLoading: boolean;
   monetizationError: boolean;
 }) {
+  const { formatCost } = useCostFormat();
   const deploymentMeta = deploymentStatus(deployment?.status);
   const deploymentHref = `/${orgSlug}/${projectSlug}/deployments`;
   const monetizationHref = `/${orgSlug}/${projectSlug}/revenue`;
@@ -683,6 +677,7 @@ function ModelUsage({
   models: ProjectOverviewModel[];
   totalRequests: number;
 }) {
+  const { formatCost } = useCostFormat();
   const sortedModels = useMemo(
     () => [...models].sort((a, b) => b.count - a.count).slice(0, 6),
     [models],
