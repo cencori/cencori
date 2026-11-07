@@ -7,6 +7,8 @@ import {
   majorAmountToMinor,
   parseTensorCheckoutInput,
   resolveTensorCheckoutOrigin,
+  tensorCheckoutReturnUrl,
+  TENSOR_WEB_BILLING_URL,
 } from "@/lib/tensor-billing";
 
 describe("Tensor billing contracts", () => {
@@ -26,6 +28,34 @@ describe("Tensor billing contracts", () => {
     ).toEqual({ plan: "starter" });
     expect(parseTensorCheckoutInput({ plan: "pro", provider: "paystack", recurring: true })).toEqual({
       plan: "pro",
+    });
+  });
+
+  it("returns a checkout opened on the Tensor website to its billing page, and nowhere else", () => {
+    expect(
+      parseTensorCheckoutInput({ plan: "builder", return_url: TENSOR_WEB_BILLING_URL }),
+    ).toEqual({ plan: "builder", returnUrl: TENSOR_WEB_BILLING_URL });
+    expect(tensorCheckoutReturnUrl("http://127.0.0.1:3001/billing")).toBe(
+      "http://127.0.0.1:3001/billing",
+    );
+
+    for (const value of [
+      "https://evil.com/billing",
+      "https://tensorade.app.evil.com/billing",
+      "http://tensorade.app/billing",
+      "https://tensorade.app/billing?next=https://evil.com",
+      "https://tensorade.app/settings",
+      "http://localhost:3001/billing",
+      "http://127.0.0.1:80/billing",
+      "javascript:alert(1)",
+      42,
+    ]) {
+      expect(tensorCheckoutReturnUrl(value)).toBeNull();
+    }
+    // An unrecognised return page is dropped, not refused: the checkout still opens, and comes
+    // back to cencori.com/tensor.
+    expect(parseTensorCheckoutInput({ plan: "starter", return_url: "https://evil.com/billing" })).toEqual({
+      plan: "starter",
     });
   });
 

@@ -4,6 +4,12 @@ export const TENSOR_CALLBACK_URL = "tensor://auth/callback";
 export const TENSOR_AUTH_CODE_TTL_MS = 5 * 60 * 1000;
 /** Pre-rename desktop scheme. Accepted so older installs can still sign in. */
 const LEGACY_CALLBACK_URL = "basecode://auth/callback";
+/**
+ * The Tensor website's account pages (tensorade.app/dashboard, /billing, /settings). Listed
+ * exactly: whoever receives a code here can exchange it, so only hosts we serve may be named.
+ * Local development of the site signs in through the loopback rule below (127.0.0.1).
+ */
+export const TENSOR_WEB_CALLBACK_URL = "https://tensorade.app/auth/callback";
 
 const CODE_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 const CHALLENGE_PATTERN = /^[A-Za-z0-9_-]{43}$/;
@@ -23,7 +29,13 @@ export function isTensorState(value: unknown): value is string {
 }
 
 export function isTensorRedirectUri(value: unknown): value is string {
-  if (value === TENSOR_CALLBACK_URL || value === LEGACY_CALLBACK_URL) return true;
+  if (
+    value === TENSOR_CALLBACK_URL ||
+    value === LEGACY_CALLBACK_URL ||
+    value === TENSOR_WEB_CALLBACK_URL
+  ) {
+    return true;
+  }
   if (typeof value !== "string" || value.length > 200) return false;
 
   try {

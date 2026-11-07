@@ -62,7 +62,9 @@ export async function POST(request: NextRequest) {
     });
     if (insertError) throw new Error("Could not create the checkout record.");
 
-    const baseUrl = appBaseUrl(request);
+    // Back to the page the checkout was opened from: the Tensor website's billing page when it
+    // asked (validated in parseTensorCheckoutInput), otherwise cencori.com/tensor.
+    const returnPage = input.returnUrl ?? `${appBaseUrl(request)}/tensor`;
     // Bachs is told what is being bought only for its own records: the checkout row above is
     // what a verified payment is matched to, and what decides the pass it grants.
     const result = await createCheckoutSession({
@@ -73,8 +75,8 @@ export async function POST(request: NextRequest) {
           (session.user.user_metadata?.full_name as string | undefined) ||
           session.user.email.split("@")[0],
       },
-      success_url: `${baseUrl}/tensor?billing_return=${encodeURIComponent(checkoutId)}`,
-      cancel_url: `${baseUrl}/tensor?billing_cancelled=1`,
+      success_url: `${returnPage}?billing_return=${encodeURIComponent(checkoutId)}`,
+      cancel_url: `${returnPage}?billing_cancelled=1`,
       reference,
       expires_in_minutes: 30,
       metadata: {
