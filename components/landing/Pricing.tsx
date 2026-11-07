@@ -17,6 +17,7 @@ import BrainIcon from "@hugeicons/core-free-icons/BrainIcon";
 import SecurityCheckIcon from "@hugeicons/core-free-icons/SecurityCheckIcon";
 import Layers01Icon from "@hugeicons/core-free-icons/Layers01Icon";
 import { Spinner } from "@/components/ui/spinner";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type Tier = "free" | "pro" | "enterprise";
 type Currency = "USD" | "NGN";
@@ -226,6 +227,8 @@ export function Pricing() {
     const { currency } = useDisplayCurrency();
     const [orgId, setOrgId] = useState<string | null>(null);
     const [loadingTier, setLoadingTier] = useState<Tier | null>(null);
+    // Phones show one plan column at a time.
+    const [mobilePlan, setMobilePlan] = useState<Tier>("pro");
 
     useEffect(() => {
         const checkAuth = async () => {
@@ -381,22 +384,33 @@ export function Pricing() {
                         })}
                     </div>
 
-                    {/* Scrolls sideways on small screens (feature names stay pinned on
-                        the left); from xl the table fits, so
-                        the wrapper stops being a scroll box and the plan header
-                        can stick under the site nav (80px) while you scroll. */}
-                    <div className="overflow-x-auto xl:overflow-visible">
-                        <table className="w-full min-w-[640px] table-fixed border-collapse text-left sm:min-w-[980px] xl:table-auto">
+                    {/* The table always fits the screen, so the plan header sticks
+                        under the site nav (80px) at every width. On phones it
+                        shows one plan at a time, picked from a dropdown. */}
+                    <div>
+                        <table className="w-full border-collapse text-left">
                             <thead>
                                 <tr className="bg-muted/15">
-                                    <th className="w-[150px] px-4 py-4 text-xs font-medium uppercase tracking-wide text-muted-foreground sticky left-0 z-40 bg-background sm:w-[30%] sm:px-5 xl:top-20 before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-border/50 after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border/50">
+                                    <th className="w-[55%] px-4 py-4 text-xs font-medium uppercase tracking-wide text-muted-foreground sticky top-20 z-30 bg-background md:w-[30%] md:px-5 before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-border/50 after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border/50">
                                         Features
                                     </th>
                                     {tiers.map((tier) => (
-                                        <th key={tier.name} className="px-5 py-4 align-top text-center relative sm:w-[17.5%] z-30 bg-background xl:sticky xl:top-20 before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-border/50 after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border/50">
-                                            <div className="space-y-2">
-                                                <p className="text-sm font-bold">{tier.displayName}</p>
+                                        <th key={tier.name} className={cn("px-4 py-3 align-middle text-center sticky top-20 z-30 bg-background md:table-cell md:w-[17.5%] md:px-5 md:py-4 before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-border/50 after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border/50", tier.name !== mobilePlan && "hidden")}>
+                                            <p className="hidden text-sm font-bold md:block">{tier.displayName}</p>
+                                            {tier.name === mobilePlan && (
+                                            <div className="flex justify-center md:hidden">
+                                                <Select value={mobilePlan} onValueChange={(value) => setMobilePlan(value as Tier)}>
+                                                    <SelectTrigger aria-label="Plan" className="h-8 w-auto gap-1.5 rounded-full border-0 bg-muted/60 pl-3.5 pr-2.5 text-sm font-bold shadow-none">
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent align="end">
+                                                        {tiers.map((option) => (
+                                                            <SelectItem key={option.name} value={option.name}>{option.displayName}</SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
                                             </div>
+                                            )}
                                         </th>
                                     ))}
                                 </tr>
@@ -405,8 +419,8 @@ export function Pricing() {
                                 {matrixSections.map((section) => (
                                     <React.Fragment key={section.title}>
                                         <tr className="border-b border-border/50 bg-muted/40">
-                                            <td colSpan={tiers.length + 1} className="px-5 py-4">
-                                                <div className="sticky left-5 flex w-fit items-center gap-3 xl:static">
+                                            <td colSpan={tiers.length + 1} className="px-4 py-4 md:px-5">
+                                                <div className="flex items-center gap-3">
                                                     <span className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-border/50 bg-background">
                                                         <HugeiconsIcon icon={section.icon} size={20} strokeWidth={1.6} className="text-foreground" />
                                                     </span>
@@ -419,9 +433,9 @@ export function Pricing() {
                                         </tr>
                                         {section.rows.map((row) => (
                                             <tr key={row.feature} className="border-b border-border/40">
-                                                <td className="sticky left-0 z-10 bg-background px-4 py-3 text-sm text-foreground sm:px-5 xl:static">{row.feature}</td>
+                                                <td className="px-4 py-3 text-sm text-foreground md:px-5">{row.feature}</td>
                                                 {tiers.map((tier) => (
-                                                    <td key={tier.name} className="px-5 py-3 text-center">
+                                                    <td key={tier.name} className={cn("px-4 py-3 text-center md:table-cell md:px-5", tier.name !== mobilePlan && "hidden")}>
                                                         {renderMatrixValue(row.values[tier.name])}
                                                     </td>
                                                 ))}
