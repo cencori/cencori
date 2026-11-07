@@ -298,14 +298,24 @@ async function forward(req: NextRequest, path: string[]): Promise<Response> {
       });
     }
     console.error(`[Tensor proxy] Gateway ${upstream.status} for user ${session.user.id}: ${raw.slice(0, 500)}`);
+    // A request the gateway rejected (4xx) is rejected the same way every time it is sent. Reported
+    // as a retryable 503 it was resent five times over about two and a half minutes before the task
+    // failed anyway, so it keeps its client-error status and fails at once. Rate limits (429) and
+    // the gateway's own failures (5xx) are worth retrying and say so.
+    const rejected = upstream.status >= 400 && upstream.status < 500 && upstream.status !== 429;
     return NextResponse.json(
       {
-        error: {
-          message: "Tensor couldn't reach the model just now. Please try again in a moment.",
-          code: "tensor_upstream_unavailable",
-        },
+        error: rejected
+          ? {
+              message: "Tensor couldn't send this request to the model. Starting a new task usually clears it.",
+              code: "tensor_request_rejected",
+            }
+          : {
+              message: "Tensor couldn't reach the model just now. Please try again in a moment.",
+              code: "tensor_upstream_unavailable",
+            },
       },
-      { status: 503, headers: { "Cache-Control": "no-store" } },
+      { status: rejected ? 400 : 503, headers: { "Cache-Control": "no-store" } },
     );
   }
 

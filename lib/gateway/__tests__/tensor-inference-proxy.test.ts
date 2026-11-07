@@ -174,6 +174,35 @@ describe('what reaches the gateway', () => {
     });
 });
 
+describe('a request the gateway refuses', () => {
+    function gatewayAnswers(status: number, body: unknown) {
+        (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+            new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } }),
+        );
+    }
+
+    // Resent as a 503 it failed the same way five times over two and a half minutes.
+    it('fails at once when the gateway rejects the request itself', async () => {
+        signedIn(true);
+        gatewayAnswers(400, { error: { message: 'Unsupported input item type.', code: 'invalid_request' } });
+        const response = await POST(request(), at('responses'));
+        expect(response.status).toBe(400);
+        expect((await response.json()).error.code).toBe('tensor_request_rejected');
+    });
+
+    it('stays retryable when the gateway or its provider fails', async () => {
+        signedIn(true);
+        gatewayAnswers(502, { error: { message: 'upstream down' } });
+        expect((await POST(request(), at('responses'))).status).toBe(503);
+    });
+
+    it('stays retryable when the provider rate limits', async () => {
+        signedIn(true);
+        gatewayAnswers(429, { error: { message: 'slow down' } });
+        expect((await POST(request(), at('responses'))).status).toBe(503);
+    });
+});
+
 describe('what the product key may be spent on', () => {
     function get(path: string[], token = 'session-token') {
         return [
