@@ -1,33 +1,67 @@
 'use client';
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { Activity, Shield, Building2, FolderOpen, Key, Users, DollarSign, Zap, Settings, ScanSearch, Radio, Database, Bot } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { useReducedMotion } from 'framer-motion';
 import { useGatewayLatency, usePlatformMetrics } from '../hooks/useMetrics';
-import { MetricsCard, MetricsGrid, MetricsSection } from '../components/MetricsCard';
-import { TimeRangeSelector } from '../components/TimeRangeSelector';
-import type { CaptureMetrics, LatencyByCountry, LatencyWindow, TimePeriod } from '../lib/types';
+import type { CaptureMetrics, LatencyByCountry, LatencyWindow, PlatformOverviewMetrics, TimePeriod } from '../lib/types';
+import {
+    MetricCardFrame,
+    type MetricCardConfig,
+} from '@/components/dashboard/project-overview/ProjectOverviewDashboard';
+import { BarBreakdownChart } from '@/components/dashboard/project-overview/ModelBreakdown';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { StatCard } from '../components/StatCard';
 
-const PERIOD_LABELS: Record<TimePeriod, string> = {
-    '1h': '1h',
-    '24h': '24h',
-    '7d': '7d',
-    '30d': '30d',
-    '90d': '90d',
-    '1y': '1y',
-    'all': 'all time',
-};
+// Platform analytics in the console's card style (same chrome as the project
+// usage charts): stat cards for snapshot numbers, bar charts for breakdowns.
+// The time series live on the internal Overview.
+
+const PERIODS: Array<{ value: TimePeriod; label: string }> = [
+    { value: '1h', label: 'Last hour' },
+    { value: '24h', label: '24 hours' },
+    { value: '7d', label: '7 days' },
+    { value: '30d', label: '30 days' },
+    { value: '90d', label: '90 days' },
+    { value: '1y', label: '1 year' },
+    { value: 'all', label: 'All time' },
+];
 
 // A metric whose query failed reads as "—". A zero here would claim "no
 // traffic", which is exactly how a timed-out query used to look.
 const UNAVAILABLE = '—';
-const UNAVAILABLE_NOTE = 'query failed · not zero';
 
-function metric(value: number | null): number | string {
-    return value === null ? UNAVAILABLE : value;
+const BAR_LIMIT = 6;
+const compact = new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 });
+
+const COLORS = {
+    amber: '#f59e0b',
+    green: '#22c55e',
+    orange: '#f97316',
+    blue: '#3b82f6',
+    violet: '#8b5cf6',
+    red: '#ef4444',
+    cyan: '#06b6d4',
+    pink: '#ec4899',
+};
+
+function n(value: number | null | undefined): string {
+    return value === null || value === undefined ? UNAVAILABLE : value.toLocaleString();
+}
+
+function plural(count: number, word: string): string {
+    return `${count.toLocaleString()} ${word}${count === 1 ? '' : 's'}`;
+}
+
+function usd(value: number): string {
+    return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 /** Governed share of gateway traffic; null when either side is unreadable. */
@@ -38,467 +72,298 @@ function governedShare(capture: CaptureMetrics): number | null {
     return Math.min(100, (governanceDecisions / gatewayRequests) * 100);
 }
 
+function topEntries(record: Record<string, number>, limit = BAR_LIMIT) {
+    const sorted = Object.entries(record)
+        .filter(([, value]) => value > 0)
+        .sort(([, a], [, b]) => b - a);
+    const top = sorted.slice(0, limit).map(([name, value]) => ({ name, value }));
+    const rest = sorted.slice(limit).reduce((sum, [, value]) => sum + value, 0);
+    return rest > 0 ? [...top, { name: 'Other', value: rest }] : top;
+}
+
+function frameConfig(title: string, detail: string, color: string, value: string): MetricCardConfig {
+    return {
+        title,
+        detail,
+        series: [{ key: 'value', label: title, color, value }],
+        formatValue: (v) => v.toLocaleString(),
+        formatAxis: (v) => compact.format(v),
+    };
+}
+
 export function AdminDashboard() {
     const [period, setPeriod] = useState<TimePeriod>('7d');
     const { data, isLoading, error } = usePlatformMetrics(period);
-    const gatewayDown = Boolean(data?.aiGateway.unavailable);
-    const securityDown = Boolean(data?.security.unavailable);
-
-    if (error) {
-        return (
-            <div className="w-full max-w-6xl mx-auto px-6 py-8">
-                <div className="text-center py-12">
-                    <p className="text-sm text-red-500">Failed to load metrics</p>
-                    <p className="text-xs text-muted-foreground mt-1">{(error as Error).message}</p>
-                </div>
-            </div>
-        );
-    }
+    const periodLabel = PERIODS.find((option) => option.value === period)?.label ?? '7 days';
 
     return (
-        <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 sm:space-y-8">
-            {/* Header */}
-            <div className="space-y-3">
-                <div className="flex items-start justify-between">
-                    <div>
-                        <h1 className="text-lg sm:text-xl font-semibold">Platform Analytics</h1>
-                        <p className="text-xs text-muted-foreground">Real-time metrics across all Cencori services</p>
-                    </div>
-                    <Link href="/internal/settings">
-                        <Button variant="outline" size="sm" className="h-8 text-xs rounded-full">
-                            <Settings className="h-3.5 w-3.5 mr-1.5" />
-                            Team
-                        </Button>
-                    </Link>
+        <section className="mx-auto w-full max-w-[1180px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+            <div className="mb-8 flex items-center justify-between gap-4">
+                <h1 className="text-sm font-medium tracking-[-0.02em]">Analytics</h1>
+                <Select value={period} onValueChange={(value) => setPeriod(value as TimePeriod)}>
+                    <SelectTrigger
+                        aria-label="Select analytics period"
+                        className="h-8 w-[8.5rem] rounded-md border-border/45 bg-muted/20 px-3 text-[11px] shadow-none"
+                    >
+                        <SelectValue placeholder="Period" />
+                    </SelectTrigger>
+                    <SelectContent align="end">
+                        {PERIODS.map((option) => (
+                            <SelectItem key={option.value} value={option.value} className="text-xs">
+                                {option.label}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+
+            {error ? (
+                <div className="rounded-md border border-red-500/20 bg-red-500/[0.04] px-4 py-3 text-[11px] text-red-600 dark:text-red-400">
+                    We couldn&apos;t load platform analytics. {(error as Error).message}
                 </div>
-                <TimeRangeSelector value={period} onChange={setPeriod} />
-            </div>
-
-            {isLoading ? (
+            ) : isLoading || !data ? (
                 <LoadingSkeleton />
-            ) : data ? (
-                <>
-                    {/* Throughput — the counter (Panel 1) */}
-                    <MetricsSection
-                        title="Throughput"
-                        description={`What % of global AI runs on Cencori — the numerator we grow (${PERIOD_LABELS[period]})`}
+            ) : (
+                <Dashboard data={data} periodLabel={periodLabel} />
+            )}
+
+            {data && (
+                <p className="mt-8 text-center text-[10px] text-muted-foreground">
+                    Last updated {new Date(data.generatedAt).toLocaleString()}
+                </p>
+            )}
+        </section>
+    );
+}
+
+function Dashboard({ data, periodLabel }: { data: PlatformOverviewMetrics; periodLabel: string }) {
+    const reduceMotion = useReducedMotion();
+    const gateway = data.aiGateway;
+    const gatewayDown = Boolean(gateway.unavailable);
+    const security = data.security;
+    const securityDown = Boolean(security.unavailable);
+    const share = governedShare(data.capture);
+    const errorRate = gateway.totalRequests > 0 ? (gateway.errorRequests / gateway.totalRequests) * 100 : 0;
+    const period = periodLabel.toLowerCase();
+
+    const providerRows = useMemo(() => topEntries(gateway.requestsByProvider), [gateway.requestsByProvider]);
+    const modelRows = useMemo(() => topEntries(gateway.requestsByModel), [gateway.requestsByModel]);
+    const severityRows = [
+        { name: 'Critical', value: security.incidentsBySeverity.critical },
+        { name: 'High', value: security.incidentsBySeverity.high },
+        { name: 'Medium', value: security.incidentsBySeverity.medium },
+        { name: 'Low', value: security.incidentsBySeverity.low },
+    ].filter((row) => row.value > 0);
+    const incidentTypeRows = useMemo(() => topEntries(security.incidentsByType), [security.incidentsByType]);
+    const heardAboutRows = data.users.heardAbout.map((row) => ({ name: row.label, value: row.count }));
+    const productRows = useMemo(() => topEntries(data.platformEvents.eventsByProduct), [data.platformEvents.eventsByProduct]);
+    const eventTypeRows = useMemo(() => topEntries(data.platformEvents.eventsByType), [data.platformEvents.eventsByType]);
+    const scoreRows = (['A', 'B', 'C', 'D', 'F'] as const)
+        .map((tier) => ({ name: `${tier}-Tier`, value: data.scan.scoreBreakdown[tier] }))
+        .filter((row) => row.value > 0);
+    const scanPlatformRows = [
+        { name: 'macOS', value: data.scan.platformBreakdown.darwin },
+        { name: 'Linux', value: data.scan.platformBreakdown.linux },
+        { name: 'Windows', value: data.scan.platformBreakdown.win32 },
+        { name: 'Other', value: data.scan.platformBreakdown.other },
+    ].filter((row) => row.value > 0);
+
+    return (
+        <div className="space-y-10">
+            <Section title="Throughput">
+                <StatCard
+                    title="AI throughput"
+                    detail={period}
+                    stats={[
+                        { label: 'Tokens processed', value: gatewayDown ? UNAVAILABLE : gateway.totalTokens.toLocaleString(), color: COLORS.blue, large: true },
+                        { label: 'Requests', value: gatewayDown ? UNAVAILABLE : gateway.totalRequests.toLocaleString(), color: COLORS.amber },
+                        { label: 'Cost', value: gatewayDown ? UNAVAILABLE : usd(gateway.totalCost), color: COLORS.orange },
+                        { label: 'Governed', value: share === null ? UNAVAILABLE : `${share.toFixed(0)}%`, color: COLORS.violet },
+                    ]}
+                    note={gatewayDown ? 'Gateway query failed. This is not zero traffic.' : undefined}
+                />
+            </Section>
+
+            <Section title="Capture by product">
+                <StatCard
+                    title="Workloads captured"
+                    detail={period}
+                    stats={[
+                        { label: 'Gateway requests', value: n(data.capture.gatewayRequests), color: COLORS.amber },
+                        { label: 'Governed events', value: n(data.capture.governanceDecisions), color: COLORS.violet },
+                        { label: 'Memories', value: n(data.capture.memories), color: COLORS.cyan },
+                        { label: 'Agent sessions', value: n(data.capture.agentSessions), color: COLORS.pink },
+                    ]}
+                />
+            </Section>
+
+            <Section title="AI Gateway">
+                <StatCard
+                    title="Requests"
+                    detail={gatewayDown ? 'query failed, not zero' : `${gateway.successfulRequests.toLocaleString()} successful`}
+                    stats={[
+                        { label: 'Total requests', value: gatewayDown ? UNAVAILABLE : gateway.totalRequests.toLocaleString(), color: COLORS.amber },
+                        { label: 'Avg latency', value: gatewayDown ? UNAVAILABLE : `${gateway.avgLatency.toLocaleString()}ms`, color: COLORS.green },
+                        { label: 'Streaming', value: gatewayDown ? UNAVAILABLE : n(gateway.streamingRequests), color: COLORS.blue },
+                        {
+                            label: 'Error rate',
+                            value: gatewayDown ? UNAVAILABLE : `${errorRate.toFixed(1)}%`,
+                            color: COLORS.red,
+                            hint: gatewayDown ? undefined : `${gateway.errorRequests.toLocaleString()} errors, ${gateway.filteredRequests.toLocaleString()} filtered`,
+                        },
+                    ]}
+                />
+                <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                    <MetricCardFrame
+                        config={frameConfig('Requests by provider', plural(Object.keys(gateway.requestsByProvider).length, 'provider'), COLORS.orange, gatewayDown ? UNAVAILABLE : gateway.totalRequests.toLocaleString())}
+                        loading={false}
                     >
-                        <ThroughputHero
-                            tokens={data.aiGateway.totalTokens}
-                            requests={data.aiGateway.totalRequests}
-                            cost={data.aiGateway.totalCost}
-                            governedShare={governedShare(data.capture)}
-                            unavailable={data.aiGateway.unavailable}
-                            period={period}
-                        />
-                    </MetricsSection>
-
-                    {/* Capture by product (Panel 2) */}
-                    <MetricsSection
-                        title="Capture by product"
-                        description="Each product captures a type of AI workload"
+                        <BarBreakdownChart rows={providerRows} color={COLORS.orange} label="Requests" formatValue={(v) => compact.format(v)} reduceMotion={reduceMotion} labelKind="provider" />
+                    </MetricCardFrame>
+                    <MetricCardFrame
+                        config={frameConfig('Requests by model', plural(Object.keys(gateway.requestsByModel).length, 'model'), COLORS.violet, gatewayDown ? UNAVAILABLE : gateway.totalRequests.toLocaleString())}
+                        loading={false}
                     >
-                        <MetricsGrid columns={4}>
-                            <MetricsCard
-                                title="Gateway"
-                                value={metric(data.capture.gatewayRequests)}
-                                subtitle={
-                                    data.aiGateway.unavailable
-                                        ? 'model traffic · unavailable'
-                                        : `${data.aiGateway.totalTokens.toLocaleString()} tokens · model traffic`
-                                }
-                                subtitleColor={data.aiGateway.unavailable ? 'warning' : 'success'}
-                                icon={<Activity className="h-4 w-4" />}
-                            />
-                            <MetricsCard
-                                title="Governance"
-                                value={metric(data.capture.governanceDecisions)}
-                                subtitle="governed events · enterprise usage"
-                                icon={<Shield className="h-4 w-4" />}
-                            />
-                            <MetricsCard
-                                title="Memory"
-                                value={metric(data.capture.memories)}
-                                subtitle="memories · state captured"
-                                icon={<Database className="h-4 w-4" />}
-                            />
-                            <MetricsCard
-                                title="Agents"
-                                value={metric(data.capture.agentSessions)}
-                                subtitle="sessions · agent workloads"
-                                icon={<Bot className="h-4 w-4" />}
-                            />
-                        </MetricsGrid>
-                    </MetricsSection>
+                        <BarBreakdownChart rows={modelRows} color={COLORS.violet} label="Requests" formatValue={(v) => compact.format(v)} reduceMotion={reduceMotion} labelKind="model" />
+                    </MetricCardFrame>
+                </div>
+            </Section>
 
-                    {/* AI Gateway Section */}
-                    <MetricsSection
-                        title="AI Gateway"
-                        description="Request processing and cost metrics"
+            <Section title="Latency by country">
+                <LatencyComparison />
+            </Section>
+
+            <Section title="Security">
+                <div className="grid gap-4 lg:grid-cols-2">
+                    <MetricCardFrame
+                        config={frameConfig('Incidents by severity', securityDown ? 'query failed, not zero' : `${security.incidentsBySeverity.critical} critical`, COLORS.red, securityDown ? UNAVAILABLE : security.totalIncidents.toLocaleString())}
+                        loading={false}
                     >
-                        <MetricsGrid columns={4}>
-                            <MetricsCard
-                                title="Total Requests"
-                                value={gatewayDown ? UNAVAILABLE : data.aiGateway.totalRequests}
-                                subtitle={gatewayDown ? UNAVAILABLE_NOTE : `${data.aiGateway.successfulRequests} successful`}
-                                subtitleColor={gatewayDown ? 'warning' : 'success'}
-                                icon={<Activity className="h-4 w-4" />}
-                            />
-                            <MetricsCard
-                                title="Total Cost"
-                                value={gatewayDown ? UNAVAILABLE : `$${data.aiGateway.totalCost.toFixed(2)}`}
-                                subtitle={gatewayDown ? UNAVAILABLE_NOTE : `${data.aiGateway.totalTokens.toLocaleString()} tokens`}
-                                subtitleColor={gatewayDown ? 'warning' : 'default'}
-                                icon={<DollarSign className="h-4 w-4" />}
-                            />
-                            <MetricsCard
-                                title="Avg Latency"
-                                value={gatewayDown ? UNAVAILABLE : `${data.aiGateway.avgLatency}ms`}
-                                subtitle={gatewayDown ? UNAVAILABLE_NOTE : `${metric(data.aiGateway.streamingRequests)} streaming`}
-                                subtitleColor={gatewayDown ? 'warning' : 'default'}
-                                icon={<Zap className="h-4 w-4" />}
-                            />
-                            <MetricsCard
-                                title="Error Rate"
-                                value={gatewayDown ? UNAVAILABLE : `${data.aiGateway.totalRequests > 0
-                                    ? ((data.aiGateway.errorRequests / data.aiGateway.totalRequests) * 100).toFixed(1)
-                                    : 0}%`}
-                                subtitle={gatewayDown ? UNAVAILABLE_NOTE : `${data.aiGateway.errorRequests} errors, ${data.aiGateway.filteredRequests} filtered`}
-                                subtitleColor={gatewayDown ? 'warning' : data.aiGateway.errorRequests > 0 ? 'error' : 'success'}
-                            />
-                        </MetricsGrid>
-
-                        {/* Provider & Model Breakdown */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <BreakdownCard
-                                title="By Provider"
-                                data={data.aiGateway.requestsByProvider}
-                                total={data.aiGateway.totalRequests}
-                            />
-                            <BreakdownCard
-                                title="By Model"
-                                data={data.aiGateway.requestsByModel}
-                                total={data.aiGateway.totalRequests}
-                            />
-                        </div>
-                    </MetricsSection>
-
-                    {/* Gateway latency by country, before and after the move to Lagos */}
-                    <MetricsSection
-                        title="Latency by country"
-                        description="Median time to first token and to completion, Vercel (14 days before the move) vs Lagos (since)"
+                        <BarBreakdownChart rows={severityRows} color={COLORS.red} label="Incidents" formatValue={(v) => compact.format(v)} reduceMotion={reduceMotion} labelKind="plain" />
+                    </MetricCardFrame>
+                    <MetricCardFrame
+                        config={frameConfig('Incidents by type', plural(Object.keys(security.incidentsByType).length, 'type'), COLORS.amber, securityDown ? UNAVAILABLE : security.totalIncidents.toLocaleString())}
+                        loading={false}
                     >
-                        <LatencyComparison />
-                    </MetricsSection>
+                        <BarBreakdownChart rows={incidentTypeRows} color={COLORS.amber} label="Incidents" formatValue={(v) => compact.format(v)} reduceMotion={reduceMotion} labelKind="plain" />
+                    </MetricCardFrame>
+                </div>
+            </Section>
 
-                    {/* Security Section */}
-                    <MetricsSection
-                        title="Security"
-                        description="Threats detected and blocked"
+            <Section title="Organizations & projects">
+                <StatCard
+                    title="Adoption"
+                    detail={`active in ${period}`}
+                    stats={[
+                        { label: 'Organizations', value: data.organizations.total.toLocaleString(), color: COLORS.pink, hint: `${data.organizations.active.toLocaleString()} active` },
+                        { label: 'Projects', value: data.projects.total.toLocaleString(), color: COLORS.blue, hint: `${data.projects.active.toLocaleString()} active` },
+                        { label: 'API keys', value: data.apiKeys.total.toLocaleString(), color: COLORS.amber, hint: `${data.apiKeys.active.toLocaleString()} active` },
+                        { label: 'Team members', value: data.organizations.totalMembers.toLocaleString(), color: COLORS.green },
+                    ]}
+                />
+            </Section>
+
+            <Section title="Users">
+                <StatCard
+                    title="Signups"
+                    detail={`${data.users.active.toLocaleString()} active in ${period}`}
+                    stats={[
+                        { label: 'Total users', value: data.users.total.toLocaleString(), color: COLORS.cyan },
+                        { label: `New in ${period}`, value: data.users.newThisPeriod.toLocaleString(), color: COLORS.green },
+                        { label: 'New this week', value: data.users.newThisWeek.toLocaleString(), color: COLORS.blue },
+                        { label: 'New this month', value: data.users.newThisMonth.toLocaleString(), color: COLORS.violet },
+                    ]}
+                />
+                <div className="mt-4">
+                    <MetricCardFrame
+                        config={frameConfig('How people heard about us', `${data.users.heardAboutAnswered} of ${data.users.newThisPeriod} new users answered`, COLORS.cyan, data.users.heardAboutAnswered.toLocaleString())}
+                        loading={false}
                     >
-                        <MetricsGrid columns={4}>
-                            <MetricsCard
-                                title="Total Incidents"
-                                value={securityDown ? UNAVAILABLE : data.security.totalIncidents}
-                                subtitle={securityDown ? UNAVAILABLE_NOTE : undefined}
-                                subtitleColor="warning"
-                                icon={<Shield className="h-4 w-4" />}
-                            />
-                            <MetricsCard
-                                title="Critical"
-                                value={securityDown ? UNAVAILABLE : data.security.incidentsBySeverity.critical}
-                                subtitleColor={data.security.incidentsBySeverity.critical > 0 ? 'error' : 'default'}
-                            />
-                            <MetricsCard
-                                title="High"
-                                value={securityDown ? UNAVAILABLE : data.security.incidentsBySeverity.high}
-                                subtitleColor={data.security.incidentsBySeverity.high > 0 ? 'warning' : 'default'}
-                            />
-                            <MetricsCard
-                                title="Medium / Low"
-                                value={securityDown
-                                    ? UNAVAILABLE
-                                    : `${data.security.incidentsBySeverity.medium} / ${data.security.incidentsBySeverity.low}`}
-                            />
-                        </MetricsGrid>
-                    </MetricsSection>
+                        <BarBreakdownChart rows={heardAboutRows} color={COLORS.cyan} label="Users" formatValue={(v) => compact.format(v)} reduceMotion={reduceMotion} labelKind="plain" />
+                    </MetricCardFrame>
+                </div>
+            </Section>
 
-                    {/* Organizations & Projects */}
-                    <MetricsSection
-                        title="Organizations & Projects"
-                        description="Platform adoption metrics"
+            <Section title="Billing & revenue">
+                <StatCard
+                    title="Subscriptions"
+                    detail={`${data.billing.activeSubscriptions} paid`}
+                    stats={[
+                        { label: 'Plan MRR (estimate)', value: `$${data.billing.mrr.toLocaleString()}`, color: COLORS.green, hint: 'list prices; real money is on Revenue' },
+                        { label: 'Active subscriptions', value: data.billing.activeSubscriptions.toLocaleString(), color: COLORS.blue },
+                        { label: `Churned in ${period}`, value: data.billing.churnedThisPeriod.toLocaleString(), color: COLORS.red },
+                        {
+                            label: 'Avg revenue / sub',
+                            value: data.billing.activeSubscriptions > 0 ? `$${(data.billing.mrr / data.billing.activeSubscriptions).toFixed(0)}` : '$0',
+                            color: COLORS.orange,
+                        },
+                    ]}
+                />
+            </Section>
+
+            <Section title="Platform events">
+                <StatCard
+                    title="Events"
+                    detail={`${data.platformEvents.eventsToday.toLocaleString()} today`}
+                    stats={[
+                        { label: 'Total events', value: data.platformEvents.totalEvents.toLocaleString(), color: COLORS.violet },
+                        { label: 'Products', value: Object.keys(data.platformEvents.eventsByProduct).length.toLocaleString(), color: COLORS.blue },
+                        { label: 'Event types', value: Object.keys(data.platformEvents.eventsByType).length.toLocaleString(), color: COLORS.amber },
+                        { label: 'Today', value: data.platformEvents.eventsToday.toLocaleString(), color: COLORS.green },
+                    ]}
+                />
+                <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                    <MetricCardFrame
+                        config={frameConfig('Events by product', plural(Object.keys(data.platformEvents.eventsByProduct).length, 'product'), COLORS.blue, data.platformEvents.totalEvents.toLocaleString())}
+                        loading={false}
                     >
-                        <MetricsGrid columns={4}>
-                            <MetricsCard
-                                title="Organizations"
-                                value={data.organizations.total}
-                                subtitle={`${data.organizations.active} active`}
-                                subtitleColor="success"
-                                icon={<Building2 className="h-4 w-4" />}
-                            />
-                            <MetricsCard
-                                title="Projects"
-                                value={data.projects.total}
-                                subtitle={`${data.projects.active} active`}
-                                subtitleColor="success"
-                                icon={<FolderOpen className="h-4 w-4" />}
-                            />
-                            <MetricsCard
-                                title="API Keys"
-                                value={data.apiKeys.total}
-                                subtitle={`${data.apiKeys.active} active`}
-                                subtitleColor="success"
-                                icon={<Key className="h-4 w-4" />}
-                            />
-                            <MetricsCard
-                                title="Team Members"
-                                value={data.organizations.totalMembers}
-                                icon={<Users className="h-4 w-4" />}
-                            />
-                        </MetricsGrid>
-                    </MetricsSection>
-
-                    {/* Users */}
-                    <MetricsSection
-                        title="Users"
-                        description="Signup and activity metrics"
+                        <BarBreakdownChart rows={productRows} color={COLORS.blue} label="Events" formatValue={(v) => compact.format(v)} reduceMotion={reduceMotion} labelKind="plain" />
+                    </MetricCardFrame>
+                    <MetricCardFrame
+                        config={frameConfig('Events by type', plural(Object.keys(data.platformEvents.eventsByType).length, 'type'), COLORS.violet, data.platformEvents.totalEvents.toLocaleString())}
+                        loading={false}
                     >
-                        <MetricsGrid columns={4}>
-                            <MetricsCard
-                                title="Total Users"
-                                value={data.users.total}
-                                subtitle={`${data.users.active} active (${PERIOD_LABELS[period]})`}
-                                subtitleColor="success"
-                                icon={<Users className="h-4 w-4" />}
-                            />
-                            <MetricsCard
-                                title="New This Period"
-                                value={data.users.newThisPeriod}
-                                subtitle={PERIOD_LABELS[period]}
-                                subtitleColor={data.users.newThisPeriod > 0 ? 'success' : 'default'}
-                            />
-                            <MetricsCard
-                                title="New This Week"
-                                value={data.users.newThisWeek}
-                            />
-                            <MetricsCard
-                                title="New This Month"
-                                value={data.users.newThisMonth}
-                            />
-                        </MetricsGrid>
-                        <div className="mt-4 rounded-lg border border-border/60 p-4">
-                            <div className="flex items-baseline justify-between gap-3">
-                                <h3 className="text-sm font-medium">How people heard about us</h3>
-                                <span className="text-xs text-muted-foreground">
-                                    {data.users.heardAboutAnswered} of {data.users.newThisPeriod} new users answered ({PERIOD_LABELS[period]})
-                                </span>
-                            </div>
-                            {data.users.heardAbout.length === 0 ? (
-                                <p className="mt-3 text-xs text-muted-foreground">No answers in this period yet.</p>
-                            ) : (
-                                <ul className="mt-3 space-y-2">
-                                    {data.users.heardAbout.map((row) => {
-                                        const total = data.users.heardAbout.reduce((sum, r) => sum + r.count, 0);
-                                        const share = Math.round((row.count / total) * 100);
-                                        return (
-                                            <li key={row.source} className="text-sm">
-                                                <div className="flex justify-between gap-3"><span>{row.label}</span><span className="tabular-nums text-muted-foreground">{row.count} · {share}%</span></div>
-                                                <div className="mt-1 h-1.5 rounded-full bg-muted"><div className="h-1.5 rounded-full bg-foreground" style={{ width: `${share}%` }} /></div>
-                                            </li>
-                                        );
-                                    })}
-                                </ul>
-                            )}
-                        </div>
-                    </MetricsSection>
+                        <BarBreakdownChart rows={eventTypeRows} color={COLORS.violet} label="Events" formatValue={(v) => compact.format(v)} reduceMotion={reduceMotion} labelKind="plain" />
+                    </MetricCardFrame>
+                </div>
+            </Section>
 
-                    {/* Billing / Revenue */}
-                    <MetricsSection
-                        title="Billing & Revenue"
-                        description="Subscription and revenue metrics"
+            <Section title="Cencori Scan">
+                <StatCard
+                    title="CLI scans"
+                    detail={`${data.scan.authenticatedScans.toLocaleString()} with an API key`}
+                    stats={[
+                        { label: 'Total scans', value: data.scan.totalScans.toLocaleString(), color: COLORS.green },
+                        { label: 'Conversion rate', value: `${data.scan.conversionRate}%`, color: COLORS.blue, hint: `${data.scan.anonymousScans.toLocaleString()} anonymous` },
+                        { label: 'Files scanned', value: data.scan.totalFilesScanned.toLocaleString(), color: COLORS.violet, hint: `${data.scan.avgIssuesPerScan} avg issues per scan` },
+                        { label: 'Issues found', value: data.scan.totalIssuesFound.toLocaleString(), color: COLORS.red },
+                    ]}
+                />
+                <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                    <MetricCardFrame
+                        config={frameConfig('Scans by score', '5 tiers', COLORS.green, data.scan.totalScans.toLocaleString())}
+                        loading={false}
                     >
-                        <MetricsGrid columns={4}>
-                            <MetricsCard
-                                title="MRR"
-                                value={`$${data.billing.mrr.toLocaleString()}`}
-                                subtitle={`${data.billing.activeSubscriptions} paid subscriptions`}
-                                subtitleColor="success"
-                                icon={<DollarSign className="h-4 w-4" />}
-                            />
-                            <MetricsCard
-                                title="Active Subscriptions"
-                                value={data.billing.activeSubscriptions}
-                                subtitleColor="success"
-                            />
-                            <MetricsCard
-                                title="Churned"
-                                value={data.billing.churnedThisPeriod}
-                                subtitle="this period"
-                                subtitleColor={data.billing.churnedThisPeriod > 0 ? 'warning' : 'default'}
-                            />
-                            <MetricsCard
-                                title="Avg Revenue / User"
-                                value={data.billing.activeSubscriptions > 0
-                                    ? `$${(data.billing.mrr / data.billing.activeSubscriptions).toFixed(0)}`
-                                    : '$0'
-                                }
-                            />
-                        </MetricsGrid>
-                    </MetricsSection>
-
-                    {/* Platform Events Section */}
-                    <MetricsSection
-                        title="Platform Events"
-                        description="Cross-platform user activity tracking"
+                        <BarBreakdownChart rows={scoreRows} color={COLORS.green} label="Scans" formatValue={(v) => compact.format(v)} reduceMotion={reduceMotion} labelKind="plain" />
+                    </MetricCardFrame>
+                    <MetricCardFrame
+                        config={frameConfig('Scans by platform', plural(scanPlatformRows.length, 'platform'), COLORS.blue, data.scan.totalScans.toLocaleString())}
+                        loading={false}
                     >
-                        <MetricsGrid columns={4}>
-                            <MetricsCard
-                                title="Total Events"
-                                value={data.platformEvents.totalEvents}
-                                subtitle={`${data.platformEvents.eventsToday} today`}
-                                subtitleColor={data.platformEvents.eventsToday > 0 ? 'success' : 'default'}
-                                icon={<Radio className="h-4 w-4" />}
-                            />
-                            <MetricsCard
-                                title="Top Product"
-                                value={Object.entries(data.platformEvents.eventsByProduct).sort((a, b) => b[1] - a[1])[0]?.[0] || 'N/A'}
-                                subtitle={`${Object.entries(data.platformEvents.eventsByProduct).sort((a, b) => b[1] - a[1])[0]?.[1] || 0} events`}
-                            />
-                            <MetricsCard
-                                title="Top Event Type"
-                                value={Object.entries(data.platformEvents.eventsByType).sort((a, b) => b[1] - a[1])[0]?.[0]?.split('.')[1] || 'N/A'}
-                                subtitle={`${Object.entries(data.platformEvents.eventsByType).sort((a, b) => b[1] - a[1])[0]?.[1] || 0} occurrences`}
-                            />
-                            <MetricsCard
-                                title="Event Types"
-                                value={Object.keys(data.platformEvents.eventsByType).length}
-                                subtitle="unique types tracked"
-                            />
-                        </MetricsGrid>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <BreakdownCard
-                                title="By Product"
-                                data={data.platformEvents.eventsByProduct}
-                                total={data.platformEvents.totalEvents}
-                            />
-                            <BreakdownCard
-                                title="By Event Type"
-                                data={data.platformEvents.eventsByType}
-                                total={data.platformEvents.totalEvents}
-                            />
-                        </div>
-                    </MetricsSection>
-
-                    {/* Cencori Scan Section */}
-                    <MetricsSection
-                        title="Cencori Scan"
-                        description="CLI usage and adoption metrics"
-                    >
-                        <MetricsGrid columns={4}>
-                            <MetricsCard
-                                title="Total Scans"
-                                value={data.scan.totalScans}
-                                subtitle={`${data.scan.authenticatedScans} with API key`}
-                                subtitleColor="success"
-                                icon={<ScanSearch className="h-4 w-4" />}
-                            />
-                            <MetricsCard
-                                title="Conversion Rate"
-                                value={`${data.scan.conversionRate}%`}
-                                subtitle={`${data.scan.anonymousScans} anonymous`}
-                                subtitleColor={data.scan.conversionRate > 10 ? 'success' : 'warning'}
-                            />
-                            <MetricsCard
-                                title="Files Scanned"
-                                value={data.scan.totalFilesScanned.toLocaleString()}
-                                subtitle={`${data.scan.avgIssuesPerScan} avg issues/scan`}
-                            />
-                            <MetricsCard
-                                title="Issues Found"
-                                value={data.scan.totalIssuesFound.toLocaleString()}
-                            />
-                        </MetricsGrid>
-
-                        {/* Score & Platform Breakdown */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <BreakdownCard
-                                title="By Score"
-                                data={{
-                                    'A-Tier': data.scan.scoreBreakdown.A,
-                                    'B-Tier': data.scan.scoreBreakdown.B,
-                                    'C-Tier': data.scan.scoreBreakdown.C,
-                                    'D-Tier': data.scan.scoreBreakdown.D,
-                                    'F-Tier': data.scan.scoreBreakdown.F,
-                                }}
-                                total={data.scan.totalScans}
-                            />
-                            <BreakdownCard
-                                title="By Platform"
-                                data={{
-                                    'macOS': data.scan.platformBreakdown.darwin,
-                                    'Linux': data.scan.platformBreakdown.linux,
-                                    'Windows': data.scan.platformBreakdown.win32,
-                                    'Other': data.scan.platformBreakdown.other,
-                                }}
-                                total={data.scan.totalScans}
-                            />
-                        </div>
-                    </MetricsSection>
-                </>
-            ) : null}
-
-            {/* Footer */}
-            <div className="text-center text-[10px] text-muted-foreground pt-4 border-t border-border/40">
-                {data && `Last updated: ${new Date(data.generatedAt).toLocaleString()}`}
-            </div>
+                        <BarBreakdownChart rows={scanPlatformRows} color={COLORS.blue} label="Scans" formatValue={(v) => compact.format(v)} reduceMotion={reduceMotion} labelKind="plain" />
+                    </MetricCardFrame>
+                </div>
+            </Section>
         </div>
     );
 }
 
-// Throughput hero — the headline "AI running on Cencori" counter (Panel 1)
-function ThroughputHero({
-    tokens, requests, cost, governedShare, unavailable, period,
-}: {
-    tokens: number;
-    requests: number;
-    cost: number;
-    governedShare: number | null;
-    unavailable?: boolean;
-    period: TimePeriod;
-}) {
-    const subStat = (label: string, value: string) => (
-        <div>
-            <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">{label}</p>
-            <p className="mt-1 font-mono text-lg tabular-nums">{value}</p>
-        </div>
-    );
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
     return (
-        <div className="rounded-xl border border-border/50 bg-card p-5 sm:p-6">
-            <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-                        AI Throughput · {PERIOD_LABELS[period]}
-                    </p>
-                    <div className="mt-2 flex items-baseline gap-2">
-                        <span className="font-mono text-4xl sm:text-5xl font-semibold tabular-nums">
-                            {unavailable ? UNAVAILABLE : tokens.toLocaleString()}
-                        </span>
-                        <span className="text-sm text-muted-foreground">tokens processed</span>
-                    </div>
-                    <p className={cn('mt-1.5 text-xs', unavailable ? 'text-amber-500' : 'text-muted-foreground')}>
-                        {unavailable
-                            ? 'Gateway metrics query failed — this is not zero traffic.'
-                            : 'The numerator behind “% of global AI on Cencori.”'}
-                    </p>
-                </div>
-                <div className="flex gap-6 sm:gap-8">
-                    {subStat('Requests', unavailable ? UNAVAILABLE : requests.toLocaleString())}
-                    {subStat('Cost', unavailable ? UNAVAILABLE : `$${cost.toFixed(2)}`)}
-                    {subStat('Governed', governedShare === null ? UNAVAILABLE : `${governedShare.toFixed(0)}%`)}
-                </div>
-            </div>
-        </div>
+        <section>
+            <h2 className="mb-4 text-sm font-medium tracking-[-0.02em]">{title}</h2>
+            {children}
+        </section>
     );
 }
 
@@ -511,38 +376,62 @@ function ms(value: number | null | undefined): string {
 
 function LatencyComparison() {
     const { data, isLoading, error } = useGatewayLatency();
-    if (isLoading) return <Skeleton className="h-48 rounded-xl" />;
-    if (error || !data) return <p className="text-xs text-red-500">Failed to load latency</p>;
 
+    const frame = (body: React.ReactNode) => (
+        <article className="flex min-w-0 flex-col overflow-hidden rounded-lg border border-border/40 bg-muted/30">
+            <header className="flex items-center justify-between gap-4 border-b border-border/40 px-5 py-3.5">
+                <p className="text-sm font-medium tracking-[-0.01em] text-foreground">Median time to first token and to completion</p>
+                <span className="text-xs text-muted-foreground">
+                    {data ? `${data.before?.label ?? 'Vercel'} vs ${data.after?.label ?? 'Lagos'}` : 'before vs after the move'}
+                </span>
+            </header>
+            {body}
+        </article>
+    );
+
+    if (isLoading) return frame(<div className="p-5"><Skeleton className="h-48 w-full rounded-sm" /></div>);
+    if (error || !data) return frame(<p className="px-5 py-6 text-xs text-red-600 dark:text-red-400">We couldn&apos;t load latency.</p>);
+
+    const before = new Map((data.before?.countries ?? []).map((row) => [row.country, row]));
     const after = new Map((data.after?.countries ?? []).map((row) => [row.country, row]));
     const countries = [...new Set([
         ...(data.before?.countries ?? []).map((row) => row.country),
         ...(data.after?.countries ?? []).map((row) => row.country),
     ])].slice(0, LATENCY_COUNTRIES);
-    const before = new Map((data.before?.countries ?? []).map((row) => [row.country, row]));
 
-    return (
-        <div className="rounded-xl border border-border/50 bg-card overflow-x-auto">
-            <table className="w-full text-xs">
-                <thead>
-                    <tr className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                        <th className="text-left font-medium px-4 py-3">Country</th>
-                        <th className="text-right font-medium px-3 py-3">Requests</th>
-                        <th className="text-right font-medium px-3 py-3">Preflight</th>
-                        <th className="text-right font-medium px-3 py-3">Provider TTFT</th>
-                        <th className="text-right font-medium px-3 py-3">Client TTFT</th>
-                        <th className="text-right font-medium px-3 py-3">TTFT p90</th>
-                        <th className="text-right font-medium px-4 py-3">Total</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {countries.map((country) => (
-                        <LatencyRows key={country} country={country} before={before.get(country)} after={after.get(country)} windows={[data.before, data.after]} />
-                    ))}
-                </tbody>
-            </table>
-            {countries.length === 0 && <p className="text-xs text-muted-foreground px-4 pb-4">No data</p>}
-        </div>
+    return frame(
+        countries.length === 0 ? (
+            <div className="flex h-40 items-center justify-center">
+                <span className="rounded-md bg-muted px-3 py-1.5 text-[11px] font-medium text-muted-foreground">No data for this period</span>
+            </div>
+        ) : (
+            <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                    <thead>
+                        <tr className="text-[11px] text-muted-foreground">
+                            <th className="px-5 py-3 text-left font-normal">Country</th>
+                            <th className="px-3 py-3 text-right font-normal">Requests</th>
+                            <th className="px-3 py-3 text-right font-normal">Preflight</th>
+                            <th className="px-3 py-3 text-right font-normal">Provider TTFT</th>
+                            <th className="px-3 py-3 text-right font-normal">Client TTFT</th>
+                            <th className="px-3 py-3 text-right font-normal">TTFT p90</th>
+                            <th className="px-5 py-3 text-right font-normal">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {countries.map((country) => (
+                            <LatencyRows
+                                key={country}
+                                country={country}
+                                before={before.get(country)}
+                                after={after.get(country)}
+                                windows={[data.before, data.after]}
+                            />
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        ),
     );
 }
 
@@ -559,72 +448,32 @@ function LatencyRows({ country, before, after, windows }: {
     return (
         <>
             {rows.map(([label, row, failed], index) => (
-                <tr key={label} className={cn(index === 0 && 'border-t border-border/50')}>
-                    <td className="px-4 py-1.5">
-                        {index === 0 && <span className="font-mono font-medium mr-2">{country}</span>}
+                <tr key={label} className={cn(index === 0 && 'border-t border-border/40')}>
+                    <td className="px-5 py-1.5">
+                        {index === 0 && <span className="mr-2 font-mono font-medium">{country}</span>}
                         <span className={cn('text-muted-foreground', index === 1 && 'ml-[calc(2ch+0.5rem)]')}>{label}</span>
                     </td>
-                    <td className="text-right px-3 py-1.5 tabular-nums">{failed ? UNAVAILABLE : (row?.requests ?? 0).toLocaleString()}</td>
-                    <td className="text-right px-3 py-1.5 tabular-nums">{ms(row?.preflightP50)}</td>
-                    <td className="text-right px-3 py-1.5 tabular-nums">{ms(row?.providerTtftP50)}</td>
-                    <td className="text-right px-3 py-1.5 tabular-nums font-medium">{ms(row?.clientTtftP50)}</td>
-                    <td className="text-right px-3 py-1.5 tabular-nums">{ms(row?.clientTtftP90)}</td>
-                    <td className="text-right px-4 py-1.5 tabular-nums">{ms(row?.latencyP50)}</td>
+                    <td className="px-3 py-1.5 text-right font-mono tabular-nums">{failed ? UNAVAILABLE : (row?.requests ?? 0).toLocaleString()}</td>
+                    <td className="px-3 py-1.5 text-right font-mono tabular-nums">{ms(row?.preflightP50)}</td>
+                    <td className="px-3 py-1.5 text-right font-mono tabular-nums">{ms(row?.providerTtftP50)}</td>
+                    <td className="px-3 py-1.5 text-right font-mono font-medium tabular-nums">{ms(row?.clientTtftP50)}</td>
+                    <td className="px-3 py-1.5 text-right font-mono tabular-nums">{ms(row?.clientTtftP90)}</td>
+                    <td className="px-5 py-1.5 text-right font-mono tabular-nums">{ms(row?.latencyP50)}</td>
                 </tr>
             ))}
         </>
     );
 }
 
-// Breakdown card for provider/model distribution
-function BreakdownCard({ title, data, total }: { title: string; data: Record<string, number>; total: number }) {
-    const sortedEntries = Object.entries(data).sort((a, b) => b[1] - a[1]).slice(0, 5);
-
-    return (
-        <div className="rounded-xl border border-border/50 bg-card p-4">
-            <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-3">
-                {title}
-            </p>
-            <div className="space-y-2">
-                {sortedEntries.length > 0 ? sortedEntries.map(([key, value]) => (
-                    <div key={key} className="flex items-center gap-2">
-                        <div className="flex-1">
-                            <div className="flex justify-between text-xs mb-0.5">
-                                <span className="font-mono truncate">{key}</span>
-                                <span className="text-muted-foreground">{value}</span>
-                            </div>
-                            <div className="h-1 bg-muted rounded-full overflow-hidden">
-                                <div
-                                    className="h-full bg-emerald-500 rounded-full"
-                                    style={{ width: `${total > 0 ? (value / total) * 100 : 0}%` }}
-                                />
-                            </div>
-                        </div>
-                    </div>
-                )) : (
-                    <p className="text-xs text-muted-foreground">No data</p>
-                )}
-            </div>
-        </div>
-    );
-}
-
-// Loading skeleton
 function LoadingSkeleton() {
     return (
-        <div className="space-y-8">
-            <div className="space-y-4">
-                <Skeleton className="h-4 w-32" />
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-24 rounded-xl" />)}
+        <div className="space-y-10">
+            {[0, 1, 2].map((i) => (
+                <div key={i}>
+                    <Skeleton className="mb-4 h-4 w-32 rounded-sm" />
+                    <Skeleton className="h-36 w-full rounded-lg" />
                 </div>
-            </div>
-            <div className="space-y-4">
-                <Skeleton className="h-4 w-24" />
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-24 rounded-xl" />)}
-                </div>
-            </div>
+            ))}
         </div>
     );
 }

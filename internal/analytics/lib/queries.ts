@@ -737,7 +737,8 @@ export async function getCaptureMetrics(period: TimePeriod): Promise<CaptureMetr
 
     const rollup = await callAnalyticsRpc<CaptureRollup>('analytics_capture_metrics', startISO);
     if (rollup === RPC_FAILED) {
-        return { gatewayRequests: 0, governanceDecisions: 0, memories: 0, agentSessions: 0 };
+        // Unknown, not zero: the page renders null as "—".
+        return { gatewayRequests: null, governanceDecisions: null, memories: null, agentSessions: null };
     }
     if (rollup) {
         return {

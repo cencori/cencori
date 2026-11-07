@@ -21,6 +21,7 @@ import {
   majorAmountToMinor,
 } from '@/lib/tensor-billing';
 import { applyPaidCreditTopup } from '@/lib/billing/paid-credit-topups';
+import { bachsPaymentRow, recordPaymentSafely } from '@/lib/billing/payments-ledger';
 import { getBachsTopupVerificationFailure, verifyBachsNgnTopupCharge } from '@/lib/billing/verify-paid-topups';
 import { CARD_TOPUP_FEE_PERCENT, CREDIT_NGN_PER_USD, ngnTopupCredits } from '@/lib/billing/credit-pricing';
 import {
@@ -331,6 +332,33 @@ async function handleCollectionSucceeded(
   }
 }
 
+/**
+ * Add a succeeded collection to the revenue ledger (public.payments). Reads
+ * the charge back from Bachs so the amount is what was actually paid. Never
+ * throws: the purchase has been granted by now.
+ */
+async function recordCollectionPayment(
+  data: BachsCollectionData,
+  supabase: ReturnType<typeof createAdminClient>
+) {
+  if (!data.charge_id) return;
+  try {
+    const charge = await getCharge(data.charge_id);
+    const row = bachsPaymentRow(charge);
+    if (row && !row.organization_id && data.customer?.id) {
+      const { data: org } = await supabase
+        .from('organizations')
+        .select('id')
+        .eq('bachs_customer_id', data.customer.id)
+        .maybeSingle();
+      row.organization_id = org?.id ?? null;
+    }
+    await recordPaymentSafely(supabase, row, 'Bachs webhook');
+  } catch (error) {
+    console.error('[Bachs Webhook] Could not record payment', { charge_id: data.charge_id, error });
+  }
+}
+
 async function handleCollectionFailed(
   data: BachsCollectionData,
   supabase: ReturnType<typeof createAdminClient>
@@ -459,6 +487,7 @@ export async function POST(req: NextRequest) {
     switch (event.type) {
       case 'collection.succeeded':
         await handleCollectionSucceeded(event.data, supabase);
+        await recordCollectionPayment(event.data, supabase);
         break;
       case 'collection.failed':
         await handleCollectionFailed(event.data, supabase);

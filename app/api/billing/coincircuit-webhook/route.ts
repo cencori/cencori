@@ -5,6 +5,7 @@ import { trackEvent } from '@/lib/track-event';
 import { writeAuditLog } from '@/lib/audit-log';
 import { verifyWebhookSignature, type CoinCircuitWebhookPayload } from '@/lib/coincircuit';
 import { CREDIT_TOPUP_PACKS } from '@/lib/bachsClient';
+import { recordPaymentSafely } from '@/lib/billing/payments-ledger';
 import { CRYPTO_TOPUP_FEE_PERCENT, netTopupCredits } from '@/lib/billing/credit-pricing';
 import { isVerifiedCryptoTopupSession } from '@/lib/billing/verify-paid-topups';
 
@@ -105,6 +106,26 @@ export async function POST(req: NextRequest) {
     if (!topup.applied) {
       return NextResponse.json({ received: true, already_applied: true });
     }
+
+    // Revenue ledger: the customer paid the gross pack price in crypto (USD-denominated).
+    await recordPaymentSafely(admin, {
+      provider: 'coincircuit',
+      provider_payment_id: session.reference,
+      organization_id: orgId,
+      product_type: 'credits_topup',
+      product_id: String(metadata.credit_pack ?? '') || null,
+      billing_interval: null,
+      amount: grossCredits,
+      currency: 'USD',
+      amount_usd: grossCredits,
+      fx_ngn_per_usd: null,
+      processing_fee: feeCredits,
+      settlement_amount: null,
+      settlement_currency: null,
+      payment_method: 'crypto',
+      customer_email: null,
+      paid_at: new Date().toISOString(),
+    }, 'CoinCircuit webhook');
 
     trackEvent({
       event_type: 'credits.topup',

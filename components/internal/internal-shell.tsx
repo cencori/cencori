@@ -11,6 +11,7 @@ import Analytics01Icon from '@hugeicons/core-free-icons/Analytics01Icon';
 import Activity01Icon from '@hugeicons/core-free-icons/Activity01Icon';
 import ChartUpIcon from '@hugeicons/core-free-icons/ChartUpIcon';
 import Mail01Icon from '@hugeicons/core-free-icons/Mail01Icon';
+import Wallet01Icon from '@hugeicons/core-free-icons/Wallet01Icon';
 import ArrowDataTransferHorizontalIcon from '@hugeicons/core-free-icons/ArrowDataTransferHorizontalIcon';
 import BubbleChatIcon from '@hugeicons/core-free-icons/BubbleChatIcon';
 import Settings02Icon from '@hugeicons/core-free-icons/Settings02Icon';
@@ -26,6 +27,7 @@ const NAV_ITEMS = [
     { href: '/internal', label: 'Overview', icon: DashboardCircleIcon, exact: true },
     { href: '/internal/tasks', label: 'Tasks', icon: CheckListIcon },
     { href: '/internal/analytics', label: 'Analytics', icon: Analytics01Icon },
+    { href: '/internal/revenue', label: 'Revenue', icon: Wallet01Icon },
     { href: '/internal/events', label: 'Events', icon: Activity01Icon },
     { href: '/internal/kpi', label: 'KPIs', icon: ChartUpIcon },
     { href: '/internal/emails', label: 'Emails', icon: Mail01Icon },
