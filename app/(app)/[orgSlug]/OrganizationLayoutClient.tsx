@@ -36,7 +36,6 @@ import { COPILOT_CONVERSATION_COOKIE, COPILOT_NEW_CHAT_EVENT } from "@/lib/conso
 import ChartRelationshipIcon from "@hugeicons/core-free-icons/ChartRelationshipIcon";
 import ThreeDRotateIcon from "@hugeicons/core-free-icons/ThreeDRotateIcon";
 import Settings02Icon from "@hugeicons/core-free-icons/Settings02Icon";
-import ThreeDMoveIcon from "@hugeicons/core-free-icons/ThreeDMoveIcon";
 import GameController03Icon from "@hugeicons/core-free-icons/GameController03Icon";
 import LeftToRightListDashIcon from "@hugeicons/core-free-icons/LeftToRightListDashIcon";
 import KeySquareIcon from "@hugeicons/core-free-icons/KeySquareIcon";
@@ -441,7 +440,7 @@ export default function OrganizationLayoutClient({
     //   3. (Logs moved under AI Gateway — logsItem)
     //   ── separator ──
     //   4. AI Gateway toggle             — expands to projectSubItems
-    //   5. AI Gateway toggle, Agents, Memory, Deployments
+    //   5. AI Gateway toggle, Agents, Memory
     //   6. (Teams, Billing, Usage, Audit Log sit under org Settings)
     //   7. bottomItems                   — Settings (fixed final position in every scope)
 
@@ -489,11 +488,6 @@ export default function OrganizationLayoutClient({
             { href: `${memoryHref}/graph`, icon: <HugeiconsIcon icon={ChartRelationshipIcon} className="!h-5 !w-5" />, label: "Graph" },
             { href: `${memoryHref}/controls`, icon: <HugeiconsIcon icon={Settings02Icon} className="!h-5 !w-5" />, label: "Controls" },
         ]
-        : [];
-    // Deployments stays attached to the selected project for the same stable
-    // project → organization → project navigation model.
-    const runItems = process.env.NODE_ENV !== "production"
-        ? [{ href: scopeProjectSlug ? scopedProjectHref("deployments") : orgProductHref("deployments"), icon: <HugeiconsIcon icon={ThreeDMoveIcon} className="!h-5 !w-5" />, label: "Deployments" }]
         : [];
 
     const bottomItems = [
@@ -759,7 +753,6 @@ export default function OrganizationLayoutClient({
                         </SidebarMenuButton>
                     </SidebarMenuItem>
                 )}
-                {runItems.map(renderMenuItem)}
                 {/* Copilot toggle */}
                 {copilotHref && (
                     <SidebarMenuItem>
