@@ -2,4 +2,4 @@
 # (from deploy/app/Dockerfile), then pinned here by commit. Brimble builds this
 # file, which only pulls the image (brimble.toml build.dockerfile). Roll back by
 # pointing this at an older tag. Edit a comment to redeploy the same image.
-FROM ghcr.io/cencori/cencori:52ac1f8b947a5c9ef233f3fd4c134b3f53c9be62
+FROM ghcr.io/cencori/cencori:50bb10addf7f414745c0869e32274d863e76d28c
