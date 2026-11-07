@@ -150,7 +150,7 @@ const VISION_CANDIDATES: AutoCandidate[] = [
     { provider: 'google', model: 'gemini-2.5-flash' },
     { provider: 'google', model: 'gemini-2.5-flash-lite' },
     { provider: 'anthropic', model: 'claude-sonnet-4-6' },
-    { provider: 'maximo', model: 'maximo-atlas-1.2' },
+    { provider: 'maximo', model: 'maximo-atlas-1.5' },
 ];
 
 const CODE_CANDIDATES: AutoCandidate[] = [
@@ -171,7 +171,7 @@ const CODE_CANDIDATES: AutoCandidate[] = [
     // Late fallbacks so single-provider BYOK setups (cohere/maximo-only)
     // serve code tasks degraded rather than 402.
     { provider: 'cohere', model: 'command-r-plus-08-2024' },
-    { provider: 'maximo', model: 'maximo-atlas-1.2' },
+    { provider: 'maximo', model: 'maximo-atlas-1.5' },
 ];
 
 const REASONING_CANDIDATES: AutoCandidate[] = [
@@ -191,7 +191,7 @@ const REASONING_CANDIDATES: AutoCandidate[] = [
     { provider: 'groq', model: 'openai/gpt-oss-120b' },
     { provider: 'cerebras', model: 'gpt-oss-120b' },
     { provider: 'cohere', model: 'command-r-plus-08-2024' },
-    { provider: 'maximo', model: 'maximo-atlas-1.2' },
+    { provider: 'maximo', model: 'maximo-atlas-1.5' },
 ];
 
 const FAST_CANDIDATES: AutoCandidate[] = [
@@ -211,7 +211,7 @@ const FAST_CANDIDATES: AutoCandidate[] = [
     { provider: 'deepseek', model: 'deepseek-v4-pro' },
     { provider: 'cerebras', model: 'gpt-oss-120b' },
     { provider: 'cohere', model: 'command-r-plus-08-2024' },
-    { provider: 'maximo', model: 'maximo-atlas-1.2' },
+    { provider: 'maximo', model: 'maximo-atlas-1.5' },
 ];
 
 // ── Non-chat modalities ──────────────────────────────────────────

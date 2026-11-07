@@ -68,7 +68,7 @@ const maximo = new OpenAICompatibleProvider('maximo', process.env.MAXIMO_API_KEY
 });
 
 // …or per call, without a new instance:
-await maximo.chat({ model: 'maximo-atlas-1.3', messages, timeoutMs: 30_000, maxCostUsd: 0.05 });
+await maximo.chat({ model: 'maximo-atlas-1.4', messages, timeoutMs: 30_000, maxCostUsd: 0.05 });
 ```
 
 Notes:

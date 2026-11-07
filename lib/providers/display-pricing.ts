@@ -196,8 +196,6 @@ export function getModelDisplayPrice(
 
     // Maximo Atlas
     if (id === 'maximo-atlas-1.5' || id === 'maximo-atlas-1.4') return price(0.2, 1.0);
-    if (id === 'maximo-atlas-1.3') return price(0.2, 0.5);
-    if (id === 'maximo-atlas-1.2') return price(0.55, 1.5);
 
     // Helix Advisor
     if (id === 'helix-advisor') return price(0.5, 1.5);

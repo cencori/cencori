@@ -511,7 +511,7 @@ export function TensorMock() {
                       <TensorComposerPlusIcon />
                     </span>
                     <span className="flex h-[1.8rem] max-w-[10rem] cursor-default items-center gap-1 rounded-[0.65rem] px-[0.4rem] text-[0.65rem] font-medium tracking-[-0.01em] text-white/60 transition-colors hover:bg-white/10 hover:text-white">
-                      <span className="truncate">Maximo Atlas 1.3</span>
+                      <span className="truncate">Maximo Atlas 1.4</span>
                       <TensorComposerChevronIcon />
                     </span>
                     <span className="flex h-[1.8rem] max-w-[6.5rem] cursor-default items-center gap-1 rounded-[0.65rem] px-[0.4rem] text-[0.65rem] font-medium tracking-[-0.01em] text-white/60 transition-colors hover:bg-white/10 hover:text-white">

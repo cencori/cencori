@@ -34,6 +34,12 @@ const MODEL_ALIASES: Record<string, string> = {
     // its internal id. Normalization happens before billing and the upstream
     // call, so pricing keys must use the internal id (see free-models.ts).
     'centaur': 'julian-origin',
+    // Maximo Atlas 1.2 and 1.3 retired 2026-11-07. Callers still sending them
+    // (saved agents, templates, SDK code) go to the nearest successor rather
+    // than fail: 1.5 keeps 1.2's image input, 1.4 is 1.3's text-only line.
+    // Billed at the successor's price.
+    'maximo-atlas-1.2': 'maximo-atlas-1.5',
+    'maximo-atlas-1.3': 'maximo-atlas-1.4',
 };
 
 /**

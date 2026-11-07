@@ -184,9 +184,8 @@ const VISION_MODELS: Record<string, ModelInfo> = {
     'gemini-2.5-flash': { provider: 'google', apiModel: 'gemini-2.5-flash', description: 'Cheapest, 1M context' },
     'gemini-2.5-flash-lite': { provider: 'google', apiModel: 'gemini-2.5-flash-lite', description: 'Fastest Gemini' },
     // Maximo (OpenAI wire format)
-    'maximo-atlas-1.2': { provider: 'maximo', apiModel: 'maximo-atlas-1.2', description: 'Atlas 1.2 — agentic coding with visual understanding, 1M context' },
-    // Maximo is retiring Atlas 1.2 (2026-10); 1.5 is the priced successor with
-    // image input, and what Copilot uses to read attached images.
+    // Atlas 1.2 retired 2026-11-07; 1.5 is its successor with image input,
+    // and what Copilot uses to read attached images.
     'maximo-atlas-1.5': { provider: 'maximo', apiModel: 'maximo-atlas-1.5', description: 'Atlas 1.5 — agentic coding with text and image input, 1M context' },
     // OpenRouter `:free` vision entries were removed 2026-09-23 with the
     // free-tier retirement (nemotron-3-nano-omni, ling-3.0-flash-vl,

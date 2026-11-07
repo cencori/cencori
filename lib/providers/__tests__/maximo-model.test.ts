@@ -6,11 +6,13 @@ import { ProviderRouter } from '../router';
 import { resolveApiKeyModelAccess } from '@/lib/gateway/model-access';
 
 describe('Maximo Atlas catalog', () => {
-    it('advertises Atlas 1.3 and 1.2, not the retired 1.1 or the preview model', () => {
+    it('advertises Atlas 1.5 and 1.4, not the retired 1.1-1.3 or the preview model', () => {
         const modelIds = getModelsForProvider('maximo').map((model) => model.id);
 
-        expect(modelIds).toContain('maximo-atlas-1.3');
-        expect(modelIds).toContain('maximo-atlas-1.2');
+        expect(modelIds).toContain('maximo-atlas-1.5');
+        expect(modelIds).toContain('maximo-atlas-1.4');
+        expect(modelIds).not.toContain('maximo-atlas-1.3');
+        expect(modelIds).not.toContain('maximo-atlas-1.2');
         expect(modelIds).not.toContain('maximo-atlas-1.1');
         expect(modelIds).not.toContain('maximo-atlas-preview');
     });
@@ -24,6 +26,13 @@ describe('Maximo Atlas catalog', () => {
         }
     });
 
+    it('sends retired 1.2 and 1.3 to their successors, so saved configs keep working', () => {
+        const router = new ProviderRouter();
+
+        expect(router.normalizeModelName('maximo-atlas-1.2', 'maximo')).toBe('maximo-atlas-1.5');
+        expect(router.normalizeModelName('maximo-atlas-1.3', 'maximo')).toBe('maximo-atlas-1.4');
+    });
+
     it('routes all Atlas versions to Maximo', () => {
         const router = new ProviderRouter();
 
@@ -35,17 +44,28 @@ describe('Maximo Atlas catalog', () => {
         );
     });
 
-    it('ships Atlas 1.2 generally available while 1.1 stays gated', () => {
+    it('ships Atlas 1.5 generally available while 1.1 stays gated', () => {
         // The allowlist restriction is per model, not per line. A key with no
-        // allowlist reaches 1.2 and is still refused 1.1.
+        // allowlist reaches 1.5 and is still refused 1.1.
         expect(resolveApiKeyModelAccess({
             provider: 'maximo',
-            model: 'maximo-atlas-1.2',
+            model: 'maximo-atlas-1.5',
         }).allowed).toBe(true);
         expect(resolveApiKeyModelAccess({
             provider: 'maximo',
             model: 'maximo-atlas-1.1',
         }).allowed).toBe(false);
+    });
+
+    it('retires Atlas 1.2 and 1.3 pricing without deleting it', () => {
+        const migration = readFileSync(
+            resolve(process.cwd(), 'supabase/migrations/20261107_120000_retire_maximo_atlas_1_2_1_3.sql'),
+            'utf8',
+        );
+
+        expect(migration).toContain('is_active = false');
+        expect(migration).toContain("'maximo-atlas-1.2', 'maximo-atlas-1.3'");
+        expect(migration).not.toMatch(/DELETE\s+FROM/i);
     });
 
     it('prices Atlas 1.2 at the launch rate with the standard rate scheduled', () => {
