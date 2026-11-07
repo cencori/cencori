@@ -21,7 +21,8 @@ import {
   majorAmountToMinor,
 } from '@/lib/tensor-billing';
 import { applyPaidCreditTopup } from '@/lib/billing/paid-credit-topups';
-import { getBachsTopupVerificationFailure } from '@/lib/billing/verify-paid-topups';
+import { getBachsTopupVerificationFailure, verifyBachsNgnTopupCharge } from '@/lib/billing/verify-paid-topups';
+import { CARD_TOPUP_FEE_PERCENT, CREDIT_NGN_PER_USD, ngnTopupCredits } from '@/lib/billing/credit-pricing';
 import {
   buildOrganizationSubscriptionUpdate,
   type SubscriptionLifecycleEventType,
@@ -29,10 +30,72 @@ import {
 
 export const runtime = 'nodejs';
 
+async function handleNgnCreditsTopup(
+  data: BachsCollectionData,
+  supabase: ReturnType<typeof createAdminClient>
+) {
+  // The signed event anchors the org, as for packs.
+  const orgId = data.metadata?.org_id;
+  if (!orgId) throw new Error('Bachs naira top-up has no organization ID');
+  if (!data.charge_id) throw new Error('Bachs naira top-up has no charge ID');
+
+  // Prove the payment with Bachs directly and credit what was actually paid.
+  const charge = await getCharge(data.charge_id);
+  const verified = verifyBachsNgnTopupCharge({ charge, chargeId: data.charge_id, organizationId: orgId });
+  if (!verified.ok) {
+    console.error('[Bachs Webhook] Naira top-up charge failed verification', {
+      charge_id: data.charge_id,
+      reason: verified.reason,
+      status: charge?.status ?? null,
+      currency: charge?.currency ?? null,
+      amount: charge?.amount ?? null,
+      requestedNgn: data.metadata?.amount_ngn ?? null,
+    });
+    throw new Error(`Bachs naira top-up charge did not verify: ${verified.reason}`);
+  }
+
+  const requestedNgn = Number(data.metadata?.amount_ngn);
+  if (Number.isFinite(requestedNgn) && requestedNgn !== verified.amountNgn) {
+    // Not fatal: credit follows the money. Logged so a mismatch is visible.
+    console.warn('[Bachs Webhook] Naira top-up paid amount differs from requested', {
+      charge_id: data.charge_id,
+      requestedNgn,
+      paidNgn: verified.amountNgn,
+    });
+  }
+
+  await applyPaidCreditTopup({
+    supabase,
+    provider: 'bachs',
+    paymentReference: data.charge_id,
+    organizationId: orgId,
+    amountUsd: ngnTopupCredits(verified.amountNgn),
+    metadata: {
+      purchase_type: 'credits_topup_ngn',
+      charged_ngn: verified.amountNgn,
+      ngn_per_usd: CREDIT_NGN_PER_USD,
+      fee_percent: CARD_TOPUP_FEE_PERCENT,
+    },
+  });
+
+  if (data.customer?.id) {
+    await supabase
+      .from('organizations')
+      .update({ bachs_customer_id: data.customer.id })
+      .eq('id', orgId);
+  }
+}
+
 async function handleCollectionSucceeded(
   data: BachsCollectionData,
   supabase: ReturnType<typeof createAdminClient>
 ) {
+  // Naira top-up of any amount: a product-less checkout, so no cart.
+  if (data.metadata?.purchase_type === 'credits_topup_ngn') {
+    await handleNgnCreditsTopup(data, supabase);
+    return;
+  }
+
   const productId = data.product_cart?.[0]?.product_id;
   if (!productId) {
     if (data.metadata?.purchase_type === 'credits_topup') {

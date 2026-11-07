@@ -11,6 +11,7 @@ import { CreditCard, Info } from 'lucide-react';
 import { motion, AnimatePresence } from "framer-motion";
 import Link from 'next/link';
 import { UpgradeDialog } from "@/components/billing/UpgradeDialog";
+import { CurrencyToggle } from "@/components/dashboard/CurrencyToggle";
 import { CENCORI_PAID_PLANS, isPaidPlanTier, type PaidPlanTier } from '@/lib/billing/plans';
 
 import { PlanDetails } from "@/components/dashboard/billing/PlanDetails";
@@ -210,12 +211,15 @@ export default function BillingPage({ params }: PageProps) {
 
     return (
         <main className="mx-auto w-full max-w-[1120px] px-0 pt-0 pb-28 sm:px-6 sm:py-10 lg:px-8">
-            <header className="mb-9">
-                <div className="text-[10px] font-medium uppercase tracking-[0.2em] text-muted-foreground">Finance</div>
-                <h1 className="mt-3 text-3xl font-medium tracking-[-0.04em]">Billing</h1>
-                <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
-                    Plans, prepaid capacity, and spend controls for {org?.name ?? "your organization"}.
-                </p>
+            <header className="mb-9 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                    <div className="text-[10px] font-medium uppercase tracking-[0.2em] text-muted-foreground">Finance</div>
+                    <h1 className="mt-3 text-3xl font-medium tracking-[-0.04em]">Billing</h1>
+                    <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
+                        Plans, prepaid capacity, and spend controls for {org?.name ?? "your organization"}.
+                    </p>
+                </div>
+                <CurrencyToggle />
             </header>
             <AnimatePresence>
                 {checkoutNotice && (

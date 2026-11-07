@@ -1,5 +1,6 @@
 import type { BachsCharge } from '@/lib/bachsClient';
 import type { CoinCircuitWebhookPayload } from '@/lib/coincircuit';
+import { NGN_TOPUP_MAX, NGN_TOPUP_MIN } from '@/lib/billing/credit-pricing';
 
 export function getBachsTopupVerificationFailure(params: {
   charge: BachsCharge;
@@ -66,6 +67,53 @@ export function getBachsTopupVerificationFailure(params: {
   }
 
   return null;
+}
+
+/**
+ * Verifies a naira top-up of any amount (a product-less Bachs checkout).
+ * Returns the paid amount in whole naira, or the reason it didn't verify.
+ * Credit is computed from this paid amount, so what the browser asked for at
+ * checkout never decides the grant.
+ */
+export function verifyBachsNgnTopupCharge(params: {
+  charge: BachsCharge;
+  chargeId: string;
+  organizationId: string;
+}): { ok: true; amountNgn: number } | { ok: false; reason: string } {
+  const { charge, chargeId, organizationId } = params;
+  if (!charge || charge.charge_id !== chargeId) return { ok: false, reason: 'charge_id_mismatch' };
+
+  const status = String(charge.status ?? '').toLowerCase();
+  if (!['succeeded', 'successful', 'paid'].includes(status)) return { ok: false, reason: 'unsettled_status' };
+
+  if (String(charge.currency ?? '').toUpperCase() !== 'NGN') return { ok: false, reason: 'currency_mismatch' };
+
+  const amountMajor = Number(String(charge.amount ?? '').replace(/,/g, '').trim());
+  if (!Number.isFinite(amountMajor) || amountMajor <= 0) return { ok: false, reason: 'invalid_amount' };
+  // Kobo are dropped: credit is only ever granted on whole naira paid.
+  const amountNgn = Math.floor(amountMajor);
+  if (amountNgn < NGN_TOPUP_MIN) return { ok: false, reason: 'amount_below_minimum' };
+  if (amountNgn > NGN_TOPUP_MAX) return { ok: false, reason: 'amount_above_maximum' };
+
+  // Same rule as packs: fail on a contradicting echo, not on a missing one.
+  const metadata = (charge.metadata ?? {}) as Record<string, unknown>;
+  const echoedPurchaseType = metadata.purchase_type;
+  if (echoedPurchaseType != null && String(echoedPurchaseType).trim() !== ''
+      && echoedPurchaseType !== 'credits_topup_ngn') {
+    return { ok: false, reason: 'metadata_purchase_type_mismatch' };
+  }
+  const echoedOrgId = metadata.org_id;
+  if (echoedOrgId != null && String(echoedOrgId).trim() !== '' && echoedOrgId !== organizationId) {
+    return { ok: false, reason: 'metadata_org_mismatch' };
+  }
+
+  // A product-less checkout has no cart. A cart here means this charge was
+  // for something else.
+  if (Array.isArray(charge.product_cart) && charge.product_cart.length > 0) {
+    return { ok: false, reason: 'unexpected_product_cart' };
+  }
+
+  return { ok: true, amountNgn };
 }
 
 export function isVerifiedBachsTopupCharge(params: {

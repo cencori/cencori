@@ -995,6 +995,25 @@ function warnBucketColumnsMissingOnce(message: string): void {
 }
 
 /**
+ * Why a request was or wasn't charged, stored on its row as
+ * metadata.billing_mode so total AI spend can include BYOK calls
+ * (Cencori charges nothing for them, but the customer's provider does).
+ * Sponsored calls are paid by the key's sponsor and never count as the
+ * customer's spend.
+ */
+export function requestBillingMode(
+    context: Pick<GatewayContext, 'sponsoredModels' | 'fullySponsoredKey'>,
+    params: Pick<LogRequestParams, 'model' | 'providerCostUsd' | 'cencoriChargeUsd' | 'costUsd'>,
+): 'standard' | 'byok' | 'sponsored' | 'free' {
+    if ((params.cencoriChargeUsd ?? params.costUsd ?? 0) > 0) return 'standard';
+    const model = (params.model || '').trim().toLowerCase();
+    const sponsored = context.fullySponsoredKey
+        || (!!model && (context.sponsoredModels ?? []).some((m) => m.trim().toLowerCase() === model));
+    if (sponsored) return 'sponsored';
+    return (params.providerCostUsd || 0) > 0 ? 'byok' : 'free';
+}
+
+/**
  * Log a request to the ai_requests table with full cost tracking.
  * Returns the inserted row id (used by post-success hooks),
  * or null when the insert fails — logging must never throw.
@@ -1036,7 +1055,7 @@ export async function logGatewayRequest(context: GatewayContext, params: LogRequ
             session_id: embeddedDims.sessionId ?? null,
             run_id: embeddedDims.runId ?? null,
             error_message: params.errorMessage,
-            metadata: params.metadata || {},
+            metadata: { ...(params.metadata || {}), billing_mode: requestBillingMode(context, params) },
             // request_payload is NOT NULL in the live schema — omitting it makes
             // the whole insert fail silently (see catch below), losing the log.
             request_payload: params.requestPayload || {},

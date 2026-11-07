@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { CENCORI_PAID_PLANS } from '@/lib/billing/plans';
-import { CARD_TOPUP_FEE_PERCENT, netTopupCredits } from '@/lib/billing/credit-pricing';
+import { CARD_TOPUP_FEE_PERCENT, CREDIT_NGN_PER_USD, netTopupCredits } from '@/lib/billing/credit-pricing';
 
 const BACHS_API_BASE =
   process.env.BACHS_API_BASE ||
@@ -40,8 +40,18 @@ export interface BachsProductCartItem {
   quantity: number;
 }
 
+/** Product-less checkout price: the buyer pays exactly `amount` in `currency`. */
+export interface BachsCheckoutPricing {
+  currency: string;
+  price_type: 'fixed';
+  /** Decimal string in major units, e.g. "15000.00". */
+  amount: string;
+}
+
 export interface CreateCheckoutSessionInput {
-  product_cart: BachsProductCartItem[];
+  /** Catalog products. Exactly one of `product_cart` and `pricing` is sent. */
+  product_cart?: BachsProductCartItem[];
+  pricing?: BachsCheckoutPricing;
   customer: BachsCustomerInput;
   success_url: string;
   cancel_url: string;
@@ -341,14 +351,19 @@ export const TIER_LIMITS = {
 } as const;
 
 // price = US cents; ngnPrice = kobo. ngnPrice must match the NGN currency
-// option on the Bachs product, or naira checkouts fail verification.
+// option on the Bachs product, or naira checkouts fail verification. Change
+// the Bachs price first (PATCH /v1/products/{id} price.currency_options),
+// then this: a minimum above what Bachs charges rejects paid checkouts.
+const ngnKobo = (usd: number) => usd * CREDIT_NGN_PER_USD * 100;
+
 export const CREDIT_TOPUP_PACKS = [
-  { label: 'Starter', credits: 10, price: 1000, ngnPrice: 1_000_000, productId: BACHS_CONFIG.products.creditsStarter },
-  { label: 'Growth', credits: 50, price: 5000, ngnPrice: 5_000_000, productId: BACHS_CONFIG.products.creditsGrowth },
-  { label: 'Scale', credits: 200, price: 20000, ngnPrice: 20_000_000, productId: BACHS_CONFIG.products.creditsScale },
+  { label: 'Starter', credits: 10, price: 1000, ngnPrice: ngnKobo(10), productId: BACHS_CONFIG.products.creditsStarter },
+  { label: 'Growth', credits: 50, price: 5000, ngnPrice: ngnKobo(50), productId: BACHS_CONFIG.products.creditsGrowth },
+  { label: 'Scale', credits: 200, price: 20000, ngnPrice: ngnKobo(200), productId: BACHS_CONFIG.products.creditsScale },
 ] as const;
 
 export { CARD_TOPUP_FEE_PERCENT as PLATFORM_FEE_PERCENT } from '@/lib/billing/credit-pricing';
+export { CREDIT_NGN_PER_USD };
 
 /* ─── Product Billing Interval Lookup ─────────────────────────────────── */
 

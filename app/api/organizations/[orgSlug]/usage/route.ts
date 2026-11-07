@@ -16,6 +16,8 @@ export type OrgUsageRollup = {
     input_tokens: number;
     output_tokens: number;
     total_cost: number;
+    /** total_cost plus the provider cost of tagged BYOK calls. Added by database/brimble/0500_org_usage_total_spend.sql. */
+    total_spend?: number;
     avg_latency: number;
     model_usage: Record<string, number>;
     provider_usage: Record<string, number>;
@@ -26,6 +28,7 @@ const RANGE_MS: Record<string, number> = {
     '24h': 24 * 60 * 60 * 1000,
     '7d': 7 * 24 * 60 * 60 * 1000,
     '30d': 30 * 24 * 60 * 60 * 1000,
+    '90d': 90 * 24 * 60 * 60 * 1000,
 };
 
 const PAGE_SIZE = 1000;
@@ -39,7 +42,7 @@ async function rollupFromRows(
 ): Promise<OrgUsageRollup> {
     const rollup: OrgUsageRollup = {
         total_requests: 0, successful_requests: 0, total_tokens: 0, input_tokens: 0,
-        output_tokens: 0, total_cost: 0, avg_latency: 0, model_usage: {}, provider_usage: {}, hourly: [],
+        output_tokens: 0, total_cost: 0, total_spend: 0, avg_latency: 0, model_usage: {}, provider_usage: {}, hourly: [],
     };
     const hourly = new Map<string, HourlyBucket>();
     let latencySum = 0;
@@ -48,7 +51,7 @@ async function rollupFromRows(
     for (let offset = 0; ; offset += PAGE_SIZE) {
         const { data, error } = await supabaseAdmin
             .from('ai_requests')
-            .select('created_at, status, prompt_tokens, completion_tokens, total_tokens, cost_usd, latency_ms, model, provider')
+            .select('created_at, status, prompt_tokens, completion_tokens, total_tokens, cost_usd, provider_cost_usd, metadata, latency_ms, model, provider')
             .in('project_id', projectIds)
             .gte('created_at', start)
             .order('created_at', { ascending: true })
@@ -66,6 +69,9 @@ async function rollupFromRows(
             rollup.input_tokens += input;
             rollup.output_tokens += output;
             rollup.total_cost += Number(r.cost_usd || 0);
+            const billingMode = (r.metadata as { billing_mode?: string } | null)?.billing_mode;
+            rollup.total_spend = (rollup.total_spend ?? 0) + Number(r.cost_usd || 0)
+                + (billingMode === 'byok' ? Number(r.provider_cost_usd || 0) : 0);
             if (r.latency_ms != null) {
                 latencySum += Number(r.latency_ms);
                 latencyCount += 1;
@@ -124,7 +130,12 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
     }
 
     const range = req.nextUrl.searchParams.get('range') || '7d';
-    const start = new Date(Date.now() - (RANGE_MS[range] ?? RANGE_MS['7d'])).toISOString();
+    // `all` reads the org's whole request history: fine at today's volume,
+    // but it scans every ai_requests row, so a daily rollup should replace
+    // this before large orgs use it heavily.
+    const start = range === 'all'
+        ? new Date(0).toISOString()
+        : new Date(Date.now() - (RANGE_MS[range] ?? RANGE_MS['7d'])).toISOString();
 
     const { data: projects, error: projectsError } = await supabaseAdmin
         .from('projects')

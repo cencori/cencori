@@ -12,7 +12,7 @@ import AirdropIcon from "@hugeicons/core-free-icons/AirdropIcon";
 import { CopilotContext } from "@/lib/contexts/CopilotContext";
 import { CreditCard } from "lucide-react";
 import { MobileTabBar } from "@/components/dashboard/MobileTabBar";
-import { formatCurrency } from "@/lib/currency";
+import { DisplayCurrencyProvider, useDisplayCurrency } from "@/hooks/useDisplayCurrency";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -52,12 +52,15 @@ export default function DashboardLayoutClient({
   children,
   initialAgentOpen = false,
   initialConversationId = null,
+  country = null,
 }: {
   children: React.ReactNode;
   // From the copilot cookies, read on the server so a refresh renders the
   // panel already open (no pop-in, no layout jump).
   initialAgentOpen?: boolean;
   initialConversationId?: string | null;
+  /** Visitor's country, read on the server: sets naira vs dollar display. */
+  country?: string | null;
 }) {
   const router = useRouter();
   const [authState, setAuthState] = useState<{
@@ -165,6 +168,7 @@ export default function DashboardLayoutClient({
   // to be the thing the user actually sees.
   return (
     <ReactQueryProvider>
+      <DisplayCurrencyProvider country={country}>
       <SessionProvider>
         {authState.loading ? null : (
           <CommandPaletteProvider>
@@ -186,6 +190,7 @@ export default function DashboardLayoutClient({
           </CommandPaletteProvider>
         )}
       </SessionProvider>
+      </DisplayCurrencyProvider>
     </ReactQueryProvider>
   );
 }
@@ -375,6 +380,7 @@ function LayoutContent({ user, avatar, name, children, initialAgentOpen, initial
     refetchInterval: 30 * 1000,
   });
 
+  const { formatMoney } = useDisplayCurrency();
   const parsedCreditsBalance = Number(orgCreditsData?.credits_balance ?? 0);
   const creditsBalance = Number.isFinite(parsedCreditsBalance) ? parsedCreditsBalance : 0;
   const isLowCredits = creditsBalance > 0 && creditsBalance < 5;
@@ -396,7 +402,7 @@ function LayoutContent({ user, avatar, name, children, initialAgentOpen, initial
     ? "Credits --"
     : orgCreditsLoading
       ? "Credits..."
-      : formatCurrency(creditsBalance, 'USD', { maximumFractionDigits: 2, minimumFractionDigits: 2 });
+      : formatMoney(creditsBalance);
 
   const agentProps = {
     project: currentProject ? { id: currentProject.id, name: currentProject.name, slug: currentProject.slug } : null,

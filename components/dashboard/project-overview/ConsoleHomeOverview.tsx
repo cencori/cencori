@@ -9,7 +9,7 @@ import { GenerateKeyDialog } from "@/components/api-keys/GenerateKeyDialog";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/lib/supabaseClient";
-import { formatCurrency } from "@/lib/currency";
+import { useDisplayCurrency } from "@/hooks/useDisplayCurrency";
 import { DitherCanvas, type DitherVariant } from "./DitherCanvas";
 import { HomeUsageStats } from "./HomeUsageStats";
 import { BusinessHomeLoading, useBusinessHome } from "./BusinessHomeRedirect";
@@ -174,6 +174,7 @@ export function ConsoleHomeOverview({
     const firstName = useFirstName(initialFirstName);
     const projectId = useProjectId(orgSlug, projectSlug, knownProjectId);
     const { data: balance, isPending: balanceLoading } = useCreditsBalance(orgSlug, initialBalance);
+    const { formatMoney } = useDisplayCurrency();
     // isPending, not isLoading: it stays true while the project id is still
     // resolving and the count query hasn't started yet.
     const { data: keyCountData, isPending: keysLoading } = useApiKeyCount(projectId);
@@ -241,10 +242,7 @@ export function ConsoleHomeOverview({
                     ) : (
                         <>
                             <p className="mt-3 font-mono text-2xl font-medium tracking-tight tabular-nums">
-                                {formatCurrency(Number(balance ?? 0), "USD", {
-                                    maximumFractionDigits: 2,
-                                    minimumFractionDigits: 2,
-                                })}
+                                {formatMoney(Number(balance ?? 0))}
                             </p>
                             <p className="mt-1 text-xs text-muted-foreground">
                                 Prepaid balance for managed model usage.

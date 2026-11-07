@@ -36,6 +36,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { useOrganizationProject } from "@/lib/contexts/OrganizationProjectContext";
+import { useDisplayCurrency } from "@/hooks/useDisplayCurrency";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -481,15 +482,32 @@ export default function ProjectSettingsPage({ params }: PageProps) {
     staleTime: 30 * 1000,
   });
 
+  // Budgets are stored in dollars. In naira mode the inputs take naira at
+  // the naira credit rate and are converted back to dollars on save.
+  const { currency: displayCurrency, rate: nairaRate, formatMoney } = useDisplayCurrency();
+  const budgetInNaira = displayCurrency === 'NGN';
+  const budgetSymbol = budgetInNaira ? '₦' : '$';
+  const toBudgetInput = (usd: number | null | undefined) => {
+    if (usd == null) return '';
+    return budgetInNaira ? String(Math.round(usd * nairaRate)) : usd.toString();
+  };
+  const fromBudgetInput = (value: string) => {
+    if (!value) return null;
+    const amount = parseFloat(value);
+    if (!Number.isFinite(amount)) return null;
+    return budgetInNaira ? Math.round((amount / nairaRate) * 100) / 100 : amount;
+  };
+
   // Sync budget settings to state
   React.useEffect(() => {
     if (budgetSettings) {
-      setMonthlyBudget(budgetSettings.monthly_budget?.toString() || '');
-      setSpendCap(budgetSettings.spend_cap?.toString() || '');
+      setMonthlyBudget(toBudgetInput(budgetSettings.monthly_budget));
+      setSpendCap(toBudgetInput(budgetSettings.spend_cap));
       setEnforceSpendCap(budgetSettings.enforce_spend_cap || false);
       setBudgetAlertsEnabled(budgetSettings.budget_alerts_enabled ?? true);
     }
-  }, [budgetSettings]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [budgetSettings, budgetInNaira]);
 
   const { data: networkPolicy, isLoading: networkPolicyLoading } = useQuery<NetworkPolicyData>({
     queryKey: ["networkPolicy", project?.id],
@@ -860,7 +878,7 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                       <DollarSign className="h-5 w-5 text-emerald-500" />
                     </div>
                     <div>
-                      <p className="text-2xl font-bold">${budgetSettings?.current_spend?.toFixed(2) || '0.00'}</p>
+                      <p className="text-2xl font-bold">{formatMoney(budgetSettings?.current_spend ?? 0)}</p>
                       <p className="text-xs text-muted-foreground">spent this month</p>
                     </div>
                   </div>
@@ -870,7 +888,7 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                         {budgetSettings.percent_used?.toFixed(0) || 0}%
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        of ${budgetSettings.monthly_budget.toFixed(2)} budget
+                        of {formatMoney(budgetSettings.monthly_budget)} budget
                       </p>
                     </div>
                   )}
@@ -902,7 +920,11 @@ export default function ProjectSettingsPage({ params }: PageProps) {
           <section>
             <div className="space-y-0.5">
               <h2 className="text-sm font-medium">Budget configuration</h2>
-              <p className="text-xs md:text-[10px] text-muted-foreground">Set spending limits and alerts.</p>
+              <p className="text-xs md:text-[10px] text-muted-foreground">
+                {budgetInNaira
+                  ? `Set limits in naira, at ₦${nairaRate.toLocaleString("en-NG")} per $1. Limits are kept in dollars.`
+                  : "Set spending limits and alerts."}
+              </p>
             </div>
             <div className="overflow-hidden rounded-lg border border-border/35 bg-muted/30">
               {/* Monthly Budget */}
@@ -912,12 +934,12 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                   <p className="text-xs md:text-[10px] text-muted-foreground">Get alerts when you approach this amount.</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground">$</span>
+                  <span className="text-muted-foreground">{budgetSymbol}</span>
                   <Input
                     type="number"
                     min="0"
                     step="1"
-                    placeholder="100"
+                    placeholder={budgetInNaira ? "150000" : "100"}
                     value={monthlyBudget}
                     onChange={(e) => setMonthlyBudget(e.target.value)}
                     className="w-full md:w-28 h-10 md:h-8 text-sm"
@@ -932,12 +954,12 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                   <p className="text-xs md:text-[10px] text-muted-foreground">Block requests when this limit is reached.</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground">$</span>
+                  <span className="text-muted-foreground">{budgetSymbol}</span>
                   <Input
                     type="number"
                     min="0"
                     step="1"
-                    placeholder="150"
+                    placeholder={budgetInNaira ? "200000" : "150"}
                     value={spendCap}
                     onChange={(e) => setSpendCap(e.target.value)}
                     className="w-full md:w-28 h-10 md:h-8 text-sm"
@@ -986,8 +1008,8 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                          monthly_budget: monthlyBudget ? parseFloat(monthlyBudget) : null,
-                          spend_cap: spendCap ? parseFloat(spendCap) : null,
+                          monthly_budget: fromBudgetInput(monthlyBudget),
+                          spend_cap: fromBudgetInput(spendCap),
                           enforce_spend_cap: enforceSpendCap,
                           budget_alerts_enabled: budgetAlertsEnabled,
                         }),
@@ -1026,7 +1048,7 @@ export default function ProjectSettingsPage({ params }: PageProps) {
                     </div>
                     <span className="text-xs text-muted-foreground">
                       {budgetSettings?.monthly_budget
-                        ? `$${(budgetSettings.monthly_budget * threshold / 100).toFixed(2)}`
+                        ? formatMoney(budgetSettings.monthly_budget * threshold / 100)
                         : '—'}
                     </span>
                   </div>

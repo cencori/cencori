@@ -3,12 +3,19 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
-import { formatCurrency } from "@/lib/currency";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useDisplayCurrency } from "@/hooks/useDisplayCurrency";
+import { CurrencyToggle } from "@/components/dashboard/CurrencyToggle";
 
-type Range = "24h" | "7d" | "30d";
+type Range = "24h" | "7d" | "30d" | "90d" | "all";
 
-const RANGES: Range[] = ["24h", "7d", "30d"];
+const RANGES: Array<{ value: Range; label: string; period: string }> = [
+    { value: "24h", label: "24 hours", period: "Last 24 hours" },
+    { value: "7d", label: "7 days", period: "Last 7 days" },
+    { value: "30d", label: "30 days", period: "Last 30 days" },
+    { value: "90d", label: "90 days", period: "Last 90 days" },
+    { value: "all", label: "All time", period: "All time" },
+];
 
 type Totals = { tokens: number; spend: number; requests: number };
 
@@ -23,11 +30,14 @@ function useUsageTotals(orgSlug: string, range: Range) {
                 throw new Error(body.error || "Failed to load usage");
             }
             const { rollup } = (await response.json()) as {
-                rollup: { total_tokens: number; total_cost: number; total_requests: number } | null;
+                rollup: { total_tokens: number; total_cost: number; total_spend?: number; total_requests: number } | null;
             };
             return {
                 tokens: Number(rollup?.total_tokens ?? 0),
-                spend: Number(rollup?.total_cost ?? 0),
+                // Total AI spend: Cencori's charges plus the provider cost of
+                // calls on the customer's own keys. total_cost (charges only)
+                // until the total_spend migration is applied.
+                spend: Number(rollup?.total_spend ?? rollup?.total_cost ?? 0),
                 requests: Number(rollup?.total_requests ?? 0),
             };
         },
@@ -42,42 +52,39 @@ const compact = (value: number) =>
         maximumFractionDigits: 1,
     }).format(value);
 
-const METRICS: Array<{ key: keyof Totals; label: string; format: (value: number) => string }> = [
-    { key: "tokens", label: "Tokens", format: compact },
-    {
-        key: "spend",
-        label: "Spend",
-        format: (value) => formatCurrency(value, "USD", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-    },
-    { key: "requests", label: "Requests", format: compact },
+const METRICS: Array<{ key: keyof Totals; label: string; money?: boolean }> = [
+    { key: "tokens", label: "Tokens" },
+    { key: "spend", label: "Spend", money: true },
+    { key: "requests", label: "Requests" },
 ];
 
 export function HomeUsageStats({ orgSlug }: { orgSlug: string }) {
     const [range, setRange] = useState<Range>("7d");
     const { data: totals, isLoading, error } = useUsageTotals(orgSlug, range);
-    const periodLabel = range === "24h" ? "Last 24 hours" : range === "30d" ? "Last 30 days" : "Last 7 days";
+    const { formatMoney } = useDisplayCurrency();
+    const periodLabel = RANGES.find((option) => option.value === range)?.period ?? "Last 7 days";
 
     return (
         <section className="mt-8">
             <div className="mb-3 flex items-center justify-between gap-4">
                 <h2 className="text-sm font-medium tracking-[-0.02em]">Usage</h2>
-                <div className="flex items-center gap-0.5 rounded-md bg-muted/60 p-0.5">
-                    {RANGES.map((option) => (
-                        <button
-                            key={option}
-                            type="button"
-                            onClick={() => setRange(option)}
-                            aria-pressed={range === option}
-                            className={cn(
-                                "h-6 rounded-[4px] px-2.5 font-mono text-[10px] font-medium transition-colors",
-                                range === option
-                                    ? "bg-foreground text-background"
-                                    : "text-muted-foreground hover:text-foreground",
-                            )}
-                        >
-                            {option.toUpperCase()}
-                        </button>
-                    ))}
+                <div className="flex items-center gap-2">
+                <CurrencyToggle />
+                <Select value={range} onValueChange={(value) => setRange(value as Range)}>
+                    <SelectTrigger
+                        aria-label="Time range"
+                        className="h-8 w-auto gap-1.5 rounded-full border-0 bg-muted/60 pl-3.5 pr-2.5 font-inter text-xs font-medium shadow-none"
+                    >
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent align="end">
+                        {RANGES.map((option) => (
+                            <SelectItem key={option.value} value={option.value} className="font-inter text-xs">
+                                {option.label}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
                 </div>
             </div>
 
@@ -105,7 +112,7 @@ export function HomeUsageStats({ orgSlug }: { orgSlug: string }) {
                         ) : (
                             <>
                                 <p className="mt-3 text-2xl font-medium tracking-tight">
-                                    {error && !totals ? "—" : metric.format(totals?.[metric.key] ?? 0)}
+                                    {error && !totals ? "—" : (metric.money ? formatMoney : compact)(totals?.[metric.key] ?? 0)}
                                 </p>
                                 <p className="mt-1 text-xs text-muted-foreground">{periodLabel}</p>
                             </>

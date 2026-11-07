@@ -4,6 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/currency";
+import { useDisplayCurrency } from "@/hooks/useDisplayCurrency";
 
 interface PlanProps {
     tier: string;
@@ -34,6 +35,8 @@ export function PlanDetails({
     actionExternal = false,
     onAction,
 }: PlanProps) {
+    const { currency, formatMoney } = useDisplayCurrency();
+    const inNaira = currency === "NGN";
     const renewalLabel = currentPeriodEnd
         ? new Date(currentPeriodEnd).toLocaleDateString("en-US", {
             month: "short",
@@ -91,7 +94,7 @@ export function PlanDetails({
                         </div>
                         <div className="mt-2 flex items-baseline gap-1.5">
                             <span className="font-mono text-2xl font-medium tabular-nums">
-                                {formatCurrency(price, "USD")}
+                                {inNaira ? formatMoney(price) : formatCurrency(price, "USD")}
                             </span>
                             <span className="text-xs text-muted-foreground">per month</span>
                         </div>
@@ -113,7 +116,9 @@ export function PlanDetails({
                     <div className="grid gap-1 px-5 py-3.5 transition-colors hover:bg-muted/30 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-6">
                         <dt className="text-muted-foreground">Prepaid balance</dt>
                         <dd className="font-mono tabular-nums">
-                            {formatCurrency(creditBalance, "USD", { maximumFractionDigits: 4 })}
+                            {inNaira
+                                ? formatMoney(creditBalance)
+                                : formatCurrency(creditBalance, "USD", { maximumFractionDigits: 4 })}
                         </dd>
                     </div>
                     <div className="grid gap-1 px-5 py-3.5 transition-colors hover:bg-muted/30 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-6">
