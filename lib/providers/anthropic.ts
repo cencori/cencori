@@ -482,6 +482,12 @@ export class AnthropicProvider extends AIProvider {
                     if (inProgress) {
                         inProgress.argumentsJson += event.delta.partial_json;
                     }
+                    // An empty chunk is progress, not output. The gateway aborts a stream that yields
+                    // nothing for 180s (stream-timeout.ts), and the arguments are only emitted when
+                    // the call is complete, so a tool call Claude spends minutes writing (a whole
+                    // file) was cut off every time and the agent resent it forever. The
+                    // OpenAI-compatible provider already yields a chunk for every event.
+                    yield { delta: '' };
                 }
                 if (event.type === 'message_delta') {
                     // Cumulative, not incremental — assign rather than add.

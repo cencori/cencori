@@ -354,6 +354,39 @@ describe('AnthropicProvider tool calling', () => {
         }]);
     });
 
+    it('yields an empty progress chunk for every argument fragment of a tool call', async () => {
+        // The gateway aborts a stream that yields nothing for 180s; a long tool call (a whole file)
+        // must keep counting as progress while its arguments are still being written.
+        createMock.mockResolvedValue({
+            async *[Symbol.asyncIterator]() {
+                yield {
+                    type: 'content_block_start',
+                    index: 0,
+                    content_block: { type: 'tool_use', id: 'toolu_1', name: 'apply_patch' },
+                };
+                for (const part of ['{"input":', '"*** Begin Patch', '\\n*** End Patch"}']) {
+                    yield { type: 'content_block_delta', index: 0, delta: { type: 'input_json_delta', partial_json: part } };
+                }
+                yield { type: 'message_delta', delta: { stop_reason: 'tool_use' } };
+            },
+        });
+
+        const provider = new AnthropicProvider('test-key');
+        const chunks = [];
+        for await (const chunk of provider.stream({
+            model: 'claude-opus-5-5',
+            messages: [{ role: 'user', content: 'edit' }],
+            tools: [{ type: 'function', function: { name: 'apply_patch', description: 'p', parameters: {} } }],
+        })) {
+            chunks.push(chunk);
+        }
+
+        const progress = chunks.slice(0, -1);
+        expect(progress).toHaveLength(3);
+        expect(progress.every((chunk) => chunk.delta === '' && !chunk.toolCalls && !chunk.finishReason)).toBe(true);
+        expect(chunks.at(-1)?.toolCalls?.[0].function.arguments).toBe('{"input":"*** Begin Patch\\n*** End Patch"}');
+    });
+
     it('emits {} arguments for a streamed tool that takes no input', async () => {
         createMock.mockResolvedValue({
             async *[Symbol.asyncIterator]() {
