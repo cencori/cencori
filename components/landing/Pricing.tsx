@@ -127,7 +127,7 @@ const matrixSections: Array<{
                 values: { free: "10", pro: "100", enterprise: "Custom" },
             },
             {
-                feature: "Customers using your embedded agents (per project)",
+                feature: "Customers (per project)",
                 values: { free: "10", pro: "100", enterprise: "Custom" },
             },
         ],
@@ -385,17 +385,17 @@ export function Pricing() {
                     </div>
 
                     {/* The table always fits the screen, so the plan header sticks
-                        under the site nav (80px) at every width. On phones it
+                        under the site nav (72px up to 900px wide, 80px above) at every width. On phones it
                         shows one plan at a time, picked from a dropdown. */}
                     <div>
                         <table className="w-full border-collapse text-left">
                             <thead>
                                 <tr className="bg-muted/15">
-                                    <th className="w-[55%] px-4 py-4 text-xs font-medium uppercase tracking-wide text-muted-foreground sticky top-20 z-30 bg-background md:w-[30%] md:px-5 before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-border/50 after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border/50">
+                                    <th className="w-[55%] px-4 py-4 text-xs font-medium uppercase tracking-wide text-muted-foreground sticky top-[72px] z-30 min-[901px]:top-20 bg-background md:w-[30%] md:px-5 before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-border/50 after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border/50">
                                         Features
                                     </th>
                                     {tiers.map((tier) => (
-                                        <th key={tier.name} className={cn("px-4 py-3 align-middle text-center sticky top-20 z-30 bg-background md:table-cell md:w-[17.5%] md:px-5 md:py-4 before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-border/50 after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border/50", tier.name !== mobilePlan && "hidden")}>
+                                        <th key={tier.name} className={cn("px-4 py-3 align-middle text-center sticky top-[72px] z-30 min-[901px]:top-20 bg-background md:table-cell md:w-[17.5%] md:px-5 md:py-4 before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-border/50 after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border/50", tier.name !== mobilePlan && "hidden")}>
                                             <p className="hidden text-sm font-bold md:block">{tier.displayName}</p>
                                             {tier.name === mobilePlan && (
                                             <div className="flex justify-center md:hidden">
