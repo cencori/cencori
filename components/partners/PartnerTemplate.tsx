@@ -30,10 +30,10 @@ export function PartnerTemplate({ config }: PartnerTemplateProps) {
 
                     {/* High-Impact Header Section */}
                     <div className="py-12 border-t border-border/10">
-                        <div className="flex flex-col md:flex-row md:items-end justify-between gap-12">
+                        <div className="flex flex-col md:flex-row md:items-end justify-between gap-12 rounded-2xl bg-white/[0.06] p-8 md:p-12">
                             <Reveal delay={0.1}>
                                 <div className="space-y-6">
-                                    <div className={`${config.logoWide ? "h-16 w-48 px-4 py-5" : "h-16 w-16 p-3"} text-foreground border border-border/20 bg-foreground/[0.02]`}>
+                                    <div className={`${config.logoWide ? "h-10 w-48" : "h-12 w-12"} text-foreground`}>
                                         <config.logo className="h-full w-full object-contain" />
                                     </div>
                                     <h1 className="text-5xl md:text-6xl font-semibold tracking-tighter uppercase">{config.name}</h1>
