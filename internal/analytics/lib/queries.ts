@@ -37,12 +37,22 @@ async function exactCount(
  * Returns null if the RPC is missing (migration not applied yet) or errors, so
  * callers can fall back and/or report the section as unavailable.
  */
-async function callAnalyticsRpc<T>(fn: string, startISO: string): Promise<T | null> {
+/**
+ * The rollup ran but failed (usually a statement timeout on a long window).
+ * Callers must NOT fall back to the row-by-row scan then: the scan reads the
+ * same rows the rollup just gave up on, page by page, and turned an "All Time"
+ * load into a minute-long wait. The scan is only for databases that don't have
+ * the function at all.
+ */
+const RPC_FAILED = Symbol('analytics-rpc-failed');
+
+async function callAnalyticsRpc<T>(fn: string, startISO: string): Promise<T | null | typeof RPC_FAILED> {
     const supabase = createAdminClient();
     const { data, error } = await supabase.rpc(fn, { p_start: startISO });
     if (error) {
         console.error(`[Analytics] RPC ${fn} failed:`, error.message);
-        return null;
+        // PGRST202: the function isn't in this database — the scan fallback applies.
+        return error.code === 'PGRST202' ? null : RPC_FAILED;
     }
     return (data ?? null) as T | null;
 }
@@ -100,9 +110,12 @@ export async function getAIGatewayMetrics(period: TimePeriod): Promise<AIGateway
         callAnalyticsRpc<number>('analytics_gateway_streaming', startISO),
     ]);
 
+    if (rollup === RPC_FAILED) {
+        return { ...EMPTY_GATEWAY_METRICS, unavailable: true };
+    }
     if (rollup) {
         const totalRequests = Number(rollup.total_requests) || 0;
-        const streamingRequests = streaming === null ? null : Number(streaming) || 0;
+        const streamingRequests = streaming === null || streaming === RPC_FAILED ? null : Number(streaming) || 0;
         return {
             totalRequests,
             successfulRequests: Number(rollup.successful_requests) || 0,
@@ -207,6 +220,15 @@ export async function getSecurityMetrics(period: TimePeriod): Promise<SecurityMe
         'analytics_security_metrics',
         startDate.toISOString(),
     );
+    if (rollup === RPC_FAILED) {
+        return {
+            totalIncidents: 0,
+            incidentsByType: {},
+            incidentsBySeverity: { low: 0, medium: 0, high: 0, critical: 0 },
+            timeSeries: [],
+            unavailable: true,
+        };
+    }
     if (rollup) {
         return {
             totalIncidents: Number(rollup.total_incidents) || 0,
@@ -300,6 +322,9 @@ async function loadActiveEntities(period: TimePeriod): Promise<ActiveEntities> {
     const startISO = getStartDate(period).toISOString();
 
     const rollup = await callAnalyticsRpc<ActiveEntitiesRollup>('analytics_active_entities', startISO);
+    if (rollup === RPC_FAILED) {
+        return { activeOrganizations: 0, activeProjects: 0, activeApiKeys: 0 };
+    }
     if (rollup) {
         return {
             activeOrganizations: Number(rollup.active_organizations) || 0,
@@ -711,6 +736,9 @@ export async function getCaptureMetrics(period: TimePeriod): Promise<CaptureMetr
     const startISO = getStartDate(period).toISOString();
 
     const rollup = await callAnalyticsRpc<CaptureRollup>('analytics_capture_metrics', startISO);
+    if (rollup === RPC_FAILED) {
+        return { gatewayRequests: 0, governanceDecisions: 0, memories: 0, agentSessions: 0 };
+    }
     if (rollup) {
         return {
             gatewayRequests: Number(rollup.gateway_requests) || 0,

@@ -1,5 +1,6 @@
 import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { createServerClient } from '@/lib/supabaseServer';
+import { createAdminClient } from '@/lib/supabaseAdmin';
 import { checkInternalAccess } from '@/lib/internal-access';
 import { InternalShell } from '@/components/internal/internal-shell';
 import { InternalLoginForm } from '@/components/internal/internal-login-form';
@@ -50,8 +51,24 @@ export default async function InternalLayout({
         );
     }
 
+    // Name and avatar for the sidebar: the saved profile first, then
+    // whatever the sign-in provider gave us.
+    const { data: profile } = await createAdminClient()
+        .from('user_profiles')
+        .select('first_name, last_name, avatar_url')
+        .eq('id', user.id)
+        .maybeSingle();
+    const meta = user.user_metadata ?? {};
+    const userName =
+        [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') ||
+        meta.full_name ||
+        meta.name ||
+        [meta.first_name || meta.given_name, meta.last_name || meta.family_name].filter(Boolean).join(' ') ||
+        '';
+    const userAvatar: string | null = profile?.avatar_url || meta.avatar_url || meta.picture || null;
+
     return (
-        <InternalShell userEmail={user.email || ''}>
+        <InternalShell userEmail={user.email || ''} userName={userName} userAvatar={userAvatar}>
             {children}
         </InternalShell>
     );

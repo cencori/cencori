@@ -4,42 +4,57 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ReactQueryProvider } from '@/lib/providers/ReactQueryProvider';
-import {
-    BarChart3,
-    Mail,
-    Settings,
-    TrendingUp,
-    LayoutDashboard,
-    LogOut,
-    Activity,
-    ArrowRightLeft,
-    CheckSquare,
-    Menu,
-    X,
-} from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import DashboardCircleIcon from '@hugeicons/core-free-icons/DashboardCircleIcon';
+import CheckListIcon from '@hugeicons/core-free-icons/CheckListIcon';
+import Analytics01Icon from '@hugeicons/core-free-icons/Analytics01Icon';
+import Activity01Icon from '@hugeicons/core-free-icons/Activity01Icon';
+import ChartUpIcon from '@hugeicons/core-free-icons/ChartUpIcon';
+import Mail01Icon from '@hugeicons/core-free-icons/Mail01Icon';
+import ArrowDataTransferHorizontalIcon from '@hugeicons/core-free-icons/ArrowDataTransferHorizontalIcon';
+import BubbleChatIcon from '@hugeicons/core-free-icons/BubbleChatIcon';
+import Settings02Icon from '@hugeicons/core-free-icons/Settings02Icon';
+import Logout01Icon from '@hugeicons/core-free-icons/Logout01Icon';
+import Menu01Icon from '@hugeicons/core-free-icons/Menu01Icon';
+import Cancel01Icon from '@hugeicons/core-free-icons/Cancel01Icon';
 import { cn } from '@/lib/utils';
-import { Logo } from '@/components/logo';
+import { UserAvatar } from '@/components/ui/user-avatar';
+
+type Account = { userEmail: string; userName: string; userAvatar: string | null };
 
 const NAV_ITEMS = [
-    { href: '/internal', label: 'Overview', icon: LayoutDashboard, exact: true },
-    { href: '/internal/tasks', label: 'Tasks', icon: CheckSquare },
-    { href: '/internal/analytics', label: 'Analytics', icon: BarChart3 },
-    { href: '/internal/events', label: 'Events', icon: Activity },
-    { href: '/internal/kpi', label: 'KPIs', icon: TrendingUp },
-    { href: '/internal/emails', label: 'Emails', icon: Mail },
-    { href: '/internal/model-mappings', label: 'Mappings', icon: ArrowRightLeft },
-    { href: '/internal/feedback', label: 'Feedback', icon: Mail },
-    { href: '/internal/settings', label: 'Settings', icon: Settings },
+    { href: '/internal', label: 'Overview', icon: DashboardCircleIcon, exact: true },
+    { href: '/internal/tasks', label: 'Tasks', icon: CheckListIcon },
+    { href: '/internal/analytics', label: 'Analytics', icon: Analytics01Icon },
+    { href: '/internal/events', label: 'Events', icon: Activity01Icon },
+    { href: '/internal/kpi', label: 'KPIs', icon: ChartUpIcon },
+    { href: '/internal/emails', label: 'Emails', icon: Mail01Icon },
+    { href: '/internal/model-mappings', label: 'Mappings', icon: ArrowDataTransferHorizontalIcon },
+    { href: '/internal/feedback', label: 'Feedback', icon: BubbleChatIcon },
+    { href: '/internal/settings', label: 'Settings', icon: Settings02Icon },
 ];
 
-function NavContent({ pathname, userEmail, onNavigate }: { pathname: string; userEmail: string; onNavigate?: () => void }) {
+function AccountBadge({ userEmail, userName, userAvatar, size = 28 }: Account & { size?: number }) {
+    return (
+        <span className="flex min-w-0 items-center gap-2.5">
+            <UserAvatar src={userAvatar} name={userName} email={userEmail} size={size} />
+            <span className="min-w-0">
+                <span className="block truncate text-sm font-semibold leading-tight">{userName || userEmail}</span>
+                {userName ? (
+                    <span className="block truncate text-[11px] leading-tight text-muted-foreground">{userEmail}</span>
+                ) : null}
+            </span>
+        </span>
+    );
+}
+
+function NavContent({ pathname, account, onNavigate }: { pathname: string; account: Account; onNavigate?: () => void }) {
     return (
         <>
-            {/* Logo / Title */}
+            {/* Signed-in user */}
             <div className="px-4 py-4 border-b border-border/30">
-                <Link href="/internal" className="flex items-center gap-2" onClick={onNavigate}>
-                    <Logo variant="mark" className="h-4" />
-                    <span className="text-sm font-semibold">Internal</span>
+                <Link href="/internal" className="block" onClick={onNavigate}>
+                    <AccountBadge {...account} />
                 </Link>
             </div>
 
@@ -61,7 +76,7 @@ function NavContent({ pathname, userEmail, onNavigate }: { pathname: string; use
                                     : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
                             )}
                         >
-                            <item.icon className="h-4 w-4" />
+                            <HugeiconsIcon icon={item.icon} className="h-4 w-4" strokeWidth={1.6} />
                             {item.label}
                         </Link>
                     );
@@ -69,16 +84,13 @@ function NavContent({ pathname, userEmail, onNavigate }: { pathname: string; use
             </nav>
 
             {/* Footer */}
-            <div className="px-3 py-3 border-t border-border/30 space-y-2">
-                <p className="text-[10px] text-muted-foreground truncate px-1">
-                    {userEmail}
-                </p>
+            <div className="px-3 py-3 border-t border-border/30">
                 <form action="/api/auth/signout" method="POST">
                     <button
                         type="submit"
                         className="flex items-center gap-2 w-full px-3 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
                     >
-                        <LogOut className="h-3.5 w-3.5" />
+                        <HugeiconsIcon icon={Logout01Icon} className="h-3.5 w-3.5" strokeWidth={1.6} />
                         Sign out
                     </button>
                 </form>
@@ -90,10 +102,12 @@ function NavContent({ pathname, userEmail, onNavigate }: { pathname: string; use
 export function InternalShell({
     children,
     userEmail,
+    userName,
+    userAvatar,
 }: {
     children: React.ReactNode;
-    userEmail: string;
-}) {
+} & Account) {
+    const account = { userEmail, userName, userAvatar };
     const pathname = usePathname();
     const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -102,20 +116,20 @@ export function InternalShell({
             <div className="min-h-screen bg-background flex">
                 {/* Desktop Sidebar */}
                 <aside className="hidden md:flex w-56 shrink-0 border-r border-border/40 bg-card/30 flex-col sticky top-0 h-screen">
-                    <NavContent pathname={pathname} userEmail={userEmail} />
+                    <NavContent pathname={pathname} account={account} />
                 </aside>
 
                 {/* Mobile Top Bar */}
                 <div className="md:hidden fixed top-0 left-0 right-0 z-40 h-12 bg-background/95 backdrop-blur-sm border-b border-border/30 flex items-center justify-between px-4">
-                    <Link href="/internal" className="flex items-center gap-2">
-                        <Logo variant="mark" className="h-4" />
-                        <span className="text-sm font-semibold">Internal</span>
+                    <Link href="/internal" className="flex min-w-0 items-center gap-2">
+                        <UserAvatar src={userAvatar} name={userName} email={userEmail} size={24} />
+                        <span className="truncate text-sm font-semibold">{userName || userEmail}</span>
                     </Link>
                     <button
                         onClick={() => setMobileOpen(true)}
                         className="p-2 rounded-lg hover:bg-muted/50 text-muted-foreground"
                     >
-                        <Menu className="h-5 w-5" />
+                        <HugeiconsIcon icon={Menu01Icon} className="h-5 w-5" strokeWidth={1.6} />
                     </button>
                 </div>
 
@@ -129,10 +143,10 @@ export function InternalShell({
                                     onClick={() => setMobileOpen(false)}
                                     className="p-1.5 rounded-lg hover:bg-muted/50 text-muted-foreground"
                                 >
-                                    <X className="h-4 w-4" />
+                                    <HugeiconsIcon icon={Cancel01Icon} className="h-4 w-4" strokeWidth={1.6} />
                                 </button>
                             </div>
-                            <NavContent pathname={pathname} userEmail={userEmail} onNavigate={() => setMobileOpen(false)} />
+                            <NavContent pathname={pathname} account={account} onNavigate={() => setMobileOpen(false)} />
                         </aside>
                     </div>
                 )}
