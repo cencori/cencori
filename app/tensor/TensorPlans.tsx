@@ -31,15 +31,15 @@ const packs: Array<{
     price: "₦5,000",
     usd: "$5",
     description: "100 tasks over 30 days, with the open-weight models to choose from.",
-    features: ["100 tasks", "Choose your own open-weight model", "Longer tasks than Starter"],
+    features: ["100 tasks", "Choose your own open-weight model", "Every task runs until it's done"],
   },
   {
     code: "pro",
     eyebrow: "Ship",
     price: "₦15,000",
     usd: "$15",
-    description: "60 tasks over 30 days on frontier models, each with far more room.",
-    features: ["60 tasks", "GPT, Opus-class and Maximo models", "The longest tasks Tensor runs"],
+    description: "60 tasks over 30 days on frontier models.",
+    features: ["60 tasks", "GPT, Opus-class and Maximo models", "Every task runs until it's done"],
   },
 ];
 
