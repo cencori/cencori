@@ -12,7 +12,7 @@ import { CENCORI_PAID_PLANS } from "@/lib/billing/plans";
 import { BusinessPricing } from "@/components/landing/BusinessPricing";
 import { Spinner } from "@/components/ui/spinner";
 
-type Tier = "free" | "pro" | "team" | "enterprise";
+type Tier = "free" | "pro" | "enterprise";
 type BillingPeriod = "monthly" | "annual";
 type Currency = "USD" | "NGN";
 type MatrixValue = boolean | string;
@@ -54,7 +54,7 @@ const tiers: Array<{
                 monthly: CENCORI_PAID_PLANS.pro.prices.month / 100,
                 annual: CENCORI_PAID_PLANS.pro.prices.year / 100,
             },
-            NGN: { monthly: 29000, annual: 290000 }
+            NGN: { monthly: 20000, annual: 200000 }
         },
         features: [
             "Unlimited projects",
@@ -63,33 +63,11 @@ const tiers: Array<{
             "Full security pipeline",
             "Jailbreak detection",
             "PII masking & audit trails",
+            "Team seats & collaboration",
             "Priority support",
         ],
         highlighted: true,
         cta: "Get Started",
-    },
-    {
-        name: "team",
-        displayName: "Team",
-        description: "For scaling startups and production teams.",
-        price: {
-            USD: {
-                monthly: CENCORI_PAID_PLANS.team.prices.month / 100,
-                annual: CENCORI_PAID_PLANS.team.prices.year / 100,
-            },
-            NGN: { monthly: 99000, annual: 990000 }
-        },
-        features: [
-            "Unlimited projects",
-            "Monetization",
-            "100,000 memory store · 200k/10k ops per mo",
-            "Full security pipeline",
-            "PII masking & jailbreak detection",
-            "Team seats & collaboration",
-            "24/7 Priority support",
-        ],
-        cta: "Get Started",
-        ctaVariant: "outline",
     },
     {
         name: "enterprise",
@@ -127,15 +105,15 @@ const matrixSections: Array<{
         rows: [
             {
                 feature: "100+ AI models (chat, image, audio, embeddings)",
-                values: { free: true, pro: true, team: true, enterprise: true },
+                values: { free: true, pro: true, enterprise: true },
             },
             {
                 feature: "Streaming & tool calling",
-                values: { free: true, pro: true, team: true, enterprise: true },
+                values: { free: true, pro: true, enterprise: true },
             },
             {
                 feature: "Structured output",
-                values: { free: true, pro: true, team: true, enterprise: true },
+                values: { free: true, pro: true, enterprise: true },
             },
         ],
     },
@@ -145,19 +123,19 @@ const matrixSections: Array<{
         rows: [
             {
                 feature: "Bring your own provider keys (BYOK)",
-                values: { free: true, pro: true, team: true, enterprise: true },
+                values: { free: true, pro: true, enterprise: true },
             },
             {
                 feature: "Multi-provider routing",
-                values: { free: false, pro: true, team: true, enterprise: true },
+                values: { free: false, pro: true, enterprise: true },
             },
             {
                 feature: "Failover & circuit breaker",
-                values: { free: false, pro: true, team: true, enterprise: true },
+                values: { free: false, pro: true, enterprise: true },
             },
             {
                 feature: "Semantic cache",
-                values: { free: false, pro: true, team: true, enterprise: true },
+                values: { free: false, pro: true, enterprise: true },
             },
         ],
     },
@@ -167,27 +145,27 @@ const matrixSections: Array<{
         rows: [
             {
                 feature: "Stored memories per project",
-                values: { free: "1,000", pro: "50,000", team: "100,000", enterprise: "Unlimited" },
+                values: { free: "1,000", pro: "50,000", enterprise: "Unlimited" },
             },
             {
                 feature: "Monthly operations (search / write)",
-                values: { free: "2k / 1k", pro: "50k / 5k", team: "200k / 10k", enterprise: "Unlimited" },
+                values: { free: "2k / 1k", pro: "50k / 5k", enterprise: "Unlimited" },
             },
             {
                 feature: "Memory scopes",
-                values: { free: "session + user", pro: "All scopes", team: "All scopes", enterprise: "All scopes" },
+                values: { free: "session + user", pro: "All scopes", enterprise: "All scopes" },
             },
             {
                 feature: "MCP memory bridge",
-                values: { free: false, pro: true, team: true, enterprise: true },
+                values: { free: false, pro: true, enterprise: true },
             },
             {
                 feature: "Region pinning",
-                values: { free: "Default region", pro: "US / EU", team: "US / EU", enterprise: "Custom regions" },
+                values: { free: "Default region", pro: "US / EU", enterprise: "Custom regions" },
             },
             {
                 feature: "GDPR export & hard-forget",
-                values: { free: true, pro: true, team: true, enterprise: true },
+                values: { free: true, pro: true, enterprise: true },
             },
         ],
     },
@@ -197,19 +175,19 @@ const matrixSections: Array<{
         rows: [
             {
                 feature: "Jailbreak detection",
-                values: { free: false, pro: true, team: true, enterprise: true },
+                values: { free: false, pro: true, enterprise: true },
             },
             {
                 feature: "PII masking & redaction",
-                values: { free: false, pro: true, team: true, enterprise: true },
+                values: { free: false, pro: true, enterprise: true },
             },
             {
                 feature: "Output scanning",
-                values: { free: false, pro: true, team: true, enterprise: true },
+                values: { free: false, pro: true, enterprise: true },
             },
             {
                 feature: "Security incidents & audit trails",
-                values: { free: false, pro: true, team: true, enterprise: true },
+                values: { free: false, pro: true, enterprise: true },
             },
         ],
     },
@@ -219,11 +197,11 @@ const matrixSections: Array<{
         rows: [
             {
                 feature: "Request logs & analytics",
-                values: { free: "7 day retention", pro: true, team: true, enterprise: true },
+                values: { free: "7 day retention", pro: true, enterprise: true },
             },
             {
                 feature: "Cost tracking",
-                values: { free: "7 day retention", pro: true, team: true, enterprise: true },
+                values: { free: "7 day retention", pro: true, enterprise: true },
             },
         ],
     },
@@ -233,24 +211,24 @@ const matrixSections: Array<{
         rows: [
             {
                 feature: "Active Projects",
-                values: { free: "1", pro: "Unlimited", team: "Unlimited", enterprise: "Unlimited" },
+                values: { free: "1", pro: "Unlimited", enterprise: "Unlimited" },
             },
             {
                 feature: "Support",
                 values: {
                     free: "Community",
                     pro: "Priority",
-                    team: "24/7 Priority",
+                   
                     enterprise: "Dedicated SLA",
                 },
             },
             {
                 feature: "SSO & SAML",
-                values: { free: false, pro: false, team: false, enterprise: true },
+                values: { free: false, pro: false, enterprise: true },
             },
             {
                 feature: "SLA guarantees",
-                values: { free: false, pro: false, team: false, enterprise: true },
+                values: { free: false, pro: false, enterprise: true },
             },
         ],
     },
@@ -468,7 +446,7 @@ export function Pricing() {
                 </div>
 
                 <div className="overflow-hidden rounded-2xl border border-border/50 bg-background/95 backdrop-blur-sm">
-                    <div className="grid border-b border-border/50 md:grid-cols-2 xl:grid-cols-4">
+                    <div className="grid border-b border-border/50 md:grid-cols-3">
                         {tiers.map((tier, index) => {
                             const displayPrice = getDisplayPrice(tier, billingPeriod, currency);
                             return (
@@ -476,7 +454,7 @@ export function Pricing() {
                                     key={tier.name}
                                     className={cn(
                                         "relative flex flex-col gap-4 p-6",
-                                        index < tiers.length - 1 && "border-b border-border/50 xl:border-b-0 xl:border-r",
+                                        index < tiers.length - 1 && "border-b border-border/50 md:border-b-0 md:border-r",
                                         index === 1 && "bg-muted/20"
                                     )}
                                 >
@@ -590,7 +568,7 @@ export function Pricing() {
 
                  <div className="mt-8 rounded-xl border border-border/50 bg-muted/20 p-4 text-xs text-muted-foreground">
                     <p>
-                        Compute billed separately by GPU hour and token usage. Team plan and usage-based pricing launching soon.
+                        Model usage is pay as you go on every plan: buy credits and pay the provider rate plus 5%. Plans cover agents, memory and security.
                     </p>
                 </div>
             </div>

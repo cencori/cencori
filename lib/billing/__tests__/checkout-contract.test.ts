@@ -34,12 +34,13 @@ describe("Cencori checkout contract", () => {
       expect(plan.features.some((feature) => /requests?\/month|requests each month/i.test(feature)))
         .toBe(false);
     }
-    expect(getMonthlyEquivalentCents("pro", "year")).toBeCloseTo(2_416.67, 1);
+    expect(getMonthlyEquivalentCents("pro", "year")).toBeCloseTo(1_666.67, 1);
   });
 
   test("does not offer a customer their current plan as an upgrade", () => {
-    expect(getAvailableUpgradePlans("free")).toEqual(["pro", "team"]);
-    expect(getAvailableUpgradePlans("pro")).toEqual(["team"]);
+    // Team is no longer sold: Free → Pro is the only self-serve upgrade.
+    expect(getAvailableUpgradePlans("free")).toEqual(["pro"]);
+    expect(getAvailableUpgradePlans("pro")).toEqual([]);
     expect(getAvailableUpgradePlans("team")).toEqual([]);
   });
 });

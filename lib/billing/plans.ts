@@ -16,18 +16,23 @@ export const CENCORI_PAID_PLANS: Record<PaidPlanTier, PaidPlan> = {
     name: "Pro",
     description: "For developers shipping production AI workloads.",
     logRetention: "30-day log retention",
+    // $20/mo since 2026-11-07 (was $29). Model usage is pay as you go on
+    // every plan; the plan covers agents, memory and security.
     prices: {
-      month: 2_900,
-      year: 29_000,
+      month: 2_000,
+      year: 20_000,
     },
     features: [
       "Unlimited projects",
+      "More agents running at once",
+      "50,000 memories per project",
       "Full security pipeline",
-      "Advanced analytics",
-      "Webhooks and integrations",
+      "Team seats",
       "Priority support",
     ],
   },
+  // No longer sold (2026-11-07). Kept so existing Team subscribers keep
+  // their plan; getAvailableUpgradePlans never offers it.
   team: {
     id: "team",
     name: "Team",
@@ -58,9 +63,10 @@ export function isPlanBillingInterval(value: unknown): value is PlanBillingInter
 export function getAvailableUpgradePlans(
   currentTier: "free" | PaidPlanTier = "free",
 ): PaidPlanTier[] {
-  if (currentTier === "team") return [];
-  if (currentTier === "pro") return ["team"];
-  return ["pro", "team"];
+  // Free → Pro is the only self-serve upgrade; above Pro is Enterprise
+  // (contact sales). Team is no longer sold.
+  if (currentTier !== "free") return [];
+  return ["pro"];
 }
 
 export function getMonthlyEquivalentCents(

@@ -322,7 +322,7 @@ export function requireFeature(
     throw new Error(
       JSON.stringify({
         error: `${featureNames[feature]} requires ${feature === 'governanceControls'
-          ? 'the Team or Enterprise plan'
+          ? 'the Enterprise plan'
           : feature === 'governanceCustomFrameworks'
             || feature === 'governanceAdvancedEvidence'
             || feature === 'governanceBespokeControls'

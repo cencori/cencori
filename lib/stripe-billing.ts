@@ -19,6 +19,19 @@ const STRIPE_PRICE_ENV_KEYS: Record<
   },
 };
 
+/**
+ * Price IDs Cencori no longer sells but existing subscriptions may still be
+ * on: Pro at $29/$290 before the 2026-11-07 move to $20/$200. Recognised as
+ * the same plan so renewals and plan changes keep working until
+ * scripts/stripe-pro-price-change.mjs has moved every subscriber.
+ */
+const STRIPE_LEGACY_PRICE_ENV_KEYS: Partial<Record<PaidPlanTier, Partial<Record<PlanBillingInterval, string>>>> = {
+  pro: {
+    month: "STRIPE_PRICE_PRO_MONTHLY_LEGACY",
+    year: "STRIPE_PRICE_PRO_ANNUAL_LEGACY",
+  },
+};
+
 export function getStripeBillingClient(): Stripe {
   if (stripeBillingClient) return stripeBillingClient;
 
@@ -63,6 +76,15 @@ export function getStripePlanFromPriceId(
     ) as PlanBillingInterval[]) {
       const configuredPriceId = process.env[STRIPE_PRICE_ENV_KEYS[tier][interval]];
       if (configuredPriceId && configuredPriceId === priceId) {
+        return { tier, interval };
+      }
+    }
+  }
+
+  for (const [tier, intervals] of Object.entries(STRIPE_LEGACY_PRICE_ENV_KEYS) as Array<[PaidPlanTier, Partial<Record<PlanBillingInterval, string>>]>) {
+    for (const [interval, envKey] of Object.entries(intervals) as Array<[PlanBillingInterval, string]>) {
+      const legacyPriceId = process.env[envKey];
+      if (legacyPriceId && legacyPriceId === priceId) {
         return { tier, interval };
       }
     }

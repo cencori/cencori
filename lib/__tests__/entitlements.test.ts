@@ -97,19 +97,19 @@ describe("subscription entitlements", () => {
 
         expect(response.status).toBe(403);
         await expect(response.json()).resolves.toMatchObject({
-            error: "Governance control access requires the Team or Enterprise plan",
+            error: "Governance control access requires the Enterprise plan",
             code: "FEATURE_NOT_INCLUDED",
             required_tier: "team",
             upgrade_url: "/billing",
         });
     });
 
-    it("returns a Team-specific API contract for extended audit history", async () => {
+    it("points Team-tier features at Enterprise now that Team is no longer sold", async () => {
         const response = featureGateResponse("auditLogExtendedHistory", "team");
 
         expect(response.status).toBe(403);
         await expect(response.json()).resolves.toMatchObject({
-            error: "Extended audit-log history requires the Team or Enterprise plan",
+            error: "Extended audit-log history requires the Enterprise plan",
             code: "FEATURE_NOT_INCLUDED",
             required_tier: "team",
         });

@@ -15,7 +15,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FeatureUpgradeWall } from "@/components/billing/FeatureUpgradeWall";
-import { UpgradeDialog } from "@/components/billing/UpgradeDialog";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -209,7 +208,6 @@ export default function AuditLogPage({ params }: PageProps) {
     const [projectFilter, setProjectFilter] = useState("all");
     const [page, setPage] = useState(1);
     const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
-    const [teamUpgradeOpen, setTeamUpgradeOpen] = useState(false);
     const [metadataCopied, setMetadataCopied] = useState(false);
     const {
         organizations,
@@ -527,7 +525,7 @@ export default function AuditLogPage({ params }: PageProps) {
                                 option.value === "all" && !allTimeHistoryEnabled
                                     ? <LockedSelectOption key={option.value} label={option.label} requiredTier="Enterprise" />
                                     : !extendedHistoryEnabled && TEAM_ONLY_TIME_RANGES.has(option.value)
-                                    ? <LockedSelectOption key={option.value} label={option.label} requiredTier="Team" />
+                                    ? <LockedSelectOption key={option.value} label={option.label} />
                                     : (
                                         <SelectItem key={option.value} value={option.value} className="text-xs">
                                             {option.label}
@@ -613,13 +611,13 @@ export default function AuditLogPage({ params }: PageProps) {
                                         variant="outline"
                                         size="sm"
                                         className="h-7 text-xs text-muted-foreground shadow-none dark:shadow-xs"
-                                        onClick={() => setTeamUpgradeOpen(true)}
+                                        onClick={() => { window.location.href = "/contact"; }}
                                     >
                                         <LockKeyhole className="mr-1.5 h-3 w-3" />
                                         Export
                                     </Button>
                                 </TooltipTrigger>
-                                <TooltipContent side="bottom" sideOffset={8}>Upgrade to Team</TooltipContent>
+                                <TooltipContent side="bottom" sideOffset={8}>Exports are on Enterprise. Contact sales</TooltipContent>
                             </Tooltip>
                         )}
                     </div>
@@ -840,28 +838,17 @@ export default function AuditLogPage({ params }: PageProps) {
                 </DialogContent>
             </Dialog>
 
-            <UpgradeDialog
-                open={teamUpgradeOpen}
-                onOpenChange={setTeamUpgradeOpen}
-                orgId={organizationContext.id}
-                orgSlug={orgSlug}
-                orgName={organizationContext.name}
-                currentTier={effectiveTier === "pro" || effectiveTier === "team" ? effectiveTier : "free"}
-                reason="Extended audit history, identity events, and ledger exports require Team or Enterprise."
-                recommendedTier="team"
-                checkoutMode="direct"
-                returnPath={`/${orgSlug}/~/audit-log`}
-            />
         </div>
     );
 }
 
+// Team-only features are now reached through Enterprise: Team is no longer
+// sold (2026-11-07), though existing Team orgs keep them.
 function LockedSelectOption({
     label,
-    requiredTier = "Team",
 }: {
     label: string;
-    requiredTier?: "Team" | "Enterprise";
+    requiredTier?: "Enterprise";
 }) {
     return (
         <Tooltip>
@@ -878,7 +865,7 @@ function LockedSelectOption({
                 </div>
             </TooltipTrigger>
             <TooltipContent side="right" sideOffset={8} className="text-[10px]">
-                {requiredTier === "Enterprise" ? "Enterprise plan required" : "Upgrade to Team"}
+                Enterprise plan required
             </TooltipContent>
         </Tooltip>
     );

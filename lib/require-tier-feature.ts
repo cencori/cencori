@@ -59,7 +59,7 @@ export function featureGateResponse(
   const requirement = requiredTier === 'enterprise'
     ? 'the Enterprise plan'
     : requiredTier === 'team'
-      ? 'the Team or Enterprise plan'
+      ? 'the Enterprise plan'
       : 'a paid plan';
 
   return NextResponse.json(
