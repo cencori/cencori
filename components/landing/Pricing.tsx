@@ -9,11 +9,16 @@ import { supabase } from "@/lib/supabaseClient";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/currency";
 import { CENCORI_PAID_PLANS } from "@/lib/billing/plans";
-import { BusinessPricing } from "@/components/landing/BusinessPricing";
+import { CurrencyToggle } from "@/components/dashboard/CurrencyToggle";
+import { useDisplayCurrency } from "@/hooks/useDisplayCurrency";
+import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
+import BotIcon from "@hugeicons/core-free-icons/BotIcon";
+import AiBrain01Icon from "@hugeicons/core-free-icons/AiBrain01Icon";
+import SecurityCheckIcon from "@hugeicons/core-free-icons/SecurityCheckIcon";
+import Layers01Icon from "@hugeicons/core-free-icons/Layers01Icon";
 import { Spinner } from "@/components/ui/spinner";
 
 type Tier = "free" | "pro" | "enterprise";
-type BillingPeriod = "monthly" | "annual";
 type Currency = "USD" | "NGN";
 type MatrixValue = boolean | string;
 
@@ -30,25 +35,26 @@ const tiers: Array<{
     {
         name: "free",
         displayName: "Free",
-        description: "Everything you need to build, experiment, and test.",
+        description: "Use every model and start building agents. Pay only for what you use.",
         price: {
             USD: { monthly: 0, annual: 0 },
             NGN: { monthly: 0, annual: 0 }
         },
         features: [
-            "1 active project",
-            "100+ AI models",
-            "1,000 memory store · 2k/1k ops per mo",
+            "100+ AI models, pay as you go",
+            "Bring your own provider keys",
+            "2 agents running at once",
+            "1,000 memories per project",
+            "1 project",
             "Community support",
-            "No credit card required",
         ],
-        cta: "Start Free",
+        cta: "Start building",
         ctaVariant: "outline",
     },
     {
         name: "pro",
         displayName: "Pro",
-        description: "For professional developers and growing products.",
+        description: "For teams and businesses running agents in production.",
         price: {
             USD: {
                 monthly: CENCORI_PAID_PLANS.pro.prices.month / 100,
@@ -57,178 +63,136 @@ const tiers: Array<{
             NGN: { monthly: 20000, annual: 200000 }
         },
         features: [
+            "Everything in Free",
+            "10 agents running at once",
+            "50,000 memories per project",
             "Unlimited projects",
-            "Monetization",
-            "50,000 memory store · 50k/5k ops per mo",
-            "Full security pipeline",
-            "Jailbreak detection",
-            "PII masking & audit trails",
-            "Team seats & collaboration",
+            "PII masking, jailbreak detection & audit trails",
+            "Team seats",
             "Priority support",
         ],
         highlighted: true,
-        cta: "Get Started",
+        cta: "Get Pro",
     },
     {
         name: "enterprise",
         displayName: "Enterprise",
-        description: "For large organizations with custom security and scale.",
+        description: "For organizations that need custom limits, security and support.",
         price: {
             USD: { monthly: "Custom", annual: "Custom" },
             NGN: { monthly: "Custom", annual: "Custom" }
         },
         features: [
-            "Unlimited requests & projects",
+            "Everything in Pro",
+            "Custom agent and memory limits",
             "Unlimited memory",
+            "Enforced SSO (SAML)",
+            "Governance controls & audit exports",
+            "Volume pricing on usage",
             "Dedicated support & SLAs",
-            "SSO & SAML",
-            "RBAC & custom residency",
-            "Bring your own infra",
-            "SOC2 compliance audit logs",
         ],
-        cta: "Contact Sales",
+        cta: "Contact sales",
         ctaVariant: "outline",
     },
 ];
 
+// Every value here mirrors lib/entitlements.ts (TIER_FEATURES,
+// EMBEDDED_LIMITS, MEMORY_QUOTA, MEMORY_OPS_QUOTA, LOG_RETENTION_RANGE).
+// Change both together.
 const matrixSections: Array<{
     title: string;
     description: string;
+    icon: IconSvgElement;
     rows: Array<{
         feature: string;
         values: Record<Tier, MatrixValue>;
     }>;
 }> = [
     {
-        title: "AI Gateway",
-        description: "Inference capabilities.",
+        title: "Agents",
+        icon: BotIcon,
+        description: "Build agents, and embed them in your own product.",
         rows: [
             {
-                feature: "100+ AI models (chat, image, audio, embeddings)",
-                values: { free: true, pro: true, enterprise: true },
+                feature: "Agents running at once",
+                values: { free: "2", pro: "10", enterprise: "Custom" },
             },
             {
-                feature: "Streaming & tool calling",
-                values: { free: true, pro: true, enterprise: true },
+                feature: "Skills",
+                values: { free: "20", pro: "200", enterprise: "Custom" },
             },
             {
-                feature: "Structured output",
-                values: { free: true, pro: true, enterprise: true },
-            },
-        ],
-    },
-    {
-        title: "Infrastructure",
-        description: "Provider routing and reliability.",
-        rows: [
-            {
-                feature: "Bring your own provider keys (BYOK)",
-                values: { free: true, pro: true, enterprise: true },
+                feature: "Knowledge bases",
+                values: { free: "10", pro: "100", enterprise: "Custom" },
             },
             {
-                feature: "Multi-provider routing",
-                values: { free: false, pro: true, enterprise: true },
-            },
-            {
-                feature: "Failover & circuit breaker",
-                values: { free: false, pro: true, enterprise: true },
-            },
-            {
-                feature: "Semantic cache",
-                values: { free: false, pro: true, enterprise: true },
+                feature: "Customers using your embedded agents (per project)",
+                values: { free: "10", pro: "100", enterprise: "Custom" },
             },
         ],
     },
     {
         title: "Memory",
-        description: "The memory layer of the AI cloud. Reads never block; writes 429 with an upgrade path when a tier fills. Search/write volume bills to prepaid credits.",
+        icon: AiBrain01Icon,
+        description: "Long-term memory for agents and apps.",
         rows: [
             {
-                feature: "Stored memories per project",
+                feature: "Memories per project",
                 values: { free: "1,000", pro: "50,000", enterprise: "Unlimited" },
             },
             {
-                feature: "Monthly operations (search / write)",
+                feature: "Memory lookups / saves per month",
                 values: { free: "2k / 1k", pro: "50k / 5k", enterprise: "Unlimited" },
-            },
-            {
-                feature: "Memory scopes",
-                values: { free: "session + user", pro: "All scopes", enterprise: "All scopes" },
-            },
-            {
-                feature: "MCP memory bridge",
-                values: { free: false, pro: true, enterprise: true },
-            },
-            {
-                feature: "Region pinning",
-                values: { free: "Default region", pro: "US / EU", enterprise: "Custom regions" },
-            },
-            {
-                feature: "GDPR export & hard-forget",
-                values: { free: true, pro: true, enterprise: true },
             },
         ],
     },
     {
         title: "Security",
-        description: "Content safety and data protection.",
+        icon: SecurityCheckIcon,
+        description: "Protect your users and data.",
         rows: [
-            {
-                feature: "Jailbreak detection",
-                values: { free: false, pro: true, enterprise: true },
-            },
             {
                 feature: "PII masking & redaction",
                 values: { free: false, pro: true, enterprise: true },
             },
             {
-                feature: "Output scanning",
+                feature: "Jailbreak detection & output scanning",
                 values: { free: false, pro: true, enterprise: true },
             },
             {
-                feature: "Security incidents & audit trails",
+                feature: "Audit log",
                 values: { free: false, pro: true, enterprise: true },
             },
-        ],
-    },
-    {
-        title: "Observability",
-        description: "Monitoring and analytics.",
-        rows: [
             {
-                feature: "Request logs & analytics",
-                values: { free: "7 day retention", pro: true, enterprise: true },
-            },
-            {
-                feature: "Cost tracking",
-                values: { free: "7 day retention", pro: true, enterprise: true },
+                feature: "Governance controls & audit exports",
+                values: { free: false, pro: false, enterprise: true },
             },
         ],
     },
     {
         title: "Platform",
-        description: "Collaboration and support.",
+        icon: Layers01Icon,
+        description: "Logs, projects and support.",
         rows: [
             {
-                feature: "Active Projects",
+                feature: "Request log history",
+                values: { free: "7 days", pro: "30 days", enterprise: "All time" },
+            },
+            {
+                feature: "Projects",
                 values: { free: "1", pro: "Unlimited", enterprise: "Unlimited" },
             },
             {
+                feature: "Team seats",
+                values: { free: false, pro: true, enterprise: true },
+            },
+            {
+                feature: "Enforced SSO (SAML)",
+                values: { free: false, pro: false, enterprise: true },
+            },
+            {
                 feature: "Support",
-                values: {
-                    free: "Community",
-                    pro: "Priority",
-                   
-                    enterprise: "Dedicated SLA",
-                },
-            },
-            {
-                feature: "SSO & SAML",
-                values: { free: false, pro: false, enterprise: true },
-            },
-            {
-                feature: "SLA guarantees",
-                values: { free: false, pro: false, enterprise: true },
+                values: { free: "Community", pro: "Priority", enterprise: "Dedicated + SLA" },
             },
         ],
     },
@@ -244,68 +208,24 @@ function renderMatrixValue(value: MatrixValue) {
     return <span className="text-xs md:text-sm text-foreground/90">{value}</span>;
 }
 
-function getDisplayPrice(tier: (typeof tiers)[number], billingPeriod: BillingPeriod, currency: Currency) {
-    const priceObj = tier.price[currency];
-    if (typeof priceObj.monthly !== "number") {
-        return priceObj.monthly;
-    }
-    if (billingPeriod === "annual" && priceObj.monthly > 0) {
-        return Math.round(Number(priceObj.annual) / 12);
-    }
-    return priceObj.monthly;
+function getDisplayPrice(tier: (typeof tiers)[number], currency: Currency) {
+    return tier.price[currency].monthly;
 }
 
-function getYearlySavings(tier: (typeof tiers)[number], currency: Currency) {
-    const priceObj = tier.price[currency];
-    if (typeof priceObj.monthly !== "number" || typeof priceObj.annual !== "number") {
-        return null;
-    }
-    if (priceObj.monthly === 0) {
-        return null;
-    }
-    const monthlyTotal = priceObj.monthly * 12;
-    const annualTotal = priceObj.annual;
-    const savings = monthlyTotal - annualTotal;
-    return savings;
-}
-
-function getSubPriceLabel(tier: (typeof tiers)[number], billingPeriod: BillingPeriod, currency: Currency) {
-    const priceObj = tier.price[currency];
-    if (typeof priceObj.monthly !== "number") {
-        return "Talk to sales";
-    }
-    if (priceObj.monthly === 0) {
-        return "Free + you pay for AI usage";
-    }
-    if (billingPeriod === "annual") {
-        const formattedAnnual = formatCurrency(priceObj.annual, currency, { maximumFractionDigits: 0 });
-        return `Billed ${formattedAnnual}/year`;
-    }
-    return "Platform subscription";
+function getSubPriceLabel(tier: (typeof tiers)[number], currency: Currency) {
+    const monthly = tier.price[currency].monthly;
+    if (typeof monthly !== "number") return "Talk to sales";
+    if (monthly === 0) return "Free forever. AI usage from credits";
+    return "Billed monthly. AI usage from credits";
 }
 
 export function Pricing() {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
-    const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>("monthly");
-    const [currency, setCurrency] = useState<Currency>("USD");
+    // Same USD/NGN choice as the dashboard: remembered per browser, naira
+    // by default in Nigeria (country read in app/pricing/layout.tsx).
+    const { currency } = useDisplayCurrency();
     const [orgId, setOrgId] = useState<string | null>(null);
     const [loadingTier, setLoadingTier] = useState<Tier | null>(null);
-
-    useEffect(() => {
-        try {
-            const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-            const isNigeriaTz = tz && (tz === "Africa/Lagos" || tz.includes("Lagos"));
-            
-            const locale = typeof navigator !== "undefined" ? (navigator.language || (navigator.languages && navigator.languages[0]) || "") : "";
-            const isNigeriaLocale = locale.includes("-NG") || locale === "en-NG";
-
-            if (isNigeriaTz || isNigeriaLocale) {
-                setCurrency("NGN");
-            }
-        } catch (e) {
-            console.warn("Timezone/Locale detection failed", e);
-        }
-    }, []);
 
     useEffect(() => {
         const checkAuth = async () => {
@@ -360,7 +280,7 @@ export function Pricing() {
             const res = await fetch("/api/billing/checkout", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ tier, interval: billingPeriod === 'annual' ? 'year' : 'month', orgId }),
+                body: JSON.stringify({ tier, interval: 'month', orgId }),
             });
             const data = await res.json();
             if (data.checkoutUrl) {
@@ -376,7 +296,7 @@ export function Pricing() {
     };
 
     return (
-        <section className="relative overflow-hidden bg-background">
+        <section className="relative overflow-x-clip bg-background">
             <div
                 className="pointer-events-none absolute inset-0 opacity-40"
                 style={{
@@ -387,68 +307,17 @@ export function Pricing() {
             />
 
             <div className="relative z-10 mx-auto max-w-7xl px-4 py-20 md:px-6 md:py-24">
-                <div className="mx-auto mb-12 max-w-3xl text-center">
-                    <Badge variant="outline" className="mb-4 rounded-full border-border/60 px-4 py-1 text-xs">
-                        Pricing
-                    </Badge>
+                <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
                     <h1 className="text-3xl font-semibold tracking-tight md:text-5xl">
-                        Simple pricing, whether you run a business or build with AI.
+                        Build. Scale. Deploy.
                     </h1>
-                    <p className="mx-auto mt-4 max-w-2xl text-sm text-muted-foreground md:text-base">
-                        Businesses pay a flat monthly price in naira for their agents&apos; conversations.
-                        Developers start free, and pay for AI usage in prepaid credits or bring their own keys.
-                    </p>
+                    <CurrencyToggle />
                 </div>
 
-                <BusinessPricing />
-
-                <div className="mx-auto mb-8 max-w-2xl text-center">
-                    <h2 className="text-2xl font-semibold tracking-tight md:text-3xl">For developers</h2>
-                    <p className="mt-3 text-sm text-muted-foreground">Build AI into your own product with our API and SDKs. AI usage is billed in prepaid credits.</p>
-                </div>
-
-                <div className="mb-10 flex justify-center">
-                    {/* Billing Cycle Selector */}
-                    <div className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/90 p-1 backdrop-blur-sm">
-                        <button
-                            type="button"
-                            onClick={() => setBillingPeriod("monthly")}
-                            className={cn(
-                                "rounded-full px-4 py-1.5 text-xs font-medium transition-colors",
-                                billingPeriod === "monthly"
-                                    ? "bg-foreground text-background"
-                                    : "text-muted-foreground hover:text-foreground"
-                            )}
-                        >
-                            Monthly
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setBillingPeriod("annual")}
-                            className={cn(
-                                "inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-medium transition-colors",
-                                billingPeriod === "annual"
-                                    ? "bg-foreground text-background"
-                                    : "text-muted-foreground hover:text-foreground"
-                            )}
-                        >
-                            <span>Annual</span>
-                            <span className={cn(
-                                "rounded-full px-1.5 py-0.5 text-[9px] font-semibold tracking-wide uppercase",
-                                billingPeriod === "annual"
-                                    ? "bg-background/20 text-background"
-                                    : "bg-emerald-500/10 text-emerald-500"
-                            )}>
-                                Save up to 17%
-                            </span>
-                        </button>
-                    </div>
-                </div>
-
-                <div className="overflow-hidden rounded-2xl border border-border/50 bg-background/95 backdrop-blur-sm">
-                    <div className="grid border-b border-border/50 md:grid-cols-3">
+                <div className="overflow-clip border border-border/50 bg-background/95 backdrop-blur-sm xl:overflow-visible">
+                    <div className="grid md:grid-cols-3">
                         {tiers.map((tier, index) => {
-                            const displayPrice = getDisplayPrice(tier, billingPeriod, currency);
+                            const displayPrice = getDisplayPrice(tier, currency);
                             return (
                                 <article
                                     key={tier.name}
@@ -462,7 +331,7 @@ export function Pricing() {
                                         <div className="flex items-center gap-2">
                                             <p className="text-xl font-semibold">{tier.displayName}</p>
                                             {tier.highlighted && (
-                                                <Badge className="rounded-full border-0 bg-foreground px-2 py-0.5 text-[10px] text-background">
+                                                <Badge className="rounded-[4px] border-0 bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-400">
                                                     Popular
                                                 </Badge>
                                             )}
@@ -476,19 +345,8 @@ export function Pricing() {
                                                 {typeof displayPrice === "number" ? formatCurrency(displayPrice, currency, { maximumFractionDigits: 0 }) : displayPrice}
                                                 {typeof displayPrice === "number" && <span className="text-base text-muted-foreground"> /mo</span>}
                                             </p>
-                                            {billingPeriod === "annual" && (() => {
-                                                const savings = getYearlySavings(tier, currency);
-                                                if (savings && savings > 0) {
-                                                    return (
-                                                        <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-500">
-                                                            Save {formatCurrency(savings, currency, { maximumFractionDigits: 0 })}/yr
-                                                        </span>
-                                                    );
-                                                }
-                                                return null;
-                                            })()}
                                         </div>
-                                        <p className="mt-1 text-xs text-muted-foreground">{getSubPriceLabel(tier, billingPeriod, currency)}</p>
+                                        <p className="mt-1 text-xs text-muted-foreground">{getSubPriceLabel(tier, currency)}</p>
                                     </div>
 
                                     <ul className="space-y-2">
@@ -523,18 +381,20 @@ export function Pricing() {
                         })}
                     </div>
 
-                    <div className="overflow-x-auto">
+                    {/* Scrolls sideways on small screens; from xl the table fits, so
+                        the wrapper stops being a scroll box and the plan header
+                        can stick under the site nav (80px) while you scroll. */}
+                    <div className="overflow-x-auto xl:overflow-visible">
                         <table className="w-full min-w-[980px] border-collapse text-left">
                             <thead>
-                                <tr className="border-b border-border/50 bg-muted/15">
-                                    <th className="w-[30%] px-5 py-4 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                <tr className="bg-muted/15">
+                                    <th className="w-[30%] px-5 py-4 text-xs font-medium uppercase tracking-wide text-muted-foreground sticky top-20 z-30 bg-background before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-border/50 after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border/50">
                                         Features
                                     </th>
                                     {tiers.map((tier) => (
-                                        <th key={tier.name} className="w-[17.5%] px-5 py-4 align-top">
+                                        <th key={tier.name} className="w-[17.5%] px-5 py-4 align-top text-center sticky top-20 z-30 bg-background before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-border/50 after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border/50">
                                             <div className="space-y-2">
-                                                <p className="text-sm font-semibold">{tier.displayName}</p>
-                                                <p className="text-xs text-muted-foreground">Platform subscription</p>
+                                                <p className="text-sm font-bold">{tier.displayName}</p>
                                             </div>
                                         </th>
                                     ))}
@@ -543,10 +403,15 @@ export function Pricing() {
                             <tbody>
                                 {matrixSections.map((section) => (
                                     <React.Fragment key={section.title}>
-                                        <tr className="border-y border-border/50 bg-muted/10">
+                                        <tr className="border-b border-border/50 bg-muted/40">
                                             <td colSpan={tiers.length + 1} className="px-5 py-4">
-                                                <p className="text-sm font-semibold">{section.title}</p>
-                                                <p className="text-xs text-muted-foreground">{section.description}</p>
+                                                <div className="flex items-center gap-3">
+                                                    <HugeiconsIcon icon={section.icon} size={20} strokeWidth={1.6} className="shrink-0 text-foreground" />
+                                                    <div>
+                                                        <p className="text-base font-bold">{section.title}</p>
+                                                        <p className="text-xs text-muted-foreground">{section.description}</p>
+                                                    </div>
+                                                </div>
                                             </td>
                                         </tr>
                                         {section.rows.map((row) => (
@@ -566,11 +431,6 @@ export function Pricing() {
                     </div>
                 </div>
 
-                 <div className="mt-8 rounded-xl border border-border/50 bg-muted/20 p-4 text-xs text-muted-foreground">
-                    <p>
-                        Model usage is pay as you go on every plan: buy credits and pay the provider rate plus 5%. Plans cover agents, memory and security.
-                    </p>
-                </div>
             </div>
         </section>
     );
