@@ -32,6 +32,7 @@ import { runGatewayInputPipeline } from '@/lib/gateway/input-guard';
 import { toLoggedMessages } from '@/lib/gateway/log-payload';
 import type { SubscriptionTier } from '@/lib/entitlements';
 import { safeProviderFetch } from '@/lib/security/outbound-url';
+import { USAGE_MARKUP_PERCENT, withUsageMarkup } from '@/lib/billing/usage-markup';
 
 // Supported embedding providers
 type EmbeddingProvider = 'openai' | 'google' | 'cohere';
@@ -341,7 +342,7 @@ export async function POST(req: NextRequest) {
 
         // Cost tracking
         const providerCost = calculateProviderTokenCost(result.usage.total_tokens, 0, pricing);
-        const cencoriCharge = providerKey?.encrypted_key ? 0 : providerCost;
+        const cencoriCharge = providerKey?.encrypted_key ? 0 : withUsageMarkup(providerCost);
 
         await logGatewayRequest(ctx, {
             endpoint: 'embeddings',

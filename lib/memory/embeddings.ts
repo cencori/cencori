@@ -21,6 +21,7 @@ import { decryptApiKey } from '@/lib/encryption';
 import { getPricingFromDB } from '@/lib/providers/pricing';
 import { calculateProviderTokenCost } from '@/lib/providers/base';
 import { getMemoryGoogleApiKey } from '@/lib/providers/google-env';
+import { USAGE_MARKUP_PERCENT, withUsageMarkup } from '@/lib/billing/usage-markup';
 
 type SupabaseAdmin = ReturnType<typeof createAdminClient>;
 
@@ -256,7 +257,7 @@ async function embedWithGemini(inputs: string[]): Promise<MemoryEmbeddingResult>
     }
 
     const providerCostUsd = calculateProviderTokenCost(totalTokens, 0, pricing);
-    const cencoriChargeUsd = providerCostUsd;
+    const cencoriChargeUsd = withUsageMarkup(providerCostUsd);
 
     return {
         embeddings,

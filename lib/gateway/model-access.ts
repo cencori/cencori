@@ -1,6 +1,7 @@
 import type { ModelPricing, UnifiedChatResponse } from '@/lib/providers/base';
 import { ModelAccessDeniedError } from '@/lib/providers/errors';
 import { isExplicitlyFree } from '@/lib/providers/pricing';
+import { USAGE_MARKUP_PERCENT, withUsageMarkup } from '@/lib/billing/usage-markup';
 
 export type GatewayBillingMode = 'standard' | 'sponsored' | 'byok';
 
@@ -95,8 +96,8 @@ export function calculateGatewayCharge(
     }
 
     return {
-        cencoriChargeUsd: providerCostUsd,
-        markupPercentage: 0,
+        cencoriChargeUsd: withUsageMarkup(providerCostUsd),
+        markupPercentage: USAGE_MARKUP_PERCENT,
     };
 }
 

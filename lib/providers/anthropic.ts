@@ -24,6 +24,7 @@ import { getPricingFromDB } from './pricing';
 import { toAnthropicMessages, type AnthropicMessage } from './utils';
 import { normalizeProviderError, ServiceUnavailableError } from './errors';
 import { safeProviderFetch } from '@/lib/security/outbound-url';
+import { USAGE_MARKUP_PERCENT, withUsageMarkup } from '@/lib/billing/usage-markup';
 
 /**
  * Map Anthropic's stop_reason onto the unified finish reason.
@@ -351,7 +352,7 @@ export class AnthropicProvider extends AIProvider {
                 pricing,
                 cached
             );
-            const cencoriCharge = providerCost;
+            const cencoriCharge = withUsageMarkup(providerCost);
 
             enforceRequestBudget({
                 provider: this.providerName,
@@ -401,7 +402,7 @@ export class AnthropicProvider extends AIProvider {
                 cost: {
                     providerCostUsd: providerCost,
                     cencoriChargeUsd: cencoriCharge,
-                    markupPercentage: 0,
+                    markupPercentage: USAGE_MARKUP_PERCENT,
                 },
                 latencyMs: Date.now() - startTime,
                 finishReason: toFinishReason(response.stop_reason),

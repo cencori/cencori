@@ -27,10 +27,17 @@ describe('project usage credits', () => {
         });
     });
 
-    it('charges the configured provider rate on managed keys', async () => {
-        expect(await calculateTokenCharge('openai', 'test-model', 1000, 500)).toEqual({
+    it('charges the provider rate plus the 5% usage markup on managed keys', async () => {
+        const charge = await calculateTokenCharge('openai', 'test-model', 1000, 500);
+        expect(charge.providerCostUsd).toBe(0.007);
+        expect(charge.cencoriChargeUsd).toBeCloseTo(0.00735, 12);
+        expect(charge.markupPercentage).toBe(5);
+    });
+
+    it('charges nothing on a BYOK key', async () => {
+        expect(await calculateTokenCharge('openai', 'test-model', 1000, 500, true)).toEqual({
             providerCostUsd: 0.007,
-            cencoriChargeUsd: 0.007,
+            cencoriChargeUsd: 0,
             markupPercentage: 0,
         });
     });

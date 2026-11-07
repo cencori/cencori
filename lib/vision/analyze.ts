@@ -33,6 +33,7 @@ import {
     safeProviderFetch,
     UnsafeOutboundUrlError,
 } from '@/lib/security/outbound-url';
+import { USAGE_MARKUP_PERCENT, withUsageMarkup } from '@/lib/billing/usage-markup';
 
 export const MAX_VISION_IMAGE_BYTES = 20 * 1024 * 1024;
 
@@ -751,7 +752,7 @@ export async function* streamVision(
         completionTokens,
         pricing
     );
-    const cencoriCharge = usesByok ? 0 : providerCost;
+    const cencoriCharge = usesByok ? 0 : withUsageMarkup(providerCost);
 
     yield {
         done: true,
@@ -765,7 +766,7 @@ export async function* streamVision(
         cost: {
             providerCostUsd: providerCost,
             cencoriChargeUsd: cencoriCharge,
-            markupPercentage: 0,
+            markupPercentage: usesByok ? 0 : USAGE_MARKUP_PERCENT,
         },
         usedFallback,
         ...(usedFallback
@@ -908,7 +909,7 @@ export async function analyzeVision(
         result.completionTokens,
         pricing
     );
-    const cencoriCharge = usesByok ? 0 : providerCost;
+    const cencoriCharge = usesByok ? 0 : withUsageMarkup(providerCost);
 
     return {
         analysis: result.analysis,
@@ -922,7 +923,7 @@ export async function analyzeVision(
         cost: {
             providerCostUsd: providerCost,
             cencoriChargeUsd: cencoriCharge,
-            markupPercentage: 0,
+            markupPercentage: usesByok ? 0 : USAGE_MARKUP_PERCENT,
         },
         ...(usedFallback
             ? {

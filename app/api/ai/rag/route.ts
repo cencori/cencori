@@ -18,6 +18,7 @@ import { calculateProviderTokenCost, type UnifiedMessage } from '@/lib/providers
 import type { SubscriptionTier } from '@/lib/entitlements';
 import { deTokenize } from '@/lib/safety/custom-data-rules';
 import { getPricingFromDB } from '@/lib/providers/pricing';
+import { USAGE_MARKUP_PERCENT, withUsageMarkup } from '@/lib/billing/usage-markup';
 
 interface Memory {
     id: string;
@@ -112,7 +113,7 @@ async function searchMemories(
         ?? embeddingResponse.usage?.total_tokens
         ?? 0;
     const providerCostUsd = calculateProviderTokenCost(promptTokens, 0, pricing);
-    const cencoriChargeUsd = providerKey?.encrypted_key ? 0 : providerCostUsd;
+    const cencoriChargeUsd = providerKey?.encrypted_key ? 0 : withUsageMarkup(providerCostUsd);
 
     // Record the upstream embedding immediately. The provider has already
     // billed this call even if the subsequent vector lookup fails.

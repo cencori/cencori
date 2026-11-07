@@ -29,6 +29,7 @@ import { toOpenAIMessages, estimateTokenCount } from './utils';
 import { normalizeProviderError, ServiceUnavailableError } from './errors';
 import { openAIReasoningEffort } from './openai';
 import { safeProviderFetch } from '@/lib/security/outbound-url';
+import { USAGE_MARKUP_PERCENT, withUsageMarkup } from '@/lib/billing/usage-markup';
 
 /**
  * Provider configuration with base URLs
@@ -360,7 +361,7 @@ export class OpenAICompatibleProvider extends AIProvider {
                 pricing,
                 cached
             );
-            const cencoriCharge = providerCost;
+            const cencoriCharge = withUsageMarkup(providerCost);
 
             enforceRequestBudget({
                 provider: this.providerName,
@@ -414,7 +415,7 @@ export class OpenAICompatibleProvider extends AIProvider {
                 cost: {
                     providerCostUsd: providerCost,
                     cencoriChargeUsd: cencoriCharge,
-                    markupPercentage: 0,
+                    markupPercentage: USAGE_MARKUP_PERCENT,
                 },
                 latencyMs: Date.now() - startTime,
                 finishReason: finishReason === 'stop' || finishReason === 'length' || finishReason === 'content_filter' || finishReason === 'tool_calls'

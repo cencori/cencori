@@ -71,7 +71,7 @@ We chose not to integrate through CostGraph's **telemetry** path (`costgraph_gen
 | `ResourceId` / `Name` / `Type` | Cencori project id / name / `Project` |
 | `SkuId` / `SkuMeter` | `provider/model` / `<endpoint family>/tokens` or `/requests` |
 | `ConsumedQuantity` / `ConsumedUnit` | Total tokens / `Tokens`, or request count / `Requests` for untokenised endpoints |
-| `BilledCost` = `EffectiveCost` = `ListCost` = `ContractedCost` | `cencori_charge_usd`. No markup, so all equal. |
+| `BilledCost` = `EffectiveCost` = `ListCost` = `ContractedCost` | `cencori_charge_usd` (provider cost + 5% usage markup). No discounts or contract rates, so all equal. |
 | `Tags` | `cencori:project`, `cencori:environment`, `cencori:endpoint` |
 | `x_RequestCount`, `x_InputTokens`, `x_CacheReadTokens`, `x_CacheWriteTokens`, `x_OutputTokens`, `x_PromptTokens` | Token buckets |
 | `x_UnsplitRequests` | Requests whose input and cache split is unknown (pre-2026-10-14 rows, or a provider that reported cache activity without an uncached count) |

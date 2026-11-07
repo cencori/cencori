@@ -96,7 +96,7 @@ Costs and quantities are **decimal strings**, so no precision is lost in JSON.
 
 ## What the costs mean
 
-- **`BilledCost`, `EffectiveCost`, `ListCost` and `ContractedCost`** are what Cencori charged for the usage. Cencori adds no markup to provider rates, so the four are equal.
+- **`BilledCost`, `EffectiveCost`, `ListCost` and `ContractedCost`** are what Cencori charged for the usage: the provider's rate plus Cencori's 5% usage fee. There are no discounts or contract rates, so the four are equal. What the provider charged on its own is in `x_UpstreamProviderCost`.
 - **BYOK usage reports a cost of zero.** Your own provider account bills it, not Cencori. If your FinOps tool also reads that provider's bill directly, reporting it here would count it twice. What the provider charged is still visible in `x_UpstreamProviderCost`.
 - **Requests that cost nothing and used no tokens are left out.** These are refusals, rate limits and errors before a provider was called. They are still in your request logs.
 

@@ -161,7 +161,7 @@ export interface TokenUsage {
 export interface CostBreakdown {
     providerCostUsd: number;     // Actual cost from provider
     cencoriChargeUsd: number;    // Amount we charge the customer
-    markupPercentage: number;    // Legacy response field; always zero for Cencori charges
+    markupPercentage: number;    // Cencori's usage markup on this charge (lib/billing/usage-markup); 0 when not charged
 }
 
 /**

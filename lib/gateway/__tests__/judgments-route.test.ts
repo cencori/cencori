@@ -101,8 +101,8 @@ describe('POST /v1/judgments', () => {
         expect(body.answers).toEqual({ refund: { type: 'noul', noul: 0.95 } });
         expect(body.usage).toEqual({ input_tokens: 100, output_tokens: 5 });
         expect(body.uses_byok).toBeUndefined();
-        // Input-token cost charged; BYOK would be zero.
-        expect(mocks.incrementUsage).toHaveBeenCalledWith(ctx, 0.0000042);
+        // Input-token cost plus the 5% usage markup charged; BYOK would be zero.
+        expect(mocks.incrementUsage).toHaveBeenCalledWith(ctx, expect.closeTo(0.0000042 * 1.05, 15));
         expect(mocks.logGatewayRequest).toHaveBeenCalledWith(ctx, expect.objectContaining({
             endpoint: 'v1/judgments',
             provider: 'typesafe',

@@ -16,6 +16,7 @@ import { runGatewayOutputGuard } from '@/lib/gateway/output-guard';
 import { deTokenize } from '@/lib/safety/custom-data-rules';
 import type { SubscriptionTier } from '@/lib/entitlements';
 import { createAdminClient } from '@/lib/supabaseAdmin';
+import { USAGE_MARKUP_PERCENT, withUsageMarkup } from '@/lib/billing/usage-markup';
 
 // Supported image generation providers
 type ImageProvider = 'openai' | 'google';
@@ -431,7 +432,7 @@ export async function POST(req: NextRequest) {
 
         // Cost tracking (fixed per-image pricing)
         const providerCost = requestedImageCount * pricePerImage;
-        const cencoriCharge = providerKey?.is_active && providerKey.encrypted_key ? 0 : providerCost;
+        const cencoriCharge = providerKey?.is_active && providerKey.encrypted_key ? 0 : withUsageMarkup(providerCost);
 
         await logGatewayRequest(ctx, {
             endpoint: 'images/generate',

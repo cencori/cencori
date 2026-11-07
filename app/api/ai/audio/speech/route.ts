@@ -33,6 +33,7 @@ import {
     VOICE_MODELS,
     type SpeechRequest,
 } from '@/lib/audio/speech';
+import { USAGE_MARKUP_PERCENT, withUsageMarkup } from '@/lib/billing/usage-markup';
 
 export async function OPTIONS() {
     return handleCorsPreFlight();
@@ -183,7 +184,7 @@ export async function POST(req: NextRequest) {
         const providerCost = minutePricing && audioSeconds !== null
             ? (audioSeconds / 60) * minutePricing.unitPriceUsd
             : (result.charCount / 1000) * pricing.unitPriceUsd;
-        const cencoriCharge = result.usesByok ? 0 : providerCost;
+        const cencoriCharge = result.usesByok ? 0 : withUsageMarkup(providerCost);
 
         await logGatewayRequest(ctx, {
             endpoint: 'audio/speech',

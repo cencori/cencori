@@ -14,6 +14,7 @@ import { calculateProviderTokenCost } from '@/lib/providers/base';
 import { runGatewayInputPipeline } from '@/lib/gateway/input-guard';
 import type { SubscriptionTier } from '@/lib/entitlements';
 import { isCreditBalanceExhausted } from '@/lib/credits';
+import { USAGE_MARKUP_PERCENT, withUsageMarkup } from '@/lib/billing/usage-markup';
 
 interface RouteParams {
     params: Promise<{ projectId: string }>;
@@ -286,7 +287,7 @@ export async function POST(request: NextRequest, context: RouteParams) {
             }
 
             const providerCostUsd = calculateProviderTokenCost(embeddingTokens, 0, pricing);
-            const cencoriChargeUsd = shouldEnforceCredits && !providerKey?.encrypted_key ? providerCostUsd : 0;
+            const cencoriChargeUsd = shouldEnforceCredits && !providerKey?.encrypted_key ? withUsageMarkup(providerCostUsd) : 0;
             const batchNumber = Math.floor(i / 10);
             const { data: rpcData, error: rpcError } = await adminClient.rpc(
                 'store_memory_batch_and_charge',

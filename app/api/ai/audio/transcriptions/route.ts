@@ -33,6 +33,7 @@ import {
     type TranscriptSegment,
     type STTProvider,
 } from '@/lib/audio/transcribe';
+import { USAGE_MARKUP_PERCENT, withUsageMarkup } from '@/lib/billing/usage-markup';
 
 function formatTimestamp(seconds: number, separator: ',' | '.'): string {
     const millis = Math.max(0, Math.round(seconds * 1000));
@@ -166,7 +167,7 @@ export async function POST(req: NextRequest) {
         // ── Cost tracking (per minute) ──
         const durationMinutes = result.durationSeconds / 60;
         const providerCost = durationMinutes * pricing.unitPriceUsd;
-        const cencoriCharge = result.usesByok ? 0 : providerCost;
+        const cencoriCharge = result.usesByok ? 0 : withUsageMarkup(providerCost);
 
         const tokenMap = inputPipeline.tokenMap ?? new Map();
         const finalTranscript = deTokenize(result.text, tokenMap);

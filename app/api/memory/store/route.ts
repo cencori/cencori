@@ -20,6 +20,7 @@ import { promptPayload, textResponsePayload } from '@/lib/gateway/log-payload';
 import { runGatewayInputPipeline } from '@/lib/gateway/input-guard';
 import type { SubscriptionTier } from '@/lib/entitlements';
 import { MEMORY_CONTENT_MAX_CHARS } from '@/lib/memory';
+import { USAGE_MARKUP_PERCENT, withUsageMarkup } from '@/lib/billing/usage-markup';
 
 interface StoreMemoryRequest {
     namespace: string; // Namespace name or ID
@@ -221,8 +222,8 @@ export async function POST(req: NextRequest) {
             totalTokens = embeddingResponse.usage?.total_tokens ?? promptTokens;
 
             providerCost = calculateProviderTokenCost(totalTokens, 0, pricing);
-            cencoriCharge = providerKey?.encrypted_key ? 0 : providerCost;
-            markupPercentage = 0;
+            cencoriCharge = providerKey?.encrypted_key ? 0 : withUsageMarkup(providerCost);
+            markupPercentage = providerKey?.encrypted_key ? 0 : USAGE_MARKUP_PERCENT;
         }
 
         const { data: memory, error: storeError } = await supabase

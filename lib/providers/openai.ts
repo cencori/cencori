@@ -34,6 +34,7 @@ import {
     responsesUsageAsChat,
     toResponsesParams,
 } from './openai-responses';
+import { USAGE_MARKUP_PERCENT, withUsageMarkup } from '@/lib/billing/usage-markup';
 
 export function openAICompletionLimits(request: Pick<UnifiedChatRequest, 'model' | 'maxTokens' | 'temperature'>) {
     // GPT-6 defaults to reasoning effort "medium", which rejects sampling
@@ -168,7 +169,7 @@ export class OpenAIProvider extends AIProvider {
                 cached
             );
 
-            const cencoriCharge = providerCost;
+            const cencoriCharge = withUsageMarkup(providerCost);
 
             enforceRequestBudget({
                 provider: this.providerName,
@@ -224,7 +225,7 @@ export class OpenAIProvider extends AIProvider {
                 cost: {
                     providerCostUsd: providerCost,
                     cencoriChargeUsd: cencoriCharge,
-                    markupPercentage: 0,
+                    markupPercentage: USAGE_MARKUP_PERCENT,
                 },
                 latencyMs: Date.now() - startTime,
                 finishReason: finishReason === 'tool_calls' ? 'tool_calls'
@@ -392,8 +393,8 @@ export class OpenAIProvider extends AIProvider {
             },
             cost: {
                 providerCostUsd: providerCost,
-                cencoriChargeUsd: providerCost,
-                markupPercentage: 0,
+                cencoriChargeUsd: withUsageMarkup(providerCost),
+                markupPercentage: USAGE_MARKUP_PERCENT,
             },
             latencyMs: Date.now() - startTime,
             finishReason: responsesFinishReason(response),

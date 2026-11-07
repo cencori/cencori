@@ -28,6 +28,7 @@ import { describeDocumentInput } from '@/lib/documents/log';
 import { runGatewayOutputGuard } from '@/lib/gateway/output-guard';
 import { deTokenize } from '@/lib/safety/custom-data-rules';
 import type { SubscriptionTier } from '@/lib/entitlements';
+import { USAGE_MARKUP_PERCENT, withUsageMarkup } from '@/lib/billing/usage-markup';
 
 const QUERY_MODEL = 'gpt-4o-mini';
 
@@ -166,7 +167,7 @@ export async function POST(req: NextRequest) {
             completionTokens,
             pricing
         );
-        const charge = providerKey?.encrypted_key ? 0 : providerCost;
+        const charge = providerKey?.encrypted_key ? 0 : withUsageMarkup(providerCost);
 
         const totalProviderCost = providerCost + (extracted.cost?.providerCostUsd ?? 0);
         const totalCharge = charge + (extracted.cost?.cencoriChargeUsd ?? 0);

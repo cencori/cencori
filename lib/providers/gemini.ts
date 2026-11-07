@@ -27,6 +27,7 @@ import type { UnifiedMessage } from './base';
 import { InvalidRequestError, normalizeProviderError, ServiceUnavailableError } from './errors';
 import { getGoogleApiKey } from './google-env';
 import { readResponseBuffer, safeProviderFetch } from '@/lib/security/outbound-url';
+import { USAGE_MARKUP_PERCENT, withUsageMarkup } from '@/lib/billing/usage-markup';
 
 /**
  * Google's inline image cap (mirrors VISION_PROVIDER_LIMITS.google in
@@ -171,7 +172,7 @@ export class GeminiProvider extends AIProvider {
                 pricing,
                 { cacheReadTokens }
             );
-            const cencoriCharge = providerCost;
+            const cencoriCharge = withUsageMarkup(providerCost);
 
             enforceRequestBudget({
                 provider: this.providerName,
@@ -200,7 +201,7 @@ export class GeminiProvider extends AIProvider {
                 cost: {
                     providerCostUsd: providerCost,
                     cencoriChargeUsd: cencoriCharge,
-                    markupPercentage: 0,
+                    markupPercentage: USAGE_MARKUP_PERCENT,
                 },
                 latencyMs: Date.now() - startTime,
             };

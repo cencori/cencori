@@ -173,6 +173,19 @@ export function recordEndUserUsage(record: UsageRecord): void {
 }
 
 /**
+ * What a call cost the reseller, which their markup is applied to: Cencori's
+ * charge for a managed call (provider cost plus Cencori's usage markup), or
+ * the provider cost when Cencori charges nothing (their own provider key, or
+ * usage reported from outside Cencori).
+ */
+export function resellerCostBasisUsd(cost: { providerUsd: number; cencoriChargeUsd: number }): number {
+  const charged = Number(cost.cencoriChargeUsd);
+  if (Number.isFinite(charged) && charged > 0) return charged;
+  const provider = Number(cost.providerUsd);
+  return Number.isFinite(provider) && provider > 0 ? provider : 0;
+}
+
+/**
  * Awaitable version of recordEndUserUsage for critical paths.
  */
 export async function recordEndUserUsageAsync(
@@ -180,8 +193,9 @@ export async function recordEndUserUsageAsync(
 ): Promise<void> {
   const supabase = createAdminClient();
   const environment = record.environment === "test" ? "test" : "production";
+  const costBasisUsd = resellerCostBasisUsd(record.cost);
   const customerChargeUsd = calculateCustomerCharge(
-    record.cost.providerUsd,
+    costBasisUsd,
     record.customerMarkupPercentage,
     record.flatRatePerRequest,
     record.pricingModel,
@@ -190,8 +204,10 @@ export async function recordEndUserUsageAsync(
     record.monthlyTokensUsed
   );
 
-  // Calculate Platform Commission (Cut of the profit)
-  const userProfitUsd = Math.max(0, customerChargeUsd - record.cost.providerUsd);
+  // Calculate Platform Commission (Cut of the profit). Profit is measured
+  // against the reseller's real cost, so the commission never also takes a
+  // cut of Cencori's own usage markup.
+  const userProfitUsd = Math.max(0, customerChargeUsd - costBasisUsd);
   const platformCommissionUsd = userProfitUsd * (record.platformCommissionPercentage / 100);
 
   const { error } = await supabase.rpc("increment_end_user_usage", {
@@ -293,11 +309,11 @@ function calculateVolumeCharge(
 /**
  * Calculate what the customer should charge their end-user.
  *
- * Flat applies the customer's markup to provider cost. Graduated and volume
+ * Flat applies the customer's markup to their cost (see resellerCostBasisUsd). Graduated and volume
  * rate plans price the request's units directly and replace the markup entirely.
  */
 export function calculateCustomerCharge(
-  providerCostUsd: number,
+  costBasisUsd: number,
   markupPercentage: number,
   flatRatePerRequest: number | null,
   pricingModel: 'flat' | 'tiered' | 'volume' = 'flat',
@@ -314,5 +330,5 @@ export function calculateCustomerCharge(
     }
   }
 
-  return providerCostUsd * (1 + markupPercentage / 100) + (flatRatePerRequest || 0);
+  return costBasisUsd * (1 + markupPercentage / 100) + (flatRatePerRequest || 0);
 }

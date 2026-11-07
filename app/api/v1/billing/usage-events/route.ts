@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { extractCencoriApiKeyFromHeaders } from '@/lib/api-keys';
-import { recordEndUserUsageAsync, calculateCustomerCharge } from '@/lib/end-user-billing';
+import { recordEndUserUsageAsync, calculateCustomerCharge, resellerCostBasisUsd } from '@/lib/end-user-billing';
 import crypto from 'crypto';
 
 // ──────────────────────────────────────────────
@@ -278,7 +278,7 @@ export async function POST(req: NextRequest) {
             const cencoriChargeUsd = 0; // External provider usage is paid outside Cencori.
             const monthBase = monthlyTokens[event.end_user_id] ?? 0;
             const customerChargeUsd = calculateCustomerCharge(
-                providerCostUsd,
+                resellerCostBasisUsd({ providerUsd: providerCostUsd, cencoriChargeUsd }),
                 markup.markupPercentage,
                 markup.flatRatePerRequest,
                 markup.pricingModel,

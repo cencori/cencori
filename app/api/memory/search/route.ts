@@ -14,6 +14,7 @@ import { runGatewayInputPipeline } from '@/lib/gateway/input-guard';
 import { runGatewayOutputGuard } from '@/lib/gateway/output-guard';
 import { getPricingFromDB } from '@/lib/providers/pricing';
 import { calculateProviderTokenCost } from '@/lib/providers/base';
+import { USAGE_MARKUP_PERCENT, withUsageMarkup } from '@/lib/billing/usage-markup';
 
 interface SearchMemoryRequest {
     namespace?: string;
@@ -175,7 +176,7 @@ export async function POST(req: NextRequest) {
             ?? embeddingResponse.usage?.prompt_tokens
             ?? Math.max(1, Math.ceil(guardedQuery.length / 4));
         const providerCost = calculateProviderTokenCost(totalTokens, 0, pricing);
-        const cencoriCharge = providerKey?.encrypted_key ? 0 : providerCost;
+        const cencoriCharge = providerKey?.encrypted_key ? 0 : withUsageMarkup(providerCost);
         await logGatewayRequest(ctx, {
             endpoint: 'memory/search',
             model,

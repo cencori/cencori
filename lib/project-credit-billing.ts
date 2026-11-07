@@ -1,6 +1,7 @@
 import { deductCredits } from '@/lib/credits';
 import { getPricingFromDB } from '@/lib/providers/pricing';
 import { calculateProviderTokenCost } from '@/lib/providers/base';
+import { USAGE_MARKUP_PERCENT, withUsageMarkup } from '@/lib/billing/usage-markup';
 
 export function shouldEnforceProjectCredits(tier: string | null | undefined): boolean {
     const normalizedTier = (tier || 'free').toLowerCase();
@@ -32,12 +33,12 @@ export async function calculateTokenCharge(
         safeCompletionTokens,
         pricing
     );
-    const cencoriChargeUsd = usesByok ? 0 : providerCostUsd;
+    const cencoriChargeUsd = usesByok ? 0 : withUsageMarkup(providerCostUsd);
 
     return {
         providerCostUsd,
         cencoriChargeUsd,
-        markupPercentage: 0,
+        markupPercentage: usesByok ? 0 : USAGE_MARKUP_PERCENT,
     };
 }
 

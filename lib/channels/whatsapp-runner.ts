@@ -27,6 +27,7 @@ import {
     type InboundMessage,
     type WhatsAppChannel,
 } from './whatsapp';
+import { USAGE_MARKUP_PERCENT, withUsageMarkup } from '@/lib/billing/usage-markup';
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -299,7 +300,7 @@ async function meterTranscription(db: Admin, channel: WhatsAppChannel, organizat
         const { chargeProjectUsageCredits } = await import('@/lib/project-credit-billing');
         charged = await chargeProjectUsageCredits(organizationId, (org?.subscription_tier as string | undefined) ?? 'free', use.providerCostUsd, 'audio/transcriptions', requestId).catch(() => false);
     }
-    const charge = charged && !planCovered ? use.providerCostUsd : 0;
+    const charge = charged && !planCovered ? withUsageMarkup(use.providerCostUsd) : 0;
     await db.from('ai_requests').insert({
         project_id: channel.projectId,
         environment: 'production',

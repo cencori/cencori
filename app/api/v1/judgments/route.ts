@@ -34,6 +34,7 @@ import {
 import { getJudgmentAdapter, resolveJudgmentAdapter } from '@/lib/judgment/registry';
 import { SUPPORTED_PROVIDERS } from '@/lib/providers/config';
 import { getModelDisplayPrice } from '@/lib/providers/display-pricing';
+import { USAGE_MARKUP_PERCENT, withUsageMarkup } from '@/lib/billing/usage-markup';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -175,7 +176,7 @@ export async function POST(req: NextRequest) {
         } catch {
             costUsd = await adapter.price(model, result.usage.input_tokens);
         }
-        const cencoriCharge = resolved.usesByok ? 0 : costUsd;
+        const cencoriCharge = resolved.usesByok ? 0 : withUsageMarkup(costUsd);
 
         await logGatewayRequest(ctx, {
             endpoint: 'v1/judgments',

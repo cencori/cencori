@@ -27,6 +27,7 @@ import { describeDocumentInput } from '@/lib/documents/log';
 import { runGatewayOutputGuard } from '@/lib/gateway/output-guard';
 import { deTokenize } from '@/lib/safety/custom-data-rules';
 import type { SubscriptionTier } from '@/lib/entitlements';
+import { USAGE_MARKUP_PERCENT, withUsageMarkup } from '@/lib/billing/usage-markup';
 
 const SUMMARY_MODEL = 'gpt-4o-mini';
 
@@ -143,7 +144,7 @@ export async function POST(req: NextRequest) {
             summaryCompletionTokens,
             pricing
         );
-        const summaryCharge = providerKey?.encrypted_key ? 0 : summaryProviderCost;
+        const summaryCharge = providerKey?.encrypted_key ? 0 : withUsageMarkup(summaryProviderCost);
 
         // Combine costs (extract may have run through Vision)
         const totalProviderCost = summaryProviderCost + (extracted.cost?.providerCostUsd ?? 0);

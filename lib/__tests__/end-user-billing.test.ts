@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculateCustomerCharge, type PricingTier } from '../end-user-billing';
+import { calculateCustomerCharge, resellerCostBasisUsd, type PricingTier } from '../end-user-billing';
 
 // $0.01/unit for the first 1,000 units, $0.005 beyond that.
 const twoTiers: PricingTier[] = [
@@ -128,5 +128,24 @@ describe('calculateCustomerCharge', () => {
             expect(volume).toBeCloseTo(2000 * 0.005, 10);
             expect(graduated).toBeGreaterThan(volume);
         });
+    });
+});
+
+describe('resellerCostBasisUsd', () => {
+    it("uses Cencori's charge on managed calls, so the reseller's markup sits on what they pay", () => {
+        // $1.00 provider cost, charged $1.05 with Cencori's 5% usage markup.
+        const basis = resellerCostBasisUsd({ providerUsd: 1, cencoriChargeUsd: 1.05 });
+        expect(basis).toBeCloseTo(1.05, 10);
+        // A 5% reseller markup now earns them 5% instead of breaking even.
+        expect(calculateCustomerCharge(basis, 5, null)).toBeCloseTo(1.1025, 10);
+    });
+
+    it('uses provider cost when Cencori charges nothing (own key or external usage)', () => {
+        expect(resellerCostBasisUsd({ providerUsd: 0.4, cencoriChargeUsd: 0 })).toBeCloseTo(0.4, 10);
+    });
+
+    it('is zero for free calls and bad input', () => {
+        expect(resellerCostBasisUsd({ providerUsd: 0, cencoriChargeUsd: 0 })).toBe(0);
+        expect(resellerCostBasisUsd({ providerUsd: Number.NaN, cencoriChargeUsd: Number.NaN })).toBe(0);
     });
 });

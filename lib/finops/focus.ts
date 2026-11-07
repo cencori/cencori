@@ -10,7 +10,8 @@
  *
  * What the cost columns mean here:
  *   - BilledCost / EffectiveCost / ListCost / ContractedCost are what Cencori charges for the
- *     usage (`cencori_charge_usd`). Cencori adds no markup, so they are equal.
+ *     usage (`cencori_charge_usd`): provider cost plus the 5% usage markup. There are no
+ *     discounts or contract rates, so they are equal.
  *   - BYOK usage is billed by the customer's own provider account, not by Cencori, so it carries
  *     a cost of zero here. A FinOps tool that also reads that provider bill would otherwise count
  *     it twice. What the provider charged is still visible as `x_UpstreamProviderCost`.

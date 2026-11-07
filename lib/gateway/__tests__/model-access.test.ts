@@ -149,13 +149,15 @@ describe('API-key model access and sponsorship', () => {
         });
     });
 
-    it('passes through provider cost even when legacy markup and fee fields are set', () => {
-        expect(calculateGatewayCharge(0.75, {
+    it('charges provider cost plus the 5% usage markup, ignoring legacy per-model markup and fee fields', () => {
+        const charge = calculateGatewayCharge(0.75, {
             inputPer1KTokens: 0.0002,
             outputPer1KTokens: 0.001,
             cencoriMarkupPercentage: 50,
             fixedFeePerRequest: 0.001,
-        }, 'standard')).toEqual({ cencoriChargeUsd: 0.75, markupPercentage: 0 });
+        }, 'standard');
+        expect(charge.cencoriChargeUsd).toBeCloseTo(0.7875, 12);
+        expect(charge.markupPercentage).toBe(5);
     });
 
     it('charges BYOK requests zero while retaining provider-cost telemetry', () => {
