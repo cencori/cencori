@@ -75,11 +75,47 @@ function isPaidPlan(value: unknown): value is TensorPaidPlanCode {
  * for here; a plans page still open from before sends a provider and a method, and they are
  * ignored. `pack` is what that page called the same thing before passes.
  */
-export function parseTensorCheckoutInput(value: unknown): { plan: TensorPaidPlanCode } | null {
+export function parseTensorCheckoutInput(
+  value: unknown,
+): { plan: TensorPaidPlanCode; returnUrl?: string } | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const body = value as Record<string, unknown>;
   const plan = body.plan ?? body.pack;
-  return isPaidPlan(plan) ? { plan } : null;
+  if (!isPaidPlan(plan)) return null;
+  const returnUrl = tensorCheckoutReturnUrl(body.return_url);
+  return returnUrl ? { plan, returnUrl } : { plan };
+}
+
+/** The Tensor website's billing page, where a checkout started there comes back to. */
+export const TENSOR_WEB_BILLING_URL = "https://tensorade.app/billing";
+
+/**
+ * Where Bachs sends the customer after paying or cancelling, when the checkout was opened from
+ * somewhere other than cencori.com/tensor. Only the Tensor website's billing page, or the same
+ * page on a loopback port for local development of that site, is accepted: anything else would
+ * make checkout an open redirect. Null falls back to cencori.com/tensor.
+ */
+export function tensorCheckoutReturnUrl(value: unknown): string | null {
+  if (value === TENSOR_WEB_BILLING_URL) return TENSOR_WEB_BILLING_URL;
+  if (typeof value !== "string" || value.length > 200) return null;
+  try {
+    const url = new URL(value);
+    const port = Number(url.port);
+    const loopback =
+      url.protocol === "http:" &&
+      url.hostname === "127.0.0.1" &&
+      Number.isInteger(port) &&
+      port >= 1024 &&
+      port <= 65535 &&
+      url.pathname === "/billing" &&
+      !url.username &&
+      !url.password &&
+      !url.search &&
+      !url.hash;
+    return loopback ? url.toString() : null;
+  } catch {
+    return null;
+  }
 }
 
 export function majorAmountToMinor(value: unknown): number | null {
