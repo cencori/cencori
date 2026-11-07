@@ -13,7 +13,7 @@ import { CurrencyToggle } from "@/components/dashboard/CurrencyToggle";
 import { useDisplayCurrency } from "@/hooks/useDisplayCurrency";
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import BotIcon from "@hugeicons/core-free-icons/BotIcon";
-import AiBrain01Icon from "@hugeicons/core-free-icons/AiBrain01Icon";
+import BrainIcon from "@hugeicons/core-free-icons/BrainIcon";
 import SecurityCheckIcon from "@hugeicons/core-free-icons/SecurityCheckIcon";
 import Layers01Icon from "@hugeicons/core-free-icons/Layers01Icon";
 import { Spinner } from "@/components/ui/spinner";
@@ -133,7 +133,7 @@ const matrixSections: Array<{
     },
     {
         title: "Memory",
-        icon: AiBrain01Icon,
+        icon: BrainIcon,
         description: "Long-term memory for agents and apps.",
         rows: [
             {
