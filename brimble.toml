@@ -88,5 +88,6 @@ region = "afr-west"
 cpu = 2
 memory = "8gb"
 disk = "50gb"
-public = false
+public = true
+allow_ips = ["102.89.32.23/32"]
 backups = { schedule = "0 2 * * *", timezone = "Africa/Lagos", keep = "30d" }
