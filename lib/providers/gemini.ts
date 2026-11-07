@@ -5,6 +5,7 @@
  */
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { defaultGeminiMaxTokens } from './output-limits';
 import {
     AIProvider,
     UnifiedChatRequest,
@@ -131,7 +132,7 @@ export class GeminiProvider extends AIProvider {
                 history,
                 generationConfig: {
                     temperature: request.temperature ?? 0.7,
-                    maxOutputTokens: request.maxTokens ?? 2048,
+                    maxOutputTokens: request.maxTokens ?? defaultGeminiMaxTokens(request.model),
                 },
             });
 
@@ -225,7 +226,7 @@ export class GeminiProvider extends AIProvider {
                 history,
                 generationConfig: {
                     temperature: request.temperature ?? 0.7,
-                    maxOutputTokens: request.maxTokens ?? 2048,
+                    maxOutputTokens: request.maxTokens ?? defaultGeminiMaxTokens(request.model),
                 },
             });
 

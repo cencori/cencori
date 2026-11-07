@@ -5,6 +5,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
+import { defaultClaudeMaxTokens } from './output-limits';
 import {
     AIProvider,
     UnifiedChatRequest,
@@ -327,7 +328,7 @@ export class AnthropicProvider extends AIProvider {
 
             const response = await this.clientFor(transport).messages.create({
                 model: request.model,
-                max_tokens: request.maxTokens ?? 4096,
+                max_tokens: request.maxTokens ?? defaultClaudeMaxTokens(request.model, false),
                 // Claude 5 family rejects temperature — omit it (undefined)
                 // rather than forwarding a default that guarantees a 400.
                 temperature: supportsTemperature(request.model) ? request.temperature : undefined,
@@ -428,7 +429,7 @@ export class AnthropicProvider extends AIProvider {
 
             const stream = await this.clientFor(transport).messages.create({
                 model: request.model,
-                max_tokens: request.maxTokens ?? 4096,
+                max_tokens: request.maxTokens ?? defaultClaudeMaxTokens(request.model, true),
                 temperature: supportsTemperature(request.model) ? request.temperature : undefined,
                 system,
                 messages,
