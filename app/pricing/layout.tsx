@@ -1,8 +1,13 @@
+import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { ThesisScrollNav } from "@/components/nav/MarketingNav";
 import { SiteFooter } from "@/components/marketing/SiteFooter";
 import { DisplayCurrencyProvider } from "@/hooks/useDisplayCurrency";
 import { requestCountry } from "@/lib/geo/ip-country";
+
+export const metadata: Metadata = {
+    title: { absolute: "Cencori Pricing" },
+};
 
 export default async function PricingLayout({
     children,
