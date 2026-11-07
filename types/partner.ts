@@ -5,6 +5,8 @@ export interface PartnerConfig {
     name: string;
     category?: string;
     logo: any;
+    /** Logo is a wide wordmark rather than a square mark. */
+    logoWide?: boolean;
     websiteUrl: string;
     docsUrl: string;
     screenshots?: string[];

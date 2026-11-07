@@ -33,7 +33,7 @@ export function PartnerTemplate({ config }: PartnerTemplateProps) {
                         <div className="flex flex-col md:flex-row md:items-end justify-between gap-12">
                             <Reveal delay={0.1}>
                                 <div className="space-y-6">
-                                    <div className="h-16 w-16 text-foreground border border-border/20 p-3 bg-foreground/[0.02]">
+                                    <div className={`${config.logoWide ? "h-16 w-48 px-4 py-5" : "h-16 w-16 p-3"} text-foreground border border-border/20 bg-foreground/[0.02]`}>
                                         <config.logo className="h-full w-full object-contain" />
                                     </div>
                                     <h1 className="text-5xl md:text-6xl font-semibold tracking-tighter uppercase">{config.name}</h1>
@@ -102,17 +102,19 @@ export function PartnerTemplate({ config }: PartnerTemplateProps) {
                             <Reveal delay={0.2}>
                                 <div className="space-y-12">
                                     <div className="space-y-10">
+                                        {config.websiteUrl ? (
                                         <div className="group">
                                             <Link href={config.websiteUrl} className="block space-y-2">
                                                 <p className="text-[8px] uppercase tracking-widest text-muted-foreground group-hover:text-zinc-500 transition-colors">Website</p>
                                                 <p className="text-xs font-mono tracking-tight underline underline-offset-4 decoration-border/40 group-hover:decoration-foreground/20 transition-all">{config.websiteUrl.replace(/^https?:\/\//, "")}</p>
                                             </Link>
                                         </div>
+                                        ) : null}
 
                                         <div className="group">
                                             <Link href={config.docsUrl} className="block space-y-2">
                                                 <p className="text-[8px] uppercase tracking-widest text-muted-foreground group-hover:text-zinc-500 transition-colors">Documentation</p>
-                                                <p className="text-xs font-mono tracking-tight underline underline-offset-4 decoration-border/40 group-hover:decoration-foreground/20 transition-all">docs.{config.websiteUrl.replace(/^https?:\/\/www\./, "").replace(/^https?:\/\//, "")}</p>
+                                                <p className="text-xs font-mono tracking-tight underline underline-offset-4 decoration-border/40 group-hover:decoration-foreground/20 transition-all">{config.docsUrl.startsWith("/") ? `cencori.com${config.docsUrl}` : config.docsUrl.replace(/^https?:\/\//, "")}</p>
                                             </Link>
                                         </div>
                                     </div>
