@@ -406,7 +406,9 @@ export function Pricing() {
                                         <tr className="border-b border-border/50 bg-muted/40">
                                             <td colSpan={tiers.length + 1} className="px-5 py-4">
                                                 <div className="flex items-center gap-3">
-                                                    <HugeiconsIcon icon={section.icon} size={20} strokeWidth={1.6} className="shrink-0 text-foreground" />
+                                                    <span className="flex size-10 shrink-0 items-center justify-center border border-border/50 bg-background">
+                                                        <HugeiconsIcon icon={section.icon} size={20} strokeWidth={1.6} className="text-foreground" />
+                                                    </span>
                                                     <div>
                                                         <p className="text-base font-bold">{section.title}</p>
                                                         <p className="text-xs text-muted-foreground">{section.description}</p>
