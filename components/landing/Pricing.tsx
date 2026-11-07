@@ -381,18 +381,19 @@ export function Pricing() {
                         })}
                     </div>
 
-                    {/* Scrolls sideways on small screens; from xl the table fits, so
+                    {/* Scrolls sideways on small screens (feature names stay pinned on
+                        the left); from xl the table fits, so
                         the wrapper stops being a scroll box and the plan header
                         can stick under the site nav (80px) while you scroll. */}
                     <div className="overflow-x-auto xl:overflow-visible">
-                        <table className="w-full min-w-[980px] border-collapse text-left">
+                        <table className="w-full min-w-[640px] table-fixed border-collapse text-left sm:min-w-[980px] xl:table-auto">
                             <thead>
                                 <tr className="bg-muted/15">
-                                    <th className="w-[30%] px-5 py-4 text-xs font-medium uppercase tracking-wide text-muted-foreground sticky top-20 z-30 bg-background before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-border/50 after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border/50">
+                                    <th className="w-[150px] px-4 py-4 text-xs font-medium uppercase tracking-wide text-muted-foreground sticky left-0 z-40 bg-background sm:w-[30%] sm:px-5 xl:top-20 before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-border/50 after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border/50">
                                         Features
                                     </th>
                                     {tiers.map((tier) => (
-                                        <th key={tier.name} className="w-[17.5%] px-5 py-4 align-top text-center sticky top-20 z-30 bg-background before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-border/50 after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border/50">
+                                        <th key={tier.name} className="px-5 py-4 align-top text-center relative sm:w-[17.5%] z-30 bg-background xl:sticky xl:top-20 before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-border/50 after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border/50">
                                             <div className="space-y-2">
                                                 <p className="text-sm font-bold">{tier.displayName}</p>
                                             </div>
@@ -405,7 +406,7 @@ export function Pricing() {
                                     <React.Fragment key={section.title}>
                                         <tr className="border-b border-border/50 bg-muted/40">
                                             <td colSpan={tiers.length + 1} className="px-5 py-4">
-                                                <div className="flex items-center gap-3">
+                                                <div className="sticky left-5 flex w-fit items-center gap-3 xl:static">
                                                     <span className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-border/50 bg-background">
                                                         <HugeiconsIcon icon={section.icon} size={20} strokeWidth={1.6} className="text-foreground" />
                                                     </span>
@@ -418,7 +419,7 @@ export function Pricing() {
                                         </tr>
                                         {section.rows.map((row) => (
                                             <tr key={row.feature} className="border-b border-border/40">
-                                                <td className="px-5 py-3 text-sm text-foreground">{row.feature}</td>
+                                                <td className="sticky left-0 z-10 bg-background px-4 py-3 text-sm text-foreground sm:px-5 xl:static">{row.feature}</td>
                                                 {tiers.map((tier) => (
                                                     <td key={tier.name} className="px-5 py-3 text-center">
                                                         {renderMatrixValue(row.values[tier.name])}
