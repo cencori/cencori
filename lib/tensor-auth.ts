@@ -10,6 +10,8 @@ const LEGACY_CALLBACK_URL = "basecode://auth/callback";
  * Local development of the site signs in through the loopback rule below (127.0.0.1).
  */
 export const TENSOR_WEB_CALLBACK_URL = "https://tensorade.app/auth/callback";
+/** The same page on www, which is the host Vercel serves the site from. */
+export const TENSOR_WEB_WWW_CALLBACK_URL = "https://www.tensorade.app/auth/callback";
 
 const CODE_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 const CHALLENGE_PATTERN = /^[A-Za-z0-9_-]{43}$/;
@@ -32,7 +34,8 @@ export function isTensorRedirectUri(value: unknown): value is string {
   if (
     value === TENSOR_CALLBACK_URL ||
     value === LEGACY_CALLBACK_URL ||
-    value === TENSOR_WEB_CALLBACK_URL
+    value === TENSOR_WEB_CALLBACK_URL ||
+    value === TENSOR_WEB_WWW_CALLBACK_URL
   ) {
     return true;
   }

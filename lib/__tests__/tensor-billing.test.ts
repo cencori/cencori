@@ -35,6 +35,7 @@ describe("Tensor billing contracts", () => {
     expect(
       parseTensorCheckoutInput({ plan: "builder", return_url: TENSOR_WEB_BILLING_URL }),
     ).toEqual({ plan: "builder", returnUrl: TENSOR_WEB_BILLING_URL });
+    expect(tensorCheckoutReturnUrl("https://www.tensorade.app/billing")).toBe("https://www.tensorade.app/billing");
     expect(tensorCheckoutReturnUrl("http://127.0.0.1:3001/billing")).toBe(
       "http://127.0.0.1:3001/billing",
     );
@@ -42,6 +43,8 @@ describe("Tensor billing contracts", () => {
     for (const value of [
       "https://evil.com/billing",
       "https://tensorade.app.evil.com/billing",
+      "https://www.tensorade.app.evil.com/billing",
+      "http://www.tensorade.app/billing",
       "http://tensorade.app/billing",
       "https://tensorade.app/billing?next=https://evil.com",
       "https://tensorade.app/settings",

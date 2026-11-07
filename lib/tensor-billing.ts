@@ -88,6 +88,8 @@ export function parseTensorCheckoutInput(
 
 /** The Tensor website's billing page, where a checkout started there comes back to. */
 export const TENSOR_WEB_BILLING_URL = "https://tensorade.app/billing";
+/** The same page on www, which is the host Vercel serves the site from. */
+export const TENSOR_WEB_WWW_BILLING_URL = "https://www.tensorade.app/billing";
 
 /**
  * Where Bachs sends the customer after paying or cancelling, when the checkout was opened from
@@ -96,7 +98,7 @@ export const TENSOR_WEB_BILLING_URL = "https://tensorade.app/billing";
  * make checkout an open redirect. Null falls back to cencori.com/tensor.
  */
 export function tensorCheckoutReturnUrl(value: unknown): string | null {
-  if (value === TENSOR_WEB_BILLING_URL) return TENSOR_WEB_BILLING_URL;
+  if (value === TENSOR_WEB_BILLING_URL || value === TENSOR_WEB_WWW_BILLING_URL) return value;
   if (typeof value !== "string" || value.length > 200) return null;
   try {
     const url = new URL(value);

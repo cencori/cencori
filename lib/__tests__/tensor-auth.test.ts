@@ -49,6 +49,7 @@ describe("Tensor desktop authentication contract", () => {
     expect(isTensorRedirectUri(TENSOR_CALLBACK_URL)).toBe(true);
     expect(isTensorRedirectUri("http://127.0.0.1:49152/auth/callback")).toBe(true);
     expect(isTensorRedirectUri(TENSOR_WEB_CALLBACK_URL)).toBe(true);
+    expect(isTensorRedirectUri("https://www.tensorade.app/auth/callback")).toBe(true);
 
     for (const value of [
       "http://localhost:49152/auth/callback",
@@ -61,6 +62,8 @@ describe("Tensor desktop authentication contract", () => {
       "https://tensorade.app/auth/callback?next=/billing",
       "https://tensorade.app/other",
       "https://evil.tensorade.app/auth/callback",
+      "https://www.tensorade.app.evil.com/auth/callback",
+      "http://www.tensorade.app/auth/callback",
       "https://tensorade.app.evil.com/auth/callback",
     ]) {
       expect(isTensorRedirectUri(value)).toBe(false);
