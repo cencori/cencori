@@ -4,6 +4,7 @@
  * handles built-in tools, and formats responses.
  */
 
+import { customToolInput, translateCustomTools } from '@/lib/gateway/responses-custom-tools';
 import { createHash } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { recoverXmlToolCalls, releasableLength } from '@/lib/gateway/tool-call-xml';
@@ -118,7 +119,7 @@ export type ResponsesUsage = {
 
 export type ResponsesOutputItem = {
     id: string;
-    type: 'message' | 'function_call' | 'web_search_call' | 'file_search_call' | 'code_interpreter_call' | 'reasoning';
+    type: 'message' | 'function_call' | 'custom_tool_call' | 'web_search_call' | 'file_search_call' | 'code_interpreter_call' | 'reasoning';
     status?: 'completed' | 'failed' | 'in_progress';
     role?: 'assistant';
     content?: Array<{
@@ -129,6 +130,8 @@ export type ResponsesOutputItem = {
     call_id?: string;
     name?: string;
     arguments?: string;
+    /** A `custom_tool_call`'s text (see responses-custom-tools.ts). */
+    input?: string;
     /** Thinking trace, OpenAI Responses shape. Replayed verbatim on the next turn. */
     summary?: Array<{ type: string; text?: string }>;
     output?: Record<string, unknown>;
@@ -284,6 +287,8 @@ function buildResponsesJson(params: {
     content: string;
     toolOutputs: ToolCallOutput[];
     functionCalls?: Array<{ id: string; name: string; arguments: string; callId: string }>;
+    /** Tools the client offered as `custom`: their calls go back as `custom_tool_call`. */
+    customToolNames?: ReadonlySet<string>;
     usage: {
         promptTokens: number;
         completionTokens: number;
@@ -339,6 +344,17 @@ function buildResponsesJson(params: {
 
     if (params.functionCalls) {
         for (const fc of params.functionCalls) {
+            if (params.customToolNames?.has(fc.name)) {
+                output.push({
+                    id: generateId('ctc'),
+                    type: 'custom_tool_call',
+                    status: 'completed',
+                    call_id: fc.callId,
+                    name: fc.name,
+                    input: customToolInput(fc.arguments),
+                });
+                continue;
+            }
             output.push({
                 id: generateId('fc'),
                 type: 'function_call',
@@ -500,7 +516,9 @@ export async function runV1ResponsesExecution(
         });
 
         // Separate function tools from built-in tools
-        const { functionTools, builtInTools } = extractTools(body.tools);
+        // Custom tools (Codex's apply_patch) become function tools every provider can call.
+        const { tools: requestTools, customToolNames } = translateCustomTools(body.tools);
+        const { functionTools, builtInTools } = extractTools(requestTools as ResponsesTool[] | undefined);
         params.performance?.step('provider');
         params.performance?.markPreflightComplete();
 
@@ -921,6 +939,7 @@ export async function runV1ResponsesExecution(
                 content,
                 toolOutputs: codeOutputs,
                 functionCalls: openAiToolCalls,
+                customToolNames,
                 usage: result.usage,
                 annotations,
                 metadata: isEmptyCompletion
@@ -1545,6 +1564,7 @@ export async function runV1ResponsesExecution(
                                     arguments: tc.arguments,
                                     callId: tc.id,
                                 })),
+                                customToolNames,
                                 usage: { promptTokens, completionTokens, totalTokens, cacheReadTokens },
                                 annotations,
                                 metadata: isEmptyCompletion
