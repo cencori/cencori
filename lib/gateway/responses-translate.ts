@@ -31,15 +31,12 @@
 
 import type { UnifiedImagePart, UnifiedMessage } from '@/lib/providers/base';
 import { normalizeResponsesContent, toolOutputTurns } from '@/lib/gateway/responses-content';
-import { customToolArguments } from '@/lib/gateway/responses-custom-tools';
 
 /** Structural subset of the Responses input items this translator reads. */
 export type TranslatableInputItem =
     | { type: 'message'; role: 'user' | 'assistant' | 'system'; content: unknown }
     | { type: 'function_call'; id: string; call_id: string; name: string; arguments: string; status?: string }
     | { type: 'function_call_output'; call_id: string; output: unknown }
-    | { type: 'custom_tool_call'; call_id: string; name: string; input: string }
-    | { type: 'custom_tool_call_output'; call_id: string; output: unknown }
     | { type: 'file'; filename: string; content: string; mime_type?: string }
     | { type: 'reasoning'; summary?: unknown; content?: unknown; text?: unknown }
     | { type: string };
@@ -48,7 +45,6 @@ export type TranslatableInputItem =
 export type TranslatableOutputItem =
     | { type: 'message'; content?: Array<{ text?: string }> }
     | { type: 'function_call'; id: string; call_id?: string; name?: string; arguments?: string }
-    | { type: 'custom_tool_call'; id: string; call_id?: string; name?: string; input?: string }
     | { type: 'reasoning'; summary?: unknown; content?: unknown }
     | { type: string };
 
@@ -199,9 +195,7 @@ export function translateResponsesInputItems(
         // A non-output item ends the tool-output run: captions flush first so
         // they land after the whole block, never inside it. A pending call
         // run flushes too — its answers, if any, belong to earlier turns.
-        const isCall = item.type === 'function_call' || item.type === 'custom_tool_call';
-        const isOutput = item.type === 'function_call_output' || item.type === 'custom_tool_call_output';
-        if (!isOutput && deferredImages.length > 0) {
+        if (item.type !== 'function_call_output' && deferredImages.length > 0) {
             flushDeferredImages();
         }
         // One model response arrives as reasoning, then its reply text, then its calls; on the
@@ -212,7 +206,7 @@ export function translateResponsesInputItems(
         const assistantText =
             item.type === 'message' && (item as { role: string }).role === 'assistant';
         if (
-            !isCall &&
+            item.type !== 'function_call' &&
             item.type !== 'reasoning' &&
             !assistantText &&
             !pending.empty
@@ -248,14 +242,6 @@ export function translateResponsesInputItems(
                 pending.addCall(call.call_id, call.name, call.arguments);
                 break;
             }
-            // A custom tool rides the chat wire as a function with one `input` argument
-            // (responses-custom-tools.ts), so its history is replayed in that same shape.
-            case 'custom_tool_call': {
-                const call = item as { call_id: string; name: string; input: string };
-                pending.addCall(call.call_id, call.name, customToolArguments(call.input ?? ''));
-                break;
-            }
-            case 'custom_tool_call_output':
             case 'function_call_output': {
                 const out = item as { call_id: string; output: unknown };
                 for (const turn of toolOutputTurns(out.output, out.call_id)) {
@@ -334,16 +320,6 @@ export function translateResponsesOutputItems(output: TranslatableOutputItem[]):
                     break;
                 }
                 pending.addCall(callId, call.name, call.arguments);
-                break;
-            }
-            case 'custom_tool_call': {
-                const call = item as { id: string; call_id?: string; name?: string; input?: string };
-                const callId = call.call_id || call.id;
-                if (typeof call.name !== 'string' || typeof call.input !== 'string') {
-                    dropped.push(`stored custom_tool_call item '${callId}' with no name or input`);
-                    break;
-                }
-                pending.addCall(callId, call.name, customToolArguments(call.input));
                 break;
             }
             case 'reasoning': {
