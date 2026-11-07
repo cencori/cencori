@@ -142,8 +142,12 @@ const matrixSections: Array<{
                 values: { free: "1,000", pro: "50,000", enterprise: "Unlimited" },
             },
             {
-                feature: "Memory lookups / saves per month",
-                values: { free: "2k / 1k", pro: "50k / 5k", enterprise: "Unlimited" },
+                feature: "Memory lookups per month",
+                values: { free: "2,000", pro: "50,000", enterprise: "Unlimited" },
+            },
+            {
+                feature: "Memory saves per month",
+                values: { free: "1,000", pro: "5,000", enterprise: "Unlimited" },
             },
         ],
     },
@@ -157,7 +161,11 @@ const matrixSections: Array<{
                 values: { free: false, pro: true, enterprise: true },
             },
             {
-                feature: "Jailbreak detection & output scanning",
+                feature: "Jailbreak detection",
+                values: { free: false, pro: true, enterprise: true },
+            },
+            {
+                feature: "Output scanning",
                 values: { free: false, pro: true, enterprise: true },
             },
             {
@@ -165,7 +173,11 @@ const matrixSections: Array<{
                 values: { free: false, pro: true, enterprise: true },
             },
             {
-                feature: "Governance controls & audit exports",
+                feature: "Governance controls",
+                values: { free: false, pro: false, enterprise: true },
+            },
+            {
+                feature: "Audit exports",
                 values: { free: false, pro: false, enterprise: true },
             },
         ],
