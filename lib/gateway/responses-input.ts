@@ -122,6 +122,25 @@ export function validateResponsesInput(input: unknown): string | null {
             totalTextBytes += measured.textBytes;
             const overBudget = chargeImages(measured);
             if (overBudget) return overBudget;
+        } else if (item.type === 'custom_tool_call') {
+            // A free-text tool call (Codex's apply_patch), replayed as the gateway returned it
+            // (responses-custom-tools.ts). Rejecting it here failed every turn after an edit.
+            if (typeof item.call_id !== 'string' || typeof item.name !== 'string' || typeof item.input !== 'string') {
+                return 'Custom tool call input items require string call_id, name, and input fields.';
+            }
+            if (utf8Bytes(item.input) > MAX_TEXT_FIELD_BYTES) {
+                return 'Custom tool call input exceeds the 1 MiB limit.';
+            }
+            totalTextBytes += utf8Bytes(item.input);
+        } else if (item.type === 'custom_tool_call_output') {
+            if (typeof item.call_id !== 'string') {
+                return 'Custom tool call output items require a string call_id field.';
+            }
+            const measured = measureResponsesContent(item.output, 'Custom tool call output', CONTENT_LIMITS);
+            if (measured.error) return measured.error;
+            totalTextBytes += measured.textBytes;
+            const overBudget = chargeImages(measured);
+            if (overBudget) return overBudget;
         } else if (item.type === 'reasoning') {
             // A thinking trace the provider returned on an earlier turn
             // (OpenAI `summary` parts, or plain `content`/`text`). Thinking-mode

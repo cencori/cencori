@@ -1,0 +1,37 @@
+{
+  "_comment": "The input Tensor's agent runtime sent on the request after an apply_patch call, captured from the real runtime (instructions and environment trimmed). Every turn after a file edit has this shape.",
+  "input": [
+    {
+      "type": "message",
+      "id": "msg_01a1b7e5-b213-78a2-8077-3ceb2fcc5ef2",
+      "role": "user",
+      "content": "<skills_instructions>\n## Skills\nA skill is a set of instructions provided through a `SKILL.md` source. Below is the list of skills that can be used. Each entry includes a name, description, and source locator. `file` locators are on the host filesystem, `environment resource` locators are owned by an execution environment, `orchestrator resource` locators are opaque non-filesystem resources, and `custom resource` locators use their provider's access mechanism.\n### Available skills\n- review-agent: Perform a read-only, defect-first review of a specified code change and return every actionable finding. Use when the user asks to review uncommitted changes, a branch diff, a commit, or a pull request. (file: /private/tmp/claude-501/-Users-apple-Tensor/7c28bfc9-7386-4090-9063-d426a83d805e/scratchpad/cap2/home/skills/.system/review-agent/SKILL.md)\n- skill-creator: Create or update reusable Tensor skills that add specialized workflows, domain knowledge, or tool guidance. Use when the user asks to create, revise, structure, or validate a skill. (file: /private/tmp/claude-501/-Users-apple-Tensor/7c28bfc9-7386-4090-9063-d426a83d805e/scratchpad/cap2/home/skills/.system/skill-creator/SKILL.md)\n- design-taste-frontend: Senior UI/UX Engineer. Architect digital interfaces overriding default LLM biases. Enforces metric-based rules, strict component architecture, CSS hardware acceleration, and balanced design engineering. (file: /Users/apple/.agents/skills/design-taste-frontend/SKILL.md)\n- find-skills: Helps users discover and install agent skills when they ask questions like \"how do I do X\", \"find a skill for X\", \"is there a skill that can...\", or express interest in extending capabilities. This skill should be used when the user is looking for functionality that might exist as an installable skill. (file: /Users/apple/.agents/skills/find-skills/SKILL.md)\n- frontend-design: Create distinctive, production-grade frontend interfaces with high design quality. Use this skill when the user asks to build web components, pages, artifacts, posters, or applications (examples include websites, landing pages, dashboards, React components, HTML/CSS layouts, or when styling/beautifying any web UI). Generates creative, polished code and UI design that avoids generic AI aesthetics. (file: /Users/apple/.agents/skills/frontend-design/SKILL.md)\n- full-output-enforcement: Overrides default LLM truncation behavior. Enforces complete code generation, bans placeholder patterns, and handles token-limit splits cleanly. Apply to any task requiring exhaustive, unabridged output. (file: /Users/apple/.agents/skills/full-output-enforcement/SKILL.md)\n- high-end-visual-design: Teaches the AI to design like a high-end agency. Defines the exact fonts, spacing, shadows, card structures, and animations that make a website feel expensive. Blocks all the common defaults that make AI designs look cheap or generic. (file: /Users/apple/.agents/skills/high-end-visual-design/SKILL.md)\n- industrial-brutalist-ui: Raw mechanical interfaces fusing Swiss typographic print with military terminal aesthetics. Rigid grids, extreme type scale contrast, utilitarian color, analog degradation effects. For data-heavy dashboards, portfolios, or editorial sites that need to feel like declassified blueprints. (file: /Users/apple/.agents/skills/industrial-brutalist-ui/SKILL.md)\n- minimalist-ui: Clean editorial-style interfaces. Warm monochrome palette, typographic contrast, flat bento grids, muted pastels. No gradients, no heavy shadows. (file: /Users/apple/.agents/skills/minimalist-ui/SKILL.md)\n- redesign-existing-projects: Upgrades existing websites and apps to premium quality. Audits current design, identifies generic AI patterns, and applies high-end design standards without breaking functionality. Works with any CSS framework or vanilla CSS. (file: /Users/apple/.agents/skills/redesign-existing-projects/SKILL.md)\n- stitch-design-taste: Semantic Design System Skill for Google Stitch. Generates agent-friendly DESIGN.md files that enforce premium, anti-generic UI standards \u2014 strict typography, calibrated color, asymmetric layouts, perpetual micro-motion, and hardware-accelerated performance. (file: /Users/apple/.agents/skills/stitch-design-taste/SKILL.md)\n</skills_instructions>\n<permissions instructions>\nFilesystem sandboxing defines which files can be read or written. `sandbox_mode` is `workspace-write`: The sandbox permits reading files, and editing files in `cwd` and `writable_roots`. Editing files in other directories requires approval. Network access is restricted.\nApproval policy is currently never. Do not provide the `sandbox_permissions` for any reason, commands will be rejected.\n The writable roots are `/private/tmp`, `/private/tmp/claude-501/-Users-apple-Tensor/7c28bfc9-7386-4090-9063-d426a83d805e/scratchpad/cap2/ws`, `/private/var/folders/14/xb39q4kn2qs4gq60brthqmpr0000gn/T`.\n</permissions instructions>"
+    },
+    {
+      "type": "message",
+      "id": "msg_01a1b7e5-b213-78a2-8077-3cf54eb6a5f3",
+      "role": "user",
+      "content": "<environment_context>\n  <cwd>/workspace</cwd>\n</environment_context>"
+    },
+    {
+      "type": "message",
+      "id": "msg_01a1b7e5-b223-72b2-bc4c-9fef4ea1f71c",
+      "role": "user",
+      "content": "change hello to hello world in a.txt"
+    },
+    {
+      "type": "custom_tool_call",
+      "id": "ctc_1",
+      "status": "completed",
+      "call_id": "call_1",
+      "name": "apply_patch",
+      "input": "*** Begin Patch\n*** Update File: a.txt\n@@\n-hello\n+hello world\n*** End Patch\n"
+    },
+    {
+      "type": "custom_tool_call_output",
+      "id": "ctco_01a1b7e5-b2a1-7882-83dd-298d702645f4",
+      "call_id": "call_1",
+      "output": "Exit code: 0\nWall time: 0.1 seconds\nOutput:\nSuccess. Updated the following files:\nM a.txt\n"
+    }
+  ]
+}
