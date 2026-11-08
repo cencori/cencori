@@ -43,7 +43,7 @@ function SourcePicker({ base, current }: { base: string; current: Source }) {
             <DropdownMenuTrigger asChild>
                 <button
                     type="button"
-                    className="flex w-full items-center gap-2.5 rounded-lg border border-border/70 bg-muted/30 px-3 py-2 text-left text-sm hover:bg-muted/50"
+                    className="flex h-8 w-full items-center gap-2 rounded-md border border-border/70 bg-muted/30 p-2 text-left text-sm hover:bg-muted/50"
                 >
                     <HugeiconsIcon icon={active.icon} className="!h-4 !w-4 shrink-0" />
                     <span className="flex-1 truncate">{active.label}</span>
@@ -154,7 +154,7 @@ export function ObservabilitySidebar({ base, orgSlug, projectSlug }: { base: str
     const onList = new RegExp(`/observability/${source}/?$`).test(pathname);
 
     return (
-        <div className="px-2 pt-1">
+        <div className="pt-1">
             <SourcePicker base={base} current={source} />
             {onList && (source === 'traces' ? <SessionFiltersPanel /> : <RequestLogFiltersPanel projectId={projectId ?? undefined} />)}
         </div>
