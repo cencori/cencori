@@ -277,6 +277,7 @@ async function* runLoop<Ctx>(
         instructions: (await agent.resolveInstructions(contextFor(agent, sessionId))) ?? '',
         model: agent.model,
         tools: wireTools(agent),
+        metadata: { sdk: 'cencori/agents', agent: agent.name },
     });
 
     let agent: Agent<any>;

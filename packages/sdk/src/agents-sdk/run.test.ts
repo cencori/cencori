@@ -184,7 +184,12 @@ describe('run', () => {
         expect(cencori.requests[1].body).toMatchObject({
             action_id: 'h1',
             tool_results: [{ action_id: 'h1', output: expect.stringContaining('Transferred to Billing') }],
-            next: { instructions: 'You handle refunds.', model: 'gemini-2.5-flash', tools: [{ type: 'function', function: { name: 'get_order' } }] },
+            next: {
+                instructions: 'You handle refunds.',
+                model: 'gemini-2.5-flash',
+                tools: [{ type: 'function', function: { name: 'get_order' } }],
+                metadata: { sdk: 'cencori/agents', agent: 'Billing' },
+            },
         });
         expect(result.lastAgent).toBe(billing);
         expect(result.newItems).toContainEqual({ type: 'handoff', from: 'Triage', to: 'Billing' });

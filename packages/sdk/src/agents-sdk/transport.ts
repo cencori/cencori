@@ -44,6 +44,8 @@ export interface ResumeNext {
     instructions?: string;
     model?: string;
     tools?: Array<Record<string, unknown>>;
+    /** Turn metadata from here on (the agent's name, for the console trace). */
+    metadata?: Record<string, string>;
 }
 
 function env(name: string): string | undefined {

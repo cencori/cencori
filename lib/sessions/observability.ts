@@ -65,6 +65,14 @@ export interface TimelineToolCall {
     /** A cencori/agents handoff (transfer_to_<agent>). */
     handoff: boolean;
     needsApproval: boolean;
+    /** Who ran it: the caller's code (paused for its result) or Cencori, inside the turn. */
+    executedBy: 'caller' | 'cencori';
+    /** From the call to its result: for the caller's tools, pause to resume (their code plus network). */
+    startedAt: string;
+    endedAt: string | null;
+    durationMs: number | null;
+    /** How a human ruled on it, when it needed approval. */
+    resolution: 'approved' | 'rejected' | null;
 }
 
 export interface TimelineTurn {
@@ -86,6 +94,19 @@ export interface TimelineTurn {
     resolution: 'approved' | 'rejected' | null;
     error: string | null;
     usage: { inputTokens: number; outputTokens: number } | null;
+    /** The agent answering this turn, when the caller named it (cencori/agents does). */
+    agent: string | null;
+    /** The model call behind this turn, from its terminal event's trace block. */
+    trace: {
+        requestId: string | null;
+        provider: string | null;
+        model: string | null;
+        usedFallback: boolean;
+        costUsd: number | null;
+        ttftMs: number | null;
+        modelMs: number | null;
+        rounds: number | null;
+    };
 }
 
 const MAX_TEXT = 20_000;
@@ -172,6 +193,11 @@ export function buildTimeline(events: SessionEventRow[]): TimelineTurn[] {
                     result: toolResults.has(id) ? pretty(toolResults.get(id)) : null,
                     handoff: name.startsWith('transfer_to_'),
                     needsApproval: pausedActions.some((a) => a.action_id === id && a.needs_approval === true),
+                    executedBy: 'caller',
+                    startedAt: event.created_at,
+                    endedAt: null,
+                    durationMs: null,
+                    resolution: null,
                 });
             } else if (event.event_type === 'tool_call.completed') {
                 const payload = p(event);
@@ -180,14 +206,35 @@ export function buildTimeline(events: SessionEventRow[]): TimelineTurn[] {
                 const output = payload.output === undefined ? null : pretty(payload.output);
                 if (call) {
                     call.result ??= output;
+                    call.executedBy = 'cencori';
+                    call.endedAt = event.created_at;
+                    call.durationMs = Math.max(0, Date.parse(event.created_at) - Date.parse(call.startedAt));
                 } else {
                     // A server tool (web search, knowledge) whose call wasn't recorded separately.
-                    toolCalls.push({ id: id || `${turn}-${event.sequence}`, name: String(payload.tool ?? 'tool'), arguments: '', result: output, handoff: false, needsApproval: false });
+                    toolCalls.push({
+                        id: id || `${turn}-${event.sequence}`, name: String(payload.tool ?? 'tool'), arguments: '', result: output,
+                        handoff: false, needsApproval: false, executedBy: 'cencori',
+                        startedAt: event.created_at, endedAt: event.created_at, durationMs: 0, resolution: null,
+                    });
                 }
             }
         }
 
+        // The caller's tools run between the pause and the resume.
+        const resolution = resumed ? (p(resumed).resolution === 'rejected' ? 'rejected' : 'approved') : null;
+        for (const call of toolCalls) {
+            if (call.executedBy !== 'caller') continue;
+            if (paused) call.startedAt = paused.created_at;
+            if (resumed) {
+                call.endedAt = resumed.created_at;
+                call.durationMs = Math.max(0, Date.parse(resumed.created_at) - Date.parse(call.startedAt));
+            }
+            if (call.needsApproval) call.resolution = resolution;
+        }
+
         const terminalPayload = terminal ? p(terminal) : {};
+        const trace = (terminalPayload.trace ?? {}) as Record<string, unknown>;
+        const meta = (startedPayload.metadata ?? {}) as Record<string, unknown>;
         const usage = terminalPayload.usage as { input_tokens?: number; output_tokens?: number } | undefined;
         const startedAt = (started ?? list[0]).created_at;
         const endedAt = terminal?.created_at ?? null;
@@ -208,11 +255,22 @@ export function buildTimeline(events: SessionEventRow[]): TimelineTurn[] {
                 : terminal?.event_type === 'turn.paused' ? 'paused'
                 : 'running',
             pauseReason: reason === 'approval_required' || reason === 'tool_results_required' ? reason : paused ? 'approval_required' : null,
-            resolution: resumed ? (p(resumed).resolution === 'rejected' ? 'rejected' : 'approved') : null,
+            resolution,
             error: terminal?.event_type === 'turn.failed'
                 ? String((terminalPayload.output as { error?: unknown } | undefined)?.error ?? 'The turn failed.')
                 : null,
             usage: usage ? { inputTokens: usage.input_tokens ?? 0, outputTokens: usage.output_tokens ?? 0 } : null,
+            agent: typeof meta.agent === 'string' && meta.agent ? meta.agent : null,
+            trace: {
+                requestId: typeof trace.request_id === 'string' ? trace.request_id : null,
+                provider: typeof trace.provider === 'string' ? trace.provider : null,
+                model: typeof trace.model === 'string' ? trace.model : null,
+                usedFallback: trace.used_fallback === true,
+                costUsd: typeof trace.cost_usd === 'number' ? trace.cost_usd : null,
+                ttftMs: typeof trace.ttft_ms === 'number' ? trace.ttft_ms : null,
+                modelMs: typeof trace.model_ms === 'number' ? trace.model_ms : null,
+                rounds: typeof trace.rounds === 'number' ? trace.rounds : null,
+            },
         });
     }
     return turns;

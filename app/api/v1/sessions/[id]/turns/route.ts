@@ -813,6 +813,9 @@ export async function POST(
         const execResult = await executeSessionTurn({
             supabase: adminClient,
             gatewayCtx: activeGatewayCtx,
+            turnMetadata: body.metadata && typeof body.metadata === 'object' && !Array.isArray(body.metadata)
+                ? Object.fromEntries(Object.entries(body.metadata).filter(([, v]) => typeof v === 'string').slice(0, 20).map(([k, v]) => [k.slice(0, 64), (v as string).slice(0, 500)]))
+                : undefined,
             sessionId,
             turnNumber: newTurnNumber,
             model,

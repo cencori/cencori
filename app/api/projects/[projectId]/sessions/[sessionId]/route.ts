@@ -51,7 +51,28 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ pro
     ]);
 
     const agentNames = new Map(agentResult.data ? [[agentResult.data.id as string, agentResult.data.name as string]] : []);
-    const turns = buildTimeline((eventsResult.data ?? []) as SessionEventRow[]);
+    const timeline = buildTimeline((eventsResult.data ?? []) as SessionEventRow[]);
+
+    // Each model call's row in the gateway log (Logs), by the request id its turn recorded.
+    const requestIds = [...new Set(timeline.map((t) => t.trace.requestId).filter(Boolean))] as string[];
+    const logs = new Map<string, { id: string; latency_ms: number | null; status: string | null; fallback_provider: string | null; fallback_model: string | null }>();
+    if (requestIds.length) {
+        const { data: rows } = await admin.from('ai_requests')
+            .select('id, request_id, latency_ms, status, fallback_provider, fallback_model')
+            .eq('project_id', projectId)
+            .in('request_id', requestIds)
+            .limit(500);
+        for (const row of rows ?? []) logs.set(row.request_id as string, row as never);
+    }
+    const turns = timeline.map((t) => {
+        const log = t.trace.requestId ? logs.get(t.trace.requestId) : undefined;
+        return {
+            ...t,
+            log: log ? { id: log.id, latencyMs: log.latency_ms, status: log.status, fallbackProvider: log.fallback_provider, fallbackModel: log.fallback_model } : null,
+        };
+    });
+    const firstStart = timeline[0]?.startedAt ?? null;
+    const lastEnd = [...timeline].reverse().find((t) => t.endedAt)?.endedAt ?? null;
     const usage = turns.reduce(
         (sum, t) => ({ inputTokens: sum.inputTokens + (t.usage?.inputTokens ?? 0), outputTokens: sum.outputTokens + (t.usage?.outputTokens ?? 0) }),
         { inputTokens: 0, outputTokens: 0 },
@@ -68,6 +89,11 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ pro
             cost_usd: Number(session.total_cost_usd ?? 0),
             usage,
             parent_session_id: parentId,
+            duration_ms: firstStart && lastEnd ? Math.max(0, Date.parse(lastEnd) - Date.parse(firstStart)) : null,
+            tool_calls: timeline.reduce((n, t) => n + t.toolCalls.length, 0),
+            models: [...new Set(timeline.map((t) => t.trace.model ?? t.model).filter(Boolean))],
+            agents: [...new Set(timeline.map((t) => t.agent).filter(Boolean))],
+            metadata,
             created_at: session.created_at,
             updated_at: session.updated_at,
             expires_at: session.expires_at ?? null,

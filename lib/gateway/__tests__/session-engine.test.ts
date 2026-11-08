@@ -863,6 +863,7 @@ describe('resumeSessionTurn continuation', () => {
                 ],
                 function_tools: [lookupOrder, checkShipment],
                 pause_on_tool_calls: true,
+                metadata: { sdk: 'cencori/agents', agent: 'Support' },
             } },
             { event_type: 'tool_call.started', sequence: 2, payload: { tool: 'lookup_order', arguments: { id: '1042' }, action_id: 'call_1' } },
             { event_type: 'turn.paused', sequence: 3, payload: {
@@ -938,6 +939,11 @@ describe('resumeSessionTurn continuation', () => {
         expect(payload.original_input_text).toBe('Where is order 1042?');
         expect(payload.resumed_from_turn).toBe(1);
         expect(payload.pause_on_tool_calls).toBe(true);
+        expect(payload.metadata).toEqual({ sdk: 'cencori/agents', agent: 'Support' }); // carried over
+        // The pause records what the trace needs: the request, the model, cost and timing.
+        const pausedCall = rpc.mock.calls.find((c) => c[1]?.p_event_type === 'turn.paused')!;
+        expect(pausedCall[1].p_payload.trace).toMatchObject({ request_id: 'req_1', model: 'gpt-4o', provider: 'openai', used_fallback: false, rounds: 1 });
+        expect(typeof pausedCall[1].p_payload.trace.ttft_ms).toBe('number');
         expect((payload.input_messages as Array<Record<string, unknown>>).at(-1)).toMatchObject({ role: 'tool', toolCallId: 'call_1' });
         // ...and the pause finalized on turn 2.
         expect(rpc).toHaveBeenCalledWith('finalize_session_turn', expect.objectContaining({
@@ -959,7 +965,7 @@ describe('resumeSessionTurn continuation', () => {
             sessionId: 'sid', turnNumber: 1,
             toolResults: [{ action_id: 'call_1', output: 'Transferred to Billing.' }],
             tier: 'free' as never, logSuccess: () => {}, incrementUsage: () => {},
-            override: { instructions: 'You handle billing.', model: 'claude-sonnet-4-5', tools: [refund] },
+            override: { instructions: 'You handle billing.', model: 'claude-sonnet-4-5', tools: [refund], metadata: { agent: 'Billing' } },
         });
         await readAll((result as { ok: true; response: NextResponse }).response);
 
@@ -971,6 +977,7 @@ describe('resumeSessionTurn continuation', () => {
         // The next resume continues as Billing.
         const started = inserts.find(r => r.event_type === 'turn.started')!.payload as Record<string, unknown>;
         expect(started.instructions).toBe('You handle billing.');
+        expect(started.metadata).toEqual({ sdk: 'cencori/agents', agent: 'Billing' });
         expect((started.function_tools as Array<{ function: { name: string } }>).map(t => t.function.name)).toEqual(['issue_refund']);
     });
 

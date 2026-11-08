@@ -10,6 +10,8 @@ export interface ResumeOverride {
     instructions?: string;
     model?: string;
     tools?: Tool[];
+    /** Replaces keys of the turn's metadata (cencori/agents: the agent handed to). */
+    metadata?: Record<string, string>;
 }
 
 const TOOL_NAME = /^[a-zA-Z0-9_-]{1,64}$/;
@@ -37,6 +39,16 @@ export function parseResumeOverride(raw: unknown): Parsed {
             return { ok: false, message: 'next.model must be a model id' };
         }
         value.model = next.model.trim();
+    }
+    if (next.metadata !== undefined) {
+        if (!next.metadata || typeof next.metadata !== 'object' || Array.isArray(next.metadata)) {
+            return { ok: false, message: 'next.metadata must be an object of strings' };
+        }
+        const entries = Object.entries(next.metadata as Record<string, unknown>);
+        if (entries.length > 20 || entries.some(([k, v]) => typeof v !== 'string' || k.length > 64 || (v as string).length > 500)) {
+            return { ok: false, message: 'next.metadata takes at most 20 string values (keys up to 64, values up to 500 characters)' };
+        }
+        value.metadata = Object.fromEntries(entries) as Record<string, string>;
     }
     if (next.tools !== undefined) {
         if (!Array.isArray(next.tools) || next.tools.length > MAX_TOOLS) {

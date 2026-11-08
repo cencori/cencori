@@ -43,6 +43,8 @@ export type TurnExecuteParams = {
     turnNumber: number;
     model: string;
     instructions?: string;
+    /** The caller's turn metadata (cencori/agents sends the agent's name), kept for the trace. */
+    turnMetadata?: Record<string, string>;
     tools?: ResponsesTool[];
     /** Effective published-version ∩ installation host policy for built-in Web results. */
     networkPolicy?: NetworkPolicy;
@@ -221,6 +223,7 @@ function makeStream(params: {
      * user's message, and the caller sees turn.resumed instead of turn.started.
      */
     resumed?: { fromTurn: number; toolResultIds: string[]; originalInputText?: string };
+    turnMetadata?: Record<string, string>;
 }): NextResponse {
     const {
         supabase, gatewayCtx, sessionId, turnNumber, resolved,
@@ -228,7 +231,7 @@ function makeStream(params: {
         temperature, max_output_tokens, pauseOnToolCalls, needsApprovalToolNames, collectedBuiltinToolOutputs,
         instructions, inputText, inputSecurity, tokenMap, endUserId,
         tier, logSuccess, incrementUsage, recordEndUserUsage, onCompletion, knowledgeContext, reasoningEffort,
-        pinnedConnectionId, agentTools, resumed,
+        pinnedConnectionId, agentTools, resumed, turnMetadata,
     } = params;
 
     // Output can only be blocked or redacted by a governance output policy.
@@ -339,6 +342,7 @@ function makeStream(params: {
                     ...(tool_choice !== undefined ? { tool_choice } : {}),
                     ...(temperature !== undefined ? { temperature } : {}),
                     ...(max_output_tokens !== undefined ? { max_output_tokens } : {}),
+                    ...(turnMetadata && Object.keys(turnMetadata).length > 0 ? { metadata: turnMetadata } : {}),
                 };
                 if (resumed) {
                     // Recorded for the next resume; the caller already knows the turn
@@ -363,7 +367,24 @@ function makeStream(params: {
                 /** Set by end_conversation: the session closes once this reply is done. */
                 let conversationEnded = false;
                 const prior = { promptTokens: 0, completionTokens: 0, providerCostUsd: 0, cencoriChargeUsd: 0 };
+                // For the trace (console Sessions): when the model was called, when its
+                // first token arrived, and how many model rounds the turn took.
+                const modelStartedAt = Date.now();
+                let firstTokenAt: number | null = null;
+                let roundsRun = 0;
+                const traceOf = (call: { provider?: string; model?: string; usedFallback?: boolean; costUsd?: number; providerCostUsd?: number }) => ({
+                    request_id: gatewayCtx.requestId,
+                    ...(call.provider ? { provider: call.provider } : {}),
+                    ...(call.model ? { model: call.model } : {}),
+                    used_fallback: Boolean(call.usedFallback),
+                    cost_usd: call.costUsd ?? 0,
+                    provider_cost_usd: call.providerCostUsd ?? 0,
+                    ttft_ms: firstTokenAt === null ? null : firstTokenAt - modelStartedAt,
+                    model_ms: Date.now() - modelStartedAt,
+                    rounds: roundsRun,
+                });
                 rounds: for (let round = 0; ; round++) {
+                    roundsRun = round + 1;
                     let roundText = '';
                     let roundStarted = fullText.length;
                     for (const key of Object.keys(toolCalls)) delete toolCalls[key];
@@ -386,6 +407,7 @@ function makeStream(params: {
                             if (chunk.usage) {
                                 reportedUsage = chunk.usage;
                             }
+                            if (firstTokenAt === null && (chunk.delta || chunk.toolCalls)) firstTokenAt = Date.now();
                             if (chunk.delta) {
                                 // A reply that resumes after a tool call starts on its own line.
                                 if (fullText.length > 0 && fullText.length === roundStarted && round > 0) {
@@ -536,6 +558,7 @@ function makeStream(params: {
                                     turn_number: turnNumber,
                                     output: { error: outputCheck.message },
                                     usage: { input_tokens: pt, output_tokens: ct, total_tokens: tt },
+                                    trace: traceOf({ provider: pn, model: chunk.actualModel, usedFallback: chunk.usedFallback, costUsd: cc, providerCostUsd: pc }),
                                 }, 'active', cc);
                                 logSuccess({
                                     provider: pn,
@@ -607,6 +630,8 @@ function makeStream(params: {
                                         arguments: tc.args,
                                         needs_approval: needsApprovalToolNames.has(tc.name),
                                     })),
+                                    usage: { input_tokens: pt, output_tokens: ct, total_tokens: tt },
+                                    trace: traceOf({ provider: pn, model: chunk.actualModel, usedFallback: chunk.usedFallback, costUsd: cc, providerCostUsd: pc }),
                                 }, 'paused', cc);
                                 // Governance: an autonomous tool call is now gated on human approval.
                                 if (needsHuman) {
@@ -639,6 +664,7 @@ function makeStream(params: {
                                         ? { knowledge_citations: knowledgeContext.citations }
                                         : {}),
                                     ...(conversationEnded ? { conversation_ended: true } : {}),
+                                    trace: traceOf({ provider: pn, model: chunk.actualModel, usedFallback: chunk.usedFallback, costUsd: cc, providerCostUsd: pc }),
                                 },
                                 // The agent ended it: the session closes, and the next message starts a new one.
                                 conversationEnded ? 'completed' : 'active',
@@ -665,7 +691,7 @@ function makeStream(params: {
                 try {
                     await terminal(
                         'turn.failed',
-                        { turn_number: turnNumber, output: { error: msg }, usage: { input_tokens: 0, output_tokens: 0, total_tokens: 0 } },
+                        { turn_number: turnNumber, output: { error: msg }, usage: { input_tokens: 0, output_tokens: 0, total_tokens: 0 }, trace: { request_id: gatewayCtx.requestId } },
                         'active',
                         0,
                     );
@@ -839,6 +865,7 @@ export async function executeSessionTurn(params: TurnExecuteParams): Promise<Tur
             knowledgeContext,
             reasoningEffort: params.reasoningEffort,
             pinnedConnectionId: params.pinnedConnectionId ?? null,
+            turnMetadata: params.turnMetadata,
             agentTools: params.agentTools,
         });
 
@@ -1048,6 +1075,11 @@ export async function resumeSessionTurn(params: ResumeTurnParams): Promise<TurnE
             endUserId: null,
             tier, logSuccess, incrementUsage, recordEndUserUsage,
             resumed: { fromTurn: turnNumber, toolResultIds: toolResults.map(r => r.action_id), originalInputText: inputText },
+            // The turn's metadata carries over; a handoff's names the new agent.
+            turnMetadata: {
+                ...((sp.metadata && typeof sp.metadata === 'object' ? sp.metadata : {}) as Record<string, string>),
+                ...(override?.metadata ?? {}),
+            },
         });
 
         return { ok: true, response };
