@@ -35,7 +35,7 @@ import PlusSignIcon from "@hugeicons/core-free-icons/PlusSignIcon";
 import { COPILOT_CONVERSATION_COOKIE, COPILOT_NEW_CHAT_EVENT } from "@/lib/console/copilot";
 import ChartRelationshipIcon from "@hugeicons/core-free-icons/ChartRelationshipIcon";
 import ThreeDRotateIcon from "@hugeicons/core-free-icons/ThreeDRotateIcon";
-import Activity01Icon from "@hugeicons/core-free-icons/Activity01Icon";
+import Telescope02Icon from "@hugeicons/core-free-icons/Telescope02Icon";
 import { ObservabilitySidebar } from "@/components/observability/ObservabilitySidebar";
 import Settings02Icon from "@hugeicons/core-free-icons/Settings02Icon";
 import GameController03Icon from "@hugeicons/core-free-icons/GameController03Icon";
@@ -770,7 +770,7 @@ export default function OrganizationLayoutClient({
                                 }}
                                 onMouseEnter={() => prefetchRoute(observabilityHref)}
                             >
-                                <HugeiconsIcon icon={Activity01Icon} className="!h-5 !w-5" />
+                                <HugeiconsIcon icon={Telescope02Icon} className="!h-5 !w-5" />
                                 <span className="text-sm">Observability</span>
                                 <ChevronRight className="!h-3 !w-3 ml-auto text-muted-foreground/50" />
                             </Link>
