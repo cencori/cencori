@@ -190,6 +190,10 @@ export async function POST(req: NextRequest) {
 
     try {
         const body = await req.json() as CreateSessionRequest;
+        // Optional first turn, run in the same request (saves the caller a round trip).
+        if (body.turn !== undefined && (typeof body.turn !== 'object' || body.turn === null || Array.isArray(body.turn))) {
+            return respondError(400, 'turn must be a turn request object', 'invalid_turn');
+        }
         const adminClient = createAdminClient();
 
         // Resolve embedded scope: ect_ claims win and cannot be overridden by body.
@@ -343,6 +347,27 @@ export async function POST(req: NextRequest) {
 
         if (error || !session) {
             return respondError(500, error?.message || 'Failed to create session', 'session_creation_failed');
+        }
+
+        if (body.turn) {
+            // Run the first turn in-process through the turns route, which does its
+            // own auth, limits, tools and billing, and stream it back. The new
+            // session's id travels in a header (and on any error response).
+            const { POST: postTurn } = await import('@/app/api/v1/sessions/[id]/turns/route');
+            const headers = new Headers(req.headers);
+            headers.set('Content-Type', 'application/json');
+            headers.delete('content-length');
+            const turnRequest = new NextRequest(new URL(`/api/v1/sessions/${session.id}/turns`, req.url), {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(body.turn),
+                signal: req.signal,
+            });
+            const turnResponse = await postTurn(turnRequest, { params: Promise.resolve({ id: session.id as string }) });
+            turnResponse.headers.set('X-Cencori-Session-Id', session.id as string);
+            const exposed = turnResponse.headers.get('Access-Control-Expose-Headers');
+            turnResponse.headers.set('Access-Control-Expose-Headers', exposed ? `${exposed}, X-Cencori-Session-Id` : 'X-Cencori-Session-Id');
+            return turnResponse;
         }
 
         return respond(NextResponse.json({

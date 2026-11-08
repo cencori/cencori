@@ -837,6 +837,8 @@ export async function POST(
                 ? (installedManifest.reasoning_effort as 'low' | 'medium' | 'high')
                 // A customer is waiting: DeepSeek Flash answers without thinking first
                 // unless the agent asks for it (thinking roughly doubled time to first word).
+                // Otherwise the caller's choice (cencori/agents modelSettings.reasoningEffort).
+                : ['none', 'low', 'medium', 'high'].includes(body.reasoning_effort as string) ? body.reasoning_effort
                 : /^deepseek-v4(\.\d+)?-flash$/.test(model) ? 'none' : undefined,
             endUserId,
             tier: (gatewayCtx.tier || "free") as SubscriptionTier,

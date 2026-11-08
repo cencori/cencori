@@ -908,8 +908,8 @@ export async function resumeSessionTurn(params: ResumeTurnParams): Promise<TurnE
         const storedPin = !override?.model && typeof sp.provider_connection_id === 'string' && sp.provider_connection_id
             ? sp.provider_connection_id
             : null;
-        const storedEffort = ['low', 'medium', 'high'].includes(sp.reasoning_effort as string)
-            ? (sp.reasoning_effort as 'low' | 'medium' | 'high')
+        const storedEffort = ['none', 'low', 'medium', 'high'].includes(sp.reasoning_effort as string)
+            ? (sp.reasoning_effort as 'none' | 'low' | 'medium' | 'high')
             : undefined;
         const storedTokenMap = new Map<string, string>(
             Object.entries((sp.input_token_map as Record<string, string> | undefined) ?? {})

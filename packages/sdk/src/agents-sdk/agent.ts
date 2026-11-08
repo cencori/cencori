@@ -27,6 +27,11 @@ export interface GuardrailResult {
 export interface ModelSettings {
     temperature?: number;
     maxTokens?: number;
+    /**
+     * How hard a reasoning model thinks before answering. Lower is faster;
+     * 'none' skips thinking where the model allows it. Default: the model's own.
+     */
+    reasoningEffort?: 'none' | 'low' | 'medium' | 'high';
 }
 
 export interface AgentOptions<Ctx = unknown, Out = string> {

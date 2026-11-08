@@ -300,11 +300,8 @@ async function* runLoop<Ctx>(
         agent = startAgent;
         turnsUsed = 0;
         usage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
-        sessionId = options.sessionId ?? await transport.createSession({
-            ...(options.metadata ?? {}),
-            sdk: 'cencori/agents',
-            agent: startAgent.name,
-        });
+        // A new run's session is created together with its first turn (one round trip).
+        sessionId = options.sessionId ?? '';
 
         // Input guardrails run on the first agent, before any model call.
         const runContext = contextFor(agent, sessionId);
@@ -316,7 +313,7 @@ async function* runLoop<Ctx>(
         yield { type: 'agent_updated', agent };
         turnsUsed++;
         const firstTools = wireTools(agent);
-        response = await transport.turn(sessionId, {
+        const firstTurn = {
             input,
             model: agent.model,
             instructions: await agent.resolveInstructions(runContext),
@@ -326,10 +323,22 @@ async function* runLoop<Ctx>(
                 : {}),
             ...(agent.modelSettings.temperature !== undefined ? { temperature: agent.modelSettings.temperature } : {}),
             ...(agent.modelSettings.maxTokens !== undefined ? { max_output_tokens: agent.modelSettings.maxTokens } : {}),
+            ...(agent.modelSettings.reasoningEffort ? { reasoning_effort: agent.modelSettings.reasoningEffort } : {}),
             ...(options.memory ? { memory: options.memory } : {}),
             ...(options.user ? { user: options.user } : {}),
             metadata: { sdk: 'cencori/agents', agent: agent.name },
-        });
+        };
+        if (sessionId) {
+            response = await transport.turn(sessionId, firstTurn);
+        } else {
+            const created = await transport.createSessionWithTurn({
+                ...(options.metadata ?? {}),
+                sdk: 'cencori/agents',
+                agent: startAgent.name,
+            }, firstTurn);
+            sessionId = created.sessionId;
+            response = created.response;
+        }
     }
 
     while (true) {

@@ -37,6 +37,7 @@ export interface TurnBody {
     memory?: Record<string, unknown>;
     user?: string;
     metadata?: Record<string, string>;
+    reasoning_effort?: 'none' | 'low' | 'medium' | 'high';
 }
 
 export interface ResumeNext {
@@ -85,11 +86,29 @@ export class Transport {
         return response;
     }
 
-    async createSession(metadata: Record<string, unknown>): Promise<string> {
-        const response = await this.post('/v1/sessions', { metadata });
-        const body = await response.json() as { id?: string };
-        if (!body.id) throw new CencoriRunError('Cencori did not return a session id.');
-        return body.id;
+    /**
+     * Create a session and run its first turn in one request. Servers that
+     * predate this answer with the plain session JSON; the turn then goes in a
+     * second request, as before.
+     */
+    async createSessionWithTurn(metadata: Record<string, unknown>, body: TurnBody): Promise<{ sessionId: string; response: Response }> {
+        const turn = { ...body, stream: true, pause_on_tool_calls: true };
+        const response = await this.fetchImpl(`${this.baseUrl}/v1/sessions`, {
+            method: 'POST',
+            headers: {
+                'CENCORI_API_KEY': this.apiKey,
+                'Content-Type': 'application/json',
+                'Accept': 'text/event-stream, application/json',
+            },
+            body: JSON.stringify({ metadata, turn }),
+            signal: this.signal,
+        });
+        const headerId = response.headers.get('X-Cencori-Session-Id') ?? undefined;
+        if (!response.ok) throw await errorFrom(response, headerId);
+        if (headerId) return { sessionId: headerId, response };
+        const created = await response.json() as { id?: string };
+        if (!created.id) throw new CencoriRunError('Cencori did not return a session id.');
+        return { sessionId: created.id, response: await this.turn(created.id, body) };
     }
 
     turn(sessionId: string, body: TurnBody): Promise<Response> {

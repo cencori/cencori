@@ -12,7 +12,7 @@ import {
 
 type Sse = Array<[event: string, data: Record<string, unknown>]>;
 
-function sseResponse(events: Sse): Response {
+function sseResponse(events: Sse, headers: Record<string, string> = {}): Response {
     const text = events.map(([event, data]) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`).join('');
     const bytes = new TextEncoder().encode(text);
     // Split mid-event to exercise the parser's buffering.
@@ -23,7 +23,7 @@ function sseResponse(events: Sse): Response {
             controller.enqueue(bytes.slice(cut));
             controller.close();
         },
-    }), { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
+    }), { status: 200, headers: { 'Content-Type': 'text/event-stream', ...headers } });
 }
 
 const completed = (text: string): Sse => [
@@ -43,21 +43,32 @@ const paused = (actions: Array<{ id: string; tool: string; args: unknown; approv
     }],
 ];
 
-/** A fake Cencori: answers sessions, turns and approvals in order, recording each request. */
-function fakeCencori(script: Array<Sse | Response>) {
-    const requests: Array<{ path: string; body: Record<string, unknown> }> = [];
+/**
+ * A fake Cencori: answers sessions, turns and approvals in order, recording
+ * each request. POST /v1/sessions with a turn streams that turn back (the
+ * current server); `legacy` mimics a server that ignores it.
+ */
+function fakeCencori(script: Array<Sse | Response>, { legacy = false } = {}) {
+    const requests: Array<{ path: string; body: Record<string, any> }> = [];
     let sessions = 0;
+    const answer = (path: string, headers: Record<string, string> = {}) => {
+        const next = script.shift();
+        if (!next) throw new Error(`unexpected request to ${path}`);
+        if (!(next instanceof Response)) return sseResponse(next, headers);
+        const merged = new Headers(next.headers);
+        for (const [name, value] of Object.entries(headers)) merged.set(name, value);
+        return new Response(next.body, { status: next.status, headers: merged });
+    };
     const fetchImpl = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
         const path = new URL(String(url)).pathname;
         const body = init?.body ? JSON.parse(String(init.body)) : {};
         requests.push({ path, body });
         if (path === '/v1/sessions') {
             sessions++;
+            if (body.turn && !legacy) return answer(path, { 'X-Cencori-Session-Id': `ses_${sessions}` });
             return new Response(JSON.stringify({ id: `ses_${sessions}` }), { status: 201 });
         }
-        const next = script.shift();
-        if (!next) throw new Error(`unexpected request to ${path}`);
-        return next instanceof Response ? next : sseResponse(next);
+        return answer(path);
     }) as unknown as typeof fetch;
     return { fetch: fetchImpl, requests, options: { apiKey: 'csk_test', baseUrl: 'https://cencori.test', fetch: fetchImpl } };
 }
@@ -80,12 +91,16 @@ describe('run', () => {
         expect(result.sessionId).toBe('ses_1');
         expect(result.interruptions).toEqual([]);
         expect(result.usage).toEqual({ inputTokens: 10, outputTokens: 5, totalTokens: 15 });
-        expect(cencori.requests[0]).toEqual({ path: '/v1/sessions', body: { metadata: { sdk: 'cencori/agents', agent: 'Greeter' } } });
-        expect(cencori.requests[1]).toMatchObject({
-            path: '/v1/sessions/ses_1/turns',
-            body: { input: 'Hi', model: 'gpt-4o', instructions: 'Be kind.', stream: true, pause_on_tool_calls: true },
+        // One request: the session is created with its first turn.
+        expect(cencori.requests).toHaveLength(1);
+        expect(cencori.requests[0]).toMatchObject({
+            path: '/v1/sessions',
+            body: {
+                metadata: { sdk: 'cencori/agents', agent: 'Greeter' },
+                turn: { input: 'Hi', model: 'gpt-4o', instructions: 'Be kind.', stream: true, pause_on_tool_calls: true },
+            },
         });
-        expect(cencori.requests[1].body.tools).toBeUndefined();
+        expect(cencori.requests[0].body.turn.tools).toBeUndefined();
     });
 
     it('continues a conversation in the same session', async () => {
@@ -106,7 +121,7 @@ describe('run', () => {
         const result = await run(agent, 'Orders 1042 and 1043?', cencori.options);
 
         expect(result.finalOutput).toBe('Both shipped.');
-        const turn = cencori.requests[1].body;
+        const turn = cencori.requests[0].body.turn;
         expect(turn.tools).toEqual([{
             type: 'function',
             function: {
@@ -115,11 +130,11 @@ describe('run', () => {
                 parameters: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'], additionalProperties: false },
             },
         }]);
-        expect(cencori.requests[2]).toEqual({
+        expect(cencori.requests[1]).toEqual({
             path: '/v1/sessions/ses_1/approve',
             body: { action_id: 'call_1', tool_results: [{ action_id: 'call_1', output: '{"id":"1042","status":"shipped"}' }] },
         });
-        expect(cencori.requests[3].body).toEqual({ action_id: 'call_2', tool_results: [{ action_id: 'call_2', output: '{"id":"1043","status":"shipped"}' }] });
+        expect(cencori.requests[2].body).toEqual({ action_id: 'call_2', tool_results: [{ action_id: 'call_2', output: '{"id":"1043","status":"shipped"}' }] });
         expect(result.newItems.map((i) => i.type)).toEqual(['tool_call', 'tool_output', 'tool_call', 'tool_output', 'message']);
     });
 
@@ -142,7 +157,7 @@ describe('run', () => {
 
         await run(agent, 'go', cencori.options);
 
-        const results = cencori.requests[2].body.tool_results as Array<{ action_id: string; output: string }>;
+        const results = cencori.requests[1].body.tool_results as Array<{ action_id: string; output: string }>;
         expect(results[0].output).toMatch(/^Error running get_order: Invalid arguments for get_order: id:/);
         expect(results[1].output).toBe('Error running flaky: database is down');
         expect(results[2].output).toBe('Error: there is no tool named nope.');
@@ -164,9 +179,9 @@ describe('run', () => {
 
         const result = await run(triage, 'I want a refund', cencori.options);
 
-        expect((cencori.requests[1].body.tools as Array<{ function: { name: string; description: string } }>)[0].function)
+        expect((cencori.requests[0].body.turn.tools as Array<{ function: { name: string; description: string } }>)[0].function)
             .toMatchObject({ name: 'transfer_to_billing', description: 'Hand the conversation to Billing: refunds and invoices' });
-        expect(cencori.requests[2].body).toMatchObject({
+        expect(cencori.requests[1].body).toMatchObject({
             action_id: 'h1',
             tool_results: [{ action_id: 'h1', output: expect.stringContaining('Transferred to Billing') }],
             next: { instructions: 'You handle refunds.', model: 'gemini-2.5-flash', tools: [{ type: 'function', function: { name: 'get_order' } }] },
@@ -193,10 +208,10 @@ describe('run', () => {
         ]);
 
         const first = await run(agent, 'Refund 1042', cencori.options);
-        expect((cencori.requests[1].body.tools as Array<Record<string, unknown>>)[0].needsApproval).toBe(true);
+        expect((cencori.requests[0].body.turn.tools as Array<Record<string, unknown>>)[0].needsApproval).toBe(true);
         expect(first.finalOutput).toBeUndefined();
         expect(first.interruptions).toEqual([{ type: 'tool_approval', callId: 'r1', toolName: 'issue_refund', arguments: '{"id":"1042"}', agentName: 'Billing' }]);
-        expect(cencori.requests).toHaveLength(2); // nothing sent back yet
+        expect(cencori.requests).toHaveLength(1); // nothing sent back yet
         expect(refund).toBeDefined();
 
         // Later, in another process:
@@ -205,7 +220,7 @@ describe('run', () => {
         const second = await run(agent, state, cencori.options);
 
         expect(second.finalOutput).toBe('Refunded.');
-        expect(cencori.requests[2].body).toEqual({
+        expect(cencori.requests[1].body).toEqual({
             action_id: 'r1',
             tool_results: [
                 { action_id: 'r1', output: 'refunded 1042' },
@@ -228,7 +243,7 @@ describe('run', () => {
         await run(agent, first.state!, cencori.options);
 
         expect(execute).not.toHaveBeenCalled();
-        expect(cencori.requests[2].body.tool_results).toEqual([
+        expect(cencori.requests[1].body.tool_results).toEqual([
             { action_id: 'd1', output: "The user rejected this call: needs a manager Don't retry it." },
         ]);
     });
@@ -250,8 +265,8 @@ describe('run', () => {
         const result = await run(agent, 'pay', cencori.options);
 
         // Not the server's to hold: no needsApproval on the wire.
-        expect((cencori.requests[1].body.tools as Array<Record<string, unknown>>)[0].needsApproval).toBeUndefined();
-        expect(cencori.requests[2].body.tool_results).toEqual([{ action_id: 's1', output: 'sent 20' }]);
+        expect((cencori.requests[0].body.turn.tools as Array<Record<string, unknown>>)[0].needsApproval).toBeUndefined();
+        expect(cencori.requests[1].body.tool_results).toEqual([{ action_id: 's1', output: 'sent 20' }]);
         expect(result.interruptions.map((i) => i.callId)).toEqual(['s2']);
     });
 
@@ -267,7 +282,7 @@ describe('run', () => {
 
         const output: { city: string; days: number } | undefined = result.finalOutput;
         expect(output).toEqual({ city: 'Lagos', days: 3 });
-        expect(cencori.requests[1].body.response_format).toEqual({
+        expect(cencori.requests[0].body.turn.response_format).toEqual({
             type: 'json_schema',
             json_schema: {
                 name: 'final_output',
@@ -292,7 +307,7 @@ describe('run', () => {
         const error = await run(agent, 'do my homework', cencori.options).catch((e) => e);
         expect(error).toBeInstanceOf(GuardrailTripwireTriggered);
         expect(error.outputInfo).toBe('off topic');
-        expect(cencori.requests.map((r) => r.path)).toEqual(['/v1/sessions']);
+        expect(cencori.requests).toHaveLength(0); // nothing reached Cencori
     });
 
     it('stops on an output guardrail', async () => {
@@ -364,13 +379,29 @@ describe('run', () => {
         const result = await run(writer, 'Write about Lagos', cencori.options);
 
         expect(result.finalOutput).toBe('Lagos has about 16 million people.');
-        expect(cencori.requests.map((r) => r.path)).toEqual([
-            '/v1/sessions', '/v1/sessions/ses_1/turns',
-            '/v1/sessions', '/v1/sessions/ses_2/turns',
-            '/v1/sessions/ses_1/approve',
-        ]);
-        expect(cencori.requests[2].body.metadata).toMatchObject({ parent_session_id: 'ses_1', agent: 'Researcher' });
-        expect(cencori.requests[4].body.tool_results).toEqual([{ action_id: 'r1', output: 'About 16 million.' }]);
+        expect(cencori.requests.map((r) => r.path)).toEqual(['/v1/sessions', '/v1/sessions', '/v1/sessions/ses_1/approve']);
+        expect(cencori.requests[1].body.metadata).toMatchObject({ parent_session_id: 'ses_1', agent: 'Researcher' });
+        expect(cencori.requests[2].body.tool_results).toEqual([{ action_id: 'r1', output: 'About 16 million.' }]);
+    });
+
+    it('falls back to a separate turn request on servers without create-with-turn', async () => {
+        const cencori = fakeCencori([completed('Hello!')], { legacy: true });
+        const result = await run(new Agent({ name: 'A', model: 'gpt-4o' }), 'Hi', cencori.options);
+        expect(result.finalOutput).toBe('Hello!');
+        expect(result.sessionId).toBe('ses_1');
+        expect(cencori.requests.map((r) => r.path)).toEqual(['/v1/sessions', '/v1/sessions/ses_1/turns']);
+    });
+
+    it('reports the new session on an error from the first turn', async () => {
+        const cencori = fakeCencori([new Response(JSON.stringify({ error: { message: 'Model not allowed', code: 'model_not_allowed' } }), { status: 403 })]);
+        const error = await run(new Agent({ name: 'A', model: 'x' }), 'Hi', cencori.options).catch((e) => e);
+        expect(error).toMatchObject({ name: 'CencoriRunError', status: 403, code: 'model_not_allowed', sessionId: 'ses_1' });
+    });
+
+    it('sends reasoning effort from modelSettings', async () => {
+        const cencori = fakeCencori([completed('ok')]);
+        await run(new Agent({ name: 'A', model: 'maximo-atlas-1.5', modelSettings: { reasoningEffort: 'low' } }), 'Hi', cencori.options);
+        expect(cencori.requests[0].body.turn.reasoning_effort).toBe('low');
     });
 
     it('validates definitions up front', () => {

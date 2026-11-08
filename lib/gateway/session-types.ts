@@ -83,6 +83,8 @@ export interface TurnRequestBody {
     pause_on_tool_calls?: boolean;
     /** Gateway memory directive — presence opts the turn into memory (retrieve + write). */
     memory?: MemoryDirectiveInput;
+    /** How hard a reasoning model thinks; lower is faster. An installed agent's own setting wins. */
+    reasoning_effort?: 'none' | 'low' | 'medium' | 'high';
 }
 
 export interface SessionResponse {
@@ -97,6 +99,8 @@ export interface SessionResponse {
 }
 
 export interface CreateSessionRequest {
+    /** Run this first turn in the same request; the response is the turn's stream. */
+    turn?: Record<string, unknown>;
     agent_id?: string;
     metadata?: Record<string, unknown>;
     /** M0 embedded scope (secret-key path only; ect_ tokens derive this from claims). */
