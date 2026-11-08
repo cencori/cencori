@@ -454,3 +454,57 @@ describe('zod 3 schemas', () => {
         await expect(t.invoke({ context: undefined, sessionId: 's', agentName: 'a' }, '{"query":"x","kind":"web","exact":null}', 'c')).resolves.toBe('ok');
     });
 });
+
+
+describe('widgets', () => {
+    const card = { type: 'Card', title: 'Order 1042', children: [{ type: 'Badge', label: 'Shipped', color: 'success' }] };
+
+    it('asks for render_ui and streams the widgets the model shows', async () => {
+        const agent = new Agent({ name: 'Sales', model: 'gpt-4o', widgets: true });
+        const cencori = fakeCencori([[
+            ['turn.started', { turn_number: 1 }],
+            ['tool_call.started', { tool: 'render_ui', arguments: {}, action_id: 'w1' }],
+            ['tool_call.completed', { tool: 'render_ui', action_id: 'w1', output: { ok: true, widget_id: 'wgt_1', widget: card } }],
+            ['output_text.delta', { delta: 'Here it is.' }],
+            ['turn.completed', { turn_number: 1, output: { output: [] }, usage: {} }],
+        ]]);
+        const streamed = run(agent, 'Show order 1042', { ...cencori.options, stream: true });
+        const events = [];
+        for await (const e of streamed) events.push(e);
+        expect(cencori.requests[0].body.turn.widgets).toBe(true);
+        expect(events.find((e) => e.type === 'widget')).toEqual({ type: 'widget', callId: 'w1', widgetId: 'wgt_1', widget: card, agentName: 'Sales' });
+        expect((await streamed.completed).newItems.some((i) => i.type === 'widget')).toBe(true);
+    });
+
+    it('shows a widget a tool returns, and gives the model the rest of the result', async () => {
+        const showOrder = tool({
+            name: 'show_order',
+            description: 'Show an order',
+            parameters: z.object({ id: z.string() }),
+            execute: async ({ id }) => ({ id, widget: card }),
+        });
+        const agent = new Agent({ name: 'Support', model: 'gpt-4o', tools: [showOrder] });
+        const cencori = fakeCencori([paused([{ id: 's1', tool: 'show_order', args: { id: '1042' } }]), completed('Done.')]);
+        const streamed = run(agent, 'Show 1042', { ...cencori.options, stream: true });
+        const events = [];
+        for await (const e of streamed) events.push(e);
+        const widget = events.find((e) => e.type === 'widget') as { widget: unknown; widgetId: string };
+        expect(widget.widget).toEqual(card);
+        const sent = JSON.parse(cencori.requests[1].body.tool_results[0].output);
+        expect(sent).toMatchObject({ id: '1042', rendered: true, widget_id: widget.widgetId });
+        expect(sent.widget).toBeUndefined();
+    });
+
+    it('does not show an invalid widget from a tool', async () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const bad = tool({ name: 'bad', description: '', parameters: z.object({}), execute: async () => ({ widget: { type: 'Blink' } }) });
+        const agent = new Agent({ name: 'A', model: 'gpt-4o', tools: [bad] });
+        const cencori = fakeCencori([paused([{ id: 'b1', tool: 'bad', args: {} }]), completed('ok')]);
+        const streamed = run(agent, 'x', { ...cencori.options, stream: true });
+        const events = [];
+        for await (const e of streamed) events.push(e);
+        expect(events.some((e) => e.type === 'widget')).toBe(false);
+        expect(warn).toHaveBeenCalled();
+        warn.mockRestore();
+    });
+});

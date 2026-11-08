@@ -54,6 +54,13 @@ export interface AgentOptions<Ctx = unknown, Out = string> {
     modelSettings?: ModelSettings;
     inputGuardrails?: InputGuardrail<Ctx>[];
     outputGuardrails?: OutputGuardrail<Ctx>[];
+    /**
+     * Let the agent answer with UI: it gets the built-in render_ui tool and can
+     * show cards, tables, charts, stats, buttons and forms in a chat
+     * (cencori/react's <AgentChat> renders them). Tools can also return
+     * `{ widget }` whether or not this is on.
+     */
+    widgets?: boolean;
 }
 
 /** The model an agent uses when none is given: GPT OSS 120B on Cerebras, chosen for speed. */
@@ -88,6 +95,7 @@ export class Agent<Ctx = unknown, Out = string> {
     readonly modelSettings: ModelSettings;
     readonly inputGuardrails: InputGuardrail<Ctx>[];
     readonly outputGuardrails: OutputGuardrail<Ctx>[];
+    readonly widgets: boolean;
 
     constructor(options: AgentOptions<Ctx, Out>) {
         if (!options.name?.trim()) throw new TypeError('An agent needs a name.');
@@ -102,6 +110,7 @@ export class Agent<Ctx = unknown, Out = string> {
         this.modelSettings = options.modelSettings ?? {};
         this.inputGuardrails = options.inputGuardrails ?? [];
         this.outputGuardrails = options.outputGuardrails ?? [];
+        this.widgets = options.widgets ?? false;
 
         const names = new Set<string>();
         for (const t of [...this.tools.map((t) => t.name), ...this.handoffs.map((a) => Agent.handoffToolName(a))]) {
@@ -123,6 +132,7 @@ export class Agent<Ctx = unknown, Out = string> {
             modelSettings: this.modelSettings,
             inputGuardrails: this.inputGuardrails,
             outputGuardrails: this.outputGuardrails,
+            widgets: this.widgets,
             ...overrides,
         });
     }

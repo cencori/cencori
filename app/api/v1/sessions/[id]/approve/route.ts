@@ -10,6 +10,7 @@ import {
     type GatewayContext,
 } from "@/lib/gateway-middleware";
 import { extractCencoriApiKeyFromHeaders } from "@/lib/api-keys";
+import { authClientTokenAction, denyOnScopeMismatch } from "@/lib/embedded/session-auth";
 import { resumeSessionTurn, type SupabaseAdmin } from "@/lib/gateway/session-engine";
 import { recordSessionApprovalResolved } from "@/lib/governance/record-session";
 import { parseResumeOverride } from "@/lib/gateway/session-resume-override";
@@ -53,17 +54,22 @@ export async function POST(
 
     try {
         const providedApiKey = extractCencoriApiKeyFromHeaders(req.headers);
-
+        // A browser can rule on its own session's tool calls with a client token
+        // that carries sessions:approve (not granted by default).
+        let embeddedScope: Parameters<typeof denyOnScopeMismatch>[2] = null;
         if (!providedApiKey) {
-            return respondError(401, "Missing CENCORI_API_KEY", "missing_api_key");
+            const client = await authClientTokenAction(req, 'sessions:approve', { billing: true });
+            if (!client.ok) return respondError(client.status, client.message, client.code);
+            gatewayCtx = client.gatewayCtx;
+            embeddedScope = client.embeddedScope;
+        } else {
+            const validation = await validateGatewayRequest(req);
+            if (!validation.success) return validation.response;
+            if (validation.context.keyType !== 'secret') {
+                return respondError(403, "This operation requires a secret project key", "secret_key_required");
+            }
+            gatewayCtx = validation.context;
         }
-
-        const validation = await validateGatewayRequest(req);
-        if (!validation.success) return validation.response;
-        if (validation.context.keyType !== 'secret') {
-            return respondError(403, "This operation requires a secret project key", "secret_key_required");
-        }
-        gatewayCtx = validation.context;
 
         let body: { action_id?: unknown; tool_results?: unknown; next?: unknown };
         try {
@@ -109,7 +115,7 @@ export async function POST(
 
         const { data: session, error: sessionError } = await adminClient
             .from('sessions')
-            .select('id, project_id, status, last_turn_number, agent_id, tenant_id, installation_id')
+            .select('id, project_id, status, last_turn_number, agent_id, tenant_id, external_user_id, installation_id')
             .eq('id', sessionId)
             .single();
 
@@ -117,7 +123,7 @@ export async function POST(
             return respondError(404, "Session not found", "session_not_found");
         }
 
-        if (session.project_id !== gatewayCtx.projectId) {
+        if (denyOnScopeMismatch(session as { project_id: string; tenant_id?: string | null; external_user_id?: string | null; installation_id?: string | null }, gatewayCtx.projectId, embeddedScope)) {
             return respondError(404, "Session not found", "session_not_found");
         }
 

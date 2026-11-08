@@ -16,6 +16,24 @@
  * <VisionUploader endpoint="https://api.cencori.com/api/ai/vision" task="describe" />
  */
 
+// Agent UI: chat with an agent that answers with UI (widgets), plus streaming replies, tool steps and approvals
+export { AgentChat, Transcript, Composer, ToolCall, ApprovalCard } from './agent-chat/agent-chat';
+export type { AgentChatProps, TranscriptProps, ToolCallProps, ApprovalCardProps } from './agent-chat/agent-chat';
+export { useAgentChat } from './agent-chat/use-agent-chat';
+export type {
+    UseAgentChatOptions,
+    UseAgentChatResult,
+    AgentChatMessage,
+    AgentChatPart,
+    AgentChatStatus,
+    WidgetActionContext,
+} from './agent-chat/use-agent-chat';
+export { Widget } from './agent-chat/widget';
+export type { WidgetProps } from './agent-chat/widget';
+export type { AgentChatTheme } from './agent-chat/styles';
+export { validateWidget } from '../widgets/spec';
+export type { WidgetNode, WidgetAction } from '../widgets/spec';
+
 // Memory-aware chat + memory hook
 export { Chat } from './chat/chat';
 export type { ChatProps, ChatMessage, ChatMemoryProp } from './chat/chat';

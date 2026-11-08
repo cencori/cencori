@@ -143,3 +143,77 @@ export function hasClientPermission(
     if (!embeddedScope) return true;
     return (embeddedScope.permissions ?? []).includes(permission);
 }
+
+/**
+ * A browser's ect_ client token on a session action other than a turn
+ * (approve, reject). The token needs `permission`, and the caller must still
+ * check the session against `embeddedScope` (denyOnScopeMismatch). With
+ * `billing`, the org must be able to pay for the reply the action starts,
+ * as the turns route checks.
+ */
+export async function authClientTokenAction(
+    req: NextRequest,
+    permission: string,
+    options: { billing?: boolean } = {},
+): Promise<
+    | { ok: true; gatewayCtx: GatewayContext; embeddedScope: NonNullable<EmbeddedSessionAuth['embeddedScope']> }
+    | { ok: false; status: number; message: string; code: string }
+> {
+    const bearer = extractBearerToken(req.headers.get('Authorization'));
+    if (!bearer?.startsWith(CLIENT_TOKEN_PREFIX)) return { ok: false, status: 401, message: 'Missing CENCORI_API_KEY', code: 'missing_api_key' };
+    const verified = verifyClientToken(bearer);
+    if (!verified.ok) return { ok: false, status: 401, message: verified.message, code: verified.code };
+    const admin = createAdminClient();
+    const { data: project } = await admin.from('projects').select('id, organization_id').eq('id', verified.claims.project_id).maybeSingle();
+    if (!project) return { ok: false, status: 401, message: 'Invalid client token project', code: 'client_token_revoked' };
+    const { data: tenant } = await admin.from('platform_tenants').select('id, status').eq('id', dePrefixId(verified.claims.tenant_id)).eq('project_id', verified.claims.project_id).maybeSingle();
+    if (!tenant || (tenant.status as string) !== 'active') return { ok: false, status: 403, message: 'Tenant is not active', code: 'tenant_suspended' };
+    const embeddedScope = { tenantId: tenant.id as string, externalUserId: verified.claims.external_user_id, installationIds: verified.claims.installation_ids?.map(dePrefixId), permissions: verified.claims.permissions };
+    if (!hasClientPermission(embeddedScope, permission)) {
+        return { ok: false, status: 403, message: `Client token lacks ${permission} permission`, code: 'insufficient_scope' };
+    }
+
+    const organizationId = (project.organization_id as string) ?? '';
+    let businessPlanCovered = false;
+    let businessModelLocked = false;
+    if (options.billing) {
+        const { getOrganizationPlan } = await import('@/lib/business/plans');
+        const plan = await getOrganizationPlan(admin as never, organizationId);
+        if (plan.accountType === 'business' && !plan.active) {
+            return { ok: false, status: 402, message: 'This business’s plan isn’t active', code: 'plan_inactive' };
+        }
+        if (plan.accountType !== 'business') {
+            const { data: org } = await admin.from('organizations').select('subscription_tier, credits_balance').eq('id', organizationId).maybeSingle();
+            const { isCreditBalanceExhausted } = await import('@/lib/credits');
+            if (org && org.subscription_tier !== 'enterprise' && isCreditBalanceExhausted(Number(org.credits_balance ?? 0))) {
+                return { ok: false, status: 402, message: 'Credit balance exhausted: add credits to keep this agent replying', code: 'insufficient_credits' };
+            }
+        }
+        businessPlanCovered = plan.accountType === 'business';
+        businessModelLocked = plan.accountType === 'business' && !plan.plan?.allModels;
+    }
+
+    const gatewayCtx = {
+        supabase: admin as never,
+        projectId: verified.claims.project_id,
+        organizationId,
+        apiKeyId: null,
+        allowedModels: null,
+        sponsoredModels: null,
+        fullySponsoredKey: false,
+        environment: verified.claims.env,
+        keyType: 'client_token',
+        tier: 'embedded',
+        requestId: crypto.randomUUID(),
+        startTime: Date.now(),
+        clientIp: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? '',
+        countryCode: null,
+        projectName: '',
+        defaultModel: null,
+        defaultProvider: null,
+        endUserBillingEnabled: false,
+        businessPlanCovered,
+        businessModelLocked,
+    } as unknown as GatewayContext;
+    return { ok: true, gatewayCtx, embeddedScope };
+}

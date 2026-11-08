@@ -85,6 +85,8 @@ export interface TurnRequestBody {
     memory?: MemoryDirectiveInput;
     /** How hard a reasoning model thinks; lower is faster. An installed agent's own setting wins. */
     reasoning_effort?: 'none' | 'low' | 'medium' | 'high';
+    /** Give the model the built-in render_ui tool, so it can answer with UI (widgets). */
+    widgets?: boolean;
 }
 
 export interface SessionResponse {

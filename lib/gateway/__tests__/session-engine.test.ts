@@ -1021,3 +1021,147 @@ describe('resumeSessionTurn continuation', () => {
         }));
     });
 });
+
+describe('widgets (render_ui)', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockResolveGatewayProvider.mockResolvedValue({
+            model: 'gpt-4o', actualModel: 'gpt-4o', actualProvider: 'openai',
+            customProviderTag: undefined, provider: makeProvider(),
+        });
+        mockPreProcessBuiltInTools.mockResolvedValue({ systemContext: '', toolOutputs: [] });
+        mockOrgHasOutputPolicies.mockResolvedValue(false);
+    });
+
+    const card = { type: 'Card', title: 'Revenue', children: [{ type: 'Stat', label: 'November', value: 48210, format: 'currency', currency: 'USD' }] };
+    const renderCall = (id: string, widget: unknown) => ({
+        toolCalls: [{ id, function: { name: 'render_ui', arguments: JSON.stringify({ widget }) } }],
+        finishReason: 'tool_calls', actualModel: 'gpt-4o', actualProvider: 'openai',
+    });
+    const events = (all: string, type: string) =>
+        [...all.matchAll(new RegExp(`event: ${type.replace('.', '\\.')}\\ndata: (.+)`, 'g'))].map((m) => JSON.parse(m[1]));
+
+    function turn(gw: ReturnType<typeof makeGateways>, extra: Record<string, unknown> = {}) {
+        return executeSessionTurn({
+            supabase: gw.supabase as never, gatewayCtx: gw.gatewayCtx as never,
+            sessionId: 'sid_1', turnNumber: 1, model: 'gpt-4o',
+            inputMessages: [{ role: 'user', content: 'Show me revenue' }], inputText: 'Show me revenue',
+            pauseOnToolCalls: true, endUserId: null, tier: 'free' as never,
+            logSuccess: gw.logSuccess, incrementUsage: gw.incrementUsage,
+            widgets: true,
+            ...extra,
+        } as never);
+    }
+
+    it('gives the model render_ui, shows the widget, and continues the reply', async () => {
+        const rounds = [
+            [renderCall('call_w', card)],
+            [{ delta: 'Up 12% on October.', actualModel: 'gpt-4o', actualProvider: 'openai' }, { finishReason: 'stop', actualModel: 'gpt-4o', actualProvider: 'openai' }],
+        ];
+        let n = 0;
+        mockStreamGatewayChat.mockImplementation((() => makeStreamChunks(rounds[n++])()) as never);
+        const gw = makeGateways();
+        const result = await turn(gw);
+        const all = await (result as { ok: true; response: NextResponse }).response.text();
+
+        const first = mockStreamGatewayChat.mock.calls[0][0] as { request: { tools?: Array<{ function: { name: string } }> } };
+        expect(first.request.tools?.map((t) => t.function.name)).toContain('render_ui');
+
+        const completed = events(all, 'tool_call.completed');
+        expect(completed).toHaveLength(1);
+        expect(completed[0]).toMatchObject({ tool: 'render_ui', action_id: 'call_w', output: { ok: true, widget: card } });
+        expect(completed[0].output.widget_id).toMatch(/^wgt_/);
+        // The engine ran it, so the turn doesn't pause for it.
+        expect(all).not.toContain('event: turn.paused');
+        expect(all).toContain('event: turn.completed');
+        const second = mockStreamGatewayChat.mock.calls[1][0] as { request: { messages: Array<{ role: string; content: string }> } };
+        expect(JSON.parse(second.request.messages.at(-1)!.content)).toMatchObject({ rendered: true });
+        // Later turns learn what was shown.
+        const done = gw.supabase.rpc.mock.calls.find((c) => (c[1] as Record<string, unknown>)?.p_event_type === 'turn.completed');
+        expect((done![1] as { p_payload: { widgets: string[] } }).p_payload.widgets).toEqual(['[Showed the user a Card: Revenue]']);
+    });
+
+    it('sends an invalid widget back to the model with the errors', async () => {
+        const rounds = [
+            [renderCall('call_bad', { type: 'Carousel', children: [] })],
+            [renderCall('call_ok', card)],
+            [{ finishReason: 'stop', actualModel: 'gpt-4o', actualProvider: 'openai' }],
+        ];
+        let n = 0;
+        mockStreamGatewayChat.mockImplementation((() => makeStreamChunks(rounds[n++])()) as never);
+        const result = await turn(makeGateways());
+        const all = await (result as { ok: true; response: NextResponse }).response.text();
+
+        const completed = events(all, 'tool_call.completed');
+        expect(completed[0].output.ok).toBe(false);
+        expect(completed[0].output.errors[0]).toContain('unknown component type "Carousel"');
+        expect(completed[1].output.ok).toBe(true);
+        const retry = mockStreamGatewayChat.mock.calls[1][0] as { request: { messages: Array<{ role: string; content: string }> } };
+        expect(JSON.parse(retry.request.messages.at(-1)!.content)).toMatchObject({ rendered: false });
+    });
+
+    it('shows a widget asked for alongside client tools, and keeps it for the resume', async () => {
+        mockStreamGatewayChat.mockImplementation(makeStreamChunks([{
+            toolCalls: [
+                { id: 'call_w', function: { name: 'render_ui', arguments: JSON.stringify({ widget: card }) } },
+                { id: 'call_c', function: { name: 'lookup_order', arguments: '{"id":"1"}' } },
+            ],
+            finishReason: 'tool_calls', actualModel: 'gpt-4o', actualProvider: 'openai',
+        }]) as never);
+        const gw = makeGateways();
+        const result = await turn(gw, { tools: [{ type: 'function', function: { name: 'lookup_order', description: '', parameters: {} } }] });
+        const all = await (result as { ok: true; response: NextResponse }).response.text();
+
+        expect(events(all, 'tool_call.completed')[0].output.ok).toBe(true);
+        const paused = events(all, 'turn.paused')[0];
+        expect(paused.actions.map((a: { tool: string }) => a.tool)).toEqual(['lookup_order']);
+        expect(paused.action_id).toBe('call_c');
+        expect(paused.server_results).toEqual([expect.objectContaining({ action_id: 'call_w', tool: 'render_ui' })]);
+    });
+
+    it('a widget only for a turn that asked for widgets', async () => {
+        mockStreamGatewayChat.mockImplementation(makeStreamChunks([{ delta: 'Hi', actualModel: 'gpt-4o', actualProvider: 'openai' }, { finishReason: 'stop', actualModel: 'gpt-4o', actualProvider: 'openai' }]) as never);
+        await (await turn(makeGateways(), { widgets: false }) as { ok: true; response: NextResponse }).response.text();
+        const req = mockStreamGatewayChat.mock.calls[0][0] as { request: { tools?: unknown[] } };
+        expect(req.request.tools).toBeUndefined();
+    });
+
+    it('resumes with the shown widget in the history the model sees', async () => {
+        mockStreamGatewayChat.mockImplementation(makeStreamChunks([{ delta: 'Done.', actualModel: 'gpt-4o', actualProvider: 'openai' }, { finishReason: 'stop', actualModel: 'gpt-4o', actualProvider: 'openai' }]) as never);
+        const stored = [
+            { event_type: 'turn.started', sequence: 1, payload: {
+                model: 'gpt-4o', input_text: 'Show order 1',
+                input_messages: [{ role: 'user', content: 'Show order 1' }],
+                function_tools: [{ type: 'function', function: { name: 'lookup_order', description: '', parameters: {} } }, { type: 'function', function: { name: 'render_ui', description: '', parameters: {} } }],
+                pause_on_tool_calls: true, widgets: true,
+            } },
+            { event_type: 'turn.paused', sequence: 4, payload: {
+                reason: 'tool_results_required', action_id: 'call_c', tool: 'lookup_order',
+                actions: [{ action_id: 'call_c', tool: 'lookup_order', arguments: '{"id":"1"}', needs_approval: false }],
+                server_results: [{ action_id: 'call_w', tool: 'render_ui', arguments: '{"widget":{}}', output: '{"rendered":true}' }],
+            } },
+        ];
+        const supabase = {
+            from: vi.fn(() => {
+                const chain: Record<string, unknown> = {};
+                chain.select = () => chain;
+                chain.eq = () => chain;
+                chain.order = () => Promise.resolve({ data: stored, error: null });
+                chain.insert = () => Promise.resolve({ error: null });
+                return chain;
+            }),
+            rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
+        };
+        const result = await resumeSessionTurn({
+            supabase: supabase as never, gatewayCtx: makeGateways().gatewayCtx as never,
+            sessionId: 'sid', turnNumber: 1,
+            toolResults: [{ action_id: 'call_c', output: '{"status":"shipped"}' }],
+            tier: 'free' as never, logSuccess: () => {}, incrementUsage: () => {},
+        });
+        await (result as { ok: true; response: NextResponse }).response.text();
+        const req = mockStreamGatewayChat.mock.calls[0][0].request as { messages: Array<Record<string, unknown>> };
+        expect(req.messages.at(-3)).toMatchObject({ role: 'assistant', tool_calls: [{ id: 'call_w' }, { id: 'call_c' }] });
+        expect(req.messages.at(-2)).toMatchObject({ role: 'tool', toolCallId: 'call_w', content: '{"rendered":true}' });
+        expect(req.messages.at(-1)).toMatchObject({ role: 'tool', toolCallId: 'call_c', content: '{"status":"shipped"}' });
+    });
+});

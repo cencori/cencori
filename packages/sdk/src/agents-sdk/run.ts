@@ -1,3 +1,4 @@
+import { isWidgetResult, validateWidget, type WidgetNode } from '../widgets/spec';
 import { Agent } from './agent';
 import type { RunContext } from './context';
 import { AgentsError, CencoriRunError, GuardrailTripwireTriggered, MaxTurnsExceededError } from './errors';
@@ -36,7 +37,8 @@ export type RunItem =
     | { type: 'message'; agentName: string; text: string }
     | { type: 'tool_call'; agentName: string; callId: string; toolName: string; arguments: string }
     | { type: 'tool_output'; agentName: string; callId: string; toolName: string; output: string }
-    | { type: 'handoff'; from: string; to: string };
+    | { type: 'handoff'; from: string; to: string }
+    | { type: 'widget'; agentName: string; callId: string; widgetId: string; widget: WidgetNode };
 
 export interface Usage {
     inputTokens: number;
@@ -50,6 +52,8 @@ export type RunStreamEvent =
     | { type: 'tool_call'; callId: string; toolName: string; arguments: string; agentName: string }
     | { type: 'tool_output'; callId: string; toolName: string; output: string; agentName: string }
     | { type: 'handoff'; from: string; to: string }
+    /** UI to show: from the model (render_ui) or from a tool that returned { widget }. */
+    | { type: 'widget'; callId: string; widgetId: string; widget: WidgetNode; agentName: string }
     | { type: 'interruption'; interruptions: ToolApprovalItem[] };
 
 interface PendingPause {
@@ -152,6 +156,26 @@ export interface StreamedRunResult<Output = string> extends AsyncIterable<RunStr
 
 const DEFAULT_MAX_TURNS = 10;
 
+/** A tool output carrying { widget }: the checked widget and what the model reads instead. */
+function toolWidget(output: string): { widgetId: string; widget: WidgetNode; modelOutput: string } | null {
+    if (!output.startsWith('{') || !output.includes('"widget"')) return null;
+    let parsed: unknown;
+    try { parsed = JSON.parse(output); } catch { return null; }
+    if (!isWidgetResult(parsed)) return null;
+    const { widget, ...rest } = parsed as { widget: unknown } & Record<string, unknown>;
+    const checked = validateWidget(widget);
+    if (!checked.ok) {
+        console.warn(`[cencori/agents] A tool returned a widget that isn't valid, so it wasn't shown:\n${checked.errors.join('\n')}`);
+        return null;
+    }
+    const widgetId = `wgt_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`;
+    return {
+        widgetId,
+        widget: checked.widget,
+        modelOutput: JSON.stringify({ ...rest, rendered: true, widget_id: widgetId, note: 'The user can see this widget now; do not repeat its contents. If the user asked for anything else, do it now with the tools it needs. Never say an action happened unless its tool returned success.' }),
+    };
+}
+
 function collectAgents(start: Agent<any>): Map<string, Agent<any>> {
     const seen = new Map<string, Agent<any>>();
     const visit = (agent: Agent<any>) => {
@@ -217,7 +241,7 @@ type TurnOutcome =
     | { kind: 'paused'; pause: PendingPause };
 
 /** Read one turn's stream: emit deltas and tool calls, end on pause or completion. */
-async function* consumeTurn(response: Response, agentName: string, sessionId: string): AsyncGenerator<RunStreamEvent, TurnOutcome> {
+async function* consumeTurn(response: Response, agentName: string, sessionId: string, items: RunItem[]): AsyncGenerator<RunStreamEvent, TurnOutcome> {
     let text = '';
     for await (const { event, data } of readSessionEvents(response)) {
         switch (event) {
@@ -226,6 +250,15 @@ async function* consumeTurn(response: Response, agentName: string, sessionId: st
                 if (delta) {
                     text += delta;
                     yield { type: 'text_delta', delta, agentName };
+                }
+                break;
+            }
+            case 'tool_call.completed': {
+                // render_ui runs on Cencori: a valid widget arrives as the call's output.
+                const out = data.output as { ok?: boolean; widget_id?: string; widget?: WidgetNode } | undefined;
+                if (data.tool === 'render_ui' && out?.ok && out.widget && out.widget_id) {
+                    items.push({ type: 'widget', agentName, callId: String(data.action_id ?? ''), widgetId: out.widget_id, widget: out.widget });
+                    yield { type: 'widget', callId: String(data.action_id ?? ''), widgetId: out.widget_id, widget: out.widget, agentName };
                 }
                 break;
             }
@@ -327,6 +360,7 @@ async function* runLoop<Ctx>(
             ...(agent.modelSettings.reasoningEffort ? { reasoning_effort: agent.modelSettings.reasoningEffort } : {}),
             ...(options.memory ? { memory: options.memory } : {}),
             ...(options.user ? { user: options.user } : {}),
+            ...(agent.widgets ? { widgets: true } : {}),
             metadata: { sdk: 'cencori/agents', agent: agent.name },
         };
         if (sessionId) {
@@ -344,7 +378,7 @@ async function* runLoop<Ctx>(
 
     while (true) {
         if (response) {
-            const outcome: TurnOutcome = yield* consumeTurn(response, agent.name, sessionId);
+            const outcome: TurnOutcome = yield* consumeTurn(response, agent.name, sessionId, items);
             response = undefined;
             if (outcome.kind === 'completed') {
                 usage = addUsage(usage, outcome.usage);
@@ -421,8 +455,18 @@ async function* runLoop<Ctx>(
             if (!t) return { action, output: `Error: there is no tool named ${action.tool}.` };
             return { action, output: await t.invoke(runContext, action.arguments, action.action_id) };
         }));
-        for (const { action, output } of results) {
+        for (const result of results) {
+            const { action } = result;
             if (handoffsByName.has(action.tool)) continue;
+            // A tool that returned { widget } shows it; the model gets the rest of
+            // its result and a note that the user can see the widget.
+            const shown = toolWidget(result.output);
+            if (shown) {
+                result.output = shown.modelOutput;
+                items.push({ type: 'widget', agentName: agent.name, callId: action.action_id, widgetId: shown.widgetId, widget: shown.widget });
+                yield { type: 'widget', callId: action.action_id, widgetId: shown.widgetId, widget: shown.widget, agentName: agent.name };
+            }
+            const output = result.output;
             items.push({ type: 'tool_output', agentName: agent.name, callId: action.action_id, toolName: action.tool, output });
             yield { type: 'tool_output', callId: action.action_id, toolName: action.tool, output, agentName: agent.name };
         }

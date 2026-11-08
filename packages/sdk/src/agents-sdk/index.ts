@@ -15,3 +15,8 @@ export type { RunContext } from './context';
 export { AgentsError, CencoriRunError, GuardrailTripwireTriggered, MaxTurnsExceededError } from './errors';
 export { SchemaValidationError } from './schema';
 export type { SchemaLike, StandardSchemaV1, JsonSchema } from './schema';
+export { createAgentChatHandler, toAgentChatStream } from './chat';
+export type { AgentChatHandlerOptions } from './chat';
+export type { AgentChatEvent, AgentChatRequest, AgentChatApprovalItem, AgentChatDecision } from '../agent-chat/protocol';
+export { validateWidget, isWidgetResult, WIDGET_TYPES } from '../widgets/spec';
+export type * from '../widgets/spec';

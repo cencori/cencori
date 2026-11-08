@@ -32,6 +32,7 @@ import { applyPolicyRedactions } from '@/lib/governance/policy-enforcement';
 import { deTokenize } from '@/lib/safety/custom-data-rules';
 import type { SecurityCheckResult } from '@/lib/safety/multi-layer-check';
 import { calculateGatewayCharge } from '@/lib/gateway/model-access';
+import { RENDER_UI_TOOL, RENDER_UI_TOOL_NAME, runRenderUi, widgetSummary } from '@/lib/gateway/render-ui-tool';
 
 type SupabaseAdmin = ReturnType<typeof createAdminClient>;
 export type { SupabaseAdmin };
@@ -45,6 +46,8 @@ export type TurnExecuteParams = {
     instructions?: string;
     /** The caller's turn metadata (cencori/agents sends the agent's name), kept for the trace. */
     turnMetadata?: Record<string, string>;
+    /** Give the model the built-in render_ui tool, so it can answer with UI (widgets). */
+    widgets?: boolean;
     tools?: ResponsesTool[];
     /** Effective published-version ∩ installation host policy for built-in Web results. */
     networkPolicy?: NetworkPolicy;
@@ -224,6 +227,8 @@ function makeStream(params: {
      */
     resumed?: { fromTurn: number; toolResultIds: string[]; originalInputText?: string };
     turnMetadata?: Record<string, string>;
+    /** render_ui is in functionTools and the engine runs it (see render-ui-tool). */
+    widgets?: boolean;
 }): NextResponse {
     const {
         supabase, gatewayCtx, sessionId, turnNumber, resolved,
@@ -231,7 +236,7 @@ function makeStream(params: {
         temperature, max_output_tokens, pauseOnToolCalls, needsApprovalToolNames, collectedBuiltinToolOutputs,
         instructions, inputText, inputSecurity, tokenMap, endUserId,
         tier, logSuccess, incrementUsage, recordEndUserUsage, onCompletion, knowledgeContext, reasoningEffort,
-        pinnedConnectionId, agentTools, resumed, turnMetadata,
+        pinnedConnectionId, agentTools, resumed, turnMetadata, widgets,
     } = params;
 
     // Output can only be blocked or redacted by a governance output policy.
@@ -343,6 +348,7 @@ function makeStream(params: {
                     ...(temperature !== undefined ? { temperature } : {}),
                     ...(max_output_tokens !== undefined ? { max_output_tokens } : {}),
                     ...(turnMetadata && Object.keys(turnMetadata).length > 0 ? { metadata: turnMetadata } : {}),
+                    ...(widgets ? { widgets: true } : {}),
                 };
                 if (resumed) {
                     // Recorded for the next resume; the caller already knows the turn
@@ -383,6 +389,18 @@ function makeStream(params: {
                     model_ms: Date.now() - modelStartedAt,
                     rounds: roundsRun,
                 });
+                // Tools the engine runs itself: the installed agent's, and render_ui.
+                const isRenderUi = (name: string) => Boolean(widgets) && name === RENDER_UI_TOOL_NAME;
+                const runsOnServer = (name: string) => isRenderUi(name) || Boolean(agentTools?.toolset.has(name));
+                /** Widgets shown this turn, summarised so later turns know about them. */
+                const shownWidgets: string[] = [];
+                const renderWidget = async (call: { id: string; name: string }, args: string) => {
+                    await el('tool_call.started', { tool: call.name, arguments: {}, action_id: call.id });
+                    const outcome = runRenderUi(args);
+                    await el('tool_call.completed', { tool: call.name, output: outcome.eventOutput, action_id: call.id });
+                    if (outcome.eventOutput.ok) shownWidgets.push(widgetSummary(outcome.eventOutput.widget));
+                    return outcome.modelOutput;
+                };
                 rounds: for (let round = 0; ; round++) {
                     roundsRun = round + 1;
                     let roundText = '';
@@ -432,8 +450,7 @@ function makeStream(params: {
                                 requested.length > 0
                                 && round < WEBHOOK_TOOL_MAX_ITERATIONS
                                 && !(forceSchemaResult && schemaToolName)
-                                && !!agentTools
-                                && requested.every((t) => agentTools.toolset.has(t.name))
+                                && requested.every((t) => runsOnServer(t.name))
                             ) {
                                 const streamProvider =
                                     chunk.actualProvider !== resolved.providerName && resolved.router?.hasProvider(chunk.actualProvider)
@@ -461,6 +478,10 @@ function makeStream(params: {
                                 for (const call of requested) {
                                     // Arguments may carry masked placeholders; the endpoint gets the real values.
                                     const args = tokenMap ? deTokenize(call.args, tokenMap) : call.args;
+                                    if (isRenderUi(call.name)) {
+                                        conversation = [...conversation, { role: 'tool', content: await renderWidget(call, args), toolCallId: call.id }];
+                                        continue;
+                                    }
                                     let parsedArgs: Record<string, unknown> = {};
                                     try { parsedArgs = JSON.parse(args || '{}'); } catch { /* sent as-is below */ }
                                     await el('tool_call.started', { tool: call.name, arguments: parsedArgs, action_id: call.id });
@@ -485,7 +506,7 @@ function makeStream(params: {
                                 if (sc?.args) fullText = sc.args;
                             }
 
-                            const callValues = Object.values(toolCalls).filter(
+                            let callValues = Object.values(toolCalls).filter(
                                 t => !(forceSchemaResult && schemaToolName && t.name === schemaToolName),
                             );
 
@@ -597,6 +618,17 @@ function makeStream(params: {
                                 await el('output_text.delta', { delta: fullText });
                             }
 
+                            // A widget asked for alongside the caller's own tools is shown now; its
+                            // result is kept with the pause so the resumed turn carries it.
+                            const serverResults: Array<{ action_id: string; tool: string; arguments: string; output: string }> = [];
+                            for (const tc of callValues.filter((t) => isRenderUi(t.name))) {
+                                serverResults.push({ action_id: tc.id, tool: tc.name, arguments: tc.args, output: await renderWidget(tc, tc.args) });
+                            }
+                            if (serverResults.length > 0) callValues = callValues.filter((t) => !isRenderUi(t.name));
+                            // Messages from this turn's earlier tool rounds, and the last round's
+                            // own text, so a resume rebuilds exactly what the model saw.
+                            const roundMessages = conversation.slice(messages.length).map(storedMessage);
+
                             for (const tc of callValues) {
                                 let args: Record<string, unknown> = {};
                                 try { args = JSON.parse(tc.args); } catch {}
@@ -630,6 +662,8 @@ function makeStream(params: {
                                         arguments: tc.args,
                                         needs_approval: needsApprovalToolNames.has(tc.name),
                                     })),
+                                    ...(serverResults.length > 0 ? { server_results: serverResults } : {}),
+                                    ...(roundMessages.length > 0 ? { round_messages: roundMessages, round_text: roundText } : {}),
                                     usage: { input_tokens: pt, output_tokens: ct, total_tokens: tt },
                                     trace: traceOf({ provider: pn, model: chunk.actualModel, usedFallback: chunk.usedFallback, costUsd: cc, providerCostUsd: pc }),
                                 }, 'paused', cc);
@@ -664,6 +698,7 @@ function makeStream(params: {
                                         ? { knowledge_citations: knowledgeContext.citations }
                                         : {}),
                                     ...(conversationEnded ? { conversation_ended: true } : {}),
+                                    ...(shownWidgets.length > 0 ? { widgets: shownWidgets } : {}),
                                     trace: traceOf({ provider: pn, model: chunk.actualModel, usedFallback: chunk.usedFallback, costUsd: cc, providerCostUsd: pc }),
                                 },
                                 // The agent ended it: the session closes, and the next message starts a new one.
@@ -750,6 +785,11 @@ async function loadSessionHistory(supabase: SupabaseAdmin, sessionId: string): P
                 }
             }
         }
+        // Widgets the agent showed, so it knows what the user has seen.
+        if (Array.isArray(p.widgets)) {
+            const shown = (p.widgets as unknown[]).filter((w): w is string => typeof w === 'string').join('\n');
+            if (shown) text = text ? `${text}\n\n${shown}` : shown;
+        }
         if (text) history.push({ role: 'assistant', content: text });
     }
     return history.slice(-SESSION_HISTORY_MAX_MESSAGES);
@@ -778,6 +818,9 @@ export async function executeSessionTurn(params: TurnExecuteParams): Promise<Tur
         });
 
         const { functionTools, builtInTools } = extractTools(tools);
+        if (params.widgets && !functionTools.some((t) => t.function.name === RENDER_UI_TOOL_NAME)) {
+            functionTools.push(RENDER_UI_TOOL);
+        }
         const needsApprovalToolNames = new Set<string>();
         if (tools) {
             for (const t of tools) {
@@ -867,6 +910,7 @@ export async function executeSessionTurn(params: TurnExecuteParams): Promise<Tur
             pinnedConnectionId: params.pinnedConnectionId ?? null,
             turnMetadata: params.turnMetadata,
             agentTools: params.agentTools,
+            widgets: params.widgets,
         });
 
         return { ok: true, response };
@@ -1013,6 +1057,29 @@ export async function resumeSessionTurn(params: ResumeTurnParams): Promise<TurnE
             messages = applyInstructionsOverride(messages, storedInstructions, override.instructions);
         }
 
+        // A widget shown alongside the paused calls: its call and result go back
+        // in with theirs. Earlier tool rounds of the turn come first, as they ran.
+        const pp = pausedEvent.payload as Record<string, unknown>;
+        const serverResults = Array.isArray(pp.server_results)
+            ? (pp.server_results as Array<{ action_id: string; tool: string; arguments: string; output: string }>)
+            : [];
+        if (Array.isArray(pp.round_messages)) {
+            for (const m of pp.round_messages as StoredMessage[]) {
+                messages.push({
+                    role: m.role as UnifiedMessage['role'],
+                    content: m.content,
+                    ...(m.tool_calls ? { tool_calls: m.tool_calls } : {}),
+                    ...(m.toolCallId ? { toolCallId: m.toolCallId } : {}),
+                } as UnifiedMessage);
+            }
+            if (typeof pp.round_text === 'string') assistantText = pp.round_text;
+        }
+        let resultsForModel = toolResults;
+        if (serverResults.length > 0 && toolCallEntries.length > 0) {
+            toolCallEntries = [...serverResults.map((r) => ({ id: r.action_id, name: r.tool, args: r.arguments })), ...toolCallEntries];
+            resultsForModel = [...serverResults.map((r) => ({ action_id: r.action_id, output: r.output })), ...toolResults];
+        }
+
         if (toolCallEntries.length > 0) {
             messages.push({
                 role: 'assistant',
@@ -1024,7 +1091,7 @@ export async function resumeSessionTurn(params: ResumeTurnParams): Promise<TurnE
                 })),
             } as UnifiedMessage as never);
             for (const tc of toolCallEntries) {
-                const result = toolResults.find(r => r.action_id === tc.id);
+                const result = resultsForModel.find(r => r.action_id === tc.id);
                 messages.push({
                     role: 'tool' as const,
                     toolCallId: tc.id,
@@ -1044,8 +1111,12 @@ export async function resumeSessionTurn(params: ResumeTurnParams): Promise<TurnE
         const storedTools = Array.isArray(sp.function_tools) ? (sp.function_tools as Tool[]) : [];
         const schemaToolName = typeof sp.schema_tool_name === 'string' ? sp.schema_tool_name : null;
         // A handoff brings its own tools; the paused turn's structured-output tool stays.
+        const widgets = sp.widgets === true;
         const functionTools = override?.tools
-            ? [...override.tools, ...storedTools.filter(t => schemaToolName && t.function.name === schemaToolName)]
+            ? [
+                ...override.tools,
+                ...storedTools.filter(t => (schemaToolName && t.function.name === schemaToolName) || (widgets && t.function.name === RENDER_UI_TOOL_NAME)),
+            ]
             : storedTools;
         const needsApprovalToolNames = new Set(
             functionTools.filter(t => t.needsApproval).map(t => t.function.name),
@@ -1075,6 +1146,7 @@ export async function resumeSessionTurn(params: ResumeTurnParams): Promise<TurnE
             endUserId: null,
             tier, logSuccess, incrementUsage, recordEndUserUsage,
             resumed: { fromTurn: turnNumber, toolResultIds: toolResults.map(r => r.action_id), originalInputText: inputText },
+            widgets,
             // The turn's metadata carries over; a handoff's names the new agent.
             turnMetadata: {
                 ...((sp.metadata && typeof sp.metadata === 'object' ? sp.metadata : {}) as Record<string, string>),

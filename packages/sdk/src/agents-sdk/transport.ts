@@ -38,6 +38,8 @@ export interface TurnBody {
     user?: string;
     metadata?: Record<string, string>;
     reasoning_effort?: 'none' | 'low' | 'medium' | 'high';
+    /** Give the model the built-in render_ui tool. */
+    widgets?: boolean;
 }
 
 export interface ResumeNext {
