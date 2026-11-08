@@ -13,6 +13,7 @@ import { RequestDetailModal } from '@/components/audit/RequestDetailModal';
 import { SESSION_SOURCE_LABELS, type SessionSource, type TimelineTurn } from '@/lib/sessions/observability';
 import { buildSpans, formatTick, niceTicks, packLanes, traceBounds, type SpanKind, type TraceSpan } from '@/lib/sessions/trace-spans';
 import { SessionStatusBadge, formatDuration, formatSessionCost } from '@/components/sessions/session-ui';
+import { Logo } from '@/components/logo';
 import { cn } from '@/lib/utils';
 
 // A session as a trace, in the style of Vercel's tracing: a Trace tab with
@@ -79,6 +80,11 @@ const BAR_STYLE: Record<SpanKind, string> = {
 const KIND_LABEL: Record<SpanKind, string> = { session: 'Session', generation: 'Model call', tool: 'Tool', handoff: 'Handoff', agent: 'Agent' };
 
 // ── small parts ─────────────────────────────────────────────────────────
+
+/** Marks a span, in place of a generic glyph: the Cencori mark. */
+function SpanMark() {
+    return <span aria-hidden className="size-2.5 shrink-0 opacity-50"><Logo variant="mark" className="h-full w-full" /></span>;
+}
 
 function CopyButton({ text }: { text: string }) {
     const [copied, setCopied] = useState(false);
@@ -219,7 +225,7 @@ function TimelineView({ spans, bounds, selectedId, onSelect }: ViewProps) {
                                             )}
                                             style={pos(s)}
                                         >
-                                            <span className="text-[8px] text-muted-foreground">▲</span>
+                                            <SpanMark />
                                             <span className="truncate">{s.name}</span>
                                             <span className="ml-auto shrink-0 pl-1 font-mono text-[10px] text-muted-foreground">{formatDuration(d)}</span>
                                         </button>
@@ -275,7 +281,7 @@ function RowsView({ spans, bounds, selectedId, onSelect, tree }: ViewProps & { t
                                     {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
                                 </button>
                             ) : tree ? <span className="w-3" /> : <span className={cn('h-1 w-1 shrink-0 rounded-full', s.id === selectedId ? 'bg-blue-500' : 'bg-muted-foreground/50')} />}
-                            <span className="text-[8px] text-muted-foreground">▲</span>
+                            <SpanMark />
                             <span className="truncate">{s.name}</span>
                             {s.detail && <span className="truncate text-muted-foreground">{s.detail}</span>}
                         </div>
@@ -507,18 +513,26 @@ export default function SessionTracePage({ params }: PageProps) {
     };
 
     return (
-        <div className="w-full max-w-[1600px] mx-auto px-0 sm:px-6 pt-0 pb-8 sm:pt-6">
-            <Link href={listHref} className="mb-3 inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
-                <ArrowLeft className="h-3.5 w-3.5" /> Sessions
-            </Link>
-
+        // The whole page: a bar with the way back and the session as a log line,
+        // then the trace and the selected span side by side to the bottom of the
+        // screen, each scrolling on its own.
+        <div className="flex w-full flex-col lg:h-[calc(100svh-var(--maintenance-banner-height,0px)-3rem)]">
             {isLoading || !data ? (
-                error ? <p className="rounded-md border border-border/40 bg-muted/30 px-5 py-12 text-center text-xs text-muted-foreground">{error instanceof Error ? error.message : 'Could not load this session.'}</p>
-                    : <div className="space-y-3"><Skeleton className="h-10 w-full" /><Skeleton className="h-[480px] w-full" /></div>
+                <>
+                    <div className="flex h-11 shrink-0 items-center border-b border-border/50 px-4">
+                        <Link href={listHref} className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
+                            <ArrowLeft className="h-3.5 w-3.5" /> Sessions
+                        </Link>
+                    </div>
+                    {error ? <p className="px-5 py-16 text-center text-xs text-muted-foreground">{error instanceof Error ? error.message : 'Could not load this session.'}</p>
+                        : <div className="space-y-3 p-4"><Skeleton className="h-8 w-full" /><Skeleton className="h-[420px] w-full" /></div>}
+                </>
             ) : (
-                <div className="overflow-hidden rounded-lg border border-border/60 bg-card">
-                    {/* The session as a log line */}
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-border/50 bg-muted/20 px-4 py-2.5 font-mono text-xs">
+                <>
+                    <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-b border-border/50 px-4 py-2.5 font-mono text-xs">
+                        <Link href={listHref} className="inline-flex items-center gap-1.5 font-sans text-muted-foreground hover:text-foreground">
+                            <ArrowLeft className="h-3.5 w-3.5" /> Sessions
+                        </Link>
                         <span className="text-muted-foreground">{stamp(Date.parse(data.session.created_at))}</span>
                         <SessionStatusBadge status={data.session.status} />
                         <span>{SESSION_SOURCE_LABELS[data.session.source]}</span>
@@ -527,9 +541,9 @@ export default function SessionTracePage({ params }: PageProps) {
                         <span className="ml-auto text-muted-foreground">{formatDuration(data.session.duration_ms)} · {data.session.turns} turns · {formatSessionCost(data.session.cost_usd)}</span>
                     </div>
 
-                    <div className="grid lg:grid-cols-[minmax(0,1fr)_380px]">
-                        <section className="min-w-0 border-b border-border/50 lg:border-b-0 lg:border-r">
-                            <div className="flex items-center gap-1 border-b border-border/50 px-3 py-2">
+                    <div className="grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1fr)_400px]">
+                        <section className="flex min-w-0 flex-col border-b border-border/50 lg:min-h-0 lg:border-b-0 lg:border-r">
+                            <div className="flex shrink-0 items-center gap-1 border-b border-border/50 px-3 py-2">
                                 {(['trace', 'events'] as const).map((t) => (
                                     <button key={t} type="button" onClick={() => setTab(t)} className={cn('rounded-md px-2.5 py-1 text-xs', tab === t ? 'bg-muted font-medium' : 'text-muted-foreground hover:text-foreground')}>
                                         {t === 'events' ? `Events (${events.length})` : 'Trace'}
@@ -537,6 +551,7 @@ export default function SessionTracePage({ params }: PageProps) {
                                 ))}
                             </div>
 
+                            <div className="min-h-0 flex-1 lg:overflow-y-auto">
                             {tab === 'trace' ? (
                                 <>
                                     <div className="flex items-center gap-2 border-b border-border/50 px-3 py-2">
@@ -563,7 +578,7 @@ export default function SessionTracePage({ params }: PageProps) {
                                     {data.truncated && <p className="px-3 py-2 text-[11px] text-muted-foreground">Long session: only the first 5,000 events are shown.</p>}
                                 </>
                             ) : (
-                                <div className="max-h-[640px] overflow-auto">
+                                <div>
                                     {events.map((e, i) => (
                                         <button key={i} type="button" onClick={() => setSelectedId(e.spanId)} className={cn('grid w-full grid-cols-[104px_64px_minmax(0,1fr)] items-start gap-3 border-b border-border/30 px-3 py-1.5 text-left font-mono text-[11px] hover:bg-muted/40', e.spanId === selected?.id && 'bg-muted/50')}>
                                             <span className="text-muted-foreground">{stamp(e.at, false)}</span>
@@ -574,15 +589,16 @@ export default function SessionTracePage({ params }: PageProps) {
                                     {events.length === 0 && <p className="py-16 text-center text-xs text-muted-foreground">No events yet.</p>}
                                 </div>
                             )}
+                            </div>
                         </section>
 
-                        <aside className="min-w-0 p-3 lg:max-h-[calc(100vh-10rem)] lg:overflow-y-auto">
+                        <aside className="min-w-0 p-4 lg:min-h-0 lg:overflow-y-auto">
                             {selected && projectId && (
                                 <DetailPanel data={data} span={selected} projectId={projectId} onClose={() => setSelectedId('session')} onOpenLog={setLogId} />
                             )}
                         </aside>
                     </div>
-                </div>
+                </>
             )}
 
             {projectId && logId && (
