@@ -14,6 +14,10 @@ create or replace function public.analytics_platform_series(p_start timestamptz,
 returns jsonb
 language sql
 stable
+-- Runs as its owner: signups come from auth_users, which
+-- 0100_lock_auth_tables.sql closes to every API role (it holds password
+-- hashes). Only counts leave this function, and only service_role may call it.
+security definer
 set search_path = public
 -- Bucket edges and generate_series must agree: in a zone with daylight
 -- saving, a '1 day' step crosses the change as 23 or 25 hours and every later
