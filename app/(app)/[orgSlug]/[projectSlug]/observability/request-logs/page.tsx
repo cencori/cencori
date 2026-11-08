@@ -1,9 +1,10 @@
 'use client';
 
-import { use, useEffect, useMemo, useState } from 'react';
+import { use, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { usePathname, useSearchParams } from 'next/navigation';
+import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { replaceQuery, requestLogsQuery } from '@/lib/observability/queries';
 import { ExternalLink, Play, RefreshCw, Search, X } from 'lucide-react';
 import LeftToRightListDashIcon from '@hugeicons/core-free-icons/LeftToRightListDashIcon';
 import BinocularsIcon from '@hugeicons/core-free-icons/BinocularsIcon';
@@ -71,7 +72,6 @@ interface RequestDetail {
     security_incidents?: Array<{ id: string; incident_type: string; severity: string; risk_score: number }>;
 }
 
-const PER_PAGE = 50;
 const COLUMNS = 'grid-cols-[170px_100px_minmax(120px,200px)_minmax(0,1fr)_80px_90px_80px]';
 
 function responseText(payload: RequestDetail['response_payload']): string {
@@ -151,7 +151,6 @@ function RequestPanel({ projectId, logId, tracesHref, onClose }: { projectId: st
 export default function RequestLogsPage({ params }: PageProps) {
     const { orgSlug, projectSlug } = use(params);
     const pathname = usePathname();
-    const router = useRouter();
     const searchParams = useSearchParams();
     const filters = readRequestLogFilters(searchParams);
     const selected = searchParams.get('request');
@@ -162,36 +161,19 @@ export default function RequestLogsPage({ params }: PageProps) {
 
     useEffect(() => setSearchInput(filters.q), [filters.q]);
 
-    const apiQuery = useMemo(() => {
-        const q = new URLSearchParams({ per_page: String(PER_PAGE), time_range: filters.range });
-        if (filters.status) q.set('status', filters.status);
-        if (filters.model) q.set('model', filters.model);
-        if (filters.key) q.set('api_key_id', filters.key);
-        if (filters.q) q.set('search', filters.q);
-        return q.toString();
-    }, [filters.range, filters.status, filters.model, filters.key, filters.q]);
-
-    const { data, isLoading, error, isFetching, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery<LogsPage>({
-        queryKey: ['request-logs', projectId, apiQuery],
-        queryFn: async ({ pageParam, signal }) => {
-            const res = await fetch(`/api/projects/${projectId}/logs?${apiQuery}&page=${pageParam}`, { signal });
-            if (!res.ok) throw new Error('Could not load request logs.');
-            return res.json();
-        },
-        initialPageParam: 1,
-        getNextPageParam: (last, pages) => (pages.length < (last.pagination?.total_pages ?? 1) ? pages.length + 1 : undefined),
-        enabled: Boolean(projectId),
-        staleTime: 15_000,
+    // Shared with the sidebar's hover prefetch; the previous rows stay on
+    // screen while a new filter loads.
+    const { data, isLoading, error, isFetching, isPlaceholderData, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
+        ...requestLogsQuery<LogsPage>(projectId, filters),
+        placeholderData: keepPreviousData,
         refetchInterval: live ? 5000 : false,
     });
 
     const requests = data?.pages.flatMap((p) => p.requests) ?? [];
     const meta = data?.pages[0]?.meta;
     const filtered = hasActiveRequestLogFilters(filters);
-    const go = (request: string | null, q = filters.q) => {
-        const qs = writeRequestLogFilters({ ...filters, q }, request);
-        router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-    };
+    // Opening a request or searching only changes the query string: no server round trip.
+    const go = (request: string | null, q = filters.q) => replaceQuery(pathname, writeRequestLogFilters({ ...filters, q }, request));
 
     if (!projectLoading && !projectId) return <p className="py-16 text-center text-sm text-muted-foreground">Project not found</p>;
 
@@ -233,7 +215,8 @@ export default function RequestLogsPage({ params }: PageProps) {
                     </div>
                 )}
 
-                <div className="min-h-0 flex-1 overflow-auto">
+                <div className={cn('relative min-h-0 flex-1 overflow-auto transition-opacity', isPlaceholderData && 'opacity-60')}>
+                    {isPlaceholderData && <div className="sticky top-0 z-20 h-0.5 w-full animate-pulse bg-foreground/60" aria-label="Loading" />}
                     <div className={cn('sticky top-0 z-10 hidden min-w-[860px] gap-3 border-b border-border/50 bg-background px-3 py-2 text-xs text-muted-foreground md:grid', COLUMNS)}>
                         <span>Time</span><span>Status</span><span>Model</span><span>Request</span>
                         <span className="text-right">Tokens</span><span className="text-right">Cost</span><span className="text-right">Latency</span>

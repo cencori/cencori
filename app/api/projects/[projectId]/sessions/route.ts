@@ -54,7 +54,8 @@ export interface SessionListItem {
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ projectId: string }> }) {
     const { projectId } = await params;
-    const access = await requireProjectAccess(projectId);
+    // Access and plan at once; nothing is returned until access is confirmed.
+    const [access, projectTier] = await Promise.all([requireProjectAccess(projectId), getProjectTier(projectId)]);
     if (!access.ok) return access.response;
 
     const sp = req.nextUrl.searchParams;
@@ -65,7 +66,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ proj
     const sources = (sp.get('source') || '').split(',').filter((v) => SOURCE_FILTERS[v]);
     const search = (sp.get('search') || '').trim();
 
-    const tier = (await getProjectTier(projectId)) || 'free';
+    const tier = projectTier || 'free';
     const requested = sp.get('time_range') || '7d';
     const timeRange = clampTimeRange(tier, requested);
     const since = RANGE_MS[timeRange] ? new Date(Date.now() - (RANGE_MS[timeRange] as number)).toISOString() : null;
@@ -91,9 +92,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ proj
         .select('id, status, agent_id, metadata, tenant_id, installation_id, last_turn_number, total_cost_usd, created_at, updated_at')
         .eq('project_id', projectId));
 
-    const { data, error } = await query
-        .order('updated_at', { ascending: false })
-        .range(offset, offset + limit); // one extra row tells us there's a next page
+    // The page of rows and the activity histogram (first page only) in parallel.
+    const [{ data, error }, timesResult] = await Promise.all([
+        query
+            .order('updated_at', { ascending: false })
+            .range(offset, offset + limit), // one extra row tells us there's a next page
+        offset === 0
+            ? filtered(admin.from('sessions').select('updated_at').eq('project_id', projectId))
+                .order('updated_at', { ascending: false })
+                .limit(5000)
+            : Promise.resolve(null),
+    ]);
     if (error) {
         console.error('[Sessions] list failed', error);
         return NextResponse.json({ error: 'Failed to load sessions' }, { status: 500 });
@@ -134,10 +143,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ proj
 
     // Activity over the range, for the timeline strip (first page only).
     let histogram: { start: string; end: string; buckets: number[] } | null = null;
-    if (offset === 0) {
-        const { data: times } = await filtered(admin.from('sessions').select('updated_at').eq('project_id', projectId))
-            .order('updated_at', { ascending: false })
-            .limit(5000);
+    if (timesResult) {
+        const times = timesResult.data;
         const stamps = (times ?? []).map((t) => Date.parse(t.updated_at as string)).filter(Number.isFinite);
         const end = Date.now();
         const start = since ? Date.parse(since) : (stamps.length ? Math.min(...stamps) : end - 7 * 864e5);

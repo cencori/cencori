@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { usePathname, useSearchParams } from 'next/navigation';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { replaceQuery, requestLogsQuery } from '@/lib/observability/queries';
 import { Check, ChevronDown } from 'lucide-react';
 import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react';
 import BinocularsIcon from '@hugeicons/core-free-icons/BinocularsIcon';
@@ -71,8 +72,8 @@ function SourcePicker({ base, current }: { base: string; current: Source }) {
 interface ApiKeyOption { id: string; name: string; key_prefix: string }
 
 function RequestLogFiltersPanel({ projectId }: { projectId?: string }) {
-    const router = useRouter();
     const pathname = usePathname();
+    const queryClient = useQueryClient();
     const searchParams = useSearchParams();
     const filters = readRequestLogFilters(searchParams);
     const [open, setOpen] = useState<Record<string, boolean>>({ timeline: true, status: true, model: false, key: false });
@@ -83,9 +84,11 @@ function RequestLogFiltersPanel({ projectId }: { projectId?: string }) {
         setOpen((o) => ({ ...o, model: o.model || Boolean(filters.model), key: o.key || Boolean(filters.key) }));
     }, [filters.model, filters.key]);
 
-    const update = (next: RequestLogFilters) => {
-        const qs = writeRequestLogFilters(next);
-        router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    // The URL changes in place (no server round trip); the page's list reads it.
+    const update = (next: RequestLogFilters) => replaceQuery(pathname, writeRequestLogFilters(next));
+    // Hovering an option loads its results, so the click finds them ready.
+    const prefetch = (next: RequestLogFilters) => {
+        if (projectId) void queryClient.prefetchInfiniteQuery(requestLogsQuery(projectId, next));
     };
 
     const { data: models = [] } = useQuery<string[]>({
@@ -120,26 +123,26 @@ function RequestLogFiltersPanel({ projectId }: { projectId?: string }) {
             </div>
             <FilterGroup title="Timeline" open={open.timeline} onToggle={() => flip('timeline')}>
                 {REQUEST_LOG_RANGES.map((r) => (
-                    <FilterOption key={r.value} radio selected={filters.range === r.value} label={r.label} onClick={() => update({ ...filters, range: r.value })} />
+                    <FilterOption key={r.value} radio selected={filters.range === r.value} label={r.label} onClick={() => update({ ...filters, range: r.value })} onHover={() => prefetch({ ...filters, range: r.value })} />
                 ))}
             </FilterGroup>
             <FilterGroup title="Status" count={filters.status ? 1 : 0} open={open.status} onToggle={() => flip('status')}>
-                <FilterOption radio selected={!filters.status} label="All statuses" onClick={() => update({ ...filters, status: null })} />
+                <FilterOption radio selected={!filters.status} label="All statuses" onClick={() => update({ ...filters, status: null })} onHover={() => prefetch({ ...filters, status: null })} />
                 {REQUEST_LOG_STATUSES.map((s) => (
-                    <FilterOption key={s.value} radio selected={filters.status === s.value} label={s.label} onClick={() => update({ ...filters, status: s.value })} />
+                    <FilterOption key={s.value} radio selected={filters.status === s.value} label={s.label} onClick={() => update({ ...filters, status: s.value })} onHover={() => prefetch({ ...filters, status: s.value })} />
                 ))}
             </FilterGroup>
             <FilterGroup title="Model" count={filters.model ? 1 : 0} open={open.model} onToggle={() => flip('model')}>
-                <FilterOption radio selected={!filters.model} label="All models" onClick={() => update({ ...filters, model: null })} />
+                <FilterOption radio selected={!filters.model} label="All models" onClick={() => update({ ...filters, model: null })} onHover={() => prefetch({ ...filters, model: null })} />
                 {models.map((m) => (
-                    <FilterOption key={m} radio selected={filters.model === m} label={m} onClick={() => update({ ...filters, model: m })} />
+                    <FilterOption key={m} radio selected={filters.model === m} label={m} onClick={() => update({ ...filters, model: m })} onHover={() => prefetch({ ...filters, model: m })} />
                 ))}
                 {models.length === 0 && <p className="px-2 py-1 text-xs text-muted-foreground">No models in this range.</p>}
             </FilterGroup>
             <FilterGroup title="API key" count={filters.key ? 1 : 0} open={open.key} onToggle={() => flip('key')}>
-                <FilterOption radio selected={!filters.key} label="All keys" onClick={() => update({ ...filters, key: null })} />
+                <FilterOption radio selected={!filters.key} label="All keys" onClick={() => update({ ...filters, key: null })} onHover={() => prefetch({ ...filters, key: null })} />
                 {keys.map((k) => (
-                    <FilterOption key={k.id} radio selected={filters.key === k.id} label={`${k.name} (${k.key_prefix}…)`} onClick={() => update({ ...filters, key: k.id })} />
+                    <FilterOption key={k.id} radio selected={filters.key === k.id} label={`${k.name} (${k.key_prefix}…)`} onClick={() => update({ ...filters, key: k.id })} onHover={() => prefetch({ ...filters, key: k.id })} />
                 ))}
             </FilterGroup>
         </div>
@@ -156,7 +159,7 @@ export function ObservabilitySidebar({ base, orgSlug, projectSlug }: { base: str
     return (
         <div className="pt-1">
             <SourcePicker base={base} current={source} />
-            {onList && (source === 'traces' ? <SessionFiltersPanel /> : <RequestLogFiltersPanel projectId={projectId ?? undefined} />)}
+            {onList && (source === 'traces' ? <SessionFiltersPanel projectId={projectId} /> : <RequestLogFiltersPanel projectId={projectId ?? undefined} />)}
         </div>
     );
 }

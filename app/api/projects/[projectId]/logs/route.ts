@@ -11,7 +11,8 @@ export async function GET(
 ) {
     const supabaseAdmin = createAdminClient();
     const { projectId } = await params;
-    const projectAccess = await requireProjectAccess(projectId);
+    // Access and plan at once; nothing is returned until access is confirmed.
+    const [projectAccess, projectTier] = await Promise.all([requireProjectAccess(projectId), getProjectTier(projectId)]);
     if (!projectAccess.ok) return projectAccess.response;
 
     try {
@@ -23,7 +24,7 @@ export async function GET(
         // History depth is tier-gated: free 7d, pro 30d, team 90d, enterprise all.
         // Surface the clamp so the UI can tell "no rows (filtered)" apart from
         // "no rows (retention limit)" instead of silently narrowing the window.
-        const tier = (await getProjectTier(projectId)) || 'free';
+        const tier = projectTier || 'free';
         const requestedTimeRange = searchParams.get('time_range') || '24h';
         const timeRange = clampTimeRange(tier, requestedTimeRange);
         const tierMax = LOG_RETENTION_RANGE[tier] ?? LOG_RETENTION_RANGE.free;
@@ -65,15 +66,11 @@ export async function GET(
         // project + environment on ai_requests itself — never by key list —
         // so playground (null key), revoked-key, and embedded-run rows stay
         // visible.
-        const { data: allApiKeys } = await supabaseAdmin
+        // Started now, awaited after the main query: the two run in parallel.
+        const apiKeysPromise = supabaseAdmin
             .from('api_keys')
             .select('id, name, key_prefix, environment')
             .eq('project_id', projectId);
-
-        const apiKeyMap: Record<string, { name: string; prefix: string }> = {};
-        allApiKeys?.forEach(k => {
-            apiKeyMap[k.id] = { name: k.name, prefix: k.key_prefix };
-        });
 
         let query = supabaseAdmin
             .from('ai_requests')
@@ -114,7 +111,11 @@ export async function GET(
             .order('created_at', { ascending: false })
             .range(offset, offset + perPage - 1);
 
-        const { data: requests, error, count } = await query;
+        const [{ data: requests, error, count }, { data: allApiKeys }] = await Promise.all([query, apiKeysPromise]);
+        const apiKeyMap: Record<string, { name: string; prefix: string }> = {};
+        allApiKeys?.forEach(k => {
+            apiKeyMap[k.id] = { name: k.name, prefix: k.key_prefix };
+        });
 
         if (error) {
             console.error('[Logs API] Error fetching requests:', error);

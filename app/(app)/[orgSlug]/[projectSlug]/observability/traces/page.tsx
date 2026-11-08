@@ -1,8 +1,9 @@
 'use client';
 
-import { use, useEffect, useMemo, useState } from 'react';
+import { use, useEffect, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
+import { replaceQuery, tracesQuery } from '@/lib/observability/queries';
 import { Download, Play, RefreshCw, Search } from 'lucide-react';
 import BinocularsIcon from '@hugeicons/core-free-icons/BinocularsIcon';
 import LeftToRightListDashIcon from '@hugeicons/core-free-icons/LeftToRightListDashIcon';
@@ -31,7 +32,6 @@ interface SessionsPage {
     meta?: { applied_time_range: string; tier_max_time_range: string; time_range_clamped: boolean };
 }
 
-const PAGE_SIZE = 50;
 const COLUMNS = 'grid-cols-[170px_80px_120px_minmax(120px,180px)_minmax(0,1fr)_60px_90px]';
 
 function axisLabel(ms: number, spanMs: number): string {
@@ -77,25 +77,11 @@ export default function TracesPage({ params }: PageProps) {
 
     useEffect(() => setSearchInput(filters.q), [filters.q]);
 
-    const apiQuery = useMemo(() => {
-        const q = new URLSearchParams({ limit: String(PAGE_SIZE), time_range: filters.range });
-        if (filters.status.length) q.set('status', filters.status.join(','));
-        if (filters.source.length) q.set('source', filters.source.join(','));
-        if (filters.q) q.set('search', filters.q);
-        return q.toString();
-    }, [filters.range, filters.status, filters.source, filters.q]);
-
-    const { data, isLoading, error, isFetching, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery<SessionsPage>({
-        queryKey: ['sessions', projectId, apiQuery],
-        queryFn: async ({ pageParam, signal }) => {
-            const response = await fetch(`/api/projects/${projectId}/sessions?${apiQuery}&offset=${pageParam}`, { signal });
-            if (!response.ok) throw new Error('Could not load traces.');
-            return response.json();
-        },
-        initialPageParam: 0,
-        getNextPageParam: (last, pages) => (last.has_more ? pages.length * PAGE_SIZE : undefined),
-        enabled: Boolean(projectId),
-        staleTime: 15_000,
+    // Shared with the sidebar's hover prefetch; the previous results stay on
+    // screen while a new filter loads, so the list never blanks.
+    const { data, isLoading, error, isFetching, isPlaceholderData, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
+        ...tracesQuery<SessionsPage>(projectId, filters),
+        placeholderData: keepPreviousData,
         refetchInterval: live ? 5000 : false,
     });
 
@@ -105,8 +91,7 @@ export default function TracesPage({ params }: PageProps) {
     const filtered = hasActiveFilters(filters);
     const open = (id: string) => router.push(`${pathname.replace(/\/$/, '')}/${id}`);
     const submitSearch = () => {
-        const qs = writeSessionFilters({ ...filters, q: searchInput.trim() });
-        router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+        replaceQuery(pathname, writeSessionFilters({ ...filters, q: searchInput.trim() }));
     };
     const exportJson = () => {
         const blob = new Blob([JSON.stringify(sessions, null, 2)], { type: 'application/json' });
@@ -161,7 +146,8 @@ export default function TracesPage({ params }: PageProps) {
             )}
 
             {/* Sessions as log lines */}
-            <div className="min-h-0 flex-1 overflow-auto">
+            <div className={cn('relative min-h-0 flex-1 overflow-auto transition-opacity', isPlaceholderData && 'opacity-60')}>
+                {isPlaceholderData && <div className="sticky top-0 z-20 h-0.5 w-full animate-pulse bg-foreground/60" aria-label="Loading" />}
                 <div className={cn('sticky top-0 z-10 hidden min-w-[900px] gap-3 border-b border-border/50 bg-background px-3 py-2 text-xs text-muted-foreground md:grid', COLUMNS)}>
                     <span>Time</span><span>Status</span><span>Source</span><span>Agent</span><span>First message</span>
                     <span className="text-right">Turns</span><span className="text-right">Cost</span>
