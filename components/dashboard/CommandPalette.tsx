@@ -344,12 +344,21 @@ export function CommandPalette({
           },
           {
             id: "logs",
-            label: "Logs",
+            label: "Request logs",
             icon: navIcon(LeftToRightListDashIcon),
             action: () => navigate(
-              consoleMode ? "/ai-gateway/logs" : `/${orgSlug}/${projectSlug}/ai-gateway/logs`,
+              consoleMode ? "/observability/request-logs" : `/${orgSlug}/${projectSlug}/observability/request-logs`,
             ),
-            keywords: ["request logs", "history", "requests", "debug", "trace"],
+            keywords: ["logs", "history", "requests", "debug", "observability", "model calls"],
+          },
+          {
+            id: "traces",
+            label: "Traces",
+            icon: navIcon(LeftToRightListDashIcon),
+            action: () => navigate(
+              consoleMode ? "/observability/traces" : `/${orgSlug}/${projectSlug}/observability/traces`,
+            ),
+            keywords: ["sessions", "agents", "tool calls", "handoffs", "approvals", "observability", "debug"],
           },
           {
             id: "byok",

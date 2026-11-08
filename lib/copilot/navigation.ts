@@ -10,7 +10,8 @@ import { buildScopedConsolePath, getConsoleRoute, isConsoleHostname } from "@/li
 export const COPILOT_PAGES = {
     overview: { path: "/home", label: "Overview" },
     gateway: { path: "/ai-gateway", label: "AI Gateway" },
-    gateway_logs: { path: "/ai-gateway/logs", label: "Gateway logs" },
+    gateway_logs: { path: "/observability/request-logs", label: "Request logs" },
+    traces: { path: "/observability/traces", label: "Traces (agent sessions)" },
     models: { path: "/ai-gateway/models", label: "Models" },
     byok: { path: "/ai-gateway/providers", label: "Your provider keys (BYOK)" },
     playground: { path: "/ai-gateway/playground", label: "Playground" },

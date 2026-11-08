@@ -3,12 +3,12 @@
 import { useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 
-// Sessions moved under /observability/sessions; keep earlier links working.
+// Session links from before Observability had views; they're traces now.
 export default function LegacySessionRedirect() {
     const pathname = usePathname();
     const router = useRouter();
     useEffect(() => {
-        router.replace(pathname.replace(/\/observability\/([^/]+)\/?$/, '/observability/sessions/$1'));
+        router.replace(pathname.replace(/\/observability\/([^/]+)\/?$/, '/observability/traces/$1'));
     }, [pathname, router]);
     return null;
 }

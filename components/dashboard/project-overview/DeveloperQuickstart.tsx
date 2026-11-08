@@ -431,7 +431,7 @@ export function DeveloperQuickstart({
   projectSlug,
 }: DeveloperQuickstartProps) {
   const pathname = usePathname();
-  const logsHref = getConsoleRoute(pathname) ? "/ai-gateway/logs" : `/${orgSlug}/${projectSlug}/ai-gateway/logs`;
+  const logsHref = getConsoleRoute(pathname) ? "/observability/request-logs" : `/${orgSlug}/${projectSlug}/observability/request-logs`;
   const queryClient = useQueryClient();
   const { environment } = useEnvironment();
   const { data: projectId, isLoading: projectLoading } = useProjectIdBySlug(

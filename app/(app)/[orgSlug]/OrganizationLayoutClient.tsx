@@ -36,7 +36,7 @@ import { COPILOT_CONVERSATION_COOKIE, COPILOT_NEW_CHAT_EVENT } from "@/lib/conso
 import ChartRelationshipIcon from "@hugeicons/core-free-icons/ChartRelationshipIcon";
 import ThreeDRotateIcon from "@hugeicons/core-free-icons/ThreeDRotateIcon";
 import Activity01Icon from "@hugeicons/core-free-icons/Activity01Icon";
-import { SessionFiltersPanel } from "@/components/sessions/SessionFilters";
+import { ObservabilitySidebar } from "@/components/observability/ObservabilitySidebar";
 import Settings02Icon from "@hugeicons/core-free-icons/Settings02Icon";
 import GameController03Icon from "@hugeicons/core-free-icons/GameController03Icon";
 import LeftToRightListDashIcon from "@hugeicons/core-free-icons/LeftToRightListDashIcon";
@@ -236,7 +236,7 @@ export default function OrganizationLayoutClient({
     const isCopilotPage = /\/copilot\/?$/.test(pathname);
     // A session's trace (/observability/<id>) fills the height, like the memory graph.
     // Observability's Sessions list and a session's trace fill the workspace edge to edge.
-    const isSessionTrace = /\/observability\/sessions(\/[^/]+)?\/?$/.test(pathname);
+    const isSessionTrace = /\/observability\/(traces|request-logs)(\/[^/]+)?\/?$/.test(pathname);
     const isFixedWorkspace = isPlayground || isAgentWorkspace || isMemoryGraph || isCopilotPage || isSessionTrace;
     const docsUrl = getMainSiteUrl("/docs");
     const scopedArea = segments[2];
@@ -320,7 +320,8 @@ export default function OrganizationLayoutClient({
     // Memory belongs to the selected project; without one there is no entry.
     const memoryHref = scopeProjectSlug ? scopedProjectHref("memory") : null;
     // Observability belongs to the selected project too; it opens on Sessions.
-    const observabilityHref = scopeProjectSlug ? scopedProjectHref("observability/sessions") : null;
+    const observabilityBase = scopeProjectSlug ? scopedProjectHref("observability") : null;
+    const observabilityHref = observabilityBase ? `${observabilityBase}/traces` : null;
     // Copilot's pages live under the selected project's address, like Memory.
     const copilotHref = scopeProjectSlug ? scopedProjectHref("copilot") : null;
     // The sidebar Settings entry has one stable meaning: settings for the
@@ -478,7 +479,8 @@ export default function OrganizationLayoutClient({
 
     const projectSubItems = [
         { href: aiGatewayHref, icon: <HugeiconsIcon icon={DashboardCircleIcon} className="!h-5 !w-5" />, label: "Overview" },
-        logsItem,
+        // A project's logs live in Observability → Request logs; the organization's stay here.
+        ...(scopeProjectSlug ? [] : [logsItem]),
         { href: scopeProjectSlug ? scopedProjectHref("ai-gateway/providers") : orgProductHref("ai-gateway/providers"), icon: <HugeiconsIcon icon={KeySquareIcon} className="!h-5 !w-5" />, label: "BYOK" },
         { href: scopeProjectSlug ? scopedProjectHref("ai-gateway/models") : orgProductHref("ai-gateway/models"), icon: <HugeiconsIcon icon={Blockchain01Icon} className="!h-5 !w-5" />, label: "Models" },
         { href: scopeProjectSlug ? scopedProjectHref("ai-gateway/playground") : orgProductHref("ai-gateway/playground"), icon: <HugeiconsIcon icon={GameController03Icon} className="!h-5 !w-5" />, label: "Playground" },
@@ -495,11 +497,8 @@ export default function OrganizationLayoutClient({
             { href: `${copilotHref}/usage`, icon: <HugeiconsIcon icon={Chart01Icon} className="!h-5 !w-5" />, label: "Usage" },
         ]
         : [];
-    const observabilitySubItems = observabilityHref
-        ? [
-            { href: observabilityHref, icon: <HugeiconsIcon icon={LeftToRightListDashIcon} className="!h-5 !w-5" />, label: "Sessions" },
-        ]
-        : [];
+    // Observability's sidebar is its own component: a source picker and filters.
+    const observabilitySubItems: Array<{ href: string; icon: React.ReactNode; label: string }> = [];
     const memorySubItems = memoryHref
         ? [
             { href: memoryHref, icon: <HugeiconsIcon icon={DashboardCircleIcon} className="!h-5 !w-5" />, label: "Overview" },
@@ -636,10 +635,10 @@ export default function OrganizationLayoutClient({
                 {activeView === "copilot" && copilotHref && organization?.id && (
                     <CopilotRecentChats organizationId={organization.id} chatHref={copilotHref} />
                 )}
-                {/* The Sessions list keeps its filters here, so the page stays full screen. */}
-                {activeView === "observability" && /\/observability\/sessions\/?$/.test(pathname) && (
+                {/* Traces and Request logs: a source picker and that source's filters, so the pages stay full screen. */}
+                {activeView === "observability" && observabilityBase && scopeProjectSlug && (
                     <SidebarMenuItem>
-                        <SessionFiltersPanel />
+                        <ObservabilitySidebar base={observabilityBase} orgSlug={orgSlug} projectSlug={scopeProjectSlug} />
                     </SidebarMenuItem>
                 )}
             </>

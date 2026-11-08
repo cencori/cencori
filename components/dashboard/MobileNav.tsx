@@ -15,6 +15,8 @@ import { getCanonicalConsoleRedirect, getConsoleRoute } from "@/lib/console/rout
 // their own heading there), by their flat console path.
 const BAR_TITLES: Record<string, string> = {
     "/ai-gateway/logs": "Logs",
+    "/observability/request-logs": "Request logs",
+    "/observability/traces": "Traces",
     "/ai-gateway/playground": "Playground",
     "/ai-gateway/models": "Models",
     "/organization/ai-gateway/models": "Models",

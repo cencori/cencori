@@ -83,6 +83,14 @@ export async function GET(
             created_at: request.created_at,
             status: request.status,
             model: request.model,
+            // For Observability → Request logs: where the call went, and the trace it belongs to.
+            request_id: request.request_id ?? null,
+            provider: request.provider ?? null,
+            endpoint: request.endpoint ?? null,
+            fallback_provider: request.fallback_provider ?? null,
+            fallback_model: request.fallback_model ?? null,
+            session_id: request.session_id ?? null,
+            end_user_id: request.end_user_id ?? null,
 
             request_payload: request.request_payload,
             response_payload: request.response_payload,

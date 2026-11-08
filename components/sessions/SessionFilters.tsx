@@ -8,7 +8,7 @@ import {
 } from '@/lib/sessions/filters';
 import { cn } from '@/lib/utils';
 
-function FilterGroup({ title, count, open, onToggle, children }: { title: string; count?: number; open: boolean; onToggle: () => void; children: React.ReactNode }) {
+export function FilterGroup({ title, count, open, onToggle, children }: { title: string; count?: number; open: boolean; onToggle: () => void; children: React.ReactNode }) {
     return (
         <div>
             <button
@@ -25,7 +25,7 @@ function FilterGroup({ title, count, open, onToggle, children }: { title: string
     );
 }
 
-function FilterOption({ selected, label, onClick, radio }: { selected: boolean; label: string; onClick: () => void; radio?: boolean }) {
+export function FilterOption({ selected, label, onClick, radio }: { selected: boolean; label: string; onClick: () => void; radio?: boolean }) {
     return (
         <button
             type="button"
@@ -67,7 +67,7 @@ export function SessionFiltersPanel() {
     const flip = (id: string) => setOpen((o) => ({ ...o, [id]: !o[id] }));
 
     return (
-        <div className="mt-4 px-2">
+        <div className="mt-4">
             <div className="mb-1 flex items-center justify-between px-2">
                 <span className="text-sm font-medium">Filters</span>
                 {hasActiveFilters(filters) && (

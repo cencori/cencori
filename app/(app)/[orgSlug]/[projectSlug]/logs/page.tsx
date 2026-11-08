@@ -11,7 +11,7 @@ interface PageProps {
     }>;
 }
 
-// Logs moved under AI Gateway; keep old links and bookmarks working.
+// Logs moved to Observability → Request logs; keep old links and bookmarks working.
 export default function LegacyLogsRedirect({ params }: PageProps) {
     const { orgSlug, projectSlug } = use(params);
     const pathname = usePathname();
@@ -21,8 +21,8 @@ export default function LegacyLogsRedirect({ params }: PageProps) {
         const query = window.location.search;
         router.replace(
             getConsoleRoute(pathname)
-                ? `/ai-gateway/logs${query}`
-                : `/${orgSlug}/${projectSlug}/ai-gateway/logs${query}`,
+                ? `/observability/request-logs${query}`
+                : `/${orgSlug}/${projectSlug}/observability/request-logs${query}`,
         );
     }, [orgSlug, pathname, projectSlug, router]);
 

@@ -52,6 +52,9 @@ export async function GET(
             case '30d':
                 startTime = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
                 break;
+            case '90d':
+                startTime = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+                break;
             case 'all':
                 startTime = null;
                 break;
