@@ -14,13 +14,13 @@
  *       onResult={(result) => console.log(result)}
  *   />
  *
- * Deps: react, lucide-react, tailwindcss.
+ * Deps: react, tailwindcss.
  */
 
 'use client';
 
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { AlertCircle, Loader2, Upload, X } from 'lucide-react';
+import { AlertCircle, Loader2, Upload, X } from '../icons';
 import { VisionFormatBanner, type VisionProvider } from './vision-format-banner';
 import { canDownscale, downscaleImage } from './downscale';
 

@@ -1,0 +1,152 @@
+---
+title: "Coming from OpenAI"
+description: "Move an agent from the OpenAI Agents SDK, ChatKit or Agent Builder to Cencori: what maps to what, and what changes."
+section: "Agents SDK"
+order: 10
+---
+
+`cencori/agents` follows the same shape as the OpenAI Agents SDK for JavaScript: agents, tools, `run()`, handoffs, guardrails, approvals. Most code moves by changing imports. What you get in return: any model in the catalog, durable runs that can wait on a person, traces, budgets and PII rules on every call, and a chat UI that works with all of it.
+
+## At a glance
+
+| OpenAI | Cencori | Notes |
+| --- | --- | --- |
+| `@openai/agents` | `cencori/agents` | Same concepts and names |
+| `OPENAI_API_KEY` | `CENCORI_API_KEY` | A secret project key (`csk_...`) |
+| OpenAI models | [Any catalog model](/docs/agents-sdk/models) | OpenAI, Anthropic, Gemini, open-weight. Default: GPT OSS 120B on Cerebras |
+| ChatKit | [Agent UI](/docs/agent-ui/overview) (`cencori/react`) | Widgets the model can write itself, charts and tables built in |
+| Agent Builder workflows | [Stored agents](/docs/agents-api/stored-agents) or [Business Agents](/docs/agents/overview) | Define in Cencori, run by id |
+| Traces dashboard | Observability → Traces | Every run, turn, tool call and handoff |
+
+## 1. Install and set your key
+
+```bash
+npm uninstall @openai/agents
+npm install cencori zod
+```
+
+```bash
+# .env
+CENCORI_API_KEY=csk_...
+```
+
+## 2. Change the imports
+
+```ts
+// Before
+import { Agent, run, tool } from '@openai/agents';
+
+// After
+import { Agent, run, tool } from 'cencori/agents';
+```
+
+Agents, tools and runs are written the same way:
+
+```ts
+const getWeather = tool({
+    name: 'get_weather',
+    description: 'Current weather for a city.',
+    parameters: z.object({ city: z.string() }),
+    execute: async ({ city }) => fetchWeather(city),
+});
+
+const agent = new Agent({
+    name: 'Assistant',
+    instructions: 'Answer briefly.',
+    tools: [getWeather],
+});
+
+const result = await run(agent, "What's the weather in Lagos?");
+console.log(result.finalOutput);
+```
+
+## 3. Pick a model
+
+Agents without `model` use GPT OSS 120B on Cerebras: fast and good at tools. To keep using an OpenAI model, name it; to try another, change the string:
+
+```ts
+new Agent({ name: 'Assistant', model: 'gpt-4o', ... });
+new Agent({ name: 'Assistant', model: 'claude-sonnet-4-5', ... });
+```
+
+## What maps one to one
+
+| | OpenAI Agents SDK | `cencori/agents` |
+| --- | --- | --- |
+| Agent | `new Agent({ name, instructions, model, tools, handoffs, outputType })` | Same |
+| Dynamic instructions | `instructions: (runContext) => ...` | Same |
+| Tool | `tool({ name, description, parameters, execute })` | Same; zod 3 or 4, any Standard Schema, or JSON Schema |
+| Run | `run(agent, input)` | Same |
+| Result | `finalOutput`, `lastAgent`, `newItems`, `interruptions`, `state` | Same |
+| Stream | `run(agent, input, { stream: true })`, `toTextStream()`, `completed` | Same; events are simpler (`text_delta`, `tool_call`, `handoff`...) |
+| Handoffs | `handoffs: [billing]`, `handoffDescription` | Same |
+| Agents as tools | `agent.asTool({ toolName, toolDescription })` | Same |
+| Structured output | `outputType: z.object(...)` | Same |
+| Guardrails | `inputGuardrails`, `outputGuardrails` with `tripwireTriggered` | Same |
+| Approvals | `needsApproval`, `result.state.approve(item)`, `run(agent, state)` | Same |
+| Context | `run(agent, input, { context })` | Same: never sent to the model provider or Cencori |
+| Max turns | `maxTurns` | Same |
+
+## What's different
+
+**Saving a paused run.** Both serialize the state. Restoring differs slightly:
+
+```ts
+// OpenAI
+const state = await RunState.fromString(agent, saved);
+
+// Cencori
+const state = RunState.fromJSON(saved);
+```
+
+Then approve or reject and call `run(agent, state)` as before. Cencori keeps the paused session for 24 hours; the request and decision land in your governance ledger.
+
+**Guardrail errors.** One class, `GuardrailTripwireTriggered`, with `kind: 'input' | 'output'` instead of two classes.
+
+**Conversations.** Each run is a Cencori session. To continue one, pass its id: `run(agent, input, { sessionId: result.sessionId })`. The session holds the history server-side.
+
+**Stream events.** Instead of raw model events plus run items, you get one flat list: `agent_updated`, `text_delta`, `tool_call`, `tool_output`, `handoff`, `widget`, `interruption`.
+
+## ChatKit to Agent UI
+
+| ChatKit | Agent UI |
+| --- | --- |
+| `<ChatKit control={useChatKit({ api: { getClientSecret } })} />` | `<AgentChat api="/api/chat" />` |
+| A ChatKit server (or Agent Builder workflow) | `createAgentChatHandler(agent)` in your own route, or a stored agent with no backend |
+| Widgets built in your server code | Widgets the model writes itself (`widgets: true`), or returned by your tools as `{ widget }` |
+| `Card`, `ListView`, `Text`, `Title`, `Badge`, `Button`, `Form`, `Select`... | The same idea, plus `Chart`, `Table` and `Stat`. See [Widgets](/docs/agent-ui/widgets) |
+| Actions: `{ type, payload, handler: 'server' \| 'client' }` | `{ type, payload, handler: 'agent' \| 'client' }` |
+| Theme options | `theme={{ colorScheme, accent, radius, density, fontFamily }}` and CSS variables |
+
+```ts
+// app/api/chat/route.ts
+import { createAgentChatHandler } from 'cencori/agents';
+import { agent } from '@/lib/agent';
+
+export const POST = createAgentChatHandler(agent);
+```
+
+```tsx
+// app/page.tsx
+import { AgentChat } from 'cencori/react';
+
+<AgentChat api="/api/chat" />
+```
+
+## Agent Builder to Cencori
+
+If your agent was built in Agent Builder rather than in code:
+
+- **No code needed:** build it under [Business Agents](/docs/agents/overview) in the console (instructions, knowledge, tools, website and WhatsApp), then put it in your app with `<AgentChat widgetKey="cwk_..." />`.
+- **Defined by API:** create a [stored agent](/docs/agents-api/stored-agents) and run it by id from the SDK (`Agent.fromCencori(id)`) or straight from a browser (`<AgentChat agent publishableKey />`).
+
+## Not here yet
+
+- **MCP servers on agents.** Coming. Until then, wrap the calls you need in a `tool()`.
+- **OpenAI hosted tools** (file search, code interpreter, computer use). Web search is available as a built-in tool on stored agents.
+- **Voice and realtime agents.** Use the [Voice API](/docs/api/voice) for now.
+- **Python.** The Agents SDK is TypeScript today; from Python, use the [Agents API](/docs/agents-api/overview) over HTTP.
+
+## A complete example
+
+The [Agent UI starter](https://github.com/cencori/cencori/tree/master/examples/agent-ui-starter) is a Next.js app with tools, widgets and an approval, ready to copy.

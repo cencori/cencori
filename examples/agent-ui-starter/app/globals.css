@@ -1,0 +1,5 @@
+/* The page follows the system's light or dark mode, like the chat (theme colorScheme 'auto'). */
+html, body { margin: 0; height: 100%; background: #ffffff; }
+@media (prefers-color-scheme: dark) {
+    html, body { background: #0a0a0a; }
+}

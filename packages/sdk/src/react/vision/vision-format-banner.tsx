@@ -5,12 +5,12 @@
  * for the Cencori Vision API. Zero external state — safe to embed anywhere,
  * including inside a customer's own product.
  *
- * Deps: react, lucide-react, tailwindcss.
+ * Deps: react, tailwindcss.
  */
 
 'use client';
 
-import { ImageIcon, Info } from 'lucide-react';
+import { ImageIcon, Info } from '../icons';
 import type { ReactNode } from 'react';
 
 export type VisionProvider = 'openai' | 'anthropic' | 'google';

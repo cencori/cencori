@@ -13,13 +13,13 @@
  *       onTranscript={(text) => console.log(text)}
  *   />
  *
- * Deps: react, lucide-react, tailwindcss.
+ * Deps: react, tailwindcss.
  */
 
 'use client';
 
 import { useCallback, useState } from 'react';
-import { AlertCircle, Loader2, Mic, Square } from 'lucide-react';
+import { AlertCircle, Loader2, Mic, Square } from '../icons';
 import { useVoiceRecorder } from './use-voice-recorder';
 
 export interface VoiceTranscript {

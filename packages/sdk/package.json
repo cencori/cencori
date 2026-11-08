@@ -1,7 +1,7 @@
 {
     "$schema": "https://json.schemastore.org/package.json",
     "name": "cencori",
-    "version": "1.12.1",
+    "version": "1.12.2",
     "description": "Cencori - The unified infrastructure layer for AI applications. One SDK for AI Gateway, Agents, Compute, Workflow, and Storage.",
     "main": "dist/index.js",
     "module": "dist/index.mjs",
@@ -131,7 +131,6 @@
     },
     "peerDependencies": {
         "@ai-sdk/provider": ">=1.0.0",
-        "lucide-react": ">=0.400.0",
         "react": ">=18.0.0"
     },
     "peerDependenciesMeta": {
@@ -139,9 +138,6 @@
             "optional": true
         },
         "react": {
-            "optional": true
-        },
-        "lucide-react": {
             "optional": true
         }
     },
@@ -151,7 +147,6 @@
         "@tanstack/ai": "^0.2.2",
         "@types/node": "^20.19.43",
         "@types/react": "^19.2.18",
-        "lucide-react": "^0.545.0",
         "react": "^19.2.1",
         "tsup": "^8.0.0",
         "typescript": "^5.3.0"

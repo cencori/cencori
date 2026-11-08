@@ -15,7 +15,7 @@
  * Streams by default (SSE). Zero external state — safe to embed in a
  * customer's own product.
  *
- * Deps: react, lucide-react, tailwindcss.
+ * Deps: react, tailwindcss.
  */
 
 'use client';
@@ -29,7 +29,7 @@ import {
     type FormEvent,
     type ReactNode,
 } from 'react';
-import { Brain, Loader2, Send } from 'lucide-react';
+import { Brain, Loader2, Send } from '../icons';
 
 // ── Public types ────────────────────────────────────────────────
 

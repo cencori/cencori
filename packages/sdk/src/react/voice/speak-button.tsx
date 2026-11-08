@@ -13,13 +13,13 @@
  *       model="aura-asteria-en"
  *   />
  *
- * Deps: react, lucide-react.
+ * Deps: react.
  */
 
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AlertCircle, Loader2, Pause, Volume2 } from 'lucide-react';
+import { AlertCircle, Loader2, Pause, Volume2 } from '../icons';
 
 export interface SpeakButtonProps {
     /** Text to synthesize. */
