@@ -68,7 +68,7 @@ interface RevenueResponse {
 }
 
 interface SyncResult {
-    bachs: { listed: number; paid: number; recorded: number };
+    bachs: { listed: number | null; recorded_charges: number; checked: number; unreadable: number; recorded: number };
     coincircuit: { recorded: number };
     total: number;
 }
@@ -244,7 +244,9 @@ export default function InternalRevenuePage() {
             {sync.isSuccess && (
                 <div className="mb-4 rounded-md border border-emerald-500/20 bg-emerald-500/[0.04] px-4 py-3 text-[11px] text-emerald-700 dark:text-emerald-400">
                     Synced {sync.data.total.toLocaleString()} payments: {sync.data.bachs.recorded.toLocaleString()} from Bachs
-                    ({sync.data.bachs.listed.toLocaleString()} listed, {sync.data.bachs.paid.toLocaleString()} paid) and{' '}
+                    ({sync.data.bachs.checked.toLocaleString()} charges checked
+                    {sync.data.bachs.unreadable ? `, ${sync.data.bachs.unreadable.toLocaleString()} unreadable` : ''}
+                    {sync.data.bachs.listed === null ? ', payins listing unavailable' : ''}) and{' '}
                     {sync.data.coincircuit.recorded.toLocaleString()} crypto top-ups.
                 </div>
             )}

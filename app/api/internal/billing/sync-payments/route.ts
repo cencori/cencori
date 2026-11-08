@@ -9,7 +9,9 @@ import { bachsPaymentRow, isPaidStatus, recordPayments, type PaymentRow } from '
 
 /**
  * Backfill and re-sync the revenue ledger (public.payments):
- *   - every paid Bachs payin, read back as a charge for fees and settlement;
+ *   - every paid Bachs charge we hold (collection webhooks, credit grants,
+ *     top-up rows) plus any the payins listing returns, each read back as a
+ *     charge for fees and settlement;
  *   - CoinCircuit crypto top-ups, rebuilt from the credit grants we keep.
  * Idempotent: rows upsert on (provider, provider_payment_id). Founders only,
  * since it reads payment data.
@@ -34,25 +36,96 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promis
     return results;
 }
 
-async function bachsRows(supabase: ReturnType<typeof createAdminClient>) {
+/** Bachs's payins listing, or null when it can't be read (it 404s for our account). */
+async function listAllPayins(): Promise<BachsPayin[] | null> {
     const payins: BachsPayin[] = [];
-    for (let page = 1; page <= MAX_PAGES; page++) {
-        const response = await listPayins({ page, per_page: PER_PAGE });
-        payins.push(...(response.payins ?? []));
-        if ((response.payins ?? []).length < PER_PAGE || page * PER_PAGE >= response.total_count) break;
+    try {
+        for (let page = 1; page <= MAX_PAGES; page++) {
+            const response = await listPayins({ page, per_page: PER_PAGE });
+            payins.push(...(response.payins ?? []));
+            if ((response.payins ?? []).length < PER_PAGE || page * PER_PAGE >= response.total_count) break;
+        }
+        return payins;
+    } catch (error) {
+        console.warn('[Payments sync] Bachs payins listing unavailable; using recorded charges', error);
+        return null;
+    }
+}
+
+/**
+ * Charge IDs we hold ourselves, with the org each belongs to when known. The
+ * payins listing doesn't return our customers' charges (see
+ * lib/billing/bachs-invoices.ts), so these are the source of truth: every
+ * signed collection webhook, plus the credit grants and top-up rows.
+ */
+async function recordedBachsCharges(supabase: ReturnType<typeof createAdminClient>): Promise<Map<string, string | null>> {
+    const charges = new Map<string, string | null>();
+    const add = (chargeId: unknown, orgId: unknown) => {
+        if (typeof chargeId !== 'string' || !chargeId.trim()) return;
+        const org = typeof orgId === 'string' && orgId ? orgId : null;
+        if (!charges.has(chargeId) || (org && !charges.get(chargeId))) charges.set(chargeId, org);
+    };
+
+    const { data: events, error: eventsError } = await supabase
+        .from('webhook_events')
+        .select('charge_id')
+        .eq('event_type', 'collection.succeeded')
+        .not('charge_id', 'is', null);
+    if (eventsError) throw eventsError;
+    for (const event of events ?? []) add(event.charge_id, null);
+
+    const { data: grants, error: grantsError } = await supabase
+        .from('payment_credit_grants')
+        .select('payment_reference, organization_id')
+        .eq('provider', 'bachs');
+    if (grantsError) throw grantsError;
+    for (const grant of grants ?? []) add(grant.payment_reference, grant.organization_id);
+
+    const { data: topups, error: topupsError } = await supabase
+        .from('credit_transactions')
+        .select('organization_id, metadata')
+        .eq('transaction_type', 'topup')
+        .eq('metadata->>payment_provider', 'bachs');
+    if (topupsError) throw topupsError;
+    for (const tx of topups ?? []) {
+        add((tx.metadata as Record<string, unknown> | null)?.payment_reference, tx.organization_id);
     }
 
-    const paid = payins.filter((payin) => isPaidStatus(payin.status));
-    const rows = (await mapLimit(paid, CONCURRENCY, async (payin) => {
+    return charges;
+}
+
+async function bachsRows(supabase: ReturnType<typeof createAdminClient>) {
+    const payins = await listAllPayins();
+    const recorded = await recordedBachsCharges(supabase);
+
+    // One entry per charge: the payin (when listed) is the fallback if the charge can't be read.
+    const sources = new Map<string, { payin: BachsPayin | null; orgId: string | null }>();
+    for (const [chargeId, orgId] of recorded) sources.set(chargeId, { payin: null, orgId });
+    const paidPayins = (payins ?? []).filter((payin) => isPaidStatus(payin.status));
+    for (const payin of paidPayins) {
+        const key = payin.charge_id ?? payin.id;
+        sources.set(key, { payin, orgId: sources.get(key)?.orgId ?? null });
+    }
+
+    let unreadable = 0;
+    const customerOf = new Map<string, string | undefined>();
+    const rows = (await mapLimit([...sources], CONCURRENCY, async ([chargeId, source]) => {
         // The charge carries the fee and settlement; fall back to the payin.
-        if (payin.charge_id) {
-            try {
-                return bachsPaymentRow(await getCharge(payin.charge_id));
-            } catch {
-                /* use the payin below */
+        let row: PaymentRow | null = null;
+        try {
+            const charge = await getCharge(chargeId);
+            customerOf.set(chargeId, charge.customer?.id);
+            row = bachsPaymentRow(charge);
+        } catch {
+            if (source.payin) {
+                customerOf.set(chargeId, source.payin.customer?.id);
+                row = bachsPaymentRow(source.payin);
+            } else {
+                unreadable++;
             }
         }
-        return bachsPaymentRow(payin);
+        if (row && !row.organization_id) row.organization_id = source.orgId;
+        return row;
     })).filter((row): row is PaymentRow => row !== null);
 
     // Subscriptions don't always carry org_id; Bachs customers map to orgs.
@@ -61,7 +134,6 @@ async function bachsRows(supabase: ReturnType<typeof createAdminClient>) {
         .select('id, bachs_customer_id')
         .not('bachs_customer_id', 'is', null);
     const byCustomer = new Map((orgs ?? []).map((org) => [org.bachs_customer_id as string, org.id as string]));
-    const customerOf = new Map(paid.map((payin) => [payin.charge_id ?? payin.id, payin.customer?.id]));
     for (const row of rows) {
         if (!row.organization_id) {
             const customerId = customerOf.get(row.provider_payment_id);
@@ -69,7 +141,13 @@ async function bachsRows(supabase: ReturnType<typeof createAdminClient>) {
         }
     }
 
-    return { listed: payins.length, paid: paid.length, rows };
+    return {
+        listed: payins?.length ?? null,
+        recorded_charges: recorded.size,
+        checked: sources.size,
+        unreadable,
+        rows,
+    };
 }
 
 async function coinCircuitRows(supabase: ReturnType<typeof createAdminClient>): Promise<PaymentRow[]> {
@@ -145,7 +223,13 @@ export async function POST() {
             recorded += await recordPayments(admin, all.slice(i, i + 200));
         }
         return NextResponse.json({
-            bachs: { listed: bachs.listed, paid: bachs.paid, recorded: bachs.rows.length },
+            bachs: {
+                listed: bachs.listed,
+                recorded_charges: bachs.recorded_charges,
+                checked: bachs.checked,
+                unreadable: bachs.unreadable,
+                recorded: bachs.rows.length,
+            },
             coincircuit: { recorded: crypto.length },
             total: recorded,
         });
