@@ -359,6 +359,15 @@ export default function InternalEmailsPage() {
     const [category, setCategory] = useState('announcement');
     const [audienceType, setAudienceType] = useState<'bulk' | 'single' | 'newsletter'>('single');
     const [singleRecipient, setSingleRecipient] = useState('');
+    // ?to= from admin search (components/internal/admin-search.tsx) starts a draft to that address.
+    useEffect(() => {
+        const to = new URLSearchParams(window.location.search).get('to');
+        if (to) {
+            setActiveTab('compose');
+            setAudienceType('single');
+            setSingleRecipient(to);
+        }
+    }, []);
     const [selectedProfileId, setSelectedProfileId] = useState('');
     const [isSending, setIsSending] = useState(false);
     const [sendResult, setSendResult] = useState<{ success: boolean; message: string } | null>(null);

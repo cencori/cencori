@@ -53,6 +53,28 @@ export const adminUsers = {
         };
     },
 
+    /** Users whose email or name contains `query` (case-insensitive), newest first. */
+    async searchUsers(query: string, limit = 8): Promise<Result<{ users: User[] }>> {
+        const q = query.trim();
+        if (!q) return { data: { users: [] }, error: null };
+        if (!isBetterAuthEnabled()) {
+            // Supabase's admin API can't filter; scan the first page.
+            const { data, error } = await createAdminClient().auth.admin.listUsers({ page: 1, perPage: 1000 });
+            const needle = q.toLowerCase();
+            const users = (data?.users ?? []).filter((u) =>
+                u.email?.toLowerCase().includes(needle)
+                || String(u.user_metadata?.full_name ?? u.user_metadata?.name ?? '').toLowerCase().includes(needle));
+            return { data: { users: users.slice(0, limit) }, error };
+        }
+        const ctx = await betterAuthContext();
+        const users = await ctx.internalAdapter.listUsers(limit, 0, { field: "createdAt", direction: "desc" }, [
+            // Both OR: the adapter ANDs every non-OR clause with the OR group.
+            { field: "email", operator: "contains", value: q, mode: "insensitive", connector: "OR" },
+            { field: "name", operator: "contains", value: q, mode: "insensitive", connector: "OR" },
+        ]);
+        return { data: { users: users.map(asUser) }, error: null };
+    },
+
     // Callers pass the full merged user_metadata, as with Supabase. A name in
     // it also updates the Better Auth user's name, which is what the app shows.
     async updateUserById(

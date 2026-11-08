@@ -10,9 +10,9 @@ import Wallet01Icon from '@hugeicons/core-free-icons/Wallet01Icon';
 import Mail01Icon from '@hugeicons/core-free-icons/Mail01Icon';
 import BubbleChatIcon from '@hugeicons/core-free-icons/BubbleChatIcon';
 import Settings02Icon from '@hugeicons/core-free-icons/Settings02Icon';
-import Menu01Icon from '@hugeicons/core-free-icons/Menu01Icon';
-import Cancel01Icon from '@hugeicons/core-free-icons/Cancel01Icon';
+import Search01Icon from '@hugeicons/core-free-icons/Search01Icon';
 import { ArrowUpRight, Check, ChevronsUpDown, LayoutDashboard, LogOut } from 'lucide-react';
+import { Drawer } from 'vaul';
 import { ReactQueryProvider } from '@/lib/providers/ReactQueryProvider';
 import {
     Sidebar,
@@ -38,6 +38,8 @@ import { Logo } from '@/components/logo';
 import { browserAuth } from '@/lib/auth/browser-auth';
 import { adminHref } from '@/lib/admin/routing';
 import { cn } from '@/lib/utils';
+import { AdminSearch } from '@/components/internal/admin-search';
+import { MobileTabBar } from '@/components/dashboard/MobileTabBar';
 
 // The internal panel's shell, built from the same sidebar parts and account
 // menu styling as the console (app/(app)/[orgSlug]/OrganizationLayoutClient.tsx,
@@ -129,6 +131,111 @@ function AccountMenu({ userEmail, userName, userAvatar, side = 'top' }: Account 
     );
 }
 
+// Phone sheets snap like the console's nav sheet: open at half the screen,
+// drag up for full height, drag down to close.
+const SHEET_SNAPS = [0.5, 1] as const;
+
+function MobileSheet({
+    open,
+    onOpenChange,
+    title,
+    description,
+    trigger,
+    children,
+}: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    title: string;
+    description: string;
+    trigger?: React.ReactNode;
+    children: React.ReactNode;
+}) {
+    const [snap, setSnap] = useState<number | string | null>(SHEET_SNAPS[0]);
+    return (
+        <Drawer.Root
+            open={open}
+            onOpenChange={onOpenChange}
+            snapPoints={[...SHEET_SNAPS]}
+            activeSnapPoint={snap}
+            setActiveSnapPoint={setSnap}
+            fadeFromIndex={0}
+            // Back to half height only once the close animation has finished:
+            // changing the snap point on open, or mid-close, makes vaul re-animate.
+            onAnimationEnd={(isOpen) => {
+                if (!isOpen) setSnap(SHEET_SNAPS[0]);
+            }}
+            // No iOS position:fixed body lock; restoring the scroll from it hitched the close.
+            noBodyStyles
+        >
+            {trigger && <Drawer.Trigger asChild>{trigger}</Drawer.Trigger>}
+            <Drawer.Portal>
+                <Drawer.Overlay className="fixed inset-0 z-50 bg-black/50 md:hidden" />
+                <Drawer.Content className="fixed inset-x-0 bottom-0 z-50 flex h-[100svh] flex-col rounded-t-2xl bg-background outline-none md:hidden">
+                    <Drawer.Title className="sr-only">{title}</Drawer.Title>
+                    <Drawer.Description className="sr-only">{description}</Drawer.Description>
+                    <div aria-hidden="true" className="mx-auto mb-1 mt-3 h-1 w-10 shrink-0 rounded-full bg-muted-foreground/40" />
+                    {/* Scrolls only at full height, so a drag on the content moves the sheet until then. */}
+                    <div className={cn('min-h-0 flex-1 pb-24', snap === SHEET_SNAPS[1] ? 'overflow-y-auto' : 'overflow-hidden')}>
+                        {children}
+                    </div>
+                </Drawer.Content>
+            </Drawer.Portal>
+        </Drawer.Root>
+    );
+}
+
+/** The account menu as a bottom sheet on phones, like the console's sheets. */
+function AccountSheet({ userEmail, userName, userAvatar }: Account) {
+    const [open, setOpen] = useState(false);
+    const display = userName || userEmail;
+    const rowClass = 'flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-[15px] transition-colors hover:bg-muted/60';
+    return (
+        <MobileSheet
+            open={open}
+            onOpenChange={setOpen}
+            title="Account"
+            description="Your account, theme and sign-out."
+            trigger={
+                <button
+                    type="button"
+                    className="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border transition-colors hover:bg-secondary"
+                    aria-label="Account menu"
+                >
+                    <UserAvatar src={userAvatar} name={userName} email={userEmail} size={28} className="border-0" />
+                </button>
+            }
+        >
+                    <div className="flex items-center gap-3 px-5 pb-3 pt-1">
+                        <UserAvatar src={userAvatar} name={userName} email={userEmail} size={36} />
+                        <div className="min-w-0">
+                            <p className="truncate text-[15px] font-medium">{display}</p>
+                            {userName && <p className="truncate text-[12px] text-muted-foreground">{userEmail}</p>}
+                        </div>
+                    </div>
+                    <div className="mx-5 border-t border-border/40" />
+                    <div className="flex min-h-12 items-center justify-between px-5">
+                        <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Theme</p>
+                        <ThemeSwitcher />
+                    </div>
+                    <div className="mx-5 border-t border-border/40" />
+                    <div className="space-y-0.5 px-2 pt-2">
+                        <a href={CONSOLE_URL} className={rowClass}>
+                            <span className="flex-1">Live Console</span>
+                            <LayoutDashboard className="size-4 text-muted-foreground" />
+                        </a>
+                        <a href="https://cencori.com" className={rowClass}>
+                            <span className="flex-1">Homepage</span>
+                            <span className="size-3.5"><Logo variant="mark" className="h-full w-full" /></span>
+                        </a>
+                        <button type="button" onClick={() => void signOut()} className={cn(rowClass, 'text-red-500')}>
+                            <span className="flex-1">Log out</span>
+                            <LogOut className="size-4" />
+                        </button>
+                    </div>
+        </MobileSheet>
+    );
+}
+
 function Brand() {
     return <span className="truncate text-sm font-medium">Admin Console</span>;
 }
@@ -197,6 +304,7 @@ export function InternalShell({
 } & Account) {
     const pathname = usePathname();
     const [mobileOpen, setMobileOpen] = useState(false);
+    const [searchOpen, setSearchOpen] = useState(false);
     const account = { userEmail, userName, userAvatar };
     const home = adminHref(pathname, '/');
 
@@ -213,6 +321,15 @@ export function InternalShell({
                     </SidebarHeader>
                     <SidebarContent>
                         <SidebarGroup className="pt-3">
+                            <SidebarMenu className="mb-1">
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton size="sm" tooltip="Search" onClick={() => setSearchOpen(true)}>
+                                        <HugeiconsIcon icon={Search01Icon} className="!h-5 !w-5" />
+                                        <span className="flex-1 text-sm">Search</span>
+                                        <kbd className="rounded border border-border/60 px-1.5 font-mono text-[10px] text-muted-foreground">⌘K</kbd>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+                            </SidebarMenu>
                             <NavMenu pathname={pathname} />
                         </SidebarGroup>
                     </SidebarContent>
@@ -223,42 +340,39 @@ export function InternalShell({
 
                 {/* Phone top bar */}
                 <div className="fixed left-0 right-0 top-0 z-40 flex h-12 items-center justify-between border-b border-border/40 bg-background/95 px-3 backdrop-blur-sm md:hidden">
-                    <div className="flex items-center gap-1">
-                        <button
-                            onClick={() => setMobileOpen(true)}
-                            className="rounded-md p-2 text-muted-foreground hover:bg-muted/50"
-                            aria-label="Open menu"
-                        >
-                            <HugeiconsIcon icon={Menu01Icon} className="h-5 w-5" strokeWidth={1.6} />
-                        </button>
-                        <Link href={home}><Brand /></Link>
-                    </div>
-                    <AccountMenu {...account} side="bottom" />
+                    <Link href={home} className="px-1"><Brand /></Link>
+                    <AccountSheet {...account} />
                 </div>
 
-                {/* Phone menu */}
-                {mobileOpen && (
-                    <div className="fixed inset-0 z-50 md:hidden">
-                        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
-                        <aside className="absolute bottom-0 left-0 top-0 flex w-64 flex-col border-r border-sidebar-border/70 bg-sidebar shadow-2xl animate-in slide-in-from-left duration-200">
-                            <div className="flex h-12 items-center justify-between gap-2 px-1.5">
-                                <WorkspaceSwitcher />
-                                <button
-                                    onClick={() => setMobileOpen(false)}
-                                    className="rounded-md p-1.5 text-muted-foreground hover:bg-muted/50"
-                                    aria-label="Close menu"
-                                >
-                                    <HugeiconsIcon icon={Cancel01Icon} className="h-4 w-4" strokeWidth={1.6} />
-                                </button>
+                {/* Phone quick actions: the console's floating pill (Find + menu) */}
+                <div className="md:hidden">
+                    <MobileTabBar
+                        onSearch={() => {
+                            setMobileOpen(false);
+                            setSearchOpen(true);
+                        }}
+                        onMenu={() => setMobileOpen((open) => !open)}
+                        menuOpen={mobileOpen}
+                    />
+                </div>
+
+                {/* Phone menu: a bottom sheet, like the console's nav sheet */}
+                <MobileSheet open={mobileOpen} onOpenChange={setMobileOpen} title="Navigation" description="Pages in the admin console.">
+                            <div className="flex h-11 items-center justify-between px-4">
+                                <span className="text-[15px] font-medium">Admin Console</span>
+                                <a href={CONSOLE_URL} className="flex items-center gap-1 text-[13px] text-muted-foreground hover:text-foreground">
+                                    Live Console
+                                    <ArrowUpRight className="size-3.5" />
+                                </a>
                             </div>
-                            <div className="flex-1 px-2 pt-3">
+                            <div className="px-2 pt-2">
                                 <NavMenu pathname={pathname} onNavigate={() => setMobileOpen(false)} />
                             </div>
-                        </aside>
-                    </div>
-                )}
+                </MobileSheet>
 
-                <main className="min-h-screen min-w-0 flex-1 overflow-y-auto pt-12 md:pt-0">
+                <AdminSearch open={searchOpen} onOpenChange={setSearchOpen} />
+
+                <main className="min-h-screen min-w-0 flex-1 overflow-y-auto pb-24 pt-12 md:pb-0 md:pt-0">
                     {children}
                 </main>
             </SidebarProvider>

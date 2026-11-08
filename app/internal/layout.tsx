@@ -4,6 +4,11 @@ import { createAdminClient } from '@/lib/supabaseAdmin';
 import { checkInternalAccess } from '@/lib/internal-access';
 import { InternalShell } from '@/components/internal/internal-shell';
 import { InternalLoginForm } from '@/components/internal/internal-login-form';
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+    title: { absolute: 'Admin Console' },
+};
 
 export default async function InternalLayout({
     children,
