@@ -306,7 +306,7 @@ function LayoutContent({ user, avatar, name, children, initialAgentOpen, initial
   // The memory graph is a canvas: it fills the workspace edge to edge.
   const isMemoryGraph = /\/memory\/graph\/?$/.test(pathname);
   // A session's trace (/observability/<id>) fills the workspace edge to edge too.
-  const isSessionTrace = /\/observability\/[^/]+\/?$/.test(pathname);
+  const isSessionTrace = /\/observability\/sessions\/[^/]+\/?$/.test(pathname);
   const isFixedWorkspace = isPlayground || isAgentWorkspace || isMemoryGraph || isCopilotPage || isSessionTrace;
   // Phones get a bottom tab bar instead of the top bar, except in full-screen
   // workspaces, which put their own actions in the top bar and a composer at

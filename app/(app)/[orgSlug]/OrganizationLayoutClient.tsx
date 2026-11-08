@@ -134,6 +134,10 @@ function isCopilotPath(pathname: string): boolean {
     return /\/copilot(\/|$)/.test(pathname);
 }
 
+function isObservabilityPath(pathname: string): boolean {
+    return /\/observability(\/|$)/.test(pathname);
+}
+
 function isMemoryPath(pathname: string): boolean {
     return /\/memory(\/|$)/.test(pathname);
 }
@@ -230,7 +234,7 @@ export default function OrganizationLayoutClient({
     const isMemoryGraph = /\/memory\/graph\/?$/.test(pathname);
     const isCopilotPage = /\/copilot\/?$/.test(pathname);
     // A session's trace (/observability/<id>) fills the height, like the memory graph.
-    const isSessionTrace = /\/observability\/[^/]+\/?$/.test(pathname);
+    const isSessionTrace = /\/observability\/sessions\/[^/]+\/?$/.test(pathname);
     const isFixedWorkspace = isPlayground || isAgentWorkspace || isMemoryGraph || isCopilotPage || isSessionTrace;
     const docsUrl = getMainSiteUrl("/docs");
     const scopedArea = segments[2];
@@ -246,9 +250,10 @@ export default function OrganizationLayoutClient({
         : scopedArea;
     const isOrganizationSettingsView = !isInsideProject
         && ["settings", "teams", "billing", "usage", "audit-log"].includes(organizationSettingsArea ?? "");
-    const [activeView, setActiveView] = useState<"main" | "ai-gateway" | "memory" | "copilot" | "agent" | "project-settings" | "settings">(() => {
+    const [activeView, setActiveView] = useState<"main" | "ai-gateway" | "observability" | "memory" | "copilot" | "agent" | "project-settings" | "settings">(() => {
         if (isAiGatewayPath(pathname)) return "ai-gateway";
         if (isAgentPath(pathname)) return "agent";
+        if (isObservabilityPath(pathname)) return "observability";
         if (isMemoryPath(pathname)) return "memory";
         if (isCopilotPath(pathname)) return "copilot";
         if (isProjectSettingsView) return "project-settings";
@@ -312,6 +317,8 @@ export default function OrganizationLayoutClient({
     const aiGatewayHref = scopeProjectSlug ? scopedProjectHref("ai-gateway") : orgProductHref("ai-gateway");
     // Memory belongs to the selected project; without one there is no entry.
     const memoryHref = scopeProjectSlug ? scopedProjectHref("memory") : null;
+    // Observability belongs to the selected project too; it opens on Sessions.
+    const observabilityHref = scopeProjectSlug ? scopedProjectHref("observability/sessions") : null;
     // Copilot's pages live under the selected project's address, like Memory.
     const copilotHref = scopeProjectSlug ? scopedProjectHref("copilot") : null;
     // The sidebar Settings entry has one stable meaning: settings for the
@@ -398,6 +405,8 @@ export default function OrganizationLayoutClient({
             setActiveView("ai-gateway");
         } else if (isAgentPath(pathname)) {
             setActiveView("agent");
+        } else if (isObservabilityPath(pathname)) {
+            setActiveView("observability");
         } else if (isMemoryPath(pathname)) {
             setActiveView("memory");
         } else if (isCopilotPath(pathname)) {
@@ -477,16 +486,16 @@ export default function OrganizationLayoutClient({
     // Main sidebar groups. AI Gateway (a sub-menu toggle) leads BUILD.
     const buildItems = [
         { href: scopeProjectSlug ? scopedProjectHref("agents") : orgProductHref("agents"), icon: <HugeiconsIcon icon={ThreeDRotateIcon} className="!h-5 !w-5" />, label: "Agents" },
-        // Every agent conversation in the project, from any source (SDK, Arcie,
-        // widget, WhatsApp, API). Sessions belong to a project, so no org entry.
-        ...(scopeProjectSlug
-            ? [{ href: scopedProjectHref("observability"), icon: <HugeiconsIcon icon={Activity01Icon} className="!h-5 !w-5" />, label: "Sessions" }]
-            : []),
     ];
     const copilotSubItems = copilotHref
         ? [
             { href: copilotHref, icon: <HugeiconsIcon icon={PlusSignIcon} className="!h-5 !w-5" />, label: "New chat" },
             { href: `${copilotHref}/usage`, icon: <HugeiconsIcon icon={Chart01Icon} className="!h-5 !w-5" />, label: "Usage" },
+        ]
+        : [];
+    const observabilitySubItems = observabilityHref
+        ? [
+            { href: observabilityHref, icon: <HugeiconsIcon icon={LeftToRightListDashIcon} className="!h-5 !w-5" />, label: "Sessions" },
         ]
         : [];
     const memorySubItems = memoryHref
@@ -577,7 +586,7 @@ export default function OrganizationLayoutClient({
     const navMenu = (
         activeView === "agent" ? (
             <AgentSubnav />
-        ) : activeView === "ai-gateway" || (activeView === "memory" && memoryHref) || (activeView === "copilot" && copilotHref) ? (
+        ) : activeView === "ai-gateway" || (activeView === "observability" && observabilityHref) || (activeView === "memory" && memoryHref) || (activeView === "copilot" && copilotHref) ? (
             <>
                 <SidebarMenuItem>
                     <SidebarMenuButton
@@ -589,7 +598,7 @@ export default function OrganizationLayoutClient({
                         <span className="text-sm">Back</span>
                     </SidebarMenuButton>
                 </SidebarMenuItem>
-                {(activeView === "memory" ? memorySubItems : activeView === "copilot" ? copilotSubItems : projectSubItems).map((item) => (
+                {(activeView === "observability" ? observabilitySubItems : activeView === "memory" ? memorySubItems : activeView === "copilot" ? copilotSubItems : projectSubItems).map((item) => (
                     <SidebarMenuItem key={item.href}>
                         <SidebarMenuButton
                             asChild
@@ -598,7 +607,7 @@ export default function OrganizationLayoutClient({
                             // is highlighted under Recent chats instead.
                             isActive={item.href !== copilotHref && (isActive(item.href) || (
                                 pendingSubnavEntry === activeView
-                                && (item.href === aiGatewayHref || item.href === memoryHref)
+                                && (item.href === aiGatewayHref || item.href === memoryHref || item.href === observabilityHref)
                             ))}
                             size="sm"
                         >
@@ -735,6 +744,32 @@ export default function OrganizationLayoutClient({
                     </SidebarMenuButton>
                 </SidebarMenuItem>
                 {buildItems.map(renderMenuItem)}
+                {/* Observability toggle: every agent session in the project, and more views to come. */}
+                {observabilityHref && (
+                    <SidebarMenuItem>
+                        <SidebarMenuButton
+                            asChild
+                            isActive={isObservabilityPath(pathname)}
+                            size="sm"
+                            className="gap-1"
+                        >
+                            <Link
+                                href={observabilityHref}
+                                prefetch={true}
+                                data-subnav-toggle=""
+                                onClick={() => {
+                                    setPendingSubnavEntry("observability");
+                                    setActiveView("observability");
+                                }}
+                                onMouseEnter={() => prefetchRoute(observabilityHref)}
+                            >
+                                <HugeiconsIcon icon={Activity01Icon} className="!h-5 !w-5" />
+                                <span className="text-sm">Observability</span>
+                                <ChevronRight className="!h-3 !w-3 ml-auto text-muted-foreground/50" />
+                            </Link>
+                        </SidebarMenuButton>
+                    </SidebarMenuItem>
+                )}
                 {/* Memory toggle */}
                 {memoryHref && (
                     <SidebarMenuItem>
