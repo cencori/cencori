@@ -5,8 +5,9 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { ExternalLink, Play, RefreshCw, Search, X } from 'lucide-react';
-import { HugeiconsIcon } from '@hugeicons/react';
 import LeftToRightListDashIcon from '@hugeicons/core-free-icons/LeftToRightListDashIcon';
+import Activity01Icon from '@hugeicons/core-free-icons/Activity01Icon';
+import { ObservabilityEmptyState } from '@/components/observability/EmptyState';
 import { useProjectIdBySlug } from '@/lib/hooks/useQueries';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StatusBadge } from '@/components/audit/StatusBadge';
@@ -242,13 +243,12 @@ export default function RequestLogsPage({ params }: PageProps) {
                     ) : error ? (
                         <p className="py-16 text-center text-xs text-muted-foreground">{error instanceof Error ? error.message : 'Could not load request logs.'}</p>
                     ) : requests.length === 0 ? (
-                        <div className="flex flex-col items-center py-24 text-center">
-                            <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-md border border-border/60">
-                                <HugeiconsIcon icon={LeftToRightListDashIcon} className="h-5 w-5 text-muted-foreground" />
-                            </div>
-                            <p className="text-sm font-medium">No requests{filtered ? ' match these filters' : ' in this time range'}</p>
-                            <p className="mt-1 max-w-sm text-xs text-muted-foreground">{filtered ? 'Change the filters in the sidebar.' : 'Make a model call through the gateway and it shows up here.'}</p>
-                        </div>
+                        <ObservabilityEmptyState
+                            icon={LeftToRightListDashIcon}
+                            title={`No requests${filtered ? ' match these filters' : ' in this time range'}`}
+                            description={filtered ? 'Change the filters in the sidebar.' : 'Make a model call through the gateway and it shows up here.'}
+                            otherSources={[{ href: tracesHref, icon: Activity01Icon, label: 'Traces', description: 'Agent sessions, turn by turn' }]}
+                        />
                     ) : (
                         <>
                             {requests.map((r) => (

@@ -4,8 +4,9 @@ import { use, useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { Download, Play, RefreshCw, Search } from 'lucide-react';
-import { HugeiconsIcon } from '@hugeicons/react';
 import Activity01Icon from '@hugeicons/core-free-icons/Activity01Icon';
+import LeftToRightListDashIcon from '@hugeicons/core-free-icons/LeftToRightListDashIcon';
+import { ObservabilityEmptyState } from '@/components/observability/EmptyState';
 import { useProjectIdBySlug } from '@/lib/hooks/useQueries';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SESSION_SOURCE_LABELS, type SessionSource } from '@/lib/sessions/observability';
@@ -171,15 +172,12 @@ export default function TracesPage({ params }: PageProps) {
                 ) : error ? (
                     <p className="py-16 text-center text-xs text-muted-foreground">{error instanceof Error ? error.message : 'Could not load traces.'}</p>
                 ) : sessions.length === 0 ? (
-                    <div className="flex flex-col items-center py-24 text-center">
-                        <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-md border border-border/60">
-                            <HugeiconsIcon icon={Activity01Icon} className="h-5 w-5 text-muted-foreground" />
-                        </div>
-                        <p className="text-sm font-medium">No traces{filtered ? ' match these filters' : ' yet'}</p>
-                        <p className="mt-1 max-w-sm text-xs text-muted-foreground">
-                            {filtered ? 'Change the filters in the sidebar.' : 'Run an agent with cencori/agents, Arcie or an embedded agent and its traces show up here.'}
-                        </p>
-                    </div>
+                    <ObservabilityEmptyState
+                        icon={Activity01Icon}
+                        title={`No traces${filtered ? ' match these filters' : ' yet'}`}
+                        description={filtered ? 'Change the filters in the sidebar.' : 'Run an agent with cencori/agents, Arcie or an embedded agent and its traces show up here.'}
+                        otherSources={[{ href: pathname.replace(/\/traces\/?$/, '/request-logs'), icon: LeftToRightListDashIcon, label: 'Request logs', description: 'Every model call through the gateway' }]}
+                    />
                 ) : (
                     <>
                         {sessions.map((s) => (
