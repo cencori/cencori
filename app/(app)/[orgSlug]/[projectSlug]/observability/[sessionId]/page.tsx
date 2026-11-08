@@ -13,7 +13,6 @@ import { RequestDetailModal } from '@/components/audit/RequestDetailModal';
 import { SESSION_SOURCE_LABELS, type SessionSource, type TimelineTurn } from '@/lib/sessions/observability';
 import { buildSpans, formatTick, niceTicks, packLanes, traceBounds, type SpanKind, type TraceSpan } from '@/lib/sessions/trace-spans';
 import { SessionStatusBadge, formatDuration, formatSessionCost } from '@/components/sessions/session-ui';
-import { Logo } from '@/components/logo';
 import { cn } from '@/lib/utils';
 
 // A session as a trace, in the style of Vercel's tracing: a Trace tab with
@@ -80,11 +79,6 @@ const BAR_STYLE: Record<SpanKind, string> = {
 const KIND_LABEL: Record<SpanKind, string> = { session: 'Session', generation: 'Model call', tool: 'Tool', handoff: 'Handoff', agent: 'Agent' };
 
 // ── small parts ─────────────────────────────────────────────────────────
-
-/** Marks a span, in place of a generic glyph: the Cencori mark. */
-function SpanMark() {
-    return <span aria-hidden className="size-2.5 shrink-0 opacity-50"><Logo variant="mark" className="h-full w-full" /></span>;
-}
 
 function CopyButton({ text }: { text: string }) {
     const [copied, setCopied] = useState(false);
@@ -225,7 +219,6 @@ function TimelineView({ spans, bounds, selectedId, onSelect }: ViewProps) {
                                             )}
                                             style={pos(s)}
                                         >
-                                            <SpanMark />
                                             <span className="truncate">{s.name}</span>
                                             <span className="ml-auto shrink-0 pl-1 font-mono text-[10px] text-muted-foreground">{formatDuration(d)}</span>
                                         </button>
@@ -281,7 +274,6 @@ function RowsView({ spans, bounds, selectedId, onSelect, tree }: ViewProps & { t
                                     {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
                                 </button>
                             ) : tree ? <span className="w-3" /> : <span className={cn('h-1 w-1 shrink-0 rounded-full', s.id === selectedId ? 'bg-blue-500' : 'bg-muted-foreground/50')} />}
-                            <SpanMark />
                             <span className="truncate">{s.name}</span>
                             {s.detail && <span className="truncate text-muted-foreground">{s.detail}</span>}
                         </div>
