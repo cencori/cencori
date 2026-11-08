@@ -40,7 +40,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ pro
             .order('sequence', { ascending: true })
             .limit(MAX_EVENTS),
         admin.from('sessions')
-            .select('id, status, metadata, last_turn_number, total_cost_usd, created_at')
+            .select('id, status, metadata, last_turn_number, total_cost_usd, created_at, updated_at')
             .eq('project_id', projectId)
             .eq('metadata->>parent_session_id', sessionId)
             .order('created_at', { ascending: true })
@@ -107,6 +107,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ pro
             turns: (c.last_turn_number as number | null) ?? 0,
             cost_usd: Number(c.total_cost_usd ?? 0),
             created_at: c.created_at,
+            updated_at: c.updated_at,
             source: sessionSource(c),
         })),
     });

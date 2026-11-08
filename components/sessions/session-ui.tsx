@@ -18,9 +18,13 @@ export function SessionStatusBadge({ status, label }: { status: string; label?: 
     );
 }
 
+const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+
+/** Log-line time, as in the trace: NOV 08 16:14:36.24 */
 export function formatSessionTime(iso: string): string {
-    const date = new Date(iso);
-    return date.toLocaleString(undefined, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+    const d = new Date(iso);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${MONTHS[d.getMonth()]} ${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${pad(Math.floor(d.getMilliseconds() / 10))}`;
 }
 
 export function formatSessionCost(usd: number): string {

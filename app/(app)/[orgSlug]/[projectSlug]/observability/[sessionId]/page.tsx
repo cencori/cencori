@@ -2,21 +2,24 @@
 
 import { use, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Check, ChevronDown, ChevronRight, Copy, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, ChevronRight, Copy, ExternalLink, Minus, Search, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { useProjectIdBySlug } from '@/lib/hooks/useQueries';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RequestDetailModal } from '@/components/audit/RequestDetailModal';
-import { SESSION_SOURCE_LABELS, type SessionSource, type TimelineToolCall, type TimelineTurn } from '@/lib/sessions/observability';
-import { SessionStatusBadge, formatDuration, formatSessionCost, formatSessionTime } from '@/components/sessions/session-ui';
+import { SESSION_SOURCE_LABELS, type SessionSource, type TimelineTurn } from '@/lib/sessions/observability';
+import { buildSpans, formatTick, niceTicks, packLanes, traceBounds, type SpanKind, type TraceSpan } from '@/lib/sessions/trace-spans';
+import { SessionStatusBadge, formatDuration, formatSessionCost } from '@/components/sessions/session-ui';
 import { cn } from '@/lib/utils';
 
-// A session as a trace, in the shape of Langfuse: a tree of observations
-// (the session, each turn's model call, the tools it called, handoffs and
-// the agents it ran as tools) on a shared time axis, and the selected
-// observation in full: its exact input, its output, and its metadata.
+// A session as a trace, in the style of Vercel's tracing: a Trace tab with
+// Timeline, Tree and Waterfall views of the spans on one time axis (the
+// session, each turn's model call, its tools and handoffs, sub-agent runs),
+// an Events tab with the session's log, and the selected span in full on
+// the right: its identifiers, timing, cost, exact input and output.
 
 interface PageProps {
     params: Promise<{ orgSlug: string; projectSlug: string; sessionId: string }>;
@@ -28,32 +31,18 @@ type Turn = TimelineTurn & {
 
 interface SessionDetail {
     session: {
-        id: string;
-        status: string;
-        source: SessionSource;
-        agent: string | null;
-        user: string | null;
-        turns: number;
-        cost_usd: number;
-        usage: { inputTokens: number; outputTokens: number };
-        parent_session_id: string | null;
-        duration_ms: number | null;
-        tool_calls: number;
-        models: string[];
-        agents: string[];
-        metadata: Record<string, unknown>;
-        created_at: string;
-        updated_at: string;
-        expires_at: string | null;
+        id: string; status: string; source: SessionSource; agent: string | null; user: string | null; turns: number; cost_usd: number;
+        usage: { inputTokens: number; outputTokens: number }; parent_session_id: string | null; duration_ms: number | null;
+        tool_calls: number; models: string[]; agents: string[]; metadata: Record<string, unknown>;
+        created_at: string; updated_at: string; expires_at: string | null;
     };
     turns: Turn[];
     truncated: boolean;
-    children: Array<{ id: string; status: string; agent: string | null; turns: number; cost_usd: number; created_at: string }>;
+    children: Array<{ id: string; status: string; agent: string | null; turns: number; cost_usd: number; created_at: string; updated_at?: string }>;
 }
 
 interface TurnDetail {
     found: boolean;
-    model: string | null;
     instructions: string | null;
     messages: Array<{ role: string; content: unknown; tool_calls?: Array<{ id?: string; function?: { name?: string; arguments?: string } }>; tool_call_id?: string }>;
     messages_omitted: number;
@@ -61,99 +50,108 @@ interface TurnDetail {
     settings: Record<string, unknown>;
     metadata: Record<string, unknown> | null;
     security: Record<string, unknown> | null;
-    result: { event: string | null; output: unknown; actions: unknown; usage: unknown; trace: unknown; knowledge_citations: unknown };
+    result: { event: string | null; output: unknown; knowledge_citations: unknown };
 }
 
-type Selection =
-    | { kind: 'session' }
-    | { kind: 'turn'; turn: number }
-    | { kind: 'tool'; turn: number; callId: string };
+type View = 'timeline' | 'tree' | 'waterfall';
 
-type ObservationKind = 'SESSION' | 'GENERATION' | 'TOOL' | 'HANDOFF' | 'AGENT';
+// ── formatting ──────────────────────────────────────────────────────────
 
-const KIND_STYLE: Record<ObservationKind, string> = {
-    SESSION: 'bg-muted text-muted-foreground',
-    GENERATION: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
-    TOOL: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
-    HANDOFF: 'bg-violet-500/10 text-violet-600 dark:text-violet-400',
-    AGENT: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+function stamp(ms: number, withDate = true): string {
+    const d = new Date(ms);
+    const pad = (n: number, w = 2) => String(n).padStart(w, '0');
+    const time = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${pad(Math.floor(d.getMilliseconds() / 10))}`;
+    return withDate ? `${MONTHS[d.getMonth()]} ${pad(d.getDate())} ${time}` : time;
+}
+
+function spanDuration(span: TraceSpan): number | null {
+    return span.end === null ? null : span.end - span.start;
+}
+
+const BAR_STYLE: Record<SpanKind, string> = {
+    session: 'border-border bg-muted/40',
+    generation: 'border-blue-500/40 bg-blue-500/10',
+    tool: 'border-amber-500/40 bg-amber-500/10',
+    handoff: 'border-violet-500/40 bg-violet-500/10',
+    agent: 'border-emerald-500/40 bg-emerald-500/10',
 };
+const KIND_LABEL: Record<SpanKind, string> = { session: 'Session', generation: 'Model call', tool: 'Tool', handoff: 'Handoff', agent: 'Agent' };
 
-function KindBadge({ kind }: { kind: ObservationKind }) {
-    return <span className={cn('shrink-0 rounded px-1 py-px font-mono text-[9px] font-medium tracking-wide', KIND_STYLE[kind])}>{kind}</span>;
-}
+// ── small parts ─────────────────────────────────────────────────────────
 
-function JsonBlock({ value, empty = '—' }: { value: unknown; empty?: string }) {
-    const text = value === null || value === undefined || value === ''
-        ? empty
-        : typeof value === 'string' ? value : JSON.stringify(value, null, 2);
-    return <pre className="max-h-[480px] overflow-auto whitespace-pre-wrap break-words rounded-md border border-border/40 bg-muted/20 p-3 font-mono text-[11px] leading-relaxed">{text}</pre>;
-}
-
-function CopyText({ text, label }: { text: string; label?: string }) {
+function CopyButton({ text }: { text: string }) {
     const [copied, setCopied] = useState(false);
     return (
         <button
-            type="button"
-            onClick={() => { void navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1200); }}
-            className="inline-flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground hover:text-foreground"
-            aria-label={`Copy ${label ?? 'value'}`}
+            type="button" aria-label="Copy"
+            onClick={(e) => { e.stopPropagation(); void navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1200); }}
+            className="shrink-0 text-muted-foreground hover:text-foreground"
         >
-            {label ?? text}
             {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
         </button>
     );
 }
 
-function Chip({ label, value, tone }: { label: string; value: React.ReactNode; tone?: 'warn' | 'error' }) {
+function KV({ rows }: { rows: Array<[string, React.ReactNode, string?] | false | null | undefined> }) {
+    const visible = rows.filter(Boolean) as Array<[string, React.ReactNode, string?]>;
     return (
-        <div className={cn('rounded-md border px-2 py-1', tone === 'warn' ? 'border-amber-500/30 bg-amber-500/5' : tone === 'error' ? 'border-red-500/30 bg-red-500/5' : 'border-border/50')}>
-            <p className="text-[9px] uppercase tracking-wider text-muted-foreground">{label}</p>
-            <p className="font-mono text-[11px]">{value}</p>
+        <div className="divide-y divide-border/40 rounded-md border border-border/50">
+            {visible.map(([label, value, copy]) => (
+                <div key={label} className="flex items-center gap-3 px-3 py-2 text-xs">
+                    <span className="shrink-0 text-muted-foreground">{label}</span>
+                    <span className="ml-auto flex min-w-0 items-center gap-1.5 font-mono text-[11px]">
+                        <span className="truncate">{value}</span>
+                        {copy && <CopyButton text={copy} />}
+                    </span>
+                </div>
+            ))}
         </div>
     );
+}
+
+function Card({ title, summary, children, defaultOpen = false }: { title: string; summary?: React.ReactNode; children: React.ReactNode; defaultOpen?: boolean }) {
+    const [open, setOpen] = useState(defaultOpen);
+    return (
+        <div className="rounded-md border border-border/50">
+            <button type="button" onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs">
+                {open ? <ChevronDown className="h-3 w-3 text-muted-foreground" /> : <ChevronRight className="h-3 w-3 text-muted-foreground" />}
+                <span className="font-medium">{title}</span>
+                {summary !== undefined && <span className="ml-auto truncate font-mono text-[11px] text-muted-foreground">{summary}</span>}
+            </button>
+            {open && <div className="border-t border-border/40 p-3">{children}</div>}
+        </div>
+    );
+}
+
+function Pre({ value, empty = '—' }: { value: unknown; empty?: string }) {
+    const text = value === null || value === undefined || value === '' ? empty : typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+    return <pre className="max-h-[420px] overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed">{text}</pre>;
 }
 
 function contentText(content: unknown): string {
     if (content === null || content === undefined) return '';
     if (typeof content === 'string') return content;
-    if (Array.isArray(content)) {
-        return content.map((part) => {
-            if (part && typeof part === 'object') {
-                const p = part as { type?: string; text?: string };
-                if (typeof p.text === 'string') return p.text;
-                return `[${p.type ?? 'part'}]`;
-            }
-            return String(part);
-        }).join('\n');
-    }
+    if (Array.isArray(content)) return content.map((p) => (p && typeof p === 'object' && typeof (p as { text?: unknown }).text === 'string' ? (p as { text: string }).text : `[${(p as { type?: string })?.type ?? 'part'}]`)).join('\n');
     return JSON.stringify(content, null, 2);
 }
 
-const ROLE_STYLE: Record<string, string> = {
-    system: 'border-l-muted-foreground/40',
-    user: 'border-l-blue-500/60',
-    assistant: 'border-l-emerald-500/60',
-    tool: 'border-l-amber-500/60',
-};
+const ROLE_COLOR: Record<string, string> = { system: 'text-muted-foreground', user: 'text-blue-600 dark:text-blue-400', assistant: 'text-emerald-600 dark:text-emerald-400', tool: 'text-amber-700 dark:text-amber-400' };
 
-function MessageList({ detail }: { detail: TurnDetail }) {
+function Messages({ detail }: { detail: TurnDetail }) {
     return (
-        <div className="space-y-2">
+        <div className="space-y-2.5">
             {detail.messages_omitted > 0 && <p className="text-[11px] text-muted-foreground">{detail.messages_omitted} earlier messages not shown.</p>}
             {detail.messages.map((m, i) => (
-                <div key={i} className={cn('rounded-md border border-border/40 border-l-2 bg-muted/10 px-3 py-2', ROLE_STYLE[m.role] ?? 'border-l-border')}>
-                    <p className="mb-1 flex items-center gap-2 text-[10px] uppercase tracking-wider text-muted-foreground">
-                        {m.role}
-                        {m.tool_call_id && <span className="font-mono normal-case tracking-normal">result of {m.tool_call_id}</span>}
+                <div key={i}>
+                    <p className={cn('mb-0.5 font-mono text-[10px] uppercase', ROLE_COLOR[m.role] ?? 'text-muted-foreground')}>
+                        {m.role}{m.tool_call_id ? <span className="normal-case text-muted-foreground"> · result of {m.tool_call_id}</span> : null}
                     </p>
                     {contentText(m.content) && <p className="whitespace-pre-wrap break-words text-xs">{contentText(m.content)}</p>}
                     {m.tool_calls?.map((call, j) => (
-                        <div key={j} className="mt-1.5 rounded border border-border/40 bg-background/60 px-2 py-1 font-mono text-[11px]">
-                            <span className="text-amber-700 dark:text-amber-400">{call.function?.name}</span>
-                            <span className="text-muted-foreground"> ({call.id})</span>
-                            <pre className="mt-0.5 whitespace-pre-wrap break-all">{call.function?.arguments}</pre>
-                        </div>
+                        <p key={j} className="mt-0.5 break-all font-mono text-[11px]">
+                            <span className="text-amber-700 dark:text-amber-400">{call.function?.name}</span>({call.function?.arguments})
+                        </p>
                     ))}
                 </div>
             ))}
@@ -161,55 +159,173 @@ function MessageList({ detail }: { detail: TurnDetail }) {
     );
 }
 
-/** Where an observation sits on the session's time axis. */
-function Bar({ start, end, t0, span, kind }: { start: string; end: string | null; t0: number; span: number; kind: ObservationKind }) {
-    const s = Date.parse(start) - t0;
-    const e = (end ? Date.parse(end) : Date.now()) - t0;
-    const left = Math.min(100, Math.max(0, (s / span) * 100));
-    const width = Math.max(0.6, Math.min(100 - left, ((e - s) / span) * 100));
-    const color = kind === 'GENERATION' ? 'bg-blue-500/60' : kind === 'TOOL' ? 'bg-amber-500/60' : kind === 'HANDOFF' ? 'bg-violet-500/60' : kind === 'AGENT' ? 'bg-emerald-500/60' : 'bg-muted-foreground/40';
+// ── views ───────────────────────────────────────────────────────────────
+
+interface ViewProps {
+    spans: TraceSpan[];
+    bounds: { t0: number; span: number };
+    selectedId: string;
+    onSelect: (span: TraceSpan) => void;
+}
+
+function Ruler({ span, className }: { span: number; className?: string }) {
+    const ticks = niceTicks(span);
     return (
-        <div className="relative h-1.5 w-full rounded-full bg-muted/50">
-            <div className={cn('absolute top-0 h-1.5 rounded-full', color, !end && 'animate-pulse')} style={{ left: `${left}%`, width: `${width}%` }} />
+        <div className={cn('relative h-6 border-b border-border/40', className)}>
+            {ticks.map((t) => (
+                <span key={t} className="absolute top-1.5 border-l border-border/60 pl-1 font-mono text-[10px] text-muted-foreground" style={{ left: `${(t / span) * 100}%` }}>
+                    {formatTick(t)}
+                </span>
+            ))}
         </div>
     );
 }
 
-function TreeRow({
-    depth, kind, name, meta, selected, onClick, bar, expandable, expanded, onToggle,
-}: {
-    depth: number; kind: ObservationKind; name: React.ReactNode; meta: React.ReactNode; selected: boolean; onClick: () => void;
-    bar: React.ReactNode; expandable?: boolean; expanded?: boolean; onToggle?: () => void;
-}) {
+function TimelineView({ spans, bounds, selectedId, onSelect }: ViewProps) {
+    const [zoom, setZoom] = useState(1);
+    const lanes = useMemo(() => packLanes(spans), [spans]);
+    const pos = (s: TraceSpan) => {
+        const left = ((s.start - bounds.t0) / bounds.span) * 100;
+        const width = (((s.end ?? Date.now()) - s.start) / bounds.span) * 100;
+        return { left: `${Math.max(0, left)}%`, width: `${Math.max(0.3, Math.min(100 - left, width))}%` };
+    };
     return (
-        <div
-            role="button"
-            tabIndex={0}
-            onClick={onClick}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } }}
-            className={cn('grid cursor-pointer grid-cols-[minmax(0,1fr)_minmax(80px,32%)] items-center gap-3 border-b border-border/30 py-1.5 pr-3 text-xs hover:bg-muted/40', selected && 'bg-muted/60')}
-            style={{ paddingLeft: 8 + depth * 16 }}
-        >
-            <div className="flex min-w-0 items-center gap-1.5">
-                {expandable ? (
-                    <button type="button" onClick={(e) => { e.stopPropagation(); onToggle?.(); }} className="text-muted-foreground" aria-label={expanded ? 'Collapse' : 'Expand'}>
-                        {expanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-                    </button>
-                ) : <span className="w-3" />}
-                <KindBadge kind={kind} />
-                <span className="truncate">{name}</span>
-                <span className="ml-auto shrink-0 pl-2 font-mono text-[10px] text-muted-foreground">{meta}</span>
+        <div className="relative">
+            {/* Overview */}
+            <div className="mx-3 mt-3 rounded border border-border/50 bg-muted/20 px-1 py-1.5">
+                {lanes.map((lane, i) => (
+                    <div key={i} className="relative my-[2px] h-[3px]">
+                        {lane.map((s) => <div key={s.id} className={cn('absolute h-[3px] rounded-full', s.id === selectedId ? 'bg-blue-500' : 'bg-muted-foreground/40')} style={pos(s)} />)}
+                    </div>
+                ))}
             </div>
-            {bar}
+            <div className="overflow-x-auto px-3 pb-12">
+                <div style={{ width: `${zoom * 100}%` }} className="min-w-full">
+                    <Ruler span={bounds.span} className="mt-2" />
+                    <div className="space-y-1 pt-2">
+                        {lanes.map((lane, i) => (
+                            <div key={i} className="relative h-7">
+                                {lane.map((s) => {
+                                    const d = spanDuration(s);
+                                    return (
+                                        <button
+                                            key={s.id} type="button" onClick={() => onSelect(s)} title={`${s.name} · ${formatDuration(d)}`}
+                                            className={cn(
+                                                'absolute top-0 flex h-7 items-center gap-1.5 overflow-hidden rounded border px-2 text-left text-[11px] transition-colors',
+                                                BAR_STYLE[s.kind],
+                                                s.id === selectedId && 'border-blue-500 bg-blue-500/20 ring-1 ring-blue-500',
+                                                (s.status === 'error' || s.status === 'rejected') && 'border-red-500/60',
+                                                s.end === null && 'animate-pulse',
+                                            )}
+                                            style={pos(s)}
+                                        >
+                                            <span className="text-[8px] text-muted-foreground">▲</span>
+                                            <span className="truncate">{s.name}</span>
+                                            <span className="ml-auto shrink-0 pl-1 font-mono text-[10px] text-muted-foreground">{formatDuration(d)}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+            <div className="absolute bottom-3 right-3 flex overflow-hidden rounded-md border border-border/60 bg-background">
+                <button type="button" aria-label="Zoom out" disabled={zoom <= 1} onClick={() => setZoom((z) => Math.max(1, z / 2))} className="px-2 py-1.5 text-muted-foreground hover:text-foreground disabled:opacity-40"><ZoomOut className="h-3.5 w-3.5" /></button>
+                <button type="button" aria-label="Reset zoom" onClick={() => setZoom(1)} className="border-x border-border/60 px-2 py-1.5 text-muted-foreground hover:text-foreground"><Minus className="h-3.5 w-3.5" /></button>
+                <button type="button" aria-label="Zoom in" disabled={zoom >= 32} onClick={() => setZoom((z) => Math.min(32, z * 2))} className="px-2 py-1.5 text-muted-foreground hover:text-foreground disabled:opacity-40"><ZoomIn className="h-3.5 w-3.5" /></button>
+            </div>
         </div>
     );
 }
 
-function toolKind(call: TimelineToolCall): ObservationKind {
-    return call.handoff ? 'HANDOFF' : 'TOOL';
+function RowsView({ spans, bounds, selectedId, onSelect, tree }: ViewProps & { tree: boolean }) {
+    const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+    const hasChildren = useMemo(() => new Set(spans.map((s) => s.parentId).filter(Boolean) as string[]), [spans]);
+    const rows = useMemo(() => {
+        if (!tree) return [...spans].sort((a, b) => a.start - b.start || a.depth - b.depth);
+        const hidden = new Set<string>();
+        return spans.filter((s) => {
+            if (s.parentId && (collapsed.has(s.parentId) || hidden.has(s.parentId))) { hidden.add(s.id); return false; }
+            return true;
+        });
+    }, [spans, tree, collapsed]);
+
+    return (
+        <div>
+            <div className="grid grid-cols-[minmax(0,45%)_minmax(0,1fr)_64px] border-b border-border/40">
+                <span />
+                <Ruler span={bounds.span} className="border-b-0" />
+                <span />
+            </div>
+            {rows.map((s) => {
+                const left = ((s.start - bounds.t0) / bounds.span) * 100;
+                const width = (((s.end ?? Date.now()) - s.start) / bounds.span) * 100;
+                const open = !collapsed.has(s.id);
+                return (
+                    <div
+                        key={s.id} role="button" tabIndex={0} onClick={() => onSelect(s)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') onSelect(s); }}
+                        className={cn('grid cursor-pointer grid-cols-[minmax(0,45%)_minmax(0,1fr)_64px] items-center border-b border-border/30 text-xs hover:bg-muted/40', s.id === selectedId && 'bg-muted/60')}
+                    >
+                        <div className="flex min-w-0 items-center gap-1.5 py-2 pr-2" style={{ paddingLeft: 8 + (tree ? s.depth * 18 : 0) }}>
+                            {tree && hasChildren.has(s.id) ? (
+                                <button type="button" aria-label={open ? 'Collapse' : 'Expand'} className="text-muted-foreground"
+                                    onClick={(e) => { e.stopPropagation(); setCollapsed((prev) => { const next = new Set(prev); if (next.has(s.id)) next.delete(s.id); else next.add(s.id); return next; }); }}>
+                                    {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                                </button>
+                            ) : tree ? <span className="w-3" /> : <span className={cn('h-1 w-1 shrink-0 rounded-full', s.id === selectedId ? 'bg-blue-500' : 'bg-muted-foreground/50')} />}
+                            <span className="text-[8px] text-muted-foreground">▲</span>
+                            <span className="truncate">{s.name}</span>
+                            {s.detail && <span className="truncate text-muted-foreground">{s.detail}</span>}
+                        </div>
+                        <div className="relative h-full py-3">
+                            <div className="absolute inset-x-0 top-1/2 h-px bg-border/50" />
+                            <div
+                                className={cn('absolute top-1/2 h-3 -translate-y-1/2 rounded-sm border', BAR_STYLE[s.kind], s.id === selectedId && 'border-blue-500 bg-blue-500/40', (s.status === 'error' || s.status === 'rejected') && 'border-red-500/60', s.end === null && 'animate-pulse')}
+                                style={{ left: `${Math.max(0, left)}%`, width: `${Math.max(0.4, Math.min(100 - left, width))}%` }}
+                            />
+                        </div>
+                        <span className="pr-3 text-right font-mono text-[11px] text-muted-foreground">{formatDuration(spanDuration(s))}</span>
+                    </div>
+                );
+            })}
+        </div>
+    );
 }
 
-function TurnPanel({ projectId, sessionId, turn, onOpenLog }: { projectId: string; sessionId: string; turn: Turn; onOpenLog: (id: string) => void }) {
+// ── events ──────────────────────────────────────────────────────────────
+
+type EventLine = { at: number; level: 'TURN' | 'TOOL' | 'PAUSE' | 'RESUME' | 'DONE' | 'ERROR' | 'AGENT'; text: string; spanId: string };
+
+function eventLines(turns: Turn[], children: SessionDetail['children']): EventLine[] {
+    const lines: EventLine[] = [];
+    for (const t of turns) {
+        const span = `turn:${t.turn}`;
+        lines.push({ at: Date.parse(t.startedAt), level: 'TURN', spanId: span, text: `turn ${t.turn} started${t.agent ? ` · ${t.agent}` : ''} · ${t.trace.model ?? t.model ?? ''}${t.input ? ` · "${t.input.slice(0, 120)}"` : t.resumedFrom ? ` · continues turn ${t.resumedFrom}` : ''}` });
+        for (const c of t.toolCalls) {
+            lines.push({ at: Date.parse(c.startedAt), level: 'TOOL', spanId: `tool:${c.id}`, text: `${c.handoff ? 'handoff' : c.name}(${c.arguments.replace(/\s+/g, ' ').slice(0, 160)}) · ${c.executedBy === 'caller' ? 'your code' : 'Cencori'}${c.needsApproval ? ' · needs approval' : ''}` });
+        }
+        if (t.status === 'paused' && t.endedAt) lines.push({ at: Date.parse(t.endedAt), level: 'PAUSE', spanId: span, text: t.pauseReason === 'approval_required' ? 'waiting for a person to approve' : 'waiting for tool results' });
+        if (t.resolution) {
+            const resumedAt = t.toolCalls.find((c) => c.endedAt)?.endedAt;
+            if (resumedAt) lines.push({ at: Date.parse(resumedAt), level: 'RESUME', spanId: span, text: t.resolution === 'rejected' ? 'resumed · rejected' : 'resumed with tool results' });
+        }
+        if (t.status === 'completed' && t.endedAt) lines.push({ at: Date.parse(t.endedAt), level: 'DONE', spanId: span, text: `turn ${t.turn} completed${t.usage ? ` · ${t.usage.inputTokens}→${t.usage.outputTokens} tokens` : ''}${t.trace.costUsd !== null ? ` · ${formatSessionCost(t.trace.costUsd)}` : ''}${t.text ? ` · "${t.text.slice(0, 120)}"` : ''}` });
+        if (t.status === 'failed' && t.endedAt) lines.push({ at: Date.parse(t.endedAt), level: 'ERROR', spanId: span, text: t.error ?? 'turn failed' });
+    }
+    for (const c of children) lines.push({ at: Date.parse(c.created_at), level: 'AGENT', spanId: `agent:${c.id}`, text: `${c.agent ?? 'agent'} sub-run · ${c.turns} turns` });
+    return lines.sort((a, b) => a.at - b.at);
+}
+
+const LEVEL_COLOR: Record<EventLine['level'], string> = {
+    TURN: 'text-blue-600 dark:text-blue-400', TOOL: 'text-amber-700 dark:text-amber-400', PAUSE: 'text-muted-foreground', RESUME: 'text-muted-foreground',
+    DONE: 'text-emerald-600 dark:text-emerald-400', ERROR: 'text-red-600 dark:text-red-400', AGENT: 'text-emerald-600 dark:text-emerald-400',
+};
+
+// ── detail panel ────────────────────────────────────────────────────────
+
+function TurnSections({ projectId, sessionId, turn }: { projectId: string; sessionId: string; turn: Turn }) {
     const { data: detail, isLoading } = useQuery<TurnDetail>({
         queryKey: ['session-turn', projectId, sessionId, turn.turn],
         queryFn: async ({ signal }) => {
@@ -219,171 +335,146 @@ function TurnPanel({ projectId, sessionId, turn, onOpenLog }: { projectId: strin
         },
         staleTime: 60_000,
     });
-    const latency = turn.trace.modelMs ?? turn.log?.latencyMs ?? turn.durationMs;
-    const fallback = turn.trace.usedFallback || Boolean(turn.log?.fallbackProvider);
-
+    if (isLoading) return <Skeleton className="h-24 w-full" />;
+    const citations = Array.isArray(detail?.result.knowledge_citations) ? (detail!.result.knowledge_citations as unknown[]) : [];
     return (
-        <div>
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-                <KindBadge kind="GENERATION" />
-                <h2 className="text-sm font-medium">{turn.agent ? `${turn.agent} · ` : ''}Turn {turn.turn}</h2>
-                <SessionStatusBadge
-                    status={turn.status === 'paused' ? 'paused' : turn.status === 'completed' ? 'completed' : turn.status === 'failed' ? 'failed' : 'running'}
-                    label={turn.status === 'paused' ? (turn.pauseReason === 'approval_required' ? 'Paused · approval' : 'Paused · tools') : undefined}
-                />
-                {turn.trace.requestId && turn.log && (
-                    <button type="button" onClick={() => onOpenLog(turn.log!.id)} className="ml-auto inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground">
-                        Open in Logs <ExternalLink className="h-3 w-3" />
-                    </button>
-                )}
-            </div>
-            <p className="mb-3 text-[11px] text-muted-foreground">
-                {formatSessionTime(turn.startedAt)}
-                {turn.resumedFrom !== null && ` · continues turn ${turn.resumedFrom} after its tool results`}
-            </p>
-            <div className="mb-4 flex flex-wrap gap-2">
-                <Chip label="Model" value={turn.trace.model ?? turn.model ?? '—'} />
-                {turn.trace.provider && <Chip label="Provider" value={turn.trace.provider} />}
-                <Chip label="Latency" value={formatDuration(latency)} />
-                {turn.trace.ttftMs !== null && <Chip label="First token" value={formatDuration(turn.trace.ttftMs)} />}
-                {turn.usage && <Chip label="Tokens" value={`${turn.usage.inputTokens.toLocaleString()} → ${turn.usage.outputTokens.toLocaleString()}`} />}
-                {turn.trace.costUsd !== null && <Chip label="Cost" value={formatSessionCost(turn.trace.costUsd)} />}
-                {turn.trace.rounds !== null && turn.trace.rounds > 1 && <Chip label="Model rounds" value={turn.trace.rounds} />}
-                {fallback && <Chip label="Fallback" value={turn.log?.fallbackModel ?? turn.log?.fallbackProvider ?? 'yes'} tone="warn" />}
-                {turn.status === 'failed' && <Chip label="Error" value={turn.error} tone="error" />}
-            </div>
-
-            <Tabs defaultValue="input">
-                <TabsList className="h-8">
-                    <TabsTrigger value="input" className="text-xs">Input</TabsTrigger>
-                    <TabsTrigger value="output" className="text-xs">Output</TabsTrigger>
-                    <TabsTrigger value="tools" className="text-xs">Tools{detail?.tools.length ? ` (${detail.tools.length})` : ''}</TabsTrigger>
-                    <TabsTrigger value="metadata" className="text-xs">Metadata</TabsTrigger>
-                </TabsList>
-                <TabsContent value="input" className="mt-3">
-                    {isLoading ? <Skeleton className="h-40 w-full" /> : detail?.found ? <MessageList detail={detail} /> : (
-                        <p className="text-xs text-muted-foreground">No input was recorded for this turn.</p>
-                    )}
-                </TabsContent>
-                <TabsContent value="output" className="mt-3 space-y-3">
-                    {turn.text && (
-                        <div className="rounded-md border border-border/40 border-l-2 border-l-emerald-500/60 bg-muted/10 px-3 py-2">
-                            <p className="mb-1 text-[10px] uppercase tracking-wider text-muted-foreground">assistant</p>
-                            <p className="whitespace-pre-wrap break-words text-xs">{turn.text}</p>
-                        </div>
-                    )}
-                    {turn.toolCalls.map((call) => (
-                        <div key={call.id} className="rounded-md border border-border/40 bg-background/60 px-3 py-2 font-mono text-[11px]">
-                            <span className="text-amber-700 dark:text-amber-400">{call.name}</span>
-                            <span className="text-muted-foreground"> ({call.id})</span>
-                            <pre className="mt-1 whitespace-pre-wrap break-all">{call.arguments}</pre>
-                        </div>
-                    ))}
-                    {!turn.text && turn.toolCalls.length === 0 && <p className="text-xs text-muted-foreground">{turn.error ?? 'No output.'}</p>}
-                    {detail?.result.output !== undefined && detail?.result.output !== null && (
-                        <details>
-                            <summary className="cursor-pointer text-[11px] text-muted-foreground">Raw output</summary>
-                            <div className="mt-2"><JsonBlock value={detail.result.output} /></div>
-                        </details>
-                    )}
-                </TabsContent>
-                <TabsContent value="tools" className="mt-3 space-y-2">
-                    {isLoading ? <Skeleton className="h-24 w-full" /> : detail?.tools.length ? detail.tools.map((t) => (
-                        <details key={t.name} className="rounded-md border border-border/40 px-3 py-2">
-                            <summary className="cursor-pointer text-xs">
-                                <span className="font-mono">{t.name}</span>
-                                {t.needs_approval && <span className="ml-2 rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-700 dark:text-amber-400">needs approval</span>}
-                                {t.description && <span className="ml-2 text-muted-foreground">{t.description}</span>}
-                            </summary>
-                            <div className="mt-2"><JsonBlock value={t.parameters} /></div>
-                        </details>
-                    )) : <p className="text-xs text-muted-foreground">No tools offered.</p>}
-                </TabsContent>
-                <TabsContent value="metadata" className="mt-3 space-y-3">
-                    <div>
-                        <p className="mb-1 text-[10px] uppercase tracking-wider text-muted-foreground">Request</p>
-                        <JsonBlock value={{
-                            request_id: turn.trace.requestId,
-                            log_id: turn.log?.id ?? null,
-                            status: turn.log?.status ?? null,
-                            ...(turn.trace as Record<string, unknown>),
-                        }} />
-                    </div>
-                    {detail && (
-                        <>
-                            <div>
-                                <p className="mb-1 text-[10px] uppercase tracking-wider text-muted-foreground">Settings</p>
-                                <JsonBlock value={detail.settings} />
+        <>
+            <Card title="Input" summary={detail?.found ? `${detail.messages.length} messages` : 'not recorded'} defaultOpen>
+                {detail?.found ? <Messages detail={detail} /> : <p className="text-xs text-muted-foreground">No input was recorded for this turn.</p>}
+            </Card>
+            <Card title="Output" summary={turn.toolCalls.length ? `${turn.toolCalls.length} tool calls` : turn.text ? 'text' : '—'} defaultOpen>
+                {turn.text && <p className="whitespace-pre-wrap break-words text-xs">{turn.text}</p>}
+                {turn.toolCalls.map((c) => (
+                    <p key={c.id} className="mt-1 break-all font-mono text-[11px]"><span className="text-amber-700 dark:text-amber-400">{c.name}</span>({c.arguments.replace(/\s+/g, ' ')})</p>
+                ))}
+                {!turn.text && turn.toolCalls.length === 0 && <p className="text-xs text-muted-foreground">{turn.error ?? 'No output.'}</p>}
+            </Card>
+            {detail && detail.tools.length > 0 && (
+                <Card title="Tools offered" summary={detail.tools.length}>
+                    <div className="space-y-2">
+                        {detail.tools.map((t) => (
+                            <div key={t.name}>
+                                <p className="font-mono text-[11px]">{t.name}{t.needs_approval && <span className="ml-2 font-sans text-[10px] text-amber-600">needs approval</span>}</p>
+                                {t.description && <p className="text-[11px] text-muted-foreground">{t.description}</p>}
+                                <Pre value={t.parameters} />
                             </div>
-                            {detail.metadata && (
-                                <div>
-                                    <p className="mb-1 text-[10px] uppercase tracking-wider text-muted-foreground">Turn metadata</p>
-                                    <JsonBlock value={detail.metadata} />
-                                </div>
-                            )}
-                            {detail.security && (
-                                <div>
-                                    <p className="mb-1 text-[10px] uppercase tracking-wider text-muted-foreground">Input security check</p>
-                                    <JsonBlock value={detail.security} />
-                                </div>
-                            )}
-                            {Array.isArray(detail.result.knowledge_citations) && detail.result.knowledge_citations.length > 0 && (
-                                <div>
-                                    <p className="mb-1 text-[10px] uppercase tracking-wider text-muted-foreground">Knowledge citations</p>
-                                    <JsonBlock value={detail.result.knowledge_citations} />
-                                </div>
-                            )}
-                        </>
-                    )}
-                </TabsContent>
-            </Tabs>
-        </div>
+                        ))}
+                    </div>
+                </Card>
+            )}
+            {detail && <Card title="Settings" summary={(detail.settings.reasoning_effort as string | null) ?? ''}><Pre value={detail.settings} /></Card>}
+            {detail?.instructions && <Card title="Instructions" summary={`${String(detail.instructions).length} chars`}><Pre value={detail.instructions} /></Card>}
+            {detail?.metadata && <Card title="Turn metadata"><Pre value={detail.metadata} /></Card>}
+            {detail?.security && <Card title="Input security" summary={(detail.security as { safe?: boolean }).safe === false ? 'flagged' : 'passed'}><Pre value={detail.security} /></Card>}
+            {citations.length > 0 && <Card title="Knowledge citations" summary={citations.length}><Pre value={citations} /></Card>}
+            {detail?.result.output !== undefined && detail?.result.output !== null && <Card title="Raw output"><Pre value={detail.result.output} /></Card>}
+        </>
     );
 }
 
-function ToolPanel({ turn, call }: { turn: Turn; call: TimelineToolCall }) {
+function DetailPanel({ data, span, projectId, onClose, onOpenLog }: { data: SessionDetail; span: TraceSpan; projectId: string; onClose: () => void; onOpenLog: (id: string) => void }) {
+    const s = data.session;
+    const turn = span.turn !== undefined ? data.turns.find((t) => t.turn === span.turn) : undefined;
+    const call = span.callId && turn ? turn.toolCalls.find((c) => c.id === span.callId) : undefined;
+
     return (
-        <div>
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-                <KindBadge kind={toolKind(call)} />
-                <h2 className="font-mono text-sm">{call.name}</h2>
-                {call.resolution === 'approved' && <SessionStatusBadge status="completed" label="Approved" />}
-                {call.resolution === 'rejected' && <SessionStatusBadge status="failed" label="Rejected" />}
-                {call.needsApproval && !call.resolution && <SessionStatusBadge status="paused" label="Awaiting approval" />}
+        <div className="space-y-3">
+            <div className="flex items-center gap-2">
+                <span className="rounded border border-border/60 px-1.5 py-0.5 font-mono text-[10px] uppercase text-muted-foreground">{KIND_LABEL[span.kind]}</span>
+                <span className="min-w-0 truncate font-mono text-xs">{span.name}</span>
+                {span.kind !== 'session' && <button type="button" onClick={onClose} aria-label="Back to session" className="ml-auto text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" /></button>}
             </div>
-            <p className="mb-3 text-[11px] text-muted-foreground">
-                Called in turn {turn.turn}{turn.agent ? ` by ${turn.agent}` : ''} · {formatSessionTime(call.startedAt)}
-            </p>
-            <div className="mb-4 flex flex-wrap gap-2">
-                <Chip label="Ran in" value={call.executedBy === 'caller' ? 'your code' : 'Cencori'} />
-                <Chip label={call.executedBy === 'caller' ? (call.needsApproval ? 'Pause to resume' : 'Your code + network') : 'Duration'} value={formatDuration(call.durationMs)} />
-                <Chip label="Call id" value={<CopyText text={call.id} />} />
+            <div className="flex items-center justify-between text-xs">
+                <span className="flex items-center gap-1.5 font-medium"><span className={cn('h-2 w-2 rounded-full border', span.status === 'error' || span.status === 'rejected' ? 'border-red-500 bg-red-500/30' : span.end === null ? 'border-amber-500' : 'border-muted-foreground')} />Started</span>
+                <span className="font-mono text-[11px] text-muted-foreground">{stamp(span.start)}</span>
             </div>
-            {call.handoff ? (
-                <p className="mb-3 text-xs">The conversation was handed to <span className="font-medium">{call.name.replace(/^transfer_to_/, '').replace(/_/g, ' ')}</span>; the next turn answers as that agent.</p>
-            ) : null}
-            <div className="space-y-3">
-                <div>
-                    <p className="mb-1 text-[10px] uppercase tracking-wider text-muted-foreground">Input (arguments)</p>
-                    <JsonBlock value={call.arguments} empty="(none)" />
-                </div>
-                <div>
-                    <p className="mb-1 text-[10px] uppercase tracking-wider text-muted-foreground">Output (result)</p>
-                    <JsonBlock value={call.result} empty="Not sent back yet." />
-                </div>
-            </div>
+
+            {span.kind === 'session' && (
+                <>
+                    <KV rows={[
+                        ['Session ID', s.id, s.id],
+                        ['Status', <SessionStatusBadge key="st" status={s.status} />],
+                        ['Source', SESSION_SOURCE_LABELS[s.source]],
+                        ['Agent', s.agents.length ? s.agents.join(' → ') : s.agent ?? '—'],
+                        s.user ? ['User', s.user, s.user] : null,
+                        ['Duration', formatDuration(s.duration_ms)],
+                        ['Turns', String(s.turns)],
+                        ['Tool calls', String(s.tool_calls)],
+                        ['Tokens', `${s.usage.inputTokens.toLocaleString()} → ${s.usage.outputTokens.toLocaleString()}`],
+                        ['Cost', formatSessionCost(s.cost_usd)],
+                        s.models.length ? ['Model', s.models.join(', ')] : null,
+                        s.parent_session_id ? ['Parent session', `${s.parent_session_id.slice(0, 13)}…`, s.parent_session_id] : null,
+                    ]} />
+                    <Card title="Metadata" summary={`${Object.keys(s.metadata ?? {}).length} keys`} defaultOpen><Pre value={s.metadata} empty="{}" /></Card>
+                </>
+            )}
+
+            {span.kind === 'generation' && turn && (
+                <>
+                    <KV rows={[
+                        ['Turn', `${turn.turn}${turn.resumedFrom !== null ? ` · continues ${turn.resumedFrom}` : ''}`],
+                        turn.agent ? ['Agent', turn.agent] : null,
+                        ['Model', turn.trace.model ?? turn.model ?? '—'],
+                        turn.trace.provider ? ['Provider', turn.trace.provider] : null,
+                        ['Status', <SessionStatusBadge key="st" status={turn.status === 'paused' ? 'paused' : turn.status === 'failed' ? 'failed' : turn.status === 'running' ? 'running' : 'completed'} label={turn.status === 'paused' ? (turn.pauseReason === 'approval_required' ? 'Paused · approval' : 'Paused · tools') : undefined} />],
+                        ['Duration', formatDuration(turn.durationMs)],
+                        turn.trace.modelMs !== null ? ['Model time', formatDuration(turn.trace.modelMs)] : null,
+                        turn.trace.ttftMs !== null ? ['First token', formatDuration(turn.trace.ttftMs)] : null,
+                        turn.usage ? ['Tokens', `${turn.usage.inputTokens.toLocaleString()} → ${turn.usage.outputTokens.toLocaleString()}`] : null,
+                        turn.trace.costUsd !== null ? ['Cost', formatSessionCost(turn.trace.costUsd)] : null,
+                        turn.trace.rounds !== null ? ['Model rounds', String(turn.trace.rounds)] : null,
+                        (turn.trace.usedFallback || turn.log?.fallbackProvider) ? ['Fallback', turn.log?.fallbackModel ?? turn.log?.fallbackProvider ?? 'yes'] : null,
+                        turn.error ? ['Error', turn.error] : null,
+                        turn.trace.requestId ? ['Request ID', turn.trace.requestId, turn.trace.requestId] : null,
+                    ]} />
+                    {turn.log && (
+                        <button type="button" onClick={() => onOpenLog(turn.log!.id)} className="flex w-full items-center justify-between rounded-md border border-border/50 px-3 py-2 text-xs hover:bg-muted/40">
+                            <span>Gateway log</span>
+                            <span className="flex items-center gap-1 font-mono text-[11px] text-muted-foreground">{turn.log.status ?? ''}{turn.log.latencyMs !== null ? ` · ${turn.log.latencyMs}ms` : ''} <ExternalLink className="h-3 w-3" /></span>
+                        </button>
+                    )}
+                    <TurnSections projectId={projectId} sessionId={s.id} turn={turn} />
+                </>
+            )}
+
+            {(span.kind === 'tool' || span.kind === 'handoff') && turn && call && (
+                <>
+                    <KV rows={[
+                        ['Tool', call.name],
+                        ['Call ID', call.id, call.id],
+                        ['Ran in', call.executedBy === 'caller' ? 'your code' : 'Cencori'],
+                        ['Called by', `${turn.agent ?? 'agent'} · turn ${turn.turn}`],
+                        ['Duration', formatDuration(call.durationMs)],
+                        call.needsApproval ? ['Approval', call.resolution ?? 'waiting'] : null,
+                        call.handoff ? ['Handed to', call.name.replace(/^transfer_to_/, '').replace(/_/g, ' ')] : null,
+                    ]} />
+                    <Card title="Arguments" defaultOpen><Pre value={call.arguments} empty="(none)" /></Card>
+                    <Card title="Result" summary={call.result === null ? 'not sent back' : undefined} defaultOpen><Pre value={call.result} empty="Not sent back yet." /></Card>
+                </>
+            )}
+
+            {span.kind === 'agent' && span.childSessionId && (
+                <>
+                    <KV rows={[['Session ID', span.childSessionId, span.childSessionId], ['Duration', formatDuration(spanDuration(span))]]} />
+                    <p className="text-[11px] text-muted-foreground">Click the span again to open this sub-run.</p>
+                </>
+            )}
         </div>
     );
 }
 
-/** One session as a trace. */
+// ── page ────────────────────────────────────────────────────────────────
+
 export default function SessionTracePage({ params }: PageProps) {
     const { orgSlug, projectSlug, sessionId } = use(params);
     const pathname = usePathname();
+    const router = useRouter();
     const listHref = pathname.replace(/\/[^/]+\/?$/, '');
     const { data: projectId } = useProjectIdBySlug(orgSlug, projectSlug);
-    const [selection, setSelection] = useState<Selection>({ kind: 'session' });
-    const [collapsed, setCollapsed] = useState<Set<number>>(new Set());
+    const [tab, setTab] = useState<'trace' | 'events'>('trace');
+    const [view, setView] = useState<View>('timeline');
+    const [query, setQuery] = useState('');
+    const [selectedId, setSelectedId] = useState('session');
     const [logId, setLogId] = useState<string | null>(null);
 
     const { data, isLoading, error } = useQuery<SessionDetail>({
@@ -395,141 +486,107 @@ export default function SessionTracePage({ params }: PageProps) {
             return response.json();
         },
         enabled: Boolean(projectId),
-        refetchInterval: (query) => (query.state.data?.session.status === 'active' || query.state.data?.session.status === 'paused' ? 5000 : false),
+        refetchInterval: (q) => (q.state.data?.session.status === 'active' || q.state.data?.session.status === 'paused' ? 5000 : false),
     });
 
-    const axis = useMemo(() => {
-        if (!data || data.turns.length === 0) return null;
-        const t0 = Date.parse(data.turns[0].startedAt);
-        let end = t0;
-        for (const t of data.turns) {
-            end = Math.max(end, Date.parse(t.endedAt ?? t.startedAt));
-            for (const c of t.toolCalls) end = Math.max(end, Date.parse(c.endedAt ?? c.startedAt));
-        }
-        for (const c of data.children) end = Math.max(end, Date.parse(c.created_at));
-        if (data.turns.some((t) => !t.endedAt)) end = Math.max(end, Date.now());
-        return { t0, span: Math.max(1, end - t0), end };
-    }, [data]);
+    const spans = useMemo(() => (data ? buildSpans(data.session.agents.join(' → ') || data.session.agent || 'Session', data.turns, data.children, data.session.status) : []), [data]);
+    const bounds = useMemo(() => (spans.length ? traceBounds(spans) : null), [spans]);
+    const visible = useMemo(() => {
+        const q = query.trim().toLowerCase();
+        return q ? spans.filter((s) => s.kind === 'session' || `${s.name} ${s.detail ?? ''}`.toLowerCase().includes(q)) : spans;
+    }, [spans, query]);
+    const selected = spans.find((s) => s.id === selectedId) ?? spans[0];
+    const events = useMemo(() => (data ? eventLines(data.turns, data.children) : []), [data]);
 
-    const selectedTurn = data && selection.kind !== 'session' ? data.turns.find((t) => t.turn === selection.turn) : undefined;
-    const selectedCall = selection.kind === 'tool' ? selectedTurn?.toolCalls.find((c) => c.id === selection.callId) : undefined;
+    const select = (span: TraceSpan) => {
+        if (span.kind === 'agent' && span.childSessionId && span.id === selectedId) {
+            router.push(`${listHref}/${span.childSessionId}`);
+            return;
+        }
+        setSelectedId(span.id);
+    };
 
     return (
-        <div className="w-full max-w-[1500px] mx-auto px-0 sm:px-6 pt-0 pb-8 sm:pt-6">
+        <div className="w-full max-w-[1600px] mx-auto px-0 sm:px-6 pt-0 pb-8 sm:pt-6">
             <Link href={listHref} className="mb-3 inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
-                <ArrowLeft className="h-3.5 w-3.5" />
-                Sessions
+                <ArrowLeft className="h-3.5 w-3.5" /> Sessions
             </Link>
 
             {isLoading || !data ? (
-                error ? (
-                    <p className="rounded-md border border-border/40 bg-muted/30 px-5 py-12 text-center text-xs text-muted-foreground">{error instanceof Error ? error.message : 'Could not load this session.'}</p>
-                ) : (
-                    <div className="space-y-3"><Skeleton className="h-24 w-full" /><Skeleton className="h-96 w-full" /></div>
-                )
+                error ? <p className="rounded-md border border-border/40 bg-muted/30 px-5 py-12 text-center text-xs text-muted-foreground">{error instanceof Error ? error.message : 'Could not load this session.'}</p>
+                    : <div className="space-y-3"><Skeleton className="h-10 w-full" /><Skeleton className="h-[480px] w-full" /></div>
             ) : (
-                <>
-                    <header className="mb-4 rounded-md border border-border/40 bg-card p-4">
-                        <div className="mb-2 flex flex-wrap items-center gap-2">
-                            <h1 className="text-base font-medium">{data.session.agents.length ? data.session.agents.join(' → ') : data.session.agent ?? 'Session'}</h1>
-                            <SessionStatusBadge status={data.session.status} />
-                            <span className="text-xs text-muted-foreground">{SESSION_SOURCE_LABELS[data.session.source]}</span>
-                        </div>
-                        <CopyText text={data.session.id} />
-                        <div className="mt-3 flex flex-wrap gap-2">
-                            <Chip label="Started" value={formatSessionTime(data.session.created_at)} />
-                            <Chip label="Duration" value={formatDuration(data.session.duration_ms)} />
-                            <Chip label="Turns" value={data.session.turns} />
-                            <Chip label="Tool calls" value={data.session.tool_calls} />
-                            <Chip label="Tokens" value={`${data.session.usage.inputTokens.toLocaleString()} → ${data.session.usage.outputTokens.toLocaleString()}`} />
-                            <Chip label="Cost" value={formatSessionCost(data.session.cost_usd)} />
-                            {data.session.models.length > 0 && <Chip label={data.session.models.length > 1 ? 'Models' : 'Model'} value={data.session.models.join(', ')} />}
-                            {data.session.user && <Chip label="User" value={data.session.user} />}
-                        </div>
-                        {data.session.parent_session_id && (
-                            <p className="mt-3 text-xs text-muted-foreground">
-                                Run as a tool by <Link className="font-mono underline underline-offset-2" href={`${listHref}/${data.session.parent_session_id}`}>{data.session.parent_session_id.slice(0, 8)}</Link>
-                            </p>
-                        )}
-                    </header>
-
-                    <div className="grid gap-4 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
-                        <section className="overflow-hidden rounded-md border border-border/40 bg-card lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
-                            <div className="grid grid-cols-[minmax(0,1fr)_minmax(80px,32%)] gap-3 border-b border-border/40 px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
-                                <span>Trace</span>
-                                <span className="flex justify-between font-mono normal-case tracking-normal"><span>0</span><span>{axis ? formatDuration(axis.span) : ''}</span></span>
-                            </div>
-                            {axis && (
-                                <>
-                                    <TreeRow
-                                        depth={0} kind="SESSION" name={data.session.agent ?? 'Session'}
-                                        meta={formatDuration(data.session.duration_ms)}
-                                        selected={selection.kind === 'session'} onClick={() => setSelection({ kind: 'session' })}
-                                        bar={<Bar start={data.turns[0].startedAt} end={new Date(axis.end).toISOString()} t0={axis.t0} span={axis.span} kind="SESSION" />}
-                                    />
-                                    {data.turns.map((turn) => {
-                                        const open = !collapsed.has(turn.turn);
-                                        return (
-                                            <div key={turn.turn}>
-                                                <TreeRow
-                                                    depth={1} kind="GENERATION"
-                                                    name={<>{turn.agent ? <span className="font-medium">{turn.agent}</span> : `Turn ${turn.turn}`}<span className="ml-1.5 text-muted-foreground">{turn.trace.model ?? turn.model}</span></>}
-                                                    meta={<>{turn.trace.costUsd !== null ? `${formatSessionCost(turn.trace.costUsd)} · ` : ''}{formatDuration(turn.durationMs)}</>}
-                                                    selected={selection.kind === 'turn' && selection.turn === turn.turn}
-                                                    onClick={() => setSelection({ kind: 'turn', turn: turn.turn })}
-                                                    expandable={turn.toolCalls.length > 0} expanded={open}
-                                                    onToggle={() => setCollapsed((prev) => { const next = new Set(prev); if (next.has(turn.turn)) next.delete(turn.turn); else next.add(turn.turn); return next; })}
-                                                    bar={<Bar start={turn.startedAt} end={turn.endedAt} t0={axis.t0} span={axis.span} kind="GENERATION" />}
-                                                />
-                                                {open && turn.toolCalls.map((call) => (
-                                                    <TreeRow
-                                                        key={call.id} depth={2} kind={toolKind(call)}
-                                                        name={<span className="font-mono">{call.handoff ? call.name.replace(/^transfer_to_/, '→ ') : call.name}{call.needsApproval && <span className="ml-1.5 font-sans text-[10px] text-amber-600">{call.resolution ?? 'approval'}</span>}</span>}
-                                                        meta={formatDuration(call.durationMs)}
-                                                        selected={selection.kind === 'tool' && selection.callId === call.id}
-                                                        onClick={() => setSelection({ kind: 'tool', turn: turn.turn, callId: call.id })}
-                                                        bar={<Bar start={call.startedAt} end={call.endedAt} t0={axis.t0} span={axis.span} kind={toolKind(call)} />}
-                                                    />
-                                                ))}
-                                            </div>
-                                        );
-                                    })}
-                                    {data.children.map((child) => (
-                                        <Link key={child.id} href={`${listHref}/${child.id}`} className="block">
-                                            <TreeRow
-                                                depth={1} kind="AGENT" name={<>{child.agent ?? 'Agent'} <span className="text-muted-foreground">sub-run</span></>}
-                                                meta={`${child.turns} turns · ${formatSessionCost(child.cost_usd)}`}
-                                                selected={false} onClick={() => {}}
-                                                bar={<Bar start={child.created_at} end={child.created_at} t0={axis.t0} span={axis.span} kind="AGENT" />}
-                                            />
-                                        </Link>
-                                    ))}
-                                </>
-                            )}
-                            {!axis && <p className="px-3 py-10 text-center text-xs text-muted-foreground">No turns yet.</p>}
-                            {data.truncated && <p className="px-3 py-2 text-[11px] text-muted-foreground">Long session: only the first 5,000 events are shown.</p>}
-                        </section>
-
-                        <section className="min-w-0 rounded-md border border-border/40 bg-card p-4">
-                            {selection.kind === 'session' || !selectedTurn ? (
-                                <div>
-                                    <div className="mb-3 flex items-center gap-2"><KindBadge kind="SESSION" /><h2 className="text-sm font-medium">Session</h2></div>
-                                    <p className="mb-3 text-xs text-muted-foreground">Select a model call or tool on the left to see its exact input, output and metadata.</p>
-                                    <p className="mb-1 text-[10px] uppercase tracking-wider text-muted-foreground">Metadata</p>
-                                    <JsonBlock value={data.session.metadata} empty="{}" />
-                                </div>
-                            ) : selection.kind === 'tool' && selectedCall ? (
-                                <ToolPanel turn={selectedTurn} call={selectedCall} />
-                            ) : projectId ? (
-                                <TurnPanel projectId={projectId} sessionId={sessionId} turn={selectedTurn} onOpenLog={setLogId} />
-                            ) : null}
-                        </section>
+                <div className="overflow-hidden rounded-lg border border-border/60 bg-card">
+                    {/* The session as a log line */}
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-border/50 bg-muted/20 px-4 py-2.5 font-mono text-xs">
+                        <span className="text-muted-foreground">{stamp(Date.parse(data.session.created_at))}</span>
+                        <SessionStatusBadge status={data.session.status} />
+                        <span>{SESSION_SOURCE_LABELS[data.session.source]}</span>
+                        <span className="truncate">{data.session.agents.join(' → ') || data.session.agent || '—'}</span>
+                        <span className="flex items-center gap-1.5 text-muted-foreground">{data.session.id}<CopyButton text={data.session.id} /></span>
+                        <span className="ml-auto text-muted-foreground">{formatDuration(data.session.duration_ms)} · {data.session.turns} turns · {formatSessionCost(data.session.cost_usd)}</span>
                     </div>
-                </>
+
+                    <div className="grid lg:grid-cols-[minmax(0,1fr)_380px]">
+                        <section className="min-w-0 border-b border-border/50 lg:border-b-0 lg:border-r">
+                            <div className="flex items-center gap-1 border-b border-border/50 px-3 py-2">
+                                {(['trace', 'events'] as const).map((t) => (
+                                    <button key={t} type="button" onClick={() => setTab(t)} className={cn('rounded-md px-2.5 py-1 text-xs', tab === t ? 'bg-muted font-medium' : 'text-muted-foreground hover:text-foreground')}>
+                                        {t === 'events' ? `Events (${events.length})` : 'Trace'}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {tab === 'trace' ? (
+                                <>
+                                    <div className="flex items-center gap-2 border-b border-border/50 px-3 py-2">
+                                        <div className="relative flex-1">
+                                            <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+                                            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search spans..." className="h-8 pl-7 text-xs shadow-none" />
+                                        </div>
+                                        <Select value={view} onValueChange={(v) => setView(v as View)}>
+                                            <SelectTrigger className="h-8 w-[130px] text-xs shadow-none"><SelectValue /></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="timeline" className="text-xs">Timeline</SelectItem>
+                                                <SelectItem value="tree" className="text-xs">Tree</SelectItem>
+                                                <SelectItem value="waterfall" className="text-xs">Waterfall</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    {!bounds ? (
+                                        <p className="py-16 text-center text-xs text-muted-foreground">No turns yet.</p>
+                                    ) : view === 'timeline' ? (
+                                        <TimelineView spans={visible} bounds={bounds} selectedId={selected?.id ?? ''} onSelect={select} />
+                                    ) : (
+                                        <RowsView spans={visible} bounds={bounds} selectedId={selected?.id ?? ''} onSelect={select} tree={view === 'tree'} />
+                                    )}
+                                    {data.truncated && <p className="px-3 py-2 text-[11px] text-muted-foreground">Long session: only the first 5,000 events are shown.</p>}
+                                </>
+                            ) : (
+                                <div className="max-h-[640px] overflow-auto">
+                                    {events.map((e, i) => (
+                                        <button key={i} type="button" onClick={() => setSelectedId(e.spanId)} className={cn('grid w-full grid-cols-[104px_64px_minmax(0,1fr)] items-start gap-3 border-b border-border/30 px-3 py-1.5 text-left font-mono text-[11px] hover:bg-muted/40', e.spanId === selected?.id && 'bg-muted/50')}>
+                                            <span className="text-muted-foreground">{stamp(e.at, false)}</span>
+                                            <span className={LEVEL_COLOR[e.level]}>{e.level}</span>
+                                            <span className="break-words">{e.text}</span>
+                                        </button>
+                                    ))}
+                                    {events.length === 0 && <p className="py-16 text-center text-xs text-muted-foreground">No events yet.</p>}
+                                </div>
+                            )}
+                        </section>
+
+                        <aside className="min-w-0 p-3 lg:max-h-[calc(100vh-10rem)] lg:overflow-y-auto">
+                            {selected && projectId && (
+                                <DetailPanel data={data} span={selected} projectId={projectId} onClose={() => setSelectedId('session')} onOpenLog={setLogId} />
+                            )}
+                        </aside>
+                    </div>
+                </div>
             )}
 
             {projectId && logId && (
-                <RequestDetailModal projectId={projectId} requestId={logId} open={Boolean(logId)} onOpenChange={(open) => { if (!open) setLogId(null); }} />
+                <RequestDetailModal projectId={projectId} requestId={logId} open onOpenChange={(open) => { if (!open) setLogId(null); }} />
             )}
         </div>
     );
