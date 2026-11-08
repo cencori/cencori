@@ -305,7 +305,9 @@ function LayoutContent({ user, avatar, name, children, initialAgentOpen, initial
   const isAgentWorkspace = /\/agents\/(?!new(?:\/|$))[^/]+/.test(pathname);
   // The memory graph is a canvas: it fills the workspace edge to edge.
   const isMemoryGraph = /\/memory\/graph\/?$/.test(pathname);
-  const isFixedWorkspace = isPlayground || isAgentWorkspace || isMemoryGraph || isCopilotPage;
+  // A session's trace (/observability/<id>) fills the workspace edge to edge too.
+  const isSessionTrace = /\/observability\/[^/]+\/?$/.test(pathname);
+  const isFixedWorkspace = isPlayground || isAgentWorkspace || isMemoryGraph || isCopilotPage || isSessionTrace;
   // Phones get a bottom tab bar instead of the top bar, except in full-screen
   // workspaces, which put their own actions in the top bar and a composer at
   // the bottom. The playground has no top-bar actions, so it keeps the pill,
@@ -570,7 +572,7 @@ function LayoutContent({ user, avatar, name, children, initialAgentOpen, initial
 
       <main
         className={cn(
-          isPlayground || isMemoryGraph || isCopilotPage || isAgentWorkspace
+          isPlayground || isMemoryGraph || isCopilotPage || isAgentWorkspace || isSessionTrace
             ? "flex min-h-0 flex-1 flex-col overflow-hidden pt-0 lg:pt-12 pb-0"
             : isOnboardingFlow
               ? "p-4 md:p-6"

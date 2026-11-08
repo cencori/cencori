@@ -1,10 +1,9 @@
 'use client';
 
 import { use, useMemo, useState } from 'react';
-import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Check, ChevronDown, ChevronRight, Copy, ExternalLink, Minus, Search, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, Copy, ExternalLink, Minus, Search, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { useProjectIdBySlug } from '@/lib/hooks/useQueries';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
@@ -505,35 +504,15 @@ export default function SessionTracePage({ params }: PageProps) {
     };
 
     return (
-        // The whole page: a bar with the way back and the session as a log line,
-        // then the trace and the selected span side by side to the bottom of the
-        // screen, each scrolling on its own.
-        <div className="flex w-full flex-col lg:h-[calc(100svh-var(--maintenance-banner-height,0px)-3rem)]">
+        // The whole workspace, edge to edge: the trace and the selected span side
+        // by side, each scrolling on its own.
+        <div className="flex min-h-0 w-full flex-1 flex-col">
             {isLoading || !data ? (
-                <>
-                    <div className="flex h-11 shrink-0 items-center border-b border-border/50 px-4">
-                        <Link href={listHref} className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
-                            <ArrowLeft className="h-3.5 w-3.5" /> Sessions
-                        </Link>
-                    </div>
-                    {error ? <p className="px-5 py-16 text-center text-xs text-muted-foreground">{error instanceof Error ? error.message : 'Could not load this session.'}</p>
-                        : <div className="space-y-3 p-4"><Skeleton className="h-8 w-full" /><Skeleton className="h-[420px] w-full" /></div>}
-                </>
+                error ? <p className="px-5 py-16 text-center text-xs text-muted-foreground">{error instanceof Error ? error.message : 'Could not load this session.'}</p>
+                    : <div className="space-y-3 p-4"><Skeleton className="h-8 w-full" /><Skeleton className="h-[420px] w-full" /></div>
             ) : (
                 <>
-                    <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-b border-border/50 px-4 py-2.5 font-mono text-xs">
-                        <Link href={listHref} className="inline-flex items-center gap-1.5 font-sans text-muted-foreground hover:text-foreground">
-                            <ArrowLeft className="h-3.5 w-3.5" /> Sessions
-                        </Link>
-                        <span className="text-muted-foreground">{stamp(Date.parse(data.session.created_at))}</span>
-                        <SessionStatusBadge status={data.session.status} />
-                        <span>{SESSION_SOURCE_LABELS[data.session.source]}</span>
-                        <span className="truncate">{data.session.agents.join(' → ') || data.session.agent || '—'}</span>
-                        <span className="flex items-center gap-1.5 text-muted-foreground">{data.session.id}<CopyButton text={data.session.id} /></span>
-                        <span className="ml-auto text-muted-foreground">{formatDuration(data.session.duration_ms)} · {data.session.turns} turns · {formatSessionCost(data.session.cost_usd)}</span>
-                    </div>
-
-                    <div className="grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1fr)_400px]">
+                    <div className="grid min-h-0 flex-1 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_400px] lg:overflow-hidden">
                         <section className="flex min-w-0 flex-col border-b border-border/50 lg:min-h-0 lg:border-b-0 lg:border-r">
                             <div className="flex shrink-0 items-center gap-1 border-b border-border/50 px-3 py-2">
                                 {(['trace', 'events'] as const).map((t) => (
