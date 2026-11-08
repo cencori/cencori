@@ -23,6 +23,7 @@ import { AgentChat } from 'cencori/react';
 | Prop | Use it for |
 | --- | --- |
 | `api` | Your route serving the agent |
+| `widgetKey` | Instead of `api`: chat with an agent built in the console, by its website key (`cwk_...`). See below |
 | `agent`, `publishableKey`, `baseUrl` | Instead of `api`: chat with a [stored agent](/docs/agents-api/stored-agents) straight from the browser |
 | `greeting`, `prompts` | What shows before the first message |
 | `placeholder` | The message box placeholder |
@@ -64,6 +65,20 @@ It fills its container. Give the parent a height.
 For full control, set the CSS variables on any parent: `--cen-bg`, `--cen-fg`, `--cen-muted`, `--cen-muted-fg`, `--cen-border`, `--cen-surface`, `--cen-accent`, `--cen-accent-fg`, `--cen-user-bg`, `--cen-success`, `--cen-warning`, `--cen-danger`, `--cen-info`, `--cen-chart-2` to `--cen-chart-6`, `--cen-radius`, `--cen-font`.
 
 The styles are scoped to `.cen-chat` and need no Tailwind or CSS import.
+
+## Agents built in the console
+
+An agent built under **Business Agents** in the console works in `<AgentChat>` with its website key: no backend, no API key.
+
+```tsx
+<AgentChat widgetKey="cwk_..." greeting="How can we help?" />
+```
+
+- Find the key on the agent's **Website** page (it's the `data-key` in the embed snippet).
+- The chat works on the sites listed there, like the website widget. Add your site first.
+- The agent runs exactly as published: its knowledge, tools, payments and bookings. It can also answer with widgets.
+- Conversations appear in the agent's inbox, and you can take one over from there.
+- Each conversation has the website widget's limits (length, pace, conversations per visitor).
 
 ## Your own layout
 

@@ -57,7 +57,13 @@ export interface UseAgentChatOptions {
     agent?: string;
     /** A publishable key (cpk_) whose allowed domains include this site. Used with `agent`. */
     publishableKey?: string;
-    /** Cencori's base URL for `agent` mode. Default https://cencori.com. */
+    /**
+     * An agent built in the Cencori console: its website key (cwk_...), from the
+     * agent's Website page. Works on the sites allowed there; conversations show
+     * in the agent's inbox like website chats.
+     */
+    widgetKey?: string;
+    /** Cencori's base URL for `agent` and `widgetKey` modes. Default https://cencori.com. */
     baseUrl?: string;
     /** Extra headers on every request (auth, CSRF...). */
     headers?: Record<string, string> | (() => Record<string, string> | Promise<Record<string, string>>);
@@ -139,7 +145,20 @@ export function useAgentChat(options: UseAgentChatOptions): UseAgentChatResult {
             const extra = typeof o.headers === 'function' ? await o.headers() : o.headers ?? {};
             const direct = !o.api;
             let res: Response;
-            if (direct) {
+            if (direct && o.widgetKey) {
+                // A console agent, through its website widget: a short-lived token per conversation.
+                if (payload.approval) throw new Error('This agent needs approvals: serve it from your backend with `api`.');
+                const input = payload.message ?? (payload.action ? formatWidgetAction(payload.action) : '');
+                const base = (o.baseUrl ?? 'https://cencori.com').replace(/\/$/, '');
+                const grant = await widgetGrant(o.fetch ?? fetch, base, o.widgetKey, sessionRef.current, controller.signal);
+                if (grant.sessionId !== sessionRef.current) setSessionId(grant.sessionId);
+                res = await (o.fetch ?? fetch)(`${base}/v1/sessions/${encodeURIComponent(grant.sessionId)}/turns`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream', Authorization: `Bearer ${grant.token}` },
+                    body: JSON.stringify({ input, stream: true, widgets: true }),
+                    signal: controller.signal,
+                });
+            } else if (direct) {
                 // No backend: the browser talks to the stored agent with a publishable key.
                 if (!o.agent || !o.publishableKey) throw new Error('Pass `api`, or `agent` with a `publishableKey`.');
                 if (payload.approval) throw new Error('This agent needs approvals: serve it from your backend with `api`.');
@@ -360,6 +379,9 @@ export function sessionEventsToChat() {
             }
             case 'turn.completed':
                 return [{ event: 'done', data: { sessionId } }];
+            case 'owner.handling':
+                // Someone from the business took over this conversation: they reply in it directly.
+                return [{ event: 'text', data: { delta: 'Someone from the team will reply here.' } }, { event: 'done', data: { sessionId } }];
             case 'turn.paused':
                 return [{ event: 'error', data: { message: 'This agent needs approvals: serve it from your backend with `api`.' } }];
             case 'turn.failed': {
@@ -374,4 +396,36 @@ export function sessionEventsToChat() {
                 return [];
         }
     };
+}
+
+// ── Console agents (widgetKey) ──────────────────────────────────
+
+const grants = new Map<string, { token: string; sessionId: string; expiresAt: number }>();
+
+function visitorId(widgetKey: string): string {
+    const storageKey = `cencori-visitor:${widgetKey}`;
+    try {
+        const saved = window.localStorage.getItem(storageKey);
+        if (saved && /^v_[A-Za-z0-9-]{8,64}$/.test(saved)) return saved;
+    } catch { /* storage blocked: a new visitor each time */ }
+    const id = `v_${typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36)}`;
+    try { window.localStorage.setItem(storageKey, id); } catch { /* fine */ }
+    return id;
+}
+
+/** A token for this conversation from the widget route: opens it, or resumes it with a fresh token. */
+async function widgetGrant(fetchImpl: typeof fetch, base: string, widgetKey: string, sessionId: string | undefined, signal: AbortSignal) {
+    const cached = sessionId ? grants.get(sessionId) : undefined;
+    if (cached && cached.expiresAt - Date.now() > 60_000) return cached;
+    const res = await fetchImpl(`${base}/api/widget/session`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: widgetKey, visitor_id: visitorId(widgetKey), ...(sessionId ? { session_id: sessionId } : {}) }),
+        signal,
+    });
+    const data = (await res.json().catch(() => ({}))) as { token?: string; session_id?: string; expires_at?: string; error?: { message?: string } };
+    if (!res.ok || !data.token || !data.session_id) throw new Error(data.error?.message || `Couldn't start the chat (${res.status}).`);
+    const grant = { token: data.token, sessionId: data.session_id, expiresAt: data.expires_at ? Date.parse(data.expires_at) : Date.now() + 14 * 60_000 };
+    grants.set(grant.sessionId, grant);
+    return grant;
 }

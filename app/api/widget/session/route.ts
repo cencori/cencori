@@ -27,6 +27,28 @@ import {
 
 const fail = (status: number, code: string, message: string) => NextResponse.json({ error: { code, message } }, { status });
 
+/**
+ * Agent UI (<AgentChat widgetKey>) calls this from the business's own site
+ * rather than from our frame. That's allowed when the browser's Origin is one
+ * of the widget's allowed sites: the same check the frame makes on the page
+ * it's embedded in, but on the header a browser can't forge.
+ */
+function withCors(res: NextResponse, origin: string | null): NextResponse {
+    if (origin) {
+        res.headers.set('Access-Control-Allow-Origin', origin);
+        res.headers.set('Vary', 'Origin');
+    }
+    return res;
+}
+
+export async function OPTIONS(req: NextRequest) {
+    const res = new NextResponse(null, { status: 204 });
+    res.headers.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.headers.set('Access-Control-Allow-Headers', 'Content-Type');
+    res.headers.set('Access-Control-Max-Age', '86400');
+    return withCors(res, req.headers.get('origin'));
+}
+
 function sameOrigin(req: NextRequest) {
     const origin = req.headers.get('origin');
     if (!origin) return false;
@@ -38,8 +60,16 @@ function sameOrigin(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-    // Only the widget frame, served from this origin, opens conversations.
-    if (!sameOrigin(req)) return fail(403, 'widget_origin_denied', 'Open this chat from the website widget.');
+    const crossOrigin = !sameOrigin(req);
+    const requestOrigin = req.headers.get('origin');
+    const res = await open(req, crossOrigin ? requestOrigin : null);
+    return crossOrigin ? withCors(res, requestOrigin) : res;
+}
+
+async function open(req: NextRequest, crossOrigin: string | null): Promise<NextResponse> {
+    // The widget frame (served from this origin) opens conversations; so can a
+    // page on one of the widget's allowed sites (checked below).
+    if (crossOrigin === null && !sameOrigin(req)) return fail(403, 'widget_origin_denied', 'Open this chat from the website widget.');
 
     const body = await req.json().catch(() => null) as Record<string, unknown> | null;
     if (!body || !isWidgetKey(body.key)) return fail(400, 'invalid_request', 'Missing widget key.');
@@ -52,12 +82,16 @@ export async function POST(req: NextRequest) {
     const widget = data as WidgetRow | null;
     if (!widget) return fail(404, 'widget_not_found', 'This chat no longer exists.');
 
-    const preview = verifyWidgetPreviewToken(body.preview, widget.id);
+    // Preview and share links belong to our own pages, never another site's.
+    const preview = crossOrigin === null && verifyWidgetPreviewToken(body.preview, widget.id);
     // The shareable link is its own page, so there's no embedding site to check.
-    const shared = !preview && verifyWidgetShareToken(body.share, widget);
+    const shared = crossOrigin === null && !preview && verifyWidgetShareToken(body.share, widget);
     if (!preview && !shared) {
         if (!widget.enabled) return fail(403, 'widget_disabled', 'This chat is turned off.');
-        const parentOrigin = typeof body.parent_origin === 'string' ? body.parent_origin : null;
+        // From another site, the browser's own Origin header is the site. The frame
+        // names the page it's embedded in; a page of ours calling directly (Agent UI
+        // on our own site) is its own site.
+        const parentOrigin = crossOrigin ?? (typeof body.parent_origin === 'string' ? body.parent_origin : req.headers.get('origin'));
         if (!originAllowed(parentOrigin, widget.allowed_origins)) return fail(403, 'widget_origin_denied', 'This chat isn’t enabled on this website.');
     }
     if (!widget.tenant_id || !widget.installation_id) return fail(409, 'widget_not_ready', 'This chat isn’t set up yet.');
@@ -112,7 +146,11 @@ export async function POST(req: NextRequest) {
             tenant_id: widget.tenant_id,
             external_user_id: visitorId,
             installation_id: widget.installation_id,
-            metadata: { source: shared ? 'link' : 'widget', widget_id: widget.id, preview, parent_origin: typeof body.parent_origin === 'string' ? body.parent_origin.slice(0, 200) : null },
+            metadata: {
+                source: shared ? 'link' : 'widget', widget_id: widget.id, preview,
+                parent_origin: (crossOrigin ?? (typeof body.parent_origin === 'string' ? body.parent_origin : req.headers.get('origin')))?.slice(0, 200) ?? null,
+                ...(crossOrigin || typeof body.parent_origin !== 'string' ? { client: 'agent-ui' } : {}),
+            },
         }).select('id').single();
         if (createError || !created) return fail(502, 'widget_unavailable', 'Could not start the conversation. Try again.');
         sessionId = created.id as string;

@@ -41,8 +41,8 @@ export interface AgentChatProps extends Partial<UseAgentChatOptions> {
 
 export function AgentChat(props: AgentChatProps) {
     if (props.chat) return <AgentChatView {...props} chat={props.chat} />;
-    if (!props.api && !(props.agent && props.publishableKey)) {
-        throw new Error('<AgentChat> needs an `api` route, or a stored `agent` with a `publishableKey` (or a `chat` from useAgentChat).');
+    if (!props.api && !props.widgetKey && !(props.agent && props.publishableKey)) {
+        throw new Error('<AgentChat> needs an `api` route, a console agent\'s `widgetKey`, or a stored `agent` with a `publishableKey` (or a `chat` from useAgentChat).');
     }
     return <OwnedAgentChat {...props} />;
 }
