@@ -5,6 +5,7 @@ import crypto from 'crypto';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { validateGatewayRequest, handleCorsPreFlight, type GatewayContext } from '@/lib/gateway-middleware';
 import { extractCencoriApiKeyFromHeaders } from '@/lib/api-keys';
+import { presentAgentTools, withWidgets } from '@/lib/gateway/agent-widgets';
 import { invalidateAgentConfig } from '@/lib/config-cache';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -142,7 +143,7 @@ export async function GET(
             config: {
                 model: agentConfig?.model ?? null,
                 system_prompt: agentConfig?.system_prompt ?? null,
-                tools: agentConfig?.tools ?? [],
+                ...presentAgentTools(agentConfig?.tools as string[] | null),
                 temperature: agentConfig?.temperature ?? null,
             },
         });
@@ -195,6 +196,8 @@ export async function PATCH(
                 system_prompt?: string;
                 tools?: string[];
                 temperature?: number;
+                /** Answer with UI: stored as 'render_ui' in tools. */
+                widgets?: boolean;
             };
         };
 
@@ -222,6 +225,9 @@ export async function PATCH(
                 || body.config.tools.some(tool => typeof tool !== 'string')
             )) {
                 return respondError(400, 'config.tools must be an array of strings', 'invalid_tools');
+            }
+            if (body.config.widgets !== undefined && typeof body.config.widgets !== 'boolean') {
+                return respondError(400, 'config.widgets must be a boolean', 'invalid_widgets');
             }
             if (body.config.temperature !== undefined && (
                 typeof body.config.temperature !== 'number'
@@ -252,11 +258,16 @@ export async function PATCH(
         }
 
         if (body.config) {
-            const { model, system_prompt, tools, temperature } = body.config;
+            const { model, system_prompt, tools, temperature, widgets } = body.config;
             const configUpdate: Record<string, unknown> = {};
             if (model !== undefined) configUpdate.model = model;
             if (system_prompt !== undefined) configUpdate.system_prompt = system_prompt;
-            if (tools !== undefined) configUpdate.tools = tools;
+            if (tools !== undefined || widgets !== undefined) {
+                // Keep the other setting as it is when only one of them changes.
+                const { data: current } = await adminClient.from('agent_configs').select('tools').eq('agent_id', agentId).maybeSingle();
+                const stored = presentAgentTools((current?.tools as string[] | null) ?? []);
+                configUpdate.tools = withWidgets(tools ?? stored.tools, widgets ?? stored.widgets);
+            }
             if (temperature !== undefined) configUpdate.temperature = temperature;
 
             if (Object.keys(configUpdate).length > 0) {
@@ -299,7 +310,7 @@ export async function PATCH(
             config: {
                 model: agentConfig?.model ?? null,
                 system_prompt: agentConfig?.system_prompt ?? null,
-                tools: agentConfig?.tools ?? [],
+                ...presentAgentTools(agentConfig?.tools as string[] | null),
                 temperature: agentConfig?.temperature ?? null,
             },
         });

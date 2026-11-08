@@ -5,6 +5,7 @@ import crypto from 'crypto';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { validateGatewayRequest, handleCorsPreFlight, type GatewayContext } from '@/lib/gateway-middleware';
 import { extractCencoriApiKeyFromHeaders } from '@/lib/api-keys';
+import { presentAgentTools, withWidgets } from '@/lib/gateway/agent-widgets';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -36,6 +37,8 @@ type AgentCreateBody = {
         system_prompt?: string;
         tools?: string[];
         temperature?: number;
+        /** Answer with UI: stored as 'render_ui' in tools. */
+        widgets?: boolean;
     };
 };
 
@@ -138,6 +141,9 @@ export async function POST(req: NextRequest) {
             )) {
                 return respondError(400, 'config.tools must be an array of strings', 'invalid_tools');
             }
+            if (body.config.widgets !== undefined && typeof body.config.widgets !== 'boolean') {
+                return respondError(400, 'config.widgets must be a boolean', 'invalid_widgets');
+            }
             if (body.config.temperature !== undefined && (
                 typeof body.config.temperature !== 'number'
                 || !Number.isFinite(body.config.temperature)
@@ -173,7 +179,7 @@ export async function POST(req: NextRequest) {
                 agent_id: agent.id,
                 model: config.model || 'gpt-4o',
                 system_prompt: config.system_prompt || null,
-                tools: config.tools || [],
+                tools: withWidgets((config.tools || []).filter((t) => t !== 'render_ui'), config.widgets === true),
                 temperature: config.temperature ?? 0.7,
             })
             .select('model, system_prompt, tools, temperature')
@@ -195,7 +201,7 @@ export async function POST(req: NextRequest) {
             config: {
                 model: agentConfig.model,
                 system_prompt: agentConfig.system_prompt,
-                tools: agentConfig.tools,
+                ...presentAgentTools(agentConfig.tools as string[] | null),
                 temperature: agentConfig.temperature,
             },
         }, 201);

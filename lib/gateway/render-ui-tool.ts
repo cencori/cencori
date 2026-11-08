@@ -85,3 +85,4 @@ export function widgetSummary(widget: WidgetNode): string {
     const title = typeof w.title === 'string' ? w.title : typeof w.label === 'string' ? w.label : '';
     return `[Showed the user a ${widget.type}${title ? `: ${title}` : ''}]`;
 }
+

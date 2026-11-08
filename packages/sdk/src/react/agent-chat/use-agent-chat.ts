@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { readEventStream, type AgentChatApprovalItem, type AgentChatDecision, type AgentChatRequest } from '../../agent-chat/protocol';
+import { formatWidgetAction, readEventStream, type AgentChatApprovalItem, type AgentChatDecision, type AgentChatRequest } from '../../agent-chat/protocol';
+import { partialRenderUiWidget } from '../../widgets/partial';
 import type { WidgetAction, WidgetNode } from '../../widgets/spec';
 
 /**
@@ -46,8 +47,18 @@ export interface WidgetActionContext {
 }
 
 export interface UseAgentChatOptions {
-    /** Your route serving the agent, e.g. "/api/chat". */
-    api: string;
+    /**
+     * Your route serving the agent, e.g. "/api/chat" (createAgentChatHandler).
+     * Your tools run on your server. Or leave it out and pass `agent` and
+     * `publishableKey` to talk to a stored agent with no backend.
+     */
+    api?: string;
+    /** A stored agent's id (POST /v1/agents): chat with it straight from the browser. */
+    agent?: string;
+    /** A publishable key (cpk_) whose allowed domains include this site. Used with `agent`. */
+    publishableKey?: string;
+    /** Cencori's base URL for `agent` mode. Default https://cencori.com. */
+    baseUrl?: string;
     /** Extra headers on every request (auth, CSRF...). */
     headers?: Record<string, string> | (() => Record<string, string> | Promise<Record<string, string>>);
     /** Extra fields merged into every request body. */
@@ -126,19 +137,42 @@ export function useAgentChat(options: UseAgentChatOptions): UseAgentChatResult {
         try {
             const o = opts.current;
             const extra = typeof o.headers === 'function' ? await o.headers() : o.headers ?? {};
-            const res = await (o.fetch ?? fetch)(o.api, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream', ...extra },
-                body: JSON.stringify({ ...o.body, ...payload, ...(sessionRef.current ? { sessionId: sessionRef.current } : {}) }),
-                signal: controller.signal,
-            });
+            const direct = !o.api;
+            let res: Response;
+            if (direct) {
+                // No backend: the browser talks to the stored agent with a publishable key.
+                if (!o.agent || !o.publishableKey) throw new Error('Pass `api`, or `agent` with a `publishableKey`.');
+                if (payload.approval) throw new Error('This agent needs approvals: serve it from your backend with `api`.');
+                const input = payload.message ?? (payload.action ? formatWidgetAction(payload.action) : '');
+                const base = (o.baseUrl ?? 'https://cencori.com').replace(/\/$/, '');
+                const sid = sessionRef.current;
+                res = await (o.fetch ?? fetch)(sid ? `${base}/v1/sessions/${encodeURIComponent(sid)}/turns` : `${base}/v1/sessions`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream', Authorization: `Bearer ${o.publishableKey}`, ...extra },
+                    body: JSON.stringify(sid
+                        ? { input, stream: true }
+                        : { agent_id: o.agent, metadata: { sdk: 'cencori/react' }, turn: { input, stream: true } }),
+                    signal: controller.signal,
+                });
+                const created = res.headers.get('X-Cencori-Session-Id');
+                if (created) setSessionId(created);
+            } else {
+                res = await (o.fetch ?? fetch)(o.api!, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream', ...extra },
+                    body: JSON.stringify({ ...o.body, ...payload, ...(sessionRef.current ? { sessionId: sessionRef.current } : {}) }),
+                    signal: controller.signal,
+                });
+            }
             if (!res.ok || !res.body) {
                 const data = (await res.json().catch(() => ({}))) as { error?: { message?: string } | string };
                 const message = typeof data.error === 'string' ? data.error : data.error?.message;
                 throw new Error(message || `The chat request failed (${res.status}).`);
             }
 
-            for await (const { event, data } of readEventStream(res.body)) {
+            const fromSession = direct ? sessionEventsToChat() : null;
+            for await (const raw of readEventStream(res.body)) {
+              for (const { event, data } of fromSession ? fromSession(raw) : [raw]) {
                 switch (event) {
                     case 'agent':
                         patch(assistantId, (m) => ({ ...m, agent: String(data.name ?? '') }));
@@ -191,11 +225,12 @@ export function useAgentChat(options: UseAgentChatOptions): UseAgentChatResult {
                         break;
                     case 'done':
                         ended = 'done';
-                        if (typeof data.sessionId === 'string') setSessionId(data.sessionId);
+                        if (typeof data.sessionId === 'string' && data.sessionId) setSessionId(data.sessionId);
                         break;
                     case 'error':
                         throw new Error(String(data.message ?? 'The agent failed.'));
                 }
+              }
             }
             if (!ended) throw new Error('The reply ended early.');
             // A widget that never finished (it failed its check) isn't left half-drawn.
@@ -290,4 +325,53 @@ export function useAgentChat(options: UseAgentChatOptions): UseAgentChatResult {
     }, [request]);
 
     return { messages, status, error, sessionId, send, sendAction, approve, reject, stop, reset, retry };
+}
+
+/**
+ * Cencori session events, as the agent chat events the hook draws: for
+ * `agent` mode, where the browser reads the session stream itself.
+ */
+export function sessionEventsToChat() {
+    const writing = new Map<string, string>();
+    let sessionId = '';
+    return ({ event, data }: { event: string; data: Record<string, unknown> }): Array<{ event: string; data: Record<string, unknown> }> => {
+        switch (event) {
+            case 'turn.started':
+                return [];
+            case 'output_text.delta':
+                return typeof data.delta === 'string' && data.delta ? [{ event: 'text', data: { delta: data.delta } }] : [];
+            case 'tool_call.delta': {
+                if (data.tool !== 'render_ui') return [];
+                const callId = String(data.action_id ?? '');
+                const args = (writing.get(callId) ?? '') + String(data.delta ?? '');
+                writing.set(callId, args);
+                const widget = partialRenderUiWidget(args);
+                return widget ? [{ event: 'widget_partial', data: { callId, widget } }] : [];
+            }
+            case 'tool_call.started':
+                // render_ui shows as the widget itself, not as a step.
+                return data.tool === 'render_ui' ? [] : [{ event: 'tool_call', data: { callId: String(data.action_id ?? ''), name: String(data.tool ?? ''), arguments: JSON.stringify(data.arguments ?? {}) } }];
+            case 'tool_call.completed': {
+                const out = data.output as { ok?: boolean; widget_id?: string; widget?: unknown } | undefined;
+                if (data.tool === 'render_ui') {
+                    return out?.ok && out.widget ? [{ event: 'widget', data: { id: String(out.widget_id ?? ''), callId: String(data.action_id ?? ''), widget: out.widget } }] : [];
+                }
+                return [{ event: 'tool_output', data: { callId: String(data.action_id ?? ''), name: String(data.tool ?? ''), output: typeof data.output === 'string' ? data.output : JSON.stringify(data.output ?? '') } }];
+            }
+            case 'turn.completed':
+                return [{ event: 'done', data: { sessionId } }];
+            case 'turn.paused':
+                return [{ event: 'error', data: { message: 'This agent needs approvals: serve it from your backend with `api`.' } }];
+            case 'turn.failed': {
+                const output = data.output as { error?: string } | undefined;
+                return [{ event: 'error', data: { message: output?.error ?? 'The agent failed.' } }];
+            }
+            case 'error': {
+                const err = (data.error ?? data) as { message?: string };
+                return [{ event: 'error', data: { message: err.message ?? 'The agent failed.' } }];
+            }
+            default:
+                return [];
+        }
+    };
 }

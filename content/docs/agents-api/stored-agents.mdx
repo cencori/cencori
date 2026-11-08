@@ -1,0 +1,81 @@
+---
+title: "Stored agents"
+description: "Define an agent once in Cencori and run it by id: from the SDK, from any language, or straight from a browser."
+section: "Agents API"
+order: 2
+---
+
+A stored agent keeps its model, instructions, tools and widgets setting in Cencori. Anything that runs it, by id, gets the same agent: change it once and every app using it changes.
+
+## Create one
+
+```http
+POST /v1/agents
+CENCORI_API_KEY: csk_...
+
+{
+  "name": "Sales analyst",
+  "config": {
+    "model": "gpt-oss-120b",
+    "system_prompt": "You are a concise sales analyst. Answer with charts and tables when it helps.",
+    "tools": ["web_search_preview"],
+    "widgets": true,
+    "temperature": 0.3
+  }
+}
+```
+
+```json
+{ "id": "fea49590-...", "name": "Sales analyst", "is_active": true, "config": { "model": "gpt-oss-120b", "tools": ["web_search_preview"], "widgets": true, ... } }
+```
+
+| Endpoint | Does |
+| --- | --- |
+| `POST /v1/agents` | Create |
+| `GET /v1/agents/:id` | Read |
+| `PATCH /v1/agents/:id` | Change `name`, `description`, `is_active` or any of `config` |
+| `DELETE /v1/agents/:id` | Delete |
+
+`config.tools` holds built-in tools (`web_search_preview` and others). Your own function tools stay in your code: add them when you run the agent from the SDK.
+
+## Run it
+
+**From the SDK**, with your own tools on top:
+
+```ts
+import { Agent, run } from 'cencori/agents';
+
+const analyst = Agent.fromCencori('fea49590-...', { tools: [getSales] });
+const result = await run(analyst, 'How is revenue trending?');
+```
+
+**Over HTTP**, start the session with the agent:
+
+```http
+POST /v1/sessions
+
+{ "agent_id": "fea49590-...", "turn": { "input": "How is revenue trending?" } }
+```
+
+The stored model and instructions apply to every turn in the session; a turn's own `model` or `instructions` only fill in what the agent doesn't set.
+
+**From a browser, with no backend**: see below.
+
+## From a browser, with no backend
+
+A [publishable key](/docs/platform/api-keys) (`cpk_`) can run a stored agent from a web page. Create one in **API keys** and set its allowed domains: requests from any other site are refused.
+
+```tsx
+import { AgentChat } from 'cencori/react';
+
+<AgentChat agent="fea49590-..." publishableKey="cpk_..." greeting="Ask about sales" />
+```
+
+What a publishable key can do is deliberately small:
+
+- Start a session **only with a stored agent** (`agent_id` is required), and continue only sessions it started.
+- Send the user's message. The agent's own model, instructions and tools always apply; anything else in the request is ignored.
+- Conversations are capped like the website widget's: a turn limit per conversation and a pace limit per minute.
+- It can't list sessions, read other sessions, approve tool calls, or attach tenants or users.
+
+Usage is billed to your project, like any other request. Use a backend ([Agent UI server](/docs/agent-ui/server)) when the agent needs your own tools, approvals, or to know who the user is.

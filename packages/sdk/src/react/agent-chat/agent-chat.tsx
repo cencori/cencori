@@ -23,7 +23,7 @@ import { Widget } from './widget';
  */
 
 export interface AgentChatProps extends Partial<UseAgentChatOptions> {
-    /** Pass a useAgentChat() result to control the chat from outside. Otherwise `api` is required. */
+    /** Pass a useAgentChat() result to control the chat from outside. Otherwise pass `api`, or `agent` with a `publishableKey`. */
     chat?: UseAgentChatResult;
     theme?: AgentChatTheme;
     /** Shown before the first message. */
@@ -41,11 +41,13 @@ export interface AgentChatProps extends Partial<UseAgentChatOptions> {
 
 export function AgentChat(props: AgentChatProps) {
     if (props.chat) return <AgentChatView {...props} chat={props.chat} />;
-    if (!props.api) throw new Error('<AgentChat> needs an `api` route (or a `chat` from useAgentChat).');
-    return <OwnedAgentChat {...props} api={props.api} />;
+    if (!props.api && !(props.agent && props.publishableKey)) {
+        throw new Error('<AgentChat> needs an `api` route, or a stored `agent` with a `publishableKey` (or a `chat` from useAgentChat).');
+    }
+    return <OwnedAgentChat {...props} />;
 }
 
-function OwnedAgentChat(props: AgentChatProps & { api: string }) {
+function OwnedAgentChat(props: AgentChatProps) {
     const chat = useAgentChat(props);
     return <AgentChatView {...props} chat={chat} />;
 }

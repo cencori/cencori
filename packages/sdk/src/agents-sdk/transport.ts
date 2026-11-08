@@ -95,7 +95,7 @@ export class Transport {
      * predate this answer with the plain session JSON; the turn then goes in a
      * second request, as before.
      */
-    async createSessionWithTurn(metadata: Record<string, unknown>, body: TurnBody): Promise<{ sessionId: string; response: Response }> {
+    async createSessionWithTurn(metadata: Record<string, unknown>, body: TurnBody, agentId?: string): Promise<{ sessionId: string; response: Response }> {
         const turn = { ...body, stream: true, pause_on_tool_calls: true };
         const response = await this.fetchImpl(`${this.baseUrl}/v1/sessions`, {
             method: 'POST',
@@ -104,7 +104,7 @@ export class Transport {
                 'Content-Type': 'application/json',
                 'Accept': 'text/event-stream, application/json',
             },
-            body: JSON.stringify({ metadata, turn }),
+            body: JSON.stringify({ metadata, turn, ...(agentId ? { agent_id: agentId } : {}) }),
             signal: this.signal,
         });
         const headerId = response.headers.get('X-Cencori-Session-Id') ?? undefined;

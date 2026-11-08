@@ -21,6 +21,7 @@ An agent packages a model, instructions and optional behaviour: tools, handoffs,
 | `outputType` | Structured output instead of text | This page |
 | `inputGuardrails`, `outputGuardrails` | Checking input and output | [Guardrails and approvals](/docs/agents-sdk/guardrails-and-approvals) |
 | `widgets` | Answering with UI: charts, tables, forms | [Agent UI](/docs/agent-ui/overview) |
+| `Agent.fromCencori(id)` | Running an agent stored in Cencori | This page |
 
 ## Start with one focused agent
 
@@ -84,6 +85,17 @@ finalOutput.category; // 'billing'
 ```
 
 The agent can still call its tools before answering.
+
+## Agents stored in Cencori
+
+Run an agent defined in Cencori ([stored agents](/docs/agents-api/stored-agents)) by id. Its model, instructions and widgets setting come from Cencori; add your own tools on top:
+
+```ts
+const analyst = Agent.fromCencori('fea49590-...', { tools: [getSales] });
+await run(analyst, 'How is revenue trending?');
+```
+
+A stored agent can be called as a tool (`analyst.asTool()`), but can't be a handoff target yet.
 
 ## Copy an agent
 

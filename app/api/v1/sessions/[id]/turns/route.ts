@@ -14,6 +14,7 @@ import { verifyClientToken } from "@/lib/embedded/client-tokens";
 import { CLIENT_TOKEN_PREFIX } from "@/lib/embedded/types";
 import { dePrefixId } from "@/lib/embedded/http";
 import { denyOnScopeMismatch, hasClientPermission } from "@/lib/embedded/session-auth";
+import { RENDER_UI_TOOL_NAME } from "@/lib/gateway/render-ui-tool";
 import { checkEndUserQuota, recordEndUserUsage, type QuotaCheckResult } from "@/lib/end-user-billing";
 import type { UnifiedMessage } from "@/lib/providers/base";
 import {
@@ -193,11 +194,14 @@ export async function POST(
         } else {
             const validation = await validateGatewayRequest(req);
             if (!validation.success) return validation.response;
-            if (validation.context.keyType !== 'secret') {
+            // A publishable key (domain-locked) continues only sessions it started
+            // with a stored agent: checked once the session is loaded.
+            if (validation.context.keyType !== 'secret' && validation.context.keyType !== 'publishable') {
                 return respondError(403, "This operation requires a secret project key", "secret_key_required");
             }
             gatewayCtx = validation.context;
         }
+        const publishable = (gatewayCtx as GatewayContext).keyType === 'publishable';
 
         // ── Agent resolution ──
         const adminClient = createAdminClient();
@@ -221,6 +225,11 @@ export async function POST(
             return respondError(404, "Session not found", "session_not_found");
         }
 
+        const sessionAccess = (session.metadata as { access?: string } | null)?.access;
+        if (publishable && (sessionAccess !== 'publishable' || !session.agent_id)) {
+            return respondError(404, "Session not found", "session_not_found");
+        }
+
         if (session.status !== 'active') {
             return respondError(409, `Session is ${session.status}, not active`, "session_not_active");
         }
@@ -228,9 +237,10 @@ export async function POST(
         // Website widget conversations come from anonymous visitors: cap their length and pace.
         // WhatsApp customers get the pace cap; their long conversations roll over to new sessions instead.
         const source = (session.metadata as { source?: string } | null)?.source;
-        if (source === 'widget' || source === 'whatsapp') {
+        // Publishable-key chats are anonymous visitors too: same caps as the website widget.
+        if (source === 'widget' || source === 'whatsapp' || sessionAccess === 'publishable') {
             const { checkWidgetTurn } = await import('@/lib/embedded/widget');
-            const blocked = await checkWidgetTurn(sessionId, source === 'widget' ? (session.last_turn_number as number | null) ?? 0 : 0);
+            const blocked = await checkWidgetTurn(sessionId, source === 'widget' || sessionAccess === 'publishable' ? (session.last_turn_number as number | null) ?? 0 : 0);
             if (blocked) return respondError(429, blocked.message, blocked.code);
         }
 
@@ -282,6 +292,15 @@ export async function POST(
             body = await req.json() as TurnRequestBody & { input: ResponsesRequest['input'] };
         } catch {
             return respondError(400, 'Request body is not valid JSON', 'invalid_json');
+        }
+        // A browser running a stored agent sends only its message: the agent's own
+        // model, instructions and tools always apply, whatever else is in the body.
+        if (publishable) {
+            if (typeof body.input !== 'string' || !body.input.trim()) {
+                return respondError(400, 'input must be a non-empty string', 'invalid_input');
+            }
+            if (body.input.length > 8000) return respondError(413, 'The message is too long', 'input_too_long');
+            body = { input: body.input } as typeof body;
         }
 
         // Studio: the owner stepped into this website or link chat. The visitor's
@@ -682,6 +701,8 @@ export async function POST(
         if (!installedManifest && agentId && agentConfig?.tools && agentConfig.tools.length > 0) {
             const existingTypes = new Set<string>(tools.map(t => t.type));
             for (const toolType of agentConfig.tools) {
+                // 'render_ui' in a stored agent's tools turns widgets on (see below).
+                if (toolType === RENDER_UI_TOOL_NAME) continue;
                 if (!existingTypes.has(toolType)) {
                     tools.push({ type: toolType } as never);
                 }
@@ -816,7 +837,7 @@ export async function POST(
             turnMetadata: body.metadata && typeof body.metadata === 'object' && !Array.isArray(body.metadata)
                 ? Object.fromEntries(Object.entries(body.metadata).filter(([, v]) => typeof v === 'string').slice(0, 20).map(([k, v]) => [k.slice(0, 64), (v as string).slice(0, 500)]))
                 : undefined,
-            widgets: body.widgets === true,
+            widgets: body.widgets === true || Boolean(!installedManifest && agentId && agentConfig?.tools?.includes(RENDER_UI_TOOL_NAME)),
             sessionId,
             turnNumber: newTurnNumber,
             model,

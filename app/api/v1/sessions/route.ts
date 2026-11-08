@@ -105,7 +105,10 @@ async function authOrError(req: NextRequest): Promise<AuthResult> {
     const validation = await validateGatewayRequest(req);
     if (!validation.success) return { gatewayCtx: null, respond, respondError, method, startedAt, callerIdentity, errorResponse: validation.response };
     gatewayCtx = validation.context;
-    if (gatewayCtx.keyType !== 'secret') {
+    // A publishable key (cpk_, locked to its allowed domains) may only start a
+    // session with a stored agent: POST below enforces that. It can't list sessions.
+    const publishableCreate = gatewayCtx.keyType === 'publishable' && req.method === 'POST';
+    if (gatewayCtx.keyType !== 'secret' && !publishableCreate) {
         return { gatewayCtx: null, respond, respondError, method, startedAt, callerIdentity, errorResponse: respondError(403, "This operation requires a secret project key", "secret_key_required") };
     }
 
@@ -195,6 +198,24 @@ export async function POST(req: NextRequest) {
             return respondError(400, 'turn must be a turn request object', 'invalid_turn');
         }
         const adminClient = createAdminClient();
+
+        // Publishable key: a browser running one of the project's stored agents.
+        // It names the agent and nothing else; the session is marked so only the
+        // agent's own configuration ever runs in it (see the turns route).
+        const publishable = gatewayCtx.keyType === 'publishable';
+        if (publishable) {
+            if (!body.agent_id) {
+                return respondError(400, 'A publishable key can only start a session with a stored agent: pass agent_id', 'agent_required');
+            }
+            if (body.tenant_id || body.installation_id || body.external_user_id) {
+                return respondError(403, 'A publishable key cannot scope a session to a tenant, installation or user', 'secret_key_required');
+            }
+            const meta = body.metadata && typeof body.metadata === 'object' && !Array.isArray(body.metadata) ? body.metadata : {};
+            body.metadata = {
+                ...Object.fromEntries(Object.entries(meta).filter(([k, v]) => typeof v === 'string' && k !== 'access').slice(0, 10).map(([k, v]) => [k.slice(0, 64), (v as string).slice(0, 200)])),
+                access: 'publishable',
+            };
+        }
 
         // Resolve embedded scope: ect_ claims win and cannot be overridden by body.
         let tenantId: string | null = null;

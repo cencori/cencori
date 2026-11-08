@@ -1,4 +1,11 @@
 {
   "title": "Agents API",
-  "pages": ["overview", "tool-calls", "widgets", "events", "browser-access"]
+  "pages": [
+    "overview",
+    "stored-agents",
+    "tool-calls",
+    "widgets",
+    "events",
+    "browser-access"
+  ]
 }

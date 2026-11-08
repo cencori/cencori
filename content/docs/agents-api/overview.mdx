@@ -9,6 +9,7 @@ The Agents API is the runtime under everything agent-shaped in Cencori. The [Age
 
 | Concept | What it is |
 | --- | --- |
+| **Stored agent** | An agent defined in Cencori (`POST /v1/agents`), run by id. See [Stored agents](/docs/agents-api/stored-agents) |
 | **Session** | One conversation. Durable: its events are stored, so it can pause, resume and be replayed |
 | **Turn** | One request in a session: input in, a streamed reply out |
 | **Tool call** | The model asks for a function. Built-in and installed tools run on Cencori; yours pause the turn for you to run |
@@ -59,7 +60,8 @@ See [Tool calls and approvals](/docs/agents-api/tool-calls) for the full loop an
 
 | Endpoint | Does |
 | --- | --- |
-| `POST /v1/sessions` | Create a session, optionally with its first `turn` |
+| `POST /v1/agents` | Store an agent: model, instructions, tools, widgets |
+| `POST /v1/sessions` | Create a session, optionally with its first `turn` and a stored `agent_id` |
 | `POST /v1/sessions/:id/turns` | Send a turn |
 | `POST /v1/sessions/:id/approve` | Send tool results (and approve) to resume a paused turn |
 | `POST /v1/sessions/:id/reject` | Decline a paused tool call |
@@ -88,4 +90,5 @@ Request and response details: [Sessions API reference](/docs/api/sessions).
 ## Who can call it
 
 - **Secret keys** (`csk_`) from your server: everything.
+- **Publishable keys** (`cpk_`) from a browser, locked to your domains: run a stored agent, nothing else. See [Stored agents](/docs/agents-api/stored-agents#from-a-browser-with-no-backend).
 - **Client tokens** (`ect_`) from a browser: turns in their own sessions, and approvals if granted. See [Browser access](/docs/agents-api/browser-access).

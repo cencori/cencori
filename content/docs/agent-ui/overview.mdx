@@ -24,6 +24,16 @@ import { AgentChat } from 'cencori/react';
 
 Your tools never run in the browser, and the browser never sees your API key.
 
+### Or with no backend
+
+For an agent stored in Cencori that doesn't need your own tools, skip the route: point the chat at the agent with a publishable key locked to your domains.
+
+```tsx
+<AgentChat agent="fea49590-..." publishableKey="cpk_..." />
+```
+
+See [Stored agents](/docs/agents-api/stored-agents#from-a-browser-with-no-backend).
+
 ## What makes it different
 
 - **Any model generates UI.** `widgets: true` gives the agent a built-in `render_ui` tool. It works on every model that calls tools, not one vendor's.

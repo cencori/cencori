@@ -328,7 +328,15 @@ async function* runLoop<Ctx>(
         return ctx;
     };
 
-    const nextFor = async (agent: Agent<any>, sessionId: string): Promise<ResumeNext> => ({
+    const nextFor = async (agent: Agent<any>, sessionId: string): Promise<ResumeNext> => {
+        // A handoff replaces the session's instructions and model, which for a
+        // stored agent live on Cencori: it can be called as a tool instead.
+        if (agent.cencoriAgentId) {
+            throw new AgentsError(`"${agent.name}" is stored in Cencori and can't be a handoff target yet. Use ${agent.name}.asTool() instead.`);
+        }
+        return nextForLocal(agent, sessionId);
+    };
+    const nextForLocal = async (agent: Agent<any>, sessionId: string): Promise<ResumeNext> => ({
         instructions: (await agent.resolveInstructions(contextFor(agent, sessionId))) ?? '',
         model: agent.model,
         tools: wireTools(agent),
@@ -392,7 +400,7 @@ async function* runLoop<Ctx>(
                 ...(options.metadata ?? {}),
                 sdk: 'cencori/agents',
                 agent: startAgent.name,
-            }, firstTurn);
+            }, firstTurn, agent.cencoriAgentId);
             sessionId = created.sessionId;
             response = created.response;
         }

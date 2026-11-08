@@ -61,6 +61,12 @@ export interface AgentOptions<Ctx = unknown, Out = string> {
      * `{ widget }` whether or not this is on.
      */
     widgets?: boolean;
+    /**
+     * Run an agent stored in Cencori (POST /v1/agents, or the console) by its
+     * id: its model, instructions and stored tools apply, and any `tools` you
+     * add here run in your process on top. Usually set with Agent.fromCencori().
+     */
+    cencoriAgentId?: string;
 }
 
 /** The model an agent uses when none is given: GPT OSS 120B on Cerebras, chosen for speed. */
@@ -96,6 +102,7 @@ export class Agent<Ctx = unknown, Out = string> {
     readonly inputGuardrails: InputGuardrail<Ctx>[];
     readonly outputGuardrails: OutputGuardrail<Ctx>[];
     readonly widgets: boolean;
+    readonly cencoriAgentId?: string;
 
     constructor(options: AgentOptions<Ctx, Out>) {
         if (!options.name?.trim()) throw new TypeError('An agent needs a name.');
@@ -111,6 +118,7 @@ export class Agent<Ctx = unknown, Out = string> {
         this.inputGuardrails = options.inputGuardrails ?? [];
         this.outputGuardrails = options.outputGuardrails ?? [];
         this.widgets = options.widgets ?? false;
+        this.cencoriAgentId = options.cencoriAgentId;
 
         const names = new Set<string>();
         for (const t of [...this.tools.map((t) => t.name), ...this.handoffs.map((a) => Agent.handoffToolName(a))]) {
@@ -133,8 +141,24 @@ export class Agent<Ctx = unknown, Out = string> {
             inputGuardrails: this.inputGuardrails,
             outputGuardrails: this.outputGuardrails,
             widgets: this.widgets,
+            cencoriAgentId: this.cencoriAgentId,
             ...overrides,
         });
+    }
+
+    /**
+     * An agent stored in Cencori, run by id. Its model, instructions, stored
+     * tools and widgets setting come from Cencori; add local tools, guardrails
+     * or handoffs here as for any agent.
+     *
+     * ```ts
+     * const support = Agent.fromCencori('agent_123', { tools: [lookupOrder] });
+     * await run(support, 'Where is order 1042?');
+     * ```
+     */
+    static fromCencori<Ctx = unknown>(agentId: string, options: Omit<AgentOptions<Ctx, string>, 'cencoriAgentId' | 'name'> & { name?: string } = {}): Agent<Ctx, string> {
+        if (!agentId || typeof agentId !== 'string') throw new TypeError('Agent.fromCencori needs the stored agent\'s id.');
+        return new Agent<Ctx, string>({ ...options, name: options.name ?? 'Agent', cencoriAgentId: agentId });
     }
 
     /** The tool name a handoff to this agent goes by. */
