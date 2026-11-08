@@ -229,7 +229,9 @@ export default function OrganizationLayoutClient({
     const isAgentWorkspace = isAgentPath(pathname);
     const isMemoryGraph = /\/memory\/graph\/?$/.test(pathname);
     const isCopilotPage = /\/copilot\/?$/.test(pathname);
-    const isFixedWorkspace = isPlayground || isAgentWorkspace || isMemoryGraph || isCopilotPage;
+    // A session's trace (/observability/<id>) fills the height, like the memory graph.
+    const isSessionTrace = /\/observability\/[^/]+\/?$/.test(pathname);
+    const isFixedWorkspace = isPlayground || isAgentWorkspace || isMemoryGraph || isCopilotPage || isSessionTrace;
     const docsUrl = getMainSiteUrl("/docs");
     const scopedArea = segments[2];
     const isProjectSettingsView = isInsideProject && (
