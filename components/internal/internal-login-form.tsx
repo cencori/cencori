@@ -13,7 +13,7 @@ async function signIn(email: string, password: string): Promise<string | null> {
     const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, redirect: '/internal' }),
+        body: JSON.stringify({ email, password, redirect: window.location.pathname }),
     });
     const data = await res.json();
     return res.ok ? null : (data.error || 'Failed to sign in');
@@ -63,7 +63,7 @@ export function InternalLoginForm() {
                     return;
                 }
 
-                window.location.assign('/internal');
+                window.location.assign(window.location.pathname);
                 return;
             }
 
@@ -74,7 +74,7 @@ export function InternalLoginForm() {
                 return;
             }
 
-            window.location.assign('/internal');
+            window.location.assign(window.location.pathname);
         } catch {
             setError(isSignUp ? 'Failed to create account' : 'Failed to sign in');
         } finally {

@@ -2,7 +2,7 @@
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { heardAboutLabel, readHeardAbout } from '@/lib/heard-about';
 import { fetchAllRows } from '@/lib/supabase-paginate';
-import type { TimePeriod, AIGatewayMetrics, SecurityMetrics, OrganizationsMetrics, ProjectsMetrics, ApiKeysMetrics, UsersMetrics, ScanMetrics, PlatformEventsMetrics, CaptureMetrics } from './types';
+import type { TimePeriod, AIGatewayMetrics, SecurityMetrics, OrganizationsMetrics, ProjectsMetrics, ApiKeysMetrics, UsersMetrics, ScanMetrics, CaptureMetrics } from './types';
 import type { User } from '@supabase/supabase-js';
 
 /**
@@ -658,63 +658,6 @@ export async function getScanMetrics(period: TimePeriod): Promise<ScanMetrics> {
         scoreBreakdown,
         issueBreakdown,
         platformBreakdown,
-    };
-}
-
-export async function getPlatformEventsMetrics(period: TimePeriod): Promise<PlatformEventsMetrics> {
-    const supabase = createAdminClient();
-    const startDate = getStartDate(period);
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let eventsAsc: any[];
-    try {
-        // Paginate past the 1000-row ceiling; order ascending so pages are stable.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        eventsAsc = await fetchAllRows<any>((from, to) =>
-            supabase
-                .from('platform_events')
-                .select('id, event_type, product, user_id, organization_id, project_id, metadata, created_at')
-                .gte('created_at', startDate.toISOString())
-                .order('created_at', { ascending: true })
-                .range(from, to)
-        );
-    } catch (error) {
-        console.error('[Analytics] Error fetching platform events:', error);
-        return {
-            totalEvents: 0,
-            eventsByProduct: {},
-            eventsByType: {},
-            recentEvents: [],
-            eventsToday: 0,
-        };
-    }
-
-    // Preserve the original newest-first semantics for the recent feed.
-    const events = eventsAsc;
-    const totalEvents = events.length;
-
-    const eventsByProduct: Record<string, number> = {};
-    events.forEach(e => {
-        eventsByProduct[e.product] = (eventsByProduct[e.product] || 0) + 1;
-    });
-
-    const eventsByType: Record<string, number> = {};
-    events.forEach(e => {
-        eventsByType[e.event_type] = (eventsByType[e.event_type] || 0) + 1;
-    });
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const eventsToday = events.filter(e => new Date(e.created_at) >= today).length;
-
-    const recentEvents = events.slice(-50).reverse();
-
-    return {
-        totalEvents,
-        eventsByProduct,
-        eventsByType,
-        recentEvents,
-        eventsToday,
     };
 }
 

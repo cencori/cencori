@@ -100,62 +100,10 @@ export const MODEL_MAPPINGS: Record<string, Record<string, string>> = {
     'glm-5.3-flash': { 'openai': 'gpt-4o-mini', 'anthropic': 'claude-haiku-4-5', 'google': 'gemini-2.5-flash-lite' },
 };
 
-// In-memory cache for DB mappings
-let dbMappingsCache: Record<string, Record<string, string>> | null = null;
-let dbMappingsCacheTime = 0;
-let dbMappingsPromise: Promise<Record<string, Record<string, string>>> | null = null;
-const CACHE_TTL_MS = 60 * 1000; // 1 minute
-
-/**
- * Load model mappings from DB (cached)
- * Falls back to hardcoded MODEL_MAPPINGS if DB is unavailable.
- * Uses a promise mutex to prevent concurrent DB reads when cache expires.
- */
-async function loadDbMappings(): Promise<Record<string, Record<string, string>>> {
-    if (dbMappingsCache && Date.now() - dbMappingsCacheTime < CACHE_TTL_MS) {
-        return dbMappingsCache;
-    }
-
-    if (dbMappingsPromise) {
-        return dbMappingsPromise;
-    }
-
-    dbMappingsPromise = (async () => {
-        try {
-            const { createAdminClient } = await import('@/lib/supabaseAdmin');
-            const supabase = createAdminClient();
-            const { data, error } = await supabase
-                .from('model_mappings')
-                .select('source_model, target_provider, target_model');
-
-            if (error || !data || data.length === 0) {
-                return MODEL_MAPPINGS;
-            }
-
-            const mappings: Record<string, Record<string, string>> = {};
-            for (const row of data) {
-                if (!mappings[row.source_model]) mappings[row.source_model] = {};
-                mappings[row.source_model][row.target_provider] = row.target_model;
-            }
-
-            dbMappingsCache = mappings;
-            dbMappingsCacheTime = Date.now();
-            return mappings;
-        } catch {
-            return MODEL_MAPPINGS;
-        } finally {
-            dbMappingsPromise = null;
-        }
-    })();
-
-    return dbMappingsPromise;
-}
-
-/** Invalidate the DB mappings cache (call after writes) */
-export function invalidateMappingsCache() {
-    dbMappingsCache = null;
-    dbMappingsCacheTime = 0;
-}
+// The mappings above are the only source. They used to be overridable from a
+// model_mappings table edited in the internal panel, but any rows there
+// replaced this list wholesale, and production's (last edited 2026-03-16)
+// hid every mapping added here since. The table is left in place, unread.
 
 /**
  * Get fallback model for a given model on a fallback provider.
@@ -170,8 +118,7 @@ export async function getFallbackModel(
         return configuredFallbackModel;
     }
 
-    const allMappings = await loadDbMappings();
-    const mappings = allMappings[originalModel];
+    const mappings = MODEL_MAPPINGS[originalModel];
 
     if (mappings && mappings[fallbackProvider]) {
         return mappings[fallbackProvider];

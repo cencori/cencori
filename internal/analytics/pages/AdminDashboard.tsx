@@ -156,8 +156,6 @@ function Dashboard({ data, periodLabel }: { data: PlatformOverviewMetrics; perio
     ].filter((row) => row.value > 0);
     const incidentTypeRows = useMemo(() => topEntries(security.incidentsByType), [security.incidentsByType]);
     const heardAboutRows = data.users.heardAbout.map((row) => ({ name: row.label, value: row.count }));
-    const productRows = useMemo(() => topEntries(data.platformEvents.eventsByProduct), [data.platformEvents.eventsByProduct]);
-    const eventTypeRows = useMemo(() => topEntries(data.platformEvents.eventsByType), [data.platformEvents.eventsByType]);
     const scoreRows = (['A', 'B', 'C', 'D', 'F'] as const)
         .map((tier) => ({ name: `${tier}-Tier`, value: data.scan.scoreBreakdown[tier] }))
         .filter((row) => row.value > 0);
@@ -299,33 +297,6 @@ function Dashboard({ data, periodLabel }: { data: PlatformOverviewMetrics; perio
                         },
                     ]}
                 />
-            </Section>
-
-            <Section title="Platform events">
-                <StatCard
-                    title="Events"
-                    detail={`${data.platformEvents.eventsToday.toLocaleString()} today`}
-                    stats={[
-                        { label: 'Total events', value: data.platformEvents.totalEvents.toLocaleString(), color: COLORS.violet },
-                        { label: 'Products', value: Object.keys(data.platformEvents.eventsByProduct).length.toLocaleString(), color: COLORS.blue },
-                        { label: 'Event types', value: Object.keys(data.platformEvents.eventsByType).length.toLocaleString(), color: COLORS.amber },
-                        { label: 'Today', value: data.platformEvents.eventsToday.toLocaleString(), color: COLORS.green },
-                    ]}
-                />
-                <div className="mt-4 grid gap-4 lg:grid-cols-2">
-                    <MetricCardFrame
-                        config={frameConfig('Events by product', plural(Object.keys(data.platformEvents.eventsByProduct).length, 'product'), COLORS.blue, data.platformEvents.totalEvents.toLocaleString())}
-                        loading={false}
-                    >
-                        <BarBreakdownChart rows={productRows} color={COLORS.blue} label="Events" formatValue={(v) => compact.format(v)} reduceMotion={reduceMotion} labelKind="plain" />
-                    </MetricCardFrame>
-                    <MetricCardFrame
-                        config={frameConfig('Events by type', plural(Object.keys(data.platformEvents.eventsByType).length, 'type'), COLORS.violet, data.platformEvents.totalEvents.toLocaleString())}
-                        loading={false}
-                    >
-                        <BarBreakdownChart rows={eventTypeRows} color={COLORS.violet} label="Events" formatValue={(v) => compact.format(v)} reduceMotion={reduceMotion} labelKind="plain" />
-                    </MetricCardFrame>
-                </div>
             </Section>
 
             <Section title="Cencori Scan">

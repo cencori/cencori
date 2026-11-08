@@ -1,15 +1,13 @@
 'use client';
 
-import React, { useState, useCallback, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useEditor, EditorContent } from '@tiptap/react';
+import React, { useState, useCallback, useEffect, useDeferredValue, useMemo } from 'react';
+import { useEditor, useEditorState, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
 import Underline from '@tiptap/extension-underline';
 import TextAlign from '@tiptap/extension-text-align';
 import Image from '@tiptap/extension-image';
 import {
-    ArrowLeft,
     Bold,
     Italic,
     Underline as UnderlineIcon,
@@ -23,25 +21,31 @@ import {
     TestTube,
     Plus,
     Trash2,
-    Clock,
     CheckCircle,
     XCircle,
     ChevronDown,
     Users,
-    Mail,
     Megaphone,
     History,
     PenLine,
     Eye,
     UserCircle,
     Camera,
+    Check,
 } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { renderTemplate } from '@/lib/email-templates';
+import { StatCard } from '@/internal/analytics/components/StatCard';
 
 // —— Types ——————————————————————————————————————————
 interface SenderProfile {
@@ -84,9 +88,37 @@ const EMAIL_CATEGORIES = [
     { value: 'transactional', label: 'Transactional' },
 ];
 
+// The editor's text styles, each shown in its own size in the menu.
+const TEXT_STYLES = [
+    { value: 'p', label: 'Paragraph', className: 'text-[13px]' },
+    { value: 'h1', label: 'Heading 1', className: 'text-lg font-semibold' },
+    { value: 'h2', label: 'Heading 2', className: 'text-base font-semibold' },
+    { value: 'h3', label: 'Heading 3', className: 'text-sm font-semibold' },
+] as const;
+
 const EMAIL_DOMAIN = process.env.NEXT_PUBLIC_EMAIL_DOMAIN || 'send.cencori.com';
 
 // —— TipTap Toolbar ——————————————————————————————————
+type EditorInstance = NonNullable<ReturnType<typeof useEditor>>;
+
+/** What's switched on at the cursor, so the toolbar can show it. */
+function readFormatting(current: EditorInstance) {
+    return {
+        bold: current.isActive('bold'),
+        italic: current.isActive('italic'),
+        underline: current.isActive('underline'),
+        bulletList: current.isActive('bulletList'),
+        orderedList: current.isActive('orderedList'),
+        alignLeft: current.isActive({ textAlign: 'left' }),
+        alignCenter: current.isActive({ textAlign: 'center' }),
+        link: current.isActive('link'),
+        style: current.isActive('heading', { level: 1 }) ? 'h1'
+            : current.isActive('heading', { level: 2 }) ? 'h2'
+                : current.isActive('heading', { level: 3 }) ? 'h3'
+                    : 'p',
+    };
+}
+
 function EditorToolbar({ editor }: { editor: ReturnType<typeof useEditor> | null }) {
     const [linkUrl, setLinkUrl] = useState('');
     const [imageUrl, setImageUrl] = useState('');
@@ -95,7 +127,20 @@ function EditorToolbar({ editor }: { editor: ReturnType<typeof useEditor> | null
     const [isUploadingImage, setIsUploadingImage] = useState(false);
     const fileInputRef = React.useRef<HTMLInputElement>(null);
 
+    // Tiptap 3 doesn't re-render on every transaction; subscribe to just the
+    // formatting at the cursor so the buttons show what's on, and only the
+    // toolbar re-renders when it changes.
+    const active = useEditorState({
+        editor,
+        selector: ({ editor: current }) => (current ? readFormatting(current) : null),
+    });
+
     if (!editor) return null;
+    // The subscription only fills in after the editor's first transaction;
+    // read it directly until then so the toolbar shows from the start.
+    const formatting = active ?? readFormatting(editor);
+
+    const currentStyle = formatting.style;
 
     const addLink = (e: React.FormEvent) => {
         e.preventDefault();
@@ -149,39 +194,52 @@ function EditorToolbar({ editor }: { editor: ReturnType<typeof useEditor> | null
     };
 
     const toolbarButtons = [
-        { icon: Bold, action: () => editor.chain().focus().toggleBold().run(), active: editor.isActive('bold'), title: 'Bold' },
-        { icon: Italic, action: () => editor.chain().focus().toggleItalic().run(), active: editor.isActive('italic'), title: 'Italic' },
-        { icon: UnderlineIcon, action: () => editor.chain().focus().toggleUnderline().run(), active: editor.isActive('underline'), title: 'Underline' },
+        { icon: Bold, action: () => editor.chain().focus().toggleBold().run(), active: formatting.bold, title: 'Bold' },
+        { icon: Italic, action: () => editor.chain().focus().toggleItalic().run(), active: formatting.italic, title: 'Italic' },
+        { icon: UnderlineIcon, action: () => editor.chain().focus().toggleUnderline().run(), active: formatting.underline, title: 'Underline' },
         { separator: true },
-        { icon: List, action: () => editor.chain().focus().toggleBulletList().run(), active: editor.isActive('bulletList'), title: 'Bullet List' },
-        { icon: ListOrdered, action: () => editor.chain().focus().toggleOrderedList().run(), active: editor.isActive('orderedList'), title: 'Ordered List' },
+        { icon: List, action: () => editor.chain().focus().toggleBulletList().run(), active: formatting.bulletList, title: 'Bullet List' },
+        { icon: ListOrdered, action: () => editor.chain().focus().toggleOrderedList().run(), active: formatting.orderedList, title: 'Ordered List' },
         { separator: true },
-        { icon: AlignLeft, action: () => editor.chain().focus().setTextAlign('left').run(), active: editor.isActive({ textAlign: 'left' }), title: 'Align Left' },
-        { icon: AlignCenter, action: () => editor.chain().focus().setTextAlign('center').run(), active: editor.isActive({ textAlign: 'center' }), title: 'Align Center' },
+        { icon: AlignLeft, action: () => editor.chain().focus().setTextAlign('left').run(), active: formatting.alignLeft, title: 'Align Left' },
+        { icon: AlignCenter, action: () => editor.chain().focus().setTextAlign('center').run(), active: formatting.alignCenter, title: 'Align Center' },
         { separator: true },
     ];
 
     return (
-        <div className="flex items-center gap-0.5 border-b border-border/40 px-3 py-1.5 flex-wrap">
-            <select
-                className="h-7 rounded bg-secondary/50 border border-border/30 text-xs text-foreground px-2 mr-2 focus:outline-none"
-                value={
-                    editor.isActive('heading', { level: 1 }) ? 'h1'
-                        : editor.isActive('heading', { level: 2 }) ? 'h2'
-                            : editor.isActive('heading', { level: 3 }) ? 'h3'
-                                : 'p'
-                }
-                onChange={(e) => {
-                    const val = e.target.value;
-                    if (val === 'p') editor.chain().focus().setParagraph().run();
-                    else editor.chain().focus().toggleHeading({ level: Number(val.replace('h', '')) as 1 | 2 | 3 }).run();
-                }}
-            >
-                <option value="p">Paragraph</option>
-                <option value="h1">Heading 1</option>
-                <option value="h2">Heading 2</option>
-                <option value="h3">Heading 3</option>
-            </select>
+        <div className="flex w-max flex-nowrap items-center gap-0.5 rounded-full bg-muted/60 px-2 py-1">
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <button
+                        type="button"
+                        className="mr-1 flex h-7 items-center gap-1 rounded-full px-2.5 text-xs text-foreground hover:bg-muted focus:outline-none"
+                        aria-label="Text style"
+                    >
+                        {TEXT_STYLES.find((style) => style.value === currentStyle)?.label ?? 'Paragraph'}
+                        <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                    </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                    side="top"
+                    align="start"
+                    sideOffset={6}
+                    className="w-48 rounded-xl !border-0 !bg-[#f3f3f1] p-1 shadow-[0_18px_48px_rgba(0,0,0,0.35)] dark:!bg-[#181818]"
+                >
+                    {TEXT_STYLES.map((style) => (
+                        <DropdownMenuItem
+                            key={style.value}
+                            className="min-h-8 cursor-pointer rounded-lg px-3 py-1"
+                            onSelect={() => {
+                                if (style.value === 'p') editor.chain().focus().setParagraph().run();
+                                else editor.chain().focus().setHeading({ level: Number(style.value.slice(1)) as 1 | 2 | 3 }).run();
+                            }}
+                        >
+                            <span className={cn('min-w-0 flex-1 truncate', style.className)}>{style.label}</span>
+                            {currentStyle === style.value && <Check className="ml-auto size-3.5 shrink-0" />}
+                        </DropdownMenuItem>
+                    ))}
+                </DropdownMenuContent>
+            </DropdownMenu>
             {toolbarButtons.map((btn, idx) => {
                 if ('separator' in btn) {
                     return <div key={idx} className="w-px h-5 bg-border/30 mx-1" />;
@@ -193,8 +251,10 @@ function EditorToolbar({ editor }: { editor: ReturnType<typeof useEditor> | null
                         type="button"
                         onClick={btn.action}
                         className={cn(
-                            "p-1.5 rounded hover:bg-secondary/60 transition-colors",
-                            btn.active && "bg-secondary text-foreground"
+                            "rounded-full p-1.5 transition-colors",
+                            btn.active
+                                ? "bg-foreground text-background"
+                                : "text-muted-foreground hover:bg-muted hover:text-foreground"
                         )}
                         title={btn.title}
                     >
@@ -208,8 +268,10 @@ function EditorToolbar({ editor }: { editor: ReturnType<typeof useEditor> | null
                     <button
                         type="button"
                         className={cn(
-                            "p-1.5 rounded hover:bg-secondary/60 transition-colors",
-                            editor.isActive('link') && "bg-secondary text-foreground"
+                            "rounded-full p-1.5 transition-colors",
+                            formatting.link
+                                ? "bg-foreground text-background"
+                                : "text-muted-foreground hover:bg-muted hover:text-foreground"
                         )}
                         title="Add Link"
                     >
@@ -235,8 +297,10 @@ function EditorToolbar({ editor }: { editor: ReturnType<typeof useEditor> | null
                     <button
                         type="button"
                         className={cn(
-                            "p-1.5 rounded hover:bg-secondary/60 transition-colors",
-                            isImageOpen && "bg-secondary text-foreground"
+                            "rounded-full p-1.5 transition-colors",
+                            isImageOpen
+                                ? "bg-foreground text-background"
+                                : "text-muted-foreground hover:bg-muted hover:text-foreground"
                         )}
                         title="Add Image"
                     >
@@ -288,7 +352,6 @@ function EditorToolbar({ editor }: { editor: ReturnType<typeof useEditor> | null
 
 // —— Main Page ——————————————————————————————————————
 export default function InternalEmailsPage() {
-    const router = useRouter();
     const [activeTab, setActiveTab] = useState<Tab>('compose');
 
     // Compose state
@@ -318,8 +381,17 @@ export default function InternalEmailsPage() {
     const [sends, setSends] = useState<EmailSend[]>([]);
     const [loadingHistory, setLoadingHistory] = useState(true);
 
+    // The preview follows the draft as you type; deferred so typing never waits on it.
+    const [bodyHtml, setBodyHtml] = useState('');
+    const deferredBody = useDeferredValue(bodyHtml);
+
     // TipTap editor
     const editor = useEditor({
+        // Tiptap 3 creates the editor after the first render and doesn't
+        // re-render on its own; setting state here shows the toolbar right
+        // away instead of after the first keystroke.
+        onCreate: ({ editor: current }) => setBodyHtml(current.getHTML()),
+        onUpdate: ({ editor: current }) => setBodyHtml(current.getHTML()),
         immediatelyRender: false,
         extensions: [
             StarterKit,
@@ -328,10 +400,10 @@ export default function InternalEmailsPage() {
             TextAlign.configure({ types: ['heading', 'paragraph'] }),
             Image,
         ],
-        content: '<p>Write your email content here...</p>',
+        content: '<p></p>',
         editorProps: {
             attributes: {
-                class: 'prose prose-invert prose-sm max-w-none focus:outline-none min-h-[60vh] px-6 py-5',
+                class: 'prose prose-sm dark:prose-invert max-w-none focus:outline-none min-h-full px-4 py-4 sm:px-6',
             },
         },
     });
@@ -396,8 +468,8 @@ export default function InternalEmailsPage() {
     }, []);
 
     useEffect(() => {
-        if (audienceType === 'bulk') fetchAudienceCount();
-    }, [audienceType, fetchAudienceCount]);
+        fetchAudienceCount();
+    }, [fetchAudienceCount]);
 
     // Fetch newsletter subscriber count
     const fetchNewsletterCount = useCallback(async () => {
@@ -413,22 +485,17 @@ export default function InternalEmailsPage() {
     }, []);
 
     useEffect(() => {
-        if (audienceType === 'newsletter') fetchNewsletterCount();
-    }, [audienceType, fetchNewsletterCount]);
+        fetchNewsletterCount();
+    }, [fetchNewsletterCount]);
 
-    // Close preview drawer on Escape, lock body scroll while open
+    // Escape closes the preview pane.
     useEffect(() => {
         if (!showPreview) return;
         const onKey = (e: KeyboardEvent) => {
             if (e.key === 'Escape') setShowPreview(false);
         };
         window.addEventListener('keydown', onKey);
-        const prevOverflow = document.body.style.overflow;
-        document.body.style.overflow = 'hidden';
-        return () => {
-            window.removeEventListener('keydown', onKey);
-            document.body.style.overflow = prevOverflow;
-        };
+        return () => window.removeEventListener('keydown', onKey);
     }, [showPreview]);
 
     // Close confirm dialog on Escape
@@ -591,10 +658,11 @@ export default function InternalEmailsPage() {
         : `hello@${EMAIL_DOMAIN}`;
     const fromInitial = (fromName.trim()[0] || 'C').toUpperCase();
 
-    const previewHtml = renderTemplate(category, {
-        subject: subject || '(no subject)',
-        body: editor?.getHTML() || '<p style="color:#9ca3af">(empty)</p>',
-    });
+    const deferredSubject = useDeferredValue(subject);
+    const previewHtml = useMemo(() => renderTemplate(category, {
+        subject: deferredSubject || '(no subject)',
+        body: deferredBody && deferredBody !== '<p></p>' ? deferredBody : '<p style="color:#9ca3af">(empty)</p>',
+    }), [category, deferredSubject, deferredBody]);
 
     const audienceToLabel =
         audienceType === 'single'
@@ -613,436 +681,531 @@ export default function InternalEmailsPage() {
 
     const categoryLabel = category.replace(/_/g, ' ');
 
+    const totalReached = sends
+        .filter((send) => send.audience_type !== 'single')
+        .reduce((sum, send) => sum + (send.success_count || 0), 0);
+    const lastBulk = sends.find((send) => send.audience_type !== 'single' && send.sent_at);
+    const failedSends = sends.filter((send) => send.status === 'failed').length;
+
+    const cardClass = 'overflow-hidden rounded-lg border border-border/40 bg-muted/30';
+    const cardHeaderClass = 'flex items-center justify-between gap-4 border-b border-border/40 px-5 py-3.5';
+    const fieldClass = 'h-8 rounded-md border border-border/45 bg-background/60 px-3 text-xs placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-zinc-500/20';
+
+    const rowClass = 'flex min-w-0 items-center gap-3 border-b border-border/40 px-4 py-2.5 text-sm sm:px-6';
+
     return (
-        <div className="min-h-screen bg-background text-foreground">
-            <div className="max-w-[1400px] mx-auto px-4 py-6 space-y-5">
-                {/* Header */}
-                <div className="flex items-start justify-between gap-4">
-                    <div>
-                        <h1 className="text-lg font-semibold tracking-tight">Email Center</h1>
-                        <p className="text-[11px] text-muted-foreground mt-0.5">
-                            Compose newsletters, product updates, and announcements
-                        </p>
-                    </div>
-                    <div className="flex items-center gap-1 bg-muted/30 rounded-lg p-0.5 border border-border/30">
-                        {([
-                            { id: 'compose' as Tab, label: 'Compose', icon: PenLine },
-                            { id: 'history' as Tab, label: 'History', icon: History },
-                            { id: 'profiles' as Tab, label: 'Senders', icon: UserCircle },
-                        ]).map((tab) => (
-                            <button
-                                key={tab.id}
-                                onClick={() => setActiveTab(tab.id)}
-                                className={cn(
-                                    "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
-                                    activeTab === tab.id
-                                        ? "bg-background text-foreground shadow-sm"
-                                        : "text-muted-foreground hover:text-foreground"
-                                )}
-                            >
-                                <tab.icon className="h-3.5 w-3.5" />
-                                {tab.label}
-                            </button>
-                        ))}
-                    </div>
+        <div className="flex h-[calc(100svh-3rem)] w-full min-w-0 flex-col overflow-hidden bg-background text-foreground md:h-svh">
+            {/* Top strip: tabs left, compose controls right */}
+            <div className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-border/40 px-2 sm:px-4">
+                <div className="flex items-center gap-1">
+                    {([
+                        { id: 'compose' as Tab, label: 'Compose', icon: PenLine },
+                        { id: 'history' as Tab, label: 'History', icon: History },
+                        { id: 'profiles' as Tab, label: 'Senders', icon: UserCircle },
+                    ]).map((tab) => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id)}
+                            className={cn(
+                                'flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[13px] transition-colors',
+                                activeTab === tab.id
+                                    ? 'bg-muted text-foreground'
+                                    : 'text-muted-foreground hover:text-foreground'
+                            )}
+                        >
+                            <tab.icon className="h-3.5 w-3.5" />
+                            <span className="hidden sm:inline">{tab.label}</span>
+                        </button>
+                    ))}
                 </div>
-
-                {/* ═══════ COMPOSE TAB ═══════ */}
                 {activeTab === 'compose' && (
-                    <div className="space-y-4">
-                        {/* Result banner */}
-                        {sendResult && (
-                            <div className={cn(
-                                "rounded-lg border px-4 py-2.5 text-xs flex items-center gap-2",
-                                sendResult.success
-                                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-                                    : "border-red-500/30 bg-red-500/10 text-red-300"
-                            )}>
-                                {sendResult.success ? <CheckCircle className="h-3.5 w-3.5 shrink-0" /> : <XCircle className="h-3.5 w-3.5 shrink-0" />}
-                                <span className="flex-1">{sendResult.message}</span>
-                                <button onClick={() => setSendResult(null)} className="text-muted-foreground hover:text-foreground">✕</button>
-                            </div>
-                        )}
-
-                        {/* Editor card — full width */}
-                        <div className="rounded-xl border border-border/30 bg-card/60 overflow-hidden">
-                            {/* Metadata bar */}
-                            <div className="flex items-center gap-4 px-5 py-3 border-b border-border/30 text-xs flex-wrap">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wider">From</span>
-                                    <div className="relative flex items-center">
-                                        <select
-                                            className="bg-transparent text-foreground appearance-none cursor-pointer focus:outline-none pr-5 text-xs"
-                                            value={selectedProfileId}
-                                            onChange={(e) => setSelectedProfileId(e.target.value)}
-                                        >
-                                            <option value="">Default sender</option>
-                                            {profiles.map((p) => (
-                                                <option key={p.id} value={p.id}>
-                                                    {p.display_name} — {p.email_handle}@{EMAIL_DOMAIN}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        <ChevronDown className="h-3 w-3 text-muted-foreground/60 absolute right-0 pointer-events-none" />
-                                    </div>
-                                </div>
-                                <div className="h-3 w-px bg-border/40" />
-                                <div className="flex items-center gap-2">
-                                    <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wider">Type</span>
-                                    <div className="relative flex items-center">
-                                        <select
-                                            className="bg-transparent text-foreground appearance-none cursor-pointer focus:outline-none pr-5 text-xs"
-                                            value={category}
-                                            onChange={(e) => setCategory(e.target.value)}
-                                        >
-                                            {EMAIL_CATEGORIES.map((cat) => (
-                                                <option key={cat.value} value={cat.value}>{cat.label}</option>
-                                            ))}
-                                        </select>
-                                        <ChevronDown className="h-3 w-3 text-muted-foreground/60 absolute right-0 pointer-events-none" />
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Subject */}
-                            <div className="px-6 py-4 border-b border-border/30">
-                                <input
-                                    type="text"
-                                    value={subject}
-                                    onChange={(e) => setSubject(e.target.value)}
-                                    placeholder="Subject"
-                                    className="w-full bg-transparent text-sm font-medium text-foreground placeholder:text-muted-foreground/40 focus:outline-none"
-                                />
-                            </div>
-
-                            {/* Toolbar */}
-                            <EditorToolbar editor={editor} />
-
-                            {/* Body */}
-                            <EditorContent editor={editor} />
-
-                            {/* Merge tags + preview toggle */}
-                            <div className="flex items-center justify-between gap-2 flex-wrap px-5 py-3 border-t border-border/30">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wider">Personalize</span>
-                                    {[
-                                        { tag: '{first_name}', label: 'First Name' },
-                                        { tag: '{full_name}', label: 'Full Name' },
-                                        { tag: '{email}', label: 'Email' },
-                                    ].map((item) => (
-                                        <button
-                                            key={item.tag}
-                                            type="button"
-                                            onClick={() => editor?.chain().focus().insertContent(item.tag).run()}
-                                            className="text-[10px] px-2 py-0.5 rounded-full border border-border/40 bg-secondary/30 text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-colors"
-                                        >
-                                            {item.tag}
-                                        </button>
-                                    ))}
-                                </div>
-                                <button
-                                    onClick={() => setShowPreview(!showPreview)}
-                                    className="text-[10px] px-2.5 py-1 rounded-md border border-border/40 text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-colors flex items-center gap-1.5"
-                                >
-                                    <Eye className="h-3 w-3" />
-                                    {showPreview ? 'Hide preview' : 'Preview'}
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Audience + Send card */}
-                        <div className="rounded-xl border border-border/30 bg-card/60 overflow-hidden">
-                            {/* Audience selector */}
-                            <div className="flex items-center gap-3 px-5 py-3.5 border-b border-border/30 flex-wrap">
-                                <span className="text-[10px] uppercase tracking-wider text-muted-foreground/60">Audience</span>
-                                <div className="flex gap-1 bg-muted/30 rounded-lg p-0.5 border border-border/30">
-                                    {[
-                                        { value: 'single' as const, label: 'Single', icon: Mail },
-                                        { value: 'bulk' as const, label: 'All Users', icon: Users },
-                                        { value: 'newsletter' as const, label: 'Newsletter', icon: Megaphone },
-                                    ].map((opt) => (
-                                        <button
-                                            key={opt.value}
-                                            onClick={() => setAudienceType(opt.value)}
-                                            className={cn(
-                                                "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
-                                                audienceType === opt.value
-                                                    ? "bg-background text-foreground shadow-sm"
-                                                    : "text-muted-foreground hover:text-foreground"
-                                            )}
-                                        >
-                                            <opt.icon className="h-3.5 w-3.5" />
-                                            {opt.label}
-                                        </button>
-                                    ))}
-                                </div>
-                                <div className="ml-auto text-[11px] text-muted-foreground">
-                                    {audienceType === 'bulk' && (
-                                        audienceCount !== null
-                                            ? <span><strong className="text-foreground">{audienceCount}</strong> confirmed user{audienceCount === 1 ? '' : 's'}</span>
-                                            : <span>Counting…</span>
-                                    )}
-                                    {audienceType === 'newsletter' && (
-                                        newsletterCount !== null
-                                            ? <span><strong className="text-foreground">{newsletterCount}</strong> confirmed subscriber{newsletterCount === 1 ? '' : 's'}</span>
-                                            : <span>Counting…</span>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Send row */}
-                            <div className="px-5 py-4 flex items-center gap-3 flex-wrap">
-                                {audienceType === 'single' ? (
-                                    <>
-                                        <input
-                                            type="email"
-                                            value={singleRecipient}
-                                            onChange={(e) => setSingleRecipient(e.target.value)}
-                                            placeholder="recipient@example.com"
-                                            className="flex-1 min-w-[220px] h-8 px-3 rounded-lg border border-border/40 bg-card/50 text-xs placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                        />
-                                        <Button
-                                            className="bg-foreground text-background hover:opacity-90 h-8 px-4 text-xs gap-1.5"
-                                            onClick={() => handleSend(false)}
-                                            disabled={isSending || !subject.trim() || !singleRecipient.trim()}
-                                        >
-                                            Send
-                                        </Button>
-                                    </>
-                                ) : (
-                                    <>
-                                        <input
-                                            type="email"
-                                            value={singleRecipient}
-                                            onChange={(e) => setSingleRecipient(e.target.value)}
-                                            placeholder="test@example.com"
-                                            className="flex-1 min-w-[220px] h-8 px-3 rounded-lg border border-border/40 bg-card/50 text-xs placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                        />
-                                        <Button
-                                            variant="outline"
-                                            className="h-8 px-3 text-xs gap-1.5 border-border/40"
-                                            onClick={() => handleSend(true)}
-                                            disabled={isSending || !subject.trim() || !singleRecipient.trim()}
-                                        >
-                                            <TestTube className="h-3.5 w-3.5" />
-                                            Send Test
-                                        </Button>
-                                        <Button
-                                            className="bg-foreground text-background hover:opacity-90 h-8 px-4 text-xs gap-1.5"
-                                            onClick={() => handleSend(false)}
-                                            disabled={isSending || !subject.trim() || (audienceType === 'newsletter' && !newsletterCount)}
-                                        >
-                                            {isSending ? <Spinner className="h-3.5 w-3.5 animate-spin" /> : audienceType === 'newsletter' ? <Megaphone className="h-3.5 w-3.5" /> : <Send className="h-3.5 w-3.5" />}
-                                            {audienceType === 'newsletter'
-                                                ? `Send to Newsletter (${newsletterCount ?? '…'})`
-                                                : `Send to All (${audienceCount ?? '…'})`}
-                                        </Button>
-                                    </>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* ═══════ HISTORY TAB ═══════ */}
-                {activeTab === 'history' && (
-                    <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/60">Send History</span>
-                                <span className="text-[10px] text-muted-foreground/40">{sends.length}</span>
-                            </div>
-                            <button
-                                onClick={fetchHistory}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border/40 bg-card/50 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    <div className="flex items-center gap-1">
+                        <span className="relative">
+                            <select
+                                className="h-8 max-w-[9rem] appearance-none truncate rounded-md bg-transparent pl-2.5 pr-7 text-[13px] text-muted-foreground hover:bg-muted focus:outline-none sm:max-w-none"
+                                value={category}
+                                onChange={(e) => setCategory(e.target.value)}
+                                aria-label="Email type"
                             >
-                                <History className="h-3.5 w-3.5" />
-                                Refresh
-                            </button>
-                        </div>
-
-                        {loadingHistory ? (
-                            <div className="flex items-center justify-center py-16 text-xs text-muted-foreground">
-                                Loading history…
-                            </div>
-                        ) : sends.length === 0 ? (
-                            <div className="text-center py-16 text-xs text-muted-foreground/50">
-                                No emails sent yet.
-                            </div>
-                        ) : (
-                            <div className="rounded-xl border border-border/30 bg-card/60 overflow-hidden">
-                                <table className="w-full">
-                                    <thead>
-                                        <tr className="border-b border-border/30">
-                                            <th className="text-left text-[10px] uppercase tracking-wider text-muted-foreground/60 font-medium px-4 py-3">Subject</th>
-                                            <th className="text-left text-[10px] uppercase tracking-wider text-muted-foreground/60 font-medium px-4 py-3">Type</th>
-                                            <th className="text-left text-[10px] uppercase tracking-wider text-muted-foreground/60 font-medium px-4 py-3">Audience</th>
-                                            <th className="text-left text-[10px] uppercase tracking-wider text-muted-foreground/60 font-medium px-4 py-3">Sender</th>
-                                            <th className="text-left text-[10px] uppercase tracking-wider text-muted-foreground/60 font-medium px-4 py-3">Status</th>
-                                            <th className="text-left text-[10px] uppercase tracking-wider text-muted-foreground/60 font-medium px-4 py-3">Sent</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-border/20">
-                                        {sends.map((send) => (
-                                            <tr key={send.id} className="hover:bg-card/80 transition-colors">
-                                                <td className="px-4 py-3 text-xs font-medium truncate max-w-[260px]">{send.subject}</td>
-                                                <td className="px-4 py-3">
-                                                    <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded border border-border/30 bg-muted/30 text-muted-foreground">
-                                                        {send.category.replace('_', ' ')}
-                                                    </span>
-                                                </td>
-                                                <td className="px-4 py-3 text-[11px] text-muted-foreground">
-                                                    {send.audience_type === 'single'
-                                                        ? send.single_recipient
-                                                        : `${send.success_count}/${send.recipient_count}`
-                                                    }
-                                                </td>
-                                                <td className="px-4 py-3 text-[11px] text-muted-foreground">
-                                                    {send.email_sender_profiles
-                                                        ? send.email_sender_profiles.display_name
-                                                        : 'Default'
-                                                    }
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <span className={cn(
-                                                        "text-[10px] font-medium px-1.5 py-0.5 rounded uppercase tracking-wider",
-                                                        send.status === 'sent' && "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20",
-                                                        send.status === 'sending' && "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20",
-                                                        send.status === 'failed' && "bg-red-500/10 text-red-400 border border-red-500/20",
-                                                        send.status === 'draft' && "bg-muted/30 text-muted-foreground border border-border/30",
-                                                    )}>
-                                                        {send.status}
-                                                    </span>
-                                                </td>
-                                                <td className="px-4 py-3 text-[11px] text-muted-foreground">
-                                                    {send.sent_at
-                                                        ? new Date(send.sent_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
-                                                        : '—'
-                                                    }
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* ═══════ PROFILES TAB ═══════ */}
-                {activeTab === 'profiles' && (
-                    <div className="space-y-4">
-                        <div>
-                            <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/60">Sender Profiles</span>
-                            <p className="text-[11px] text-muted-foreground/60 mt-1">
-                                Configure how your name and email appear when sending. Emails are sent from <strong className="text-foreground">handle@{EMAIL_DOMAIN}</strong>.
-                            </p>
-                        </div>
-
-                        {/* Add new */}
-                        <div className="rounded-xl border border-border/30 bg-card/60 p-5">
-                            <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-3 items-end">
-                                <div>
-                                    <label className="text-[10px] text-muted-foreground/60 uppercase tracking-wider block mb-1.5">Display Name</label>
-                                    <input
-                                        type="text"
-                                        value={newProfileName}
-                                        onChange={(e) => setNewProfileName(e.target.value)}
-                                        placeholder="Samuel from Cencori"
-                                        className="w-full h-8 px-3 rounded-lg border border-border/40 bg-card/50 text-xs placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-[10px] text-muted-foreground/60 uppercase tracking-wider block mb-1.5">Email Handle</label>
-                                    <div className="flex items-center">
-                                        <input
-                                            type="text"
-                                            value={newProfileHandle}
-                                            onChange={(e) => setNewProfileHandle(e.target.value.replace(/[^a-z0-9._-]/gi, '').toLowerCase())}
-                                            placeholder="samuel"
-                                            className="flex-1 h-8 px-3 rounded-l-lg border border-border/40 bg-card/50 text-xs placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                        />
-                                        <span className="h-8 inline-flex items-center bg-muted/30 border border-l-0 border-border/40 rounded-r-lg px-2.5 text-[11px] text-muted-foreground">
-                                            @{EMAIL_DOMAIN}
-                                        </span>
-                                    </div>
-                                </div>
-                                <button
-                                    onClick={handleSaveProfile}
-                                    disabled={savingProfile || !newProfileName.trim() || !newProfileHandle.trim()}
-                                    className="h-8 px-3 rounded-lg bg-foreground text-background text-xs font-medium hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
-                                >
-                                    {savingProfile ? <Spinner className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
-                                    Add Profile
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Existing profiles */}
-                        {loadingProfiles ? (
-                            <div className="flex items-center justify-center py-12 text-xs text-muted-foreground">
-                                Loading profiles…
-                            </div>
-                        ) : profiles.length === 0 ? (
-                            <div className="text-center py-12 text-xs text-muted-foreground/50">
-                                No sender profiles yet. Create one above.
-                            </div>
-                        ) : (
-                            <div className="space-y-2">
-                                {profiles.map((profile) => (
-                                    <div
-                                        key={profile.id}
-                                        className="rounded-xl border border-border/30 bg-card/60 px-4 py-3 flex items-center justify-between hover:border-border/50 hover:bg-card/80 transition-all"
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            {/* Avatar with upload */}
-                                            <label className="relative h-9 w-9 rounded-full shrink-0 cursor-pointer group">
-                                                {profile.avatar_url ? (
-                                                    <img
-                                                        src={profile.avatar_url}
-                                                        alt={profile.display_name}
-                                                        className="h-9 w-9 rounded-full object-cover"
-                                                    />
-                                                ) : (
-                                                    <div className="h-9 w-9 rounded-full bg-muted/30 border border-border/40 flex items-center justify-center text-foreground text-xs font-medium">
-                                                        {profile.display_name.charAt(0).toUpperCase()}
-                                                    </div>
-                                                )}
-                                                <div className="absolute inset-0 rounded-full bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <Camera className="h-3.5 w-3.5 text-white" />
-                                                </div>
-                                                <input
-                                                    type="file"
-                                                    accept="image/jpeg,image/png,image/webp,image/gif"
-                                                    className="hidden"
-                                                    onChange={(e) => {
-                                                        const file = e.target.files?.[0];
-                                                        if (file) handleAvatarUpload(profile.id, file);
-                                                        e.target.value = '';
-                                                    }}
-                                                />
-                                            </label>
-                                            <div>
-                                                <p className="text-xs font-medium">{profile.display_name}</p>
-                                                <p className="text-[11px] text-muted-foreground">{profile.email_handle}@{EMAIL_DOMAIN}</p>
-                                            </div>
-                                            {profile.is_default && (
-                                                <span className="text-[10px] uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.5 rounded">Default</span>
-                                            )}
-                                        </div>
-                                        <button
-                                            onClick={() => handleDeleteProfile(profile.id)}
-                                            className="p-1.5 rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-colors"
-                                        >
-                                            <Trash2 className="h-3.5 w-3.5" />
-                                        </button>
-                                    </div>
+                                {EMAIL_CATEGORIES.map((cat) => (
+                                    <option key={cat.value} value={cat.value}>{cat.label}</option>
                                 ))}
-                            </div>
-                        )}
+                            </select>
+                            <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() => setShowPreview((open) => !open)}
+                            aria-pressed={showPreview}
+                            className={cn(
+                                'flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[13px] transition-colors',
+                                showPreview ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                            )}
+                        >
+                            <Eye className="h-3.5 w-3.5" />
+                            <span className="hidden sm:inline">Preview</span>
+                        </button>
                     </div>
                 )}
             </div>
+
+            {/* ═══════ COMPOSE TAB ═══════ */}
+            {activeTab === 'compose' && (
+                <div className="flex min-h-0 flex-1">
+                    {/* Draft (on phones the preview takes its place) */}
+                    <div className={cn('min-w-0 flex-1 flex-col', showPreview ? 'hidden md:flex' : 'flex')}>
+                        {sendResult && (
+                            <div className={cn(
+                                'flex items-center gap-2 border-b px-6 py-2 text-[12px]',
+                                sendResult.success
+                                    ? 'border-emerald-500/20 bg-emerald-500/[0.06] text-emerald-700 dark:text-emerald-400'
+                                    : 'border-red-500/20 bg-red-500/[0.06] text-red-600 dark:text-red-400'
+                            )}>
+                                {sendResult.success ? <CheckCircle className="h-3.5 w-3.5 shrink-0" /> : <XCircle className="h-3.5 w-3.5 shrink-0" />}
+                                <span className="flex-1">{sendResult.message}</span>
+                                <button onClick={() => setSendResult(null)} className="text-muted-foreground hover:text-foreground" aria-label="Dismiss">✕</button>
+                            </div>
+                        )}
+
+                        {/* From */}
+                        <div className={rowClass}>
+                            <span className="w-10 shrink-0 text-muted-foreground sm:w-14">From</span>
+                            <span className="relative min-w-0 flex-1">
+                                <select
+                                    className="w-full appearance-none truncate bg-transparent pr-6 text-sm text-foreground focus:outline-none"
+                                    value={selectedProfileId}
+                                    onChange={(e) => setSelectedProfileId(e.target.value)}
+                                >
+                                    <option value="">Default sender (hello@{EMAIL_DOMAIN})</option>
+                                    {profiles.map((p) => (
+                                        <option key={p.id} value={p.id}>
+                                            {p.display_name} &lt;{p.email_handle}@{EMAIL_DOMAIN}&gt;
+                                        </option>
+                                    ))}
+                                </select>
+                                <ChevronDown className="pointer-events-none absolute right-0 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                            </span>
+                        </div>
+
+                        {/* To */}
+                        <div className={rowClass}>
+                            <span className="w-10 shrink-0 text-muted-foreground sm:w-14">To</span>
+                            <div className="min-w-0 flex-1">
+                                {audienceType === 'single' ? (
+                                    <input
+                                        type="email"
+                                        value={singleRecipient}
+                                        onChange={(e) => setSingleRecipient(e.target.value)}
+                                        placeholder="name@example.com"
+                                        className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+                                    />
+                                ) : (
+                                    <span className="inline-flex items-center gap-1.5 rounded-full border border-border/50 bg-muted/50 py-0.5 pl-2.5 pr-1 text-[13px]">
+                                        {audienceType === 'bulk' ? <Users className="h-3.5 w-3.5 text-muted-foreground" /> : <Megaphone className="h-3.5 w-3.5 text-muted-foreground" />}
+                                        {audienceType === 'bulk' ? 'All users' : 'Newsletter subscribers'}
+                                        <span className="font-mono text-[11px] text-muted-foreground">
+                                            {(audienceType === 'bulk' ? audienceCount : newsletterCount)?.toLocaleString() ?? '…'}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={() => setAudienceType('single')}
+                                            className="ml-0.5 flex size-4 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+                                            aria-label="Send to one address instead"
+                                        >
+                                            ✕
+                                        </button>
+                                    </span>
+                                )}
+                            </div>
+                            <div className="flex shrink-0 items-center gap-2 text-[13px] text-muted-foreground sm:gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setAudienceType('bulk')}
+                                    className={cn('underline-offset-4 hover:text-foreground hover:underline', audienceType === 'bulk' && 'text-foreground')}
+                                >
+                                    All users
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setAudienceType('newsletter')}
+                                    className={cn('underline-offset-4 hover:text-foreground hover:underline', audienceType === 'newsletter' && 'text-foreground')}
+                                >
+                                    Newsletter
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Subject */}
+                        <div className="border-b border-border/40 px-4 py-2.5 sm:px-6">
+                            <input
+                                type="text"
+                                value={subject}
+                                onChange={(e) => setSubject(e.target.value)}
+                                placeholder="Subject"
+                                className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none"
+                            />
+                        </div>
+
+                        {/* Body */}
+                        <div className="min-h-0 flex-1 cursor-text overflow-y-auto" onClick={() => editor?.commands.focus()}>
+                            <EditorContent editor={editor} />
+                        </div>
+
+                        {/* Formatting, then actions */}
+                        <div className="border-t border-border/40 px-3 py-2.5 sm:px-6">
+                            <div className="flex min-w-0 flex-nowrap items-center gap-1">
+                                <div className="mr-1 flex shrink-0 items-center sm:mr-2">
+                                    <Button
+                                        className="h-9 gap-1.5 rounded-l-full rounded-r-none px-5 text-sm"
+                                        onClick={() => handleSend(false)}
+                                        disabled={
+                                            isSending || !subject.trim()
+                                            || (audienceType === 'single' && !singleRecipient.trim())
+                                            || (audienceType === 'newsletter' && !newsletterCount)
+                                        }
+                                    >
+                                        {isSending && <Spinner className="h-3.5 w-3.5 animate-spin" />}
+                                        Send
+                                    </Button>
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                            <Button
+                                                className="h-9 rounded-l-none rounded-r-full border-l border-background/25 px-2"
+                                                aria-label="Send a test"
+                                                disabled={isSending}
+                                            >
+                                                <ChevronDown className="h-4 w-4" />
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-80 p-3" align="start" side="top">
+                                            <p className="mb-2 text-xs font-medium">Send a test</p>
+                                            <p className="mb-3 text-[11px] text-muted-foreground">Sends this email to one address only, with the merge tags filled in.</p>
+                                            <div className="flex gap-2">
+                                                <Input
+                                                    type="email"
+                                                    placeholder="you@cencori.com"
+                                                    value={singleRecipient}
+                                                    onChange={(e) => setSingleRecipient(e.target.value)}
+                                                    className="h-8 text-xs"
+                                                />
+                                                <Button
+                                                    size="sm"
+                                                    className="h-8 gap-1.5 px-3 text-xs"
+                                                    onClick={() => handleSend(true)}
+                                                    disabled={isSending || !subject.trim() || !singleRecipient.trim()}
+                                                >
+                                                    <TestTube className="h-3.5 w-3.5" />
+                                                    Send test
+                                                </Button>
+                                            </div>
+                                        </PopoverContent>
+                                    </Popover>
+                                </div>
+
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <button
+                                            type="button"
+                                            className="flex h-8 shrink-0 items-center rounded-md px-2 font-mono text-xs text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                                            title="Personalize"
+                                        >
+                                            {'{ }'}
+                                        </button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-56 p-1.5" align="start" side="top">
+                                        {[
+                                            { tag: '{first_name}', label: 'First name' },
+                                            { tag: '{full_name}', label: 'Full name' },
+                                            { tag: '{email}', label: 'Email' },
+                                        ].map((item) => (
+                                            <button
+                                                key={item.tag}
+                                                type="button"
+                                                onClick={() => editor?.chain().focus().insertContent(item.tag).run()}
+                                                className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-xs hover:bg-muted"
+                                            >
+                                                {item.label}
+                                                <span className="font-mono text-[10px] text-muted-foreground">{item.tag}</span>
+                                            </button>
+                                        ))}
+                                    </PopoverContent>
+                                </Popover>
+
+                                <div className="ml-1 min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                                    <EditorToolbar editor={editor} />
+                                </div>
+
+                                <span className="ml-auto shrink-0" />
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (!confirm('Discard this draft?')) return;
+                                        setSubject('');
+                                        editor?.commands.setContent('<p></p>');
+                                        setBodyHtml('');
+                                        setSendResult(null);
+                                    }}
+                                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                                    title="Discard draft"
+                                >
+                                    <Trash2 className="h-4 w-4" />
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Live preview: shares the page with the draft */}
+                    {showPreview && (
+                        <aside className="flex w-full min-w-0 flex-col md:w-1/2 md:border-l md:border-border/40" aria-label="Email preview">
+                            <div className="shrink-0 border-b border-border/40 px-4 py-4 sm:px-6">
+                                <div className="flex items-start gap-3">
+                                    <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border/40 bg-muted/40 text-sm font-semibold">
+                                        {selectedProfile?.avatar_url ? (
+                                            // eslint-disable-next-line @next/next/no-img-element
+                                            <img src={selectedProfile.avatar_url} alt={fromName} className="h-full w-full object-cover" />
+                                        ) : (
+                                            fromInitial
+                                        )}
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex items-baseline justify-between gap-2">
+                                            <div className="truncate text-sm font-medium">{fromName}</div>
+                                            <div className="shrink-0 text-[11px] text-muted-foreground">{previewDate}</div>
+                                        </div>
+                                        <div className="truncate text-[12px] text-muted-foreground">&lt;{fromEmail}&gt;</div>
+                                        <div className="mt-0.5 truncate text-[12px] text-muted-foreground">
+                                            to <span className="text-foreground/80">{audienceToLabel}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="mt-3 pl-[52px]">
+                                    <div className="break-words text-sm font-semibold leading-snug">
+                                        {subject || <span className="italic text-muted-foreground">(no subject)</span>}
+                                    </div>
+                                    <span className="mt-1.5 inline-flex rounded border border-border/40 bg-muted/40 px-1.5 py-0.5 text-[10px] capitalize text-muted-foreground">
+                                        {categoryLabel}
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="min-h-0 flex-1 bg-white">
+                                <iframe
+                                    srcDoc={previewHtml}
+                                    className="block h-full w-full border-0"
+                                    title="Email preview"
+                                    sandbox="allow-same-origin"
+                                />
+                            </div>
+                        </aside>
+                    )}
+                </div>
+            )}
+
+            {activeTab !== 'compose' && (
+                <div className="min-h-0 flex-1 overflow-y-auto">
+                    <section className="mx-auto w-full max-w-[1180px] px-4 py-6 sm:px-6 lg:px-8">
+    {/* ═══════ HISTORY TAB ═══════ */}
+                    {activeTab === 'history' && (
+                        <div className="space-y-4">
+                            <StatCard
+                                title="Sends"
+                                detail={lastBulk?.sent_at ? `last broadcast ${new Date(lastBulk.sent_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : 'no broadcasts yet'}
+                                stats={[
+                                    { label: 'Emails sent', value: sends.length.toLocaleString(), color: '#3b82f6' },
+                                    { label: 'Broadcasts', value: sends.filter((send) => send.audience_type !== 'single').length.toLocaleString(), color: '#8b5cf6' },
+                                    { label: 'People reached', value: totalReached.toLocaleString(), color: '#22c55e', hint: 'delivered, all broadcasts' },
+                                    { label: 'Failed', value: failedSends.toLocaleString(), color: '#ef4444' },
+                                ]}
+                            />
+
+                            <article className={cardClass}>
+                                <header className={cardHeaderClass}>
+                                    <p className="text-sm font-medium tracking-[-0.01em]">History</p>
+                                    <button
+                                        onClick={fetchHistory}
+                                        className="flex h-7 items-center gap-1.5 rounded-md border border-border/45 bg-muted/20 px-2.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+                                    >
+                                        <History className="h-3 w-3" />
+                                        Refresh
+                                    </button>
+                                </header>
+                                {loadingHistory ? (
+                                    <div className="flex h-40 items-center justify-center text-[11px] text-muted-foreground">Loading history…</div>
+                                ) : sends.length === 0 ? (
+                                    <div className="flex h-40 items-center justify-center">
+                                        <span className="rounded-md bg-muted px-3 py-1.5 text-[11px] font-medium text-muted-foreground">No emails sent yet</span>
+                                    </div>
+                                ) : (
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-xs">
+                                            <thead>
+                                                <tr className="text-[11px] text-muted-foreground">
+                                                    <th className="px-5 py-3 text-left font-normal">Subject</th>
+                                                    <th className="px-3 py-3 text-left font-normal">Type</th>
+                                                    <th className="px-3 py-3 text-left font-normal">Audience</th>
+                                                    <th className="px-3 py-3 text-left font-normal">Sender</th>
+                                                    <th className="px-3 py-3 text-left font-normal">Status</th>
+                                                    <th className="px-5 py-3 text-right font-normal">Sent</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {sends.map((send) => (
+                                                    <tr key={send.id} className="border-t border-border/40 transition-colors hover:bg-muted/40">
+                                                        <td className="max-w-[280px] truncate px-5 py-2.5 font-medium">{send.subject}</td>
+                                                        <td className="px-3 py-2.5 capitalize text-muted-foreground">{send.category.replace(/_/g, ' ')}</td>
+                                                        <td className="px-3 py-2.5 font-mono tabular-nums text-muted-foreground">
+                                                            {send.audience_type === 'single'
+                                                                ? <span className="font-sans">{send.single_recipient}</span>
+                                                                : `${send.success_count.toLocaleString()} / ${send.recipient_count.toLocaleString()}`}
+                                                        </td>
+                                                        <td className="px-3 py-2.5 text-muted-foreground">
+                                                            {send.email_sender_profiles ? send.email_sender_profiles.display_name : 'Default'}
+                                                        </td>
+                                                        <td className="px-3 py-2.5">
+                                                            <span className="flex items-center gap-1.5 capitalize">
+                                                                <span className={cn(
+                                                                    'size-2 rounded-[1px]',
+                                                                    send.status === 'sent' && 'bg-emerald-500',
+                                                                    send.status === 'sending' && 'bg-amber-500',
+                                                                    send.status === 'failed' && 'bg-red-500',
+                                                                    send.status === 'draft' && 'bg-muted-foreground/50',
+                                                                )} />
+                                                                {send.status}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-5 py-2.5 text-right text-muted-foreground">
+                                                            {send.sent_at
+                                                                ? new Date(send.sent_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+                                                                : '—'}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </article>
+                        </div>
+                    )}
+
+                    {/* ═══════ PROFILES TAB ═══════ */}
+                    {activeTab === 'profiles' && (
+                        <div className="space-y-4">
+                            <article className={cardClass}>
+                                <header className={cardHeaderClass}>
+                                    <p className="text-sm font-medium tracking-[-0.01em]">New sender</p>
+                                    <span className="text-xs text-muted-foreground">sends from handle@{EMAIL_DOMAIN}</span>
+                                </header>
+                                <div className="grid grid-cols-1 items-end gap-3 px-5 py-4 sm:grid-cols-[1fr_1fr_auto]">
+                                    <div>
+                                        <label className="mb-1.5 block text-[11px] text-muted-foreground">Display name</label>
+                                        <input
+                                            type="text"
+                                            value={newProfileName}
+                                            onChange={(e) => setNewProfileName(e.target.value)}
+                                            placeholder="Samuel from Cencori"
+                                            className={cn(fieldClass, 'w-full')}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="mb-1.5 block text-[11px] text-muted-foreground">Email handle</label>
+                                        <div className="flex items-center">
+                                            <input
+                                                type="text"
+                                                value={newProfileHandle}
+                                                onChange={(e) => setNewProfileHandle(e.target.value.replace(/[^a-z0-9._-]/gi, '').toLowerCase())}
+                                                placeholder="samuel"
+                                                className={cn(fieldClass, 'flex-1 rounded-r-none')}
+                                            />
+                                            <span className="inline-flex h-8 items-center rounded-r-md border border-l-0 border-border/45 bg-muted/30 px-2.5 text-[11px] text-muted-foreground">
+                                                @{EMAIL_DOMAIN}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <Button
+                                        onClick={handleSaveProfile}
+                                        disabled={savingProfile || !newProfileName.trim() || !newProfileHandle.trim()}
+                                        className="h-8 gap-1.5 px-3 text-xs"
+                                    >
+                                        {savingProfile ? <Spinner className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                                        Add sender
+                                    </Button>
+                                </div>
+                            </article>
+
+                            <article className={cardClass}>
+                                <header className={cardHeaderClass}>
+                                    <p className="text-sm font-medium tracking-[-0.01em]">Senders</p>
+                                    <span className="text-xs text-muted-foreground">
+                                        {profiles.length} {profiles.length === 1 ? 'sender' : 'senders'}
+                                    </span>
+                                </header>
+                                {loadingProfiles ? (
+                                    <div className="flex h-28 items-center justify-center text-[11px] text-muted-foreground">Loading senders…</div>
+                                ) : profiles.length === 0 ? (
+                                    <div className="flex h-28 items-center justify-center">
+                                        <span className="rounded-md bg-muted px-3 py-1.5 text-[11px] font-medium text-muted-foreground">No senders yet</span>
+                                    </div>
+                                ) : (
+                                    <ul>
+                                        {profiles.map((profile, index) => (
+                                            <li
+                                                key={profile.id}
+                                                className={cn('flex items-center justify-between gap-4 px-5 py-3', index > 0 && 'border-t border-border/40')}
+                                            >
+                                                <div className="flex min-w-0 items-center gap-3">
+                                                    <label className="group relative h-9 w-9 shrink-0 cursor-pointer rounded-full" title="Change photo">
+                                                        {profile.avatar_url ? (
+                                                            // eslint-disable-next-line @next/next/no-img-element
+                                                            <img src={profile.avatar_url} alt={profile.display_name} className="h-9 w-9 rounded-full object-cover" />
+                                                        ) : (
+                                                            <div className="flex h-9 w-9 items-center justify-center rounded-full border border-border/45 bg-muted/40 text-xs font-medium">
+                                                                {profile.display_name.charAt(0).toUpperCase()}
+                                                            </div>
+                                                        )}
+                                                        <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/60 opacity-0 transition-opacity group-hover:opacity-100">
+                                                            <Camera className="h-3.5 w-3.5 text-white" />
+                                                        </div>
+                                                        <input
+                                                            type="file"
+                                                            accept="image/jpeg,image/png,image/webp,image/gif"
+                                                            className="hidden"
+                                                            onChange={(e) => {
+                                                                const file = e.target.files?.[0];
+                                                                if (file) handleAvatarUpload(profile.id, file);
+                                                                e.target.value = '';
+                                                            }}
+                                                        />
+                                                    </label>
+                                                    <div className="min-w-0">
+                                                        <p className="flex items-center gap-2 text-sm font-medium">
+                                                            <span className="truncate">{profile.display_name}</span>
+                                                            {profile.is_default && (
+                                                                <span className="flex items-center gap-1 text-[11px] font-normal text-muted-foreground">
+                                                                    <span className="size-2 rounded-[1px] bg-emerald-500" />
+                                                                    Default
+                                                                </span>
+                                                            )}
+                                                        </p>
+                                                        <p className="truncate font-mono text-[11px] text-muted-foreground">{profile.email_handle}@{EMAIL_DOMAIN}</p>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={() => handleDeleteProfile(profile.id)}
+                                                    className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-500"
+                                                    aria-label={`Delete ${profile.display_name}`}
+                                                >
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                </button>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+                            </article>
+                        </div>
+                    )}
+                    </section>
+                </div>
+            )}
 
             {/* ═══════ SEND CONFIRMATION DIALOG ═══════ */}
             {confirmSend && (
@@ -1055,7 +1218,7 @@ export default function InternalEmailsPage() {
                         role="dialog"
                         aria-modal="true"
                         aria-label="Confirm send"
-                        className="relative z-10 w-full max-w-md rounded-xl border border-border/40 bg-card/95 backdrop-blur shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+                        className="relative z-10 w-full max-w-md overflow-hidden rounded-lg border border-border/40 bg-background shadow-2xl animate-in fade-in zoom-in-95 duration-150"
                     >
                         {/* Header */}
                         <div className="px-5 pt-5 pb-4">
@@ -1074,14 +1237,14 @@ export default function InternalEmailsPage() {
                                             : 'Send to all users?'}
                                     </h3>
                                     <p className="text-[11px] text-muted-foreground/70 mt-1 leading-snug">
-                                        You're about to email{' '}
+                                        You&apos;re about to email{' '}
                                         <span className="text-foreground font-medium">
                                             {confirmSend.count ?? '…'}
                                         </span>{' '}
                                         {confirmSend.audienceType === 'newsletter'
                                             ? `confirmed subscriber${confirmSend.count === 1 ? '' : 's'}`
                                             : `confirmed user${confirmSend.count === 1 ? '' : 's'}`}
-                                        . This can't be undone.
+                                        . This can&apos;t be undone.
                                     </p>
                                 </div>
                             </div>
@@ -1134,98 +1297,7 @@ export default function InternalEmailsPage() {
                 </div>
             )}
 
-            {/* ═══════ PREVIEW DRAWER ═══════ */}
-            <div
-                className={cn(
-                    "fixed inset-0 z-50 transition-opacity duration-300",
-                    showPreview ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-                )}
-                aria-hidden={!showPreview}
-            >
-                {/* Backdrop */}
-                <div
-                    className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-                    onClick={() => setShowPreview(false)}
-                />
-
-                {/* Drawer panel */}
-                <div
-                    className={cn(
-                        "absolute right-0 top-0 h-full w-full max-w-[680px] bg-background border-l border-border/40 shadow-2xl flex flex-col transition-transform duration-300 ease-out",
-                        showPreview ? "translate-x-0" : "translate-x-full"
-                    )}
-                    role="dialog"
-                    aria-label="Email preview"
-                >
-                    {/* Drawer header */}
-                    <div className="flex items-center justify-between px-5 py-3 border-b border-border/30 shrink-0">
-                        <div className="flex items-center gap-2">
-                            <Eye className="h-3.5 w-3.5 text-muted-foreground" />
-                            <div>
-                                <h3 className="text-sm font-medium leading-tight">Preview</h3>
-                                <p className="text-[10px] text-muted-foreground/60 leading-tight">How recipients will see it</p>
-                            </div>
-                        </div>
-                        <button
-                            onClick={() => setShowPreview(false)}
-                            className="p-1.5 rounded-md hover:bg-muted/30 text-muted-foreground hover:text-foreground transition-colors"
-                            aria-label="Close preview"
-                        >
-                            <XCircle className="h-4 w-4" />
-                        </button>
-                    </div>
-
-                    {/* Email envelope — Gmail-style */}
-                    <div className="px-5 py-4 border-b border-border/30 shrink-0 bg-card/30">
-                        <div className="flex items-start gap-3">
-                            {/* Avatar */}
-                            <div className="h-10 w-10 rounded-full bg-muted/40 border border-border/40 flex items-center justify-center text-sm font-semibold text-foreground shrink-0 overflow-hidden">
-                                {selectedProfile?.avatar_url ? (
-                                    // eslint-disable-next-line @next/next/no-img-element
-                                    <img src={selectedProfile.avatar_url} alt={fromName} className="h-full w-full object-cover" />
-                                ) : (
-                                    fromInitial
-                                )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <div className="flex items-baseline justify-between gap-2">
-                                    <div className="text-sm font-medium text-foreground truncate">
-                                        {fromName}
-                                    </div>
-                                    <div className="text-[10px] text-muted-foreground/60 shrink-0">{previewDate}</div>
-                                </div>
-                                <div className="text-[11px] text-muted-foreground/80 truncate">
-                                    &lt;{fromEmail}&gt;
-                                </div>
-                                <div className="text-[11px] text-muted-foreground/80 truncate mt-0.5">
-                                    to <span className="text-foreground/80">{audienceToLabel}</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="mt-3 pl-[52px]">
-                            <div className="text-sm font-semibold text-foreground leading-snug break-words">
-                                {subject || <span className="text-muted-foreground/60 italic">(no subject)</span>}
-                            </div>
-                            <div className="mt-1.5 flex items-center gap-1.5">
-                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-muted/40 border border-border/30 text-muted-foreground capitalize">
-                                    {categoryLabel}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* iframe body */}
-                    <div className="flex-1 overflow-hidden bg-white">
-                        <iframe
-                            srcDoc={previewHtml}
-                            className="w-full h-full border-0 block"
-                            title="Email preview"
-                            sandbox="allow-same-origin"
-                        />
-                    </div>
-                </div>
-            </div>
         </div>
     );
 }
+
