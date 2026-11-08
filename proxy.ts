@@ -7,6 +7,7 @@ import { createClient } from "@supabase/supabase-js";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { RESERVED_ORG_SLUGS, isReservedSlug } from "@/lib/reserved-slugs";
 import { mainSiteSubdomainRedirect, marketingSubdomainFor, routeMarketingSubdomain } from "@/lib/marketing/subdomains";
+import { adminInternalPath, adminOrigin, adminPublicPath, isAdminHostname, isAdminInternalPath } from "@/lib/admin/routing";
 import { STUDIO_INTERNAL_PREFIX, isStudioHostname, isStudioPassThrough, studioInternalPath, studioOrigin } from "@/lib/studio/routing";
 import {
   ACTIVE_ORG_COOKIE,
@@ -557,6 +558,33 @@ export async function proxy(request: NextRequest) {
   // Skip rewriting for static files (images, etc)
   // If it has a dot and isn't just a hidden file/folder (like .well-known), assume it's a file
   const isFile = pathname.includes(".") && !pathname.startsWith("/.well-known");
+
+  // admin.cencori.com serves the internal panel (app/internal) from its root
+  // (lib/admin/routing.ts). Handled here, before the console and auth rules,
+  // which would read /settings, /usage etc. as console pages: the panel's
+  // layout does its own sign-in and access check.
+  if (!isFile && isAdminHostname(hostname)) {
+    if (isAdminInternalPath(pathname)) {
+      const cleanUrl = request.nextUrl.clone();
+      cleanUrl.pathname = adminPublicPath(pathname);
+      return applySecurityHeaders(NextResponse.redirect(cleanUrl, 308));
+    }
+    const internal = adminInternalPath(pathname);
+    if (internal) {
+      const url = request.nextUrl.clone();
+      url.pathname = internal;
+      return applySecurityHeaders(NextResponse.rewrite(url));
+    }
+  }
+  // /internal on any other cencori host moves to the admin host.
+  if (!isFile && !isAdminHostname(hostname) && isAdminInternalPath(pathname)) {
+    const origin = adminOrigin(hostname);
+    if (origin) {
+      const url = new URL(adminPublicPath(pathname), origin);
+      url.search = request.nextUrl.search;
+      return applySecurityHeaders(NextResponse.redirect(url, 308));
+    }
+  }
 
   // The two front doors: cencori.com/developers and /business moved to their own
   // subdomains, which serve their own pages and send everything else to cencori.com.
