@@ -12,18 +12,25 @@ on:
           - cencori
           - both
 
+# npm trusted publishing (OIDC): no npm token is stored anywhere. Each package
+# lists this repo + workflow as its trusted publisher on npmjs.com, and every
+# release carries provenance (which commit and workflow built it).
 jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           registry-url: "https://registry.npmjs.org"
+
+      # Trusted publishing needs npm 11.5.1 or later.
+      - run: npm install -g npm@11.6.2
 
       - name: Publish create-cencori-app
         if: inputs.package == 'create-cencori-app' || inputs.package == 'both'
@@ -31,9 +38,7 @@ jobs:
         run: |
           npm ci
           npm test
-          npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          npm publish --access public --provenance
 
       - name: Publish cencori SDK
         if: inputs.package == 'cencori' || inputs.package == 'both'
@@ -41,6 +46,4 @@ jobs:
         run: |
           npm ci
           npm run build
-          npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          npm publish --access public --provenance

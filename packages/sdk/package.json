@@ -1,8 +1,8 @@
 {
     "$schema": "https://json.schemastore.org/package.json",
     "name": "cencori",
-    "version": "1.9.0",
-    "description": "Cencori - The unified infrastructure layer for AI applications. One SDK for AI Gateway, Compute, Workflow, and Storage.",
+    "version": "1.10.0",
+    "description": "Cencori - The unified infrastructure layer for AI applications. One SDK for AI Gateway, Agents, Compute, Workflow, and Storage.",
     "main": "dist/index.js",
     "module": "dist/index.mjs",
     "types": "dist/index.d.ts",
@@ -109,7 +109,10 @@
         "serverless",
         "workflow",
         "vector-database",
-        "rag"
+        "rag",
+        "agents",
+        "ai-agents",
+        "agents-sdk"
     ],
     "author": "Cencori",
     "license": "MIT",

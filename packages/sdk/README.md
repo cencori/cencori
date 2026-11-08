@@ -34,7 +34,95 @@ console.log(response.content);
 | **Web** | ✅ Available | First-party fetch, extraction, crawl, and evidence-bearing search |
 | **Billing** | ✅ Available | End-user usage monetization and Stripe integration |
 | **Integration** | ✅ Available | SDKs, Vercel AI, TanStack |
+| **Agents** | ✅ Available | Code-first agents (`cencori/agents`): tools, handoffs, approvals, guardrails, any model |
 | **Embedded Agents** | ✅ Available | Multi-tenant agent backend: tenants, versions, runs, approvals, metering |
+
+## Agents
+
+`cencori/agents` builds agents in code and runs them on Cencori. Your tools run in your process; the agent loop, sessions, approvals, memory, guardrails, billing and traces run on Cencori, with any model in the catalog.
+
+```bash
+npm install cencori zod
+```
+
+```typescript
+import { Agent, run, tool } from 'cencori/agents';
+import { z } from 'zod';
+
+const getOrder = tool({
+  name: 'get_order',
+  description: 'Look up an order by id',
+  parameters: z.object({ id: z.string() }),
+  execute: async ({ id }) => db.orders.find(id),
+});
+
+const support = new Agent({
+  name: 'Support',
+  instructions: 'Answer order questions. Be brief.',
+  tools: [getOrder],
+  // model: 'claude-sonnet-4-5',  // any catalog model; default gpt-oss-120b (fast)
+});
+
+const result = await run(support, 'Where is order 1042?'); // reads CENCORI_API_KEY
+console.log(result.finalOutput);
+```
+
+The agent calls as many tools, over as many rounds, as it needs. Pass `result.sessionId` back as `{ sessionId }` to continue the conversation.
+
+**Stream**
+
+```typescript
+const stream = run(support, 'Where is order 1042?', { stream: true });
+for await (const text of stream.toTextStream()) process.stdout.write(text);
+const result = await stream.completed;
+```
+
+**Handoffs and agents as tools**
+
+```typescript
+const billing = new Agent({ name: 'Billing', instructions: 'You handle refunds.', handoffDescription: 'refunds and invoices' });
+const triage = new Agent({ name: 'Triage', instructions: 'Route billing questions to Billing.', handoffs: [billing] });
+// Or keep the conversation and just ask another agent: tools: [billing.asTool()]
+```
+
+**Human approval**
+
+```typescript
+import { RunState } from 'cencori/agents';
+
+const refund = tool({
+  name: 'issue_refund',
+  description: 'Refund an order',
+  parameters: z.object({ id: z.string() }),
+  needsApproval: true, // recorded in your project's governance ledger
+  execute: async ({ id }) => payments.refund(id),
+});
+
+const first = await run(billingAgent, 'Refund order 1042');
+if (first.interruptions.length) {
+  const saved = JSON.stringify(first.state);        // store it; decide later, anywhere
+  const state = RunState.fromJSON(saved);
+  state.approve(first.interruptions[0]);            // or state.reject(item, { message })
+  const done = await run(billingAgent, state);
+}
+```
+
+`needsApproval` can also be a function, `(ctx, args) => args.amount > 100`, decided per call.
+
+**Structured output, guardrails, memory**
+
+```typescript
+const extractor = new Agent({
+  name: 'Extractor',
+  outputType: z.object({ city: z.string(), days: z.number() }), // finalOutput is typed
+  inputGuardrails: [{ name: 'on_topic', execute: ({ input }) => ({ tripwireTriggered: input.includes('homework') }) }],
+  modelSettings: { reasoningEffort: 'low' },
+});
+
+await run(extractor, 'Trip to Lagos for 3 days', { memory: { userId: 'user_123' }, user: 'user_123' });
+```
+
+Tool parameters accept zod 3 or 4, any [Standard Schema](https://standardschema.dev) library, or a plain JSON Schema object.
 
 ## Embedded Agents
 
