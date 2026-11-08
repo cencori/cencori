@@ -21,6 +21,7 @@ export const RENDER_UI_TOOL: Tool = {
             'Use it when data or choices read better as UI than as text: numbers over time (Chart), records (Table or ListView), a headline figure (Stat), a decision (Buttons), details to collect (Form).',
             'Put the real data in the widget; never invent values. After it renders, add at most a short sentence: don\'t repeat what the widget shows.',
             'Usually start with a Card. Keep it focused: one idea per widget.',
+            'Always show UI by calling this tool. Never write widget JSON in your reply text: the user would see raw code.',
             '',
             describeWidgetSpec(),
             '',

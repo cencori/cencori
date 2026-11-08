@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect as useLayoutEffectClient, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
 import type { AgentChatApprovalItem } from '../../agent-chat/protocol';
+import { extractTextWidget } from '../../widgets/partial';
 import { Markdown } from './markdown';
 import { AGENT_CHAT_CSS, themeStyle, type AgentChatTheme } from './styles';
 import { useAgentChat, type AgentChatMessage, type AgentChatPart, type UseAgentChatOptions, type UseAgentChatResult } from './use-agent-chat';
@@ -140,7 +141,7 @@ function Message({ message, chat, showToolCalls, toolLabels, live }: { message: 
                     // Only the latest reply's widgets take actions.
                     interactive={live && !streaming} />
             ))}
-            {streaming && (!lastPart || lastPart.type !== 'text') && (
+            {streaming && (!lastPart || (lastPart.type !== 'text' && !(lastPart.type === 'widget' && lastPart.partial))) && (
                 <div className="cen-thinking" aria-label="Thinking"><span /><span /><span /></div>
             )}
         </div>
@@ -149,12 +150,24 @@ function Message({ message, chat, showToolCalls, toolLabels, live }: { message: 
 
 function Part({ part, chat, toolLabels, cursor, interactive }: { part: AgentChatPart; chat: UseAgentChatResult; toolLabels?: Record<string, string>; cursor: boolean; interactive: boolean }) {
     switch (part.type) {
-        case 'text':
+        case 'text': {
+            // Widget JSON the model wrote as text (instead of calling render_ui) is drawn as a widget.
+            const found = extractTextWidget(part.text);
+            if (found) {
+                return (
+                    <>
+                        {found.before && <div className="cen-text"><Markdown text={found.before} /></div>}
+                        <Widget widget={found.widget} id={`text_${found.widget.type}`} disabled={!interactive || !found.complete} onAction={(action, ctx) => chat.sendAction(action, ctx)} />
+                        {found.after && <div className="cen-text"><Markdown text={found.after} />{cursor && <span className="cen-cursor" />}</div>}
+                    </>
+                );
+            }
             return <div className="cen-text"><Markdown text={part.text} />{cursor && <span className="cen-cursor" />}</div>;
+        }
         case 'tool':
             return <ToolCall name={part.name} label={toolLabels?.[part.name]} arguments={part.arguments} output={part.output} running={part.status === 'running'} />;
         case 'widget':
-            return <Widget widget={part.widget} id={part.id} disabled={!interactive} onAction={(action, ctx) => chat.sendAction(action, ctx)} />;
+            return <Widget widget={part.widget} id={part.id} disabled={!interactive || part.partial} onAction={(action, ctx) => chat.sendAction(action, ctx)} />;
         case 'handoff':
             return <div className="cen-step"><ArrowIcon /> Handed to {part.to}</div>;
         case 'approval':

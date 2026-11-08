@@ -110,6 +110,7 @@ export function toAgentChatStream(streamed: StreamedRunResult<unknown>, options:
                         case 'tool_call': send({ event: 'tool_call', data: { callId: e.callId, name: e.toolName, arguments: e.arguments, agent: e.agentName } }); break;
                         case 'tool_output': send({ event: 'tool_output', data: { callId: e.callId, name: e.toolName, output: e.output, agent: e.agentName } }); break;
                         case 'widget': send({ event: 'widget', data: { id: e.widgetId, callId: e.callId, widget: e.widget, agent: e.agentName } }); break;
+                        case 'widget_partial': send({ event: 'widget_partial', data: { callId: e.callId, widget: e.widget, agent: e.agentName } }); break;
                         case 'handoff': send({ event: 'handoff', data: { from: e.from, to: e.to } }); break;
                         case 'interruption': break; // sent below, with the state
                     }

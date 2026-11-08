@@ -23,6 +23,7 @@ import {
     resolveProviderTransport,
     runWithProviderRetry,
     streamSignal,
+    type ToolCallDelta,
 } from './base';
 import { getPricingFromDB } from './pricing';
 import { toOpenAIMessages, estimateTokenCount } from './utils';
@@ -516,6 +517,7 @@ export class OpenAICompatibleProvider extends AIProvider {
                     };
                 }
 
+                const liveToolCalls: ToolCallDelta[] = [];
                 if (toolCallDeltas) {
                     for (const tc of toolCallDeltas) {
                         const existing = toolCallsInProgress.get(tc.index);
@@ -529,7 +531,10 @@ export class OpenAICompatibleProvider extends AIProvider {
                                     && tc.function.name === existing.name
                                     && tc.function.arguments === existing.arguments
                                     && isCompleteArgumentsObject(tc.function.arguments);
-                                if (!replaysSnapshot) existing.arguments += tc.function.arguments;
+                                if (!replaysSnapshot) {
+                                    existing.arguments += tc.function.arguments;
+                                    liveToolCalls.push({ index: tc.index, id: existing.id, name: existing.name, arguments: tc.function.arguments });
+                                }
                             }
                         } else {
                             toolCallsInProgress.set(tc.index, {
@@ -537,6 +542,9 @@ export class OpenAICompatibleProvider extends AIProvider {
                                 name: tc.function?.name || '',
                                 arguments: tc.function?.arguments || '',
                             });
+                            if (tc.function?.arguments) {
+                                liveToolCalls.push({ index: tc.index, id: tc.id || '', name: tc.function?.name || '', arguments: tc.function.arguments });
+                            }
                         }
                     }
                 }
@@ -560,6 +568,7 @@ export class OpenAICompatibleProvider extends AIProvider {
                             ? finishReason
                             : undefined,
                     toolCalls,
+                    ...(liveToolCalls.length > 0 ? { toolCallDeltas: liveToolCalls } : {}),
                     ...(usage ? { usage } : {}),
                     ...(reasoningDelta ? { reasoning: reasoningDelta } : {}),
                 };

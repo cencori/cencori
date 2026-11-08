@@ -22,6 +22,7 @@ import {
     resolveProviderTransport,
     runWithProviderRetry,
     streamSignal,
+    type ToolCallDelta,
 } from './base';
 import { getPricingFromDB } from './pricing';
 import { toOpenAIMessages, estimateTokenCount } from './utils';
@@ -304,6 +305,7 @@ export class OpenAIProvider extends AIProvider {
                 const toolCallDeltas = chunk.choices[0]?.delta?.tool_calls;
 
                 // Accumulate tool call data
+                const liveToolCalls: ToolCallDelta[] = [];
                 if (toolCallDeltas) {
                     for (const tc of toolCallDeltas) {
                         const existing = toolCallsInProgress.get(tc.index);
@@ -311,6 +313,7 @@ export class OpenAIProvider extends AIProvider {
                             // Append to existing tool call
                             if (tc.function?.arguments) {
                                 existing.arguments += tc.function.arguments;
+                                liveToolCalls.push({ index: tc.index, id: existing.id, name: existing.name, arguments: tc.function.arguments });
                             }
                         } else {
                             // New tool call
@@ -319,6 +322,9 @@ export class OpenAIProvider extends AIProvider {
                                 name: tc.function?.name || '',
                                 arguments: tc.function?.arguments || '',
                             });
+                            if (tc.function?.arguments) {
+                                liveToolCalls.push({ index: tc.index, id: tc.id || '', name: tc.function?.name || '', arguments: tc.function.arguments });
+                            }
                         }
                     }
                 }
@@ -343,6 +349,7 @@ export class OpenAIProvider extends AIProvider {
                             ? finishReason
                             : undefined,
                     toolCalls,
+                    ...(liveToolCalls.length > 0 ? { toolCallDeltas: liveToolCalls } : {}),
                     ...(usage ? { usage } : {}),
                 };
             }

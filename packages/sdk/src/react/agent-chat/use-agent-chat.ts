@@ -21,7 +21,8 @@ import type { WidgetAction, WidgetNode } from '../../widgets/spec';
 export type AgentChatPart =
     | { type: 'text'; text: string }
     | { type: 'tool'; callId: string; name: string; arguments: string; output?: string; status: 'running' | 'done' }
-    | { type: 'widget'; id: string; widget: WidgetNode }
+    /** `partial` while the agent is still writing it: drawn, but not usable yet. */
+    | { type: 'widget'; id: string; widget: WidgetNode; callId?: string; partial?: boolean }
     | { type: 'handoff'; from: string; to: string }
     | { type: 'approval'; items: AgentChatApprovalItem[]; decisions: Record<string, AgentChatDecision>; state: string; status: 'pending' | 'submitted' };
 
@@ -163,11 +164,22 @@ export function useAgentChat(options: UseAgentChatOptions): UseAgentChatResult {
                             ? { ...m, parts: m.parts.map((p) => (p.type === 'tool' && p.callId === data.callId ? { ...p, output: String(data.output ?? ''), status: 'done' } : p)) }
                             : m)));
                         break;
-                    case 'widget':
-                        if (data.widget && typeof data.widget === 'object') {
-                            pushPart({ type: 'widget', id: String(data.id), widget: data.widget as WidgetNode });
-                        }
+                    case 'widget_partial':
+                    case 'widget': {
+                        if (!data.widget || typeof data.widget !== 'object') break;
+                        const callId = typeof data.callId === 'string' && data.callId ? data.callId : undefined;
+                        const partial = event === 'widget_partial';
+                        const part: AgentChatPart = { type: 'widget', id: partial ? `partial_${callId}` : String(data.id), widget: data.widget as WidgetNode, callId, partial };
+                        // The widget being written is replaced in place as it grows, then by the finished one.
+                        patch(assistantId, (m) => {
+                            const at = callId ? m.parts.findIndex((p) => p.type === 'widget' && p.callId === callId) : -1;
+                            if (at === -1) return { ...m, parts: [...m.parts, part] };
+                            const parts = [...m.parts];
+                            parts[at] = part;
+                            return { ...m, parts };
+                        });
                         break;
+                    }
                     case 'handoff':
                         pushPart({ type: 'handoff', from: String(data.from), to: String(data.to) });
                         patch(assistantId, (m) => ({ ...m, agent: String(data.to) }));
@@ -186,7 +198,8 @@ export function useAgentChat(options: UseAgentChatOptions): UseAgentChatResult {
                 }
             }
             if (!ended) throw new Error('The reply ended early.');
-            patch(assistantId, (m) => ({ ...m, status: 'done' }));
+            // A widget that never finished (it failed its check) isn't left half-drawn.
+            patch(assistantId, (m) => ({ ...m, status: 'done', parts: m.parts.filter((p) => !(p.type === 'widget' && p.partial)) }));
             setStatus(ended === 'approval' ? 'awaiting_approval' : 'idle');
         } catch (err) {
             if (controller.signal.aborted) {

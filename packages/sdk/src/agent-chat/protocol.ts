@@ -14,6 +14,8 @@ export type AgentChatEvent =
     | { event: 'tool_call'; data: { callId: string; name: string; arguments: string; agent?: string } }
     | { event: 'tool_output'; data: { callId: string; name: string; output: string; agent?: string } }
     | { event: 'widget'; data: { id: string; callId?: string; widget: WidgetNode; agent?: string } }
+    /** A widget still being written: draw it, then replace it with the 'widget' for the same callId. */
+    | { event: 'widget_partial'; data: { callId: string; widget: WidgetNode; agent?: string } }
     | { event: 'handoff'; data: { from: string; to: string } }
     /** Tool calls waiting for the user. Send `state` back with the decisions to continue. */
     | { event: 'approval'; data: { sessionId: string; state: string; items: AgentChatApprovalItem[] } }

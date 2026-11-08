@@ -476,6 +476,31 @@ describe('widgets', () => {
         expect((await streamed.completed).newItems.some((i) => i.type === 'widget')).toBe(true);
     });
 
+    it('draws a widget while the model writes it', async () => {
+        vi.useFakeTimers({ toFake: ['Date'] });
+        const agent = new Agent({ name: 'Sales', model: 'gpt-4o', widgets: true });
+        const args = JSON.stringify({ widget: card });
+        const cut = args.indexOf('"children"');
+        const cencori = fakeCencori([[
+            ['turn.started', { turn_number: 1 }],
+            ['tool_call.delta', { tool: 'render_ui', action_id: 'w1', delta: args.slice(0, cut) }],
+            ['tool_call.delta', { tool: 'render_ui', action_id: 'w1', delta: args.slice(cut) }],
+            ['tool_call.completed', { tool: 'render_ui', action_id: 'w1', output: { ok: true, widget_id: 'wgt_1', widget: card } }],
+            ['turn.completed', { turn_number: 1, output: { output: [] }, usage: {} }],
+        ]]);
+        const streamed = run(agent, 'Show order 1042', { ...cencori.options, stream: true });
+        const events = [];
+        for await (const e of streamed) {
+            events.push(e);
+            vi.advanceTimersByTime(100);
+        }
+        vi.useRealTimers();
+        const partials = events.filter((e) => e.type === 'widget_partial') as Array<{ widget: unknown; callId: string }>;
+        expect(partials[0]).toMatchObject({ callId: 'w1', widget: { type: 'Card', title: 'Order 1042', children: [] } });
+        expect(partials.at(-1)!.widget).toEqual(card);
+        expect(events.findIndex((e) => e.type === 'widget')).toBeGreaterThan(events.findIndex((e) => e.type === 'widget_partial'));
+    });
+
     it('shows a widget a tool returns, and gives the model the rest of the result', async () => {
         const showOrder = tool({
             name: 'show_order',

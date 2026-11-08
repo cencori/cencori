@@ -1,4 +1,5 @@
 import { isWidgetResult, validateWidget, type WidgetNode } from '../widgets/spec';
+import { partialRenderUiWidget } from '../widgets/partial';
 import { Agent } from './agent';
 import type { RunContext } from './context';
 import { AgentsError, CencoriRunError, GuardrailTripwireTriggered, MaxTurnsExceededError } from './errors';
@@ -54,6 +55,8 @@ export type RunStreamEvent =
     | { type: 'handoff'; from: string; to: string }
     /** UI to show: from the model (render_ui) or from a tool that returned { widget }. */
     | { type: 'widget'; callId: string; widgetId: string; widget: WidgetNode; agentName: string }
+    /** A widget the model is still writing (render_ui): draw it, then replace it with the 'widget' for the same callId. */
+    | { type: 'widget_partial'; callId: string; widget: WidgetNode; agentName: string }
     | { type: 'interruption'; interruptions: ToolApprovalItem[] };
 
 interface PendingPause {
@@ -243,8 +246,27 @@ type TurnOutcome =
 /** Read one turn's stream: emit deltas and tool calls, end on pause or completion. */
 async function* consumeTurn(response: Response, agentName: string, sessionId: string, items: RunItem[]): AsyncGenerator<RunStreamEvent, TurnOutcome> {
     let text = '';
+    // render_ui arguments as they stream, per call, and when each was last drawn.
+    const writing = new Map<string, { args: string; drawnAt: number; drawn: string }>();
     for await (const { event, data } of readSessionEvents(response)) {
         switch (event) {
+            case 'tool_call.delta': {
+                if (data.tool !== 'render_ui' || typeof data.delta !== 'string') break;
+                const callId = String(data.action_id ?? '');
+                const w = writing.get(callId) ?? { args: '', drawnAt: 0, drawn: '' };
+                w.args += data.delta;
+                writing.set(callId, w);
+                // Parsing on every few characters is wasted work: draw at most every 50ms.
+                const now = Date.now();
+                if (now - w.drawnAt < 50) break;
+                const partial = partialRenderUiWidget(w.args);
+                const key = partial ? JSON.stringify(partial) : '';
+                if (!partial || key === w.drawn) break;
+                w.drawnAt = now;
+                w.drawn = key;
+                yield { type: 'widget_partial', callId, widget: partial, agentName };
+                break;
+            }
             case 'output_text.delta': {
                 const delta = typeof data.delta === 'string' ? data.delta : '';
                 if (delta) {

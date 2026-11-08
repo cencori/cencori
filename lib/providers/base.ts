@@ -181,6 +181,14 @@ export interface UnifiedChatResponse {
     reasoning?: string;
 }
 
+/** A piece of a tool call's arguments (see StreamChunk.toolCallDeltas). */
+export interface ToolCallDelta {
+    index: number;
+    id: string;
+    name: string;
+    arguments: string;
+}
+
 /**
  * Streaming chunk
  */
@@ -191,6 +199,13 @@ export interface StreamChunk {
     error?: string;
     /** Tool calls in this chunk (streamed incrementally) */
     toolCalls?: ToolCall[];
+    /**
+     * Pieces of tool-call arguments as the model writes them, for showing a
+     * call live (e.g. a widget being drawn). Optional: adapters that can't
+     * stream calls leave it out, and the finished calls always arrive in
+     * `toolCalls`, which is what anything that runs a tool should read.
+     */
+    toolCallDeltas?: ToolCallDelta[];
     /** Reasoning-trace delta (DeepSeek `reasoning_content`); accumulates like `delta`. */
     reasoning?: string;
     /**

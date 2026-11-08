@@ -444,6 +444,17 @@ function makeStream(params: {
                                 if (tc.function?.arguments) toolCalls[k].args += tc.function.arguments;
                             }
                         }
+                        // A widget being written streams to the chat as it's written, when the
+                        // reply could stream anyway (no output policy to pass, no masked values
+                        // to restore). Live only, never stored: the checked widget arrives in
+                        // tool_call.completed. Adapters that can't stream calls send none.
+                        if (chunk.toolCallDeltas && streamsLive && !(tokenMap && tokenMap.size > 0)) {
+                            for (const d of chunk.toolCallDeltas) {
+                                if (d.id && d.arguments && isRenderUi(d.name)) {
+                                    controller.enqueue(encoder.encode(buildSSE('tool_call.delta', { action_id: d.id, tool: RENDER_UI_TOOL_NAME, delta: d.arguments })));
+                                }
+                            }
+                        }
                         if (chunk.finishReason) {
                             const requested = Object.values(toolCalls).filter((t) => t.name);
                             if (

@@ -536,6 +536,7 @@ export async function* streamGatewayChat(params: {
                 isUsable: (chunk) => Boolean(
                     chunk.delta
                     || (chunk.toolCalls && chunk.toolCalls.length > 0)
+                    || (chunk.toolCallDeltas && chunk.toolCallDeltas.length > 0)
                     || chunk.finishReason
                 ),
             });

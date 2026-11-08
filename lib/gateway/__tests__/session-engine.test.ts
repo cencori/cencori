@@ -1119,6 +1119,41 @@ describe('widgets (render_ui)', () => {
         expect(paused.server_results).toEqual([expect.objectContaining({ action_id: 'call_w', tool: 'render_ui' })]);
     });
 
+    it('streams a widget as the model writes it, live only', async () => {
+        const args = JSON.stringify({ widget: card });
+        const pieces = [args.slice(0, 20), args.slice(20, 50), args.slice(50)];
+        const rounds = [
+            [
+                // The adapter sends the pieces as they're written, then the finished call.
+                ...pieces.map((p) => ({ delta: '', toolCallDeltas: [{ index: 0, id: 'call_w', name: 'render_ui', arguments: p }], actualModel: 'gpt-4o', actualProvider: 'openai' })),
+                { toolCalls: [{ id: 'call_w', function: { name: 'render_ui', arguments: args } }], finishReason: 'tool_calls', actualModel: 'gpt-4o', actualProvider: 'openai' },
+            ],
+            [{ finishReason: 'stop', actualModel: 'gpt-4o', actualProvider: 'openai' }],
+        ];
+        let n = 0;
+        mockStreamGatewayChat.mockImplementation((() => makeStreamChunks(rounds[n++])()) as never);
+        const gw = makeGateways();
+        const all = await ((await turn(gw)) as { ok: true; response: NextResponse }).response.text();
+        const deltas = events(all, 'tool_call.delta');
+        expect(deltas.map((d) => d.delta).join('')).toBe(args);
+        expect(deltas[0]).toMatchObject({ action_id: 'call_w', tool: 'render_ui' });
+        // Before the checked widget.
+        expect(all.indexOf('event: tool_call.delta')).toBeLessThan(all.indexOf('event: tool_call.completed'));
+        // Never stored.
+        const stored = (gw.supabase.from as ReturnType<typeof vi.fn>).mock.results
+            .flatMap((r) => ((r.value as { insert: ReturnType<typeof vi.fn> }).insert.mock.calls as Array<[Record<string, unknown>]>).map((c) => c[0].event_type));
+        expect(stored).not.toContain('tool_call.delta');
+    });
+
+    it('does not stream a widget when masked values would show', async () => {
+        mockStreamGatewayChat.mockImplementation(makeStreamChunks([
+            { delta: '', toolCallDeltas: [{ index: 0, id: 'call_w', name: 'render_ui', arguments: JSON.stringify({ widget: card }) }], actualModel: 'gpt-4o', actualProvider: 'openai' },
+            { toolCalls: [{ id: 'call_w', function: { name: 'render_ui', arguments: JSON.stringify({ widget: card }) } }], finishReason: 'stop', actualModel: 'gpt-4o', actualProvider: 'openai' },
+        ]) as never);
+        const all = await ((await turn(makeGateways(), { tokenMap: new Map([['[EMAIL_1]', 'a@b.co']]), pauseOnToolCalls: false })) as { ok: true; response: NextResponse }).response.text();
+        expect(all).not.toContain('event: tool_call.delta');
+    });
+
     it('a widget only for a turn that asked for widgets', async () => {
         mockStreamGatewayChat.mockImplementation(makeStreamChunks([{ delta: 'Hi', actualModel: 'gpt-4o', actualProvider: 'openai' }, { finishReason: 'stop', actualModel: 'gpt-4o', actualProvider: 'openai' }]) as never);
         await (await turn(makeGateways(), { widgets: false }) as { ok: true; response: NextResponse }).response.text();

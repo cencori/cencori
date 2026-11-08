@@ -482,6 +482,10 @@ export class AnthropicProvider extends AIProvider {
                     if (inProgress) {
                         inProgress.argumentsJson += event.delta.partial_json;
                     }
+                    if (inProgress && event.delta.partial_json) {
+                        yield { delta: '', toolCallDeltas: [{ index: event.index, id: inProgress.id, name: inProgress.name, arguments: event.delta.partial_json }] };
+                        continue;
+                    }
                     // An empty chunk is progress, not output. The gateway aborts a stream that yields
                     // nothing for 180s (stream-timeout.ts), and the arguments are only emitted when
                     // the call is complete, so a tool call Claude spends minutes writing (a whole
