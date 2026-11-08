@@ -1,213 +1,220 @@
 'use client';
 
-import { use, useEffect, useState } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
-import { Search, X } from 'lucide-react';
+import { use, useEffect, useMemo, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useInfiniteQuery } from '@tanstack/react-query';
+import { Download, Play, RefreshCw, Search } from 'lucide-react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import Activity01Icon from '@hugeicons/core-free-icons/Activity01Icon';
 import { useProjectIdBySlug } from '@/lib/hooks/useQueries';
-import { TimeRangeSelector } from '@/components/audit/TimeRangeSelector';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SESSION_SOURCE_LABELS, type SessionSource } from '@/lib/sessions/observability';
+import { hasActiveFilters, readSessionFilters, writeSessionFilters } from '@/lib/sessions/filters';
 import { SessionStatusBadge, formatSessionCost, formatSessionTime } from '@/components/sessions/session-ui';
 import type { SessionListItem } from '@/app/api/projects/[projectId]/sessions/route';
+import { cn } from '@/lib/utils';
+
+// Every agent session in the project, full screen: a search bar, the
+// activity over the selected time range, and the sessions as log lines.
+// Filters live in the sidebar (components/sessions/SessionFilters.tsx) and
+// in the URL, so this page reads them from there.
 
 interface PageProps {
     params: Promise<{ orgSlug: string; projectSlug: string }>;
 }
 
-interface SessionsResponse {
+interface SessionsPage {
     sessions: SessionListItem[];
     has_more: boolean;
-    meta?: { applied_time_range: string; tier_max_time_range: string; time_range_clamped: boolean; requested_time_range: string };
+    histogram: { start: string; end: string; buckets: number[] } | null;
+    meta?: { applied_time_range: string; tier_max_time_range: string; time_range_clamped: boolean };
 }
 
-const PAGE_SIZE = 25;
-const DEFAULT_FILTERS = { status: 'all', source: 'all', time_range: '7d', search: '' };
-const SOURCE_FILTERS: Array<[string, string]> = [
-    ['sdk', SESSION_SOURCE_LABELS.sdk],
-    ['arcie', SESSION_SOURCE_LABELS.arcie],
-    ['widget', 'Widget & links'],
-    ['whatsapp', SESSION_SOURCE_LABELS.whatsapp],
-    ['embedded', SESSION_SOURCE_LABELS.embedded],
-];
+const PAGE_SIZE = 50;
+const COLUMNS = 'grid-cols-[170px_80px_120px_minmax(120px,180px)_minmax(0,1fr)_60px_90px]';
 
-/** Every agent conversation in the project, from any source. */
-export default function ObservabilityPage({ params }: PageProps) {
+function axisLabel(ms: number, spanMs: number): string {
+    const d = new Date(ms);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    if (spanMs <= 36 * 3600_000) return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    return `${d.toLocaleString('en', { month: 'short' }).toUpperCase()} ${pad(d.getDate())}`;
+}
+
+function Histogram({ data }: { data: NonNullable<SessionsPage['histogram']> }) {
+    const max = Math.max(1, ...data.buckets);
+    const start = Date.parse(data.start);
+    const end = Date.parse(data.end);
+    const ticks = [0, 0.25, 0.5, 0.75, 1].map((f) => start + (end - start) * f);
+    return (
+        <div className="border-b border-border/50 px-3 pb-1.5 pt-3">
+            <div className="flex h-10 items-end gap-px">
+                {data.buckets.map((count, i) => (
+                    <div
+                        key={i}
+                        title={`${count} session${count === 1 ? '' : 's'}`}
+                        className={cn('flex-1 rounded-[1px]', count ? 'bg-foreground/40' : 'bg-border/40')}
+                        style={{ height: count ? `${Math.max(10, (count / max) * 100)}%` : '2px' }}
+                    />
+                ))}
+            </div>
+            <div className="mt-1 flex justify-between font-mono text-[10px] text-muted-foreground">
+                {ticks.map((t) => <span key={t}>{axisLabel(t, end - start)}</span>)}
+            </div>
+        </div>
+    );
+}
+
+export default function SessionsPageView({ params }: PageProps) {
     const { orgSlug, projectSlug } = use(params);
     const pathname = usePathname();
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const filters = readSessionFilters(searchParams);
     const { data: projectId, isLoading: projectLoading } = useProjectIdBySlug(orgSlug, projectSlug);
-    const [filters, setFilters] = useState(DEFAULT_FILTERS);
-    const [searchInput, setSearchInput] = useState('');
-    const [offset, setOffset] = useState(0);
+    const [searchInput, setSearchInput] = useState(filters.q);
+    const [live, setLive] = useState(false);
 
-    useEffect(() => setOffset(0), [filters]);
+    useEffect(() => setSearchInput(filters.q), [filters.q]);
 
-    const { data, isLoading, error, isFetching } = useQuery<SessionsResponse>({
-        queryKey: ['sessions', projectId, filters, offset],
-        queryFn: async ({ signal }) => {
-            const query = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(offset), time_range: filters.time_range });
-            if (filters.status !== 'all') query.set('status', filters.status);
-            if (filters.source !== 'all') query.set('source', filters.source);
-            if (filters.search) query.set('search', filters.search);
-            const response = await fetch(`/api/projects/${projectId}/sessions?${query}`, { signal });
+    const apiQuery = useMemo(() => {
+        const q = new URLSearchParams({ limit: String(PAGE_SIZE), time_range: filters.range });
+        if (filters.status.length) q.set('status', filters.status.join(','));
+        if (filters.source.length) q.set('source', filters.source.join(','));
+        if (filters.q) q.set('search', filters.q);
+        return q.toString();
+    }, [filters.range, filters.status, filters.source, filters.q]);
+
+    const { data, isLoading, error, isFetching, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery<SessionsPage>({
+        queryKey: ['sessions', projectId, apiQuery],
+        queryFn: async ({ pageParam, signal }) => {
+            const response = await fetch(`/api/projects/${projectId}/sessions?${apiQuery}&offset=${pageParam}`, { signal });
             if (!response.ok) throw new Error('Could not load sessions.');
             return response.json();
         },
+        initialPageParam: 0,
+        getNextPageParam: (last, pages) => (last.has_more ? pages.length * PAGE_SIZE : undefined),
         enabled: Boolean(projectId),
         staleTime: 15_000,
-        refetchInterval: 30_000,
-        placeholderData: (previous) => previous,
+        refetchInterval: live ? 5000 : false,
     });
 
-    const sessions = data?.sessions ?? [];
-    const filtered = filters.status !== 'all' || filters.source !== 'all' || filters.search !== '' || filters.time_range !== '7d';
+    const sessions = data?.pages.flatMap((p) => p.sessions) ?? [];
+    const histogram = data?.pages[0]?.histogram ?? null;
+    const meta = data?.pages[0]?.meta;
+    const filtered = hasActiveFilters(filters);
     const open = (id: string) => router.push(`${pathname.replace(/\/$/, '')}/${id}`);
+    const submitSearch = () => {
+        const qs = writeSessionFilters({ ...filters, q: searchInput.trim() });
+        router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    };
+    const exportJson = () => {
+        const blob = new Blob([JSON.stringify(sessions, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `sessions-${new Date().toISOString().slice(0, 19)}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+    };
 
     if (!projectLoading && !projectId) {
-        return (
-            <div className="w-full max-w-[1360px] mx-auto px-0 sm:px-6 pt-0 pb-8 sm:pt-8 text-center py-16">
-                <p className="text-sm font-medium">Project not found</p>
-            </div>
-        );
+        return <p className="py-16 text-center text-sm text-muted-foreground">Project not found</p>;
     }
 
     return (
-        <div className="w-full max-w-[1360px] mx-auto px-0 sm:px-6 pt-0 pb-8 sm:pt-8">
-            <header className="mb-5">
-                <h1 className="text-base font-medium">Sessions</h1>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                    Every agent conversation in this project: Agents SDK, Arcie, widget, WhatsApp and API. Open one to see its turns, tool calls and approvals.
-                </p>
-            </header>
-
-            <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center">
-                <form
-                    onSubmit={(event) => { event.preventDefault(); setFilters((f) => ({ ...f, search: searchInput.trim() })); }}
-                    className="relative w-full lg:order-1 lg:w-auto"
-                >
-                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
-                    <Input
-                        placeholder="Session id..."
+        <div className="flex min-h-0 w-full flex-1 flex-col">
+            {/* Toolbar */}
+            <div className="flex shrink-0 items-center gap-2 border-b border-border/50 px-3 py-2">
+                <form className="relative flex-1" onSubmit={(e) => { e.preventDefault(); submitSearch(); }}>
+                    <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                    <input
                         value={searchInput}
-                        onChange={(event) => setSearchInput(event.target.value)}
-                        className="w-full lg:w-64 h-9 lg:h-7 pl-7 text-xs font-mono rounded border-border/50 bg-transparent placeholder:font-sans placeholder:text-muted-foreground/60 shadow-none dark:shadow-xs"
+                        onChange={(e) => setSearchInput(e.target.value)}
+                        onBlur={() => { if (searchInput.trim() !== filters.q) submitSearch(); }}
+                        placeholder="Search sessions by id or agent..."
+                        className="h-9 w-full rounded-md border border-border/60 bg-transparent pl-8 pr-3 text-sm outline-none placeholder:text-muted-foreground/60 focus:border-border"
                     />
                 </form>
-                <div className="-mx-5 flex items-center gap-3 overflow-x-auto px-5 scrollbar-hide sm:mx-0 sm:px-0 [&>*]:shrink-0 [&_button]:h-9 lg:contents lg:[&_button]:h-7">
-                    <Select value={filters.source} onValueChange={(value) => setFilters((f) => ({ ...f, source: value }))}>
-                        <SelectTrigger className="w-[150px] h-7 text-xs shadow-none dark:shadow-xs"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all" className="text-xs">All sources</SelectItem>
-                            {SOURCE_FILTERS.map(([value, label]) => <SelectItem key={value} value={value} className="text-xs">{label}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
-                    <Select value={filters.status} onValueChange={(value) => setFilters((f) => ({ ...f, status: value }))}>
-                        <SelectTrigger className="w-[130px] h-7 text-xs shadow-none dark:shadow-xs"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all" className="text-xs">All statuses</SelectItem>
-                            <SelectItem value="active" className="text-xs">Active</SelectItem>
-                            <SelectItem value="paused" className="text-xs">Waiting</SelectItem>
-                            <SelectItem value="completed" className="text-xs">Ended</SelectItem>
-                            <SelectItem value="failed" className="text-xs">Failed</SelectItem>
-                        </SelectContent>
-                    </Select>
-                    <TimeRangeSelector value={filters.time_range} onChange={(value) => setFilters((f) => ({ ...f, time_range: value }))} />
-                    {filtered && (
-                        <Button variant="ghost" size="sm" className="h-7 text-xs px-2 lg:order-2" onClick={() => { setFilters(DEFAULT_FILTERS); setSearchInput(''); }}>
-                            <X className="h-3 w-3 mr-1" />
-                            Clear
-                        </Button>
-                    )}
-                </div>
+                <button
+                    type="button"
+                    onClick={() => setLive((l) => !l)}
+                    className={cn('flex h-9 items-center gap-1.5 rounded-md border px-3 text-sm', live ? 'border-emerald-500/50 text-emerald-600 dark:text-emerald-400' : 'border-border/60 text-foreground hover:bg-muted/50')}
+                    aria-pressed={live}
+                >
+                    {live ? <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" /> : <Play className="h-3.5 w-3.5" />}
+                    Live
+                </button>
+                <button type="button" onClick={() => void refetch()} aria-label="Refresh" className="flex h-9 w-9 items-center justify-center rounded-md border border-border/60 hover:bg-muted/50">
+                    <RefreshCw className={cn('h-3.5 w-3.5', isFetching && !isFetchingNextPage && 'animate-spin')} />
+                </button>
+                <button type="button" onClick={exportJson} disabled={!sessions.length} aria-label="Export as JSON" className="flex h-9 w-9 items-center justify-center rounded-md border border-border/60 hover:bg-muted/50 disabled:opacity-40">
+                    <Download className="h-3.5 w-3.5" />
+                </button>
             </div>
 
-            {data?.meta?.time_range_clamped && (
-                <div className="mb-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-200">
-                    Showing {data.meta.applied_time_range}: your plan keeps {data.meta.tier_max_time_range} of history.
+            {histogram && <Histogram data={histogram} />}
+            {meta?.time_range_clamped && (
+                <div className="shrink-0 border-b border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-700 dark:text-amber-200">
+                    Showing {meta.applied_time_range}: your plan keeps {meta.tier_max_time_range} of history.
                 </div>
             )}
 
-            {isLoading || projectLoading ? (
-                <Skeleton className="h-[320px] w-full rounded-md" />
-            ) : error ? (
-                <p className="rounded-md border border-border/40 bg-muted/30 px-5 py-12 text-center text-xs text-muted-foreground">
-                    {error instanceof Error ? error.message : 'Could not load sessions.'}
-                </p>
-            ) : sessions.length === 0 ? (
-                <div className="text-center py-16 flex flex-col items-center">
-                    <div className="w-10 h-10 rounded-md bg-secondary flex items-center justify-center mb-3">
-                        <HugeiconsIcon icon={Activity01Icon} className="h-5 w-5 text-muted-foreground" />
-                    </div>
-                    <p className="text-sm font-medium mb-1">No sessions</p>
-                    <p className="text-xs text-muted-foreground max-w-sm">
-                        {filtered ? 'Nothing matches these filters.' : 'Run an agent with cencori/agents, Arcie or an embedded agent and its sessions show up here.'}
-                    </p>
+            {/* Sessions as log lines */}
+            <div className="min-h-0 flex-1 overflow-auto">
+                <div className={cn('sticky top-0 z-10 hidden min-w-[900px] gap-3 border-b border-border/50 bg-background px-3 py-2 text-xs text-muted-foreground md:grid', COLUMNS)}>
+                    <span>Time</span><span>Status</span><span>Source</span><span>Agent</span><span>First message</span>
+                    <span className="text-right">Turns</span><span className="text-right">Cost</span>
                 </div>
-            ) : (
-                <div className="bg-card border border-border/40 rounded-md overflow-hidden">
-                    <div className="hidden md:block overflow-x-auto">
-                        <Table>
-                            <TableHeader>
-                                <TableRow className="hover:bg-transparent border-b border-border/40">
-                                    {['Last activity', 'Status', 'Source', 'Agent', 'First message'].map((h) => (
-                                        <TableHead key={h} className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider h-8 px-3">{h}</TableHead>
-                                    ))}
-                                    <TableHead className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider h-8 text-right w-[70px]">Turns</TableHead>
-                                    <TableHead className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider h-8 text-right pr-3 w-[90px]">Cost</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {sessions.map((s) => (
-                                    <TableRow key={s.id} onClick={() => open(s.id)} className="cursor-pointer hover:bg-muted/50 border-b border-border/40 last:border-b-0">
-                                        <TableCell className="py-2 px-3 font-mono text-xs text-muted-foreground whitespace-nowrap">{formatSessionTime(s.updated_at)}</TableCell>
-                                        <TableCell className="py-2 px-3"><SessionStatusBadge status={s.status} /></TableCell>
-                                        <TableCell className="py-2 px-3 text-xs whitespace-nowrap">{SESSION_SOURCE_LABELS[s.source as SessionSource]}</TableCell>
-                                        <TableCell className="py-2 px-3 text-xs whitespace-nowrap">
-                                            {s.agent ?? <span className="text-muted-foreground">—</span>}
-                                            {s.parent_session_id && <span className="ml-1.5 text-[10px] text-muted-foreground">sub-run</span>}
-                                        </TableCell>
-                                        <TableCell className="py-2 px-3 text-xs text-muted-foreground max-w-[380px] truncate">{s.preview ?? '—'}</TableCell>
-                                        <TableCell className="py-2 text-right text-xs font-mono text-muted-foreground">{s.turns}</TableCell>
-                                        <TableCell className="py-2 pr-3 text-right text-xs font-mono text-muted-foreground">{formatSessionCost(s.cost_usd)}</TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
+
+                {isLoading || projectLoading ? (
+                    <div className="space-y-2 p-3">{Array.from({ length: 8 }, (_, i) => <Skeleton key={i} className="h-6 w-full" />)}</div>
+                ) : error ? (
+                    <p className="py-16 text-center text-xs text-muted-foreground">{error instanceof Error ? error.message : 'Could not load sessions.'}</p>
+                ) : sessions.length === 0 ? (
+                    <div className="flex flex-col items-center py-24 text-center">
+                        <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-md border border-border/60">
+                            <HugeiconsIcon icon={Activity01Icon} className="h-5 w-5 text-muted-foreground" />
+                        </div>
+                        <p className="text-sm font-medium">No sessions{filtered ? ' match these filters' : ' yet'}</p>
+                        <p className="mt-1 max-w-sm text-xs text-muted-foreground">
+                            {filtered ? 'Change the filters in the sidebar.' : 'Run an agent with cencori/agents, Arcie or an embedded agent and its sessions show up here.'}
+                        </p>
                     </div>
-                    <div className="md:hidden divide-y divide-border/40">
+                ) : (
+                    <>
                         {sessions.map((s) => (
-                            <button key={s.id} type="button" onClick={() => open(s.id)} className="block w-full p-3 text-left hover:bg-secondary/30 active:bg-secondary/50">
-                                <div className="mb-1.5 flex items-center justify-between">
-                                    <SessionStatusBadge status={s.status} />
-                                    <span className="text-[10px] text-muted-foreground">{formatSessionTime(s.updated_at)}</span>
-                                </div>
-                                <p className="mb-1.5 truncate text-xs">{s.preview ?? 'No message'}</p>
-                                <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-                                    <span>{SESSION_SOURCE_LABELS[s.source as SessionSource]}{s.agent ? ` · ${s.agent}` : ''}</span>
-                                    <span className="font-mono">{s.turns} turns · {formatSessionCost(s.cost_usd)}</span>
-                                </div>
+                            <button
+                                key={s.id}
+                                type="button"
+                                onClick={() => open(s.id)}
+                                className={cn('block w-full border-b border-border/30 px-3 py-2 text-left hover:bg-muted/40 md:grid md:min-w-[900px] md:items-center md:gap-3', COLUMNS)}
+                            >
+                                <span className="font-mono text-xs text-muted-foreground">{formatSessionTime(s.updated_at)}</span>
+                                <span className="hidden md:block"><SessionStatusBadge status={s.status} /></span>
+                                <span className="hidden truncate font-mono text-xs md:block">{SESSION_SOURCE_LABELS[s.source as SessionSource]}</span>
+                                <span className="hidden truncate font-mono text-xs md:block">
+                                    {s.agent ?? '—'}{s.parent_session_id && <span className="ml-1.5 text-[10px] text-muted-foreground">sub-run</span>}
+                                </span>
+                                <span className="block truncate font-mono text-xs md:inline">{s.preview ?? <span className="text-muted-foreground">—</span>}</span>
+                                <span className="hidden text-right font-mono text-xs text-muted-foreground md:block">{s.turns}</span>
+                                <span className="hidden text-right font-mono text-xs text-muted-foreground md:block">{formatSessionCost(s.cost_usd)}</span>
+                                <span className="mt-0.5 block font-mono text-[10px] text-muted-foreground md:hidden">
+                                    {SESSION_SOURCE_LABELS[s.source as SessionSource]}{s.agent ? ` · ${s.agent}` : ''} · {s.turns} turns · {formatSessionCost(s.cost_usd)}
+                                </span>
                             </button>
                         ))}
-                    </div>
-                </div>
-            )}
-
-            {(offset > 0 || data?.has_more) && (
-                <div className="flex items-center justify-between py-3">
-                    <p className="text-xs text-muted-foreground tabular-nums">{offset + 1}–{offset + sessions.length}</p>
-                    <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm" className="h-7 text-xs" disabled={offset === 0 || isFetching} onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}>Previous</Button>
-                        <Button variant="outline" size="sm" className="h-7 text-xs" disabled={!data?.has_more || isFetching} onClick={() => setOffset(offset + PAGE_SIZE)}>Next</Button>
-                    </div>
-                </div>
-            )}
+                        <div className="py-4 text-center">
+                            {hasNextPage ? (
+                                <button type="button" onClick={() => void fetchNextPage()} disabled={isFetchingNextPage} className="rounded-md border border-border/60 px-3 py-1.5 text-xs hover:bg-muted/50 disabled:opacity-50">
+                                    {isFetchingNextPage ? 'Loading…' : 'Load more'}
+                                </button>
+                            ) : (
+                                <p className="text-xs text-muted-foreground">No more sessions in this time range.</p>
+                            )}
+                        </div>
+                    </>
+                )}
+            </div>
         </div>
     );
 }

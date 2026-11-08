@@ -36,6 +36,7 @@ import { COPILOT_CONVERSATION_COOKIE, COPILOT_NEW_CHAT_EVENT } from "@/lib/conso
 import ChartRelationshipIcon from "@hugeicons/core-free-icons/ChartRelationshipIcon";
 import ThreeDRotateIcon from "@hugeicons/core-free-icons/ThreeDRotateIcon";
 import Activity01Icon from "@hugeicons/core-free-icons/Activity01Icon";
+import { SessionFiltersPanel } from "@/components/sessions/SessionFilters";
 import Settings02Icon from "@hugeicons/core-free-icons/Settings02Icon";
 import GameController03Icon from "@hugeicons/core-free-icons/GameController03Icon";
 import LeftToRightListDashIcon from "@hugeicons/core-free-icons/LeftToRightListDashIcon";
@@ -234,7 +235,8 @@ export default function OrganizationLayoutClient({
     const isMemoryGraph = /\/memory\/graph\/?$/.test(pathname);
     const isCopilotPage = /\/copilot\/?$/.test(pathname);
     // A session's trace (/observability/<id>) fills the height, like the memory graph.
-    const isSessionTrace = /\/observability\/sessions\/[^/]+\/?$/.test(pathname);
+    // Observability's Sessions list and a session's trace fill the workspace edge to edge.
+    const isSessionTrace = /\/observability\/sessions(\/[^/]+)?\/?$/.test(pathname);
     const isFixedWorkspace = isPlayground || isAgentWorkspace || isMemoryGraph || isCopilotPage || isSessionTrace;
     const docsUrl = getMainSiteUrl("/docs");
     const scopedArea = segments[2];
@@ -633,6 +635,12 @@ export default function OrganizationLayoutClient({
                 ))}
                 {activeView === "copilot" && copilotHref && organization?.id && (
                     <CopilotRecentChats organizationId={organization.id} chatHref={copilotHref} />
+                )}
+                {/* The Sessions list keeps its filters here, so the page stays full screen. */}
+                {activeView === "observability" && /\/observability\/sessions\/?$/.test(pathname) && (
+                    <SidebarMenuItem>
+                        <SessionFiltersPanel />
+                    </SidebarMenuItem>
                 )}
             </>
         ) : activeView === "project-settings" ? (
