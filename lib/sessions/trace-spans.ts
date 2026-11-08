@@ -112,7 +112,9 @@ export function formatTick(ms: number): string {
     if (ms === 0) return '0';
     if (ms < 1000) return `${Math.round(ms)}ms`;
     if (ms < 60_000) return `${(ms / 1000).toFixed(ms % 1000 === 0 ? 0 : 1)}s`;
-    return `${Math.floor(ms / 60_000)}m${Math.round((ms % 60_000) / 1000)}s`;
+    const m = Math.floor(ms / 60_000);
+    const sec = Math.round((ms % 60_000) / 1000);
+    return sec ? `${m}m${sec}s` : `${m}m`;
 }
 
 /**
@@ -139,4 +141,75 @@ export function packLanes(spans: TraceSpan[], now = Date.now()): TraceSpan[][] {
         lanes.push(...local.map((l) => l.spans));
     }
     return lanes;
+}
+
+export interface TraceGap {
+    /** Where the collapsed gap sits on the axis, 0..1. */
+    at: number;
+    width: number;
+    /** How long it really was. */
+    realMs: number;
+}
+
+export interface TimeScale {
+    t0: number;
+    /** Position of a time on the axis, 0..1. */
+    x: (t: number) => number;
+    /** Length of the axis in time it shows (idle gaps counted at their collapsed length). */
+    span: number;
+    gaps: TraceGap[];
+}
+
+/** Gaps longer than this are idle time between turns, collapsed on the axis. */
+const IDLE_GAP_MS = 30_000;
+
+/**
+ * The trace's time axis with idle gaps collapsed. A conversation can run for
+ * hours while each turn takes a second or two; on a linear axis the turns
+ * would vanish. Active time keeps its proportions; each gap longer than
+ * IDLE_GAP_MS between activity shrinks to a short break, shown as such.
+ */
+export function timeScale(spans: TraceSpan[], now = Date.now()): TimeScale {
+    const { t0, t1 } = traceBounds(spans, now);
+    const intervals = spans
+        .filter((s) => s.kind !== 'session')
+        .map((s) => [s.start, Math.max(s.start, s.end ?? now)] as [number, number])
+        .sort((a, b) => a[0] - b[0]);
+    const merged: [number, number][] = [];
+    for (const [a, b] of intervals) {
+        const last = merged.at(-1);
+        if (last && a <= last[1]) last[1] = Math.max(last[1], b);
+        else merged.push([a, b]);
+    }
+    const active = merged.reduce((sum, [a, b]) => sum + (b - a), 0);
+    const collapsed = Math.max(800, active * 0.04);
+
+    // Each long gap: [start, end, collapsed length].
+    const longGaps: Array<[number, number, number]> = [];
+    for (let i = 1; i < merged.length; i++) {
+        const gap = merged[i][0] - merged[i - 1][1];
+        if (gap > IDLE_GAP_MS) longGaps.push([merged[i - 1][1], merged[i][0], collapsed]);
+    }
+    const virtual = (t: number) => {
+        let v = t - t0;
+        for (const [a, b, c] of longGaps) {
+            if (t >= b) v -= (b - a) - c;
+            else if (t > a) v -= ((t - a) / (b - a)) * ((b - a) - c);
+        }
+        return v;
+    };
+    const span = Math.max(1, virtual(t1));
+    const x = (t: number) => Math.min(1, Math.max(0, virtual(t) / span));
+    return {
+        t0,
+        x,
+        span,
+        gaps: longGaps.map(([a, b]) => ({ at: x(a), width: x(b) - x(a), realMs: b - a })),
+    };
+}
+
+export function formatIdle(ms: number): string {
+    if (ms < 3600_000) return `${Math.round(ms / 60_000)}m idle`;
+    if (ms < 86_400_000) return `${Math.round(ms / 3600_000)}h idle`;
+    return `${Math.round(ms / 86_400_000)}d idle`;
 }

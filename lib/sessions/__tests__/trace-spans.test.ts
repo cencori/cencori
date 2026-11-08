@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildSpans, formatTick, niceTicks, packLanes, traceBounds } from '@/lib/sessions/trace-spans';
+import { buildSpans, formatIdle, formatTick, niceTicks, packLanes, timeScale, traceBounds } from '@/lib/sessions/trace-spans';
 import type { TimelineTurn } from '@/lib/sessions/observability';
 
 const at = (ms: number) => new Date(Date.UTC(2026, 10, 8, 12, 0, 0, ms)).toISOString();
@@ -67,5 +67,29 @@ describe('trace spans', () => {
         expect(formatTick(20)).toBe('20ms');
         expect(formatTick(1500)).toBe('1.5s');
         expect(formatTick(2000)).toBe('2s');
+        expect(formatTick(60_000)).toBe('1m');
+        expect(formatTick(80_000)).toBe('1m20s');
+    });
+});
+
+describe('timeScale', () => {
+    it('keeps a linear axis when there are no long idle gaps', () => {
+        const spans = buildSpans('S', [turn(1, 0, 1000), turn(2, 2000, 3000)], [], 'active');
+        const scale = timeScale(spans);
+        expect(scale.gaps).toEqual([]);
+        expect(scale.x(Date.parse(at(1500)))).toBeCloseTo(0.5);
+    });
+
+    it('collapses hours of idle time between turns so the turns stay visible', () => {
+        const hour = 3600_000;
+        const spans = buildSpans('S', [turn(1, 0, 2000), turn(2, 16 * hour, 16 * hour + 2000)], [], 'active');
+        const scale = timeScale(spans);
+        expect(scale.gaps).toHaveLength(1);
+        expect(scale.gaps[0].realMs).toBe(16 * hour - 2000);
+        // Each 2 s turn takes a large share of the axis instead of 0.003%.
+        const w1 = scale.x(Date.parse(at(2000))) - scale.x(Date.parse(at(0)));
+        expect(w1).toBeGreaterThan(0.3);
+        expect(scale.x(Date.parse(at(16 * hour + 2000)))).toBe(1);
+        expect(formatIdle(scale.gaps[0].realMs)).toBe('16h idle');
     });
 });

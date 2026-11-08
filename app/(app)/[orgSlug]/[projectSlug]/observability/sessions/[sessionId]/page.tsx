@@ -1,16 +1,17 @@
 'use client';
 
 import { use, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { Check, ChevronDown, ChevronRight, Copy, ExternalLink, Minus, Search, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { Check, ChevronDown, ChevronLeft, ChevronRight, Copy, ExternalLink, Minus, Search, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { useProjectIdBySlug } from '@/lib/hooks/useQueries';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RequestDetailModal } from '@/components/audit/RequestDetailModal';
 import { SESSION_SOURCE_LABELS, type SessionSource, type TimelineTurn } from '@/lib/sessions/observability';
-import { buildSpans, formatTick, niceTicks, packLanes, traceBounds, type SpanKind, type TraceSpan } from '@/lib/sessions/trace-spans';
+import { buildSpans, formatIdle, formatTick, niceTicks, packLanes, timeScale, type SpanKind, type TimeScale, type TraceSpan } from '@/lib/sessions/trace-spans';
 import { SessionStatusBadge, formatDuration, formatSessionCost } from '@/components/sessions/session-ui';
 import { cn } from '@/lib/utils';
 
@@ -162,32 +163,81 @@ function Messages({ detail }: { detail: TurnDetail }) {
 
 interface ViewProps {
     spans: TraceSpan[];
-    bounds: { t0: number; span: number };
+    scale: TimeScale;
     selectedId: string;
     onSelect: (span: TraceSpan) => void;
 }
 
-function Ruler({ span, className }: { span: number; className?: string }) {
-    const ticks = niceTicks(span);
+/** Where a span sits on the axis, in percent. Exact width, no minimum padding. */
+function placement(scale: TimeScale, s: TraceSpan) {
+    const left = scale.x(s.start) * 100;
+    const right = scale.x(s.end ?? Date.now()) * 100;
+    return { left: `${left}%`, width: `${Math.max(0.25, right - left)}%` };
+}
+
+/**
+ * The time ruler: ticks in the axis's time (active time; idle gaps count at
+ * their collapsed length), with each collapsed gap shown as a labelled break.
+ */
+function Ruler({ scale, className }: { scale: TimeScale; className?: string }) {
+    const ticks = niceTicks(scale.span).filter((t) => {
+        const at = t / scale.span;
+        return !scale.gaps.some((g) => at > g.at && at < g.at + g.width);
+    });
     return (
         <div className={cn('relative h-6 border-b border-border/40', className)}>
             {ticks.map((t) => (
-                <span key={t} className="absolute top-1.5 border-l border-border/60 pl-1 font-mono text-[10px] text-muted-foreground" style={{ left: `${(t / span) * 100}%` }}>
+                <span key={t} className="absolute top-1.5 border-l border-border/60 pl-1 font-mono text-[10px] text-muted-foreground" style={{ left: `${(t / scale.span) * 100}%` }}>
                     {formatTick(t)}
+                </span>
+            ))}
+            {labelledGaps(scale).map((g, i) => (
+                <span key={`gap-${i}`} title={`${formatIdle(g.realMs)} between turns`} className="absolute top-1 whitespace-nowrap rounded bg-muted px-1 font-mono text-[9px] text-muted-foreground" style={{ left: `${g.at * 100}%` }}>
+                    ⋯ {formatIdle(g.realMs)}
                 </span>
             ))}
         </div>
     );
 }
 
-function TimelineView({ spans, bounds, selectedId, onSelect }: ViewProps) {
+/**
+ * Gaps that get a label on the ruler: close neighbours would overlap, so a
+ * gap within 9% of the last labelled one keeps its band but not its label
+ * (the band's tooltip still says how long it was).
+ */
+function labelledGaps(scale: TimeScale) {
+    const shown: TimeScale['gaps'] = [];
+    for (const g of [...scale.gaps].sort((a, b) => b.realMs - a.realMs)) {
+        if (shown.every((s) => Math.abs(s.at - g.at) > 0.09)) shown.push(g);
+    }
+    return shown;
+}
+
+/** Collapsed idle gaps as hatched bands behind the bars. */
+function GapBands({ scale }: { scale: TimeScale }) {
+    return (
+        <>
+            {scale.gaps.map((g, i) => (
+                <div
+                    key={i}
+                    aria-hidden
+                    title={formatIdle(g.realMs)}
+                    className="pointer-events-none absolute inset-y-0 border-x border-dashed border-border/60"
+                    style={{
+                        left: `${g.at * 100}%`,
+                        width: `${g.width * 100}%`,
+                        backgroundImage: 'repeating-linear-gradient(135deg, transparent 0 4px, color-mix(in srgb, var(--border) 70%, transparent) 4px 5px)',
+                    }}
+                />
+            ))}
+        </>
+    );
+}
+
+function TimelineView({ spans, scale, selectedId, onSelect }: ViewProps) {
     const [zoom, setZoom] = useState(1);
     const lanes = useMemo(() => packLanes(spans), [spans]);
-    const pos = (s: TraceSpan) => {
-        const left = ((s.start - bounds.t0) / bounds.span) * 100;
-        const width = (((s.end ?? Date.now()) - s.start) / bounds.span) * 100;
-        return { left: `${Math.max(0, left)}%`, width: `${Math.max(0.3, Math.min(100 - left, width))}%` };
-    };
+    const pos = (s: TraceSpan) => placement(scale, s);
     return (
         <div className="relative">
             {/* Overview */}
@@ -200,8 +250,9 @@ function TimelineView({ spans, bounds, selectedId, onSelect }: ViewProps) {
             </div>
             <div className="overflow-x-auto px-3 pb-12">
                 <div style={{ width: `${zoom * 100}%` }} className="min-w-full">
-                    <Ruler span={bounds.span} className="mt-2" />
-                    <div className="space-y-1 pt-2">
+                    <Ruler scale={scale} className="mt-2" />
+                    <div className="relative space-y-1 pt-2">
+                        <GapBands scale={scale} />
                         {lanes.map((lane, i) => (
                             <div key={i} className="relative h-7">
                                 {lane.map((s) => {
@@ -210,7 +261,7 @@ function TimelineView({ spans, bounds, selectedId, onSelect }: ViewProps) {
                                         <button
                                             key={s.id} type="button" onClick={() => onSelect(s)} title={`${s.name} · ${formatDuration(d)}`}
                                             className={cn(
-                                                'absolute top-0 flex h-7 items-center gap-1.5 overflow-hidden rounded border px-2 text-left text-[11px] transition-colors',
+                                                'absolute top-0 h-7 overflow-hidden rounded border text-left text-[11px] transition-colors',
                                                 BAR_STYLE[s.kind],
                                                 s.id === selectedId && 'border-blue-500 bg-blue-500/20 ring-1 ring-blue-500',
                                                 (s.status === 'error' || s.status === 'rejected') && 'border-red-500/60',
@@ -218,8 +269,11 @@ function TimelineView({ spans, bounds, selectedId, onSelect }: ViewProps) {
                                             )}
                                             style={pos(s)}
                                         >
-                                            <span className="truncate">{s.name}</span>
-                                            <span className="ml-auto shrink-0 pl-1 font-mono text-[10px] text-muted-foreground">{formatDuration(d)}</span>
+                                            {/* The label sits inside so a short bar stays exactly as wide as its time. */}
+                                            <span className="flex h-full w-full min-w-0 items-center gap-1.5 px-2">
+                                                <span className="truncate">{s.name}</span>
+                                                <span className="ml-auto shrink-0 pl-1 font-mono text-[10px] text-muted-foreground">{formatDuration(d)}</span>
+                                            </span>
                                         </button>
                                     );
                                 })}
@@ -237,7 +291,7 @@ function TimelineView({ spans, bounds, selectedId, onSelect }: ViewProps) {
     );
 }
 
-function RowsView({ spans, bounds, selectedId, onSelect, tree }: ViewProps & { tree: boolean }) {
+function RowsView({ spans, scale, selectedId, onSelect, tree }: ViewProps & { tree: boolean }) {
     const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
     const hasChildren = useMemo(() => new Set(spans.map((s) => s.parentId).filter(Boolean) as string[]), [spans]);
     const rows = useMemo(() => {
@@ -253,12 +307,10 @@ function RowsView({ spans, bounds, selectedId, onSelect, tree }: ViewProps & { t
         <div>
             <div className="grid grid-cols-[minmax(0,45%)_minmax(0,1fr)_64px] border-b border-border/40">
                 <span />
-                <Ruler span={bounds.span} className="border-b-0" />
+                <Ruler scale={scale} className="border-b-0" />
                 <span />
             </div>
             {rows.map((s) => {
-                const left = ((s.start - bounds.t0) / bounds.span) * 100;
-                const width = (((s.end ?? Date.now()) - s.start) / bounds.span) * 100;
                 const open = !collapsed.has(s.id);
                 return (
                     <div
@@ -277,10 +329,11 @@ function RowsView({ spans, bounds, selectedId, onSelect, tree }: ViewProps & { t
                             {s.detail && <span className="truncate text-muted-foreground">{s.detail}</span>}
                         </div>
                         <div className="relative h-full py-3">
+                            <GapBands scale={scale} />
                             <div className="absolute inset-x-0 top-1/2 h-px bg-border/50" />
                             <div
                                 className={cn('absolute top-1/2 h-3 -translate-y-1/2 rounded-sm border', BAR_STYLE[s.kind], s.id === selectedId && 'border-blue-500 bg-blue-500/40', (s.status === 'error' || s.status === 'rejected') && 'border-red-500/60', s.end === null && 'animate-pulse')}
-                                style={{ left: `${Math.max(0, left)}%`, width: `${Math.max(0.4, Math.min(100 - left, width))}%` }}
+                                style={placement(scale, s)}
                             />
                         </div>
                         <span className="pr-3 text-right font-mono text-[11px] text-muted-foreground">{formatDuration(spanDuration(s))}</span>
@@ -487,7 +540,8 @@ export default function SessionTracePage({ params }: PageProps) {
     });
 
     const spans = useMemo(() => (data ? buildSpans(data.session.agents.join(' → ') || data.session.agent || 'Session', data.turns, data.children, data.session.status) : []), [data]);
-    const bounds = useMemo(() => (spans.length ? traceBounds(spans) : null), [spans]);
+    // One axis for every view, with idle gaps between turns collapsed.
+    const scale = useMemo(() => (spans.length ? timeScale(spans) : null), [spans]);
     const visible = useMemo(() => {
         const q = query.trim().toLowerCase();
         return q ? spans.filter((s) => s.kind === 'session' || `${s.name} ${s.detail ?? ''}`.toLowerCase().includes(q)) : spans;
@@ -515,6 +569,14 @@ export default function SessionTracePage({ params }: PageProps) {
                     <div className="grid min-h-0 flex-1 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_400px] lg:overflow-hidden">
                         <section className="flex min-w-0 flex-col border-b border-border/50 lg:min-h-0 lg:border-b-0 lg:border-r">
                             <div className="flex shrink-0 items-center gap-1 border-b border-border/50 px-3 py-2">
+                                <Link
+                                    href={listHref}
+                                    aria-label="Back to sessions"
+                                    title="Back to sessions"
+                                    className="mr-1.5 flex size-7 shrink-0 items-center justify-center rounded-full border border-border/70 text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+                                >
+                                    <ChevronLeft className="h-4 w-4" />
+                                </Link>
                                 {(['trace', 'events'] as const).map((t) => (
                                     <button key={t} type="button" onClick={() => setTab(t)} className={cn('rounded-md px-2.5 py-1 text-xs', tab === t ? 'bg-muted font-medium' : 'text-muted-foreground hover:text-foreground')}>
                                         {t === 'events' ? `Events (${events.length})` : 'Trace'}
@@ -539,12 +601,12 @@ export default function SessionTracePage({ params }: PageProps) {
                                             </SelectContent>
                                         </Select>
                                     </div>
-                                    {!bounds ? (
+                                    {!scale ? (
                                         <p className="py-16 text-center text-xs text-muted-foreground">No turns yet.</p>
                                     ) : view === 'timeline' ? (
-                                        <TimelineView spans={visible} bounds={bounds} selectedId={selected?.id ?? ''} onSelect={select} />
+                                        <TimelineView spans={visible} scale={scale} selectedId={selected?.id ?? ''} onSelect={select} />
                                     ) : (
-                                        <RowsView spans={visible} bounds={bounds} selectedId={selected?.id ?? ''} onSelect={select} tree={view === 'tree'} />
+                                        <RowsView spans={visible} scale={scale} selectedId={selected?.id ?? ''} onSelect={select} tree={view === 'tree'} />
                                     )}
                                     {data.truncated && <p className="px-3 py-2 text-[11px] text-muted-foreground">Long session: only the first 5,000 events are shown.</p>}
                                 </>
