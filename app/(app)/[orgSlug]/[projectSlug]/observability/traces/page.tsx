@@ -4,7 +4,7 @@ import { use, useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { Download, Play, RefreshCw, Search } from 'lucide-react';
-import Activity01Icon from '@hugeicons/core-free-icons/Activity01Icon';
+import BinocularsIcon from '@hugeicons/core-free-icons/BinocularsIcon';
 import LeftToRightListDashIcon from '@hugeicons/core-free-icons/LeftToRightListDashIcon';
 import { ObservabilityEmptyState } from '@/components/observability/EmptyState';
 import { useProjectIdBySlug } from '@/lib/hooks/useQueries';
@@ -173,7 +173,7 @@ export default function TracesPage({ params }: PageProps) {
                     <p className="py-16 text-center text-xs text-muted-foreground">{error instanceof Error ? error.message : 'Could not load traces.'}</p>
                 ) : sessions.length === 0 ? (
                     <ObservabilityEmptyState
-                        icon={Activity01Icon}
+                        icon={BinocularsIcon}
                         title={`No traces${filtered ? ' match these filters' : ' yet'}`}
                         description={filtered ? 'Change the filters in the sidebar.' : 'Run an agent with cencori/agents, Arcie or an embedded agent and its traces show up here.'}
                         otherSources={[{ href: pathname.replace(/\/traces\/?$/, '/request-logs'), icon: LeftToRightListDashIcon, label: 'Request logs', description: 'Every model call through the gateway' }]}

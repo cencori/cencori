@@ -6,7 +6,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { ExternalLink, Play, RefreshCw, Search, X } from 'lucide-react';
 import LeftToRightListDashIcon from '@hugeicons/core-free-icons/LeftToRightListDashIcon';
-import Activity01Icon from '@hugeicons/core-free-icons/Activity01Icon';
+import BinocularsIcon from '@hugeicons/core-free-icons/BinocularsIcon';
 import { ObservabilityEmptyState } from '@/components/observability/EmptyState';
 import { useProjectIdBySlug } from '@/lib/hooks/useQueries';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -247,7 +247,7 @@ export default function RequestLogsPage({ params }: PageProps) {
                             icon={LeftToRightListDashIcon}
                             title={`No requests${filtered ? ' match these filters' : ' in this time range'}`}
                             description={filtered ? 'Change the filters in the sidebar.' : 'Make a model call through the gateway and it shows up here.'}
-                            otherSources={[{ href: tracesHref, icon: Activity01Icon, label: 'Traces', description: 'Agent sessions, turn by turn' }]}
+                            otherSources={[{ href: tracesHref, icon: BinocularsIcon, label: 'Traces', description: 'Agent sessions, turn by turn' }]}
                         />
                     ) : (
                         <>

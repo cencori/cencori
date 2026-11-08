@@ -6,7 +6,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { Check, ChevronDown } from 'lucide-react';
 import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react';
-import Activity01Icon from '@hugeicons/core-free-icons/Activity01Icon';
+import BinocularsIcon from '@hugeicons/core-free-icons/BinocularsIcon';
 import LeftToRightListDashIcon from '@hugeicons/core-free-icons/LeftToRightListDashIcon';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { FilterGroup, FilterOption, SessionFiltersPanel } from '@/components/sessions/SessionFilters';
@@ -27,7 +27,7 @@ import {
 type Source = 'traces' | 'request-logs';
 
 const SOURCES: Array<{ value: Source; label: string; description: string; icon: IconSvgElement }> = [
-    { value: 'traces', label: 'Traces', description: 'Agent sessions, turn by turn', icon: Activity01Icon },
+    { value: 'traces', label: 'Traces', description: 'Agent sessions, turn by turn', icon: BinocularsIcon },
     { value: 'request-logs', label: 'Request logs', description: 'Every model call through the gateway', icon: LeftToRightListDashIcon },
 ];
 
