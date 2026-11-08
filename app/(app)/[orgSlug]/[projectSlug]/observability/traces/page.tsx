@@ -176,7 +176,7 @@ export default function TracesPage({ params }: PageProps) {
                         icon={BinocularsIcon}
                         title={`No traces${filtered ? ' match these filters' : ' yet'}`}
                         description={filtered ? 'Change the filters in the sidebar.' : 'Run an agent with cencori/agents, Arcie or an embedded agent and its traces show up here.'}
-                        otherSources={[{ href: pathname.replace(/\/traces\/?$/, '/request-logs'), icon: LeftToRightListDashIcon, label: 'Request logs', description: 'Every model call through the gateway' }]}
+                        otherSources={[{ href: pathname.replace(/\/traces\/?$/, '/request-logs'), icon: LeftToRightListDashIcon, label: 'Request logs', description: 'Every model call through Cencori' }]}
                     />
                 ) : (
                     <>

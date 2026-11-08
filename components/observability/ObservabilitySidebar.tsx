@@ -28,7 +28,7 @@ type Source = 'traces' | 'request-logs';
 
 const SOURCES: Array<{ value: Source; label: string; description: string; icon: IconSvgElement }> = [
     { value: 'traces', label: 'Traces', description: 'Agent sessions, turn by turn', icon: BinocularsIcon },
-    { value: 'request-logs', label: 'Request logs', description: 'Every model call through the gateway', icon: LeftToRightListDashIcon },
+    { value: 'request-logs', label: 'Request logs', description: 'Every model call through Cencori', icon: LeftToRightListDashIcon },
 ];
 
 export function observabilitySource(pathname: string): Source | null {

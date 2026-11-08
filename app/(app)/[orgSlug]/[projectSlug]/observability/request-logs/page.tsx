@@ -246,7 +246,7 @@ export default function RequestLogsPage({ params }: PageProps) {
                         <ObservabilityEmptyState
                             icon={LeftToRightListDashIcon}
                             title={`No requests${filtered ? ' match these filters' : ' in this time range'}`}
-                            description={filtered ? 'Change the filters in the sidebar.' : 'Make a model call through the gateway and it shows up here.'}
+                            description={filtered ? 'Change the filters in the sidebar.' : 'Make a model call through Cencori and it shows up here.'}
                             otherSources={[{ href: tracesHref, icon: BinocularsIcon, label: 'Traces', description: 'Agent sessions, turn by turn' }]}
                         />
                     ) : (
