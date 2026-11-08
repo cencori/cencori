@@ -35,6 +35,7 @@ import PlusSignIcon from "@hugeicons/core-free-icons/PlusSignIcon";
 import { COPILOT_CONVERSATION_COOKIE, COPILOT_NEW_CHAT_EVENT } from "@/lib/console/copilot";
 import ChartRelationshipIcon from "@hugeicons/core-free-icons/ChartRelationshipIcon";
 import ThreeDRotateIcon from "@hugeicons/core-free-icons/ThreeDRotateIcon";
+import Activity01Icon from "@hugeicons/core-free-icons/Activity01Icon";
 import Settings02Icon from "@hugeicons/core-free-icons/Settings02Icon";
 import GameController03Icon from "@hugeicons/core-free-icons/GameController03Icon";
 import LeftToRightListDashIcon from "@hugeicons/core-free-icons/LeftToRightListDashIcon";
@@ -474,6 +475,11 @@ export default function OrganizationLayoutClient({
     // Main sidebar groups. AI Gateway (a sub-menu toggle) leads BUILD.
     const buildItems = [
         { href: scopeProjectSlug ? scopedProjectHref("agents") : orgProductHref("agents"), icon: <HugeiconsIcon icon={ThreeDRotateIcon} className="!h-5 !w-5" />, label: "Agents" },
+        // Every agent conversation in the project, from any source (SDK, Arcie,
+        // widget, WhatsApp, API). Sessions belong to a project, so no org entry.
+        ...(scopeProjectSlug
+            ? [{ href: scopedProjectHref("observability"), icon: <HugeiconsIcon icon={Activity01Icon} className="!h-5 !w-5" />, label: "Sessions" }]
+            : []),
     ];
     const copilotSubItems = copilotHref
         ? [
