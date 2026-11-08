@@ -124,6 +124,39 @@ await run(extractor, 'Trip to Lagos for 3 days', { memory: { userId: 'user_123' 
 
 Tool parameters accept zod 3 or 4, any [Standard Schema](https://standardschema.dev) library, or a plain JSON Schema object.
 
+## Agent UI
+
+A chat for your agent where it can answer with UI: charts, tables, stats, lists, buttons and forms, generated on the fly. Works with any model in the catalog.
+
+```ts
+// app/api/chat/route.ts: your tools run on your server
+import { Agent, createAgentChatHandler, tool } from 'cencori/agents';
+import { z } from 'zod';
+
+const getSales = tool({
+    name: 'get_sales',
+    description: 'Monthly revenue by product',
+    parameters: z.object({}),
+    execute: async () => db.sales.monthly(),
+});
+
+const analyst = new Agent({ name: 'Analyst', instructions: 'Answer with charts and tables when it helps.', tools: [getSales], widgets: true });
+export const POST = createAgentChatHandler(analyst);
+```
+
+```tsx
+// In your page
+import { AgentChat } from 'cencori/react';
+
+<AgentChat api="/api/chat" greeting="Ask about your sales" prompts={['Revenue by product', 'Top customers']} />
+```
+
+- `widgets: true` gives the model the built-in `render_ui` tool. Cencori checks every widget before it's shown.
+- A tool can also return `{ widget }` to show a design you control, filled with real data.
+- Buttons and forms send their action back to the agent (or to `onAction` with `handler: 'client'`).
+- Approvals (`needsApproval`) show an approval card; the paused run is signed so the browser can't change it.
+- Theme with `theme={{ colorScheme, accent, radius }}` or CSS variables. Build your own layout with `useAgentChat()`, `<Transcript>`, `<Composer>` and `<Widget>`.
+
 ## Embedded Agents
 
 ```typescript
