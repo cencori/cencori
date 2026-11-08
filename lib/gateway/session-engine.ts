@@ -21,6 +21,7 @@ import {
 } from '@/lib/providers/base';
 import { settleStreamUsage } from '@/lib/gateway/stream-usage';
 import type { SessionEventType, SessionEventPayloadMap } from '@/lib/gateway/session-types';
+import { applyInstructionsOverride, type ResumeOverride } from '@/lib/gateway/session-resume-override';
 import { runGatewayOutputGuard } from '@/lib/gateway/output-guard';
 import { orgHasOutputPolicies } from '@/lib/governance/policy-enforcement';
 import { WEBHOOK_TOOL_MAX_ITERATIONS } from '@/lib/embedded/webhook-tools';
@@ -138,6 +139,22 @@ async function finalizeSessionTurn(
 
 export { expireStaleSessions } from './session-expiry';
 
+/**
+ * A message as turn.started stores it. Tool-call linkage (the assistant's
+ * tool_calls, a tool message's toolCallId) is kept so a resumed turn can be
+ * rebuilt and resumed again; a provider rejects tool results it can't match.
+ */
+type StoredMessage = { role: string; content: UnifiedMessage['content'] | null; tool_calls?: unknown; toolCallId?: string };
+function storedMessage(m: UnifiedMessage): StoredMessage {
+    const linked = m as UnifiedMessage & { tool_calls?: unknown; toolCallId?: string };
+    return {
+        role: m.role,
+        content: m.content ?? null,
+        ...(linked.tool_calls ? { tool_calls: linked.tool_calls } : {}),
+        ...(linked.toolCallId ? { toolCallId: linked.toolCallId } : {}),
+    };
+}
+
 function buildSSE(eventType: string, data: Record<string, unknown>): string {
     return `event: ${eventType}\ndata: ${JSON.stringify(data)}\n\n`;
 }
@@ -156,7 +173,13 @@ function extractTools(tools?: ResponsesTool[]) {
 function resolveToolChoice(
     forceSchema: boolean, schemaName: string | null,
     choice?: 'auto' | 'none' | 'required' | { type: 'function'; name: string },
+    otherToolCount = 0,
 ): 'auto' | 'none' | 'required' | { type: 'function'; function: { name: string } } | undefined {
+    // Structured output with other tools: the model must call a tool each round,
+    // either a real one (the turn pauses or runs it) or the schema tool, whose
+    // arguments are the final answer. Forcing the schema tool would mean the
+    // agent could never use its tools.
+    if (forceSchema && schemaName && otherToolCount > 0) return 'required';
     if (forceSchema && schemaName) return { type: 'function', function: { name: schemaName } };
     if (choice === 'none' || choice === 'required') return choice;
     if (choice && typeof choice === 'object' && 'name' in choice) {
@@ -191,6 +214,13 @@ function makeStream(params: {
     incrementUsage: (c: number) => void;
     recordEndUserUsage?: (u: { promptTokens: number; completionTokens: number; totalTokens: number; providerCostUsd: number; cencoriChargeUsd: number; markupPercentage: number }) => void;
     onCompletion?: (fullText: string) => void;
+    /**
+     * Set when this stream continues a paused turn after its tool results came
+     * back (resumeSessionTurn). The continuation is recorded as its own turn:
+     * its turn.started carries no input_text, so history doesn't repeat the
+     * user's message, and the caller sees turn.resumed instead of turn.started.
+     */
+    resumed?: { fromTurn: number; toolResultIds: string[]; originalInputText?: string };
 }): NextResponse {
     const {
         supabase, gatewayCtx, sessionId, turnNumber, resolved,
@@ -198,7 +228,7 @@ function makeStream(params: {
         temperature, max_output_tokens, pauseOnToolCalls, needsApprovalToolNames, collectedBuiltinToolOutputs,
         instructions, inputText, inputSecurity, tokenMap, endUserId,
         tier, logSuccess, incrementUsage, recordEndUserUsage, onCompletion, knowledgeContext, reasoningEffort,
-        pinnedConnectionId, agentTools,
+        pinnedConnectionId, agentTools, resumed,
     } = params;
 
     // Output can only be blocked or redacted by a governance output policy.
@@ -285,19 +315,45 @@ function makeStream(params: {
             };
 
             try {
-                await el('turn.started', {
+                const started = {
                     turn_number: turnNumber,
                     model: resolved.model,
                     instructions,
-                    input_text: inputText,
-                    input_messages: messages.map(m => ({ role: m.role, content: m.content ?? null })),
+                    // A resumed turn keeps the user's words for the output guard and
+                    // the next resume, but not as input_text: history reads that as
+                    // a new user message.
+                    ...(resumed
+                        ? { original_input_text: resumed.originalInputText, resumed_from_turn: resumed.fromTurn }
+                        : { input_text: inputText }),
+                    input_messages: messages.map(storedMessage),
                     input_security: inputSecurity,
                     input_token_map: tokenMap ? Object.fromEntries(tokenMap) : undefined,
                     // Frozen turn controls so an approved resume runs on the
                     // same key and effort as the paused turn.
                     ...(pinnedConnectionId ? { provider_connection_id: pinnedConnectionId } : {}),
                     ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
-                });
+                    // ...and with the same tools, so it can call them again and pause again.
+                    ...(functionTools.length > 0 ? { function_tools: functionTools } : {}),
+                    ...(pauseOnToolCalls ? { pause_on_tool_calls: true } : {}),
+                    ...(forceSchemaResult && schemaToolName ? { schema_tool_name: schemaToolName } : {}),
+                    ...(tool_choice !== undefined ? { tool_choice } : {}),
+                    ...(temperature !== undefined ? { temperature } : {}),
+                    ...(max_output_tokens !== undefined ? { max_output_tokens } : {}),
+                };
+                if (resumed) {
+                    // Recorded for the next resume; the caller already knows the turn
+                    // is under way and gets turn.resumed, as before.
+                    seq++;
+                    await appendSessionEvent(supabase, sessionId, turnNumber, seq, 'turn.started', started as Record<string, unknown>);
+                    controller.enqueue(encoder.encode(buildSSE('turn.resumed', {
+                        action_id: resumed.toolResultIds[0] ?? '',
+                        resolution: 'approved',
+                        tool_results: resumed.toolResultIds.map((action_id) => ({ action_id })),
+                        resumed_from_turn: resumed.fromTurn,
+                    })));
+                } else {
+                    await el('turn.started', started as SessionEventPayloadMap['turn.started']);
+                }
 
                 // The agent's own tools run here: when every call the model makes is
                 // one, Cencori runs them, records the calls, hands back the results
@@ -321,7 +377,7 @@ function makeStream(params: {
                             temperature, maxTokens: max_output_tokens, stream: true,
                             // After ending the conversation the agent only says goodbye.
                             tools: functionTools.length > 0 && !conversationEnded ? functionTools : undefined,
-                            toolChoice: resolveToolChoice(forceSchemaResult, schemaToolName, tool_choice),
+                            toolChoice: resolveToolChoice(forceSchemaResult, schemaToolName, tool_choice, functionTools.filter(t => t.function.name !== schemaToolName).length),
                             ...(reasoningEffort ? { reasoningEffort } : {}),
                         },
                         resolved: resolved as never,
@@ -530,38 +586,45 @@ function makeStream(params: {
                                 });
                             }
 
-                            // Pause if tool calls present and pause is enabled
+                            // Pause on client tool calls when the caller asked to. Every call
+                            // pauses: the caller has to run it and send its result back, so a
+                            // turn never completes with calls nobody executed. The reason tells
+                            // the caller which kind of pause this is: a human must rule on a
+                            // needsApproval tool (approval_required), or the caller just runs
+                            // its own tools (tool_results_required). Only the first is a human
+                            // approval, so only it reaches the governance ledger.
                             if (pauseOnToolCalls && callValues.length > 0) {
-                                const shouldPause = needsApprovalToolNames.size === 0
-                                    || callValues.some(tc => needsApprovalToolNames.has(tc.name));
-                                if (shouldPause) {
-                                    await terminal('turn.paused', {
-                                        reason: 'approval_required',
-                                        action_id: callValues[0].id,
-                                        tool: callValues[0].name,
-                                        arguments: Object.fromEntries(callValues.map(tc => [tc.name, tc.args])),
-                                        actions: callValues.map(tc => ({
-                                            action_id: tc.id,
-                                            tool: tc.name,
-                                            arguments: tc.args,
-                                        })),
-                                    }, 'paused', cc);
-                                    // Governance: an autonomous tool call is now gated on human approval.
+                                const approvalCalls = callValues.filter(tc => needsApprovalToolNames.has(tc.name));
+                                const needsHuman = approvalCalls.length > 0;
+                                await terminal('turn.paused', {
+                                    reason: needsHuman ? 'approval_required' : 'tool_results_required',
+                                    action_id: callValues[0].id,
+                                    tool: callValues[0].name,
+                                    arguments: Object.fromEntries(callValues.map(tc => [tc.name, tc.args])),
+                                    actions: callValues.map(tc => ({
+                                        action_id: tc.id,
+                                        tool: tc.name,
+                                        arguments: tc.args,
+                                        needs_approval: needsApprovalToolNames.has(tc.name),
+                                    })),
+                                }, 'paused', cc);
+                                // Governance: an autonomous tool call is now gated on human approval.
+                                if (needsHuman) {
                                     void recordSessionApprovalRequested(supabase, {
                                         orgId: gatewayCtx.organizationId,
                                         projectId: gatewayCtx.projectId,
                                         sessionId,
                                         turnNumber,
-                                        tool: callValues[0].name,
-                                        actionIds: callValues.map(tc => tc.id),
+                                        tool: approvalCalls[0].name,
+                                        actionIds: approvalCalls.map(tc => tc.id),
                                         model: resolved.model,
                                     });
-                                    logSuccess({ provider: pn, model: chunk.actualModel, status: chunk.usedFallback ? 'success_fallback' : 'success', promptTokens: pt, completionTokens: ct, totalTokens: tt, cacheReadTokens: settled.cacheReadTokens, cacheWriteTokens: settled.cacheWriteTokens, uncachedPromptTokens: settled.uncachedPromptTokens, providerCostUsd: pc, cencoriChargeUsd: cc, markupPercentage, responseText: fullText });
-                                    incrementUsage(cc);
-                                    if (recordEndUserUsage) recordEndUserUsage({ promptTokens: pt, completionTokens: ct, totalTokens: tt, providerCostUsd: pc, cencoriChargeUsd: cc, markupPercentage });
-                                    controller.close();
-                                    return;
                                 }
+                                logSuccess({ provider: pn, model: chunk.actualModel, status: chunk.usedFallback ? 'success_fallback' : 'success', promptTokens: pt, completionTokens: ct, totalTokens: tt, cacheReadTokens: settled.cacheReadTokens, cacheWriteTokens: settled.cacheWriteTokens, uncachedPromptTokens: settled.uncachedPromptTokens, providerCostUsd: pc, cencoriChargeUsd: cc, markupPercentage, responseText: fullText });
+                                incrementUsage(cc);
+                                if (recordEndUserUsage) recordEndUserUsage({ promptTokens: pt, completionTokens: ct, totalTokens: tt, providerCostUsd: pc, cencoriChargeUsd: cc, markupPercentage });
+                                controller.close();
+                                return;
                             }
 
                             // Complete
@@ -799,6 +862,8 @@ export type ResumeTurnParams = {
     inputText?: string;
     inputSecurity?: SecurityCheckResult;
     tokenMap?: Map<string, string>;
+    /** Continue under another agent configuration (a handoff); see session-resume-override. */
+    override?: ResumeOverride;
 };
 
 export async function resumeSessionTurn(params: ResumeTurnParams): Promise<TurnExecuteResult> {
@@ -807,6 +872,7 @@ export async function resumeSessionTurn(params: ResumeTurnParams): Promise<TurnE
         tier, logSuccess, incrementUsage, recordEndUserUsage,
         inputText: resumedInputText, inputSecurity: resumedInputSecurity,
         tokenMap: resumedTokenMap,
+        override,
     } = params;
 
     try {
@@ -832,12 +898,16 @@ export async function resumeSessionTurn(params: ResumeTurnParams): Promise<TurnE
         }
 
         const sp = startedEvent.payload as Record<string, unknown>;
-        const model = sp.model as string;
-        const instructions = sp.instructions as string | undefined;
-        const inputText = sp.input_text as string | undefined;
+        const storedInstructions = sp.instructions as string | undefined;
+        const model = override?.model ?? (sp.model as string);
+        const instructions = override?.instructions ?? storedInstructions;
+        const inputText = (sp.input_text ?? sp.original_input_text) as string | undefined;
         const storedInputSecurity = sp.input_security as SecurityCheckResult | undefined;
         // Frozen at turn start so the resumed turn runs on the same key/effort.
-        const storedPin = typeof sp.provider_connection_id === 'string' && sp.provider_connection_id ? sp.provider_connection_id : null;
+        // A handoff to another model can't keep the paused turn's provider-connection pin.
+        const storedPin = !override?.model && typeof sp.provider_connection_id === 'string' && sp.provider_connection_id
+            ? sp.provider_connection_id
+            : null;
         const storedEffort = ['low', 'medium', 'high'].includes(sp.reasoning_effort as string)
             ? (sp.reasoning_effort as 'low' | 'medium' | 'high')
             : undefined;
@@ -865,10 +935,11 @@ export async function resumeSessionTurn(params: ResumeTurnParams): Promise<TurnE
             autoRouterInput: { text: inputText ?? null, tools: null, hasImage: false },
         });
 
-        // Reconstruct assistant text and tool calls from events
+        // Reconstruct the assistant's text and the paused tool calls. The paused
+        // event lists exactly the calls awaiting results; older pauses without
+        // that list fall back to the turn's tool_call.started events.
         let assistantText = '';
-        const toolCallEntries: Array<{ id: string; name: string; args: string }> = [];
-
+        let toolCallEntries: Array<{ id: string; name: string; args: string }> = [];
         for (const ev of events) {
             const p = ev.payload as Record<string, unknown>;
             switch (ev.event_type) {
@@ -884,11 +955,24 @@ export async function resumeSessionTurn(params: ResumeTurnParams): Promise<TurnE
                     break;
             }
         }
+        const pausedActions = (pausedEvent.payload as Record<string, unknown>).actions;
+        if (Array.isArray(pausedActions) && pausedActions.length > 0) {
+            toolCallEntries = (pausedActions as Array<{ action_id: string; tool: string; arguments?: unknown }>).map((a) => ({
+                id: a.action_id,
+                name: a.tool,
+                args: typeof a.arguments === 'string' ? a.arguments : JSON.stringify(a.arguments ?? {}),
+            }));
+        }
 
-        // Restore original input messages from turn.started payload
-        const storedMessages = (startedEvent.payload as Record<string, unknown>).input_messages as Array<{ role: string; content: string | null }> | undefined;
-        const messages: UnifiedMessage[] = storedMessages && storedMessages.length > 0
-            ? storedMessages.map(m => ({ role: m.role as 'system' | 'user' | 'assistant' | 'tool', content: m.content } as UnifiedMessage))
+        // Restore the turn's messages from turn.started, tool-call linkage included.
+        const storedMessages = sp.input_messages as StoredMessage[] | undefined;
+        let messages: UnifiedMessage[] = storedMessages && storedMessages.length > 0
+            ? storedMessages.map(m => ({
+                role: m.role as 'system' | 'user' | 'assistant' | 'tool',
+                content: m.content,
+                ...(m.tool_calls ? { tool_calls: m.tool_calls } : {}),
+                ...(m.toolCallId ? { toolCallId: m.toolCallId } : {}),
+            } as UnifiedMessage))
             : [];
         if (!storedMessages || storedMessages.length === 0) {
             if (instructions) messages.push({ role: 'system', content: instructions } as UnifiedMessage);
@@ -898,7 +982,10 @@ export async function resumeSessionTurn(params: ResumeTurnParams): Promise<TurnE
             messages.push({ role: 'system', content: contextSummary } as UnifiedMessage);
         }
 
-        // Add the assistant's tool call message
+        if (override?.instructions !== undefined && storedMessages && storedMessages.length > 0) {
+            messages = applyInstructionsOverride(messages, storedInstructions, override.instructions);
+        }
+
         if (toolCallEntries.length > 0) {
             messages.push({
                 role: 'assistant',
@@ -909,10 +996,7 @@ export async function resumeSessionTurn(params: ResumeTurnParams): Promise<TurnE
                     function: { name: tc.name, arguments: tc.args },
                 })),
             } as UnifiedMessage as never);
-
-            // Add tool results
-            for (let i = 0; i < toolCallEntries.length; i++) {
-                const tc = toolCallEntries[i];
+            for (const tc of toolCallEntries) {
                 const result = toolResults.find(r => r.action_id === tc.id);
                 messages.push({
                     role: 'tool' as const,
@@ -921,200 +1005,52 @@ export async function resumeSessionTurn(params: ResumeTurnParams): Promise<TurnE
                 } as UnifiedMessage);
             }
         } else {
-            // No tool calls — just the assistant text
             if (assistantText) {
                 messages.push({ role: 'assistant', content: assistantText } as UnifiedMessage);
             }
             messages.push({ role: 'user', content: 'Continue.' } as UnifiedMessage);
         }
 
-        const stream = new ReadableStream({
-            async start(controller) {
-                const encoder = new TextEncoder();
-                let seq = 0;
-                let fullText = '';
-                // Real usage from the provider when the adapter reports it.
-                let reportedUsage: TokenUsage | undefined;
-                const newToolCalls: Record<string, { id: string; name: string; args: string }> = {};
+        // The continuation runs on the main turn engine with the paused turn's
+        // own tools, so the model can call tools again and pause again (several
+        // tool rounds per request), with the same output guard and billing.
+        const storedTools = Array.isArray(sp.function_tools) ? (sp.function_tools as Tool[]) : [];
+        const schemaToolName = typeof sp.schema_tool_name === 'string' ? sp.schema_tool_name : null;
+        // A handoff brings its own tools; the paused turn's structured-output tool stays.
+        const functionTools = override?.tools
+            ? [...override.tools, ...storedTools.filter(t => schemaToolName && t.function.name === schemaToolName)]
+            : storedTools;
+        const needsApprovalToolNames = new Set(
+            functionTools.filter(t => t.needsApproval).map(t => t.function.name),
+        );
 
-                const es = async (eventType: SessionEventType, data: Record<string, unknown>) => {
-                    seq++;
-                    const payload = { ...data, resumed_from_turn: turnNumber };
-                    await appendSessionEvent(
-                        supabase,
-                        sessionId,
-                        turnNumber + 1,
-                        seq,
-                        eventType,
-                        payload,
-                    );
-                    controller.enqueue(encoder.encode(buildSSE(eventType, payload)));
-                };
-                const terminal = async (
-                    eventType: 'turn.completed' | 'turn.failed',
-                    data: Record<string, unknown>,
-                    costUsd: number,
-                ) => {
-                    seq++;
-                    const payload = { ...data, resumed_from_turn: turnNumber };
-                    await finalizeSessionTurn(
-                        supabase,
-                        gatewayCtx.projectId,
-                        sessionId,
-                        turnNumber + 1,
-                        seq,
-                        eventType,
-                        payload,
-                        'active',
-                        costUsd,
-                    );
-                    controller.enqueue(encoder.encode(buildSSE(eventType, payload)));
-                };
-
-                try {
-                    // SSE-only turn.resumed — DB insert already happened in approve route
-                    controller.enqueue(encoder.encode(buildSSE('turn.resumed', {
-                        action_id: toolResults[0]?.action_id || '',
-                        resolution: 'approved',
-                        tool_results: toolResults.map(r => ({ action_id: r.action_id })),
-                        resumed_from_turn: turnNumber,
-                    })));
-
-                    for await (const chunk of streamGatewayChat({
-                        supabase, projectId: gatewayCtx.projectId,
-                        organizationId: gatewayCtx.organizationId,
-                        allowedModels: gatewayCtx.allowedModels, sponsoredModels: gatewayCtx.sponsoredModels, tier,
-                        request: {
-                            messages: messages as never,
-                            model: resolved.model,
-                            stream: true,
-                            ...(storedEffort ? { reasoningEffort: storedEffort } : {}),
-                        },
-                        resolved: resolved as never,
-                        requestId: gatewayCtx.requestId,
-                    })) {
-                        if (chunk.usage) {
-                            reportedUsage = chunk.usage;
-                        }
-                        if (chunk.delta) {
-                            fullText += chunk.delta;
-                        }
-                        if (chunk.finishReason) {
-                            fullText = storedTokenMap.size > 0
-                                ? deTokenize(fullText, storedTokenMap)
-                                : fullText;
-                            const outputCheck = await runGatewayOutputGuard({
-                                supabase,
-                                projectId: gatewayCtx.projectId,
-                                apiKeyId: gatewayCtx.apiKeyId,
-                                environment: gatewayCtx.environment,
-                                outputText: fullText,
-                                inputText: [inputText, resumedInputText].filter(Boolean).join('\n'),
-                                inputSecurity: resumedInputSecurity ?? storedInputSecurity ?? {
-                                    safe: true,
-                                    reasons: [],
-                                    layer: 'input',
-                                    riskScore: 0,
-                                    confidence: 1,
-                                },
-                                conversationHistory: messages,
-                                organizationId: gatewayCtx.organizationId,
-                                model: resolved.model,
-                                region: gatewayCtx.countryCode,
-                            });
-                            const streamProvider =
-                                chunk.actualProvider !== resolved.providerName
-                                && resolved.router?.hasProvider(chunk.actualProvider)
-                                    ? resolved.router.getProvider(chunk.actualProvider)
-                                    : resolved.provider;
-                            const pricing = await streamProvider.getPricing(chunk.actualModel);
-                            const settled = await settleStreamUsage({
-                                reported: reportedUsage,
-                                pricing,
-                                estimate: async () => {
-                                    const promptText = messages
-                                        .map(m => (m as { content: string }).content || '')
-                                        .join(' ');
-                                    try {
-                                        return {
-                                            promptTokens: await streamProvider.countTokens(promptText, chunk.actualModel),
-                                            completionTokens: await streamProvider.countTokens(fullText, chunk.actualModel),
-                                        };
-                                    } catch {
-                                        return {
-                                            promptTokens: Math.max(1, Math.ceil(promptText.length / 4)),
-                                            completionTokens: Math.max(1, Math.ceil(fullText.length / 4)),
-                                        };
-                                    }
-                                },
-                            });
-                            const pt = settled.promptTokens;
-                            const ct = settled.completionTokens;
-                            const tt = settled.totalTokens;
-                            const pc = settled.providerCostUsd;
-                            const { cencoriChargeUsd: cc, markupPercentage } = calculateGatewayCharge(
-                                pc,
-                                pricing,
-                                chunk.billingMode,
-                            );
-
-                            if (!outputCheck.ok) {
-                                await terminal('turn.failed', {
-                                    turn_number: turnNumber + 1,
-                                    output: { error: outputCheck.message },
-                                    usage: { input_tokens: pt, output_tokens: ct, total_tokens: tt },
-                                }, cc);
-                                const pn = resolved.customProviderTag || chunk.actualProvider;
-                                logSuccess({ provider: pn, model: chunk.actualModel, status: 'error', promptTokens: pt, completionTokens: ct, totalTokens: tt, cacheReadTokens: settled.cacheReadTokens, cacheWriteTokens: settled.cacheWriteTokens, uncachedPromptTokens: settled.uncachedPromptTokens, providerCostUsd: pc, cencoriChargeUsd: cc, markupPercentage, errorMessage: outputCheck.message });
-                                incrementUsage(cc);
-                                if (recordEndUserUsage) recordEndUserUsage({ promptTokens: pt, completionTokens: ct, totalTokens: tt, providerCostUsd: pc, cencoriChargeUsd: cc, markupPercentage });
-                                controller.close();
-                                return;
-                            }
-
-                            if (outputCheck.redactions?.length) {
-                                fullText = applyPolicyRedactions(fullText, outputCheck.redactions).text;
-                            }
-
-                            if (fullText) await es('output_text.delta', { delta: fullText });
-
-                            await terminal(
-                                'turn.completed',
-                                { turn_number: turnNumber + 1, output: { text: fullText, tool_outputs: toolResults }, usage: { input_tokens: pt, output_tokens: ct, total_tokens: tt } },
-                                cc,
-                            );
-
-                            const pn = resolved.customProviderTag || chunk.actualProvider;
-                            logSuccess({ provider: pn, model: chunk.actualModel, status: chunk.usedFallback ? 'success_fallback' : 'success', promptTokens: pt, completionTokens: ct, totalTokens: tt, cacheReadTokens: settled.cacheReadTokens, cacheWriteTokens: settled.cacheWriteTokens, uncachedPromptTokens: settled.uncachedPromptTokens, providerCostUsd: pc, cencoriChargeUsd: cc, markupPercentage, responseText: fullText });
-                            incrementUsage(cc);
-                            if (recordEndUserUsage) recordEndUserUsage({ promptTokens: pt, completionTokens: ct, totalTokens: tt, providerCostUsd: pc, cencoriChargeUsd: cc, markupPercentage });
-
-                            void maybeCreateCheckpoint(supabase, sessionId, turnNumber + 1, messages, fullText);
-
-                            controller.close();
-                        }
-                    }
-                } catch (error) {
-                    const msg = error instanceof Error ? error.message : 'Resume execution failed';
-                    try {
-                        await terminal(
-                            'turn.failed',
-                            { turn_number: turnNumber + 1, output: { error: msg }, usage: { input_tokens: 0, output_tokens: 0, total_tokens: 0 } },
-                            0,
-                        );
-                    } catch (eventError) {
-                        console.error('[SessionEngine] Failed to persist resume failure:', eventError);
-                    }
-                    logSuccess({ provider: '', model: '', status: 'error', promptTokens: 0, completionTokens: 0, totalTokens: 0, providerCostUsd: 0, cencoriChargeUsd: 0, markupPercentage: 0, errorMessage: msg });
-                    controller.close();
-                }
-            },
+        const response = makeStream({
+            supabase, gatewayCtx, sessionId,
+            turnNumber: turnNumber + 1,
+            resolved: resolved as never,
+            messages,
+            functionTools,
+            forceSchemaResult: Boolean(schemaToolName),
+            schemaToolName,
+            tool_choice: sp.tool_choice as never,
+            temperature: typeof sp.temperature === 'number' ? sp.temperature : undefined,
+            max_output_tokens: typeof sp.max_output_tokens === 'number' ? sp.max_output_tokens : undefined,
+            pauseOnToolCalls: sp.pause_on_tool_calls === true,
+            needsApprovalToolNames,
+            collectedBuiltinToolOutputs: [],
+            reasoningEffort: storedEffort,
+            pinnedConnectionId: storedPin,
+            instructions,
+            // The output guard sees the user's words and the tool results, as before.
+            inputText: [inputText, resumedInputText].filter(Boolean).join('\n') || undefined,
+            inputSecurity: resumedInputSecurity ?? storedInputSecurity,
+            tokenMap: storedTokenMap.size > 0 ? storedTokenMap : undefined,
+            endUserId: null,
+            tier, logSuccess, incrementUsage, recordEndUserUsage,
+            resumed: { fromTurn: turnNumber, toolResultIds: toolResults.map(r => r.action_id), originalInputText: inputText },
         });
 
-        return { ok: true, response: new NextResponse(stream, {
-            headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' },
-        })};
-
+        return { ok: true, response };
     } catch (error) {
         const msg = error instanceof Error ? error.message : 'Session engine error';
         return { ok: false, status: 500, body: { error: { message: msg, type: 'invalid_request_error', code: 'session_engine_error' }, status: 'failed' } };

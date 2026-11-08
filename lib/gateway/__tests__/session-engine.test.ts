@@ -15,6 +15,10 @@ vi.mock('@/lib/embedded/webhook-tools', async (importOriginal) => ({
     ...(await importOriginal<typeof import('@/lib/embedded/webhook-tools')>()),
     executeWebhookTool: vi.fn(),
 }));
+vi.mock('@/lib/governance/record-session', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('@/lib/governance/record-session')>()),
+    recordSessionApprovalRequested: vi.fn(async () => {}),
+}));
 vi.mock('@/lib/governance/policy-enforcement', async (importOriginal) => ({
     ...(await importOriginal<typeof import('@/lib/governance/policy-enforcement')>()),
     orgHasOutputPolicies: vi.fn().mockResolvedValue(false),
@@ -33,6 +37,7 @@ import * as providersSetup from '@/lib/gateway/providers-setup';
 import * as responsesTools from '@/lib/gateway/v1-responses-tools';
 import * as policyEnforcement from '@/lib/governance/policy-enforcement';
 import * as webhookToolsModule from '@/lib/embedded/webhook-tools';
+import * as recordSession from '@/lib/governance/record-session';
 import { agentToolset } from '@/lib/embedded/agent-tools';
 
 const mockStreamGatewayChat = vi.mocked(chatExecutor.streamGatewayChat);
@@ -317,6 +322,8 @@ describe('executeSessionTurn', () => {
         expect(allData).toContain('event: turn.paused');
         expect(allData).toContain('"tool":"get_weather"');
         expect(allData).not.toContain('event: turn.completed');
+        // Running your own tools is not a human approval: nothing for the ledger.
+        expect(vi.mocked(recordSession.recordSessionApprovalRequested)).not.toHaveBeenCalled();
     });
 
     it('should pause only on tools with needsApproval when set', async () => {
@@ -362,9 +369,17 @@ describe('executeSessionTurn', () => {
             allData += decoder.decode(value, { stream: true });
         }
 
-        // Should pause because send_email has needsApproval and was called
+        // send_email has needsApproval and was called: a human must rule.
         expect(allData).toContain('event: turn.paused');
+        expect(allData).toContain('"reason":"approval_required"');
         expect(allData).toContain('"tool":"get_weather"'); // first tool in callValues
+        expect(allData).toContain('"action_id":"tc_2","tool":"send_email","arguments":"{\\"to\\":\\"a@b.com\\"}","needs_approval":true');
+        expect(allData).toContain('"action_id":"tc_1","tool":"get_weather","arguments":"{\\"city\\":\\"NYC\\"}","needs_approval":false');
+        // Only the approval call is recorded as a human approval request.
+        expect(vi.mocked(recordSession.recordSessionApprovalRequested)).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.objectContaining({ tool: 'send_email', actionIds: ['tc_2'] }),
+        );
     });
 
     it('should NOT pause when no tool has needsApproval and none were called', async () => {
@@ -406,7 +421,7 @@ describe('executeSessionTurn', () => {
         expect(allData).not.toContain('event: turn.paused');
     });
 
-    it('should not pause on tools without needsApproval even when pauseOnToolCalls is true', async () => {
+    it('pauses for tool results (not approval) when only tools without needsApproval are called', async () => {
         mockStreamGatewayChat.mockImplementation(makeStreamChunks([
             { delta: 'Fetching...', actualModel: 'gpt-4o', actualProvider: 'openai' },
             {
@@ -446,9 +461,12 @@ describe('executeSessionTurn', () => {
             allData += decoder.decode(value, { stream: true });
         }
 
-        // get_weather does NOT have needsApproval, so should NOT pause
-        expect(allData).toContain('event: turn.completed');
-        expect(allData).not.toContain('event: turn.paused');
+        // get_weather has no needsApproval: the caller still has to run it, so the
+        // turn pauses for its result, but no human approval is involved.
+        expect(allData).toContain('event: turn.paused');
+        expect(allData).toContain('"reason":"tool_results_required"');
+        expect(allData).toContain('"needs_approval":false');
+        expect(allData).not.toContain('event: turn.completed');
     });
 
     it('should emit turn.failed on execution error', async () => {
@@ -815,5 +833,184 @@ describe('resumeSessionTurn validations', () => {
 
         expect(result.ok).toBe(false);
         expect(result.status).toBe(400);
+    });
+});
+
+describe('resumeSessionTurn continuation', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockResolveGatewayProvider.mockResolvedValue({
+            model: 'gpt-4o',
+            actualModel: 'gpt-4o',
+            actualProvider: 'openai',
+            customProviderTag: undefined,
+            provider: makeProvider(),
+        });
+        mockOrgHasOutputPolicies.mockResolvedValue(false);
+    });
+
+    const lookupOrder = { type: 'function', function: { name: 'lookup_order', description: '', parameters: {} } };
+    const checkShipment = { type: 'function', function: { name: 'check_shipment', description: '', parameters: {} } };
+
+    /** A session whose turn 1 paused on lookup_order, with the turn's tools stored. */
+    function pausedSession() {
+        const events = [
+            { event_type: 'turn.started', sequence: 1, payload: {
+                model: 'gpt-4o', instructions: 'Be brief.', input_text: 'Where is order 1042?',
+                input_messages: [
+                    { role: 'system', content: 'Be brief.' },
+                    { role: 'user', content: 'Where is order 1042?' },
+                ],
+                function_tools: [lookupOrder, checkShipment],
+                pause_on_tool_calls: true,
+            } },
+            { event_type: 'tool_call.started', sequence: 2, payload: { tool: 'lookup_order', arguments: { id: '1042' }, action_id: 'call_1' } },
+            { event_type: 'turn.paused', sequence: 3, payload: {
+                reason: 'tool_results_required', action_id: 'call_1', tool: 'lookup_order',
+                actions: [{ action_id: 'call_1', tool: 'lookup_order', arguments: '{"id":"1042"}', needs_approval: false }],
+            } },
+        ];
+        const inserts: Array<Record<string, unknown>> = [];
+        const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
+        const supabase = {
+            from: vi.fn(() => {
+                const chain: Record<string, unknown> = {};
+                chain.select = () => chain;
+                chain.eq = () => chain;
+                chain.order = () => Promise.resolve({ data: events, error: null });
+                chain.insert = (row: Record<string, unknown>) => { inserts.push(row); return Promise.resolve({ error: null }); };
+                return chain;
+            }),
+            rpc,
+        };
+        return { supabase, inserts, rpc };
+    }
+
+    async function readAll(response: NextResponse) {
+        const reader = response.body!.getReader();
+        const decoder = new TextDecoder();
+        let all = '';
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            all += decoder.decode(value, { stream: true });
+        }
+        return all;
+    }
+
+    it('gives the model its tools again, so a second tool round pauses again', async () => {
+        mockStreamGatewayChat.mockImplementation(makeStreamChunks([
+            {
+                toolCalls: [{ id: 'call_2', function: { name: 'check_shipment', arguments: '{"order":"1042"}' } }],
+                finishReason: 'tool_calls', actualModel: 'gpt-4o', actualProvider: 'openai',
+            },
+        ]));
+        const { supabase, inserts, rpc } = pausedSession();
+
+        const result = await resumeSessionTurn({
+            supabase: supabase as never,
+            gatewayCtx: makeGateways().gatewayCtx as never,
+            sessionId: 'sid', turnNumber: 1,
+            toolResults: [{ action_id: 'call_1', output: '{"status":"shipped"}' }],
+            tier: 'free' as never, logSuccess: () => {}, incrementUsage: () => {},
+        });
+        expect(result.ok).toBe(true);
+        const all = await readAll((result as { ok: true; response: NextResponse }).response);
+
+        // The model was called with the stored tools and the full tool-call history.
+        const request = mockStreamGatewayChat.mock.calls[0][0].request as { tools?: Array<{ function: { name: string } }>; messages: Array<Record<string, unknown>> };
+        expect(request.tools?.map(t => t.function.name)).toEqual(['lookup_order', 'check_shipment']);
+        expect(request.messages.at(-2)).toMatchObject({ role: 'assistant', tool_calls: [{ id: 'call_1' }] });
+        expect(request.messages.at(-1)).toMatchObject({ role: 'tool', toolCallId: 'call_1', content: '{"status":"shipped"}' });
+
+        // The caller sees the resume, then a second pause for check_shipment.
+        expect(all).toContain('event: turn.resumed');
+        expect(all).not.toContain('event: turn.started');
+        expect(all).toContain('event: turn.paused');
+        expect(all).toContain('"tool":"check_shipment"');
+
+        // Recorded as turn 2: a turn.started that can be resumed again, without
+        // input_text (history must not repeat the user's message)...
+        const started = inserts.find(r => r.event_type === 'turn.started');
+        expect(started).toMatchObject({ turn_number: 2 });
+        const payload = started!.payload as Record<string, unknown>;
+        expect(payload.input_text).toBeUndefined();
+        expect(payload.original_input_text).toBe('Where is order 1042?');
+        expect(payload.resumed_from_turn).toBe(1);
+        expect(payload.pause_on_tool_calls).toBe(true);
+        expect((payload.input_messages as Array<Record<string, unknown>>).at(-1)).toMatchObject({ role: 'tool', toolCallId: 'call_1' });
+        // ...and the pause finalized on turn 2.
+        expect(rpc).toHaveBeenCalledWith('finalize_session_turn', expect.objectContaining({
+            p_turn_number: 2, p_event_type: 'turn.paused', p_status: 'paused',
+        }));
+    });
+
+    it('continues under the next agent on a handoff (instructions, model and tools)', async () => {
+        mockStreamGatewayChat.mockImplementation(makeStreamChunks([
+            { delta: 'Billing here.', actualModel: 'claude-sonnet-4-5', actualProvider: 'anthropic' },
+            { finishReason: 'stop', actualModel: 'claude-sonnet-4-5', actualProvider: 'anthropic' },
+        ]));
+        const { supabase, inserts } = pausedSession();
+        const refund = { type: 'function' as const, function: { name: 'issue_refund', description: '', parameters: {} }, needsApproval: true };
+
+        const result = await resumeSessionTurn({
+            supabase: supabase as never,
+            gatewayCtx: makeGateways().gatewayCtx as never,
+            sessionId: 'sid', turnNumber: 1,
+            toolResults: [{ action_id: 'call_1', output: 'Transferred to Billing.' }],
+            tier: 'free' as never, logSuccess: () => {}, incrementUsage: () => {},
+            override: { instructions: 'You handle billing.', model: 'claude-sonnet-4-5', tools: [refund] },
+        });
+        await readAll((result as { ok: true; response: NextResponse }).response);
+
+        expect(mockResolveGatewayProvider).toHaveBeenCalledWith(expect.objectContaining({ requestedModel: 'claude-sonnet-4-5', pinnedConnectionId: null }));
+        const request = mockStreamGatewayChat.mock.calls[0][0].request as { tools?: Array<{ function: { name: string } }>; messages: Array<Record<string, unknown>> };
+        expect(request.tools?.map(t => t.function.name)).toEqual(['issue_refund']);
+        expect(request.messages[0]).toEqual({ role: 'system', content: 'You handle billing.' });
+        expect(request.messages.some(m => m.content === 'Be brief.')).toBe(false);
+        // The next resume continues as Billing.
+        const started = inserts.find(r => r.event_type === 'turn.started')!.payload as Record<string, unknown>;
+        expect(started.instructions).toBe('You handle billing.');
+        expect((started.function_tools as Array<{ function: { name: string } }>).map(t => t.function.name)).toEqual(['issue_refund']);
+    });
+
+    it('lets a structured-output turn still call its tools (tool_choice required, not the schema tool)', async () => {
+        mockStreamGatewayChat.mockImplementation(makeStreamChunks([
+            { delta: 'ok', actualModel: 'gpt-4o', actualProvider: 'openai' },
+            { finishReason: 'stop', actualModel: 'gpt-4o', actualProvider: 'openai' },
+        ]));
+        const { supabase, gatewayCtx, logSuccess, incrementUsage } = makeGateways();
+        const result = await executeSessionTurn({
+            supabase: supabase as never, gatewayCtx: gatewayCtx as never,
+            sessionId: 'sid_1', turnNumber: 1, model: 'gpt-4o',
+            inputMessages: [{ role: 'user', content: 'order 1042?' }], inputText: 'order 1042?',
+            pauseOnToolCalls: true, endUserId: null, tier: 'free' as never, logSuccess, incrementUsage,
+            tools: [lookupOrder as never],
+            response_format: { type: 'json_schema', json_schema: { name: 'final_output', schema: { type: 'object' } } },
+        });
+        await readAll((result as { ok: true; response: NextResponse }).response);
+        expect(mockStreamGatewayChat.mock.calls[0][0].request.toolChoice).toBe('required');
+    });
+
+    it('completes normally when the model answers after the tool results', async () => {
+        mockStreamGatewayChat.mockImplementation(makeStreamChunks([
+            { delta: 'Order 1042 has shipped.', actualModel: 'gpt-4o', actualProvider: 'openai' },
+            { finishReason: 'stop', actualModel: 'gpt-4o', actualProvider: 'openai' },
+        ]));
+        const { supabase, rpc } = pausedSession();
+
+        const result = await resumeSessionTurn({
+            supabase: supabase as never,
+            gatewayCtx: makeGateways().gatewayCtx as never,
+            sessionId: 'sid', turnNumber: 1,
+            toolResults: [{ action_id: 'call_1', output: '{"status":"shipped"}' }],
+            tier: 'free' as never, logSuccess: () => {}, incrementUsage: () => {},
+        });
+        const all = await readAll((result as { ok: true; response: NextResponse }).response);
+        expect(all).toContain('Order 1042 has shipped.');
+        expect(all).toContain('event: turn.completed');
+        expect(rpc).toHaveBeenCalledWith('finalize_session_turn', expect.objectContaining({
+            p_turn_number: 2, p_event_type: 'turn.completed', p_status: 'active',
+        }));
     });
 });

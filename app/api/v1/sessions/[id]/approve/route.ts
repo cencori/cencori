@@ -12,6 +12,7 @@ import {
 import { extractCencoriApiKeyFromHeaders } from "@/lib/api-keys";
 import { resumeSessionTurn, type SupabaseAdmin } from "@/lib/gateway/session-engine";
 import { recordSessionApprovalResolved } from "@/lib/governance/record-session";
+import { parseResumeOverride } from "@/lib/gateway/session-resume-override";
 import { waitUntil } from "@vercel/functions";
 import type { SubscriptionTier } from "@/lib/entitlements";
 import { runGatewayInputPipeline } from "@/lib/gateway/input-guard";
@@ -64,9 +65,9 @@ export async function POST(
         }
         gatewayCtx = validation.context;
 
-        let body: { action_id?: unknown; tool_results?: unknown };
+        let body: { action_id?: unknown; tool_results?: unknown; next?: unknown };
         try {
-            body = await req.json() as { action_id?: unknown; tool_results?: unknown };
+            body = await req.json() as { action_id?: unknown; tool_results?: unknown; next?: unknown };
         } catch {
             return respondError(400, 'Request body must be valid JSON', 'invalid_json');
         }
@@ -96,6 +97,13 @@ export async function POST(
             );
         }
         const validatedToolResults = tool_results as Array<{ action_id: string; output: string }>;
+
+        // Optional: continue under a different agent configuration (a handoff in
+        // cencori/agents). The resumed turn uses these instead of the paused turn's.
+        const parsedNext = parseResumeOverride(body.next);
+        if (!parsedNext.ok) {
+            return respondError(400, parsedNext.message, 'invalid_next');
+        }
 
         const adminClient = createAdminClient();
 
@@ -236,40 +244,44 @@ export async function POST(
             return respondError(status, 'Session pause was already resolved or no longer matches', code);
         }
 
-        // Governance: immutable record of the human approval (who/what/when).
-        void recordSessionApprovalResolved(adminClient as SupabaseAdmin, {
-            orgId: gatewayCtx.organizationId,
-            projectId: gatewayCtx.projectId,
-            sessionId,
-            actionId: action_id,
-            resolution: 'approved',
-            tool: typeof pausedPayload.tool === 'string' ? pausedPayload.tool : null,
-            apiKeyId: gatewayCtx.apiKeyId,
-            actorIp: gatewayCtx.clientIp,
-        });
+        // A tool_results_required pause is the caller running its own tools, not a
+        // human ruling: it stays out of the governance ledger and the actions index.
+        if (pausedPayload.reason !== 'tool_results_required') {
+            // Governance: immutable record of the human approval (who/what/when).
+            void recordSessionApprovalResolved(adminClient as SupabaseAdmin, {
+                orgId: gatewayCtx.organizationId,
+                projectId: gatewayCtx.projectId,
+                sessionId,
+                actionId: action_id,
+                resolution: 'approved',
+                tool: typeof pausedPayload.tool === 'string' ? pausedPayload.tool : null,
+                apiKeyId: gatewayCtx.apiKeyId,
+                actorIp: gatewayCtx.clientIp,
+            });
 
-        // M2 convergence: mirror into unified actions index (best-effort, never blocks resume).
-        void (async () => {
-            try {
-                const { data: sess } = await adminClient.from('sessions').select('tenant_id').eq('id', sessionId).maybeSingle();
-                await adminClient.from('actions').upsert({
-                    project_id: gatewayCtx.projectId,
-                    tenant_id: ((sess as { tenant_id?: string | null } | null)?.tenant_id as string | null) ?? null,
-                    session_id: sessionId,
-                    turn_number: session.last_turn_number,
-                    tool_name: typeof pausedPayload.tool === 'string' ? pausedPayload.tool : 'unknown',
-                    risk_level: 'write',
-                    status: 'approved',
-                    sanitized_arguments: { action_id },
-                    approval_policy: {},
-                    approved_by: gatewayCtx.apiKeyId,
-                    resolved_at: new Date().toISOString(),
-                    execution_key: `ses_${sessionId}_${session.last_turn_number}_${action_id}`,
-                }, { onConflict: 'execution_key' });
-            } catch {
-                // best-effort only
-            }
-        })();
+            // M2 convergence: mirror into unified actions index (best-effort, never blocks resume).
+            void (async () => {
+                try {
+                    const { data: sess } = await adminClient.from('sessions').select('tenant_id').eq('id', sessionId).maybeSingle();
+                    await adminClient.from('actions').upsert({
+                        project_id: gatewayCtx.projectId,
+                        tenant_id: ((sess as { tenant_id?: string | null } | null)?.tenant_id as string | null) ?? null,
+                        session_id: sessionId,
+                        turn_number: session.last_turn_number,
+                        tool_name: typeof pausedPayload.tool === 'string' ? pausedPayload.tool : 'unknown',
+                        risk_level: 'write',
+                        status: 'approved',
+                        sanitized_arguments: { action_id },
+                        approval_policy: {},
+                        approved_by: gatewayCtx.apiKeyId,
+                        resolved_at: new Date().toISOString(),
+                        execution_key: `ses_${sessionId}_${session.last_turn_number}_${action_id}`,
+                    }, { onConflict: 'execution_key' });
+                } catch {
+                    // best-effort only
+                }
+            })();
+        }
 
         // Resume the turn and return its SSE stream.
         const execResult = await resumeSessionTurn({
@@ -282,6 +294,7 @@ export async function POST(
                 inputText: toolInputPipeline.inputText,
                 inputSecurity: toolInputPipeline.inputSecurity,
                 tokenMap: toolInputPipeline.tokenMap,
+                override: parsedNext.value,
                 logSuccess: (meta) => {
                     void logGatewayRequest(gatewayCtx!, {
                         endpoint: "/v1/sessions/:id/approve",

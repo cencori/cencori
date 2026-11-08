@@ -51,7 +51,12 @@ export interface SessionEventPayloadMap {
     // and how long each step took.
     'tool_call.started': { tool: string; arguments?: Record<string, unknown>; action_id?: string; call_id?: string; arguments_bytes?: number };
     'tool_call.completed': { tool?: string; output?: unknown; action_id?: string; call_id?: string; output_bytes?: number };
-    'turn.paused': { reason: string; action_id: string; tool: string; arguments: Record<string, unknown>; actions?: Array<{ action_id: string; tool: string; arguments: string }> };
+    /**
+     * reason: 'approval_required' = a needsApproval tool was called and a human must rule;
+     * 'tool_results_required' = only the caller's own tools were called, run them and resume.
+     * Pauses recorded before 2026-11 always say 'approval_required' and carry no needs_approval.
+     */
+    'turn.paused': { reason: 'approval_required' | 'tool_results_required' | (string & {}); action_id: string; tool: string; arguments: Record<string, unknown>; actions?: Array<{ action_id: string; tool: string; arguments: string; needs_approval?: boolean }> };
     'turn.resumed': { action_id: string; resolution: 'approved' | 'rejected' };
     'turn.completed': { turn_number: number; output?: unknown; usage?: { input_tokens: number; output_tokens: number; total_tokens: number }; knowledge_citations?: Array<{ chunk_id: string; source_id: string; ord?: number | null; score: number }> };
     'turn.failed': { turn_number: number; output: { error: string }; usage: { input_tokens: number; output_tokens: number; total_tokens: number } };

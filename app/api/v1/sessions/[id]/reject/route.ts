@@ -127,40 +127,44 @@ export async function POST(
             return respondError(status, 'Session pause was already resolved or no longer matches', code);
         }
 
-        // Governance: immutable record of the human rejection (who/what/when).
-        void recordSessionApprovalResolved(adminClient, {
-            orgId: gatewayCtx.organizationId,
-            projectId: gatewayCtx.projectId,
-            sessionId,
-            actionId: action_id,
-            resolution: 'rejected',
-            tool: typeof pausedPayload.tool === 'string' ? pausedPayload.tool : null,
-            apiKeyId: gatewayCtx.apiKeyId,
-            actorIp: gatewayCtx.clientIp,
-        });
+        // A tool_results_required pause is the caller running its own tools, not a
+        // human ruling: it stays out of the governance ledger and the actions index.
+        if (pausedPayload.reason !== 'tool_results_required') {
+            // Governance: immutable record of the human rejection (who/what/when).
+            void recordSessionApprovalResolved(adminClient, {
+                orgId: gatewayCtx.organizationId,
+                projectId: gatewayCtx.projectId,
+                sessionId,
+                actionId: action_id,
+                resolution: 'rejected',
+                tool: typeof pausedPayload.tool === 'string' ? pausedPayload.tool : null,
+                apiKeyId: gatewayCtx.apiKeyId,
+                actorIp: gatewayCtx.clientIp,
+            });
 
-        // M2 convergence: mirror into unified actions index (best-effort).
-        void (async () => {
-            try {
-                const { data: sess } = await adminClient.from('sessions').select('tenant_id').eq('id', sessionId).maybeSingle();
-                await adminClient.from('actions').upsert({
-                    project_id: gatewayCtx.projectId,
-                    tenant_id: ((sess as { tenant_id?: string | null } | null)?.tenant_id as string | null) ?? null,
-                    session_id: sessionId,
-                    turn_number: session.last_turn_number,
-                    tool_name: typeof pausedPayload.tool === 'string' ? pausedPayload.tool : 'unknown',
-                    risk_level: 'write',
-                    status: 'rejected',
-                    sanitized_arguments: { action_id },
-                    approval_policy: {},
-                    approved_by: gatewayCtx.apiKeyId,
-                    resolved_at: new Date().toISOString(),
-                    execution_key: `ses_${sessionId}_${session.last_turn_number}_${action_id}`,
-                }, { onConflict: 'execution_key' });
-            } catch {
-                // best-effort only
-            }
-        })();
+            // M2 convergence: mirror into unified actions index (best-effort).
+            void (async () => {
+                try {
+                    const { data: sess } = await adminClient.from('sessions').select('tenant_id').eq('id', sessionId).maybeSingle();
+                    await adminClient.from('actions').upsert({
+                        project_id: gatewayCtx.projectId,
+                        tenant_id: ((sess as { tenant_id?: string | null } | null)?.tenant_id as string | null) ?? null,
+                        session_id: sessionId,
+                        turn_number: session.last_turn_number,
+                        tool_name: typeof pausedPayload.tool === 'string' ? pausedPayload.tool : 'unknown',
+                        risk_level: 'write',
+                        status: 'rejected',
+                        sanitized_arguments: { action_id },
+                        approval_policy: {},
+                        approved_by: gatewayCtx.apiKeyId,
+                        resolved_at: new Date().toISOString(),
+                        execution_key: `ses_${sessionId}_${session.last_turn_number}_${action_id}`,
+                    }, { onConflict: 'execution_key' });
+                } catch {
+                    // best-effort only
+                }
+            })();
+        }
 
         return respond(NextResponse.json({
             id: sessionId,
