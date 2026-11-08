@@ -5,7 +5,7 @@
  * memory, guardrails, billing and traces run on Cencori, with any model in
  * the catalog.
  */
-export { Agent } from './agent';
+export { Agent, DEFAULT_MODEL } from './agent';
 export type { AgentOptions, InputGuardrail, OutputGuardrail, GuardrailResult, ModelSettings } from './agent';
 export { tool } from './tool';
 export type { FunctionTool, ToolOptions, NeedsApproval } from './tool';

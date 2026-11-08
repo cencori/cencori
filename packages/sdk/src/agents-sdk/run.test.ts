@@ -404,6 +404,14 @@ describe('run', () => {
         expect(cencori.requests[0].body.turn.reasoning_effort).toBe('low');
     });
 
+    it('uses GPT OSS 120B when no model is given', async () => {
+        const cencori = fakeCencori([completed('ok')]);
+        const agent = new Agent({ name: 'A' });
+        expect(agent.model).toBe('gpt-oss-120b');
+        await run(agent, 'Hi', cencori.options);
+        expect(cencori.requests[0].body.turn.model).toBe('gpt-oss-120b');
+    });
+
     it('validates definitions up front', () => {
         expect(() => tool({ name: 'has space', description: '', execute: () => '' })).toThrow(/must be 1-64/);
         expect(() => new Agent({ name: 'A', model: '' })).toThrow(/needs a model/);

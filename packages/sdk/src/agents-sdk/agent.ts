@@ -39,8 +39,11 @@ export interface AgentOptions<Ctx = unknown, Out = string> {
     name: string;
     /** System prompt. A function gets the run context, for per-user instructions. */
     instructions?: string | ((runContext: RunContext<Ctx>) => string | Promise<string>);
-    /** Any model in the Cencori catalog: 'claude-sonnet-4-5', 'gpt-4o', 'gemini-2.5-flash'... */
-    model: string;
+    /**
+     * Any model in the Cencori catalog: 'claude-sonnet-4-5', 'gemini-2.5-flash'...
+     * Default: DEFAULT_MODEL, GPT OSS 120B on Cerebras (fast, calls tools).
+     */
+    model?: string;
     tools?: FunctionTool<Ctx>[];
     /** Agents this one can hand the conversation to. */
     handoffs?: Agent<Ctx, any>[];
@@ -52,6 +55,9 @@ export interface AgentOptions<Ctx = unknown, Out = string> {
     inputGuardrails?: InputGuardrail<Ctx>[];
     outputGuardrails?: OutputGuardrail<Ctx>[];
 }
+
+/** The model an agent uses when none is given: GPT OSS 120B on Cerebras, chosen for speed. */
+export const DEFAULT_MODEL = 'gpt-oss-120b';
 
 function toolSafe(name: string): string {
     const safe = name.toLowerCase().replace(/[^a-z0-9_-]+/g, '_').replace(/^_+|_+$/g, '');
@@ -85,10 +91,10 @@ export class Agent<Ctx = unknown, Out = string> {
 
     constructor(options: AgentOptions<Ctx, Out>) {
         if (!options.name?.trim()) throw new TypeError('An agent needs a name.');
-        if (!options.model?.trim()) throw new TypeError(`Agent "${options.name}" needs a model.`);
+        if (options.model !== undefined && !options.model.trim()) throw new TypeError(`Agent "${options.name}" needs a model.`);
         this.name = options.name;
         this.instructions = options.instructions;
-        this.model = options.model;
+        this.model = options.model ?? DEFAULT_MODEL;
         this.tools = options.tools ?? [];
         this.handoffs = options.handoffs ?? [];
         this.handoffDescription = options.handoffDescription;

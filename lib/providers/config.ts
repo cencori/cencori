@@ -397,7 +397,7 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
             // up, and they bill from their model_pricing rows when it is.
             // `zai-glm-4.7` is gone entirely: Cerebras archived it (404
             // model_archived), so it is not orderable at any price.
-            { id: 'gpt-oss-120b', name: 'GPT OSS 120B (Cerebras)', type: ['chat'], contextWindow: 131072, description: '120B open model, 3000 tok/s inference', addedAt: '2025-08-05' },
+            { id: 'gpt-oss-120b', name: 'GPT OSS 120B (Cerebras)', type: ['chat'], contextWindow: 131072, description: '120B open model, 3000 tok/s inference', capabilities: { tools: true }, addedAt: '2025-08-05' },
             { id: 'gemma-4-31b', name: 'Gemma 4 31B (Cerebras)', type: ['chat', 'vision'], contextWindow: 131072, description: 'Multimodal production model on Cerebras', addedAt: '2026-08-01' },
         ],
     },
