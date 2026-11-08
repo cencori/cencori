@@ -37,7 +37,7 @@ export function observabilitySource(pathname: string): Source | null {
     return match ? (match[1] as Source) : null;
 }
 
-function SourcePicker({ base, current }: { base: string; current: Source }) {
+function SourcePicker({ base, current, onPick }: { base: string; current: Source; onPick: (source: Source) => void }) {
     const active = SOURCES.find((s) => s.value === current)!;
     return (
         <DropdownMenu>
@@ -54,7 +54,7 @@ function SourcePicker({ base, current }: { base: string; current: Source }) {
             <DropdownMenuContent align="start" sideOffset={6} className="w-72 rounded-xl p-1">
                 {SOURCES.map((s) => (
                     <DropdownMenuItem key={s.value} asChild className="cursor-pointer rounded-lg px-3 py-2">
-                        <Link href={`${base}/${s.value}`} className="flex items-start gap-3">
+                        <Link href={`${base}/${s.value}`} onClick={() => onPick(s.value)} className="flex items-start gap-3">
                             <HugeiconsIcon icon={s.icon} className="mt-0.5 !h-4 !w-4 shrink-0" />
                             <span className="min-w-0 flex-1">
                                 <span className="block text-sm">{s.label}</span>
@@ -71,8 +71,18 @@ function SourcePicker({ base, current }: { base: string; current: Source }) {
 
 interface ApiKeyOption { id: string; name: string; key_prefix: string }
 
-function RequestLogFiltersPanel({ projectId }: { projectId?: string }) {
-    const pathname = usePathname();
+/** Placeholder rows while a filter's options (models, keys) load; the filter itself is already there. */
+function OptionSkeletons() {
+    return (
+        <div className="space-y-1.5 px-2 py-1">
+            {[70, 55, 62].map((w) => <div key={w} className="h-3 animate-pulse rounded bg-muted" style={{ width: `${w}%` }} />)}
+        </div>
+    );
+}
+
+function RequestLogFiltersPanel({ projectId, listPath }: { projectId?: string; listPath: string }) {
+    // The Request logs list's address, even while the sidebar shows ahead of a navigation.
+    const pathname = listPath;
     const queryClient = useQueryClient();
     const searchParams = useSearchParams();
     const filters = readRequestLogFilters(searchParams);
@@ -91,7 +101,7 @@ function RequestLogFiltersPanel({ projectId }: { projectId?: string }) {
         if (projectId) void queryClient.prefetchInfiniteQuery(requestLogsQuery(projectId, next));
     };
 
-    const { data: models = [] } = useQuery<string[]>({
+    const { data: models = [], isLoading: modelsLoading } = useQuery<string[]>({
         queryKey: ['log-models', projectId, filters.range],
         queryFn: async () => {
             const res = await fetch(`/api/projects/${projectId}/logs/models?time_range=${filters.range}`);
@@ -101,7 +111,7 @@ function RequestLogFiltersPanel({ projectId }: { projectId?: string }) {
         enabled: Boolean(projectId),
         staleTime: 60_000,
     });
-    const { data: keys = [] } = useQuery<ApiKeyOption[]>({
+    const { data: keys = [], isLoading: keysLoading } = useQuery<ApiKeyOption[]>({
         queryKey: ['api-keys-filter', projectId],
         queryFn: async () => {
             const { data } = await supabase.from('api_keys').select('id, name, key_prefix').eq('project_id', projectId).is('revoked_at', null);
@@ -137,10 +147,12 @@ function RequestLogFiltersPanel({ projectId }: { projectId?: string }) {
                 {models.map((m) => (
                     <FilterOption key={m} radio selected={filters.model === m} label={m} onClick={() => update({ ...filters, model: m })} onHover={() => prefetch({ ...filters, model: m })} />
                 ))}
-                {models.length === 0 && <p className="px-2 py-1 text-xs text-muted-foreground">No models in this range.</p>}
+                {modelsLoading && <OptionSkeletons />}
+                {!modelsLoading && models.length === 0 && <p className="px-2 py-1 text-xs text-muted-foreground">No models in this range.</p>}
             </FilterGroup>
             <FilterGroup title="API key" count={filters.key ? 1 : 0} open={open.key} onToggle={() => flip('key')}>
                 <FilterOption radio selected={!filters.key} label="All keys" onClick={() => update({ ...filters, key: null })} onHover={() => prefetch({ ...filters, key: null })} />
+                {keysLoading && <OptionSkeletons />}
                 {keys.map((k) => (
                     <FilterOption key={k.id} radio selected={filters.key === k.id} label={`${k.name} (${k.key_prefix}…)`} onClick={() => update({ ...filters, key: k.id })} onHover={() => prefetch({ ...filters, key: k.id })} />
                 ))}
@@ -151,15 +163,26 @@ function RequestLogFiltersPanel({ projectId }: { projectId?: string }) {
 
 export function ObservabilitySidebar({ base, orgSlug, projectSlug }: { base: string; orgSlug: string; projectSlug: string }) {
     const pathname = usePathname();
-    const source = observabilitySource(pathname) ?? 'traces';
+    const routeSource = observabilitySource(pathname);
+    // The source picked in the picker, shown straight away while its page loads.
+    const [pending, setPending] = useState<Source | null>(null);
+    useEffect(() => {
+        if (pending && routeSource === pending) setPending(null);
+    }, [pending, routeSource]);
+    // Arriving from elsewhere in the console, the Observability link opens Traces:
+    // show its filters now, not once the page has loaded.
+    const source = pending ?? routeSource ?? 'traces';
     const { data: projectId } = useProjectIdBySlug(orgSlug, projectSlug);
-    // Filters belong to the lists; a single trace shows none.
-    const onList = new RegExp(`/observability/${source}/?$`).test(pathname);
+    // Filters belong to the lists; a single trace's page shows none.
+    const onDetail = !pending && /\/observability\/(traces|request-logs)\/[^/]+/.test(pathname);
+    const listPath = `${base}/${source}`;
 
     return (
         <div className="pt-1">
-            <SourcePicker base={base} current={source} />
-            {onList && (source === 'traces' ? <SessionFiltersPanel projectId={projectId} /> : <RequestLogFiltersPanel projectId={projectId ?? undefined} />)}
+            <SourcePicker base={base} current={source} onPick={(next) => { if (next !== routeSource) setPending(next); }} />
+            {!onDetail && (source === 'traces'
+                ? <SessionFiltersPanel projectId={projectId} listPath={listPath} />
+                : <RequestLogFiltersPanel projectId={projectId ?? undefined} listPath={listPath} />)}
         </div>
     );
 }

@@ -53,8 +53,10 @@ export function FilterOption({ selected, label, onClick, onHover, radio }: { sel
  * Vercel's Logs keeps its filters there), so the page itself stays full
  * screen. They write to the URL; the page reads them from it.
  */
-export function SessionFiltersPanel({ projectId }: { projectId?: string | null }) {
-    const pathname = usePathname();
+export function SessionFiltersPanel({ projectId, listPath }: { projectId?: string | null; listPath?: string }) {
+    const currentPath = usePathname();
+    // The Traces list's address, even while the sidebar shows ahead of a navigation.
+    const pathname = listPath ?? currentPath;
     const queryClient = useQueryClient();
     const searchParams = useSearchParams();
     const filters = readSessionFilters(searchParams);
