@@ -1,0 +1,103 @@
+---
+title: "The chat"
+description: "<AgentChat>, theming, and building your own layout with useAgentChat."
+section: "Agent UI"
+order: 4
+---
+
+## AgentChat
+
+```tsx
+import { AgentChat } from 'cencori/react';
+
+<AgentChat
+    api="/api/chat"
+    greeting="How can I help?"
+    prompts={['Revenue this month', { label: 'Top customers', prompt: 'Who are our top 5 customers by MRR?' }]}
+    placeholder="Ask anything…"
+    toolLabels={{ get_sales: 'Reading sales', issue_refund: 'Refund the order' }}
+    theme={{ colorScheme: 'auto', accent: '#2563eb', radius: 'md' }}
+/>
+```
+
+| Prop | Use it for |
+| --- | --- |
+| `api` | Your route serving the agent |
+| `greeting`, `prompts` | What shows before the first message |
+| `placeholder` | The message box placeholder |
+| `showToolCalls` | Show tool calls as steps in the reply. Default `true` |
+| `toolLabels` | Friendly names for tool steps and approval cards |
+| `theme` | See below |
+| `headers`, `body` | Extra headers (auth, CSRF) and body fields on every request |
+| `sessionId` | Open an existing conversation |
+| `onSessionId` | Save the session id when the server assigns one |
+| `onAction` | See [Actions and forms](/docs/agent-ui/actions) |
+| `onError` | Called when a request fails |
+| `className`, `style` | On the outer element |
+
+It fills its container. Give the parent a height.
+
+## What the user sees
+
+- Replies stream in, with Markdown.
+- Tool calls show as steps ("Reading sales") that expand to show arguments and results.
+- Widgets draw as they're written, then become usable once finished. Only the latest reply's widgets take clicks.
+- Approvals show a card with **Approve** and **Decline**. The message box waits until every call is decided.
+- Handoffs show as "Handed to Billing".
+- Errors show with **Try again**. The user can stop a reply mid-stream.
+
+## Theming
+
+```tsx
+<AgentChat api="/api/chat" theme={{ colorScheme: 'dark', accent: '#16a34a', accentForeground: '#fff', radius: 'lg', density: 'compact', fontFamily: 'Inter, sans-serif' }} />
+```
+
+| Option | Values |
+| --- | --- |
+| `colorScheme` | `light`, `dark`, `auto` (follows the system, the default) |
+| `accent`, `accentForeground` | Buttons, the send button, the first chart series |
+| `radius` | `none`, `sm`, `md`, `lg`, or pixels |
+| `density` | `normal`, `compact` |
+| `fontFamily` | Any CSS font stack |
+
+For full control, set the CSS variables on any parent: `--cen-bg`, `--cen-fg`, `--cen-muted`, `--cen-muted-fg`, `--cen-border`, `--cen-surface`, `--cen-accent`, `--cen-accent-fg`, `--cen-user-bg`, `--cen-success`, `--cen-warning`, `--cen-danger`, `--cen-info`, `--cen-chart-2` to `--cen-chart-6`, `--cen-radius`, `--cen-font`.
+
+The styles are scoped to `.cen-chat` and need no Tailwind or CSS import.
+
+## Your own layout
+
+Use the parts with `useAgentChat()`:
+
+```tsx
+'use client';
+import { useAgentChat, Transcript, Composer } from 'cencori/react';
+
+export function SupportPanel() {
+    const chat = useAgentChat({ api: '/api/chat' });
+    return (
+        <aside className="panel">
+            <header>Support · {chat.status}</header>
+            <Transcript chat={chat} greeting="Hi! Ask me anything." />
+            <Composer chat={chat} placeholder="Type a message" />
+        </aside>
+    );
+}
+```
+
+Or pass it to `<AgentChat chat={chat} />` to keep the default layout while controlling it from outside.
+
+### Fully custom
+
+`useAgentChat()` returns everything to draw a chat yourself:
+
+| Field | What it is |
+| --- | --- |
+| `messages` | `{ id, role, parts, agent?, action?, status? }[]`. Parts: `text`, `tool`, `widget`, `handoff`, `approval` |
+| `status` | `idle`, `streaming`, `awaiting_approval`, `error` |
+| `error`, `sessionId` | |
+| `send(text)` | Send a message |
+| `sendAction(action, { widgetId, label })` | Run a widget action |
+| `approve(callId)`, `reject(callId, message?)` | Decide on a pending tool call |
+| `stop()`, `retry()`, `reset()` | |
+
+Draw widgets with `<Widget widget={part.widget} id={part.id} onAction={chat.sendAction} />`, and approvals with `<ApprovalCard>`. `<ToolCall>` draws a tool step.

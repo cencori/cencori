@@ -1,0 +1,103 @@
+---
+title: "Widgets"
+description: "Every component an agent can show, its props, and the limits Cencori checks."
+section: "Agent UI"
+order: 3
+---
+
+A widget is a JSON tree of components. Every component has a `type` and its props. Usually the root is a `Card`.
+
+```json
+{
+  "type": "Card",
+  "title": "Revenue",
+  "children": [
+    { "type": "Stat", "label": "November", "value": 48210, "format": "currency", "currency": "USD", "delta": 0.12, "deltaFormat": "percent" },
+    { "type": "Chart", "chart": "bar", "x": "month", "series": [{ "key": "revenue", "label": "Revenue" }], "format": "currency", "currency": "USD",
+      "data": [{ "month": "Sep", "revenue": 39100 }, { "month": "Oct", "revenue": 43050 }, { "month": "Nov", "revenue": 48210 }] }
+  ],
+  "actions": [{ "type": "Button", "label": "Break down by product", "action": { "type": "breakdown", "payload": { "by": "product" } } }]
+}
+```
+
+## Where widgets come from
+
+| Source | How | Use it for |
+| --- | --- | --- |
+| The model | `new Agent({ widgets: true })` adds the built-in `render_ui` tool | Answers shaped by the question: "chart this", "compare those" |
+| Your tool | Return `{ widget, ...data }` from `execute` | Screens you design: an order card, a receipt |
+
+Either way the widget is checked against this spec before it's shown. With `render_ui`, an invalid widget goes back to the model with the errors (`widget.children[2].color: expected one of "default", "muted", ...`) and it tries again. From your tool, an invalid widget isn't shown and the SDK logs why.
+
+## Layout
+
+| Component | Props |
+| --- | --- |
+| `Card` | `children` (required), `title`, `subtitle`, `status` (badge in the corner), `actions` (Buttons in the footer) |
+| `ListView` | `items` (required): `{ title, subtitle?, value?, badge?, badgeColor?, image?, action? }[]`, `title` |
+| `Row` | `children` (required), `gap`, `align` (`start` `center` `end` `stretch`), `justify` (`start` `center` `end` `between`), `wrap` |
+| `Col` | `children` (required), `gap`, `align`, `flex` |
+| `Divider` | |
+| `Spacer` | Pushes siblings apart in a `Row` |
+
+`gap` is `none`, `xs`, `sm`, `md` or `lg`.
+
+## Content
+
+| Component | Props |
+| --- | --- |
+| `Title` | `value` (required), `size` (`sm` `md` `lg` `xl`) |
+| `Text` | `value` (required), `size` (`xs` `sm` `md` `lg`), `weight` (`normal` `medium` `semibold` `bold`), `color`, `align`, `truncate` |
+| `Markdown` | `value` (required): paragraphs, lists, bold, italics, code, https links |
+| `Badge` | `label` (required), `color` |
+| `Image` | `src` (required, https or a base64 `data:image`), `alt`, `aspectRatio`, `fit` (`cover` `contain`) |
+
+## Data
+
+| Component | Props |
+| --- | --- |
+| `Stat` | `label` and `value` (required), `format`, `currency`, `delta` (e.g. `0.12`), `deltaFormat` (`percent` `number`), `caption` |
+| `Chart` | `chart` (`bar` `line` `area` `pie`), `data` (rows), `x` (the key for the x axis, or pie slice labels), `series` (`{ key, label?, color? }[]`), all required; `stacked`, `height`, `format`, `currency`, `title` |
+| `Table` | `columns` (`{ key, label, align?, format?, currency? }[]`) and `rows` (required), `title` |
+
+`format` is `number`, `compact`, `currency`, `percent`, `date` or `datetime`. `currency` is an ISO code: `USD`, `NGN`, `EUR`. Values are formatted in the viewer's locale.
+
+## Interaction
+
+| Component | Props |
+| --- | --- |
+| `Button` | `label` (required), and one of `action`, `href` (opens in a new tab) or `submit: true` inside a Form; `variant` (`primary` `secondary` `outline` `ghost` `danger`), `size` (`sm` `md`), `block` |
+| `Form` | `children` and `action` (required), `submitLabel` |
+| `Input` | `name` (required), `label`, `placeholder`, `inputType` (`text` `number` `email` `date` `tel` `url`), `required`, `defaultValue`, `multiline` |
+| `Select` | `name` and `options` (`{ label, value }[]`, required), `label`, `placeholder`, `defaultValue`, `required`, `action` (runs on change) |
+| `Checkbox` | `name` and `label` (required), `defaultChecked` |
+
+An action is `{ type, payload?, handler? }`. See [Actions and forms](/docs/agent-ui/actions).
+
+## Colors
+
+`default`, `muted`, `accent`, `success`, `warning`, `danger`, `info`. They follow the chat's theme in light and dark mode.
+
+## Limits
+
+| Limit | Value |
+| --- | --- |
+| Widget size | 64 KB |
+| Components | 400 |
+| Nesting | 12 levels |
+| Text | 4,000 characters per string |
+| Table | 200 rows, 20 columns |
+| Chart | 500 points, 12 series |
+| List | 100 items |
+| Action payload | 4 KB |
+
+Unknown props are dropped. URLs must be https (links may also be `mailto:`).
+
+## Checking a widget yourself
+
+```ts
+import { validateWidget } from 'cencori/agents';
+
+const result = validateWidget(widget);
+if (!result.ok) console.log(result.errors);
+```

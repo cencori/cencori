@@ -1,0 +1,91 @@
+---
+title: "Agents API"
+description: "The HTTP runtime every Cencori agent runs on: sessions, turns, tool calls, approvals, widgets and traces."
+section: "Agents API"
+order: 1
+---
+
+The Agents API is the runtime under everything agent-shaped in Cencori. The [Agents SDK](/docs/agents-sdk/overview), [Agent UI](/docs/agent-ui/overview), [Arcie](/arcie/docs), [Embedded Agents](/docs/embedded-agents/overview) and WhatsApp agents all run on it. Use it directly from any language.
+
+| Concept | What it is |
+| --- | --- |
+| **Session** | One conversation. Durable: its events are stored, so it can pause, resume and be replayed |
+| **Turn** | One request in a session: input in, a streamed reply out |
+| **Tool call** | The model asks for a function. Built-in and installed tools run on Cencori; yours pause the turn for you to run |
+| **Approval** | A paused tool call waiting for a person. Recorded in your governance ledger |
+| **Widget** | UI the model shows, checked by Cencori (`render_ui`) |
+| **Trace** | Every session in Observability → Traces |
+
+## A run, end to end
+
+```http
+POST /v1/sessions
+CENCORI_API_KEY: csk_...
+Content-Type: application/json
+
+{
+  "metadata": { "agent": "Support" },
+  "turn": {
+    "input": "Where is order 1042?",
+    "model": "gpt-oss-120b",
+    "instructions": "Help customers with their orders.",
+    "tools": [{ "type": "function", "function": { "name": "get_order", "description": "Look up an order", "parameters": { "type": "object", "properties": { "id": { "type": "string" } }, "required": ["id"] } } }],
+    "pause_on_tool_calls": true
+  }
+}
+```
+
+Creating the session with its first `turn` saves a round trip: the reply streams back straight away, with the session id in the `X-Cencori-Session-Id` header.
+
+```
+event: turn.started
+event: tool_call.started   data: {"tool":"get_order","arguments":{"id":"1042"},"action_id":"call_1"}
+event: turn.paused         data: {"reason":"tool_results_required","action_id":"call_1","actions":[...]}
+```
+
+Run the tool yourself and send the result:
+
+```http
+POST /v1/sessions/ses_.../approve
+
+{ "action_id": "call_1", "tool_results": [{ "action_id": "call_1", "output": "{\"status\":\"shipped\"}" }] }
+```
+
+The turn resumes and streams the answer. If the model calls another tool, it pauses again.
+
+See [Tool calls and approvals](/docs/agents-api/tool-calls) for the full loop and [Events](/docs/agents-api/events) for every event.
+
+## Endpoints
+
+| Endpoint | Does |
+| --- | --- |
+| `POST /v1/sessions` | Create a session, optionally with its first `turn` |
+| `POST /v1/sessions/:id/turns` | Send a turn |
+| `POST /v1/sessions/:id/approve` | Send tool results (and approve) to resume a paused turn |
+| `POST /v1/sessions/:id/reject` | Decline a paused tool call |
+| `GET /v1/sessions/:id` | The session |
+| `GET /v1/sessions/:id/events` | Its event log |
+| `GET /v1/sessions` | List sessions |
+| `DELETE /v1/sessions/:id` | Delete a session |
+
+Request and response details: [Sessions API reference](/docs/api/sessions).
+
+## Turn options
+
+| Field | Use it for |
+| --- | --- |
+| `input` | The user's message |
+| `model`, `instructions` | Any catalog model; the system prompt |
+| `tools` | Function tools (yours) and built-in tools |
+| `pause_on_tool_calls` | Pause on your tools so you can run them. Without it, calls are returned in the output |
+| `widgets` | Give the model `render_ui` to answer with UI. See [Widgets](/docs/agents-api/widgets) |
+| `response_format` | Structured output (JSON Schema) |
+| `temperature`, `max_output_tokens`, `reasoning_effort` | Model settings |
+| `memory` | Gateway memory for an end user |
+| `user` | Your end user's id: quotas, billing, memory |
+| `metadata` | Up to 20 strings, shown in traces (`agent` names the agent) |
+
+## Who can call it
+
+- **Secret keys** (`csk_`) from your server: everything.
+- **Client tokens** (`ect_`) from a browser: turns in their own sessions, and approvals if granted. See [Browser access](/docs/agents-api/browser-access).

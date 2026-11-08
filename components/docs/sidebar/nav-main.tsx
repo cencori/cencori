@@ -268,7 +268,7 @@ export function NavMain({
                       const isActive = activeTrigger.url === subItem.url;
 
                       if (item.name == subItem.name) {
-                        subItem.name = "Default"; // for base charts
+                        subItem.name = "Overview"; // the section's own page
                       }
 
                       return (

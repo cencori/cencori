@@ -1,0 +1,42 @@
+---
+title: "Agent UI"
+description: "A chat where your agent answers with UI: charts, tables, stats, lists, buttons and forms, generated on the fly."
+section: "Agent UI"
+order: 1
+---
+
+Agent UI puts your agent in a chat that can answer with more than text. Ask "show me revenue by product" and the agent draws a chart from your real data. Ask it to issue a refund and the user gets an approval card. Click a button in a widget and the agent carries on from there.
+
+```tsx
+import { AgentChat } from 'cencori/react';
+
+<AgentChat api="/api/chat" greeting="Ask about your sales" prompts={['Revenue by product', 'Top customers']} />
+```
+
+## How it fits together
+
+| Piece | Where it runs | What it does |
+| --- | --- | --- |
+| Your agent (`cencori/agents`) | Your server | Instructions, tools, your data |
+| `createAgentChatHandler` | Your route, e.g. `/api/chat` | Runs the agent for the chat, streams events |
+| Cencori | Cencori | Model calls, sessions, `render_ui`, approvals, traces |
+| `<AgentChat>` (`cencori/react`) | The browser | Streams replies, draws widgets, approval cards, tool steps |
+
+Your tools never run in the browser, and the browser never sees your API key.
+
+## What makes it different
+
+- **Any model generates UI.** `widgets: true` gives the agent a built-in `render_ui` tool. It works on every model that calls tools, not one vendor's.
+- **Every widget is checked.** Cencori validates each widget against the [spec](/docs/agent-ui/widgets) before it's shown. A broken one goes back to the model with the errors, and it fixes it. Your page never gets malformed UI.
+- **Charts and tables built in.** Bar, line, area and pie charts, tables with number, currency and date formats, stats with deltas.
+- **Widgets stream.** A widget draws as the model writes it, then the checked version replaces it.
+- **Approvals in the chat.** `needsApproval` tools show an approval card. The paused run is signed so the browser can't change what runs.
+- **No styling setup.** It brings its own styles: no Tailwind required, light and dark modes, themable.
+
+## Read next
+
+- [Quickstart](/docs/agent-ui/quickstart): a working chat in a Next.js app.
+- [Widgets](/docs/agent-ui/widgets): every component and its props.
+- [The chat](/docs/agent-ui/chat): `<AgentChat>`, theming, and building your own layout.
+- [Actions and forms](/docs/agent-ui/actions): what happens when a user clicks.
+- [Server](/docs/agent-ui/server): `createAgentChatHandler`, auth, and the wire format.

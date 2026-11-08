@@ -1,0 +1,83 @@
+---
+title: "Quickstart"
+description: "A chat where the agent answers with charts and tables, in a Next.js app."
+section: "Agent UI"
+order: 2
+---
+
+## 1. Install
+
+```bash
+npm install cencori zod
+```
+
+```bash
+# .env.local
+CENCORI_API_KEY=csk_...
+```
+
+## 2. Serve the agent from a route
+
+```ts
+// app/api/chat/route.ts
+import { Agent, createAgentChatHandler, tool } from 'cencori/agents';
+import { z } from 'zod';
+
+const getSales = tool({
+    name: 'get_sales',
+    description: 'Monthly revenue in USD by product.',
+    parameters: z.object({}),
+    execute: async () => [
+        { month: 'Sep', Gateway: 30600, Agents: 18400 },
+        { month: 'Oct', Gateway: 33900, Agents: 21500 },
+        { month: 'Nov', Gateway: 35400, Agents: 24600 },
+    ],
+});
+
+const analyst = new Agent({
+    name: 'Analyst',
+    instructions: 'Use tools for real numbers. Answer with charts, tables and stats when it helps. Keep text short.',
+    tools: [getSales],
+    widgets: true,
+});
+
+export const POST = createAgentChatHandler(analyst);
+```
+
+`widgets: true` lets the agent answer with UI. Leave it out for a text-only chat.
+
+## 3. Add the chat to a page
+
+```tsx
+// app/page.tsx
+'use client';
+import { AgentChat } from 'cencori/react';
+
+export default function Page() {
+    return (
+        <div style={{ height: '100dvh', maxWidth: 760, margin: '0 auto' }}>
+            <AgentChat
+                api="/api/chat"
+                greeting="Ask about sales"
+                prompts={['Revenue by product', 'How did Agents grow?']}
+            />
+        </div>
+    );
+}
+```
+
+`<AgentChat>` fills its container: give the parent a height.
+
+## 4. Try it
+
+```bash
+npm run dev
+```
+
+Ask "Revenue by product". The agent calls `get_sales`, then draws a line chart of the numbers it got back.
+
+## Next
+
+- Add an approval: mark a tool `needsApproval: true` and the chat shows an approval card. See [Guardrails and approvals](/docs/agents-sdk/guardrails-and-approvals).
+- Check the user in your route: see [Server](/docs/agent-ui/server).
+- Match your brand: see [The chat](/docs/agent-ui/chat#theming).

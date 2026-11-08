@@ -1,0 +1,70 @@
+---
+title: "Actions and forms"
+description: "What happens when a user clicks a button, picks an option or submits a form in a widget."
+section: "Agent UI"
+order: 5
+---
+
+Buttons, list items, selects and forms carry an action:
+
+```json
+{ "type": "Button", "label": "Break down by product", "action": { "type": "breakdown", "payload": { "by": "product" } } }
+```
+
+| Field | What it is |
+| --- | --- |
+| `type` | Your name for the action |
+| `payload` | Any data, up to 4 KB |
+| `handler` | `agent` (the default) or `client` |
+
+## Actions that go to the agent
+
+By default an action is the user's next message. The agent receives:
+
+```
+[The user used the widget ("Break down by product"): action "breakdown" {"by":"product"}]
+```
+
+and answers, usually with a new widget. The chat shows the action as a small chip ("✓ Break down by product") instead of a typed message. After a click, that widget fades and stops taking clicks.
+
+You don't need to handle anything: the agent wrote the button, so it knows what it means.
+
+## Actions your page handles
+
+`handler: "client"` actions only call `onAction`. Use them for things the page does itself: open a record, copy text, navigate.
+
+```tsx
+<AgentChat
+    api="/api/chat"
+    onAction={(action, { widgetId, label }) => {
+        if (action.type === 'open_order') router.push(`/orders/${action.payload?.id}`);
+    }}
+/>
+```
+
+`onAction` is called for every action. For agent actions, return `false` to stop it reaching the agent.
+
+## Forms
+
+Inputs, selects and checkboxes inside a `Form` are sent in the payload by `name`:
+
+```json
+{
+  "type": "Form",
+  "action": { "type": "book_demo" },
+  "submitLabel": "Book",
+  "children": [
+    { "type": "Input", "name": "email", "label": "Work email", "inputType": "email", "required": true },
+    { "type": "Select", "name": "size", "label": "Team size", "options": [{ "label": "1–10", "value": "small" }, { "label": "11–100", "value": "mid" }] },
+    { "type": "Checkbox", "name": "newsletter", "label": "Send me product updates" }
+  ]
+}
+```
+
+Submitting sends `{ "type": "book_demo", "payload": { "email": "...", "size": "mid", "newsletter": true } }`. Number inputs arrive as numbers, checkboxes as booleans. `required` fields are checked by the browser before submitting.
+
+A `Select` with its own `action` runs it on change, with the chosen value in the payload.
+
+## Treat payloads as user input
+
+An action's payload comes from the browser. Check it in your tools like any user input: the agent's tools run with your permissions, not the payload's.

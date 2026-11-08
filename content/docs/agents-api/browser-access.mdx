@@ -1,0 +1,37 @@
+---
+title: "Browser access"
+description: "Talk to an agent from the browser with short-lived client tokens."
+section: "Agents API"
+order: 5
+---
+
+Never put a secret key in a browser. Mint a client token on your server instead: a 15-minute `ect_` token scoped to one tenant and end user.
+
+```http
+POST /v1/client-tokens
+CENCORI_API_KEY: csk_...
+
+{
+  "tenant_id": "ten_...",
+  "external_user_id": "user_42",
+  "permissions": ["sessions:create", "sessions:turn"]
+}
+```
+
+The browser sends it as `Authorization: Bearer ect_...`.
+
+## Permissions
+
+| Permission | Allows |
+| --- | --- |
+| `sessions:create` | Creating sessions (default) |
+| `sessions:turn` | Sending turns and reading its own sessions (default) |
+| `sessions:approve` | Approving and rejecting paused tool calls in its own sessions. Not granted unless you ask for it |
+
+A token only reaches sessions of its own tenant and user. Anything else is a 404, as if the session didn't exist.
+
+## Approvals from the browser
+
+Grant `sessions:approve` when the end user is the right person to decide: "Book this flight?", "Send this email?". Keep approvals on your server when someone else should decide, like a manager approving a refund.
+
+With [Agent UI](/docs/agent-ui/server) you don't need this: approvals go through your own route, which holds the secret key.

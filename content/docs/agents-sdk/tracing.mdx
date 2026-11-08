@@ -1,0 +1,29 @@
+---
+title: "Tracing"
+description: "See every run: turns, tool calls, handoffs, timings and cost."
+section: "Agents SDK"
+order: 9
+---
+
+Every run is a Cencori session, and every session is traced. There's nothing to set up.
+
+Open **Observability → Traces** in your project:
+
+- **Timeline** of the run: each model call, tool call and wait, on one time axis. Long idle gaps (a person deciding on an approval) are folded so the work stays readable.
+- **Tree** of agents: handoffs and agents called as tools, with their own sessions linked to the caller's.
+- **Each turn**: the exact messages the model saw, the tools it had, its settings, the output, tokens, cost, time to first token, and which provider served it (and whether a fallback was used).
+- **Events**: the raw session event log.
+
+Filter traces by status (active, waiting, ended, failed) and by source (Agents SDK, Arcie, embedded agents...). The agent's name comes from your `Agent`, so a team of agents reads by name.
+
+## Naming runs
+
+Add your own labels with `metadata`:
+
+```ts
+await run(support, input, { metadata: { ticket: 'T-4821', channel: 'email' } });
+```
+
+## Request logs
+
+Each model call in a run is also in **Observability → Request logs**, with the prompt, response, latency and cost, linked back to its trace.

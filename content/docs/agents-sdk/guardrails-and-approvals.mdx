@@ -1,0 +1,92 @@
+---
+title: "Guardrails and approvals"
+description: "Check input and output, and pause for a human before risky tools."
+section: "Agents SDK"
+order: 7
+---
+
+## Approvals
+
+Mark a tool `needsApproval: true` and the run stops before calling it. Nothing runs until someone decides.
+
+```ts
+const issueRefund = tool({
+    name: 'issue_refund',
+    description: 'Refund an order.',
+    parameters: z.object({ id: z.string(), amount: z.number() }),
+    needsApproval: true,
+    execute: async ({ id, amount }) => payments.refund(id, amount),
+});
+
+const result = await run(billing, 'Refund order 1042');
+
+if (result.interruptions.length > 0) {
+    // [{ type: 'tool_approval', callId, toolName: 'issue_refund', arguments: '{"id":"1042","amount":40}', agentName }]
+    await db.reviews.insert({ state: JSON.stringify(result.state), items: result.interruptions });
+}
+```
+
+Later, maybe in another process, after a person decides:
+
+```ts
+import { RunState, run } from 'cencori/agents';
+
+const review = await db.reviews.find(reviewId);
+const state = RunState.fromJSON(review.state);
+
+state.approve(review.items[0].callId);
+// or: state.reject(review.items[0].callId, { message: 'Over the limit without a manager.' });
+
+const result = await run(billing, state);
+result.finalOutput; // "Done: I've refunded $40 for order 1042."
+```
+
+- `RunState` is plain JSON: keep it in your database, a queue, anywhere.
+- Cencori holds a paused session for 24 hours.
+- A rejected call isn't run; the model is told it was rejected (with your message) and continues.
+- With `needsApproval: true`, the request and the decision are recorded in your project's governance ledger.
+
+### Deciding per call
+
+Pass a function to decide for each call, in your process:
+
+```ts
+needsApproval: async ({ context }, { amount }) => amount > 100 || !context.isManager,
+```
+
+### In a chat
+
+[Agent UI](/docs/agent-ui/chat) shows an approval card and continues the run when the user decides. The paused state is signed so the browser can't change it.
+
+## Input guardrails
+
+Run before the first model call. Return `tripwireTriggered: true` to stop the run.
+
+```ts
+const noSecrets = {
+    name: 'no_secrets',
+    execute: async ({ input }) => ({ tripwireTriggered: /sk_live_|-----BEGIN/.test(input) }),
+};
+
+const agent = new Agent({ name: 'Support', inputGuardrails: [noSecrets] });
+```
+
+## Output guardrails
+
+Run on the final answer before `run()` returns it.
+
+```ts
+const onTopic = {
+    name: 'on_topic',
+    execute: async ({ output }) => {
+        const verdict = await run(classifier, String(output));
+        return { tripwireTriggered: verdict.finalOutput.offTopic, outputInfo: verdict.finalOutput };
+    },
+};
+```
+
+A tripped guardrail throws `GuardrailTripwireTriggered` with `kind` (`'input'` or `'output'`), the guardrail's name and your `outputInfo`.
+
+## Gateway protection still applies
+
+Every model call in a run goes through the Cencori gateway, so your project's PII rules, security policies, budgets and rate limits apply to agents too, with no extra code.

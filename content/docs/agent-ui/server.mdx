@@ -1,0 +1,70 @@
+---
+title: "Server"
+description: "createAgentChatHandler: serving an agent to the chat, auth, approvals, and the wire format."
+section: "Agent UI"
+order: 6
+---
+
+`createAgentChatHandler(agent, options?)` turns an agent into a route handler for `<AgentChat>`. It takes a standard `Request` and returns a streaming `Response`, so it works in Next.js route handlers, Hono, Remix, Bun, Deno and Cloudflare Workers.
+
+```ts
+// app/api/chat/route.ts
+import { createAgentChatHandler } from 'cencori/agents';
+import { support } from '@/agents/support';
+
+export const POST = createAgentChatHandler(support, {
+    context: async (req) => {
+        const user = await getUser(req);
+        return { userId: user.id, tenantId: user.tenantId };
+    },
+    user: async (req) => (await getUser(req)).id,
+    authorizeSession: async (sessionId, req) => db.chats.belongsTo(sessionId, (await getUser(req)).id),
+});
+```
+
+## Options
+
+| Option | Use it for |
+| --- | --- |
+| `context(req)` | Your context for the run: who the user is, what they can do. Tools receive it |
+| `user(req)` | The end user's id, for per-user quotas, billing and analytics |
+| `authorizeSession(sessionId, req)` | Check a conversation belongs to this user before continuing it. Without it, any session id the browser sends is continued |
+| `secret` | Signs paused-run state. Default: `CENCORI_AGENT_CHAT_SECRET`, then your API key |
+| `maxTurns`, `memory`, `metadata`, `apiKey`, `baseUrl` | As in [run()](/docs/agents-sdk/running-agents) |
+
+## Who can do what
+
+- The browser sends messages, widget actions and approval decisions. It never sees your API key, and your tools never run in it.
+- Authenticate in `context` or `user` as you would any route: read the session cookie, return 401 by throwing.
+- Use `authorizeSession` once users have more than one conversation.
+
+## Approvals
+
+When a tool needs approval, the handler sends the paused run's state to the chat, signed with HMAC. The chat sends it back with the user's decisions. A changed state fails the signature check, so a browser can't alter which tool runs or its arguments.
+
+Set `CENCORI_AGENT_CHAT_SECRET` if several servers share sessions and use different API keys.
+
+## The wire format
+
+The handler accepts `POST` with JSON:
+
+```ts
+{ sessionId?: string; message?: string; action?: { type, payload?, label? }; approval?: { state: string; decisions: Record<callId, { approved: boolean; message?: string }> } }
+```
+
+and replies with server-sent events:
+
+| Event | Data |
+| --- | --- |
+| `agent` | `{ name }`: the answering agent |
+| `text` | `{ delta }` |
+| `tool_call` | `{ callId, name, arguments }` |
+| `tool_output` | `{ callId, name, output }` |
+| `widget_partial` | `{ callId, widget }`: a widget being written |
+| `widget` | `{ id, callId, widget }`: a finished, checked widget |
+| `handoff` | `{ from, to }` |
+| `approval` | `{ sessionId, state, items: [{ callId, toolName, arguments, agentName }] }` |
+| `done` | `{ sessionId }` |
+| `error` | `{ message, code? }` |
+
+Anything that speaks this format can drive `<AgentChat>`. Use `toAgentChatStream(run(agent, input, { stream: true }), { secret })` to build your own handler.

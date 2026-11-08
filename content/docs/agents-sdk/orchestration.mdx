@@ -1,0 +1,66 @@
+---
+title: "Orchestration"
+description: "Several agents working together: handoffs and agents as tools."
+section: "Agents SDK"
+order: 6
+---
+
+There are two ways to use more than one agent.
+
+| | Handoff | Agent as a tool |
+| --- | --- | --- |
+| Who keeps the conversation | The new agent takes over | The calling agent keeps it |
+| Good for | Routing: triage → billing | Asking a specialist a question |
+| How | `handoffs: [billing]` | `tools: [policy.asTool()]` |
+
+## Handoffs
+
+```ts
+const billing = new Agent({
+    name: 'Billing',
+    handoffDescription: 'Refunds, invoices and charges.',
+    instructions: 'Resolve billing questions.',
+    tools: [getOrder, issueRefund],
+});
+
+const triage = new Agent({
+    name: 'Triage',
+    instructions: 'Work out what the customer needs and hand off.',
+    handoffs: [billing],
+});
+
+const result = await run(triage, 'I was charged twice for order 1042');
+result.lastAgent.name; // 'Billing'
+```
+
+Each handoff becomes a tool named `transfer_to_<name>`. When the model calls it, the run continues in the same session as the other agent, with its own instructions, model and tools. The whole conversation carries over.
+
+Agents can hand off to each other in any shape: a router, a chain, back and forth.
+
+## Agents as tools
+
+```ts
+const policy = new Agent({
+    name: 'Policy',
+    instructions: 'Answer questions about the refund policy, citing the clause.',
+});
+
+const support = new Agent({
+    name: 'Support',
+    instructions: 'Help customers. Check the policy before promising anything.',
+    tools: [policy.asTool({ toolName: 'ask_policy', toolDescription: 'Ask what the refund policy allows.' })],
+});
+```
+
+The policy agent runs in its own session and returns its final answer as the tool result. Its session is linked to the caller's, so both show up in Traces.
+
+`asTool()` options: `toolName`, `toolDescription`, and `runOptions` (`maxTurns`, `apiKey`, `baseUrl`).
+
+## Choosing models per agent
+
+Orchestration is where model choice pays off: a fast model to route, a strong one for the hard part.
+
+```ts
+const analyst = new Agent({ name: 'Analyst', model: 'claude-opus-5', tools: [runQuery] });
+const triage = new Agent({ name: 'Triage', model: 'gpt-oss-120b', handoffs: [analyst] });
+```

@@ -1,0 +1,62 @@
+---
+title: "Agents SDK"
+description: "Build agents in code: tools, handoffs, guardrails and approvals, on any model, on Cencori's durable runtime."
+section: "Agents SDK"
+order: 1
+---
+
+`cencori/agents` is a code-first SDK for building agents. You define agents and tools in TypeScript, your tools run in your process, and every run lives in a Cencori session: durable, traced, and able to wait hours for a human.
+
+```ts
+import { Agent, run, tool } from 'cencori/agents';
+import { z } from 'zod';
+
+const getOrder = tool({
+    name: 'get_order',
+    description: 'Look up an order by id.',
+    parameters: z.object({ id: z.string() }),
+    execute: async ({ id }) => db.orders.find(id),
+});
+
+const support = new Agent({
+    name: 'Support',
+    instructions: 'Help customers with their orders. Be brief.',
+    tools: [getOrder],
+});
+
+const result = await run(support, 'Where is order 1042?');
+console.log(result.finalOutput);
+```
+
+## Why build on Cencori
+
+| | What you get |
+| --- | --- |
+| **Any model** | Every model in the catalog: OpenAI, Anthropic, Gemini, open-weight models. Change `model` and nothing else. |
+| **Your tools stay yours** | Tools run in your process, with your database and secrets. Cencori never sees them. |
+| **Durable runs** | A run is a [session](/docs/agents-api/overview). Approvals can wait hours; the state survives restarts. |
+| **Human review** | `needsApproval` pauses a run until someone decides. Approvals land in your governance ledger. |
+| **Traces** | Every turn, tool call, handoff and model call in [Observability → Traces](/docs/agents-sdk/tracing). |
+| **Billing and limits** | Per-user quotas, end-user billing, budgets and PII rules from the gateway apply to every model call. |
+| **UI** | [Agent UI](/docs/agent-ui/overview): a chat where the agent answers with charts, tables and forms. |
+
+## What's in the SDK
+
+| Piece | Use it for | Read next |
+| --- | --- | --- |
+| `Agent` | A model, instructions, tools and behaviour | [Agent definitions](/docs/agents-sdk/agent-definitions) |
+| `tool()` | Functions the agent can call | [Tools](/docs/agents-sdk/tools) |
+| `run()` | Running an agent, streaming, continuing a conversation | [Running agents](/docs/agents-sdk/running-agents) |
+| `handoffs`, `asTool()` | Several agents working together | [Orchestration](/docs/agents-sdk/orchestration) |
+| Guardrails, `needsApproval`, `RunState` | Checking input and output, human review | [Guardrails and approvals](/docs/agents-sdk/guardrails-and-approvals) |
+| `widgets`, `createAgentChatHandler` | A chat UI the agent can draw in | [Agent UI](/docs/agent-ui/overview) |
+
+## Install
+
+```bash
+npm install cencori zod
+```
+
+Set `CENCORI_API_KEY` to a secret project key (`csk_...`). `zod` is optional: tools also accept JSON Schema or any Standard Schema library.
+
+Next: the [quickstart](/docs/agents-sdk/quickstart).

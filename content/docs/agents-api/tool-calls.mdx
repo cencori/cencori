@@ -1,0 +1,76 @@
+---
+title: "Tool calls and approvals"
+description: "Run your own tools, pause for people, hand off between agents."
+section: "Agents API"
+order: 2
+---
+
+## Three kinds of tools
+
+| Kind | Who runs it | The turn |
+| --- | --- | --- |
+| Built-in (web search, `render_ui`) and an installed agent's tools | Cencori | Continues on its own |
+| Your function tools, with `pause_on_tool_calls: true` | You | Pauses until you send results |
+| Your function tools, without it | Nobody | Ends with the calls in its output |
+
+## The pause
+
+```
+event: turn.paused
+data: {
+  "reason": "tool_results_required",
+  "action_id": "call_1",
+  "actions": [
+    { "action_id": "call_1", "tool": "get_order", "arguments": "{\"id\":\"1042\"}", "needs_approval": false }
+  ]
+}
+```
+
+`reason` is:
+
+- `tool_results_required`: run the tools and send the results.
+- `approval_required`: at least one call is to a tool marked `needsApproval`. A person should decide first. The request is recorded in the governance ledger.
+
+Every call in `actions` needs a result to resume, including the ones that didn't need approval.
+
+## Resume
+
+```http
+POST /v1/sessions/:id/approve
+
+{
+  "action_id": "call_1",
+  "tool_results": [
+    { "action_id": "call_1", "output": "{\"status\":\"shipped\"}" }
+  ]
+}
+```
+
+- `action_id` is the pause's `action_id`.
+- `output` is a string, up to 1 MiB each, up to 100 results. Results go through your input security rules before the model sees them.
+- The reply streams back. The model may call tools again and pause again: loop until `turn.completed`.
+
+To tell the model a call was declined, send a result that says so (`"The user declined this refund."`), or reject the pause outright with `POST /v1/sessions/:id/reject` and `{ "action_id" }`, which ends the turn.
+
+## Handoffs: continue as another agent
+
+`next` changes the agent for the rest of the run:
+
+```json
+{
+  "action_id": "call_7",
+  "tool_results": [{ "action_id": "call_7", "output": "Transferred to Billing." }],
+  "next": {
+    "instructions": "You handle refunds and invoices.",
+    "model": "claude-sonnet-4-5",
+    "tools": [ ... ],
+    "metadata": { "agent": "Billing" }
+  }
+}
+```
+
+This is how the Agents SDK implements handoffs. The conversation carries over; the new instructions, model and tools apply from here on.
+
+## How long a pause lasts
+
+A paused session waits 24 hours, then expires. Waiting costs nothing.

@@ -1,0 +1,45 @@
+---
+title: "Widgets"
+description: "Let any model answer with UI: render_ui, validation, and streaming."
+section: "Agents API"
+order: 3
+---
+
+Send `"widgets": true` on a turn and the model gets a built-in tool, `render_ui`, for showing UI: cards, lists, tables, charts, stats, buttons and forms. The [widget spec](/docs/agent-ui/widgets) lists every component.
+
+```json
+{ "input": "Show revenue by month as a chart", "model": "gpt-oss-120b", "widgets": true }
+```
+
+## What happens
+
+1. The model calls `render_ui` with a widget.
+2. Cencori checks it against the spec.
+3. Valid: it's sent as the tool's output and the model is told the user can see it. Invalid: the errors go back to the model, which fixes the widget and calls again. Nothing invalid reaches the user.
+4. The turn continues: usually a short sentence after the widget.
+
+`render_ui` runs on Cencori, so it never pauses the turn, even with `pause_on_tool_calls`.
+
+## Events
+
+```
+event: tool_call.delta       data: {"action_id":"call_w","tool":"render_ui","delta":"{\"widget\":{\"type\":\"Card\",..."}
+event: tool_call.started     data: {"tool":"render_ui","arguments":{},"action_id":"call_w"}
+event: tool_call.completed   data: {"tool":"render_ui","action_id":"call_w","output":{"ok":true,"widget_id":"wgt_...","widget":{...}}}
+```
+
+- `tool_call.delta` carries the widget's JSON as the model writes it, so a chat can draw it early. It's live only (not stored) and isn't sent when an output policy or PII masking needs the full text first. How smoothly it arrives depends on the provider.
+- `tool_call.completed` with `output.ok: true` carries the checked widget. Draw that one.
+- `output.ok: false` carries `errors`: the model is fixing it.
+
+## Later turns
+
+The session remembers what was shown: later turns see a note like `[Showed the user a Card: Revenue]`, so "break that down by product" works.
+
+## Widget actions
+
+A button or form in a widget sends an action. With [Agent UI](/docs/agent-ui/actions) it becomes the next turn's input:
+
+```
+[The user used the widget ("Break down by product"): action "breakdown" {"by":"product"}]
+```

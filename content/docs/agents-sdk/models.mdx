@@ -1,0 +1,46 @@
+---
+title: "Models"
+description: "Choose a model per agent and tune how it runs."
+section: "Agents SDK"
+order: 8
+---
+
+An agent takes any model in the [Cencori catalog](/docs/ai/models). Switching provider is changing one string.
+
+```ts
+new Agent({ name: 'Fast', model: 'gpt-oss-120b' });
+new Agent({ name: 'Careful', model: 'claude-sonnet-4-5' });
+new Agent({ name: 'Cheap', model: 'gemini-2.5-flash' });
+```
+
+## The default
+
+Without `model`, agents use `gpt-oss-120b` on Cerebras (`DEFAULT_MODEL`): thousands of tokens a second and reliable tool calling, so agents with several tool rounds stay quick.
+
+## Model settings
+
+```ts
+new Agent({
+    name: 'Analyst',
+    model: 'gpt-oss-120b',
+    modelSettings: {
+        temperature: 0.2,
+        maxTokens: 2000,
+        reasoningEffort: 'low', // 'none' | 'low' | 'medium' | 'high'
+    },
+});
+```
+
+| Setting | Effect |
+| --- | --- |
+| `temperature` | Lower is steadier, higher more varied |
+| `maxTokens` | Cap on each reply |
+| `reasoningEffort` | How long a reasoning model thinks first. Lower is faster |
+
+## Tools need a model that calls tools
+
+Agents with tools, handoffs or widgets need a model that supports tool calling. Check `capabilities.tools` in `GET /v1/models`.
+
+## Your own keys
+
+Bring your own provider keys (BYOK) in project settings and agents use them automatically: same code, your account's rates and limits.

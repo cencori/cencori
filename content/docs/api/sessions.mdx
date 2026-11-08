@@ -7,6 +7,9 @@ order: 4
 
 ## Overview
 
+> [!NOTE]
+> For how sessions fit together with tool calls, approvals, handoffs and widgets, start with the [Agents API](/docs/agents-api/overview). This page is the endpoint reference.
+
 Sessions is an event-sourced durable execution layer for AI agents. Every turn is checkpointed as an append-only event log. Sessions survive crashes, cold starts, and redeploys. They pause for human approval without consuming compute and resume exactly where they stopped.
 
 **Key idea:** You pay for what calls the model, nothing for what waits.
@@ -146,7 +149,8 @@ data: {"turn_number": 1, "output": {...}, "usage": {...}}
 | `turn.started` | Turn begins execution | `{ turn_number, model, input_text }` |
 | `output_text.delta` | Text token generated | `{ delta }` |
 | `tool_call.started` | Model requests a tool | `{ tool, arguments, action_id }` |
-| `tool_call.completed` | Built-in tool finishes | `{ tool, output, action_id }` |
+| `tool_call.delta` | A widget being written (`widgets: true`, live only) | `{ action_id, tool, delta }` |
+| `tool_call.completed` | Built-in tool finishes (for `render_ui`, the checked widget) | `{ tool, output, action_id }` |
 | `turn.paused` | Waiting for approval | `{ reason, action_id, tool, arguments }` |
 | `turn.resumed` | Approved/rejected, continuing | `{ action_id, resolution }` |
 | `turn.completed` | Turn finished successfully | `{ turn_number, output, usage }` |

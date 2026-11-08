@@ -1,0 +1,43 @@
+---
+title: "Events"
+description: "Every event a turn streams, and the stored event log."
+section: "Agents API"
+order: 4
+---
+
+Turns stream server-sent events. Most are also stored in the session's event log (`GET /v1/sessions/:id/events`), which is what traces, replay and resume read.
+
+| Event | When | Data |
+| --- | --- | --- |
+| `turn.started` | A turn starts | `{ turn_number, model, input_text, ... }` |
+| `turn.resumed` | A paused turn continues after `/approve` | `{ action_id, resolution, tool_results, resumed_from_turn }` |
+| `output_text.delta` | Text as it's written | `{ delta }` |
+| `tool_call.delta` | A widget being written (live only) | `{ action_id, tool, delta }` |
+| `tool_call.started` | The model called a tool | `{ tool, arguments, action_id }` |
+| `tool_call.completed` | A tool Cencori ran finished | `{ tool, output, action_id }` |
+| `turn.paused` | Waiting for your tool results or an approval | `{ reason, action_id, actions, usage, trace }` |
+| `turn.completed` | The reply is done | `{ turn_number, output, usage, trace }` |
+| `turn.failed` | The turn failed | `{ turn_number, output: { error }, usage, trace }` |
+
+## Trace data
+
+`turn.paused`, `turn.completed` and `turn.failed` carry a `trace`:
+
+```json
+{
+  "request_id": "req_...",
+  "provider": "cerebras",
+  "model": "gpt-oss-120b",
+  "used_fallback": false,
+  "cost_usd": 0.00042,
+  "ttft_ms": 310,
+  "model_ms": 1240,
+  "rounds": 2
+}
+```
+
+`rounds` counts model calls in the turn (each tool round Cencori runs itself adds one). `request_id` links to the call in Request logs.
+
+## Reading a stream
+
+Events are standard SSE: an `event:` line, a `data:` line of JSON, a blank line. Ignore events you don't know: new ones are added over time.

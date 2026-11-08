@@ -22,6 +22,9 @@ const ICON_MAP: Record<string, IconComponent> = {
   installation: SquareAddonIcon,
   // Folders
   ai: BarChartIcon,
+  "agents-api": ChartConfigIcon,
+  "agents-sdk": SquareAddonIcon,
+  "agent-ui": ShapesIcon,
   api: ChartConfigIcon,
   "getting-started": BookIcon,
   guides: BookIcon,

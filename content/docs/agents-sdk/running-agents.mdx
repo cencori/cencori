@@ -1,0 +1,102 @@
+---
+title: "Running agents"
+description: "Run, stream, continue a conversation, and read the result."
+section: "Agents SDK"
+order: 5
+---
+
+`run(agent, input, options?)` runs an agent until it answers, running its tools along the way.
+
+```ts
+import { run } from 'cencori/agents';
+
+const result = await run(support, 'Where is order 1042?');
+```
+
+## Options
+
+| Option | Use it for |
+| --- | --- |
+| `context` | Your value for tools, guardrails and instructions. Never sent to Cencori |
+| `sessionId` | Continue an earlier conversation |
+| `stream` | Get events as they happen |
+| `maxTurns` | Most model calls the run may make (each tool round is one). Default 10 |
+| `user` | Your end user's id: per-user quotas, billing and memory |
+| `memory` | Turn on [memory](/docs/memory) for a user: `{ userId }` |
+| `metadata` | Strings stored on the session, shown in traces |
+| `signal` | An `AbortSignal` to stop the run |
+| `apiKey`, `baseUrl`, `fetch` | Override the key (default `CENCORI_API_KEY`), endpoint or fetch |
+
+## The result
+
+| Field | What it is |
+| --- | --- |
+| `finalOutput` | The answer: text, or the parsed `outputType`. `undefined` while waiting on an approval |
+| `sessionId` | The Cencori session. Pass it back to continue |
+| `lastAgent` | The agent that answered, after any handoffs |
+| `newItems` | Messages, tool calls, tool outputs, handoffs and widgets, in order |
+| `interruptions` | Tool calls waiting for approval |
+| `state` | A `RunState` to resume after deciding on them |
+| `usage` | Input, output and total tokens across the run |
+
+## Streaming
+
+```ts
+const stream = run(support, 'Where is order 1042?', { stream: true });
+
+for await (const event of stream) {
+    switch (event.type) {
+        case 'text_delta': process.stdout.write(event.delta); break;
+        case 'tool_call': console.log('calling', event.toolName); break;
+        case 'handoff': console.log(`${event.from} → ${event.to}`); break;
+    }
+}
+
+const result = await stream.completed;
+```
+
+| Event | When |
+| --- | --- |
+| `agent_updated` | The answering agent starts, or changes after a handoff |
+| `text_delta` | Text as it's written |
+| `tool_call` | The model asked for a tool |
+| `tool_output` | A tool returned |
+| `handoff` | The conversation moved to another agent |
+| `widget_partial`, `widget` | UI being drawn, then finished ([Agent UI](/docs/agent-ui/overview)) |
+| `interruption` | The run is waiting for approvals |
+
+`stream.toTextStream()` yields only the text.
+
+## Conversations
+
+Each run lives in a Cencori session. Pass `sessionId` to continue it: the agent sees the earlier turns.
+
+```ts
+const first = await run(support, 'Where is order 1042?');
+const next = await run(support, 'Can you cancel it?', { sessionId: first.sessionId });
+```
+
+A session the user stops using expires on its own; idle sessions cost nothing.
+
+## Errors
+
+| Error | When |
+| --- | --- |
+| `MaxTurnsExceededError` | The run hit `maxTurns` |
+| `GuardrailTripwireTriggered` | A guardrail stopped the run |
+| `CencoriRunError` | Cencori refused or failed a turn. Has `status`, `code` and `sessionId` |
+| `SchemaValidationError` | `outputType` didn't match |
+
+All extend `AgentsError`.
+
+```ts
+import { CencoriRunError, MaxTurnsExceededError } from 'cencori/agents';
+
+try {
+    await run(support, input);
+} catch (error) {
+    if (error instanceof CencoriRunError && error.status === 402) {
+        // Out of credits
+    }
+}
+```

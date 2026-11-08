@@ -1,0 +1,4 @@
+{
+  "title": "Agent UI",
+  "pages": ["overview", "quickstart", "widgets", "chat", "actions", "server"]
+}

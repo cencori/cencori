@@ -1,0 +1,4 @@
+{
+  "title": "Agents API",
+  "pages": ["overview", "tool-calls", "widgets", "events", "browser-access"]
+}

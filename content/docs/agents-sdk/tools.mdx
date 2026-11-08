@@ -1,0 +1,104 @@
+---
+title: "Tools"
+description: "Give an agent functions to call. They run in your process."
+section: "Agents SDK"
+order: 4
+---
+
+A tool is a function the model can ask to call. `tool()` takes a name, a description the model reads, parameters, and `execute`.
+
+```ts
+import { tool } from 'cencori/agents';
+import { z } from 'zod';
+
+const searchOrders = tool({
+    name: 'search_orders',
+    description: 'Find orders by customer email. Returns at most 10.',
+    parameters: z.object({
+        email: z.string().email(),
+        status: z.enum(['open', 'shipped', 'refunded']).optional(),
+    }),
+    execute: async ({ email, status }, { context }) => db.orders.search({ email, status, tenant: context.tenantId }),
+});
+```
+
+## How a tool call runs
+
+1. The model asks for `search_orders` with arguments.
+2. Cencori pauses the turn and sends the call to your process.
+3. The SDK validates the arguments against `parameters` and runs `execute`.
+4. The result goes back to the model, which continues.
+
+Your code, your database, your secrets: Cencori only sees the arguments and the result.
+
+## Parameters
+
+| You pass | Example |
+| --- | --- |
+| zod (v3 or v4) | `z.object({ id: z.string() })` |
+| Any Standard Schema library | Valibot, ArkType |
+| JSON Schema | `{ type: 'object', properties: { id: { type: 'string' } }, required: ['id'] }` |
+| Nothing | A tool with no arguments |
+
+Invalid arguments don't throw: the model is told what was wrong and can try again.
+
+## Results
+
+Return anything. Strings go to the model as they are; anything else is sent as JSON.
+
+## Errors
+
+If `execute` throws, the model gets `Error running <name>: <message>` and the run continues. Change what it sees with `errorFunction`:
+
+```ts
+const charge = tool({
+    name: 'charge_card',
+    description: 'Charge the saved card.',
+    parameters: z.object({ amount: z.number() }),
+    execute: async ({ amount }) => payments.charge(amount),
+    errorFunction: () => 'The charge failed. Ask the user to update their card.',
+});
+```
+
+## Approval
+
+Ask a human before a tool runs with `needsApproval`. See [Guardrails and approvals](/docs/agents-sdk/guardrails-and-approvals).
+
+```ts
+const refund = tool({ name: 'issue_refund', description: '...', parameters, execute, needsApproval: true });
+```
+
+## Tools that show UI
+
+A tool can return `{ widget }` to show a card, table or chart in [Agent UI](/docs/agent-ui/widgets). The model gets the rest of the result.
+
+```ts
+const showOrder = tool({
+    name: 'show_order',
+    description: 'Show an order to the user.',
+    parameters: z.object({ id: z.string() }),
+    execute: async ({ id }) => {
+        const order = await db.orders.find(id);
+        return {
+            status: order.status,
+            widget: {
+                type: 'Card',
+                title: `Order ${order.id}`,
+                children: [
+                    { type: 'Badge', label: order.status, color: order.status === 'shipped' ? 'success' : 'warning' },
+                    { type: 'Text', value: `${order.items.length} items · ${order.total}` },
+                ],
+            },
+        };
+    },
+});
+```
+
+## Agents as tools
+
+Another agent can be a tool: it answers a question and the calling agent keeps the conversation. See [Orchestration](/docs/agents-sdk/orchestration).
+
+```ts
+const researcher = new Agent({ name: 'Researcher', instructions: '...' });
+const writer = new Agent({ name: 'Writer', tools: [researcher.asTool({ toolDescription: 'Look up facts.' })] });
+```

@@ -1,0 +1,100 @@
+---
+title: "Agent definitions"
+description: "Configure a single agent cleanly before you build a team of them."
+section: "Agents SDK"
+order: 3
+---
+
+An agent packages a model, instructions and optional behaviour: tools, handoffs, guardrails, structured output and widgets.
+
+## What belongs on an agent
+
+| Property | Use it for | Read next |
+| --- | --- | --- |
+| `name` | Its identity in traces and in handoff tool names | This page |
+| `instructions` | The job, constraints and style. A string, or a function of the run context | This page |
+| `model` | Any catalog model. Default `gpt-oss-120b` | [Models](/docs/agents-sdk/models) |
+| `modelSettings` | `temperature`, `maxTokens`, `reasoningEffort` | [Models](/docs/agents-sdk/models) |
+| `tools` | Functions the agent can call | [Tools](/docs/agents-sdk/tools) |
+| `handoffs` | Agents it can hand the conversation to | [Orchestration](/docs/agents-sdk/orchestration) |
+| `handoffDescription` | Tells other agents when to hand off to this one | [Orchestration](/docs/agents-sdk/orchestration) |
+| `outputType` | Structured output instead of text | This page |
+| `inputGuardrails`, `outputGuardrails` | Checking input and output | [Guardrails and approvals](/docs/agents-sdk/guardrails-and-approvals) |
+| `widgets` | Answering with UI: charts, tables, forms | [Agent UI](/docs/agent-ui/overview) |
+
+## Start with one focused agent
+
+Give an agent one clear job. Add more agents only when you need different instructions, different tools, or a different approval policy.
+
+```ts
+import { Agent } from 'cencori/agents';
+
+const billing = new Agent({
+    name: 'Billing',
+    instructions: 'You handle refunds and invoices. Never promise a refund before checking the order.',
+    model: 'claude-sonnet-4-5',
+    modelSettings: { temperature: 0.2 },
+    tools: [getOrder, issueRefund],
+});
+```
+
+## Instructions from context
+
+`instructions` can be a function. It gets the run context, so instructions can depend on who's asking.
+
+```ts
+const support = new Agent<{ plan: 'free' | 'pro' }>({
+    name: 'Support',
+    instructions: ({ context }) =>
+        context.plan === 'pro' ? 'Offer a call with an engineer when stuck.' : 'Point to the docs first.',
+});
+
+await run(support, 'My deploy fails', { context: { plan: 'pro' } });
+```
+
+## Keep local context separate from model context
+
+`context` is your value: a user, a database handle, permissions. Tools, guardrails and instructions receive it, and it never leaves your process. Only what you put in instructions, messages and tool results reaches the model.
+
+```ts
+const getInvoices = tool({
+    name: 'get_invoices',
+    description: "The signed-in user's invoices.",
+    parameters: z.object({}),
+    execute: async (_args, { context }) => db.invoices.forUser(context.userId),
+});
+```
+
+## Structured output
+
+Set `outputType` to a zod schema (or JSON Schema) and `finalOutput` is the parsed, validated object.
+
+```ts
+const triage = new Agent({
+    name: 'Triage',
+    instructions: 'Classify the ticket.',
+    outputType: z.object({
+        category: z.enum(['billing', 'bug', 'question']),
+        urgent: z.boolean(),
+    }),
+});
+
+const { finalOutput } = await run(triage, 'I was charged twice!!');
+finalOutput.category; // 'billing'
+```
+
+The agent can still call its tools before answering.
+
+## Copy an agent
+
+```ts
+const fastSupport = support.clone({ model: 'gpt-oss-120b', modelSettings: { reasoningEffort: 'low' } });
+```
+
+## When to split one agent into several
+
+- Its instructions are trying to do two jobs.
+- Some tools need approval and others don't, and you want that boundary clear.
+- Part of the work is better on a different model (a cheap fast one for triage, a strong one for analysis).
+
+See [Orchestration](/docs/agents-sdk/orchestration).
