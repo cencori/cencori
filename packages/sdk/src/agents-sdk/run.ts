@@ -190,8 +190,8 @@ function collectAgents(start: Agent<any>): Map<string, Agent<any>> {
     return seen;
 }
 
-function wireTools(agent: Agent<any>): Array<Record<string, unknown>> {
-    const tools: Array<Record<string, unknown>> = agent.tools.map((t) => ({
+function wireTools(agent: Agent<any>, resolved: FunctionTool<any>[] = agent.tools): Array<Record<string, unknown>> {
+    const tools: Array<Record<string, unknown>> = resolved.map((t) => ({
         type: 'function',
         function: { name: t.name, description: t.description, parameters: t.parameters },
         // Only an unconditional approval is the server's to hold and record; a
@@ -336,10 +336,18 @@ async function* runLoop<Ctx>(
         }
         return nextForLocal(agent, sessionId);
     };
+    // Each agent's tools, MCP servers' included, fetched once per run.
+    const resolvedTools = new Map<Agent<any>, Promise<FunctionTool<any>[]>>();
+    const toolsOf = (agent: Agent<any>) => {
+        let tools = resolvedTools.get(agent);
+        if (!tools) { tools = agent.resolveTools(); resolvedTools.set(agent, tools); }
+        return tools;
+    };
+
     const nextForLocal = async (agent: Agent<any>, sessionId: string): Promise<ResumeNext> => ({
         instructions: (await agent.resolveInstructions(contextFor(agent, sessionId))) ?? '',
         model: agent.model,
-        tools: wireTools(agent),
+        tools: wireTools(agent, await toolsOf(agent)),
         metadata: { sdk: 'cencori/agents', agent: agent.name },
     });
 
@@ -376,7 +384,7 @@ async function* runLoop<Ctx>(
 
         yield { type: 'agent_updated', agent };
         turnsUsed++;
-        const firstTools = wireTools(agent);
+        const firstTools = wireTools(agent, await toolsOf(agent));
         const firstTurn = {
             input,
             model: agent.model,
@@ -441,7 +449,7 @@ async function* runLoop<Ctx>(
 
         // Decide each paused call: run it, hand off, or wait for a human.
         const runContext = contextFor(agent, sessionId);
-        const toolsByName = new Map<string, FunctionTool<any>>(agent.tools.map((t) => [t.name, t]));
+        const toolsByName = new Map<string, FunctionTool<any>>((await toolsOf(agent)).map((t) => [t.name, t]));
         const handoffsByName = new Map<string, Agent<any>>(agent.handoffs.map((a) => [Agent.handoffToolName(a), a]));
         const interruptions: ToolApprovalItem[] = [];
         for (const action of pending.actions) {

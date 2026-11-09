@@ -5,6 +5,7 @@
     "quickstart",
     "agent-definitions",
     "tools",
+    "mcp",
     "running-agents",
     "orchestration",
     "guardrails-and-approvals",

@@ -1,0 +1,89 @@
+---
+title: "MCP servers"
+description: "Give an agent the tools of any MCP server: remote over HTTP, or local over stdio."
+section: "Agents SDK"
+order: 5
+---
+
+An agent can use the tools of [Model Context Protocol](https://modelcontextprotocol.io) servers next to its own: GitHub, Linear, Sentry, your company's internal server, or a local one.
+
+```ts
+import { Agent, MCPServerStreamableHttp, MCPServerStdio, run } from 'cencori/agents';
+
+const linear = new MCPServerStreamableHttp({
+    url: 'https://mcp.linear.app/mcp',
+    headers: { Authorization: `Bearer ${process.env.LINEAR_TOKEN}` },
+});
+
+const docs = new MCPServerStdio({
+    command: 'npx',
+    args: ['-y', '@modelcontextprotocol/server-filesystem', './docs'],
+});
+
+const ops = new Agent({
+    name: 'Ops',
+    instructions: 'Triage bugs. Check the docs before filing anything.',
+    mcpServers: [linear, docs],
+});
+
+await run(ops, 'Is anyone already working on the login timeout bug?');
+```
+
+## How it works
+
+- The servers connect **from your process**, like your other tools. Their credentials stay with you and never reach Cencori.
+- At the start of a run the agent lists each server's tools (once per server; set `cacheToolsList: false` to list every run). They join the agent's own tools.
+- When the model calls one, the SDK calls the server and sends the result back. MCP tool calls show in **Observability → Traces** like any other.
+- Text results go to the model as they are; structured results as JSON; images and other content as a placeholder.
+
+## Remote servers
+
+`MCPServerStreamableHttp` speaks Streamable HTTP. It uses stateless MCP and falls back to the session handshake for servers that predate it, so it works with both.
+
+| Option | Use it for |
+| --- | --- |
+| `url` | The server's endpoint |
+| `headers` | Auth and anything else sent on every request |
+| `fetch` | A custom fetch (proxies, tests) |
+
+## Local servers
+
+`MCPServerStdio` starts the server as a process and talks to it over stdin/stdout. Node.js only.
+
+| Option | Use it for |
+| --- | --- |
+| `command`, `args` | What to run |
+| `env`, `cwd` | Its environment and working directory |
+
+Call `await server.close()` when you're done (for example on shutdown) to stop the process.
+
+## Choosing tools and approvals
+
+Options on both kinds of server:
+
+| Option | Effect |
+| --- | --- |
+| `allowedTools` | Only these tools, by their MCP name. Recommended: an agent with fewer tools chooses better |
+| `requireApproval` | `true` for all tools, a list of names, or a function. Calls wait for a person, like [`needsApproval`](/docs/agents-sdk/guardrails-and-approvals) |
+| `name` | Shown in traces; also used to keep tool names apart |
+| `cacheToolsList` | Default `true` |
+| `timeoutMs` | Per request. Default 30 seconds |
+
+Tools a server marks as destructive (`destructiveHint`) ask for approval unless you set `requireApproval: false`.
+
+```ts
+const github = new MCPServerStreamableHttp({
+    url: 'https://api.githubcopilot.com/mcp/',
+    headers: { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` },
+    allowedTools: ['search_issues', 'get_issue', 'create_issue'],
+    requireApproval: ['create_issue'],
+});
+```
+
+## Tool names
+
+MCP tools keep their names, made safe for models (`team.list` becomes `team_list`). If a name is already taken by the agent's own tools or another server, the server's name goes in front: `linear_search_issues`.
+
+## In a chat
+
+Agents served with [`createAgentChatHandler`](/docs/agent-ui/server) use their MCP servers like any other tool, approvals included. Stored agents run without your backend, so they can't use your MCP servers yet.

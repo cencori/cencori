@@ -2,7 +2,7 @@
 title: "Coming from OpenAI"
 description: "Move an agent from the OpenAI Agents SDK, ChatKit or Agent Builder to Cencori: what maps to what, and what changes."
 section: "Agents SDK"
-order: 10
+order: 11
 ---
 
 `cencori/agents` follows the same shape as the OpenAI Agents SDK for JavaScript: agents, tools, `run()`, handoffs, guardrails, approvals. Most code moves by changing imports. What you get in return: any model in the catalog, durable runs that can wait on a person, traces, budgets and PII rules on every call, and a chat UI that works with all of it.
@@ -86,6 +86,7 @@ new Agent({ name: 'Assistant', model: 'claude-sonnet-4-5', ... });
 | Approvals | `needsApproval`, `result.state.approve(item)`, `run(agent, state)` | Same |
 | Context | `run(agent, input, { context })` | Same: never sent to the model provider or Cencori |
 | Max turns | `maxTurns` | Same |
+| MCP servers | `mcpServers: [new MCPServerStreamableHttp(...)]`, `MCPServerStdio` | Same names. See [MCP servers](/docs/agents-sdk/mcp) |
 
 ## What's different
 
@@ -142,7 +143,6 @@ If your agent was built in Agent Builder rather than in code:
 
 ## Not here yet
 
-- **MCP servers on agents.** Coming. Until then, wrap the calls you need in a `tool()`.
 - **OpenAI hosted tools** (file search, code interpreter, computer use). Web search is available as a built-in tool on stored agents.
 - **Voice and realtime agents.** Use the [Voice API](/docs/api/voice) for now.
 - **Python.** The Agents SDK is TypeScript today; from Python, use the [Agents API](/docs/agents-api/overview) over HTTP.

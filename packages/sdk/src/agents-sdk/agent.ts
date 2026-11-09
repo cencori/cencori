@@ -1,6 +1,9 @@
 import type { RunContext } from './context';
 import type { SchemaLike, StandardSchemaV1 } from './schema';
 import { tool, TOOL_NAME_PATTERN, type FunctionTool } from './tool';
+import { AgentsError } from './errors';
+import { mcpNeedsApproval, mcpResultText, type MCPServer, type MCPTool } from './mcp';
+import type { JsonSchema } from './schema';
 import type { RunOptions } from './run';
 
 /** Checks the user's input before the first model call. */
@@ -67,6 +70,12 @@ export interface AgentOptions<Ctx = unknown, Out = string> {
      * add here run in your process on top. Usually set with Agent.fromCencori().
      */
     cencoriAgentId?: string;
+    /**
+     * MCP servers whose tools this agent can use, next to its own. They connect
+     * from your process (MCPServerStreamableHttp for remote servers,
+     * MCPServerStdio for local ones).
+     */
+    mcpServers?: MCPServer[];
 }
 
 /** The model an agent uses when none is given: GPT OSS 120B on Cerebras, chosen for speed. */
@@ -103,6 +112,7 @@ export class Agent<Ctx = unknown, Out = string> {
     readonly outputGuardrails: OutputGuardrail<Ctx>[];
     readonly widgets: boolean;
     readonly cencoriAgentId?: string;
+    readonly mcpServers: MCPServer[];
 
     constructor(options: AgentOptions<Ctx, Out>) {
         if (!options.name?.trim()) throw new TypeError('An agent needs a name.');
@@ -119,6 +129,7 @@ export class Agent<Ctx = unknown, Out = string> {
         this.outputGuardrails = options.outputGuardrails ?? [];
         this.widgets = options.widgets ?? false;
         this.cencoriAgentId = options.cencoriAgentId;
+        this.mcpServers = options.mcpServers ?? [];
 
         const names = new Set<string>();
         for (const t of [...this.tools.map((t) => t.name), ...this.handoffs.map((a) => Agent.handoffToolName(a))]) {
@@ -142,6 +153,7 @@ export class Agent<Ctx = unknown, Out = string> {
             outputGuardrails: this.outputGuardrails,
             widgets: this.widgets,
             cencoriAgentId: this.cencoriAgentId,
+            mcpServers: this.mcpServers,
             ...overrides,
         });
     }
@@ -159,6 +171,41 @@ export class Agent<Ctx = unknown, Out = string> {
     static fromCencori<Ctx = unknown>(agentId: string, options: Omit<AgentOptions<Ctx, string>, 'cencoriAgentId' | 'name'> & { name?: string } = {}): Agent<Ctx, string> {
         if (!agentId || typeof agentId !== 'string') throw new TypeError('Agent.fromCencori needs the stored agent\'s id.');
         return new Agent<Ctx, string>({ ...options, name: options.name ?? 'Agent', cencoriAgentId: agentId });
+    }
+
+    /**
+     * Every tool this agent can call: its own, then its MCP servers' (fetched
+     * from each server, once per server unless it says otherwise). An MCP tool
+     * whose name is taken gets its server's name in front.
+     */
+    async resolveTools(): Promise<FunctionTool<Ctx>[]> {
+        if (this.mcpServers.length === 0) return this.tools;
+        const taken = new Set([...this.tools.map((t) => t.name), ...this.handoffs.map((a) => Agent.handoffToolName(a))]);
+        const out: FunctionTool<Ctx>[] = [...this.tools];
+        for (const server of this.mcpServers) {
+            let listed: MCPTool[];
+            try {
+                listed = await server.listTools();
+            } catch (error) {
+                throw new AgentsError(`Couldn't list the tools of MCP server "${server.name}": ${error instanceof Error ? error.message : String(error)}`);
+            }
+            const allowed = server.options.allowedTools;
+            for (const t of listed) {
+                if (allowed && !allowed.includes(t.name)) continue;
+                let name = toolSafe(t.name).slice(0, 64);
+                if (taken.has(name)) name = `${toolSafe(server.name)}_${toolSafe(t.name)}`.slice(0, 64);
+                if (taken.has(name) || !TOOL_NAME_PATTERN.test(name)) continue;
+                taken.add(name);
+                out.push(tool({
+                    name,
+                    description: (t.description ?? `${t.name} (from ${server.name})`).slice(0, 1024),
+                    parameters: (t.inputSchema && typeof t.inputSchema === 'object' ? t.inputSchema : { type: 'object', properties: {} }) as JsonSchema,
+                    needsApproval: mcpNeedsApproval(server, t),
+                    execute: async (args) => mcpResultText(await server.callTool(t.name, (args ?? {}) as Record<string, unknown>)),
+                }) as FunctionTool<Ctx>);
+            }
+        }
+        return out;
     }
 
     /** The tool name a handoff to this agent goes by. */

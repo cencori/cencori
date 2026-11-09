@@ -20,3 +20,5 @@ export type { AgentChatHandlerOptions } from './chat';
 export type { AgentChatEvent, AgentChatRequest, AgentChatApprovalItem, AgentChatDecision } from '../agent-chat/protocol';
 export { validateWidget, isWidgetResult, WIDGET_TYPES } from '../widgets/spec';
 export type * from '../widgets/spec';
+export { MCPServerStreamableHttp, MCPServerStdio } from './mcp';
+export type { MCPServer, MCPServerOptions, MCPServerStreamableHttpOptions, MCPServerStdioOptions, MCPTool, MCPCallResult } from './mcp';
