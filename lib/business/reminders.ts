@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { createAdminClient } from "@/lib/supabaseAdmin";
+import { adminUsers } from "@/lib/auth/admin-users";
 import { escapeHtml, sendEmail } from "@/lib/email/sendbyte";
 import { pushToOwners } from "@/lib/studio/push";
 import { earnedSince, paidThroughAssistant } from "@/lib/studio/earned";
@@ -106,7 +107,9 @@ export async function remindOwners(db: Admin, organizationId: string, plan: Orga
         await Promise.all(projectIds.map((id) => pushToOwners(db, id, { ...text, url: "/?plan=choose", tag: "plan" })));
 
         const ownerId = (organization as { owner_id?: string } | null)?.owner_id;
-        const email = ownerId ? (await db.auth.admin.getUserById(ownerId)).data.user?.email : null;
+        // Better Auth holds users since the RFC-0001 cutover; db.auth.admin
+        // still pointed at the retired Supabase Auth, so the email never went.
+        const email = ownerId ? (await adminUsers.getUserById(ownerId)).data.user?.email : null;
         if (email) {
             const business = (organization as { name?: string } | null)?.name ?? "Your business";
             await sendEmail({
