@@ -39,6 +39,7 @@ import {
     type WhatsAppChannel,
 } from '@/lib/channels/whatsapp';
 import { finishSignup, signupConfigFor } from '@/lib/channels/whatsapp-signup';
+import { adminUsers } from '@/lib/auth/admin-users';
 
 type Admin = ReturnType<typeof createAdminClient>;
 type Context = { params: Promise<{ projectId: string; agentId: string }> };
@@ -73,7 +74,8 @@ async function businessDetails(db: Admin, projectId: string, agent: { id: string
     const [alerts, { data: widget }, { data: user }] = await Promise.all([
         getOwnerAlerts(db, projectId, agent.id).catch(() => null),
         db.from('agent_widgets').select('allowed_origins').eq('project_id', projectId).eq('agent_id', agent.id).maybeSingle(),
-        db.auth.admin.getUserById(userId),
+        // Better Auth holds users since the RFC-0001 cutover (db.auth.admin is the retired Supabase Auth).
+        adminUsers.getUserById(userId),
     ]);
     const origin = ((widget?.allowed_origins as string[] | null) ?? []).find((value) => !value.includes('*'));
     return {
