@@ -17,7 +17,7 @@ import {
   PaymentElement,
   useCheckoutElements,
 } from "@stripe/react-stripe-js/checkout";
-import { ArrowRight, CreditCard } from "lucide-react";
+import { ArrowRight, Check, CreditCard, X } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,10 +31,13 @@ import {
   CENCORI_PAID_PLANS,
   getAvailableUpgradePlans,
   getMonthlyEquivalentCents,
+  isUpgradeReason,
+  UPGRADE_REASONS,
   type PaidPlanTier,
   type PlanBillingInterval,
 } from "@/lib/billing/plans";
 import { formatCurrency } from "@/lib/currency";
+import { useDisplayCurrency } from "@/hooks/useDisplayCurrency";
 import { cn } from "@/lib/utils";
 
 interface UpgradeDialogProps {
@@ -44,7 +47,10 @@ interface UpgradeDialogProps {
   orgSlug: string;
   orgName?: string;
   currentTier?: "free" | PaidPlanTier;
-  /** Kept so existing callers compile; the checkout no longer shows it. */
+  /**
+   * What the user reached for: a known reason ("history", "projects", ...)
+   * puts that feature first in the list. Other text is ignored.
+   */
   reason?: string;
   recommendedTier?: PaidPlanTier;
   checkoutMode?: "review" | "direct";
@@ -76,6 +82,27 @@ function formatCents(cents: number, maximumFractionDigits = 2): string {
     minimumFractionDigits: 0,
     maximumFractionDigits,
   });
+}
+
+/**
+ * Plan prices in the dashboard's display currency (the USD/NGN toggle). In
+ * naira a plan shows its set naira price (Pro: ₦20,000/mo), and amounts
+ * derived from the dollar price (annual per month, prorations) scale with it.
+ * Plans are still charged in dollars.
+ */
+function usePlanPrice(tier: PaidPlanTier) {
+  const { currency, formatMoney } = useDisplayCurrency();
+  const plan = CENCORI_PAID_PLANS[tier];
+  const format = (cents: number) => {
+    if (currency !== "NGN") return formatCents(cents);
+    if (!plan.ngnPrices) return formatMoney(cents / 100);
+    const nairaPerCent = plan.ngnPrices.month / plan.prices.month;
+    return formatCurrency(Math.round(cents * nairaPerCent), "NGN", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    });
+  };
+  return { currency, format };
 }
 
 function getInitialTier(
@@ -349,6 +376,7 @@ export function UpgradeDialog({
   checkoutMode = "review",
   preload = false,
   returnPath,
+  reason,
 }: UpgradeDialogProps) {
   const { resolvedTheme } = useTheme();
   const availablePlans = useMemo(
@@ -636,6 +664,7 @@ export function UpgradeDialog({
       dueNow={dueNow}
       dueToday={changingPlan ? (planChange?.amountDue ?? null) : dueNow}
       interval={checkoutInterval}
+      tier={checkoutTier}
     />
   );
 
@@ -663,7 +692,7 @@ export function UpgradeDialog({
         onOpenAutoFocus={(event) => event.preventDefault()}
         onEscapeKeyDown={ignoreWhileHidden}
         onInteractOutside={ignoreWhileHidden}
-        className="flex max-h-[min(52rem,calc(100%-4rem-var(--maintenance-banner-height,0px)))] flex-col gap-0 overflow-hidden border-border/60 p-0 shadow-2xl data-[state=closed]:pointer-events-none data-[state=closed]:invisible sm:max-w-[400px] max-sm:top-auto max-sm:bottom-0 max-sm:left-0 max-sm:max-h-[90dvh] max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-b-none max-sm:border-x-0 max-sm:border-b-0"
+        className="flex max-h-[min(52rem,calc(100%-4rem-var(--maintenance-banner-height,0px)))] flex-col gap-0 overflow-hidden border-border/30 p-0 shadow-2xl data-[state=closed]:pointer-events-none data-[state=closed]:invisible max-sm:top-auto max-sm:bottom-0 max-sm:left-0 max-sm:max-h-[90dvh] max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-b-none max-sm:border-x-0 max-sm:border-b-0 sm:top-[calc(var(--maintenance-banner-height,0px)+3rem)] sm:bottom-0 sm:right-0 sm:left-auto sm:max-h-none sm:max-w-[440px] sm:translate-x-0 sm:translate-y-0 sm:rounded-none sm:border-y-0 sm:border-r-0"
       >
         {/* Grab handle on the bottom sheet; tapping outside or Escape closes it. */}
         <div
@@ -675,12 +704,28 @@ export function UpgradeDialog({
           Upgrade {organizationLabel} to {plan.name}
         </DialogDescription>
 
+        <button
+          type="button"
+          onClick={() => handleOpenChange(false)}
+          aria-label="Close"
+          className="absolute top-3 right-3 z-10 hidden size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 sm:flex"
+        >
+          <X className="size-4" aria-hidden="true" />
+        </button>
+
+        {/* One column: the price, what the plan includes, then the payment. */}
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
           <PlanPrice
+            tier={checkoutTier}
             amount={dueNow}
             interval={checkoutInterval}
             organizationLabel={organizationLabel}
             planName={plan.name}
+          />
+          <PlanFeatures
+            planName={plan.name}
+            features={plan.features}
+            reason={reason}
           />
           {!changingPlan && checkoutMode === "review" && summary}
           {changingPlan ? (
@@ -764,18 +809,79 @@ export function UpgradeDialog({
   return checkoutModal;
 }
 
+/**
+ * What the plan includes. When the dialog opened because of a limit, that
+ * feature comes first, marked, so the user sees what they're unlocking.
+ */
+function PlanFeatures({
+  planName,
+  features,
+  reason,
+}: {
+  planName: string;
+  features: readonly string[];
+  reason?: string;
+}) {
+  const highlight = isUpgradeReason(reason) ? UPGRADE_REASONS[reason] : null;
+  const ordered = highlight && features.includes(highlight)
+    ? [highlight, ...features.filter((feature) => feature !== highlight)]
+    : features;
+
+  return (
+    <section aria-label={`${planName} includes`} className="px-5 pt-8 sm:px-8 lg:px-10">
+      <h3 className="mb-3 text-xs font-medium">{planName} includes</h3>
+      <ul className="space-y-2 text-xs">
+        {ordered.map((feature) => {
+          const unlocking = feature === highlight;
+          return (
+            <li
+              key={feature}
+              className={cn(
+                "flex items-start gap-2.5",
+                unlocking && "-mx-2.5 rounded-md bg-foreground/[0.06] px-2.5 py-2",
+              )}
+            >
+              <Check
+                className={cn("mt-0.5 size-3.5 shrink-0", unlocking ? "text-foreground" : "text-muted-foreground")}
+                aria-hidden="true"
+              />
+              <span className={cn("leading-5", unlocking ? "font-medium text-foreground" : "text-foreground/85")}>
+                {feature}
+                {unlocking && (
+                  <span className="block text-[11px] font-normal text-muted-foreground">
+                    What you just tried to use
+                  </span>
+                )}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="mt-3 text-[11px] leading-4 text-muted-foreground">
+        Model usage stays pay as you go.{" "}
+        <Link href="/pricing" target="_blank" className="underline underline-offset-2 hover:text-foreground">
+          Compare plans
+        </Link>
+      </p>
+    </section>
+  );
+}
+
 /** "Upgrade {org} to {plan}" and the price, at the top of the payment panel. */
 function PlanPrice({
   amount,
   interval,
   organizationLabel,
   planName,
+  tier,
 }: {
   amount: number;
   interval: PlanBillingInterval;
   organizationLabel: string;
   planName: string;
+  tier: PaidPlanTier;
 }) {
+  const price = usePlanPrice(tier);
   return (
     <div className="px-5 pt-6 text-center sm:px-8 sm:pt-8 lg:px-10 lg:pt-10">
       <p className="text-sm text-muted-foreground">
@@ -783,7 +889,7 @@ function PlanPrice({
       </p>
       <div className="mt-1.5 flex items-center justify-center gap-3">
         <span className="text-4xl font-semibold tracking-[-0.035em] tabular-nums">
-          {formatCents(amount)}
+          {price.format(amount)}
         </span>
         <span className="text-left text-xs font-medium leading-4 text-muted-foreground">
           per
@@ -876,6 +982,7 @@ function CheckoutSummary({
   setInterval: (interval: PlanBillingInterval) => void;
   setSelectedTier: (tier: PaidPlanTier) => void;
 }) {
+  const price = usePlanPrice(selectedTier);
   return (
     <div className="space-y-8 px-5 pt-8 sm:px-8 lg:px-10">
       <section aria-labelledby="billing-cycle-heading">
@@ -936,7 +1043,7 @@ function CheckoutSummary({
                   <div className="flex items-start justify-between gap-3">
                     <p className="text-sm font-medium">{option.name}</p>
                     <p className="text-sm font-medium tabular-nums">
-                      {formatCents(optionMonthly)}
+                      {price.format(optionMonthly)}
                       <span className="text-[10px] font-normal text-muted-foreground">
                         {" "}
                         /mo
@@ -958,18 +1065,21 @@ function OrderTotals({
   dueNow,
   dueToday,
   interval,
+  tier,
 }: {
   dueNow: number;
   /** What's charged now: the price, or the prorated difference when changing plan. null while it loads. */
   dueToday: number | null;
   interval: PlanBillingInterval;
+  tier: PaidPlanTier;
 }) {
   const prorated = dueToday !== dueNow;
+  const price = usePlanPrice(tier);
   const total =
     dueToday === null ? (
       <Skeleton className="inline-block h-5 w-14 align-middle" />
     ) : (
-      formatCents(dueToday)
+      price.format(dueToday)
     );
 
   return (
@@ -983,8 +1093,11 @@ function OrderTotals({
           <span className="block font-medium">Total due today</span>
           <span className="mt-0.5 block text-xs text-muted-foreground">
             {prorated
-              ? `Prorated for the rest of your current billing period, then ${formatCents(dueNow)} per ${interval}`
+              ? `Prorated for the rest of your current billing period, then ${price.format(dueNow)} per ${interval}`
               : "Taxes, if applicable, are calculated during payment"}
+            {price.currency === "NGN" && dueToday !== null && (
+              <> · Charged as {formatCents(dueToday)} in US dollars; your bank converts it</>
+            )}
           </span>
         </dt>
         <dd className="text-lg font-semibold tabular-nums">{total}</dd>

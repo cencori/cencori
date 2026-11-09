@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Lock } from "lucide-react";
+import { useRangeChoice } from "@/components/sessions/SessionFilters";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useDisplayCurrency } from "@/hooks/useDisplayCurrency";
@@ -63,6 +65,10 @@ export function HomeUsageStats({ orgSlug }: { orgSlug: string }) {
     const { data: totals, isLoading, error } = useUsageTotals(orgSlug, range);
     const { formatMoney } = useDisplayCurrency();
     const periodLabel = RANGES.find((option) => option.value === range)?.period ?? "Last 7 days";
+    // History follows the plan (Free 7 days, Pro 30, Enterprise all): a longer
+    // range shows a lock; picking it opens the upgrade (Pro) or /contact (Enterprise).
+    const rangeChoice = useRangeChoice();
+    const chooseRange = (value: Range) => rangeChoice(value, () => setRange(value)).onClick();
 
     return (
         <section className="mt-8">
@@ -70,7 +76,7 @@ export function HomeUsageStats({ orgSlug }: { orgSlug: string }) {
                 <h2 className="text-sm font-medium tracking-[-0.02em]">Usage</h2>
                 <div className="flex items-center gap-2">
                 <CurrencyToggle />
-                <Select value={range} onValueChange={(value) => setRange(value as Range)}>
+                <Select value={range} onValueChange={(value) => chooseRange(value as Range)}>
                     <SelectTrigger
                         aria-label="Time range"
                         className="h-8 w-auto gap-1.5 rounded-full border-0 bg-muted/60 pl-3.5 pr-2.5 font-inter text-xs font-medium shadow-none"
@@ -80,7 +86,15 @@ export function HomeUsageStats({ orgSlug }: { orgSlug: string }) {
                     <SelectContent align="end">
                         {RANGES.map((option) => (
                             <SelectItem key={option.value} value={option.value} className="font-inter text-xs">
-                                {option.label}
+                                <span className="flex w-full items-center gap-2">
+                                    {option.label}
+                                    {rangeChoice(option.value, () => {}).lock && (
+                                        <Lock
+                                            className="ml-auto h-3 w-3 text-muted-foreground"
+                                            aria-label={rangeChoice(option.value, () => {}).lock === "pro" ? "Pro" : "Enterprise"}
+                                        />
+                                    )}
+                                </span>
                             </SelectItem>
                         ))}
                     </SelectContent>

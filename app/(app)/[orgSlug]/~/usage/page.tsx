@@ -371,7 +371,7 @@ export default function UsagePage({ params }: PageProps) {
 
     const periodLocked = (value: string) => upgrade.canUpgrade && PRO_ONLY_PERIODS.has(value);
     const choosePeriod = (value: string) => {
-        if (periodLocked(value)) upgrade.openUpgrade();
+        if (periodLocked(value)) upgrade.openUpgrade("history");
         else setTimeRange(value);
     };
 

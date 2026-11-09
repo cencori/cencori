@@ -450,7 +450,7 @@ export function DeveloperQuickstart({
   const upgrade = useUpgrade();
   const periodLocked = (value: string) => upgrade.canUpgrade && PRO_ONLY_PERIODS.has(value);
   const choosePeriod = (value: string) => {
-    if (periodLocked(value)) upgrade.openUpgrade();
+    if (periodLocked(value)) upgrade.openUpgrade("history");
     else setChartPeriod(value);
   };
   // Dismissing hides the quick start and agent prompt for this project in

@@ -63,16 +63,14 @@ const tiers: Array<{
                 monthly: CENCORI_PAID_PLANS.pro.prices.month / 100,
                 annual: CENCORI_PAID_PLANS.pro.prices.year / 100,
             },
-            NGN: { monthly: 20000, annual: 200000 }
+            NGN: {
+                monthly: CENCORI_PAID_PLANS.pro.ngnPrices!.month,
+                annual: CENCORI_PAID_PLANS.pro.ngnPrices!.year,
+            },
         },
         features: [
             "Everything in Free",
-            "10 agents, 10 running at once",
-            "50,000 memories per project",
-            "Unlimited projects",
-            "PII masking, jailbreak detection & audit trails",
-            "Invite your team",
-            "Priority support",
+            ...CENCORI_PAID_PLANS.pro.features,
         ],
         highlighted: true,
         cta: "Get Pro",

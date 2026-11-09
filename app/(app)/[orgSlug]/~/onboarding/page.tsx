@@ -637,7 +637,7 @@ export default function OnboardingPage({ params }: PageProps) {
           orgId={organization.id}
           orgSlug={orgSlug}
           orgName={organization.name}
-          reason="Your free plan is limited to 1 project. Upgrade to Pro for unlimited projects."
+          reason="projects"
           recommendedTier="pro"
         />
       )}

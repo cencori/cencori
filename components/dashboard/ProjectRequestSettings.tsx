@@ -1,6 +1,7 @@
 'use client';
 
 import { useUpgrade } from '@/components/billing/UpgradeProvider';
+import type { UpgradeReason } from '@/lib/billing/plans';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
@@ -69,6 +70,7 @@ function ToggleRow({
     loading,
     disabled,
     note,
+    upgradeReason,
     onChange,
 }: {
     title: string;
@@ -77,6 +79,8 @@ function ToggleRow({
     loading: boolean;
     disabled: boolean;
     note?: string;
+    /** The Pro feature this switch needs, shown first in the upgrade. */
+    upgradeReason?: UpgradeReason;
     onChange: (enabled: boolean) => void;
 }) {
     const upgrade = useUpgrade();
@@ -93,7 +97,7 @@ function ToggleRow({
                 // Not on this plan: the way to it, right here.
                 <button
                     type="button"
-                    onClick={upgrade.openUpgrade}
+                    onClick={() => upgrade.openUpgrade(upgradeReason)}
                     onMouseEnter={upgrade.preloadUpgrade}
                     className="h-7 shrink-0 rounded-md bg-foreground px-3 text-xs font-medium text-background transition-opacity hover:opacity-90"
                 >
@@ -139,6 +143,7 @@ export function PiiProtectionSetting({ projectId }: { projectId: string }) {
             loading={setting.isLoading}
             disabled={setting.isPending || !raw}
             note={gated ?? (setting.isError ? 'Could not load this setting.' : undefined)}
+            upgradeReason="security"
             onChange={(checked) => setting.mutate(checked)}
         />
     );

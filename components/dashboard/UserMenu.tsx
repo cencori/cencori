@@ -143,7 +143,11 @@ export function UserMenu({ organization, variant = "sidebar" }: UserMenuProps) {
         if (!organization || !canUpgrade) return;
         setMenuOpen(false);
         if (sharedUpgrade.canUpgrade) sharedUpgrade.openUpgrade();
-        else setUpgradeOpen(true);
+        else {
+            // Keep the checkout mounted after it closes, so reopening is instant.
+            setUpgradePreload(true);
+            setUpgradeOpen(true);
+        }
     };
 
     const switchOrganization = async (organizationId: string) => {

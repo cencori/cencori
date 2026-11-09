@@ -2,6 +2,7 @@ import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { createServerClient } from '@/lib/supabaseServer';
+import { clampTimeRange, type SubscriptionTier } from '@/lib/entitlements';
 
 interface RouteParams {
     params: Promise<{ orgSlug: string }>;
@@ -110,7 +111,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
 
     const { data: org, error: orgError } = await supabaseAdmin
         .from('organizations')
-        .select('id')
+        .select('id, subscription_tier')
         .eq('slug', orgSlug)
         .single();
 
@@ -129,7 +130,9 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    const range = req.nextUrl.searchParams.get('range') || '7d';
+    // History follows the plan (Free 7 days, Pro 30, Team 90, Enterprise all),
+    // whatever range the page asks for.
+    const range = clampTimeRange((org.subscription_tier ?? 'free') as SubscriptionTier, req.nextUrl.searchParams.get('range') || '7d');
     // `all` reads the org's whole request history: fine at today's volume,
     // but it scans every ai_requests row, so a daily rollup should replace
     // this before large orgs use it heavily.

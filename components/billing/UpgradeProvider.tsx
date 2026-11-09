@@ -1,8 +1,9 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode, type SyntheticEvent } from "react";
 import { LOG_RETENTION_RANGE, type SubscriptionTier } from "@/lib/entitlements";
+import { isUpgradeReason, type UpgradeReason } from "@/lib/billing/plans";
 
 const UpgradeDialog = dynamic(
     () => import("@/components/billing/UpgradeDialog").then((module) => module.UpgradeDialog),
@@ -29,7 +30,8 @@ interface UpgradeContextValue {
     tier: SubscriptionTier;
     /** True on Free: there's a Pro to buy. */
     canUpgrade: boolean;
-    openUpgrade: () => void;
+    /** Open the checkout; `reason` puts the feature the user reached for first. */
+    openUpgrade: (reason?: UpgradeReason | SyntheticEvent) => void;
     /** Load the checkout ahead of a likely click (hover/focus). */
     preloadUpgrade: () => void;
 }
@@ -43,6 +45,7 @@ const UpgradeContext = createContext<UpgradeContextValue>({
 
 export function UpgradeProvider({ org, children }: { org: UpgradeOrg | null | undefined; children: ReactNode }) {
     const [open, setOpen] = useState(false);
+    const [reason, setReason] = useState<UpgradeReason | undefined>();
     const [preload, setPreload] = useState(false);
     // Local development only: ?preview_plan=free shows the console as another plan would.
     const [preview] = useState<string | null>(() => {
@@ -53,8 +56,16 @@ export function UpgradeProvider({ org, children }: { org: UpgradeOrg | null | un
     const tier = (preview ?? org?.tier ?? "free") as SubscriptionTier;
     const canUpgrade = Boolean(org) && tier === "free" && org?.accountType !== "business";
 
-    const openUpgrade = useCallback(() => {
-        if (canUpgrade) setOpen(true);
+    // Also used directly as an onClick, so `reason` may be a click event: only
+    // a known reason counts.
+    const openUpgrade = useCallback((value?: unknown) => {
+        if (!canUpgrade) return;
+        setReason(isUpgradeReason(value) ? value : undefined);
+        // Stay mounted from now on: closing keeps the Stripe session and card
+        // form, so opening again is instant. It loads afresh only on a page
+        // load (or an org switch, which starts a new checkout).
+        setPreload(true);
+        setOpen(true);
     }, [canUpgrade]);
     const preloadUpgrade = useCallback(() => setPreload(true), []);
 
@@ -74,6 +85,7 @@ export function UpgradeProvider({ org, children }: { org: UpgradeOrg | null | un
                     recommendedTier="pro"
                     checkoutMode="direct"
                     preload={open || preload}
+                    reason={reason}
                 />
             )}
         </UpgradeContext.Provider>

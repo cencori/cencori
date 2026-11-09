@@ -67,7 +67,7 @@ export default function NewAgentPage({ params }: { params: Promise<{ orgSlug: st
             setError(cause instanceof Error ? cause.message : "That didn't work. Try again.");
             setBusy(false);
             // A plan limit: offer Pro right away.
-            if ((cause as { status?: number })?.status === 402) upgrade.openUpgrade();
+            if ((cause as { status?: number })?.status === 402) upgrade.openUpgrade("agents");
         }
     };
 

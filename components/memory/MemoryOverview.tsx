@@ -368,7 +368,7 @@ export function MemoryOverview({ projectId, onViewMemories }: MemoryOverviewProp
                             {(quota?.percent ?? 0) >= 80 && upgrade.canUpgrade && (
                                 <p className="mt-2 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
                                     {(quota?.percent ?? 0) >= 100 ? 'New memories aren\u2019t being saved.' : 'Nearly at your memory limit.'}
-                                    <button type="button" onClick={upgrade.openUpgrade} onMouseEnter={upgrade.preloadUpgrade} className="font-medium text-foreground underline underline-offset-2">
+                                    <button type="button" onClick={() => upgrade.openUpgrade("memory")} onMouseEnter={upgrade.preloadUpgrade} className="font-medium text-foreground underline underline-offset-2">
                                         Upgrade to Pro for 50,000
                                     </button>
                                 </p>

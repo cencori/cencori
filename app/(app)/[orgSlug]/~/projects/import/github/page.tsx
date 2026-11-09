@@ -272,7 +272,7 @@ export default function GitHubImportPage({ params }: PageProps) {
             onOpenChange={setUpgradeOpen}
             orgId={githubData.organizationId}
             orgSlug={orgSlug}
-            reason="Your free plan is limited to 1 project. Upgrade to Pro for unlimited projects."
+            reason="projects"
             recommendedTier="pro"
           />
         )}
@@ -421,7 +421,7 @@ export default function GitHubImportPage({ params }: PageProps) {
           onOpenChange={setUpgradeOpen}
           orgId={githubData.organizationId}
           orgSlug={orgSlug}
-          reason="Your free plan is limited to 1 project. Upgrade to Pro for unlimited projects."
+          reason="projects"
           recommendedTier="pro"
         />
       )}

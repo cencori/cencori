@@ -7,6 +7,11 @@ export type PaidPlan = {
   description: string;
   logRetention: string;
   prices: Record<PlanBillingInterval, number>;
+  /**
+   * The price shown in naira, in whole naira: a set price, not a conversion
+   * of the dollar price. Plans are still charged in dollars.
+   */
+  ngnPrices?: Record<PlanBillingInterval, number>;
   features: readonly string[];
 };
 
@@ -22,11 +27,19 @@ export const CENCORI_PAID_PLANS: Record<PaidPlanTier, PaidPlan> = {
       month: 2_000,
       year: 20_000,
     },
+    ngnPrices: {
+      month: 20_000,
+      year: 200_000,
+    },
+    // The pricing page and the upgrade dialog both list these.
     features: [
-      "Unlimited projects",
-      "10 agents",
+      "10 agents, 10 running at once",
+      "100 knowledge bases",
+      "100 customers",
       "50,000 memories per project",
-      "Full security pipeline",
+      "Unlimited projects",
+      "30 days of usage, logs and traces",
+      "PII masking, jailbreak detection & audit trails",
       "Invite your team",
       "Priority support",
     ],
@@ -75,4 +88,24 @@ export function getMonthlyEquivalentCents(
 ): number {
   const total = CENCORI_PAID_PLANS[tier].prices[interval];
   return interval === "year" ? total / 12 : total;
+}
+
+/**
+ * Why the upgrade dialog opened: the Pro feature the user just reached for,
+ * shown first in the dialog. Each names a line of the Pro features above.
+ */
+export const UPGRADE_REASONS = {
+  history: "30 days of usage, logs and traces",
+  agents: "10 agents, 10 running at once",
+  knowledge: "100 knowledge bases",
+  memory: "50,000 memories per project",
+  projects: "Unlimited projects",
+  security: "PII masking, jailbreak detection & audit trails",
+  team: "Invite your team",
+} as const;
+
+export type UpgradeReason = keyof typeof UPGRADE_REASONS;
+
+export function isUpgradeReason(value: unknown): value is UpgradeReason {
+  return typeof value === "string" && value in UPGRADE_REASONS;
 }

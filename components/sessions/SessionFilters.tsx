@@ -32,17 +32,20 @@ export function FilterOption({ selected, label, onClick, onHover, radio, lock }:
     return (
         <button
             type="button"
+            role={radio ? 'radio' : 'checkbox'}
+            aria-checked={selected}
             onClick={onClick}
             onMouseEnter={onHover}
             onFocus={onHover}
             className={cn('flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-[13px] hover:bg-sidebar-accent', selected ? 'text-foreground' : 'text-muted-foreground', lock && 'text-muted-foreground/60')}
         >
+            {/* Single-choice (radio) and multi-choice options share one square
+                box, so every filter in the sidebar looks the same. */}
             <span className={cn(
-                'flex h-3.5 w-3.5 shrink-0 items-center justify-center border',
-                radio ? 'rounded-full' : 'rounded-[3px]',
+                'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[3px] border',
                 selected ? 'border-foreground bg-foreground text-background' : 'border-border',
             )}>
-                {selected && (radio ? <span className="h-1.5 w-1.5 rounded-full bg-background" /> : <Check className="h-2.5 w-2.5" strokeWidth={3} />)}
+                {selected && <Check className="h-2.5 w-2.5" strokeWidth={3} />}
             </span>
             {label}
         </button>
@@ -59,7 +62,7 @@ export function useRangeChoice() {
     return (range: string, select: () => void) => {
         const lock = rangeLock(range);
         if (!lock) return { lock, onClick: select };
-        if (lock === 'pro' && upgrade.canUpgrade) return { lock, onClick: upgrade.openUpgrade, onHover: upgrade.preloadUpgrade };
+        if (lock === 'pro' && upgrade.canUpgrade) return { lock, onClick: () => upgrade.openUpgrade('history'), onHover: upgrade.preloadUpgrade };
         return { lock, onClick: () => window.open('/contact', '_blank', 'noopener') };
     };
 }

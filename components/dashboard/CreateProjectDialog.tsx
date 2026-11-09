@@ -279,7 +279,7 @@ export function CreateProjectDialog({
                     orgId={orgId}
                     orgSlug={orgSlug}
                     orgName={orgName}
-                    reason="Your free plan is limited to 1 project. Upgrade to Pro for unlimited projects."
+                    reason="projects"
                     recommendedTier="pro"
                 />
             )}

@@ -349,7 +349,7 @@ export default function TeamsPage({ params }: PageProps) {
                         <Button
                             size="sm"
                             className="h-8 gap-1.5 text-xs"
-                            onClick={upgrade.openUpgrade}
+                            onClick={() => upgrade.openUpgrade("team")}
                             onMouseEnter={upgrade.preloadUpgrade}
                             title="Inviting members is a Pro feature"
                         >
