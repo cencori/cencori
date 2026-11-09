@@ -46,6 +46,14 @@ Use one of these integration paths:
 - Package: `@cencori/mcp`
 - Best for: giving MCP clients Cencori docs, first-party web search, and authenticated platform tools
 
+7. Agents SDK
+- Import: `cencori/agents`
+- Best for: agents defined in code (tools, handoffs, guardrails, approvals, MCP, human handoff) running on Cencori sessions
+
+8. Agent UI
+- Import: `cencori/react` (`<AgentChat>`, `useAgentChat`)
+- Best for: a chat UI where the agent can answer with charts, tables and forms
+
 Current minimum versions:
 - Cencori Web TypeScript SDK: `cencori@1.6.1`
 - Cencori Web MCP server: `@cencori/mcp@0.7.1`
@@ -53,6 +61,8 @@ Current minimum versions:
 - Public catalog helpers (`listCatalogModels`, `listCatalogProviders`, `providerLogoUrl`): `cencori@1.8.0`
 - Embedded Agents Python SDK: not yet published; use the HTTP API for Python integrations
 - Embedded Agents MCP inspection: `@cencori/mcp@0.8.0`
+- Agents SDK + Agent UI (`cencori/agents`, `cencori/react`), incl. MCP servers on agents: `cencori@1.13.0`
+- Human handoff, images/files in `run()`, attachments in `<AgentChat>`: `cencori@1.14.0`
 
 ## Setup Decision
 
@@ -1243,7 +1253,7 @@ One project per application environment (never one project per downstream compan
 Auth:
 - `csk_*` (secret project key, server only): all control-plane operations. Anything else returns `403 secret_key_required`.
 - `ect_*` (15-minute browser token from `POST /v1/client-tokens`): `sessions:create` and `sessions:turn` within one tenant and user only.
-- `cpk_*` (publishable): cannot call embedded management APIs.
+- `cpk_*` (publishable): cannot call embedded management APIs. It can only start sessions with a stored agent and continue sessions it started (see Stored Agents below).
 - Never ship `csk_*` to a browser or mobile client.
 
 Canonical endpoints (`https://api.cencori.com/v1/*`; [full OpenAPI reference](https://cencori.com/openapi/embedded-agents.json)):
@@ -1268,6 +1278,126 @@ TypeScript SDK namespaces: `tenants`, `clientTokens`, `models`, `providerConnect
 
 Docs: https://cencori.com/docs/embedded-agents/overview (overview, authentication, manifests, skills, remote MCP servers, actions, webhooks, usage, runs, memory isolation).
 
+## Agents SDK (`cencori/agents`)
+
+Code-first agents. Tools run in your process; every run is a Cencori session (durable, traced, can wait on approvals). Requires `CENCORI_API_KEY` (`csk_*`, server only). `zod` is optional (tools also take JSON Schema or any Standard Schema).
+
+```ts
+import { Agent, run, tool } from 'cencori/agents';
+import { z } from 'zod';
+
+const getOrder = tool({
+  name: 'get_order',
+  description: 'Look up an order by id.',
+  parameters: z.object({ id: z.string() }),
+  execute: async ({ id }) => db.orders.find(id),
+});
+
+const support = new Agent({ name: 'Support', instructions: 'Help with orders. Be brief.', tools: [getOrder] });
+const result = await run(support, 'Where is order 1042?');
+result.finalOutput; // text, or the parsed outputType
+result.sessionId;   // pass back as { sessionId } to continue the conversation
+```
+
+- `new Agent({ name, instructions, model?, tools?, handoffs?, mcpServers?, outputType?, widgets?, inputGuardrails?, outputGuardrails?, modelSettings? })`. Any catalog model id works for `model`.
+- `run(agent, input, { sessionId?, stream?, context?, maxTurns? (default 10), user?, memory?: { userId }, metadata?, signal?, apiKey?, baseUrl? })`.
+- Result: `finalOutput`, `sessionId`, `lastAgent`, `newItems`, `interruptions`, `state` (a `RunState` to resume after approvals), `usage`, `withHuman`.
+- Streaming: `run(..., { stream: true })` is async-iterable; events `agent_updated`, `text_delta`, `tool_call`, `tool_output`, `handoff`, `widget_partial`, `widget`, `interruption`, `human_handoff`, `with_human`; `await stream.completed` for the result; `stream.toTextStream()` for text only.
+- Approvals: `tool({ ..., needsApproval: true | (args, ctx) => boolean })` pauses the run (`result.interruptions`); approve/reject on `result.state`, then `run(agent, result.state)`.
+- Orchestration: `handoffs: [otherAgent]` moves the conversation; `otherAgent.asTool()` calls an agent as a tool.
+- MCP servers (tools from remote/local MCP servers, connected from your process): `new MCPServerStreamableHttp({ url, headers? })`, `new MCPServerStdio({ command, args })`; pass as `mcpServers: [...]`.
+- Errors: `CencoriRunError` (`code`, `status`, `sessionId`), `MaxTurnsExceededError`, `GuardrailTripwireTriggered`.
+
+### Images and files in `run()` (cencori@1.14.0+)
+
+Input can be a string or OpenAI Responses-style message items:
+
+```ts
+import { file, image, run } from 'cencori/agents';
+
+await run(agent, [{
+  role: 'user',
+  content: [
+    { type: 'input_text', text: 'How much is due on this invoice?' },
+    file('invoice.pdf', readFileSync('invoice.pdf')),  // -> { type: 'input_file', filename, file_data: 'data:...;base64,...' }
+    image('https://example.com/receipt.jpg'),          // -> { type: 'input_image', image_url }
+  ],
+}]);
+```
+
+- Images go to the model as images; on a text-only model (e.g. `gpt-oss-*`) that turn runs on `claude-haiku-4-5`.
+- PDFs and text files (`.txt .md .csv .json` …) are read server-side and given to the model as text, so they work with any model.
+- Limits: 5 files per message, 10 MB each; long files cut at ~60,000 characters. `file_data` must be a base64 data URL.
+- The same item shape works on `POST /v1/sessions/:id/turns` (`input` array). `{ role, content }` without `type` is treated as `{ type: 'message', role, content }`.
+
+### Human handoff (cencori@1.14.0+)
+
+```ts
+import { Agent, humanHandoff, humanReply, humanStatus, releaseToAgent } from 'cencori/agents';
+
+const support = new Agent({
+  name: 'Support',
+  tools: [humanHandoff({ onHandoff: ({ sessionId, reason }) => notifyTeam(sessionId, reason) })],
+});
+
+// While a person has the conversation: run() returns { withHuman: true, finalOutput: undefined }
+// and the user's messages are kept for the person.
+await humanStatus(sessionId, { after? });   // { handledBy: 'human'|'agent', handoff, messages: [{ from: 'user'|'human'|'agent', text, at }] }
+await humanReply(sessionId, 'Your refund is approved.');
+await releaseToAgent(sessionId);           // the agent is told what was said, then carries on
+```
+
+- The tool is named `handoff_to_human`. Conversations go back to the agent on their own after 30 quiet minutes.
+- HTTP: `GET /v1/sessions/:id/human?after=<iso>` (secret key or the session's own client token), `POST /v1/sessions/:id/human` with `{ action: 'handoff', reason }`, `{ action: 'reply', text }` (max 4,000 chars) or `{ action: 'release' }` (secret key only).
+- During a handoff, `POST /v1/sessions/:id/turns` replies with a single SSE event `owner.handling` instead of running a turn.
+
+## Agent UI (`cencori/react`)
+
+A chat component for agents: streaming Markdown, tool steps, approvals, handoffs, widgets (cards, charts, tables, forms), attachments and team replies. Needs only React (>=18).
+
+Server route (any framework with `Request`/`Response`):
+
+```ts
+// app/api/chat/route.ts
+import { createAgentChatHandler } from 'cencori/agents';
+export const POST = createAgentChatHandler(support, {
+  user: async (req) => (await getUser(req)).id,
+  authorizeSession: async (sessionId, req) => db.chats.belongsTo(sessionId, (await getUser(req)).id),
+});
+```
+
+Client:
+
+```tsx
+import { AgentChat } from 'cencori/react';
+<AgentChat api="/api/chat" greeting="How can I help?" prompts={['Revenue this month']} />
+```
+
+- Props: `api` | `widgetKey` (`cwk_...`, an agent built in the console) | `agent` + `publishableKey` (stored agent, no backend); `greeting`, `prompts`, `placeholder`, `attachments` (default true), `showToolCalls`, `toolLabels`, `theme`, `headers`, `body`, `sessionId`, `onSessionId`, `onAction`, `onError`. It fills its container: give the parent a height.
+- Custom layout: `useAgentChat(options)` returns messages and `send(text, files?)`, plus the `Transcript`, `Composer`, `ToolCall`, `ApprovalCard`, `Widget` parts.
+- Widgets: `new Agent({ widgets: true })` adds the built-in `render_ui` tool, or return `{ widget, ...data }` from your own tool. Validate with `validateWidget()` from `cencori/agents`. Widget actions default to `handler: 'agent'` (sent to the agent as the next message); `handler: 'client'` only calls `onAction`.
+- Paused-run state sent to the browser for approvals is HMAC-signed (`CENCORI_AGENT_CHAT_SECRET`, default: your API key).
+
+## Stored Agents (run by id)
+
+Define an agent once in Cencori and run it from anywhere:
+
+- `POST /v1/agents` `{ name, config: { model, system_prompt, tools?, widgets?, temperature? } }`; `GET`/`PATCH`/`DELETE /v1/agents/:id`.
+- SDK: `Agent.fromCencori(agentId, { tools: [yourTools] })`.
+- HTTP: `POST /v1/sessions { agent_id, turn: { input } }`. The stored model and instructions always apply.
+- Browser, no backend: `<AgentChat agent="<id>" publishableKey="cpk_..." />`. A `cpk_` key needs allowed domains, can only start sessions with a stored agent, and is capped per conversation and per minute.
+
+## Response Caching
+
+Off by default, available on every plan: project **Settings → General**. Exact matching returns a stored response for an identical request (model, temperature, max tokens, messages); optional similar-request (semantic) matching works on non-streaming requests above a 0.95 similarity threshold. Cache hits cost nothing. Response header `X-Cencori-Cache: HIT | SEMANTIC-HIT`.
+
+## Plans, Limits, And Their Errors
+
+- Free: 1 project per organization, 1 agent (and 1 running), 5 knowledge bases, 5 customers (tenants), 10 runs a minute. One Free organization per person; other organizations need Pro.
+- Pro: 10 agents (10 running), 100 knowledge bases, 100 customers (tenants), team members, PII protection (security), longer history.
+- Enterprise: governance, audit exports, SSO, all-time history.
+- Errors: `402 agent_limit_exceeded`, `402 knowledge_limit_exceeded`, `402 tenant_limit_exceeded`, `402 budget_exceeded` (spend budget), `402 plan_paused` (a lapsed paid plan, 7 days after the lapse, or an extra Free organization), `429 run_rate_exceeded` / `run_concurrency_exceeded` with `Retry-After`. Do not retry 402s: they need a plan or budget change in the console.
+
 ## Decision Rules For Code Agents
 
 When integrating Cencori into a project:
@@ -1281,6 +1411,7 @@ When integrating Cencori into a project:
 7. Failover is configured in the dashboard (project settings), not via SDK call options; do not assume other undocumented routing or evaluation settings are user-configurable from code.
 8. For existing products, complete the dashboard-to-code checklist before changing application code.
 9. For new apps, prefer `create-cencori-app` over manually assembling a starter.
+10. For agents with your own tools, use `cencori/agents`; for a chat UI on top, `createAgentChatHandler` + `<AgentChat>` from `cencori/react`.
 
 ## Documentation Links
 
@@ -1297,4 +1428,12 @@ When integrating Cencori into a project:
 - Cencori Web API: https://cencori.com/docs/api/web
 - Build a Web Research Agent: https://cencori.com/docs/guides/build-a-web-research-agent
 - MCP Server: https://cencori.com/docs/mcp
+- Agents SDK: https://cencori.com/docs/agents-sdk/overview
+- Running agents (streaming, images and files): https://cencori.com/docs/agents-sdk/running-agents
+- Human handoff: https://cencori.com/docs/agents-sdk/human-handoff
+- Coming from the OpenAI Agents SDK: https://cencori.com/docs/agents-sdk/migrate-from-openai
+- Agent UI: https://cencori.com/docs/agent-ui/overview
+- Stored agents: https://cencori.com/docs/agents-api/stored-agents
+- Response caching: https://cencori.com/docs/platform/ai-gateway/caching
+- Billing and plans: https://cencori.com/docs/platform/billing
 - Continue: https://cencori.com/docs/agentic-engineering/desktop/continue

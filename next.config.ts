@@ -96,6 +96,7 @@ const nextConfig: NextConfig = {
         // /llm.txt. Serve the same content at /llms.txt with a 200 (a rewrite, not
         // a redirect, so fetchers that don't follow 3xx still get the guide).
         { source: "/llms.txt", destination: "/llm.txt" },
+        { source: "/llms-full.txt", destination: "/llm.txt" },
         // An agent's shareable link (the full-page widget chat).
         { source: "/talk/:token", destination: "/api/widget/share/:token" },
         // "View as Markdown" and agents fetch `<docs page>.md`. Rewrites run
