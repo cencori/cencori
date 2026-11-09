@@ -27,6 +27,7 @@ import { AgentChat } from 'cencori/react';
 | `agent`, `publishableKey`, `baseUrl` | Instead of `api`: chat with a [stored agent](/docs/agents-api/stored-agents) straight from the browser |
 | `greeting`, `prompts` | What shows before the first message |
 | `placeholder` | The message box placeholder |
+| `attachments` | Let users attach images, PDFs and text files. Default `true` |
 | `showToolCalls` | Show tool calls as steps in the reply. Default `true` |
 | `toolLabels` | Friendly names for tool steps and approval cards |
 | `theme` | See below |
@@ -46,6 +47,8 @@ It fills its container. Give the parent a height.
 - Widgets draw as they're written, then become usable once finished. Only the latest reply's widgets take clicks.
 - Approvals show a card with **Approve** and **Decline**. The message box waits until every call is decided.
 - Handoffs show as "Handed to Billing".
+- Users can attach images, PDFs and text files with the paperclip, by dragging them in, or by pasting. Images show as thumbnails and files as chips. Large images are scaled down before they're sent.
+- When the agent [hands off to a person](/docs/agents-sdk/human-handoff), a notice shows. The team's replies appear labelled **Team**.
 - Errors show with **Try again**. The user can stop a reply mid-stream.
 
 ## Theming

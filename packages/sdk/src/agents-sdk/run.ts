@@ -1,4 +1,6 @@
 import { isWidgetResult, validateWidget, type WidgetNode } from '../widgets/spec';
+import { inputText, type AgentInput } from './input';
+import { HUMAN_HANDOFF_TOOL } from './human';
 import { partialRenderUiWidget } from '../widgets/partial';
 import { Agent } from './agent';
 import type { RunContext } from './context';
@@ -57,7 +59,11 @@ export type RunStreamEvent =
     | { type: 'widget'; callId: string; widgetId: string; widget: WidgetNode; agentName: string }
     /** A widget the model is still writing (render_ui): draw it, then replace it with the 'widget' for the same callId. */
     | { type: 'widget_partial'; callId: string; widget: WidgetNode; agentName: string }
-    | { type: 'interruption'; interruptions: ToolApprovalItem[] };
+    | { type: 'interruption'; interruptions: ToolApprovalItem[] }
+    /** The agent handed the conversation to a person (humanHandoff). */
+    | { type: 'human_handoff'; reason: string; agentName: string }
+    /** A person is handling the conversation: the message was kept for them, no answer from the agent. */
+    | { type: 'with_human' };
 
 interface PendingPause {
     actionId: string;
@@ -147,6 +153,12 @@ export interface RunResult<Output = string> {
     /** Messages, tool calls and handoffs in this run, in order. */
     newItems: RunItem[];
     usage: Usage;
+    /**
+     * A person is handling this conversation (the agent handed it over with
+     * humanHandoff, or someone stepped in): the message was kept for them and
+     * the agent didn't answer. See humanReply / releaseToAgent.
+     */
+    withHuman: boolean;
 }
 
 /** run(..., { stream: true }): iterate events as they happen, then await completed. */
@@ -240,6 +252,7 @@ function completedText(streamed: string, data: Record<string, unknown>): string 
 }
 
 type TurnOutcome =
+    | { kind: 'with_human' }
     | { kind: 'completed'; text: string; usage: unknown }
     | { kind: 'paused'; pause: PendingPause };
 
@@ -292,6 +305,8 @@ async function* consumeTurn(response: Response, agentName: string, sessionId: st
             }
             case 'turn.completed':
                 return { kind: 'completed', text: completedText(text, data), usage: data.usage };
+            case 'owner.handling':
+                return { kind: 'with_human' };
             case 'turn.failed': {
                 const output = data.output as { error?: string } | undefined;
                 throw new CencoriRunError(output?.error ?? 'The turn failed.', { code: 'turn_failed', sessionId });
@@ -309,7 +324,7 @@ async function* consumeTurn(response: Response, agentName: string, sessionId: st
 
 async function* runLoop<Ctx>(
     startAgent: Agent<Ctx, any>,
-    input: string | RunState,
+    input: AgentInput | RunState,
     options: RunOptions<Ctx>,
 ): AsyncGenerator<RunStreamEvent, RunResult<unknown>> {
     const transport = new Transport(options);
@@ -378,7 +393,7 @@ async function* runLoop<Ctx>(
         // Input guardrails run on the first agent, before any model call.
         const runContext = contextFor(agent, sessionId);
         for (const guardrail of agent.inputGuardrails) {
-            const verdict = await guardrail.execute({ input, agent, runContext });
+            const verdict = await guardrail.execute({ input: inputText(input), agent, runContext });
             if (verdict.tripwireTriggered) throw new GuardrailTripwireTriggered('input', guardrail.name, verdict.outputInfo);
         }
 
@@ -418,6 +433,11 @@ async function* runLoop<Ctx>(
         if (response) {
             const outcome: TurnOutcome = yield* consumeTurn(response, agent.name, sessionId, items);
             response = undefined;
+            if (outcome.kind === 'with_human') {
+                // A person is handling it: the message was kept for them.
+                yield { type: 'with_human' };
+                return { finalOutput: undefined, sessionId, lastAgent: agent, interruptions: [], state: undefined, newItems: items, usage, withHuman: true };
+            }
             if (outcome.kind === 'completed') {
                 usage = addUsage(usage, outcome.usage);
                 let finalOutput: unknown = outcome.text;
@@ -436,7 +456,7 @@ async function* runLoop<Ctx>(
                     const verdict = await guardrail.execute({ output: finalOutput, agent, runContext });
                     if (verdict.tripwireTriggered) throw new GuardrailTripwireTriggered('output', guardrail.name, verdict.outputInfo);
                 }
-                return { finalOutput, sessionId, lastAgent: agent, interruptions: [], state: undefined, newItems: items, usage };
+                return { finalOutput, sessionId, lastAgent: agent, interruptions: [], state: undefined, newItems: items, usage, withHuman: false };
             }
             pending = outcome.pause;
             if (outcome.pause.text) items.push({ type: 'message', agentName: agent.name, text: outcome.pause.text });
@@ -470,7 +490,7 @@ async function* runLoop<Ctx>(
         if (interruptions.length > 0) {
             const state = new RunState({ sessionId, agentName: agent.name, turnsUsed, usage, pending });
             yield { type: 'interruption', interruptions };
-            return { finalOutput: undefined, sessionId, lastAgent: agent, interruptions, state, newItems: items, usage };
+            return { finalOutput: undefined, sessionId, lastAgent: agent, interruptions, state, newItems: items, usage, withHuman: false };
         }
 
         if (turnsUsed >= maxTurns) throw new MaxTurnsExceededError(maxTurns, sessionId);
@@ -507,6 +527,11 @@ async function* runLoop<Ctx>(
             const output = result.output;
             items.push({ type: 'tool_output', agentName: agent.name, callId: action.action_id, toolName: action.tool, output });
             yield { type: 'tool_output', callId: action.action_id, toolName: action.tool, output, agentName: agent.name };
+            if (action.tool === HUMAN_HANDOFF_TOOL && !output.startsWith('Error')) {
+                let reason = '';
+                try { reason = String((JSON.parse(action.arguments || '{}') as { reason?: unknown }).reason ?? ''); } catch { /* keep empty */ }
+                yield { type: 'human_handoff', reason, agentName: agent.name };
+            }
         }
 
         let next: ResumeNext | undefined;
@@ -542,9 +567,9 @@ async function* runLoop<Ctx>(
  * Pass `{ stream: true }` for events as they happen, `{ sessionId }` to
  * continue a conversation, or a RunState to resume after approvals.
  */
-export function run<Ctx, Out>(agent: Agent<Ctx, Out>, input: string | RunState, options: RunOptions<Ctx> & { stream: true }): StreamedRunResult<Out>;
-export function run<Ctx, Out>(agent: Agent<Ctx, Out>, input: string | RunState, options?: RunOptions<Ctx> & { stream?: false }): Promise<RunResult<Out>>;
-export function run<Ctx, Out>(agent: Agent<Ctx, Out>, input: string | RunState, options: RunOptions<Ctx> = {}): Promise<RunResult<unknown>> | StreamedRunResult<unknown> {
+export function run<Ctx, Out>(agent: Agent<Ctx, Out>, input: AgentInput | RunState, options: RunOptions<Ctx> & { stream: true }): StreamedRunResult<Out>;
+export function run<Ctx, Out>(agent: Agent<Ctx, Out>, input: AgentInput | RunState, options?: RunOptions<Ctx> & { stream?: false }): Promise<RunResult<Out>>;
+export function run<Ctx, Out>(agent: Agent<Ctx, Out>, input: AgentInput | RunState, options: RunOptions<Ctx> = {}): Promise<RunResult<unknown>> | StreamedRunResult<unknown> {
     if (options.stream) return streamed(agent, input, options);
     return (async () => {
         const loop = runLoop(agent, input, options);
@@ -555,7 +580,7 @@ export function run<Ctx, Out>(agent: Agent<Ctx, Out>, input: string | RunState, 
     })();
 }
 
-function streamed<Ctx>(agent: Agent<Ctx, any>, input: string | RunState, options: RunOptions<Ctx>): StreamedRunResult<unknown> {
+function streamed<Ctx>(agent: Agent<Ctx, any>, input: AgentInput | RunState, options: RunOptions<Ctx>): StreamedRunResult<unknown> {
     const loop = runLoop(agent, input, options);
     let resolve!: (r: RunResult<unknown>) => void;
     let reject!: (e: unknown) => void;

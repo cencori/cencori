@@ -22,3 +22,7 @@ export { validateWidget, isWidgetResult, WIDGET_TYPES } from '../widgets/spec';
 export type * from '../widgets/spec';
 export { MCPServerStreamableHttp, MCPServerStdio } from './mcp';
 export type { MCPServer, MCPServerOptions, MCPServerStreamableHttpOptions, MCPServerStdioOptions, MCPTool, MCPCallResult } from './mcp';
+export { humanHandoff, humanReply, releaseToAgent, humanStatus, HUMAN_HANDOFF_TOOL } from './human';
+export type { HumanHandoffOptions, HumanMessage, HumanStatus } from './human';
+export { image, file, inputText } from './input';
+export type { AgentInput, AgentInputItem, InputContentPart } from './input';

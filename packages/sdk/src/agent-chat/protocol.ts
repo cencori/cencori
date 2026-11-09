@@ -19,6 +19,10 @@ export type AgentChatEvent =
     | { event: 'handoff'; data: { from: string; to: string } }
     /** Tool calls waiting for the user. Send `state` back with the decisions to continue. */
     | { event: 'approval'; data: { sessionId: string; state: string; items: AgentChatApprovalItem[] } }
+    /** The agent handed the conversation to a person on the team. */
+    | { event: 'human_handoff'; data: { reason: string } }
+    /** A person is handling the conversation: the message was kept for them. */
+    | { event: 'with_human'; data: Record<string, never> }
     | { event: 'done'; data: { sessionId: string } }
     | { event: 'error'; data: { message: string; code?: string } };
 
@@ -35,10 +39,28 @@ export interface AgentChatDecision {
     message?: string;
 }
 
-/** What the chat sends: a message, a widget action, or decisions on pending approvals. */
+/** An image or file the user attached (a data URL). */
+export interface AgentChatAttachment {
+    kind: 'image' | 'file';
+    name: string;
+    data_url: string;
+}
+
+/** A message in a conversation a person is handling (for polling). */
+export interface AgentChatHumanMessage {
+    id: string;
+    from: 'user' | 'human' | 'agent';
+    text: string;
+    at: string;
+}
+
+/** What the chat sends: a message, a widget action, decisions on pending approvals, or a poll for the team's replies. */
 export interface AgentChatRequest {
     sessionId?: string;
     message?: string;
+    attachments?: AgentChatAttachment[];
+    /** While a person handles the chat: their replies since `after`. Answered with JSON, not a stream. */
+    poll?: { after?: string };
     action?: WidgetAction & { widgetId?: string; label?: string };
     approval?: { state: string; decisions: Record<string, AgentChatDecision> };
 }

@@ -31,6 +31,8 @@ export interface AgentChatProps extends Partial<UseAgentChatOptions> {
     /** Suggestions shown before the first message. */
     prompts?: Array<string | { label: string; prompt: string }>;
     placeholder?: string;
+    /** Let users attach images, PDFs and text files. Default true. */
+    attachments?: boolean;
     /** Show tool calls as steps in the reply. Default true. */
     showToolCalls?: boolean;
     /** Friendly names for tool steps: { lookup_order: 'Looking up the order' }. */
@@ -52,7 +54,7 @@ function OwnedAgentChat(props: AgentChatProps) {
     return <AgentChatView {...props} chat={chat} />;
 }
 
-function AgentChatView({ chat, theme, greeting, prompts, placeholder, showToolCalls = true, toolLabels, className, style }: AgentChatProps & { chat: UseAgentChatResult }) {
+function AgentChatView({ chat, theme, greeting, prompts, placeholder, attachments = true, showToolCalls = true, toolLabels, className, style }: AgentChatProps & { chat: UseAgentChatResult }) {
     return (
         <div className={`cen-chat${className ? ` ${className}` : ''}`} data-scheme={theme?.colorScheme ?? 'auto'} style={{ ...themeStyle(theme), ...style }}>
             <style>{AGENT_CHAT_CSS}</style>
@@ -63,7 +65,7 @@ function AgentChatView({ chat, theme, greeting, prompts, placeholder, showToolCa
                     <button type="button" className="cen-w-btn" data-variant="ghost" data-size="sm" onClick={() => void chat.retry()}>Try again</button>
                 </div>
             )}
-            <Composer chat={chat} placeholder={placeholder} />
+            <Composer chat={chat} placeholder={placeholder} attachments={attachments} />
         </div>
     );
 }
@@ -127,7 +129,20 @@ function Message({ message, chat, showToolCalls, toolLabels, live }: { message: 
             );
         }
         const text = message.parts.map((p) => (p.type === 'text' ? p.text : '')).join('');
-        return <div className="cen-msg cen-msg-user"><div className="cen-bubble">{text}</div></div>;
+        const attachments = message.parts.filter((p): p is Extract<AgentChatPart, { type: 'attachment' }> => p.type === 'attachment');
+        return (
+            <div className="cen-msg cen-msg-user">
+                {attachments.length > 0 && (
+                    <div className="cen-attachments">
+                        {attachments.map((a, i) => a.kind === 'image' && a.url
+                            // eslint-disable-next-line @next/next/no-img-element
+                            ? <img key={i} src={a.url} alt={a.name} className="cen-attachment-image" />
+                            : <span key={i} className="cen-attachment-file"><FileIcon /> {a.name}</span>)}
+                    </div>
+                )}
+                {text && <div className="cen-bubble">{text}</div>}
+            </div>
+        );
     }
 
     const streaming = message.status === 'streaming';
@@ -137,6 +152,7 @@ function Message({ message, chat, showToolCalls, toolLabels, live }: { message: 
     const lastPart = visible[visible.length - 1];
     return (
         <div className="cen-msg">
+            {message.author === 'human' && <span className="cen-agent-label">Team</span>}
             {visible.map((part, i) => (
                 <Part key={i} part={part} chat={chat} toolLabels={toolLabels}
                     cursor={streaming && part === lastPart && part.type === 'text'}
@@ -172,6 +188,10 @@ function Part({ part, chat, toolLabels, cursor, interactive }: { part: AgentChat
             return <Widget widget={part.widget} id={part.id} disabled={!interactive || part.partial} onAction={(action, ctx) => chat.sendAction(action, ctx)} />;
         case 'handoff':
             return <div className="cen-step"><ArrowIcon /> Handed to {part.to}</div>;
+        case 'notice':
+            return <div className="cen-notice">{part.text}</div>;
+        case 'attachment':
+            return null;
         case 'approval':
             return (
                 <ApprovalCard items={part.items} decisions={part.decisions} pending={part.status === 'pending'}
@@ -252,9 +272,11 @@ export function ApprovalCard({ items, decisions = {}, pending = true, onApprove,
 
 // ── Composer ────────────────────────────────────────────────────
 
-export function Composer({ chat, placeholder = 'Message…' }: { chat: UseAgentChatResult; placeholder?: string }) {
+export function Composer({ chat, placeholder = 'Message…', attachments = true }: { chat: UseAgentChatResult; placeholder?: string; attachments?: boolean }) {
     const [value, setValue] = useState('');
+    const [files, setFiles] = useState<File[]>([]);
     const ref = useRef<HTMLTextAreaElement>(null);
+    const picker = useRef<HTMLInputElement>(null);
     const streaming = chat.status === 'streaming';
     // The run is paused on the approval card: it has to be answered first.
     const waiting = chat.status === 'awaiting_approval';
@@ -266,10 +288,15 @@ export function Composer({ chat, placeholder = 'Message…' }: { chat: UseAgentC
         el.style.height = `${Math.min(160, el.scrollHeight)}px`;
     }, [value]);
 
+    const add = (list: FileList | File[] | null) => {
+        if (!list || !attachments) return;
+        setFiles((current) => [...current, ...Array.from(list)].slice(0, 5));
+    };
     const submit = () => {
-        if (streaming || waiting || !value.trim()) return;
-        void chat.send(value);
+        if (streaming || waiting || (!value.trim() && files.length === 0)) return;
+        void chat.send(value, files);
         setValue('');
+        setFiles([]);
     };
     const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
         if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -279,14 +306,38 @@ export function Composer({ chat, placeholder = 'Message…' }: { chat: UseAgentC
     };
 
     return (
-        <form className="cen-composer" onSubmit={(e) => { e.preventDefault(); submit(); }}>
+        <form
+            className="cen-composer"
+            onSubmit={(e) => { e.preventDefault(); submit(); }}
+            onDragOver={(e) => { if (attachments) e.preventDefault(); }}
+            onDrop={(e) => { if (!attachments) return; e.preventDefault(); add(e.dataTransfer.files); }}
+        >
+            {chat.withHuman && <div className="cen-notice">A person from the team is handling this chat.</div>}
+            {files.length > 0 && (
+                <div className="cen-attachments cen-attachments-pending">
+                    {files.map((f, i) => (
+                        <span key={`${f.name}-${i}`} className="cen-attachment-file">
+                            {f.type.startsWith('image/') ? <ImageIcon /> : <FileIcon />} {f.name}
+                            <button type="button" aria-label={`Remove ${f.name}`} onClick={() => setFiles((current) => current.filter((_, j) => j !== i))}>×</button>
+                        </span>
+                    ))}
+                </div>
+            )}
             <div className="cen-composer-box">
+                {attachments && (
+                    <>
+                        <button type="button" className="cen-attach" aria-label="Attach images or files" disabled={waiting} onClick={() => picker.current?.click()}><PaperclipIcon /></button>
+                        <input ref={picker} type="file" multiple hidden accept="image/*,.pdf,.txt,.md,.csv,.json"
+                            onChange={(e) => { add(e.target.files); e.target.value = ''; }} />
+                    </>
+                )}
                 <textarea ref={ref} rows={1} value={value} placeholder={waiting ? 'Approve or decline above to continue' : placeholder} aria-label="Message" disabled={waiting}
-                    onChange={(e) => setValue(e.target.value)} onKeyDown={onKeyDown} />
+                    onChange={(e) => setValue(e.target.value)} onKeyDown={onKeyDown}
+                    onPaste={(e) => { const pasted = Array.from(e.clipboardData.files); if (pasted.length) { e.preventDefault(); add(pasted); } }} />
                 {streaming ? (
                     <button type="button" className="cen-send" aria-label="Stop" onClick={chat.stop}><StopIcon /></button>
                 ) : (
-                    <button type="submit" className="cen-send" aria-label="Send" disabled={waiting || !value.trim()}><SendIcon /></button>
+                    <button type="submit" className="cen-send" aria-label="Send" disabled={waiting || (!value.trim() && files.length === 0)}><SendIcon /></button>
                 )}
             </div>
         </form>
@@ -308,6 +359,9 @@ const icon = { width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', stroke
 function SendIcon() { return <svg {...icon} width={16} height={16}><path d="M12 19V5M5 12l7-7 7 7" /></svg>; }
 function StopIcon() { return <svg {...icon}><rect x="6" y="6" width="12" height="12" rx="1.5" fill="currentColor" stroke="none" /></svg>; }
 function CheckIcon() { return <svg {...icon} width={12} height={12}><path d="M20 6 9 17l-5-5" /></svg>; }
+function PaperclipIcon() { return <svg {...icon} width={16} height={16}><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" /></svg>; }
+function FileIcon() { return <svg {...icon} width={12} height={12}><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" /><path d="M14 2v4a2 2 0 0 0 2 2h4" /></svg>; }
+function ImageIcon() { return <svg {...icon} width={12} height={12}><rect width="18" height="18" x="3" y="3" rx="2" /><circle cx="9" cy="9" r="2" /><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21" /></svg>; }
 function ArrowIcon() { return <svg {...icon} width={12} height={12}><path d="M5 12h14M13 6l6 6-6 6" /></svg>; }
 function ChevronIcon({ open }: { open: boolean }) {
     return <svg {...icon} width={12} height={12} style={{ transform: open ? 'rotate(90deg)' : undefined, transition: 'transform .15s' }}><path d="m9 6 6 6-6 6" /></svg>;

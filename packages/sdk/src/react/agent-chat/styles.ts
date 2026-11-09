@@ -141,6 +141,15 @@ export const AGENT_CHAT_CSS = `
 .cen-composer-box:focus-within { border-color: color-mix(in srgb, var(--cen-fg) 35%, var(--cen-border)); }
 .cen-composer textarea { flex: 1; resize: none; border: 0; outline: 0; background: transparent; color: inherit; font: inherit; padding: 6px 0; max-height: 160px; min-height: 22px; }
 .cen-composer textarea::placeholder { color: var(--cen-muted-fg); }
+.cen-attach { width: 32px; height: 32px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; border: 0; background: transparent; color: var(--cen-muted-fg); border-radius: calc(var(--cen-radius) - 2px); }
+.cen-attach:hover:not(:disabled) { color: var(--cen-fg); background: var(--cen-muted); }
+.cen-attachments { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; max-width: 85%; }
+.cen-attachments-pending { justify-content: flex-start; max-width: 100%; margin-bottom: 8px; }
+.cen-attachment-image { width: 96px; height: 96px; object-fit: cover; border-radius: var(--cen-radius); border: 1px solid var(--cen-border); }
+.cen-attachment-file { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--cen-border); border-radius: var(--cen-radius); padding: 4px 8px; font-size: 12px; color: var(--cen-muted-fg); max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cen-attachment-file button { border: 0; background: none; padding: 0 0 0 2px; color: var(--cen-muted-fg); font-size: 14px; line-height: 1; }
+.cen-notice { align-self: center; font-size: 12px; color: var(--cen-muted-fg); text-align: center; padding: 2px 0; }
+.cen-composer .cen-notice { margin-bottom: 8px; }
 .cen-chat .cen-send { width: 32px; height: 32px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: calc(var(--cen-radius) - 2px); background: var(--cen-accent); color: var(--cen-accent-fg); }
 
 /* Widgets */

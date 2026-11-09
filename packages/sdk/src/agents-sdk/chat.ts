@@ -1,6 +1,8 @@
 import type { Agent } from './agent';
 import { AgentsError, GuardrailTripwireTriggered } from './errors';
 import { run, RunState, type RunOptions, type StreamedRunResult } from './run';
+import { humanStatus } from './human';
+import type { AgentInput } from './input';
 import {
     encodeAgentChatEvent,
     formatWidgetAction,
@@ -43,6 +45,9 @@ export interface AgentChatHandlerOptions<Ctx> extends Omit<RunOptions<Ctx>, 'con
 }
 
 const MAX_MESSAGE = 32_000;
+const MAX_ATTACHMENTS = 5;
+/** A 10 MB file as a base64 data URL. */
+const MAX_ATTACHMENT_CHARS = 14_000_000;
 
 export function createAgentChatHandler<Ctx>(agent: Agent<Ctx, any>, options: AgentChatHandlerOptions<Ctx> = {}): (req: Request) => Promise<Response> {
     const { context, user, authorizeSession, secret, ...runOptions } = options;
@@ -56,7 +61,16 @@ export function createAgentChatHandler<Ctx>(agent: Agent<Ctx, any>, options: Age
         const signingKey = secret ?? env('CENCORI_AGENT_CHAT_SECRET') ?? runOptions.apiKey ?? env('CENCORI_API_KEY');
         if (!signingKey) return json(500, 'Set CENCORI_API_KEY (or pass secret) to serve an agent chat.');
 
-        let input: string | RunState;
+        // A chat waiting on a person asks for their replies.
+        if (body.poll) {
+            const sid = typeof body.sessionId === 'string' ? body.sessionId : '';
+            if (!sid) return json(400, 'sessionId is required to poll.');
+            if (authorizeSession && !(await authorizeSession(sid, req))) return json(403, 'This conversation belongs to someone else.');
+            const status = await humanStatus(sid, { ...runOptions, after: body.poll.after });
+            return new Response(JSON.stringify({ handled_by: status.handledBy, messages: status.messages }), { headers: { 'Content-Type': 'application/json' } });
+        }
+
+        let input: AgentInput | RunState;
         let sessionId: string | undefined;
         if (body.approval) {
             const verified = await verifyState(body.approval.state, signingKey);
@@ -72,9 +86,21 @@ export function createAgentChatHandler<Ctx>(agent: Agent<Ctx, any>, options: Age
             const text = typeof body.message === 'string' && body.message.trim()
                 ? body.message
                 : body.action && typeof body.action.type === 'string' ? formatWidgetAction(body.action) : '';
-            if (!text) return json(400, 'Send a message, an action or an approval.');
+            const attachments = Array.isArray(body.attachments) ? body.attachments.slice(0, MAX_ATTACHMENTS) : [];
+            if (!text && attachments.length === 0) return json(400, 'Send a message, an action or an approval.');
             if (text.length > MAX_MESSAGE) return json(413, 'The message is too long.');
-            input = text;
+            if (attachments.some((a) => typeof a?.data_url !== 'string' || !a.data_url.startsWith('data:') || a.data_url.length > MAX_ATTACHMENT_CHARS)) {
+                return json(413, 'Each attachment must be a data URL under 10 MB.');
+            }
+            input = attachments.length === 0 ? text : [{
+                type: 'message', role: 'user',
+                content: [
+                    ...(text ? [{ type: 'input_text' as const, text }] : []),
+                    ...attachments.map((a) => a.kind === 'image'
+                        ? { type: 'input_image' as const, image_url: a.data_url }
+                        : { type: 'input_file' as const, filename: String(a.name || 'file').slice(0, 200), file_data: a.data_url }),
+                ],
+            }];
             sessionId = typeof body.sessionId === 'string' && body.sessionId ? body.sessionId : undefined;
         }
         if (sessionId && authorizeSession && !(await authorizeSession(sessionId, req))) {
@@ -84,7 +110,7 @@ export function createAgentChatHandler<Ctx>(agent: Agent<Ctx, any>, options: Age
         const streamed = run(agent, input, {
             ...runOptions,
             stream: true,
-            ...(sessionId && typeof input === 'string' ? { sessionId } : {}),
+            ...(sessionId && !(input instanceof RunState) ? { sessionId } : {}),
             context: context ? await context(req) : undefined,
             user: user ? await user(req) : undefined,
             signal: req.signal,
@@ -112,6 +138,8 @@ export function toAgentChatStream(streamed: StreamedRunResult<unknown>, options:
                         case 'widget': send({ event: 'widget', data: { id: e.widgetId, callId: e.callId, widget: e.widget, agent: e.agentName } }); break;
                         case 'widget_partial': send({ event: 'widget_partial', data: { callId: e.callId, widget: e.widget, agent: e.agentName } }); break;
                         case 'handoff': send({ event: 'handoff', data: { from: e.from, to: e.to } }); break;
+                        case 'human_handoff': send({ event: 'human_handoff', data: { reason: e.reason } }); break;
+                        case 'with_human': send({ event: 'with_human', data: {} }); break;
                         case 'interruption': break; // sent below, with the state
                     }
                 }

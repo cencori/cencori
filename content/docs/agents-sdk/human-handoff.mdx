@@ -1,0 +1,88 @@
+---
+title: "Human handoff"
+description: "Let an agent pass a conversation to a person on your team, and take it back."
+section: "Agents SDK"
+order: 9
+---
+
+Give an agent the `humanHandoff()` tool and it can pass a conversation to your team. It tells the user a person will reply, and then stays quiet until you hand the conversation back.
+
+```ts
+import { Agent, humanHandoff, run } from 'cencori/agents';
+
+const support = new Agent({
+    name: 'Support',
+    instructions: 'Help with orders. If the user asks for a person or is upset, hand off.',
+    tools: [
+        lookupOrder,
+        humanHandoff({
+            onHandoff: ({ sessionId, reason }) => slack.post(`#support needs you: ${reason} (${sessionId})`),
+        }),
+    ],
+});
+
+const result = await run(support, 'I want to talk to a real person');
+// result.finalOutput → "A person from the team will reply here shortly."
+```
+
+## While a person has it
+
+While a person is handling the conversation, the agent doesn't run. The user's messages are saved for that person. `run()` returns `withHuman: true` and no answer:
+
+```ts
+const next = await run(support, 'Hello? Anyone there?', { sessionId });
+next.withHuman;   // true
+next.finalOutput; // undefined
+```
+
+Your team reads the conversation and replies from your own tools: a dashboard, a Slack bot, or a script.
+
+```ts
+import { humanReply, humanStatus, releaseToAgent } from 'cencori/agents';
+
+const status = await humanStatus(sessionId);
+// { handledBy: 'human', handoff: { reason, at }, messages: [{ from: 'user', text, at }, ...] }
+
+await humanReply(sessionId, 'Hi, this is Ada. Your refund is approved.');
+await releaseToAgent(sessionId);
+```
+
+| Function | What it does |
+| --- | --- |
+| `humanStatus(sessionId, { after? })` | Shows who is handling the conversation, and the messages sent since the handoff. Pass `after` (an ISO time) to get only newer messages. |
+| `humanReply(sessionId, text)` | Posts a reply as your team. The conversation stays with the person. |
+| `releaseToAgent(sessionId)` | Hands the conversation back to the agent. |
+
+If nobody replies for 30 minutes, the conversation goes back to the agent automatically.
+
+## Back with the agent
+
+When the agent takes over again, it is told what was said while it was away. It carries on from there instead of starting over. In the example above, the user's next question gets an answer that already knows the refund was approved.
+
+## In Agent UI
+
+[`<AgentChat>`](/docs/agent-ui/chat) handles this for you:
+
+- When the agent hands off, it shows a notice.
+- It checks for your team's replies every few seconds.
+- Team replies are labelled **Team**.
+
+With a server route built using `toAgentChatResponse`, that's the whole setup.
+
+## Events
+
+When `stream: true`, the run emits these events:
+
+| Event | When |
+| --- | --- |
+| `human_handoff` | The agent handed the conversation off. Includes `reason`. |
+| `with_human` | A person is handling it, so this message was saved for them. |
+
+## Options
+
+| Option | Default |
+| --- | --- |
+| `description` | Tells the model when to hand off: when the user asks for a person, is upset, or the agent can't help. |
+| `onHandoff({ sessionId, reason, runContext })` | Runs right after the handoff. Use it to alert your team. |
+
+The REST endpoints behind these functions are `GET` and `POST /v1/sessions/:id/human`. `POST` takes `{ action: 'handoff' | 'reply' | 'release' }` and needs a secret key.

@@ -27,7 +27,7 @@ export interface PausedAction {
 }
 
 export interface TurnBody {
-    input: string | Array<Record<string, unknown>>;
+    input: string | ReadonlyArray<object>;
     model: string;
     instructions?: string;
     tools?: Array<Record<string, unknown>>;
@@ -121,6 +121,22 @@ export class Transport {
             stream: true,
             pause_on_tool_calls: true,
         }, sessionId);
+    }
+
+    /** Human handoff: hand over, reply as a person, or release (POST /v1/sessions/:id/human). */
+    async human(sessionId: string, body: { action: 'handoff' | 'reply' | 'release'; reason?: string; text?: string }): Promise<unknown> {
+        const response = await this.post(`/v1/sessions/${encodeURIComponent(sessionId)}/human`, body, sessionId);
+        return response.json();
+    }
+
+    async humanStatus(sessionId: string, after?: string): Promise<unknown> {
+        const query = after ? `?after=${encodeURIComponent(after)}` : '';
+        const response = await this.fetchImpl(`${this.baseUrl}/v1/sessions/${encodeURIComponent(sessionId)}/human${query}`, {
+            headers: { 'CENCORI_API_KEY': this.apiKey, 'Accept': 'application/json' },
+            signal: this.signal,
+        });
+        if (!response.ok) throw await errorFrom(response, sessionId);
+        return response.json();
     }
 
     resume(sessionId: string, actionId: string, toolResults: Array<{ action_id: string; output: string }>, next?: ResumeNext): Promise<Response> {

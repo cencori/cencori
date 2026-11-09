@@ -311,10 +311,13 @@ export async function POST(
         // message is kept for them and the assistant stays quiet; once it's handed
         // back, the assistant first hears what was said. (WhatsApp does the same in
         // its runner, before it ever calls this route.)
-        if ((source === 'widget' || source === 'link') && typeof body.input === 'string' && body.input.trim()) {
+        // The same goes for any session a person is handling: an SDK agent that
+        // handed over (humanHandoff), or someone who stepped in from the console.
+        const sessionMetadata = session.metadata as Record<string, unknown> | null;
+        if ((source === 'widget' || source === 'link' || sessionMetadata?.owner_active_at || Array.isArray(sessionMetadata?.manual_messages)) && (typeof body.input === 'string' ? body.input.trim() : Array.isArray(body.input))) {
             const takeover = await import('@/lib/studio/takeover');
-            if (takeover.isOwnerActive(session.metadata as Record<string, unknown> | null)) {
-                await takeover.addManualMessage(adminClient as never, sessionId, { from: 'customer', text: body.input.trim().slice(0, 4000) });
+            if (takeover.isOwnerActive(sessionMetadata)) {
+                await takeover.addManualMessage(adminClient as never, sessionId, { from: 'customer', text: messageText(body.input).slice(0, 4000) });
                 return new Response('event: owner.handling\ndata: {}\n\n', {
                     status: 200,
                     headers: { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-store' },
@@ -324,7 +327,10 @@ export async function POST(
             const missed = takeover.manualMessages(session.metadata as Record<string, unknown> | null).some((message) => !message.seen)
                 ? await takeover.takeUnseenManualMessages(adminClient as never, sessionId).catch(() => null)
                 : null;
-            if (missed) body.input = `${missed}\n\n${body.input}`;
+            if (missed) {
+                if (typeof body.input === 'string') body.input = `${missed}\n\n${body.input}`;
+                else if (Array.isArray(body.input)) body.input = [{ type: 'message', role: 'user', content: missed }, ...body.input] as typeof body.input;
+            }
         }
 
         // Installed versions override legacy agent_configs: the normalized
@@ -416,9 +422,15 @@ export async function POST(
             return respondError(400, "Missing model. Provide model in request body or set a default model in project settings.", 'missing_model');
         }
         const configuredModel = lockedModel || agentConfig?.model || body.model || gatewayCtx?.defaultModel || '';
-        const model = normalizeGatewayModelId(configuredModel.trim());
+        const chosenModel = normalizeGatewayModelId(configuredModel.trim());
 
-        const input = body.input;
+        // Attached files become text any model can read (PDF text, text files);
+        // images stay images, and a model that can't see them is swapped for one
+        // that can, for this turn.
+        const { inlineFileParts, textOnlyModel, VISION_FALLBACK_MODEL } = await import('@/lib/gateway/file-inputs');
+        const inlined = await inlineFileParts(body.input, gatewayCtx as GatewayContext);
+        const input = inlined.input as typeof body.input;
+        const model = inlined.hasImage && !lockedModel && textOnlyModel(chosenModel) ? VISION_FALLBACK_MODEL : chosenModel;
         // Installed agents get today's date (they look things up by date through their tools)
         // and the business's events on sale, with their ticket links; Studio's employees, who they are.
         const instructions = installedManifest
@@ -963,4 +975,20 @@ export async function POST(
         const message = error instanceof Error ? error.message : "Internal server error";
         return respondError(500, message, 'internal_error');
     }
+}
+
+/** The text of a turn's input, for storing it while a person handles the chat. */
+function messageText(input: unknown): string {
+    if (typeof input === 'string') return input.trim();
+    if (!Array.isArray(input)) return '';
+    const parts: string[] = [];
+    for (const item of input as Array<Record<string, unknown>>) {
+        const content = Array.isArray(item?.content) ? item.content as Array<Record<string, unknown>> : typeof item?.content === 'string' ? [{ type: 'input_text', text: item.content }] : [item];
+        for (const part of content) {
+            if (typeof part?.text === 'string') parts.push(part.text);
+            else if (part?.type === 'input_image' || part?.type === 'image_url') parts.push('[image]');
+            else if (part?.type === 'input_file') parts.push(`[file: ${typeof part.filename === 'string' ? part.filename : 'file'}]`);
+        }
+    }
+    return parts.join('\n').trim();
 }

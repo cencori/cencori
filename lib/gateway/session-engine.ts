@@ -824,7 +824,7 @@ export async function executeSessionTurn(params: TurnExecuteParams): Promise<Tur
             autoRouterInput: {
                 text: [...(inputMessages ?? []).map((m) => m.content ?? ''), inputText ?? ''].join('\n') || null,
                 tools: (tools as unknown[] | null) ?? null,
-                hasImage: false,
+                hasImage: (inputMessages ?? []).some((m) => ((m as { images?: unknown[] }).images?.length ?? 0) > 0),
             },
         });
 

@@ -36,6 +36,7 @@ const result = await run(support, 'Where is order 1042?');
 | `lastAgent` | The agent that answered, after any handoffs |
 | `newItems` | Messages, tool calls, tool outputs, handoffs and widgets, in order |
 | `interruptions` | Tool calls waiting for approval |
+| `withHuman` | `true` when a person is handling the conversation, so the message was saved for them ([Human handoff](/docs/agents-sdk/human-handoff)) |
 | `state` | A `RunState` to resume after deciding on them |
 | `usage` | Input, output and total tokens across the run |
 
@@ -64,8 +65,32 @@ const result = await stream.completed;
 | `handoff` | The conversation moved to another agent |
 | `widget_partial`, `widget` | UI being drawn, then finished ([Agent UI](/docs/agent-ui/overview)) |
 | `interruption` | The run is waiting for approvals |
+| `human_handoff`, `with_human` | The agent handed off to a person, or a person is handling the conversation |
 
 `stream.toTextStream()` yields only the text.
+
+## Images and files
+
+Instead of a string, pass messages with content parts. The shape is the same as OpenAI's Responses input.
+
+```ts
+import { readFileSync } from 'node:fs';
+import { file, image, run } from 'cencori/agents';
+
+await run(agent, [{
+    role: 'user',
+    content: [
+        { type: 'input_text', text: 'How much is due on this invoice, and does it match the receipt?' },
+        file('invoice.pdf', readFileSync('invoice.pdf')),
+        image('https://example.com/receipt.jpg'),
+    ],
+}]);
+```
+
+- **Images** (URL or data URL) go to the model as images. If the agent's model can't see images, that turn runs on a model that can (`claude-haiku-4-5`).
+- **PDFs and text files** (`.txt`, `.md`, `.csv`, `.json` and similar) are read on Cencori. Their text is given to the model, so they work with any model.
+- Up to 5 files per message, 10 MB each. Very long files are cut at about 60,000 characters.
+- Use `file(name, bytes)` to turn a Buffer or Uint8Array into a data URL. Use `image(url)` to make an image part.
 
 ## Conversations
 

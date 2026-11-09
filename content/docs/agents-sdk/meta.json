@@ -9,6 +9,7 @@
     "running-agents",
     "orchestration",
     "guardrails-and-approvals",
+    "human-handoff",
     "models",
     "tracing",
     "migrate-from-openai"

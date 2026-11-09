@@ -78,6 +78,19 @@ export async function stepIn(db: Admin, sessionId: string): Promise<Metadata | n
     return patchMetadata(db, sessionId, (metadata) => ({ ...metadata, owner_active_at: new Date().toISOString(), needs_owner: null }));
 }
 
+/**
+ * The agent handed the conversation to a person (cencori/agents humanHandoff):
+ * it goes quiet now, as if someone stepped in, and stays flagged with the
+ * reason until a person replies.
+ */
+export async function handOffToHuman(db: Admin, sessionId: string, reason: string): Promise<Metadata | null> {
+    return patchMetadata(db, sessionId, (metadata) => ({
+        ...metadata,
+        owner_active_at: new Date().toISOString(),
+        needs_owner: { reason: reason.slice(0, 300), at: new Date().toISOString() },
+    }), true);
+}
+
 export async function handBack(db: Admin, sessionId: string): Promise<Metadata | null> {
     return patchMetadata(db, sessionId, (metadata) => ({ ...metadata, owner_active_at: null, needs_owner: null }));
 }

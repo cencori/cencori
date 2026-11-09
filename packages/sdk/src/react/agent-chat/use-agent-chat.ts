@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { formatWidgetAction, readEventStream, type AgentChatApprovalItem, type AgentChatDecision, type AgentChatRequest } from '../../agent-chat/protocol';
+import { formatWidgetAction, readEventStream, type AgentChatApprovalItem, type AgentChatAttachment, type AgentChatDecision, type AgentChatHumanMessage, type AgentChatRequest } from '../../agent-chat/protocol';
+import { downscaleImage, canDownscale } from '../vision/downscale';
 import { partialRenderUiWidget } from '../../widgets/partial';
 import type { WidgetAction, WidgetNode } from '../../widgets/spec';
 
@@ -25,7 +26,11 @@ export type AgentChatPart =
     /** `partial` while the agent is still writing it: drawn, but not usable yet. */
     | { type: 'widget'; id: string; widget: WidgetNode; callId?: string; partial?: boolean }
     | { type: 'handoff'; from: string; to: string }
-    | { type: 'approval'; items: AgentChatApprovalItem[]; decisions: Record<string, AgentChatDecision>; state: string; status: 'pending' | 'submitted' };
+    | { type: 'approval'; items: AgentChatApprovalItem[]; decisions: Record<string, AgentChatDecision>; state: string; status: 'pending' | 'submitted' }
+    /** An image or file the user attached (`url` is a preview for images). */
+    | { type: 'attachment'; kind: 'image' | 'file'; name: string; url?: string }
+    /** A line about the conversation itself, e.g. it was handed to a person. */
+    | { type: 'notice'; text: string };
 
 export interface AgentChatMessage {
     id: string;
@@ -35,6 +40,8 @@ export interface AgentChatMessage {
     agent?: string;
     /** A user message that was a widget action rather than typed text. */
     action?: WidgetAction & { label?: string };
+    /** Who wrote an assistant message: the agent, or a person on the team (human handoff). */
+    author?: 'agent' | 'human';
     status?: 'streaming' | 'done' | 'error';
 }
 
@@ -89,8 +96,10 @@ export interface UseAgentChatResult {
     status: AgentChatStatus;
     error: Error | null;
     sessionId: string | undefined;
-    /** Send a message. Ignored while a reply is streaming. */
-    send: (text: string) => Promise<void>;
+    /** Send a message, optionally with images and files (PDF, text). Ignored while a reply is streaming. */
+    send: (text: string, files?: File[]) => Promise<void>;
+    /** A person on the team is handling the conversation (the agent handed it over). */
+    withHuman: boolean;
     /** Run a widget action (what a widget's buttons and forms call). */
     sendAction: (action: WidgetAction, context: WidgetActionContext) => Promise<void>;
     /** Decide a pending tool call. Once every pending call is decided, the run continues. */
@@ -112,6 +121,8 @@ export function useAgentChat(options: UseAgentChatOptions): UseAgentChatResult {
     const [status, setStatus] = useState<AgentChatStatus>('idle');
     const [error, setError] = useState<Error | null>(null);
     const [sessionId, setSessionId] = useState<string | undefined>(options.sessionId);
+    const [withHuman, setWithHuman] = useState(false);
+    const humanSince = useRef<string | null>(null);
 
     // Latest values for callbacks that outlive a render.
     const opts = useRef(options);
@@ -137,6 +148,7 @@ export function useAgentChat(options: UseAgentChatOptions): UseAgentChatResult {
         const controller = new AbortController();
         abort.current = controller;
         let ended: 'done' | 'approval' | 'error' | null = null;
+        let keptForHuman = false;
 
         const pushPart = (part: AgentChatPart) => patch(assistantId, (m) => ({ ...m, parts: [...m.parts, part] }));
 
@@ -148,7 +160,7 @@ export function useAgentChat(options: UseAgentChatOptions): UseAgentChatResult {
             if (direct && o.widgetKey) {
                 // A console agent, through its website widget: a short-lived token per conversation.
                 if (payload.approval) throw new Error('This agent needs approvals: serve it from your backend with `api`.');
-                const input = payload.message ?? (payload.action ? formatWidgetAction(payload.action) : '');
+                const input = turnInput(payload);
                 const base = (o.baseUrl ?? 'https://cencori.com').replace(/\/$/, '');
                 const grant = await widgetGrant(o.fetch ?? fetch, base, o.widgetKey, sessionRef.current, controller.signal);
                 if (grant.sessionId !== sessionRef.current) setSessionId(grant.sessionId);
@@ -162,7 +174,7 @@ export function useAgentChat(options: UseAgentChatOptions): UseAgentChatResult {
                 // No backend: the browser talks to the stored agent with a publishable key.
                 if (!o.agent || !o.publishableKey) throw new Error('Pass `api`, or `agent` with a `publishableKey`.');
                 if (payload.approval) throw new Error('This agent needs approvals: serve it from your backend with `api`.');
-                const input = payload.message ?? (payload.action ? formatWidgetAction(payload.action) : '');
+                const input = turnInput(payload);
                 const base = (o.baseUrl ?? 'https://cencori.com').replace(/\/$/, '');
                 const sid = sessionRef.current;
                 res = await (o.fetch ?? fetch)(sid ? `${base}/v1/sessions/${encodeURIComponent(sid)}/turns` : `${base}/v1/sessions`, {
@@ -242,6 +254,15 @@ export function useAgentChat(options: UseAgentChatOptions): UseAgentChatResult {
                         if (typeof data.sessionId === 'string') setSessionId(data.sessionId);
                         pushPart({ type: 'approval', items: (data.items as AgentChatApprovalItem[]) ?? [], decisions: {}, state: String(data.state), status: 'pending' });
                         break;
+                    case 'human_handoff':
+                        pushPart({ type: 'notice', text: 'Handed to a person on the team. They\u2019ll reply here.' });
+                        setWithHuman(true);
+                        break;
+                    case 'with_human':
+                        // Kept for the person handling it: no answer from the agent.
+                        keptForHuman = true;
+                        setWithHuman(true);
+                        break;
                     case 'done':
                         ended = 'done';
                         if (typeof data.sessionId === 'string' && data.sessionId) setSessionId(data.sessionId);
@@ -252,6 +273,10 @@ export function useAgentChat(options: UseAgentChatOptions): UseAgentChatResult {
               }
             }
             if (!ended) throw new Error('The reply ended early.');
+            if (keptForHuman) {
+                // Nothing from the agent to show: drop its empty reply.
+                setMessages((prev) => prev.filter((m) => !(m.id === assistantId && m.parts.length === 0)));
+            }
             // A widget that never finished (it failed its check) isn't left half-drawn.
             patch(assistantId, (m) => ({ ...m, status: 'done', parts: m.parts.filter((p) => !(p.type === 'widget' && p.partial)) }));
             setStatus(ended === 'approval' ? 'awaiting_approval' : 'idle');
@@ -290,10 +315,23 @@ export function useAgentChat(options: UseAgentChatOptions): UseAgentChatResult {
         await request(payload, assistant.id);
     }, [request]);
 
-    const send = useCallback(async (text: string) => {
+    const send = useCallback(async (text: string, files: File[] = []) => {
         const trimmed = text.trim();
-        if (!trimmed) return;
-        await startTurn({ id: uid('msg'), role: 'user', parts: [{ type: 'text', text: trimmed }] }, { message: trimmed });
+        if (!trimmed && files.length === 0) return;
+        let attachments: AgentChatAttachment[] = [];
+        try {
+            attachments = await Promise.all(files.slice(0, 5).map(readAttachment));
+        } catch (cause) {
+            const e = cause instanceof Error ? cause : new Error(String(cause));
+            setError(e);
+            opts.current.onError?.(e);
+            return;
+        }
+        const parts: AgentChatPart[] = [
+            ...attachments.map((a): AgentChatPart => ({ type: 'attachment', kind: a.kind, name: a.name, ...(a.kind === 'image' ? { url: a.data_url } : {}) })),
+            ...(trimmed ? [{ type: 'text' as const, text: trimmed }] : []),
+        ];
+        await startTurn({ id: uid('msg'), role: 'user', parts }, { message: trimmed, ...(attachments.length ? { attachments } : {}) });
     }, [startTurn]);
 
     const sendAction = useCallback(async (action: WidgetAction, context: WidgetActionContext) => {
@@ -329,6 +367,8 @@ export function useAgentChat(options: UseAgentChatOptions): UseAgentChatResult {
         abort.current?.abort();
         setMessages([]);
         setSessionId(undefined);
+        setWithHuman(false);
+        humanSince.current = null;
         setError(null);
         setStatus('idle');
     }, []);
@@ -343,7 +383,42 @@ export function useAgentChat(options: UseAgentChatOptions): UseAgentChatResult {
         await request(last, assistant.id);
     }, [request]);
 
-    return { messages, status, error, sessionId, send, sendAction, approve, reject, stop, reset, retry };
+    // While a person handles the chat, check for their replies every few seconds.
+    useEffect(() => {
+        if (!withHuman || !sessionId) return;
+        let stopped = false;
+        let after = humanSince.current ?? new Date().toISOString();
+        humanSince.current = after;
+        const tick = async () => {
+            try {
+                const o = opts.current;
+                const status = await pollHuman(o, sessionId, after);
+                if (stopped || !status) return;
+                const replies = status.messages.filter((m) => m.from === 'human');
+                if (replies.length > 0) {
+                    after = status.messages[status.messages.length - 1].at;
+                    humanSince.current = after;
+                    setMessages((prev) => [...prev, ...replies
+                        .filter((m) => !prev.some((p) => p.id === `human_${m.id}`))
+                        .map((m): AgentChatMessage => ({ id: `human_${m.id}`, role: 'assistant', author: 'human', status: 'done', parts: [{ type: 'text', text: m.text }] }))]);
+                } else if (status.messages.length > 0) {
+                    after = status.messages[status.messages.length - 1].at;
+                    humanSince.current = after;
+                }
+                if (status.handled_by === 'agent') {
+                    humanSince.current = null;
+                    setWithHuman(false);
+                }
+            } catch {
+                // Try again on the next tick.
+            }
+        };
+        const timer = setInterval(() => { void tick(); }, 4000);
+        void tick();
+        return () => { stopped = true; clearInterval(timer); };
+    }, [withHuman, sessionId]);
+
+    return { messages, status, error, sessionId, send, sendAction, approve, reject, stop, reset, retry, withHuman };
 }
 
 /**
@@ -380,8 +455,8 @@ export function sessionEventsToChat() {
             case 'turn.completed':
                 return [{ event: 'done', data: { sessionId } }];
             case 'owner.handling':
-                // Someone from the business took over this conversation: they reply in it directly.
-                return [{ event: 'text', data: { delta: 'Someone from the team will reply here.' } }, { event: 'done', data: { sessionId } }];
+                // A person is handling this conversation: the message was kept for them.
+                return [{ event: 'with_human', data: {} }, { event: 'done', data: { sessionId } }];
             case 'turn.paused':
                 return [{ event: 'error', data: { message: 'This agent needs approvals: serve it from your backend with `api`.' } }];
             case 'turn.failed': {
@@ -428,4 +503,60 @@ async function widgetGrant(fetchImpl: typeof fetch, base: string, widgetKey: str
     const grant = { token: data.token, sessionId: data.session_id, expiresAt: data.expires_at ? Date.parse(data.expires_at) : Date.now() + 14 * 60_000 };
     grants.set(grant.sessionId, grant);
     return grant;
+}
+
+// ── Attachments and human replies ───────────────────────────────
+
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+const MAX_FILE_BYTES = 10 * 1024 * 1024;
+
+/** A file as an attachment: images shrunk to fit, everything as a data URL. */
+async function readAttachment(file: File): Promise<AgentChatAttachment> {
+    const isImage = file.type.startsWith('image/');
+    let blob: File = file;
+    if (isImage && file.size > MAX_IMAGE_BYTES) {
+        if (!canDownscale(file.type)) throw new Error(`${file.name} is too large (images up to 4 MB).`);
+        blob = (await downscaleImage(file, MAX_IMAGE_BYTES)).file;
+    }
+    if (!isImage && file.size > MAX_FILE_BYTES) throw new Error(`${file.name} is too large (files up to 10 MB).`);
+    const data_url = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error(`Couldn't read ${file.name}.`));
+        reader.readAsDataURL(blob);
+    });
+    return { kind: isImage ? 'image' : 'file', name: file.name, data_url };
+}
+
+/** A turn's input for the no-backend modes: text, or a message with attachments. */
+function turnInput(payload: AgentChatRequest): unknown {
+    const text = payload.message ?? (payload.action ? formatWidgetAction(payload.action) : '');
+    const attachments = payload.attachments ?? [];
+    if (attachments.length === 0) return text;
+    return [{
+        type: 'message', role: 'user',
+        content: [
+            ...(text ? [{ type: 'input_text', text }] : []),
+            ...attachments.map((a) => a.kind === 'image'
+                ? { type: 'input_image', image_url: a.data_url }
+                : { type: 'input_file', filename: a.name, file_data: a.data_url }),
+        ],
+    }];
+}
+
+/** The person's replies since `after`: from your route (api) or Cencori (widgetKey). */
+async function pollHuman(o: UseAgentChatOptions, sessionId: string, after: string): Promise<{ handled_by: 'human' | 'agent'; messages: AgentChatHumanMessage[] } | null> {
+    const f = o.fetch ?? fetch;
+    if (o.api) {
+        const extra = typeof o.headers === 'function' ? await o.headers() : o.headers ?? {};
+        const res = await f(o.api, { method: 'POST', headers: { 'Content-Type': 'application/json', ...extra }, body: JSON.stringify({ ...o.body, sessionId, poll: { after } }) });
+        return res.ok ? res.json() : null;
+    }
+    if (o.widgetKey) {
+        const base = (o.baseUrl ?? 'https://cencori.com').replace(/\/$/, '');
+        const grant = await widgetGrant(f, base, o.widgetKey, sessionId, new AbortController().signal);
+        const res = await f(`${base}/v1/sessions/${encodeURIComponent(sessionId)}/human?after=${encodeURIComponent(after)}`, { headers: { Authorization: `Bearer ${grant.token}` } });
+        return res.ok ? res.json() : null;
+    }
+    return null;
 }
