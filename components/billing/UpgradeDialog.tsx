@@ -170,9 +170,11 @@ function PaymentForm({
     onError(null);
 
     try {
+      // The Checkout Session already has return_url (set server-side in
+      // /api/billing/checkout). Stripe rejects confirm() if returnUrl is
+      // passed again, so it must not be sent here.
       const confirmRequest = checkoutState.checkout.confirm({
         redirect: "if_required",
-        returnUrl: getReturnUrl(orgSlug, sessionId, returnPath),
       });
       const timeout = new Promise<never>((_, reject) => {
         window.setTimeout(() => {
