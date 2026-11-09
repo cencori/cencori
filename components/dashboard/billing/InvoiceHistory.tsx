@@ -66,7 +66,7 @@ export function InvoiceHistory({ invoices }: InvoiceHistoryProps) {
         <section className="grid gap-6 border-t border-border/30 py-9 lg:grid-cols-[200px_minmax(0,1fr)] lg:gap-12">
             <div>
                 <h2 className="text-sm font-medium">Invoices</h2>
-                <p className="mt-1.5 text-sm leading-6 text-muted-foreground">
+                <p className="mt-1.5 text-xs leading-5 text-muted-foreground">
                     Receipts and subscription charges for this organization.
                 </p>
             </div>

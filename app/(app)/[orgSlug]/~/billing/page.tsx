@@ -210,12 +210,11 @@ export default function BillingPage({ params }: PageProps) {
     }));
 
     return (
-        <main className="mx-auto w-full max-w-[1120px] px-0 pt-0 pb-28 sm:px-6 sm:py-10 lg:px-8">
-            <header className="mb-9 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <main className="mx-auto w-full max-w-[1180px] px-0 pb-6 pt-0 sm:px-6 sm:pt-4 lg:px-8 lg:pt-6">
+            <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                 <div>
-                    <div className="text-[10px] font-medium uppercase tracking-[0.2em] text-muted-foreground">Finance</div>
-                    <h1 className="mt-3 text-3xl font-medium tracking-[-0.04em]">Billing</h1>
-                    <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
+                    <h1 className="text-base font-medium">Billing</h1>
+                    <p className="mt-0.5 max-w-[60ch] text-xs text-muted-foreground">
                         Plans, prepaid capacity, and spend controls for {org?.name ?? "your organization"}.
                     </p>
                 </div>

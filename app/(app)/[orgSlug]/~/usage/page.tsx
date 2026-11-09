@@ -15,6 +15,22 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from '@/components/ui/toast';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import { Lock } from "lucide-react";
+import { useReducedMotion } from "framer-motion";
+import { useCostFormat } from "@/hooks/useDisplayCurrency";
+import {
+    MetricCard,
+    MetricCardFrame,
+    type MetricCardConfig,
+} from "@/components/dashboard/project-overview/ProjectOverviewDashboard";
+import { BarBreakdownChart } from "@/components/dashboard/project-overview/ModelBreakdown";
 
 interface Organization {
     id: string;
@@ -50,6 +66,8 @@ type UsageHour = {
 };
 
 type UsageRollup = Omit<UsageStats, 'success_rate' | 'daily_requests'> & {
+    /** total_cost plus the provider cost of BYOK calls (0500_org_usage_total_spend.sql). */
+    total_spend?: number;
     successful_requests: number;
     hourly: UsageHour[];
 };
@@ -121,75 +139,66 @@ function emptyUsageStats(timeRange: string): UsageStats {
     };
 }
 
-function formatCompactNumber(value: number): string {
-    return new Intl.NumberFormat('en-US', {
-        notation: value >= 1_000 ? 'compact' : 'standard',
-        maximumFractionDigits: 1,
-    }).format(value);
+const PERIODS = [
+    { value: '24h', label: '24 hours' },
+    { value: '7d', label: '7 days' },
+    { value: '30d', label: '30 days' },
+] as const;
+const PRO_ONLY_PERIODS = new Set(['30d']);
+// The console page frame shared with the AI Gateway and Memory pages.
+const PAGE_CLASS = 'mx-auto w-full max-w-[1180px] px-0 pb-6 pt-0 sm:px-6 sm:pt-4 lg:px-8 lg:pt-6';
+const BAR_LIMIT = 6;
+const REQUEST_COLOR = '#f59e0b';
+const INPUT_COLOR = '#3b82f6';
+const OUTPUT_COLOR = '#a855f7';
+const MODEL_COLOR = '#8b5cf6';
+const PROVIDER_COLOR = '#f97316';
+
+const compactNumber = new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 });
+
+function formatLatency(ms: number): string {
+    if (!Number.isFinite(ms) || ms <= 0) return '0ms';
+    return ms >= 1000 ? `${(ms / 1000).toFixed(ms >= 10_000 ? 1 : 2)}s` : `${Math.round(ms)}ms`;
 }
 
-function PeriodMetric({ label, value, detail }: { label: string; value: string; detail: string }) {
-    return (
-        <div className="min-w-0 px-5 py-5 sm:px-6">
-            <p className="text-[10px] font-medium tracking-[0.08em] text-muted-foreground">{label}</p>
-            <p className="mt-3 truncate font-mono text-[1.35rem] font-medium leading-none tracking-[-0.05em] tabular-nums sm:text-2xl">{value}</p>
-            <p className="mt-2 truncate text-[10px] leading-4 text-muted-foreground">{detail}</p>
-        </div>
-    );
+/** Top entries by value, with the remainder rolled into "Other". */
+function topEntries(record: Record<string, number>, limit: number) {
+    // Requests that failed before routing are stored with an empty model/provider.
+    const merged: Record<string, number> = {};
+    for (const [name, value] of Object.entries(record)) {
+        const key = name.trim() && name !== 'unknown' ? name : 'Unknown';
+        merged[key] = (merged[key] || 0) + value;
+    }
+    const sorted = Object.entries(merged)
+        .filter(([, value]) => value > 0)
+        .sort(([, a], [, b]) => b - a);
+    const top = sorted.slice(0, limit).map(([name, value]) => ({ name, value }));
+    const rest = sorted.slice(limit).reduce((sum, [, value]) => sum + value, 0);
+    return rest > 0 ? [...top, { name: 'Other', value: rest }] : top;
 }
 
-function TrafficLedger({
-    title,
-    description,
-    items,
-    total,
-    capitalize = false,
-}: {
-    title: string;
-    description: string;
-    items: Array<[string, number]>;
-    total: number;
-    capitalize?: boolean;
+function SummaryStat({ label, value, detail, loading, className }: {
+    label: string;
+    value: string;
+    detail: string;
+    loading: boolean;
+    className?: string;
 }) {
     return (
-        <section className="min-w-0">
-            <header className="flex items-end justify-between gap-4 px-5 pb-4 pt-5 sm:px-6 sm:pt-6">
-                <div>
-                    <h3 className="text-sm font-medium tracking-[-0.02em]">{title}</h3>
-                    <p className="mt-1 text-[10px] leading-4 text-muted-foreground">{description}</p>
-                </div>
-                <span className="font-mono text-[9px] tracking-[0.12em] text-muted-foreground">SHARE OF TOTAL</span>
-            </header>
-            {items.length === 0 ? (
-                <div className="flex min-h-48 items-center px-5 pb-6 sm:px-6">
-                    <div>
-                        <p className="text-xs font-medium">No routed traffic</p>
-                        <p className="mt-1 text-[10px] text-muted-foreground">Requests will appear after the first model call.</p>
-                    </div>
-                </div>
+        <div className={clsx('min-w-0 border-border/40 px-5 py-4', className)}>
+            <p className="text-xs text-muted-foreground">{label}</p>
+            {loading ? (
+                <>
+                    <Skeleton className="mt-2 h-6 w-24 rounded-sm" />
+                    <Skeleton className="mt-2 h-3 w-28 rounded-sm" />
+                </>
             ) : (
-                <ol className="pb-3">
-                    {items.map(([name, count], index) => {
-                        const share = total > 0 ? (count / total) * 100 : 0;
-                        return (
-                            <li key={name} className="group relative grid grid-cols-[1.75rem_minmax(0,1fr)_auto] items-center gap-3 border-t border-border/25 px-5 py-3.5 transition-colors duration-200 hover:bg-foreground/[0.025] sm:px-6">
-                                <span className="font-mono text-[9px] text-muted-foreground/60">{String(index + 1).padStart(2, '0')}</span>
-                                <div className="min-w-0">
-                                    <div className="flex items-center justify-between gap-3">
-                                        <span className={clsx("truncate text-xs font-medium", capitalize && "capitalize")}>{name}</span>
-                                        <span className="font-mono text-[9px] tabular-nums text-muted-foreground">{share.toFixed(1)}%</span>
-                                    </div>
-                                    <div className="mt-2 h-px overflow-hidden bg-foreground/[0.07]">
-                                        <div className="h-full bg-foreground/65 transition-[width] duration-500" style={{ width: `${share}%` }} />
-                                    </div>
-                                </div>
-                                <span className="w-12 text-right font-mono text-[10px] tabular-nums">{count.toLocaleString()}</span>
-                            </li>
-                        );
-                    })}
-                </ol>
+                <>
+                    <p className="mt-1.5 truncate font-mono text-xl font-medium leading-tight tracking-[-0.03em] tabular-nums">{value}</p>
+                    <p className="mt-1 truncate text-[11px] text-muted-foreground">{detail}</p>
+                </>
             )}
-        </section>
+        </div>
     );
 }
 
@@ -254,7 +263,9 @@ function useUsageStats(orgSlug: string, timeRange: string) {
                 total_tokens: Number(rollup.total_tokens),
                 input_tokens: Number(rollup.input_tokens),
                 output_tokens: Number(rollup.output_tokens),
-                total_cost: Number(rollup.total_cost),
+                // Same figure as the console home's spend: falls back to total_cost
+                // until the total_spend migration is applied.
+                total_cost: Number(rollup.total_spend ?? rollup.total_cost),
                 avg_latency: Number(rollup.avg_latency),
                 success_rate: (Number(rollup.successful_requests) / Number(rollup.total_requests)) * 100,
                 model_usage: rollup.model_usage,
@@ -272,7 +283,6 @@ export default function UsagePage({ params }: PageProps) {
     const upgrade = useUpgrade();
     const [timeRange, setTimeRange] = React.useState('7d');
     const [isExporting, setIsExporting] = React.useState(false);
-    const [hoveredActivityIndex, setHoveredActivityIndex] = React.useState<number | null>(null);
 
     const handleExport = async (format: 'csv' | 'json') => {
         setIsExporting(true);
@@ -326,21 +336,15 @@ export default function UsagePage({ params }: PageProps) {
     };
 
     const { data: org, isLoading: orgLoading } = useOrganization(orgSlug);
-    const { data: stats, isLoading: statsLoading, error: statsError } = useUsageStats(orgSlug, timeRange);
+    const { data: stats, isLoading: statsLoading, error: statsError, refetch: refetchStats } = useUsageStats(orgSlug, timeRange);
+    const { formatCost } = useCostFormat();
+    const reduceMotion = useReducedMotion();
 
     const isLoading = orgLoading || statsLoading;
 
     const monthlyRequestsUsed = org && Number.isFinite(org.monthly_requests_used) && org.monthly_requests_used >= 0
         ? org.monthly_requests_used
         : 0;
-
-    const topModels = Object.entries(stats?.model_usage || {})
-        .sort(([, a], [, b]) => b - a)
-        .slice(0, 5);
-
-    const topProviders = Object.entries(stats?.provider_usage || {})
-        .sort(([, a], [, b]) => b - a)
-        .slice(0, 5);
 
     const totalRequests = stats?.total_requests || 0;
     const totalInputTokens = stats?.input_tokens || 0;
@@ -350,353 +354,203 @@ export default function UsagePage({ params }: PageProps) {
     const successRate = stats?.success_rate || 0;
     const averageLatency = stats?.avg_latency || 0;
     const successfulRequests = Math.round(totalRequests * (successRate / 100));
+    const failedRequests = Math.max(totalRequests - successfulRequests, 0);
     const activity = stats?.daily_requests || buildRequestActivity([], timeRange);
-    const activityMaximum = Math.max(...activity.map((point) => point.input_tokens + point.output_tokens), 1);
-    const activityLabelInterval = activity.length > 24 ? 5 : activity.length > 12 ? 4 : 1;
+    const hasActivity = activity.some((point) => point.count > 0);
+    const modelRows = topEntries(stats?.model_usage || {}, BAR_LIMIT);
+    const providerRows = topEntries(stats?.provider_usage || {}, BAR_LIMIT);
+    const modelCount = Object.keys(stats?.model_usage || {}).length;
+    const providerCount = Object.values(stats?.provider_usage || {}).filter((value) => value > 0).length;
     const nextReset = new Date();
     nextReset.setMonth(nextReset.getMonth() + 1, 1);
     nextReset.setHours(0, 0, 0, 0);
-    const periodLabel = timeRange === '24h' ? 'Last 24 hours' : timeRange === '30d' ? 'Last 30 days' : 'Last 7 days';
+    const periodLabel = PERIODS.find((option) => option.value === timeRange)?.label ?? '7 days';
     const planLabel = org?.subscription_tier
         ? `${org.subscription_tier.charAt(0).toUpperCase()}${org.subscription_tier.slice(1)}`
-        : "Free";
-    const peakTokenInterval = Math.max(...activity.map((point) => point.input_tokens + point.output_tokens), 0);
-    const averageTokenInterval = activity.length > 0 ? totalTokens / activity.length : 0;
-    const hoveredActivityPoint = hoveredActivityIndex === null ? null : activity[hoveredActivityIndex] || null;
+        : 'Free';
+
+    const periodLocked = (value: string) => upgrade.canUpgrade && PRO_ONLY_PERIODS.has(value);
+    const choosePeriod = (value: string) => {
+        if (periodLocked(value)) upgrade.openUpgrade();
+        else setTimeRange(value);
+    };
+
+    const requestsConfig: MetricCardConfig = {
+        title: 'Requests',
+        detail: `${successfulRequests.toLocaleString()} successful`,
+        series: [{ key: 'count', label: 'Requests', color: REQUEST_COLOR, value: totalRequests.toLocaleString() }],
+        formatValue: (value) => value.toLocaleString(),
+        formatAxis: (value) => compactNumber.format(value),
+    };
+    const tokensConfig: MetricCardConfig = {
+        title: 'Tokens',
+        detail: compactNumber.format(totalTokens),
+        series: [
+            { key: 'input_tokens', label: 'Input', color: INPUT_COLOR, value: compactNumber.format(totalInputTokens) },
+            { key: 'output_tokens', label: 'Output', color: OUTPUT_COLOR, value: compactNumber.format(totalOutputTokens) },
+        ],
+        formatValue: (value) => compactNumber.format(value),
+        formatAxis: (value) => compactNumber.format(value),
+    };
+    const modelConfig: MetricCardConfig = {
+        title: 'Model usage',
+        detail: `${modelCount} ${modelCount === 1 ? 'model' : 'models'}`,
+        series: [{ key: 'value', label: 'Requests', color: MODEL_COLOR, value: totalRequests.toLocaleString() }],
+        formatValue: (value) => value.toLocaleString(),
+        formatAxis: (value) => compactNumber.format(value),
+    };
+    const providerConfig: MetricCardConfig = {
+        title: 'Requests by provider',
+        detail: `${providerCount} ${providerCount === 1 ? 'provider' : 'providers'}`,
+        series: [{ key: 'value', label: 'Requests', color: PROVIDER_COLOR, value: totalRequests.toLocaleString() }],
+        formatValue: (value) => value.toLocaleString(),
+        formatAxis: (value) => compactNumber.format(value),
+    };
+
+    if (!orgLoading && !org) {
+        return (
+            <main className={PAGE_CLASS}>
+                <p className="py-16 text-center text-sm text-muted-foreground">Organization not found.</p>
+            </main>
+        );
+    }
 
     return (
-        <main className="mx-auto w-full max-w-[980px] px-0 pt-0 pb-24 sm:px-6 sm:py-10 lg:px-8">
-            <header className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+        <main className={PAGE_CLASS}>
+            <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                 <div>
-                    <p className="text-[10px] font-medium tracking-[0.18em] text-muted-foreground">ORGANIZATION TELEMETRY</p>
-                    <h1 className="mt-3 text-[2rem] font-medium leading-none tracking-[-0.055em]">Usage</h1>
-                    <p className="mt-3 max-w-[60ch] text-xs leading-5 text-muted-foreground">
-                        Model traffic, token consumption, and capacity across {org?.name ?? "your organization"}.
+                    <h1 className="text-base font-medium">Usage</h1>
+                    <p className="mt-0.5 max-w-[60ch] text-xs text-muted-foreground">
+                        Requests, tokens, and spend across every project in {org?.name ?? 'your organization'}.
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="sm" className="h-8 rounded-md border-border/30 bg-transparent px-3 text-[10px] shadow-none transition-colors hover:bg-muted/50 active:scale-[0.98]" disabled={isExporting}>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 rounded-md border-border/45 bg-muted/20 px-3 text-[11px] shadow-none"
+                                disabled={isExporting}
+                            >
                                 {isExporting && <Spinner className="mr-1 size-3 animate-spin" />}
-                                Export data
+                                Export
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleExport('csv')}>Export CSV</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleExport('json')}>Export JSON</DropdownMenuItem>
+                            <DropdownMenuItem className="text-xs" onClick={() => handleExport('csv')}>Export CSV</DropdownMenuItem>
+                            <DropdownMenuItem className="text-xs" onClick={() => handleExport('json')}>Export JSON</DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
-                    <div className="flex h-8 items-center rounded-md border border-border/30 p-0.5" aria-label="Usage period">
-                        {['24h', '7d', '30d'].map((range) => {
-                            const isGated = range === '30d' && org?.subscription_tier === 'free';
-
-                            if (isGated) {
-                                return (
-                                    <div key={range} className="group relative">
-                                        <span
-                                            tabIndex={0}
-                                            aria-label="30-day history requires an upgrade"
-                                            className="block rounded-[4px] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                                        >
-                                            <button
-                                                type="button"
-                                                disabled
-                                                className="h-6 cursor-not-allowed rounded-[4px] px-3 font-mono text-[9px] font-medium text-muted-foreground/45"
-                                            >
-                                                30D
-                                            </button>
-                                        </span>
-                                        <div
-                                            className="pointer-events-none invisible absolute -right-4 top-full z-50 w-60 pt-2 group-hover:pointer-events-auto group-hover:visible group-focus-within:pointer-events-auto group-focus-within:visible"
-                                        >
-                                            <div
-                                                role="dialog"
-                                                aria-label="Upgrade to unlock 30-day history"
-                                                className="rounded-md border border-border/30 bg-[#f0f0ee] p-3.5 shadow-2xl dark:bg-[#191919]"
-                                            >
-                                                <p className="text-[11px] font-medium text-popover-foreground">Unlock 30-day history</p>
-                                                <p className="mt-1 text-[10px] leading-4 text-muted-foreground">Available on Pro and Enterprise plans.</p>
-                                                <button
-                                                    type="button"
-                                                    onClick={upgrade.openUpgrade}
-                                                    onMouseEnter={upgrade.preloadUpgrade}
-                                                    className="mt-3 inline-flex text-[10px] font-medium text-popover-foreground underline underline-offset-4 transition-opacity hover:opacity-70 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                                                >
-                                                    Upgrade to Pro
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            }
-
-                            return (
-                                <button
-                                key={range}
-                                type="button"
-                                onClick={() => {
-                                    setHoveredActivityIndex(null);
-                                    setTimeRange(range);
-                                }}
-                                    aria-pressed={timeRange === range}
-                                    className={clsx(
-                                        "h-6 rounded-[4px] px-3 font-mono text-[9px] font-medium transition-[background-color,color,transform] duration-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring active:scale-[0.97]",
-                                        timeRange === range ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
-                                    )}
-                                >
-                                    {range.toUpperCase()}
-                                </button>
-                            );
-                        })}
-                    </div>
+                    <Select value={timeRange} onValueChange={choosePeriod} onOpenChange={(open) => { if (open) upgrade.preloadUpgrade(); }}>
+                        <SelectTrigger
+                            aria-label="Select usage period"
+                            className="h-8 w-[8.5rem] rounded-md border-border/45 bg-muted/20 px-3 text-[11px] shadow-none"
+                        >
+                            <SelectValue placeholder="Period" />
+                        </SelectTrigger>
+                        <SelectContent align="end">
+                            {PERIODS.map((option) => (
+                                <SelectItem key={option.value} value={option.value} className="text-xs">
+                                    <span className="flex w-full items-center gap-2">
+                                        {option.label}
+                                        {periodLocked(option.value) && <Lock className="ml-auto h-3 w-3 text-muted-foreground" aria-label="Pro" />}
+                                    </span>
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                 </div>
             </header>
 
             {statsError && (
-                <div className="mt-6 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-xs text-destructive">
-                    Couldn&apos;t load usage for this window: {statsError.message}. The figures below are not your real usage.
-                </div>
-            )}
-
-            {isLoading ? (
-                <>
-                    <div className="mt-10 overflow-hidden rounded-lg bg-muted/35 dark:bg-[#111111]">
-                        <div className="grid lg:grid-cols-[1.55fr_1fr]">
-                            <div className="p-6 sm:p-8 lg:p-10">
-                                <Skeleton className="h-3 w-28" />
-                                <Skeleton className="mt-8 h-12 w-64" />
-                                <Skeleton className="mt-8 h-9 w-full" />
-                                <div className="mt-8 grid grid-cols-3 gap-5 border-t border-border/25 pt-5">
-                                    {[1, 2, 3].map((item) => <Skeleton key={item} className="h-8 w-24 max-w-full" />)}
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-px bg-border/25 lg:border-l lg:border-border/25">
-                                {[1, 2, 3, 4].map((item) => (
-                                    <div key={item} className="bg-muted/35 p-6 dark:bg-[#111111]">
-                                        <Skeleton className="h-3 w-16" />
-                                        <Skeleton className="mt-4 h-7 w-24" />
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="mt-12 border-y border-border/25 py-7">
-                        <div className="flex items-end justify-between">
-                            <Skeleton className="h-5 w-28" />
-                            <Skeleton className="h-8 w-24" />
-                        </div>
-                        <Skeleton className="mt-8 h-64 w-full" />
-                    </div>
-
-                    <div className="mt-12 grid overflow-hidden rounded-lg bg-muted/30 dark:bg-[#0d0d0d] lg:grid-cols-2 lg:divide-x lg:divide-border/25">
-                        {[1, 2].map((section) => (
-                            <div key={section} className="space-y-px">
-                                <div className="p-6"><Skeleton className="h-5 w-32" /></div>
-                                {[1, 2, 3, 4].map((row) => (
-                                    <div key={row} className="px-6"><Skeleton className="h-10 w-full" /></div>
-                                ))}
-                            </div>
-                        ))}
-                    </div>
-                </>
-            ) : !org ? (
-                <div className="w-full max-w-5xl mx-auto px-0 sm:px-6 pt-0 pb-8 sm:pt-8">
-                    <div className="text-center py-16 flex flex-col items-center">
-                        <div className="w-10 h-10 rounded-md bg-secondary flex items-center justify-center mb-3">
-                        </div>
-                        <p className="text-sm font-medium">Organization not found</p>
-                    </div>
-                </div>
-            ) : (
-            <>
-            <section className="relative mt-10 overflow-hidden rounded-lg bg-[#f3f3f1] dark:bg-[#111111]" aria-labelledby="capacity-heading">
-                <div className="grid lg:grid-cols-[1.55fr_1fr]">
-                    <div className="relative px-5 py-7 sm:px-8 sm:py-9 lg:px-10 lg:py-10">
-                        <div>
-                            <div>
-                                <p className="text-[9px] font-medium tracking-[0.16em] text-muted-foreground">REQUESTS THIS MONTH</p>
-                                <h2 id="capacity-heading" className="mt-2 text-sm font-medium">{planLabel} plan</h2>
-                            </div>
-                        </div>
-
-                        <div className="mt-10 flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
-                            <div className="flex min-w-0 items-baseline gap-3">
-                                <span className="font-mono text-4xl font-medium leading-none tracking-[-0.075em] tabular-nums sm:text-[3.25rem]">{monthlyRequestsUsed.toLocaleString()}</span>
-                                <span className="truncate text-xs text-muted-foreground">requests</span>
-                            </div>
-                        </div>
-
-                        {/* The quota meter that used to sit here charted requests
-                            against a per-tier ceiling. There is no ceiling on any
-                            plan now, so there is nothing to fill. Spend is the
-                            number worth watching, and it has its own tile. */}
-
-                        <dl className="mt-8 grid grid-cols-2 gap-4 border-t border-border/25 pt-5">
-                            <div className="min-w-0">
-                                <dt className="text-[9px] tracking-[0.08em] text-muted-foreground">Resets</dt>
-                                <dd className="mt-1.5 truncate text-[11px]">{nextReset.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</dd>
-                            </div>
-                            <div className="min-w-0">
-                                <dt className="text-[9px] tracking-[0.08em] text-muted-foreground">Scope</dt>
-                                <dd className="mt-1.5 truncate text-[11px]">All projects</dd>
-                            </div>
-                        </dl>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-px border-t border-border/25 bg-border/25 lg:border-l lg:border-t-0">
-                        <div className="bg-[#f3f3f1] dark:bg-[#111111]"><PeriodMetric label="Requests" value={totalRequests.toLocaleString()} detail={periodLabel} /></div>
-                        <div className="bg-[#f3f3f1] dark:bg-[#111111]"><PeriodMetric label="Success" value={`${successRate.toFixed(1)}%`} detail={`${successfulRequests.toLocaleString()} completed`} /></div>
-                        <div className="bg-[#f3f3f1] dark:bg-[#111111]"><PeriodMetric label="Tokens" value={formatCompactNumber(totalTokens)} detail={totalRequests ? `${formatCompactNumber(Math.round(totalTokens / totalRequests))} / request` : 'No token activity'} /></div>
-                        <div className="bg-[#f3f3f1] dark:bg-[#111111]"><PeriodMetric label="Spend" value={`$${totalCost.toFixed(2)}`} detail={totalRequests ? `$${(totalCost / totalRequests).toFixed(4)} / request` : 'No spend recorded'} /></div>
-                        <div className="col-span-2 flex items-center justify-between gap-4 bg-[#ededeb] px-5 py-4 dark:bg-[#0d0d0d] sm:px-6">
-                            <span className="text-[10px] text-muted-foreground">Mean response latency</span>
-                            <span className="font-mono text-xs tabular-nums">{averageLatency.toLocaleString()} ms</span>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <section className="mt-14 overflow-hidden rounded-lg bg-muted/30 dark:bg-[#111111]" aria-labelledby="activity-heading">
-                <header className="flex flex-col gap-5 border-b border-border/25 px-5 py-5 sm:flex-row sm:items-end sm:justify-between sm:px-6 sm:py-6">
-                    <div>
-                        <p className="text-[9px] font-medium tracking-[0.16em] text-muted-foreground">TOKEN FLOW</p>
-                        <h2 id="activity-heading" className="mt-2 text-lg font-medium tracking-[-0.035em]">Input and output tokens</h2>
-                        <p className="mt-1.5 text-[11px] leading-5 text-muted-foreground">Token volume processed across every organization project.</p>
-                    </div>
-                    <div className="flex gap-8 sm:text-right">
-                        <div>
-                            <p className="text-[9px] text-muted-foreground">Peak tokens</p>
-                            <p className="mt-1.5 font-mono text-xs tabular-nums">{formatCompactNumber(peakTokenInterval)}</p>
-                        </div>
-                        <div>
-                            <p className="text-[9px] text-muted-foreground">Average tokens</p>
-                            <p className="mt-1.5 font-mono text-xs tabular-nums">{formatCompactNumber(Math.round(averageTokenInterval))}</p>
-                        </div>
-                    </div>
-                </header>
-
-                <div className="relative overflow-hidden px-5 pb-5 pt-6 sm:px-6 sm:pb-6 sm:pt-7">
-                    <div
-                        className="relative h-64 w-full sm:h-72"
-                        role="img"
-                        aria-label={`Input and output token activity for the ${periodLabel.toLowerCase()}`}
-                        onMouseLeave={() => setHoveredActivityIndex(null)}
-                    >
-                        <div className="pointer-events-none absolute inset-0 flex flex-col justify-between" aria-hidden="true">
-                            {[0, 1, 2, 3].map((line) => <span key={line} className="w-full border-t border-foreground/[0.08]" />)}
-                        </div>
-
-                        <div className="absolute inset-0 z-10 flex items-end">
-                            {activity.map((point, index) => {
-                                const intervalTokens = point.input_tokens + point.output_tokens;
-                                const barHeight = intervalTokens > 0 ? Math.max((intervalTokens / activityMaximum) * 100, 1.5) : 0;
-                                const inputShare = intervalTokens > 0 ? (point.input_tokens / intervalTokens) * 100 : 0;
-                                const outputShare = intervalTokens > 0 ? (point.output_tokens / intervalTokens) * 100 : 0;
-                                const isActive = hoveredActivityIndex === index;
-
-                                return (
-                                    <div
-                                        key={`${point.date}-bars-${index}`}
-                                        className={clsx(
-                                            "relative flex h-full min-w-0 flex-1 cursor-crosshair items-end justify-center px-px transition-colors",
-                                            isActive && "bg-foreground/[0.025]",
-                                        )}
-                                        onMouseEnter={() => setHoveredActivityIndex(index)}
-                                    >
-                                        <div
-                                            className="flex w-full min-w-[4px] flex-col overflow-hidden rounded-t-[2px] transition-opacity duration-150"
-                                            style={{ height: `${barHeight}%`, opacity: isActive ? 1 : 0.86 }}
-                                        >
-                                            <span className="w-full bg-orange-400" style={{ height: `${outputShare}%` }} />
-                                            <span className="w-full bg-emerald-500" style={{ height: `${inputShare}%` }} />
-                                        </div>
-
-                                        {isActive && hoveredActivityPoint && (
-                                            <div
-                                                role="status"
-                                                className={clsx(
-                                                    "pointer-events-none absolute top-3 z-20 w-44 rounded-md border border-border/30 bg-[#f0f0ee] px-3 py-2.5 text-left shadow-xl dark:bg-[#191919]",
-                                                    index <= 1 ? "left-0" : index >= activity.length - 2 ? "right-0" : "left-1/2 -translate-x-1/2",
-                                                )}
-                                            >
-                                                <p className="font-mono text-[9px] text-muted-foreground">{point.date}</p>
-                                                <div className="mt-2.5 flex items-center justify-between gap-5">
-                                                    <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground"><span className="size-1.5 bg-emerald-500" />Input</span>
-                                                    <span className="font-mono text-[10px] font-medium tabular-nums">{point.input_tokens.toLocaleString()}</span>
-                                                </div>
-                                                <div className="mt-1.5 flex items-center justify-between gap-5">
-                                                    <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground"><span className="size-1.5 bg-orange-400" />Output</span>
-                                                    <span className="font-mono text-[10px] font-medium tabular-nums">{point.output_tokens.toLocaleString()}</span>
-                                                </div>
-                                                <div className="mt-2 flex items-center justify-between gap-5 border-t border-border/25 pt-2">
-                                                    <span className="text-[10px] text-muted-foreground">Requests</span>
-                                                    <span className="font-mono text-[10px] tabular-nums">{point.count.toLocaleString()}</span>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                        </div>
-
-                        {totalTokens === 0 && (
-                            <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
-                                <div className="bg-background/80 px-4 py-3 text-center backdrop-blur-sm">
-                                    <p className="text-xs font-medium">No token activity</p>
-                                    <p className="mt-1 text-[10px] text-muted-foreground">Input and output volume will appear after the first model call.</p>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                    <div className="mt-1 flex justify-between gap-2 font-mono text-[8px] text-muted-foreground">
-                        {activity.map((point, index) => {
-                            const showLabel = index === 0 || index === activity.length - 1 || index % activityLabelInterval === 0;
-                            return (
-                                <span key={`${point.date}-label-${index}`} className="min-w-0 flex-1 truncate text-center">{showLabel ? point.date : ''}</span>
-                            );
-                        })}
-                    </div>
-                    <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-border/25 pt-4 text-[10px]">
-                        <div className="flex items-center gap-2">
-                            <span className="size-2 bg-emerald-500" />
-                            <span className="text-muted-foreground">Input tokens</span>
-                            <span className="font-mono tabular-nums">{formatCompactNumber(totalInputTokens)}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <span className="size-2 bg-orange-400" />
-                            <span className="text-muted-foreground">Output tokens</span>
-                            <span className="font-mono tabular-nums">{formatCompactNumber(totalOutputTokens)}</span>
-                        </div>
-                        <span className="ml-auto font-mono text-[9px] text-muted-foreground">{timeRange === '24h' ? 'HOURLY' : 'DAILY'} BUCKETS</span>
-                    </div>
-                </div>
-            </section>
-
-            <section className="mt-14" aria-labelledby="routing-heading">
-                <header>
-                    <p className="text-[9px] font-medium tracking-[0.16em] text-muted-foreground">ROUTING DISTRIBUTION</p>
-                    <h2 id="routing-heading" className="mt-2 text-lg font-medium tracking-[-0.035em]">Where traffic ran</h2>
-                    <p className="mt-1.5 text-[11px] leading-5 text-muted-foreground">
-                        Traffic distribution for the selected window. Bars show share of total requests, not usage limits.
+                <div className="mb-4 flex items-center justify-between gap-4 rounded-md border border-red-500/20 bg-red-500/[0.04] px-4 py-3 text-[11px]">
+                    <p className="text-red-600 dark:text-red-400">
+                        We couldn&apos;t load usage for this period. The figures below are not your real usage.
                     </p>
-                </header>
-
-                <div className="mt-6 grid overflow-hidden rounded-lg bg-muted/30 dark:bg-[#0d0d0d] lg:grid-cols-2 lg:divide-x lg:divide-border/25">
-                    <TrafficLedger title="Models" description="Request share by model identifier" items={topModels} total={totalRequests} />
-                    <div className="border-t border-border/25 lg:border-t-0">
-                        <TrafficLedger title="Providers" description="Request share by upstream provider" items={topProviders} total={totalRequests} capitalize />
-                    </div>
+                    <button
+                        type="button"
+                        onClick={() => void refetchStats()}
+                        className="shrink-0 font-medium underline decoration-border underline-offset-4 hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                    >
+                        Try again
+                    </button>
                 </div>
+            )}
+
+            <section
+                aria-label="Usage summary"
+                className="mb-4 grid overflow-hidden rounded-lg border border-border/40 bg-muted/30 sm:grid-cols-2 lg:grid-cols-4"
+            >
+                <SummaryStat
+                    loading={isLoading}
+                    label="This month"
+                    value={monthlyRequestsUsed.toLocaleString()}
+                    detail={`${planLabel} plan · resets ${nextReset.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
+                />
+                <SummaryStat
+                    loading={isLoading}
+                    label="Success rate"
+                    value={`${successRate.toFixed(1)}%`}
+                    detail={`${failedRequests.toLocaleString()} failed`}
+                    className="border-t sm:border-l sm:border-t-0"
+                />
+                <SummaryStat
+                    loading={isLoading}
+                    label="Spend"
+                    value={formatCost(totalCost)}
+                    detail={totalRequests ? `${formatCost(totalCost / totalRequests)} / request` : `${periodLabel.toLowerCase()} total`}
+                    className="border-t lg:border-l lg:border-t-0"
+                />
+                <SummaryStat
+                    loading={isLoading}
+                    label="Latency"
+                    value={formatLatency(averageLatency)}
+                    detail="mean response time"
+                    className="border-t sm:border-l lg:border-t-0"
+                />
             </section>
 
-            <footer className="mt-12 flex flex-col gap-2 border-t border-border/25 pt-5 text-[10px] leading-4 text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-                <p>Usage aggregates every project and environment in {org?.name ?? "your organization"}.</p>
-                <p className="font-mono">WINDOW / {timeRange.toUpperCase()}</p>
-            </footer>
-            </>
-            )}
+            <section aria-label="Usage charts" className="grid gap-4 lg:grid-cols-2">
+                <MetricCard
+                    config={requestsConfig}
+                    data={activity}
+                    loading={isLoading}
+                    hasData={hasActivity}
+                    reduceMotion={reduceMotion}
+                />
+                <MetricCard
+                    config={tokensConfig}
+                    data={activity}
+                    loading={isLoading}
+                    hasData={hasActivity}
+                    reduceMotion={reduceMotion}
+                />
+                <MetricCardFrame config={modelConfig} loading={isLoading}>
+                    <BarBreakdownChart
+                        rows={modelRows}
+                        color={MODEL_COLOR}
+                        label="Requests"
+                        formatValue={(value) => compactNumber.format(value)}
+                        reduceMotion={reduceMotion}
+                        labelKind="model"
+                    />
+                </MetricCardFrame>
+                <MetricCardFrame config={providerConfig} loading={isLoading}>
+                    <BarBreakdownChart
+                        rows={providerRows}
+                        color={PROVIDER_COLOR}
+                        label="Requests"
+                        formatValue={(value) => compactNumber.format(value)}
+                        reduceMotion={reduceMotion}
+                        labelKind="provider"
+                    />
+                </MetricCardFrame>
+            </section>
+
+            <p className="mt-4 text-[11px] text-muted-foreground">
+                Covers every project and environment in {org?.name ?? 'your organization'}.
+            </p>
         </main>
     );
 }
