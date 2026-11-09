@@ -66,9 +66,14 @@ export function bachsPaymentRow(charge: BachsCharge | BachsPayin): PaymentRow | 
   const currency = String(charge.currency || 'USD').toUpperCase();
   const paidAt = new Date(charge.created_at || Date.now());
   const productId = charge.product_cart?.[0]?.product_id ?? null;
-  const productType = charge.metadata?.purchase_type
-    || (productId ? getProductTypeFromId(productId) : null)
-    || 'other';
+  // Pro paid in naira is a plan payment: count it with subscriptions (MRR).
+  const nairaPlan = charge.metadata?.purchase_type === 'plan_pass_ngn';
+  const productType = nairaPlan
+    ? 'subscription'
+    : charge.metadata?.purchase_type
+      || (productId ? getProductTypeFromId(productId) : null)
+      || 'other';
+  const metadataInterval = charge.metadata?.interval;
   const fx = currency === 'NGN' ? ngnPerUsdAt(paidAt) : null;
   const full = charge as Partial<BachsCharge>;
 
@@ -78,7 +83,9 @@ export function bachsPaymentRow(charge: BachsCharge | BachsPayin): PaymentRow | 
     organization_id: charge.metadata?.org_id || null,
     product_type: productType,
     product_id: productId,
-    billing_interval: productId ? getBillingInterval(productId) : null,
+    billing_interval: nairaPlan
+      ? (metadataInterval === 'year' || metadataInterval === 'month' ? metadataInterval : null)
+      : productId ? getBillingInterval(productId) : null,
     amount,
     currency,
     amount_usd: Math.round((fx ? amount / fx : amount) * 100) / 100,

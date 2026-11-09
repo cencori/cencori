@@ -58,3 +58,14 @@ describe('payments ledger', () => {
         }
     });
 });
+
+describe('payments ledger: Pro paid in naira', () => {
+    it('counts it as a subscription with its interval', () => {
+        const row = bachsPaymentRow(charge({
+            amount: '20000.00',
+            currency: 'NGN',
+            metadata: { org_id: 'org_1', purchase_type: 'plan_pass_ngn', tier: 'pro', interval: 'month' },
+        }));
+        expect(row).toMatchObject({ product_type: 'subscription', billing_interval: 'month', currency: 'NGN', amount: 20000 });
+    });
+});
