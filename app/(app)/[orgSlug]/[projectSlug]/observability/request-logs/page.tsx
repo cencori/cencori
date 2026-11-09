@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { replaceQuery, requestLogsQuery } from '@/lib/observability/queries';
-import { ExternalLink, Play, RefreshCw, Search, X } from 'lucide-react';
+import { ExternalLink, RefreshCw, Search, X } from 'lucide-react';
 import LeftToRightListDashIcon from '@hugeicons/core-free-icons/LeftToRightListDashIcon';
 import BinocularsIcon from '@hugeicons/core-free-icons/BinocularsIcon';
 import { ObservabilityEmptyState } from '@/components/observability/EmptyState';
@@ -156,7 +156,6 @@ export default function RequestLogsPage({ params }: PageProps) {
     const selected = searchParams.get('request');
     const { data: projectId, isLoading: projectLoading } = useProjectIdBySlug(orgSlug, projectSlug);
     const [searchInput, setSearchInput] = useState(filters.q);
-    const [live, setLive] = useState(false);
     const tracesHref = pathname.replace(/\/request-logs\/?$/, '/traces');
 
     useEffect(() => setSearchInput(filters.q), [filters.q]);
@@ -166,7 +165,6 @@ export default function RequestLogsPage({ params }: PageProps) {
     const { data, isLoading, error, isFetching, isPlaceholderData, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
         ...requestLogsQuery<LogsPage>(projectId, filters),
         placeholderData: keepPreviousData,
-        refetchInterval: live ? 5000 : false,
     });
 
     const requests = data?.pages.flatMap((p) => p.requests) ?? [];
@@ -188,17 +186,10 @@ export default function RequestLogsPage({ params }: PageProps) {
                             onChange={(e) => setSearchInput(e.target.value)}
                             onBlur={() => { if (searchInput.trim() !== filters.q) go(selected, searchInput.trim()); }}
                             placeholder="Search request logs..."
-                            className="h-9 w-full rounded-md border border-border/60 bg-transparent pl-8 pr-3 text-sm outline-none placeholder:text-muted-foreground/60 focus:border-border"
+                            className="h-8 w-full rounded-md border border-border/60 bg-transparent pl-8 pr-3 text-sm outline-none placeholder:text-muted-foreground/60 focus:border-border"
                         />
                     </form>
-                    <button
-                        type="button" onClick={() => setLive((l) => !l)} aria-pressed={live}
-                        className={cn('flex h-9 items-center gap-1.5 rounded-md border px-3 text-sm', live ? 'border-emerald-500/50 text-emerald-600 dark:text-emerald-400' : 'border-border/60 hover:bg-muted/50')}
-                    >
-                        {live ? <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" /> : <Play className="h-3.5 w-3.5" />}
-                        Live
-                    </button>
-                    <button type="button" onClick={() => void refetch()} aria-label="Refresh" className="flex h-9 w-9 items-center justify-center rounded-md border border-border/60 hover:bg-muted/50">
+                    <button type="button" onClick={() => void refetch()} aria-label="Refresh" className="flex h-8 w-8 items-center justify-center rounded-md border border-border/60 hover:bg-muted/50">
                         <RefreshCw className={cn('h-3.5 w-3.5', isFetching && !isFetchingNextPage && 'animate-spin')} />
                     </button>
                     {projectId && (
@@ -207,6 +198,7 @@ export default function RequestLogsPage({ params }: PageProps) {
                                 projectId={projectId}
                                 filters={{ status: filters.status ?? 'all', model: filters.model ?? 'all', time_range: filters.range, search: filters.q }}
                                 environment="production"
+                                className="h-8"
                             />
                         </span>
                     )}

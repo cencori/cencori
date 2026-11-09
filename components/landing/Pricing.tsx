@@ -196,6 +196,18 @@ const matrixSections: Array<{
                 values: { free: "7 days", pro: "30 days", enterprise: "All time" },
             },
             {
+                feature: "Log export",
+                values: { free: "Last 7 days", pro: "Last 30 days", enterprise: "All time" },
+            },
+            {
+                feature: "Usage history",
+                values: { free: "7 days", pro: "30 days", enterprise: "All time" },
+            },
+            {
+                feature: "Organizations",
+                values: { free: "1 per person", pro: "Unlimited", enterprise: "Unlimited" },
+            },
+            {
                 feature: "Projects",
                 values: { free: "1", pro: "Unlimited", enterprise: "Unlimited" },
             },

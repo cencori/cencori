@@ -1,5 +1,6 @@
 'use client';
 
+import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -21,9 +22,11 @@ interface ExportButtonProps {
         search?: string;
     };
     environment?: string;
+    /** Extra classes on the button, e.g. to match a toolbar's height. */
+    className?: string;
 }
 
-export function ExportButton({ projectId, filters, environment = 'production' }: ExportButtonProps) {
+export function ExportButton({ projectId, filters, environment = 'production', className }: ExportButtonProps) {
     const [isExporting, setIsExporting] = useState(false);
 
     const handleExport = async (format: 'csv' | 'json') => {
@@ -93,7 +96,7 @@ export function ExportButton({ projectId, filters, environment = 'production' }:
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-7 text-xs shadow-none dark:shadow-xs" disabled={isExporting}>
+                <Button variant="outline" size="sm" className={cn("h-7 text-xs shadow-none dark:shadow-xs", className)} disabled={isExporting}>
                     {isExporting ? (
                         <>
                             <Spinner className="mr-1.5 h-3 w-3 animate-spin" />
