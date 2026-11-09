@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Copy, Check, ArrowRight, Settings, User, Search, Bell, Home, Plus, Trash2, Edit, Eye, Download, Upload, RefreshCw } from "lucide-react";
+import { Copy, Check, Settings, User, Search, Bell, Home, Plus, Trash2, Edit, Download, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
 import { Cloudflare, Aws, Azure, Google, OpenAI, Claude, Gemini } from "@/components/icons/provider-icons";

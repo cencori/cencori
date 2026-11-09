@@ -6,7 +6,6 @@ import {
     ArrowRightIcon,
     CodeBracketIcon,
     PuzzlePieceIcon,
-    CloudArrowUpIcon,
     CursorArrowRaysIcon,
     GlobeAltIcon,
     CheckCircleIcon,

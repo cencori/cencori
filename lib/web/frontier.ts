@@ -72,13 +72,6 @@ function asNumber(value: unknown): number {
     return Number.isFinite(number) ? number : 0;
 }
 
-function asTimestamp(value: unknown): string | null {
-    if (value instanceof Date) return value.toISOString();
-    if (typeof value !== 'string') return null;
-    const timestamp = Date.parse(value);
-    return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : value;
-}
-
 export async function enqueueFrontierEntries(
     supabase: SupabaseClient,
     jobId: string,

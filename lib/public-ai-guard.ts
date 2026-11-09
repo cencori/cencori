@@ -43,8 +43,15 @@ export async function limitPublicAi(req: Request, endpoint: string): Promise<Nex
 export function trimPublicAiMessages(messages: unknown): { role: string; content: string }[] | null {
     if (!Array.isArray(messages)) return null;
     const kept = messages
-        .filter((m): m is { role: string; content: string } => typeof m?.content === 'string' && typeof m?.role === 'string')
+        // Gemini rejects empty parts, so a blank reply (a failed stream) would
+        // break every later question in the chat.
+        .filter((m): m is { role: string; content: string } => (
+            typeof m?.content === 'string' && typeof m?.role === 'string' && m.content.trim() !== ''
+        ))
         .slice(-PUBLIC_AI_MAX_MESSAGES)
         .map((m) => ({ role: m.role, content: m.content.slice(0, PUBLIC_AI_MAX_CHARS) }));
-    return kept.length > 0 ? kept : null;
+    // Gemini also needs the history to open with a user turn; the window above
+    // can start on an assistant reply once a chat passes the limit.
+    while (kept.length > 0 && kept[0].role !== 'user') kept.shift();
+    return kept.length > 0 && kept[kept.length - 1].role === 'user' ? kept : null;
 }

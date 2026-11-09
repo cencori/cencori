@@ -21,11 +21,6 @@ export function isSignupNewsletterOptInPending(): boolean {
     return window.localStorage.getItem(SIGNUP_NEWSLETTER_OPTIN_STORAGE_KEY) === "1";
 }
 
-export function markSignupNewsletterOptInPending(): void {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem(SIGNUP_NEWSLETTER_OPTIN_STORAGE_KEY, "1");
-}
-
 export function clearSignupNewsletterOptInPending(): void {
     if (typeof window === "undefined") return;
     window.localStorage.removeItem(SIGNUP_NEWSLETTER_OPTIN_STORAGE_KEY);

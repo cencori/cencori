@@ -1,6 +1,4 @@
-import Link from "next/link";
-import { ExternalLink, Key, Lock } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Key, Lock } from "lucide-react";
 
 export default function Step3Page() {
     return (

@@ -28,7 +28,7 @@ import { describeDocumentInput } from '@/lib/documents/log';
 import { runGatewayOutputGuard } from '@/lib/gateway/output-guard';
 import { deTokenize } from '@/lib/safety/custom-data-rules';
 import type { SubscriptionTier } from '@/lib/entitlements';
-import { USAGE_MARKUP_PERCENT, withUsageMarkup } from '@/lib/billing/usage-markup';
+import { withUsageMarkup } from '@/lib/billing/usage-markup';
 
 const QUERY_MODEL = 'gpt-4o-mini';
 

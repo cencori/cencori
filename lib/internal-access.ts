@@ -31,10 +31,3 @@ export async function checkInternalAccess(
     return !!data;
 }
 
-/**
- * Check if the email belongs to the @cencori.com domain.
- */
-export function isCencoriEmail(email: string | undefined | null): boolean {
-    if (!email) return false;
-    return email.trim().toLowerCase().endsWith('@cencori.com');
-}

@@ -3,7 +3,6 @@ import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { SendByte } from '@sendbyte/node';
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
-import { createAdminClient } from '@/lib/supabaseAdmin';
 import { generateUserUnsubscribeToken, buildUserUnsubscribeUrl } from '@/lib/user-unsubscribe';
 import { getBaseUrl } from '@/lib/newsletter';
 
@@ -75,7 +74,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, skipped: true, reason: 'from_email_not_configured' }, { status: 202 });
     }
 
-    const supabaseAdmin = createAdminClient();
     const { data: adminUserData, error: adminUserError } = await adminUsers.getUserById(user.id);
     if (adminUserError || !adminUserData?.user) {
       return NextResponse.json({ error: 'Failed to load user metadata' }, { status: 500 });

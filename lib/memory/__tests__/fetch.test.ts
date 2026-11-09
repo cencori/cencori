@@ -5,7 +5,7 @@
  * Must enforce the tenant boundary, strip the mem_ prefix, and the tool executor
  * must never throw on bad model input.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
     fetchMemoryById,

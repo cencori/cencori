@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, ChevronRight, Briefcase, FileText, LayoutTemplate, Shield } from "lucide-react";
+import { ArrowRight, ChevronRight, Briefcase, FileText, Shield } from "lucide-react";
 
 export default function AgenciesPage() {
 

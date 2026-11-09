@@ -8,7 +8,6 @@ import { appendRunEvent, canTransition } from '@/lib/embedded/runs';
 import { scheduleEmbeddedWebhook } from '@/lib/embedded/dispatch-webhook';
 import { decodeRunRequest, encodeRunRequest, isRunResponseFormat, sameRunRequestBody } from '@/lib/embedded/run-request';
 import { validateJsonSchema, validateRunSchemaDefinition } from '@/lib/embedded/json-schema';
-import { chargeProjectUsageCredits } from '@/lib/project-credit-billing';
 import { waitUntil } from '@vercel/functions';
 import crypto from 'crypto';
 import type { UnifiedMessage, ToolCall, TokenUsage } from '@/lib/providers/base';

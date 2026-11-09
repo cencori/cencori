@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
     ArrowUp,
@@ -11,11 +10,8 @@ import {
     Trash2,
     Search,
     Check,
-    ChevronDown,
     Brain,
     Settings,
-    PanelLeftIcon,
-    Plus,
     X,
 } from "lucide-react";
 import {
@@ -174,7 +170,6 @@ export function PlaygroundChat({
     subscriptionTier,
     isPublic = false,
 }: PlaygroundChatProps) {
-    const router = useRouter();
     const { isAuthenticated } = useAuth();
     const [selectedModels, setSelectedModels] = useState<string[]>(
         isPublic ? [firstFreeModelId] : ["gpt-4o"]
@@ -532,11 +527,6 @@ export function PlaygroundChat({
         setIsLoading(false);
     };
 
-    const clearChat = () => {
-        if (isLoading) stopGeneration();
-        setMessages([]);
-    };
-
     const handleNewChat = () => {
         // Save current session if there are messages
         if (messages.length > 0 && activeSessionId) {
@@ -639,9 +629,6 @@ export function PlaygroundChat({
 
     // The active model is the one whose selector popover is open (or first slot)
     const activeSlotIndex = activeSelectorIndex ?? 0;
-    const activeModelObj = chatCatalogModels.find(
-        (m) => m.id === selectedModels[activeSlotIndex]
-    );
 
     const handleAddModelSlot = () => {
         if (selectedModels.length >= 8) return;
@@ -676,7 +663,6 @@ export function PlaygroundChat({
 
     // Helpers for rendering
     const getModelObj = (modelId: string) => chatCatalogModels.find((m) => m.id === modelId);
-    const isMultiModel = selectedModels.length > 1;
     // One model's settings, in the floating cards (desktop) and the sheet (phones).
     const renderModelConfig = (configModelId: string, inSheet = false) => {
         const configModelObj = getModelObj(configModelId);

@@ -49,15 +49,6 @@ interface OSVVulnDetail {
     references?: Array<{ type: string; url: string }>;
 }
 
-export interface DependencyFinding {
-    dependency: ParsedDependency;
-    vulnId: string;
-    summary: string;
-    severity: IssueSeverity;
-    fixedVersion?: string;
-    referenceUrl?: string;
-}
-
 // ── Lockfile Detection ───────────────────────────────────────────────
 
 const LOCKFILE_NAMES = new Set([

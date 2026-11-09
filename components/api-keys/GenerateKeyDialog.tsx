@@ -12,7 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Copy, Check, AlertCircle, Shield, X } from "lucide-react";
+import { Copy, Check, AlertCircle, X } from "lucide-react";
 import { toast } from "@/components/ui/toast";
 import { useEnvironment } from "@/lib/contexts/EnvironmentContext";
 import { Badge } from "@/components/ui/badge";

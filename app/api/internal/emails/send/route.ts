@@ -35,7 +35,6 @@ function sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-
 interface SendEmailRequest {
     subject: string;
     htmlBody: string;
@@ -100,7 +99,6 @@ async function getNewsletterRecipients(maxRecipients: number): Promise<Recipient
 }
 
 async function getAllRecipients(maxRecipients: number): Promise<Recipient[]> {
-    const supabaseAdmin = createAdminClient();
     const dedupe = new Set<string>();
     const recipients: Recipient[] = [];
     let page = 1;

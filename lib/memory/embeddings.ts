@@ -21,7 +21,7 @@ import { decryptApiKey } from '@/lib/encryption';
 import { getPricingFromDB } from '@/lib/providers/pricing';
 import { calculateProviderTokenCost } from '@/lib/providers/base';
 import { getMemoryGoogleApiKey } from '@/lib/providers/google-env';
-import { USAGE_MARKUP_PERCENT, withUsageMarkup } from '@/lib/billing/usage-markup';
+import { withUsageMarkup } from '@/lib/billing/usage-markup';
 
 type SupabaseAdmin = ReturnType<typeof createAdminClient>;
 

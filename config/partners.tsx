@@ -1,19 +1,10 @@
 import { PartnerConfig } from "@/types/partner";
 import React from "react";
-import Image from "next/image";
 import {
     CursorLogo,
-    VSCodeLogo,
-    WindsurfLogo,
     ClaudeLogo,
-    LovableLogo,
-    ReplitLogo,
-    V0Logo,
-    BoltLogo,
     NextjsLogo,
     ReactLogo,
-    VueLogo,
-    SvelteLogo,
     ViteLogo,
     PythonLogo,
 } from "@/components/icons/BrandIcons";

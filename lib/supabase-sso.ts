@@ -67,14 +67,6 @@ export async function updateSSOProvider(
     });
 }
 
-export async function getSSOProvider(providerId: string): Promise<SSOProvider> {
-    return gotrueAdmin(`/admin/sso/providers/${providerId}`);
-}
-
-export async function listSSOProviders(): Promise<{ items: SSOProvider[] }> {
-    return gotrueAdmin("/admin/sso/providers");
-}
-
 export async function deleteSSOProvider(providerId: string): Promise<SSOProvider> {
     return gotrueAdmin(`/admin/sso/providers/${providerId}`, {
         method: "DELETE",

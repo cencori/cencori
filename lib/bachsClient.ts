@@ -1,5 +1,4 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { CENCORI_PAID_PLANS } from '@/lib/billing/plans';
 import { CARD_TOPUP_FEE_PERCENT, CREDIT_NGN_PER_USD, netTopupCredits } from '@/lib/billing/credit-pricing';
 
 const BACHS_API_BASE =
@@ -240,27 +239,6 @@ export async function createCheckoutSession(
   });
 }
 
-export async function getCheckoutSession(
-  checkoutId: string
-): Promise<BachsCheckoutSession> {
-  return bachsFetch<BachsCheckoutSession>(`/checkout-sessions/${checkoutId}`);
-}
-
-export async function createCustomer(
-  input: BachsCustomerInput
-): Promise<BachsCustomer> {
-  return bachsFetch<BachsCustomer>('/customers', {
-    method: 'POST',
-    body: JSON.stringify(input),
-  });
-}
-
-export async function getCustomer(
-  customerId: string
-): Promise<BachsCustomer> {
-  return bachsFetch<BachsCustomer>(`/customers/${customerId}`);
-}
-
 export async function getCharge(chargeId: string): Promise<BachsCharge> {
   return bachsFetch<BachsCharge>(`/payments/charges/${chargeId}`);
 }
@@ -332,24 +310,6 @@ export const BACHS_CONFIG = {
   } as const,
 } as const;
 
-// No requestsPerMonth here any more: requests aren't capped on any tier, so a
-// per-tier request number would only be a figure nothing enforces. Seats and
-// prices are what still differ between plans.
-export const TIER_LIMITS = {
-  free: { seats: 1, priceMonthly: 0, priceAnnual: 0 },
-  pro: {
-    seats: 5,
-    priceMonthly: CENCORI_PAID_PLANS.pro.prices.month,
-    priceAnnual: CENCORI_PAID_PLANS.pro.prices.year,
-  },
-  team: {
-    seats: Infinity,
-    priceMonthly: CENCORI_PAID_PLANS.team.prices.month,
-    priceAnnual: CENCORI_PAID_PLANS.team.prices.year,
-  },
-  enterprise: { seats: Infinity, priceMonthly: null, priceAnnual: null },
-} as const;
-
 // price = US cents; ngnPrice = kobo. ngnPrice must match the NGN currency
 // option on the Bachs product, or naira checkouts fail verification. Change
 // the Bachs price first (PATCH /v1/products/{id} price.currency_options),
@@ -362,7 +322,6 @@ export const CREDIT_TOPUP_PACKS = [
   { label: 'Scale', credits: 200, price: 20000, ngnPrice: ngnKobo(200), productId: BACHS_CONFIG.products.creditsScale },
 ] as const;
 
-export { CARD_TOPUP_FEE_PERCENT as PLATFORM_FEE_PERCENT } from '@/lib/billing/credit-pricing';
 export { CREDIT_NGN_PER_USD };
 
 /* ─── Product Billing Interval Lookup ─────────────────────────────────── */
@@ -403,20 +362,6 @@ function ensureTierInit() {
     initProductTier();
     _tierInit = true;
   }
-}
-
-/* ─── Helper Functions ────────────────────────────────────────────────── */
-
-export function getProductId(
-  tier: SubscriptionTier,
-  interval: BillingInterval
-): string {
-  const key = `${tier}${
-    interval === 'month' ? 'Monthly' : 'Annual'
-  }` as keyof typeof BACHS_CONFIG.products;
-  const id = BACHS_CONFIG.products[key];
-  if (!id) throw new Error(`No Bachs product configured for ${tier}/${interval}`);
-  return id;
 }
 
 export function getTensorProductId(tier: 'starter' | 'builder' | 'pro'): string {

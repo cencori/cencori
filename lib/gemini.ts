@@ -114,16 +114,3 @@ export async function sendChatRequest(request: ChatRequest): Promise<ChatRespons
     }
 }
 
-/**
- * Test if Gemini API is configured correctly
- */
-export async function testGeminiConnection(): Promise<boolean> {
-    try {
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-        const result = await model.generateContent('Hello');
-        return !!result.response.text();
-    } catch (error) {
-        console.error('[Gemini] Connection test failed:', error);
-        return false;
-    }
-}

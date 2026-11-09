@@ -188,15 +188,3 @@ export function isReservedProjectSlug(slug: string): boolean {
     return RESERVED_PROJECT_SLUGS.has(slug.toLowerCase());
 }
 
-export function validateProjectSlug(raw: string): string | null {
-    const slug = raw.trim().toLowerCase();
-    if (!slug) return "Project URL cannot be empty.";
-    if (slug.length > 48) return "URL must be 48 characters or fewer.";
-    if (!ORG_SLUG_PATTERN.test(slug)) {
-        return "URL can only contain lowercase letters, numbers, and hyphens.";
-    }
-    if (isReservedProjectSlug(slug)) {
-        return `"${slug}" is reserved. Try a different project name.`;
-    }
-    return null;
-}

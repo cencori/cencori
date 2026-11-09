@@ -14,7 +14,7 @@ import { runGatewayInputPipeline } from '@/lib/gateway/input-guard';
 import { runGatewayOutputGuard } from '@/lib/gateway/output-guard';
 import { getPricingFromDB } from '@/lib/providers/pricing';
 import { calculateProviderTokenCost } from '@/lib/providers/base';
-import { USAGE_MARKUP_PERCENT, withUsageMarkup } from '@/lib/billing/usage-markup';
+import { withUsageMarkup } from '@/lib/billing/usage-markup';
 
 interface SearchMemoryRequest {
     namespace?: string;

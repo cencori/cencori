@@ -4,8 +4,6 @@ import { CoinCircuit, type components } from 'coincircuit';
 type CreateCheckoutSessionDto = components['schemas']['CreateCheckoutSessionDto'];
 type CheckoutSessionV2Dto = components['schemas']['CheckoutSessionV2Dto'];
 type PaymentCompletedWebhookDto = components['schemas']['PaymentCompletedWebhookDto'];
-type PaymentWebhookEnvelopeDto = components['schemas']['PaymentWebhookEnvelopeDto'];
-
 const apiKey = process.env.COINCIRCUIT_API_KEY || '';
 const webhookSecret = process.env.COINCIRCUIT_WEBHOOK_SECRET || '';
 
@@ -27,12 +25,6 @@ export async function createPaymentSession(
   params: CreateCheckoutSessionDto
 ): Promise<CheckoutSessionV2Dto> {
   return getClient().payments.create(params);
-}
-
-export async function getPaymentSession(
-  reference: string
-): Promise<CheckoutSessionV2Dto> {
-  return getClient().payments.get(reference);
 }
 
 // CoinCircuit signs webhooks as `X-Coincircuit-Signature: v1=<hex>` with
@@ -95,5 +87,3 @@ export function verifyWebhookSignature(
 }
 
 export type CoinCircuitWebhookPayload = PaymentCompletedWebhookDto;
-export type CoinCircuitWebhookEnvelope = PaymentWebhookEnvelopeDto;
-export type CoinCircuitSessionResponse = CheckoutSessionV2Dto;

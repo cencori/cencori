@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Code2, CheckCircle } from 'lucide-react';
 import { CTA } from "@/components/landing/CTA";
 import { WaitlistModal } from "@/components/landing/WaitlistModal";
-import { VercelLogo, SupabaseLogo, VSCodeLogo, CursorLogo } from "@/components/icons/BrandIcons";
+import { VercelLogo, SupabaseLogo } from "@/components/icons/BrandIcons";
 
 export default function ProductEdgePage() {
   const features = [

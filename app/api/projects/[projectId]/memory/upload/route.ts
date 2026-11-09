@@ -14,7 +14,7 @@ import { calculateProviderTokenCost } from '@/lib/providers/base';
 import { runGatewayInputPipeline } from '@/lib/gateway/input-guard';
 import type { SubscriptionTier } from '@/lib/entitlements';
 import { isCreditBalanceExhausted } from '@/lib/credits';
-import { USAGE_MARKUP_PERCENT, withUsageMarkup } from '@/lib/billing/usage-markup';
+import { withUsageMarkup } from '@/lib/billing/usage-markup';
 
 interface RouteParams {
     params: Promise<{ projectId: string }>;

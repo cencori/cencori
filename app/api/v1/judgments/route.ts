@@ -28,13 +28,12 @@ import {
     JUDGMENT_CONTEXT_TOKENS,
     JudgmentRequestError,
     JudgmentUpstreamError,
-    listJudgmentCatalogModels,
     validateJudgmentBody,
 } from '@/lib/judgment/typesafe';
 import { getJudgmentAdapter, resolveJudgmentAdapter } from '@/lib/judgment/registry';
 import { SUPPORTED_PROVIDERS } from '@/lib/providers/config';
 import { getModelDisplayPrice } from '@/lib/providers/display-pricing';
-import { USAGE_MARKUP_PERCENT, withUsageMarkup } from '@/lib/billing/usage-markup';
+import { withUsageMarkup } from '@/lib/billing/usage-markup';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;

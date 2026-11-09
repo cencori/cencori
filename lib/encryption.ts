@@ -9,8 +9,6 @@ import { createHash, randomBytes, createCipheriv, createDecipheriv } from 'crypt
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16;
-const AUTH_TAG_LENGTH = 16;
-const SALT_LENGTH = 32;
 
 /**
  * Generate encryption key from organization ID

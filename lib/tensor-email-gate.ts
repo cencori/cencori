@@ -1,5 +1,5 @@
 import { promises as dns } from "node:dns";
-import { gateReply, quickGateEmail } from "./tensor-email-quick";
+import { quickGateEmail } from "./tensor-email-quick";
 
 export type { QuickGate as EmailGate } from "./tensor-email-quick";
 export { gateReply } from "./tensor-email-quick";

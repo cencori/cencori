@@ -5,7 +5,7 @@
  */
 
 import OpenAI from 'openai';
-import type { ChatCompletionMessageParam, ChatCompletionTool } from 'openai/resources/chat/completions';
+import type { ChatCompletionTool } from 'openai/resources/chat/completions';
 import {
     AIProvider,
     UnifiedChatRequest,

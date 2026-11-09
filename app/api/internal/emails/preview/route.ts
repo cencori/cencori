@@ -2,7 +2,6 @@ import { adminUsers } from "@/lib/auth/admin-users";
 import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
-import { createAdminClient } from '@/lib/supabaseAdmin';
 import { checkInternalAccess } from '@/lib/internal-access';
 import { isUserMarketingOptedOut } from '@/lib/user-unsubscribe';
 
@@ -22,8 +21,6 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const maxRecipients = Math.min(Math.max(Number(body.maxRecipients) || 500, 1), 2000);
 
-    // Count confirmed users
-    const supabaseAdmin = createAdminClient();
     let confirmedCount = 0;
     let totalUsers = 0;
     let page = 1;

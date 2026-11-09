@@ -1,6 +1,4 @@
 import React from 'react';
-import Link from "next/link";
-import { siteConfig } from "@/config/site";
 
 export default function EventsPage() {
   return (

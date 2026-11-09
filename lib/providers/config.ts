@@ -563,26 +563,6 @@ export function getModelsForProvider(providerId: string): AIModel[] {
 }
 
 /**
- * Get chat/reasoning models for a provider (excludes image models)
- */
-export function getChatModelsForProvider(providerId: string): AIModel[] {
-    return getModelsForProvider(providerId).filter(m => {
-        const types = Array.isArray(m.type) ? m.type : [m.type];
-        return !types.includes('image');
-    });
-}
-
-/**
- * Get image generation models for a provider
- */
-export function getImageModelsForProvider(providerId: string): AIModel[] {
-    return getModelsForProvider(providerId).filter(m => {
-        const types = Array.isArray(m.type) ? m.type : [m.type];
-        return types.includes('image');
-    });
-}
-
-/**
  * Get model by ID across all providers
  */
 export function getModel(modelId: string): AIModel | undefined {

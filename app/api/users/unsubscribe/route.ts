@@ -1,6 +1,5 @@
 import { adminUsers } from "@/lib/auth/admin-users";
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabaseAdmin';
 import { verifyUserUnsubscribeToken } from '@/lib/user-unsubscribe';
 import { getBaseUrl } from '@/lib/newsletter';
 
@@ -17,7 +16,6 @@ async function optOutUser(
         return { ok: false, reason: 'invalid_token' };
     }
 
-    const admin = createAdminClient();
     const { data: userData, error: fetchError } = await adminUsers.getUserById(uid);
     if (fetchError || !userData?.user) {
         return { ok: false, reason: 'invalid_token' };

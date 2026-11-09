@@ -13,7 +13,7 @@ import { revalidatePath } from 'next/cache';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { validateOrgSlug } from '@/lib/reserved-slugs';
 import { requireOrgOwnerOrAdmin } from '@/lib/org-admin-access';
-import { decryptApiKey, encryptApiKey } from '@/lib/encryption';
+import { decryptApiKey } from '@/lib/encryption';
 import { writeAuditLog } from '@/lib/audit-log';
 import {
     createExportKey,
@@ -278,93 +278,6 @@ export async function revokeUsageExportKey(orgSlug: string, keyId: string): Prom
         console.error('[Org Settings] revokeUsageExportKey failed:', error);
         return { ok: false, error: 'Could not revoke the export key.' };
     }
-}
-
-export async function saveCostGraphConnection(
-    orgSlug: string,
-    input: { connectionId: string; apiKey?: string; subAccount: string; enabled: boolean },
-): Promise<ActionResult<CostGraphConnectionView>> {
-    const connectionId = input.connectionId.trim();
-    const apiKey = input.apiKey?.trim() || '';
-    if (!/^fpc_[A-Za-z0-9_-]+$/.test(connectionId)) {
-        return { ok: false, error: 'Paste the CostGraph push connection id. It starts with fpc_.' };
-    }
-    if (!isSubAccountMode(input.subAccount)) return { ok: false, error: 'Choose what fills the sub-account column.' };
-    if (apiKey && apiKey.length < 16) return { ok: false, error: 'That does not look like a CostGraph API key.' };
-
-    const auth = await requireOwnerOrAdmin(orgSlug);
-    if (!auth.ok) return { ok: false, error: auth.error };
-
-    const admin = createAdminClient();
-    const { data: existing } = await admin
-        .from('organization_finops_connections')
-        .select('id, connection_id, sub_account, last_pushed_day')
-        .eq('organization_id', auth.orgId)
-        .eq('provider', 'costgraph')
-        .maybeSingle();
-    if (!existing && !apiKey) return { ok: false, error: 'Add a CostGraph API key with the focus:write scope.' };
-    // The sub-account is part of each record's identity, and CostGraph keeps every record it has
-    // ingested: changing it after a push would count the history twice. A new connection may choose.
-    if (existing?.last_pushed_day && existing.connection_id === connectionId && existing.sub_account !== input.subAccount) {
-        return { ok: false, error: 'The sub-account is fixed once usage has been sent to this CostGraph connection.' };
-    }
-
-    const patch: Record<string, unknown> = {
-        organization_id: auth.orgId,
-        provider: 'costgraph',
-        connection_id: connectionId,
-        sub_account: input.subAccount,
-        enabled: input.enabled,
-        updated_at: new Date().toISOString(),
-    };
-    if (apiKey) {
-        patch.api_key_encrypted = encryptApiKey(apiKey, auth.orgId);
-        patch.api_key_hint = `…${apiKey.slice(-4)}`;
-    }
-    // A different CostGraph connection has received none of our days yet.
-    if (existing && existing.connection_id !== connectionId) {
-        patch.last_pushed_day = null;
-        patch.last_closed_month = null;
-    }
-    if (!existing) patch.created_by = auth.userId;
-
-    // Saving a pasted key makes this an API-key connection, so any OAuth grant on the row goes.
-    // Those columns arrive by a later migration; without it, save the API-key fields alone.
-    const oauthReset = {
-        auth_method: 'api_key',
-        oauth_access_token_encrypted: null,
-        oauth_refresh_token_encrypted: null,
-        oauth_access_expires_at: null,
-        oauth_refresh_lease_until: null,
-    };
-    let { data, error } = await admin
-        .from('organization_finops_connections')
-        .upsert({ ...patch, ...oauthReset }, { onConflict: 'organization_id,provider' })
-        .select(CONNECTION_COLUMNS)
-        .single();
-    if (error && /auth_method|oauth_/.test(error.message ?? '')) {
-        ({ data, error } = await admin
-            .from('organization_finops_connections')
-            .upsert(patch, { onConflict: 'organization_id,provider' })
-            .select(CONNECTION_COLUMNS)
-            .single());
-    }
-    if (error || !data) {
-        console.error('[Org Settings] saveCostGraphConnection failed:', error);
-        return { ok: false, error: 'Could not save the CostGraph connection.' };
-    }
-
-    writeAuditLog({
-        organizationId: auth.orgId,
-        category: 'integration',
-        action: existing ? 'updated' : 'configured',
-        resourceType: 'finops_connection',
-        resourceId: data.id as string,
-        actorId: auth.userId,
-        description: `${existing ? 'Updated' : 'Connected'} CostGraph usage export`,
-        metadata: { connection_id: connectionId, sub_account: input.subAccount, enabled: input.enabled, key_rotated: Boolean(apiKey) },
-    });
-    return { ok: true, data: toConnectionView(data) };
 }
 
 export async function deleteCostGraphConnection(orgSlug: string): Promise<ActionResult> {

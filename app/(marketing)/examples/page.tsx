@@ -1,12 +1,9 @@
 "use client";
 
 import React from "react";
-import Link from "next/link";
 import { ArrowRightIcon, ArrowUpRightIcon } from "@heroicons/react/24/outline";
 import { EXAMPLE_PROJECTS, type ExampleProject } from "@/config/examples";
-import { siteConfig } from "@/config/site";
 
-import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 

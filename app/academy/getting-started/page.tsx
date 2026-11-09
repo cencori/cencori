@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getCourseIntro, parseAcademyMDX } from "@/lib/academy";
-import { GETTING_STARTED_STEPS, COURSE_TITLE } from "./steps";
+import { GETTING_STARTED_STEPS } from "./steps";
 
 export default async function GettingStartedPage() {
     const intro = getCourseIntro("getting-started");

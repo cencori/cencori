@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 
-export type ScanStandaloneTier = "scan" | "scan_team";
 type EntitlementSource = "platform" | "free" | null;
 type ScanPlan = "free" | "pro" | "team" | "enterprise";
 

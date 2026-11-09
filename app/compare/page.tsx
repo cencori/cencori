@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { SiteNav } from "@/components/nav/SiteNav";
 import { SiteFooter } from "@/components/marketing/SiteFooter";
 import { Reveal } from "@/components/landing/Reveal";
-import { Check, X, Shield, ArrowRight, Activity, DollarSign, Lock, HeartHandshake, Layers } from "lucide-react";
+import { Check, X, Shield, Activity, Lock, HeartHandshake, Layers } from "lucide-react";
 import Link from "next/link";
 
 type CompetitorId = "openrouter" | "portkey" | "litellm" | "bedrock" | "helicone" | "braintrust";

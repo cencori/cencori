@@ -20,6 +20,7 @@ import { COPILOT_MENUS, NAVIGATE_TOOL, OPEN_MENU_TOOL, prepareNavigation, type C
 import { COPILOT_FILES_REQUEST_BUDGET, sanitizeFiles, sanitizeImages, withFiles, type CopilotFile } from "@/lib/copilot/files";
 import { COPILOT_DAILY_LIMITS, COPILOT_TOKEN_RATE_USD_PER_MILLION, PLAN_NAMES, copilotVisionModel, resolveCopilotModel } from "@/lib/console/copilot";
 import { deductCredits, getCreditsBalance, isCreditBalanceExhausted } from "@/lib/credits";
+import { limitPublicAi } from "@/lib/public-ai-guard";
 
 type ChatMessage = {
     role: "user" | "assistant";
@@ -65,6 +66,12 @@ Rules:
 - You can take the user around the dashboard with navigate: it opens the page in the same tab and you stay open beside it. Use it when they ask to go somewhere or be shown something ("take me to…", "show me…", "open my billing"), or when a page shows the answer better than words (the full log, a chart). Look up first when the target depends on data (e.g. list_agents for their busiest agent, which comes sorted by recent runs), then navigate once. Don't navigate for questions you can just answer, and never more than once per reply. current_path in the dashboard context is the page they're on now. For "where do I…" / "where is…" questions about a setting or button, navigate with highlight so it's outlined on screen. After navigating, say in one short line where you took them and what to look at (with highlight: "the part I've outlined"); don't say "click" or describe links. If navigate is awaiting confirmation (unsaved changes), say so in one line instead. open_menu opens the command palette, their account menu or the organization switcher on screen, when they ask for one.
 - You cannot delete agents, change billing, payment providers or plans, or delete projects or organizations; point the user to the right page instead. (A business's own accounts that customers pay into by transfer are fine: list_bank_accounts, save_bank_account and remove_bank_account.)
 `;
+
+/** The public docs site: Copilot answers there too, signed in or not. */
+const DOCS_SURFACE_NOTE = `DOCS
+You're answering inside Cencori's public documentation (current_path is the docs page they're reading; when they say "this page", or docs_scope is "this page only", read_doc it first and answer from it). Answer product questions from the docs with search_docs and read_doc, and link the doc pages you used. You can't open console pages, open menus or propose changes from here: say where in the console they'd do it instead.`;
+
+const DOCS_SIGNED_OUT_NOTE = `The visitor isn't signed in, so you can't see any workspace data. If they ask about their own usage, keys, billing or projects, tell them to sign in and ask again.`;
 
 /** Studio threads: how to read the stamps on the owner's messages. */
 const TIME_NOTE = `TIME
@@ -144,9 +151,15 @@ export async function POST(request: NextRequest) {
     try {
         const supabase = await createServerClient();
         const { data: { user } } = await getAuthUser(supabase);
-        if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
         const body = await request.json();
+        // The docs site's Ask AI is Copilot too. Signed out, it answers from the
+        // docs only, on Cencori's key, under the same public limits as before.
+        const docsSurface = body.surface === "docs";
+        if (!user && !docsSurface) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        if (!user) {
+            const limited = await limitPublicAi(request, "copilot-docs");
+            if (limited) return limited;
+        }
         const parsedMessages: { role: "user" | "assistant"; text: string; files: CopilotFile[] }[] = Array.isArray(body.messages)
             ? body.messages.filter(isChatMessage).slice(-12).map((message: ChatMessage) => ({
                 role: message.role,
@@ -179,13 +192,14 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "A user message is required." }, { status: 400 });
         }
 
-        const projectId = typeof body.projectId === "string" ? body.projectId : null;
+        // The docs have no project; Copilot reads the organization there.
+        const projectId = typeof body.projectId === "string" && !docsSurface ? body.projectId : null;
         // Only models on Copilot's list; anything else falls back to the default.
         let agentModel = resolveCopilotModel(body.model);
         const conversationId = typeof body.conversationId === "string" && UUID_PATTERN.test(body.conversationId)
             ? body.conversationId
             : null;
-        const organizationId = typeof body.organizationId === "string" ? body.organizationId : null;
+        let organizationId = typeof body.organizationId === "string" ? body.organizationId : null;
         const environment = body.environment === "test" ? "test" : "production";
         const currentSurface = typeof body.currentSurface === "string" ? body.currentSurface.slice(0, 120) : "Dashboard";
         const currentPath = typeof body.currentPath === "string" ? body.currentPath.slice(0, 300) : "";
@@ -205,7 +219,17 @@ export async function POST(request: NextRequest) {
         let organization: { id: string; name: string; slug: string; owner_id: string; subscription_tier: string | null } | null = null;
         let project: { id: string; name: string; slug: string; organization_id: string } | null = null;
 
-        if (projectId) {
+        // On the docs, a signed-in user's workspace is the console's active
+        // organization (its cookie when it reaches this host, else their first).
+        // verifyOrganizationAccess below still checks membership.
+        if (docsSurface && user && !organizationId) {
+            const { getActiveConsoleOrganization } = await import("@/lib/console/active-workspace");
+            organizationId = (await getActiveConsoleOrganization().catch(() => null))?.id ?? null;
+        }
+
+        if (!user) {
+            // Signed out: no workspace.
+        } else if (projectId) {
             const { data: projectRecord } = await admin
                 .from("projects")
                 .select("id, name, slug, organization_id")
@@ -223,7 +247,7 @@ export async function POST(request: NextRequest) {
 
         // Who Copilot usage is counted against: the organization, or the user
         // when no organization is in context (so leaving it out can't dodge the cap).
-        const usageSubject = organization ? `org:${organization.id}` : `user:${user.id}`;
+        const usageSubject = organization ? `org:${organization.id}` : user ? `user:${user.id}` : null;
 
         // Free questions per day by plan; small talk doesn't count. Past the
         // allowance the answer is billed to the organization's credits. Fails
@@ -240,7 +264,9 @@ export async function POST(request: NextRequest) {
         // their organization's track, so they meet their employee and its business tools. Billing
         // and the plan still follow the organization's track (isBusiness).
         const runsBusiness = isBusiness || (currentPath === "studio" && !!project);
-        if (isBusiness && !lightweightConversation) {
+        if (!usageSubject) {
+            // Signed out on the docs: limitPublicAi above is the cap, and it's never billed.
+        } else if (isBusiness && !lightweightConversation) {
             const { data: usage, error: usageError } = await admin.rpc("copilot_consume", { p_subject: usageSubject, p_limit: BUSINESS_COPILOT_DAILY_LIMIT });
             if (usageError) {
                 console.error("[Cencori Agent] Usage cap unavailable:", usageError.message);
@@ -299,7 +325,7 @@ export async function POST(request: NextRequest) {
         let timeZone = "Africa/Lagos";
         const sentAt = new Date().toISOString();
         const incomingId = typeof body.messageId === "string" && UUID_PATTERN.test(body.messageId) ? body.messageId : crypto.randomUUID();
-        if (employee && body.thread === true && project) {
+        if (employee && body.thread === true && project && user) {
             const [{ businessTimeZone }, { safeTimeZone }] = await Promise.all([import("@/lib/studio/business-zone"), import("@/lib/studio/time")]);
             // The owner's own clock first (the app sends its phone's zone), so "what time is it" and the
             // stamps are theirs wherever they are; else the business's zone, Lagos by default.
@@ -318,12 +344,13 @@ export async function POST(request: NextRequest) {
         }
 
         const pageContext = {
-            current_surface: currentSurface,
+            current_surface: docsSurface ? "Docs" : currentSurface,
             current_path: currentPath,
             organization: organization ? { name: organization.name, slug: organization.slug } : null,
             project: project ? { name: project.name, slug: project.slug } : null,
             environment,
             user_first_name: userName,
+            ...(docsSurface ? { signed_in: !!user, docs_scope: body.scope === "page" ? "this page only" : "all docs" } : {}),
             // In the owner's thread only their local time: given UTC too, the model answered "what time is it" in UTC.
             ...(thread ? { now_local: `${stamp(sentAt, timeZone)} ${new Date(sentAt).getUTCFullYear()}`, time_zone: timeZone } : { now_utc: new Date().toISOString() }),
             ...(businessZone ? { business_time_zone: businessZone } : {}),
@@ -405,6 +432,7 @@ export async function POST(request: NextRequest) {
                     : messages.slice(0, -1).map((message): ChatCompletionMessageParam => ({ role: message.role, content: message.content }));
             return [
                 { role: "system", content: SYSTEM_PROMPT },
+                ...(docsSurface ? [{ role: "system" as const, content: user ? DOCS_SURFACE_NOTE : `${DOCS_SURFACE_NOTE}\n${DOCS_SIGNED_OUT_NOTE}` }] : []),
                 ...(employee ? [{ role: "system" as const, content: employee }] : []),
                 ...(thread ? [{ role: "system" as const, content: TIME_NOTE }] : []),
                 ...earlier,
@@ -413,7 +441,7 @@ export async function POST(request: NextRequest) {
         };
 
         // Tools only for real questions inside a workspace the user can see.
-        const toolContext: CopilotToolContext | null = organization
+        const toolContext: CopilotToolContext | null = organization && user
             ? {
                 admin,
                 organization: { id: organization.id, name: organization.name, slug: organization.slug },
@@ -423,10 +451,17 @@ export async function POST(request: NextRequest) {
                 ...(speakerId ? { employeeId: speakerId } : {}),
             }
             : null;
-        // Read tools always; action tools only inside a project.
-        const tools = !lightweightConversation && toolContext
-            ? [...toolsFor(toolContext), ...DOCS_TOOLS, NAVIGATE_TOOL, OPEN_MENU_TOOL, ...(toolContext.project ? COPILOT_ACTIONS : []), ...(toolContext.project && toolContext.business ? BUSINESS_ACTIONS : [])]
-            : undefined;
+        // Read tools always; action tools only inside a project. On the docs:
+        // the docs, plus the workspace's read tools when signed in. No
+        // navigation, menus or actions there: the docs have no console to drive.
+        const tools = lightweightConversation
+            ? undefined
+            : docsSurface
+                ? [...(toolContext ? toolsFor(toolContext) : []), ...DOCS_TOOLS]
+                : toolContext
+                    ? [...toolsFor(toolContext), ...DOCS_TOOLS, NAVIGATE_TOOL, OPEN_MENU_TOOL, ...(toolContext.project ? COPILOT_ACTIONS : []), ...(toolContext.project && toolContext.business ? BUSINESS_ACTIONS : [])]
+                    : undefined;
+        const offeredTools = new Set((tools ?? []).map((tool) => tool.function.name));
         const encoder = new TextEncoder();
 
         const stream = new ReadableStream({
@@ -507,7 +542,7 @@ export async function POST(request: NextRequest) {
                             }
                         }
 
-                        if (calls.size === 0 || !toolContext) {
+                        if (calls.size === 0 || !tools) {
                             answer = content;
                             break;
                         }
@@ -521,14 +556,20 @@ export async function POST(request: NextRequest) {
                         agentMessages.push({ role: "assistant", content: content || null, tool_calls: toolCalls });
 
                         for (const call of toolCalls) {
-                            const isAction = ACTION_NAMES.has(call.function.name) || (!!toolContext.business && BUSINESS_ACTION_NAMES.has(call.function.name));
+                            const isAction = ACTION_NAMES.has(call.function.name) || (!!toolContext?.business && BUSINESS_ACTION_NAMES.has(call.function.name));
                             const isNavigate = call.function.name === NAVIGATE_TOOL.function.name;
                             const isMenu = call.function.name === OPEN_MENU_TOOL.function.name;
                             send({ status: DOCS_TOOL_STATUS[call.function.name] ?? (isNavigate ? "Opening the page" : isMenu ? "Opening the menu" : (isAction ? ACTION_STATUS : TOOL_STATUS)[call.function.name] ?? "Looking it up") });
                             let output: unknown;
                             try {
                                 const args = JSON.parse(call.function.arguments || "{}") as Record<string, unknown>;
-                                if (isMenu) {
+                                if (!offeredTools.has(call.function.name)) {
+                                    output = { error: `${call.function.name} isn't available here.` };
+                                } else if (DOCS_TOOL_NAMES.has(call.function.name)) {
+                                    output = await runDocsTool(call.function.name, args);
+                                } else if (!toolContext) {
+                                    output = { error: "Sign in to look at workspace data." };
+                                } else if (isMenu) {
                                     const menu = String(args.menu ?? "") as CopilotMenu;
                                     if (menu in COPILOT_MENUS) {
                                         send({ openMenu: menu });
@@ -549,8 +590,6 @@ export async function POST(request: NextRequest) {
                                     } else {
                                         output = { error: prepared.error };
                                     }
-                                } else if (DOCS_TOOL_NAMES.has(call.function.name)) {
-                                    output = await runDocsTool(call.function.name, args);
                                 } else if (isAction) {
                                     // Never executes: the panel shows a card
                                     // and the user's click runs it.
@@ -596,7 +635,7 @@ export async function POST(request: NextRequest) {
                 } finally {
                     // The owner's message and the reply join the thread, even when the reply failed
                     // (the message was still said); older messages fold into the summary afterwards.
-                    if (thread && project) {
+                    if (thread && project && user) {
                         const said: StoredMessage[] = [
                             { id: incomingId, role: "user", content: latestQuestion.slice(0, 20_000), at: sentAt, ...(body.hidden === true ? { hidden: true } : {}) },
                             ...(answer || proposedActions.length || savedNotes.length ? [{
@@ -628,7 +667,7 @@ export async function POST(request: NextRequest) {
                     }
                     // Record the answer's usage and, past the free allowance, charge
                     // it. After the response, so it never delays or breaks it.
-                    if (organization && inputTokens + outputTokens > 0) {
+                    if (organization && user && inputTokens + outputTokens > 0) {
                         waitUntil(recordCopilotUsage({
                             admin,
                             organizationId: organization.id,

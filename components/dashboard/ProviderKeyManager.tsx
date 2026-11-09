@@ -10,7 +10,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/components/ui/toast";
-import { Check, ChevronRight, Eye, EyeOff, Plus, Trash2, X } from "lucide-react";
+import { Check, ChevronRight, Eye, EyeOff, Trash2 } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { SUPPORTED_PROVIDERS, type AIProviderConfig } from "@/lib/providers/config";
 import { getProviderLogoMark } from "@/components/dashboard/ProviderLogo";
@@ -18,8 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 
@@ -239,9 +238,6 @@ export function ProviderKeyManager({ projectId }: ProviderKeyManagerProps) {
             </div>
         );
     }
-
-    const configuredProviders = data?.providers.filter(p => p.hasKey) || [];
-    const availableProviders = SUPPORTED_PROVIDERS.filter(p => !data?.providers.find(dp => dp.provider === p.id && dp.hasKey));
 
     const totalPages = Math.max(1, Math.ceil(SUPPORTED_PROVIDERS.length / PROVIDERS_PER_PAGE));
     const currentPage = Math.min(page, totalPages);

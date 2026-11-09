@@ -11,7 +11,7 @@
 
 import {
     GhostContainer, GhostBox, GhostBoxTitle, GhostBoxContent,
-    GhostArrow, GhostCaption
+    GhostCaption
 } from '@/components/ui/ghost-diagram';
 
 function StateIndicator({ color, pulse }: { color: string; pulse?: boolean }) {
@@ -23,32 +23,6 @@ function StateIndicator({ color, pulse }: { color: string; pulse?: boolean }) {
             )}
         </div>
     );
-}
-
-function TransitionLabel({ children, direction = 'down' }: { children: React.ReactNode; direction?: 'down' | 'right' | 'up' }) {
-    if (direction === 'right') {
-        return (
-            <div className="flex items-center gap-2">
-                <div className="flex-1 border-t border-current/30" />
-                <span className="text-[9px] text-current/50 whitespace-nowrap">{children}</span>
-                <svg width="6" height="8" viewBox="0 0 6 8" className="fill-current/30">
-                    <path d="M6 4L0 0v8l6-4z" />
-                </svg>
-            </div>
-        );
-    }
-    if (direction === 'up') {
-        return (
-            <div className="flex flex-col items-center">
-                <svg width="8" height="5" viewBox="0 0 8 5" className="fill-current/30 rotate-180">
-                    <path d="M4 5L0 0h8L4 5z" />
-                </svg>
-                <span className="text-[9px] text-current/50 my-1">{children}</span>
-                <div className="w-px h-3 bg-current/30" />
-            </div>
-        );
-    }
-    return null;
 }
 
 export function CircuitBreakerDiagram() {

@@ -193,7 +193,6 @@ export function formatPRComment(options: PRCommentOptions): string {
         // Count how many have inline comments
         const { inlineComments } = buildReviewComments(newIssues, diffLineMap, options.aiSuggestions);
         const inlineCount = inlineComments.length;
-        const summaryOnly = newIssues.length - inlineCount;
 
         if (inlineCount > 0) {
             lines.push(`⚠️ **${newIssues.length} new ${issueWord}** introduced in this PR — ${inlineCount} marked inline below`);

@@ -4,7 +4,7 @@ import Image from "next/image";
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { usePathname } from "next/navigation";
-import { X, Send, ThumbsUp, ThumbsDown, Copy, RotateCcw, StopCircle, MessageCircle, Plus, ArrowUp, File, Share } from "lucide-react";
+import { X, ThumbsUp, ThumbsDown, Copy, RotateCcw, StopCircle, ArrowUp, File, Share } from "lucide-react";
 import { useDocsContext } from "./DocsContext";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -17,6 +17,8 @@ interface Message {
     role: "user" | "assistant";
     content: string;
     attachedPage?: { title: string; slug: string } | null;
+    /** A local failure notice; never sent back to the model as history. */
+    isError?: boolean;
 }
 
 interface AskAISidebarProps {
@@ -122,28 +124,34 @@ export function AskAISidebar({ open, onClose }: AskAISidebarProps) {
         abortControllerRef.current = new AbortController();
 
         try {
-            const response = await fetch("/api/docs/ai", {
+            // Ask AI is Copilot: the same agent as the console, with the docs.
+            const response = await fetch("/api/agent", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    messages: [...messages, userMessage].map((m) => ({
+                    messages: [...messages, userMessage].filter((m) => !m.isError).map((m) => ({
                         role: m.role,
                         content: m.content,
                     })),
-                    currentPage: currentAttachment ? `/docs/${currentAttachment.slug}` : pathname,
+                    surface: "docs",
+                    currentPath: currentAttachment ? `/docs/${currentAttachment.slug}` : pathname,
                     scope,
                     userName: userProfile?.name,
                 }),
                 signal: abortControllerRef.current.signal,
             });
 
-            if (!response.ok) throw new Error("Failed to get response");
+            if (!response.ok) {
+                const body = await response.json().catch(() => null) as { error?: string } | null;
+                throw new Error(response.status === 429 && body?.error ? body.error : "Failed to get response");
+            }
 
             const reader = response.body?.getReader();
             if (!reader) throw new Error("No response body");
 
             const decoder = new TextDecoder();
             let fullContent = "";
+            let streamError: string | null = null;
 
             while (true) {
                 const { done, value } = await reader.read();
@@ -159,6 +167,12 @@ export function AskAISidebar({ open, onClose }: AskAISidebarProps) {
 
                         try {
                             const parsed = JSON.parse(data);
+                            if (parsed.error) streamError = parsed.error;
+                            // Copilot drops a preamble when it goes off to search the docs.
+                            if (parsed.discard) {
+                                fullContent = "";
+                                setStreamingContent("");
+                            }
                             if (parsed.content) {
                                 fullContent += parsed.content;
                                 setStreamingContent(fullContent);
@@ -168,6 +182,9 @@ export function AskAISidebar({ open, onClose }: AskAISidebarProps) {
                     }
                 }
             }
+
+            // A stream that failed or said nothing is an error, not an empty reply.
+            if (!fullContent.trim()) throw new Error(streamError ?? "Empty response");
 
             const assistantMessage: Message = {
                 id: crypto.randomUUID(),
@@ -182,7 +199,10 @@ export function AskAISidebar({ open, onClose }: AskAISidebarProps) {
                 const errorMessage: Message = {
                     id: crypto.randomUUID(),
                     role: "assistant",
-                    content: "Sorry, I encountered an error. Please try again.",
+                    content: /^(Too many|You've)/.test((error as Error).message)
+                        ? (error as Error).message
+                        : "Sorry, I encountered an error. Please try again.",
+                    isError: true,
                 };
                 setMessages((prev) => [...prev, errorMessage]);
             }

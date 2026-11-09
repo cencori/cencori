@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, ChevronRight, Rocket, ShieldCheck, TrendingUp, Users } from "lucide-react";
+import { ArrowRight, ChevronRight, Rocket, ShieldCheck, TrendingUp } from "lucide-react";
 
 export default function StartupsPage() {
 

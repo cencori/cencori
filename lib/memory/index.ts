@@ -10,7 +10,6 @@ export {
     DEFAULT_MEMORY_SETTINGS,
     MEMORY_CONTENT_MAX_CHARS,
     MEMORY_MANAGED_MODEL,
-    PHASE1_SCOPES,
     SUPPORTED_SCOPES,
     fromMemoryId,
     normalizeDirectiveScope,

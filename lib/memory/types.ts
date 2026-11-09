@@ -17,12 +17,6 @@ export type MemoryScope = 'session' | 'user' | 'workspace' | 'org';
 export const SUPPORTED_SCOPES: MemoryScope[] = ['session', 'user', 'workspace', 'org'];
 
 /**
- * @deprecated Phase 1 subset (session + user). Kept for compat — new code
- * should use SUPPORTED_SCOPES.
- */
-export const PHASE1_SCOPES: MemoryScope[] = ['session', 'user'];
-
-/**
  * Default similarity cutoffs, calibrated per embedding provider. Applied only
  * when the caller does not send an explicit `threshold`.
  *

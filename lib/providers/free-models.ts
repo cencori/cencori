@@ -38,7 +38,3 @@ export function hasStaticPricing(provider: string, model: string): boolean {
     return isExplicitlyFree(provider, model);
 }
 
-/** Empty since the retirement. Kept for tooling that enumerates the set. */
-export function listFreeModelKeys(): string[] {
-    return [...EXPLICITLY_FREE_MODELS];
-}

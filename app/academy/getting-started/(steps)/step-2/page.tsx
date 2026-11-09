@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ExternalLink, FolderPlus } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function Step2Page() {

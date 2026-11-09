@@ -33,7 +33,7 @@ import {
     type TranscriptSegment,
     type STTProvider,
 } from '@/lib/audio/transcribe';
-import { USAGE_MARKUP_PERCENT, withUsageMarkup } from '@/lib/billing/usage-markup';
+import { withUsageMarkup } from '@/lib/billing/usage-markup';
 
 function formatTimestamp(seconds: number, separator: ',' | '.'): string {
     const millis = Math.max(0, Math.round(seconds * 1000));

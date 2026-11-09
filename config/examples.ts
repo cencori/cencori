@@ -70,10 +70,3 @@ export const EXAMPLE_PROJECTS: ExampleProject[] = [
     },
 ];
 
-export function getExamplesByCategory(category: ExampleProject['category']): ExampleProject[] {
-    return EXAMPLE_PROJECTS.filter(p => p.category === category);
-}
-
-export function getFeaturedExamples(): ExampleProject[] {
-    return EXAMPLE_PROJECTS.filter(p => p.featured);
-}

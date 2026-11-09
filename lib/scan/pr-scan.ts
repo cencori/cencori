@@ -132,7 +132,6 @@ async function completeCheckRun(
         title = `✅ No new security issues (Score: ${score})`;
     } else {
         const matchingIssues = newIssues.filter(i => failOn.includes(i.severity));
-        const hasCritical = newIssues.some(i => i.severity === 'critical');
 
         if (matchingIssues.length > 0) {
             conclusion = 'failure';

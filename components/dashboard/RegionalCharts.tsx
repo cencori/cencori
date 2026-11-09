@@ -14,8 +14,6 @@ import { useQuery } from "@tanstack/react-query";
 import {
     LineChart,
     Line,
-    BarChart,
-    Bar,
     XAxis,
 } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";

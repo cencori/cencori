@@ -25,8 +25,6 @@ import { writeMemories } from '../writeback';
 const mockedOps = vi.mocked(checkMemoryOpsQuota);
 const mockedEmbed = vi.mocked(embedForMemory);
 
-const SUPABASE = {} as never;
-
 function userDirective(scopeKey = 'user_a') {
     return {
         scope: 'user' as const,

@@ -3,10 +3,9 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { 
+import {
     ArrowRight,
     ChevronRight,
-    Lock,
     CheckCircle,
 } from 'lucide-react';
 

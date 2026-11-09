@@ -1,13 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { Copy, Share, ArrowUp, ThumbsUp, ThumbsDown, RotateCcw } from "lucide-react";
+import { Copy, ArrowUp, ThumbsUp, ThumbsDown, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
 import { ThinkingIndicator } from "@/components/docs/ThinkingIndicator";
 import { toast } from "@/components/ui/toast";
 import { SiteNav } from "@/components/nav/SiteNav";
-import { siteConfig } from "@/config/site";
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -53,12 +52,16 @@ export function SharedChatUI({ messages, title, createdAt }: SharedChatUIProps) 
         abortControllerRef.current = new AbortController();
 
         try {
-            const response = await fetch("/api/docs/ai", {
+            // Copilot, as on the docs: continuing a shared docs chat.
+            const response = await fetch("/api/agent", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    messages: [...localMessages, userMessage],
-                    currentPage: "Shared Chat", // Context for the AI
+                    messages: [...localMessages, userMessage]
+                        .filter((m) => m.content.trim())
+                        .map((m) => ({ role: m.role, content: m.content })),
+                    surface: "docs",
+                    currentPath: "/docs",
                 }),
                 signal: abortControllerRef.current.signal,
             });
@@ -70,6 +73,7 @@ export function SharedChatUI({ messages, title, createdAt }: SharedChatUIProps) 
 
             const decoder = new TextDecoder();
             let fullContent = "";
+            let streamError: string | null = null;
 
             while (true) {
                 const { done, value } = await reader.read();
@@ -85,6 +89,11 @@ export function SharedChatUI({ messages, title, createdAt }: SharedChatUIProps) 
 
                         try {
                             const parsed = JSON.parse(data);
+                            if (parsed.error) streamError = parsed.error;
+                            if (parsed.discard) {
+                                fullContent = "";
+                                setStreamingContent("");
+                            }
                             if (parsed.content) {
                                 fullContent += parsed.content;
                                 setStreamingContent(fullContent);
@@ -94,6 +103,9 @@ export function SharedChatUI({ messages, title, createdAt }: SharedChatUIProps) 
                     }
                 }
             }
+
+            // A stream that failed or said nothing is an error, not an empty reply.
+            if (!fullContent.trim()) throw new Error(streamError ?? "Empty response");
 
             const assistantMessage: Message = {
                 role: "assistant",

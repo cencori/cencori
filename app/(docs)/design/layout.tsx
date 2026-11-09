@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -69,8 +69,6 @@ function Sidebar({ onLinkClick }: { onLinkClick?: () => void }) {
     const isSubdomain = useIsDesignSubdomain();
 
     const isActive = (path: string) => {
-        // Normalize paths for comparison
-        const normalizedPath = path === "" ? "/design" : `/design${path}`;
         if (path === "") {
             return pathname === "/design" || pathname === "/";
         }

@@ -2,8 +2,6 @@ import type { ResponsesRequest } from '@/lib/gateway/v1-responses-execute';
 import type { MemoryDirectiveInput } from '@/lib/memory';
 import type { SecurityCheckResult } from '@/lib/safety/multi-layer-check';
 
-export type SessionStatus = 'active' | 'paused' | 'completed' | 'failed';
-
 export type SessionEventType =
     | 'turn.started'
     | 'output_text.delta'
@@ -14,31 +12,6 @@ export type SessionEventType =
     | 'turn.completed'
     | 'turn.failed'
     | 'turn.checkpoint';
-
-export interface SessionRecord {
-    id: string;
-    project_id: string;
-    organization_id: string;
-    status: SessionStatus;
-    agent_id: string | null;
-    tenant_id?: string | null;
-    external_user_id?: string | null;
-    installation_id?: string | null;
-    last_turn_number: number;
-    metadata: Record<string, unknown>;
-    created_at: string;
-    updated_at: string;
-}
-
-export interface SessionEventRecord {
-    id: string;
-    session_id: string;
-    turn_number: number;
-    sequence: number;
-    event_type: SessionEventType;
-    payload: Record<string, unknown>;
-    created_at: string;
-}
 
 export interface SessionEventPayloadMap {
     'turn.started': { turn_number: number; model: string; instructions?: string; input_text?: string; input_messages?: Array<{ role: string; content: string | null }>; input_security?: SecurityCheckResult; input_token_map?: Record<string, string> };
@@ -89,17 +62,6 @@ export interface TurnRequestBody {
     widgets?: boolean;
 }
 
-export interface SessionResponse {
-    id: string;
-    status: SessionStatus;
-    turn_count: number;
-    created_at: string;
-    updated_at: string;
-    agent_id: string | null;
-    metadata: Record<string, unknown>;
-    total_cost?: number;
-}
-
 export interface CreateSessionRequest {
     /** Run this first turn in the same request; the response is the turn's stream. */
     turn?: Record<string, unknown>;
@@ -111,7 +73,3 @@ export interface CreateSessionRequest {
     external_user_id?: string;
 }
 
-export interface SSESessionEvent<T extends SessionEventType = SessionEventType> {
-    event: T;
-    data: SessionEventPayloadMap[T];
-}

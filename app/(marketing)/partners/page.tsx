@@ -20,11 +20,6 @@ export default function PartnersIndexPage() {
         p.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-    const navActions = [
-        { text: "Sign in", href: "/login", isButton: false },
-        { text: "Get Started", href: "/signup", isButton: true, variant: "default" as const },
-    ];
-
     return (
       <main className="pt-32 pb-24">
                 <div className="mx-auto max-w-6xl px-4 md:px-6">

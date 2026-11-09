@@ -32,7 +32,7 @@ import { runGatewayInputPipeline } from '@/lib/gateway/input-guard';
 import { toLoggedMessages } from '@/lib/gateway/log-payload';
 import type { SubscriptionTier } from '@/lib/entitlements';
 import { safeProviderFetch } from '@/lib/security/outbound-url';
-import { USAGE_MARKUP_PERCENT, withUsageMarkup } from '@/lib/billing/usage-markup';
+import { withUsageMarkup } from '@/lib/billing/usage-markup';
 
 // Supported embedding providers
 type EmbeddingProvider = 'openai' | 'google' | 'cohere';

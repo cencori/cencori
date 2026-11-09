@@ -20,7 +20,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { beginIntentionalSignOut, clearClientSessionCaches } from "@/lib/auth/session-caches";
 import { useUnsavedChanges } from "@/lib/console/unsaved-changes";
 

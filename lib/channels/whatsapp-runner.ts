@@ -27,7 +27,7 @@ import {
     type InboundMessage,
     type WhatsAppChannel,
 } from './whatsapp';
-import { USAGE_MARKUP_PERCENT, withUsageMarkup } from '@/lib/billing/usage-markup';
+import { withUsageMarkup } from '@/lib/billing/usage-markup';
 
 type Admin = ReturnType<typeof createAdminClient>;
 

@@ -11,7 +11,6 @@ const redis = createRedisClient({
 });
 
 const REDIS_PREFIX = 'pcache:';
-const DEFAULT_ENVIRONMENT = 'production';
 
 function normalizeEnvironment(environment: string | undefined): 'production' | 'test' {
     return environment === 'test' ? 'test' : 'production';

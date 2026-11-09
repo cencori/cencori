@@ -19,7 +19,7 @@
  * every reader — which is why the write path drops rather than merely flags.
  */
 
-import { detectJailbreak, isJailbreakRisky } from '@/lib/safety/jailbreak-detector';
+import { detectJailbreak } from '@/lib/safety/jailbreak-detector';
 
 /** Instruction-override signals — the memory-poisoning shape. */
 const MEMORY_INJECTION_PHRASES = [

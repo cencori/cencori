@@ -10,8 +10,6 @@ import { createAdminClient } from '@/lib/supabaseAdmin';
 import { createEndUserInvoice } from '@/lib/stripe-connect';
 import { writeAuditLog } from '@/lib/audit-log';
 
-type SupabaseAdmin = ReturnType<typeof createAdminClient>;
-
 interface InvoiceLineItem {
     description: string;
     amount_usd: number;
@@ -78,15 +76,6 @@ export async function generateInvoices(params: GenerateInvoiceParams): Promise<{
         }
         stripeAccountId = connectAccount.stripe_account_id;
     }
-
-    // Get project billing config
-    const { data: project } = await supabase
-        .from('projects')
-        .select('customer_markup_percentage')
-        .eq('id', projectId)
-        .single();
-
-    const defaultMarkup = project?.customer_markup_percentage ?? 0;
 
     // Get end-users to invoice
     let usersQuery = supabase

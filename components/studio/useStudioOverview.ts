@@ -71,21 +71,6 @@ export function formatMoney(amount: number, currency: string): string {
     }
 }
 
-/** Where the assistant is answering customers, in plain words ("WhatsApp, your website and your link"). */
-export function liveChannels(assistant: StudioAssistantSummary | null): string[] {
-    if (!assistant?.published) return [];
-    return [
-        assistant.whatsapp?.replies_on && "WhatsApp",
-        assistant.website_chat?.on && "your website",
-        assistant.website_chat && "your link",
-    ].filter((item): item is string => !!item);
-}
-
-export function joinWords(items: string[]): string {
-    if (items.length <= 1) return items.join("");
-    return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
-}
-
 /**
  * Copilot's "still to do" notes as owner-facing steps (they carry hints for
  * Copilot in brackets, which the owner never sees).

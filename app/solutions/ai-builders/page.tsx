@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Check, Copy, DollarSign, CreditCard, Users } from "lucide-react";
+import { ArrowRight, Check, Copy } from "lucide-react";
 import { Reveal } from "@/components/landing/Reveal";
 import { Logo } from "@/components/logo";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -28,7 +28,6 @@ import {
     CrewAILogo,
     LangChainLogo,
     LlamaIndexLogo,
-    DifyLogo,
 } from "@/components/icons/BrandIcons";
 
 function CopyButton({ text }: { text: string }) {

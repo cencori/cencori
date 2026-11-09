@@ -10,7 +10,6 @@ import { adminUsers } from "@/lib/auth/admin-users";
  * scripts so every launch email addresses the recipient by their real name.
  */
 
-import { createAdminClient } from '@/lib/supabaseAdmin';
 
 export interface RecipientName {
     firstName: string;
@@ -47,7 +46,6 @@ export async function lookupRecipientName(email: string): Promise<RecipientName>
     if (!normalized || !normalized.includes('@')) return fallbackFromEmail(email);
 
     try {
-        const admin = createAdminClient();
         const { data } = await adminUsers.listUsers({ perPage: 1000 });
         const found = data?.users?.find(u => u.email?.toLowerCase() === normalized);
         if (!found) return fallbackFromEmail(email);

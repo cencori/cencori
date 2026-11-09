@@ -18,7 +18,7 @@ import { calculateProviderTokenCost, type UnifiedMessage } from '@/lib/providers
 import type { SubscriptionTier } from '@/lib/entitlements';
 import { deTokenize } from '@/lib/safety/custom-data-rules';
 import { getPricingFromDB } from '@/lib/providers/pricing';
-import { USAGE_MARKUP_PERCENT, withUsageMarkup } from '@/lib/billing/usage-markup';
+import { withUsageMarkup } from '@/lib/billing/usage-markup';
 
 interface Memory {
     id: string;

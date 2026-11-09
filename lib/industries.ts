@@ -9,8 +9,6 @@ export const CONTACT_INDUSTRIES = [
   "Other",
 ] as const;
 
-export type ContactIndustry = (typeof CONTACT_INDUSTRIES)[number];
-
 export const CONTACT_BUDGETS = [
   "Under $50k",
   "$50k – $250k",
@@ -19,4 +17,3 @@ export const CONTACT_BUDGETS = [
   "Not sure yet",
 ] as const;
 
-export type ContactBudget = (typeof CONTACT_BUDGETS)[number];

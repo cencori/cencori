@@ -85,9 +85,3 @@ export function formatCurrency(
     return formatted;
 }
 
-/**
- * Get the symbol for a given currency code
- */
-export function getCurrencySymbol(currencyCode: string): string {
-    return CURRENCY_SYMBOLS[currencyCode.toUpperCase()] || currencyCode;
-}

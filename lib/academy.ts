@@ -24,12 +24,6 @@ export interface Lesson extends LessonFrontmatter {
     content: string;
 }
 
-export interface Heading {
-    id: string;
-    text: string;
-    level: number;
-}
-
 /**
  * Get all lessons for a course
  */
@@ -74,28 +68,6 @@ export function getCourseIntro(courseId: string): { content: string; frontmatter
     const fileContents = fs.readFileSync(introPath, 'utf-8');
     const { data, content } = matter(fileContents);
     return { content, frontmatter: data };
-}
-
-/**
- * Extract headings from MDX content for TOC
- */
-export function extractHeadings(content: string): Heading[] {
-    const headingRegex = /^(#{2,3})\s+(.+)$/gm;
-    const headings: Heading[] = [];
-    let match;
-
-    while ((match = headingRegex.exec(content)) !== null) {
-        const level = match[1].length;
-        const text = match[2].trim();
-        const id = text
-            .toLowerCase()
-            .replace(/[^a-z0-9\s-]/g, '')
-            .replace(/\s+/g, '-');
-
-        headings.push({ id, text, level });
-    }
-
-    return headings;
 }
 
 /**

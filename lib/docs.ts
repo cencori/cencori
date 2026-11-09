@@ -2,14 +2,8 @@ import 'server-only';
 import fs from 'fs';
 import path from 'path';
 import matter from 'gray-matter';
-import { compileMDX } from 'next-mdx-remote/rsc';
-import rehypePrettyCode from 'rehype-pretty-code';
-import rehypeSlug from 'rehype-slug';
-import remarkGfm from 'remark-gfm';
 
 const DOCS_DIR = path.join(process.cwd(), 'content', 'docs');
-
-import { CUSTOM_SHIKI_THEME } from './shiki-theme';
 
 export interface DocFrontmatter {
     title: string;
@@ -39,12 +33,6 @@ export interface NavSection {
         title: string;
         items: NavItem[];
     };
-}
-
-export interface Heading {
-    id: string;
-    text: string;
-    level: number;
 }
 
 /**
@@ -199,90 +187,3 @@ export function getDocsNavigation(): NavSection[] {
     return result;
 }
 
-/**
- * Extract headings from MDX content for TOC
- */
-export function extractHeadings(content: string): Heading[] {
-    const headingRegex = /^(#{2,3})\s+(.+)$/gm;
-    const headings: Heading[] = [];
-    let match;
-
-    while ((match = headingRegex.exec(content)) !== null) {
-        const level = match[1].length;
-        const text = match[2].trim();
-        const id = text
-            .toLowerCase()
-            .replace(/[^a-z0-9\s-]/g, '')
-            .replace(/\s+/g, '-');
-
-        headings.push({ id, text, level });
-    }
-
-    return headings;
-}
-
-// Import docs-specific MDX components
-import { DocsMDXComponents } from '@/components/docs/DocsMDXComponents';
-
-/**
- * Parse and render MDX content
- */
-export async function parseMDX(content: string) {
-    const { content: mdxContent } = await compileMDX({
-        source: content,
-        options: {
-            parseFrontmatter: false,
-            mdxOptions: {
-                remarkPlugins: [remarkGfm],
-                rehypePlugins: [
-                    rehypeSlug,
-                    [
-                        rehypePrettyCode,
-                        {
-                            theme: CUSTOM_SHIKI_THEME,
-                        },
-                    ],
-                ],
-            },
-        },
-        components: DocsMDXComponents,
-    });
-
-    return mdxContent;
-}
-
-/**
- * Get previous and next docs for navigation
- */
-export function getDocNavigation(currentSlug: string): { prev: Doc | null; next: Doc | null } {
-    const docs = getAllDocs().sort((a, b) => {
-        // Sort by section then by order
-        if (a.section !== b.section) {
-            const sectionOrder = [
-                'Getting Started',
-                'Platform',
-                'AI',
-                'Agents API',
-                'Agents SDK',
-                'Agent UI',
-                'Embedded Agents',
-                'Endpoints',
-                'Business Agents',
-                'Security',
-                'Integrations',
-                'Guides',
-                'API Reference',
-                'Hackathons',
-            ];
-            return sectionOrder.indexOf(a.section) - sectionOrder.indexOf(b.section);
-        }
-        return (a.order || 999) - (b.order || 999);
-    });
-
-    const currentIndex = docs.findIndex((doc) => doc.slug === currentSlug);
-
-    return {
-        prev: currentIndex > 0 ? docs[currentIndex - 1] : null,
-        next: currentIndex < docs.length - 1 ? docs[currentIndex + 1] : null,
-    };
-}

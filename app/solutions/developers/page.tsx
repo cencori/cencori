@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, ChevronRight, Shield, Eye, Activity, Terminal, Code2, Copy, Check, Server } from "lucide-react";
+import { ArrowRight, ChevronRight, Shield, Activity, Terminal, Server } from "lucide-react";
 import {
     NextjsLogo,
     PythonLogo,
@@ -11,27 +11,6 @@ import {
     GoLogo,
     RustLogo
 } from "@/components/icons/BrandIcons";
-
-// Simple copy button
-function CopyButton({ text }: { text: string }) {
-    const [copied, setCopied] = useState(false);
-
-    const handleCopy = () => {
-        navigator.clipboard.writeText(text);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-    };
-
-    return (
-        <button
-            onClick={handleCopy}
-            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-        >
-            {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
-            {copied ? "Copied" : "Copy"}
-        </button>
-    );
-}
 
 export default function DevelopersPage() {
 

@@ -3,21 +3,17 @@
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabaseClient";
-import { 
-    Mail, 
-    MessageSquare, 
-    Lightbulb, 
-    CheckCircle2, 
-    Clock, 
+import {
+    Mail,
+    MessageSquare,
+    Lightbulb,
     Search,
-    ChevronRight,
     User,
     Calendar,
-    Filter
+    Filter,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 
 export function FeedbackDashboard() {

@@ -6,7 +6,6 @@ import {
     AnthropicProvider,
     OpenAICompatibleProvider,
     CohereProvider,
-    isOpenAICompatible,
 } from '@/lib/providers';
 import { ProviderRouter } from '@/lib/providers/router';
 import { decryptApiKey } from '@/lib/encryption';

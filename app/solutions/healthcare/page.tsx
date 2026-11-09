@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, ChevronRight, Stethoscope, HeartPulse, ShieldCheck, Activity } from "lucide-react";
+import { ArrowRight, Stethoscope, ShieldCheck, Activity } from "lucide-react";
 
 export default function HealthcarePage() {
 

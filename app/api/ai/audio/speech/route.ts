@@ -33,7 +33,7 @@ import {
     VOICE_MODELS,
     type SpeechRequest,
 } from '@/lib/audio/speech';
-import { USAGE_MARKUP_PERCENT, withUsageMarkup } from '@/lib/billing/usage-markup';
+import { withUsageMarkup } from '@/lib/billing/usage-markup';
 
 export async function OPTIONS() {
     return handleCorsPreFlight();

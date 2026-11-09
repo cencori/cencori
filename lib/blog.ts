@@ -6,7 +6,7 @@ import readingTime from 'reading-time';
 import type { BlogCategory, BlogCategoryMeta } from './blog-categories';
 
 export type { BlogCategory, BlogCategoryMeta };
-export { BLOG_CATEGORIES, getBlogCategoryMeta } from './blog-categories';
+export { getBlogCategoryMeta } from './blog-categories';
 
 const BLOG_DIR = path.join(process.cwd(), 'content', 'blog');
 const AUTHORS_DIR = path.join(process.cwd(), 'content', 'authors');
@@ -114,14 +114,6 @@ export function getPostBySlug(slug: string): BlogPost | null {
 }
 
 /**
- * Get posts by tag
- */
-export function getPostsByTag(tag: string): BlogPost[] {
-  const posts = getAllPosts();
-  return posts.filter((post) => post.tags.includes(tag));
-}
-
-/**
  * Get posts by category
  */
 export function getPostsByCategory(category: BlogCategory): BlogPost[] {
@@ -135,26 +127,6 @@ export function getPostsByCategory(category: BlogCategory): BlogPost[] {
 export function getPostUrl(post: BlogPost | BlogPostFrontmatter): string {
   if (post.category === 'changelog') return `/changelog/${post.slug}`;
   return `/newsroom/${post.slug}`;
-}
-
-/**
- * Get posts by author
- */
-export function getPostsByAuthor(authorSlug: string): BlogPost[] {
-  const posts = getAllPosts();
-  return posts.filter((post) => post.authors.includes(authorSlug));
-}
-
-/**
- * Get all unique tags
- */
-export function getAllTags(): string[] {
-  const posts = getAllPosts();
-  const tags = new Set<string>();
-  posts.forEach((post) => {
-    post.tags.forEach((tag) => tags.add(tag));
-  });
-  return Array.from(tags).sort();
 }
 
 import GithubSlugger from 'github-slugger';

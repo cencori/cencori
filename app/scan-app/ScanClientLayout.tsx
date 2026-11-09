@@ -12,7 +12,6 @@ import { UserAvatar } from "@/components/ui/user-avatar";
 import {
     ExternalLink,
     LogOut,
-    CircleUserRound,
     HelpCircle,
     Book,
     Mail,

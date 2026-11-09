@@ -32,13 +32,6 @@ interface GitHubRepo {
   description: string | null;
 }
 
-interface GitHubInstallation {
-  installation_id: number;
-  github_account_type: string;
-  github_account_login: string;
-  github_account_name: string | null;
-}
-
 interface ConnectedAccount {
   installationId: number;
   login: string;

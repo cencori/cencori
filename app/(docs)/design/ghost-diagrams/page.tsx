@@ -11,7 +11,6 @@ import {
     GhostBoxContent,
     GhostGrid,
     GhostArrow,
-    GhostDashedLine,
     GhostPlaceholder,
     GhostCaption,
     GhostLabel,

@@ -1,4 +1,4 @@
-import { Key, Copy, AlertTriangle } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 
 export default function Step4Page() {
     return (

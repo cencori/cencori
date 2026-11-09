@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, ChevronRight, Trophy, Zap, Code, Flame } from "lucide-react";
+import { ArrowRight, Trophy, Zap, Flame } from "lucide-react";
 
 export default function HackathonsPage() {
 

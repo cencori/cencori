@@ -1,6 +1,5 @@
 import { BLOG_CATEGORIES } from "@/lib/blog-categories";
 
-export type { BlogCategory, BlogCategoryMeta } from "@/lib/blog-categories";
 
 export type BlogCardPost = {
   slug: string;

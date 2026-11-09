@@ -2,7 +2,6 @@
  * @vitest-environment node
  */
 import { describe, expect, it, vi } from 'vitest';
-import { NextResponse } from 'next/server';
 
 vi.mock('@/lib/supabaseAdmin', () => ({
     createAdminClient: vi.fn(),

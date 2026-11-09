@@ -373,22 +373,3 @@ export async function processCustomRules(
     };
 }
 
-/**
- * Process AI Detect rules asynchronously (for background job)
- */
-export async function processAIDetectRules(
-    text: string,
-    rules: CustomDataRule[]
-): Promise<MatchResult[]> {
-    const aiRules = rules.filter(r => r.match_type === 'ai_detect' && r.is_active);
-    const results: MatchResult[] = [];
-
-    for (const rule of aiRules) {
-        const matchResult = await matchAIDetect(text, rule.pattern);
-        if (matchResult.matched) {
-            results.push({ ...matchResult, rule });
-        }
-    }
-
-    return results;
-}

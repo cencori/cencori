@@ -1,5 +1,3 @@
-export type WebFetchFormat = 'raw' | 'text';
-
 export interface WebLink {
     url: string;
     text: string;
@@ -162,18 +160,3 @@ export interface WebBrowserOptions {
     viewport?: { width: number; height: number };
 }
 
-export type WebBrowserJobStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
-
-export interface WebBrowserJob {
-    id: string;
-    url: string;
-    actions: WebBrowserAction[];
-    options: Omit<WebBrowserOptions, 'actions'>;
-    status: WebBrowserJobStatus;
-    result: Record<string, unknown> | null;
-    error: string | null;
-    attempts: number;
-    createdAt: string;
-    startedAt: string | null;
-    finishedAt: string | null;
-}

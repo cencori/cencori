@@ -1,6 +1,4 @@
 import React from "react";
-import Image from "next/image";
-import { cn } from "@/lib/utils";
 
 interface IconProps extends React.SVGProps<SVGSVGElement> {
     className?: string;
@@ -95,10 +93,8 @@ export { Windsurf as WindsurfLogo } from "@/components/icons/provider-icons";
 export { Claude as ClaudeLogo } from "@/components/icons/provider-icons";
 export { CrewAI as CrewAILogo } from "@/components/icons/provider-icons";
 export { LangChain as LangChainLogo } from "@/components/icons/provider-icons";
-export { LangGraph as LangGraphLogo } from "@/components/icons/provider-icons";
 export { LlamaIndex as LlamaIndexLogo } from "@/components/icons/provider-icons";
 export { Dify as DifyLogo } from "@/components/icons/provider-icons";
-export { N8n as N8nLogo } from "@/components/icons/provider-icons";
 
 // Vibe coding platforms - Re-exported from @lobehub/icons
 export { Lovable as LovableLogo } from "@/components/icons/provider-icons";
@@ -207,24 +203,6 @@ export function GoLogo({ className, ...props }: FrameworkIconProps) {
     );
 }
 
-export function FlutterLogo({ className, ...props }: FrameworkIconProps) {
-    return (
-        <svg viewBox="0 0 128 128" className={className} {...props}>
-            <g fill="#3FB6D3">
-                <path d="M12.3 64.2L76.3 0h39.4L32.1 83.6zM76.3 128h39.4L81.6 93.9l34.1-34.8H76.3L42.2 93.5z" />
-            </g>
-            <path fill="#27AACD" d="M81.6 93.9l-20-20-19.4 19.6 19.4 19.6z" />
-            <path fill="#19599A" d="M115.7 128L81.6 93.9l-19.4 19.6L76.3 128z" />
-            <linearGradient id="flutter-gradient" x1="59.365" x2="86.825" y1="116.36" y2="99.399" gradientUnits="userSpaceOnUse">
-                <stop offset="0" stopColor="#1b4e94" />
-                <stop offset=".63" stopColor="#1a5497" />
-                <stop offset="1" stopColor="#195a9b" />
-            </linearGradient>
-            <path fill="url(#flutter-gradient)" d="M81.6 93.9l-20-20-19.4 19.6 19.4 19.6z" />
-        </svg>
-    );
-}
-
 // React Logo (custom SVG)
 export function ReactLogo({ className, ...props }: IconProps) {
     return (
@@ -265,18 +243,6 @@ export function VueLogo({ className, ...props }: IconProps) {
     );
 }
 
-// Microsoft Logo (4 squares)
-export function MicrosoftLogo({ className, ...props }: IconProps) {
-    return (
-        <svg viewBox="0 0 23 23" className={className} {...props}>
-            <path fill="#f35325" d="M1 1h10v10H1z" />
-            <path fill="#81bc06" d="M12 1h10v10H12z" />
-            <path fill="#05a6f0" d="M1 12h10v10H1z" />
-            <path fill="#ffba08" d="M12 12h10v10H12z" />
-        </svg>
-    );
-}
-
 // Node.js Logo
 export function NodeLogo({ className, ...props }: FrameworkIconProps) {
     return (
@@ -297,73 +263,3 @@ export function RustLogo({ className, ...props }: FrameworkIconProps) {
     );
 }
 
-// Google Cloud Logo
-export function GoogleCloudLogo({ className, ...props }: IconProps) {
-    return (
-        <svg viewBox="0 0 24 24" className={className} {...props}>
-            <path fill="#EA4335" d="M12.19 5.599c.531 0 1.049.094 1.525.266l1.262-1.262A6.604 6.604 0 0 0 12.19 4c-2.382 0-4.478 1.25-5.656 3.127l1.469 1.14a4.99 4.99 0 0 1 4.187-2.668z" />
-            <path fill="#4285F4" d="M15.715 8.267l1.469-1.14A6.607 6.607 0 0 1 18.79 12c0 .751-.125 1.472-.354 2.145l-1.469-1.14a4.984 4.984 0 0 0-.252-2.738z" />
-            <path fill="#FBBC05" d="M6.534 13.867l-1.469 1.14A6.608 6.608 0 0 1 5.59 12c0-1.124.28-2.182.776-3.107l1.469 1.14a4.984 4.984 0 0 0-.301 3.834z" />
-            <path fill="#34A853" d="M12.19 18.401a4.99 4.99 0 0 1-4.187-2.268l-1.469 1.14A6.603 6.603 0 0 0 12.19 20c.951 0 1.858-.201 2.674-.563l-1.262-1.262a5.003 5.003 0 0 1-1.412.226z" />
-            <circle fill="#4285F4" cx="12.19" cy="12" r="2.5" />
-        </svg>
-    );
-}
-
-// Zapier Logo
-export function ZapierLogo({ className, ...props }: IconProps) {
-    return (
-        <svg viewBox="0 0 128 128" className={className} {...props}>
-            <path fill="#FF4F00" d="M30.4,64 L67.2,64 L67.2,27.2 L97.6,64 L60.8,64 L60.8,100.8 L30.4,64 Z" />
-        </svg>
-    );
-}
-
-// Make (Integromat) Logo
-export function MakeLogo({ className, ...props }: IconProps) {
-    return (
-        <svg viewBox="0 0 128 128" className={className} {...props}>
-            <circle cx="64" cy="64" r="64" fill="#6f00e6" />
-            <path fill="#fff" d="M35.5 45.5h16.2v37H35.5zM76.3 45.5h16.2v37H76.3zM55.9 82.5V59.4l8.1 11.2 8.1-11.2v23.1h13.2V45.5h-10.8L64 59.9 53.5 45.5H42.7v37h13.2z" />
-        </svg>
-    );
-}
-
-// OpenClaw Logo (Custom Placeholder)
-export function OpenClawLogo({ className, ...props }: any) {
-    return (
-        <div className={cn("relative overflow-hidden rounded-md", className)} {...props}>
-            <Image
-                src="/oc.JPG"
-                alt="OpenClaw"
-                fill
-                className="object-cover"
-                sizes="64px"
-            />
-        </div>
-    );
-}
-
-// AutoGPT Logo (Custom Placeholder)
-export function AutoGPTLogo({ className, ...props }: any) {
-    return (
-        <div className={cn("relative overflow-hidden rounded-md", className)} {...props}>
-            <Image
-                src="/autogpt.png"
-                alt="AutoGPT"
-                fill
-                className="object-cover"
-                sizes="64px"
-            />
-        </div>
-    );
-}
-
-// Custom Agent Logo (User Provided)
-export function CustomAgentLogo({ className, ...props }: IconProps) {
-    return (
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className} {...props}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 17.25v1.007a3 3 0 0 1-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0 1 15 18.257V17.25m6-12V15a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 15V5.25m18 0A2.25 2.25 0 0 0 18.75 3H5.25A2.25 2.25 0 0 0 3 5.25m18 0V12a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 12V5.25" />
-        </svg>
-    );
-}

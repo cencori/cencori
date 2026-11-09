@@ -2,7 +2,7 @@
 import { browserAuth } from "@/lib/auth/browser-auth";
 
 import React, { useState, useEffect } from "react";
-import { ShieldCheck, Key, Smartphone, Monitor, Laptop, Tablet, Globe, LogOut } from "lucide-react";
+import { ShieldCheck, Key, Smartphone, Monitor, Tablet } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";

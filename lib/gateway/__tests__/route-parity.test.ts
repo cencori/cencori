@@ -5,7 +5,6 @@
  */
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-import { AuthenticationError } from '@/lib/providers/errors';
 import type { GatewayContext } from '@/lib/gateway-middleware';
 import {
     ALLOWED_USER_MESSAGE,

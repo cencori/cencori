@@ -12,7 +12,7 @@ import {
     OpenAI, Anthropic, Google, Mistral, Cohere,
     Perplexity, Groq, XAI, Together,
     Meta, HuggingFace, Qwen, DeepSeek,
-    Ai21, Bedrock, Nova, Azure, Cerebras,
+    Ai21, Cerebras,
     Cloudflare, DeepInfra, Fireworks, Nvidia,
     SambaNova, Upstage, Minimax, Moonshot,
     Stepfun, Baseten, Alibaba, Baidu, ZAI,

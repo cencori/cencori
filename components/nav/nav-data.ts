@@ -800,8 +800,6 @@ export const navigationMenus = [
   },
 ] as const;
 
-export type NavigationMenuId = (typeof navigationMenus)[number]["id"];
-
 export const developerNavigationMenus = [
   {
     id: "dev-home",
@@ -950,9 +948,6 @@ export const developerNavigationMenus = [
     href: "/developers/blog",
   },
 ] as const;
-
-export type DeveloperNavigationMenuId =
-  (typeof developerNavigationMenus)[number]["id"];
 
 export type DeveloperNavigationMenu =
   (typeof developerNavigationMenus)[number];

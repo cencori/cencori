@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, ChevronRight, Zap, Puzzle, Lock, Globe } from "lucide-react";
+import { ArrowRight, ChevronRight, Zap, Lock, Globe } from "lucide-react";
 
 export default function NoCodePage() {
 
