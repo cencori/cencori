@@ -37,7 +37,7 @@ export const CTA = ({ isAuthenticated: providedIsAuthenticated }: CTAProps) => {
                                     {isAuthenticated ? "Go to Dashboard" : "Get Started Free"}
                                 </Button>
                             </Link>
-                            <Link href="/contact/sales">
+                            <Link href="/contact">
                                 <Button variant="outline" size="default" className="h-8 px-4 text-xs font-medium rounded-md border-foreground/20 hover:bg-foreground/5 hover:border-foreground/40 transition-all">
                                   Request a Demo
                                 </Button>

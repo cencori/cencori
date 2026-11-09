@@ -15,6 +15,7 @@ export const TIME_RANGES = [
 
 export const STATUS_OPTIONS = [
     { value: 'active', label: 'Active' },
+    { value: 'idle', label: 'Idle' },
     { value: 'paused', label: 'Waiting' },
     { value: 'completed', label: 'Ended' },
     { value: 'failed', label: 'Failed' },

@@ -371,7 +371,7 @@ export default function ComparePage() {
                                         View the Gateway Docs
                                     </button>
                                 </Link>
-                                <Link href="/contact/sales">
+                                <Link href="/contact">
                                     <button className="px-6 py-2.5 rounded-full text-xs font-semibold border border-border bg-foreground/[0.01] hover:bg-foreground/[0.03] text-foreground transition-all">
                                         Talk to the Team
                                     </button>

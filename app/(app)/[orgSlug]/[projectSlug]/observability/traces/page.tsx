@@ -4,7 +4,7 @@ import { use, useEffect, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
 import { replaceQuery, tracesQuery } from '@/lib/observability/queries';
-import { Download, Play, RefreshCw, Search } from 'lucide-react';
+import { Download, Paperclip, RefreshCw, Search } from 'lucide-react';
 import BinocularsIcon from '@hugeicons/core-free-icons/BinocularsIcon';
 import LeftToRightListDashIcon from '@hugeicons/core-free-icons/LeftToRightListDashIcon';
 import { ObservabilityEmptyState } from '@/components/observability/EmptyState';
@@ -73,7 +73,6 @@ export default function TracesPage({ params }: PageProps) {
     const filters = readSessionFilters(searchParams);
     const { data: projectId, isLoading: projectLoading } = useProjectIdBySlug(orgSlug, projectSlug);
     const [searchInput, setSearchInput] = useState(filters.q);
-    const [live, setLive] = useState(false);
 
     useEffect(() => setSearchInput(filters.q), [filters.q]);
 
@@ -82,7 +81,6 @@ export default function TracesPage({ params }: PageProps) {
     const { data, isLoading, error, isFetching, isPlaceholderData, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
         ...tracesQuery<SessionsPage>(projectId, filters),
         placeholderData: keepPreviousData,
-        refetchInterval: live ? 5000 : false,
     });
 
     const sessions = data?.pages.flatMap((p) => p.sessions) ?? [];
@@ -118,22 +116,13 @@ export default function TracesPage({ params }: PageProps) {
                         onChange={(e) => setSearchInput(e.target.value)}
                         onBlur={() => { if (searchInput.trim() !== filters.q) submitSearch(); }}
                         placeholder="Search traces by session id or agent..."
-                        className="h-9 w-full rounded-md border border-border/60 bg-transparent pl-8 pr-3 text-sm outline-none placeholder:text-muted-foreground/60 focus:border-border"
+                        className="h-8 w-full rounded-md border border-border/60 bg-transparent pl-8 pr-3 text-sm outline-none placeholder:text-muted-foreground/60 focus:border-border"
                     />
                 </form>
-                <button
-                    type="button"
-                    onClick={() => setLive((l) => !l)}
-                    className={cn('flex h-9 items-center gap-1.5 rounded-md border px-3 text-sm', live ? 'border-emerald-500/50 text-emerald-600 dark:text-emerald-400' : 'border-border/60 text-foreground hover:bg-muted/50')}
-                    aria-pressed={live}
-                >
-                    {live ? <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" /> : <Play className="h-3.5 w-3.5" />}
-                    Live
-                </button>
-                <button type="button" onClick={() => void refetch()} aria-label="Refresh" className="flex h-9 w-9 items-center justify-center rounded-md border border-border/60 hover:bg-muted/50">
+                <button type="button" onClick={() => void refetch()} aria-label="Refresh" className="flex h-8 w-8 items-center justify-center rounded-md border border-border/60 hover:bg-muted/50">
                     <RefreshCw className={cn('h-3.5 w-3.5', isFetching && !isFetchingNextPage && 'animate-spin')} />
                 </button>
-                <button type="button" onClick={exportJson} disabled={!sessions.length} aria-label="Export as JSON" className="flex h-9 w-9 items-center justify-center rounded-md border border-border/60 hover:bg-muted/50 disabled:opacity-40">
+                <button type="button" onClick={exportJson} disabled={!sessions.length} aria-label="Export as JSON" className="flex h-8 w-8 items-center justify-center rounded-md border border-border/60 hover:bg-muted/50 disabled:opacity-40">
                     <Download className="h-3.5 w-3.5" />
                 </button>
             </div>
@@ -179,7 +168,14 @@ export default function TracesPage({ params }: PageProps) {
                                 <span className="hidden truncate font-mono text-xs md:block">
                                     {s.agent ?? '—'}{s.parent_session_id && <span className="ml-1.5 text-[10px] text-muted-foreground">sub-run</span>}
                                 </span>
-                                <span className="block truncate font-mono text-xs md:inline">{s.preview ?? <span className="text-muted-foreground">—</span>}</span>
+                                <span className="flex min-w-0 items-center gap-1.5 font-mono text-xs">
+                                    {s.preview ? <span className="truncate">{s.preview}</span> : !s.attachments?.length && <span className="text-muted-foreground">—</span>}
+                                    {s.attachments?.map((name) => (
+                                        <span key={name} className="inline-flex max-w-[16ch] shrink-0 items-center gap-1 rounded border border-border/60 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                            <Paperclip className="h-2.5 w-2.5 shrink-0" /><span className="truncate">{name}</span>
+                                        </span>
+                                    ))}
+                                </span>
                                 <span className="hidden text-right font-mono text-xs text-muted-foreground md:block">{s.turns}</span>
                                 <span className="hidden text-right font-mono text-xs text-muted-foreground md:block">{formatSessionCost(s.cost_usd)}</span>
                                 <span className="mt-0.5 block font-mono text-[10px] text-muted-foreground md:hidden">

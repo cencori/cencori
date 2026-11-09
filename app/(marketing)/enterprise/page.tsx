@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 const CONTACT_EMAIL = 'enterprise@cencori.com';
 const CAL_URL = 'https://cal.com/omogbolahan/cencori-enterprise';
 const COMPUTE_EMAIL = `mailto:${CONTACT_EMAIL}?subject=Cencori%20Compute%20%E2%80%94%20early%20access`;
-const ENTERPRISE_EMAIL = `mailto:${CONTACT_EMAIL}?subject=Cencori%20for%20Enterprise%20%E2%80%94%20conversation`;
+const ENTERPRISE_CONTACT = "/contact";
 
 function CornerMarkers({ withVertical = false }: { withVertical?: boolean }) {
     return (
@@ -285,7 +285,7 @@ export default function EnterprisePage() {
                                             </li>
                                         </ul>
                                     </div>
-                                    <Link href={ENTERPRISE_EMAIL} className="pt-2">
+                                    <Link href={ENTERPRISE_CONTACT} className="pt-2">
                                         <Button
                                             variant="outline"
                                             className="h-7 rounded-md border-foreground/20 bg-transparent px-3 text-[11px] font-medium text-foreground/90 hover:border-foreground/40 hover:bg-foreground/5 hover:text-foreground transition-colors"
@@ -331,7 +331,7 @@ export default function EnterprisePage() {
                                 Read the full security posture &rarr;
                             </Link>
                             <span className="opacity-40">/</span>
-                            <Link href={ENTERPRISE_EMAIL} className="hover:text-foreground">
+                            <Link href={ENTERPRISE_CONTACT} className="hover:text-foreground">
                                 Request a DPA
                             </Link>
                             <span className="opacity-40">/</span>
@@ -386,7 +386,7 @@ export default function EnterprisePage() {
                                         Book a working session
                                     </Button>
                                 </Link>
-                                <Link href={ENTERPRISE_EMAIL}>
+                                <Link href={ENTERPRISE_CONTACT}>
                                     <Button
                                         variant="outline"
                                         className="h-7 rounded-md border-foreground/20 bg-transparent px-3 text-[11px] font-medium text-foreground/90 hover:border-foreground/40 hover:bg-foreground/5 hover:text-foreground transition-colors"

@@ -60,7 +60,7 @@ export function useRangeChoice() {
         const lock = rangeLock(range);
         if (!lock) return { lock, onClick: select };
         if (lock === 'pro' && upgrade.canUpgrade) return { lock, onClick: upgrade.openUpgrade, onHover: upgrade.preloadUpgrade };
-        return { lock, onClick: () => window.open('/contact/sales', '_blank', 'noopener') };
+        return { lock, onClick: () => window.open('/contact', '_blank', 'noopener') };
     };
 }
 

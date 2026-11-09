@@ -238,9 +238,9 @@ export default function EnterprisePage() {
                                 </Reveal>
                                 <Reveal delay={0.15}>
                                     <div className="flex gap-4">
-                                        <a href="/contact/sales">
+                                        <Link href="/contact">
                                             <Button size="sm" className="h-7 text-xs px-3">Request a Demo</Button>
-                                        </a>
+                                        </Link>
                                         <Link href="/pricing">
                                             <Button variant="outline" size="sm" className="h-7 text-xs px-3">View Pricing</Button>
                                         </Link>
@@ -288,7 +288,7 @@ export default function EnterprisePage() {
                                 Talk to our team about your security, compliance, and scale requirements.
                             </p>
                             <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                                <Link href="/contact/sales">
+                                <Link href="/contact">
                                     <Button size="sm" className="h-7 text-xs px-3">Contact Sales</Button>
                                 </Link>
                                 <Link href="/docs">

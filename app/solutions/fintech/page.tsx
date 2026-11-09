@@ -128,7 +128,7 @@ export default function FintechPage() {
                         </Reveal>
                         <Reveal delay={0.15}>
                             <div className="flex flex-wrap items-center justify-center gap-3">
-                                <Link href="/contact/sales">
+                                <Link href="/contact">
                                     <Button size="default" className="h-8 px-4 text-xs font-medium rounded-md bg-foreground text-background hover:bg-foreground/90 transition-all">
                                         Contact Sales <ArrowRight className="ml-1.5 h-3 w-3" />
                                     </Button>
@@ -572,7 +572,7 @@ export default function FintechPage() {
                             </Reveal>
                             <Reveal delay={0.1}>
                                 <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                                    <Link href="/contact/sales">
+                                    <Link href="/contact">
                                         <Button size="sm" className="h-7 text-xs px-3 bg-foreground text-background hover:bg-foreground/90">
                                             Talk to Sales <ArrowRight className="ml-1.5 h-3 w-3" />
                                         </Button>
