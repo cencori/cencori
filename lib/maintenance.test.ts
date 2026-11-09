@@ -136,7 +136,55 @@ describe("maintenanceResponse", () => {
       row.fail = true;
       vi.advanceTimersByTime(11_000);
       expect((await getMaintenanceState()).enabled).toBe(true);
+      await vi.runAllTimersAsync();
       expect(row.reads).toBe(2);
+      expect((await getMaintenanceState()).enabled).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("answers from the last value while it refreshes, never waiting on the read", async () => {
+    vi.useFakeTimers();
+    try {
+      const { getMaintenanceState } = await load();
+      expect((await getMaintenanceState()).enabled).toBe(false);
+
+      // The flag flips on; the next request after the cache expires still gets
+      // the old value at once, and the one after that sees the new one.
+      row.current = { enabled: true, message: null, retry_after_seconds: 600 };
+      vi.advanceTimersByTime(11_000);
+      expect((await getMaintenanceState()).enabled).toBe(false);
+      await vi.runAllTimersAsync();
+      expect((await getMaintenanceState()).enabled).toBe(true);
+      expect(row.reads).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("backs off after a failed read and logs once per run of failures", async () => {
+    vi.useFakeTimers();
+    try {
+      const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+      errors.mockClear();
+      row.fail = true;
+      const { getMaintenanceState } = await load();
+      await getMaintenanceState();
+      expect(row.reads).toBe(1);
+
+      // Within the 30s back-off: no new read.
+      vi.advanceTimersByTime(20_000);
+      await getMaintenanceState();
+      await vi.runAllTimersAsync();
+      expect(row.reads).toBe(1);
+
+      // After it: one more read, still failing, still only one error logged.
+      vi.advanceTimersByTime(15_000);
+      await getMaintenanceState();
+      await vi.runAllTimersAsync();
+      expect(row.reads).toBe(2);
+      expect(errors).toHaveBeenCalledTimes(1);
     } finally {
       vi.useRealTimers();
     }

@@ -14,7 +14,10 @@ export type MaintenanceState = {
 };
 
 const OFF: MaintenanceState = { enabled: false, message: null, retryAfterSeconds: 600 };
+/** How old the flag may get before a background refresh. */
 const CACHE_MS = 10_000;
+/** After a failed read, wait this long before trying again. */
+const RETRY_AFTER_FAILURE_MS = 30_000;
 const READ_TIMEOUT_MS = 1_500;
 
 const DEFAULT_MESSAGE =
@@ -25,8 +28,11 @@ const DEFAULT_MESSAGE =
 export const MAINTENANCE_BYPASS_COOKIE = "cencori-maintenance-bypass";
 export const MAINTENANCE_BYPASS_PATH = "/__maintenance/bypass";
 
-let cached: { state: MaintenanceState; at: number } | null = null;
+/** The last known flag, and when the next refresh is due. */
+let cached: { state: MaintenanceState; refreshAt: number } | null = null;
 let inflight: Promise<MaintenanceState> | null = null;
+/** Failed reads in a row, so a slow database logs once, not every 10s. */
+let failures = 0;
 
 async function readState(): Promise<MaintenanceState> {
   const { createAdminClient } = await import("@/lib/supabaseAdmin");
@@ -50,24 +56,34 @@ export async function getMaintenanceState(): Promise<MaintenanceState> {
   if (override === "on") return { ...OFF, enabled: true };
   if (override === "off") return OFF;
 
-  if (cached && Date.now() - cached.at < CACHE_MS) return cached.state;
+  if (cached && Date.now() < cached.refreshAt) return cached.state;
+
   inflight ??= readState()
     .then((state) => {
-      cached = { state, at: Date.now() };
+      if (failures > 0) {
+        console.info(`[Maintenance] platform_maintenance readable again after ${failures} failed read(s)`);
+      }
+      failures = 0;
+      cached = { state, refreshAt: Date.now() + CACHE_MS };
       return state;
     })
     .catch((error) => {
       // Fail open, keeping the last known state: an unreadable flag must not
       // take the site down, nor end a window that is already on.
-      console.error("[Maintenance] Could not read platform_maintenance", error);
+      failures += 1;
+      if (failures === 1) console.error("[Maintenance] Could not read platform_maintenance", error);
       const state = cached?.state ?? OFF;
-      cached = { state, at: Date.now() };
+      cached = { state, refreshAt: Date.now() + RETRY_AFTER_FAILURE_MS };
       return state;
     })
     .finally(() => {
       inflight = null;
     });
-  return inflight;
+
+  // Once the flag is known, no request waits on the database for it: this
+  // one gets the last value and the refresh lands for the requests after.
+  // Only a fresh instance, with nothing cached yet, waits (up to the timeout).
+  return cached ? cached.state : inflight;
 }
 
 function tokenMatches(candidate: string | null | undefined): boolean {
