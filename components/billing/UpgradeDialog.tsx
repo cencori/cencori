@@ -381,6 +381,7 @@ export function UpgradeDialog({
   reason,
 }: UpgradeDialogProps) {
   const { resolvedTheme } = useTheme();
+  const { currency: displayCurrency } = useDisplayCurrency();
   const availablePlans = useMemo(
     () => getAvailableUpgradePlans(currentTier),
     [currentTier],
@@ -730,6 +731,14 @@ export function UpgradeDialog({
             reason={reason}
           />
           {!changingPlan && checkoutMode === "review" && summary}
+          {!changingPlan && displayCurrency === "NGN" && (
+            <NairaCheckout
+              orgId={orgId}
+              tier={checkoutTier}
+              interval={checkoutInterval}
+              disabled={paymentSubmitting || availablePlans.length === 0}
+            />
+          )}
           {changingPlan ? (
             <CardOnFilePanel
               card={planChange?.card ?? null}
@@ -1077,9 +1086,14 @@ function OrderTotals({
 }) {
   const prorated = dueToday !== dueNow;
   const price = usePlanPrice(tier);
+  // Cards are charged in US dollars, so the card total is shown in dollars
+  // even when prices are shown in naira. Naira checkout charges naira.
+  const inNaira = price.currency === "NGN";
   const total =
     dueToday === null ? (
       <Skeleton className="inline-block h-5 w-14 align-middle" />
+    ) : inNaira ? (
+      formatCents(dueToday)
     ) : (
       price.format(dueToday)
     );
@@ -1095,16 +1109,116 @@ function OrderTotals({
           <span className="block font-medium">Total due today</span>
           <span className="mt-0.5 block text-xs text-muted-foreground">
             {prorated
-              ? `Prorated for the rest of your current billing period, then ${price.format(dueNow)} per ${interval}`
+              ? `Prorated for the rest of your current billing period, then ${inNaira ? formatCents(dueNow) : price.format(dueNow)} per ${interval}`
               : "Taxes, if applicable, are calculated during payment"}
-            {price.currency === "NGN" && dueToday !== null && (
-              <> · Charged as {formatCents(dueToday)} in US dollars; your bank converts it</>
+            {inNaira && dueToday !== null && (
+              <> · Card payments are charged in US dollars. Your bank sets the naira amount and may add fees.</>
             )}
           </span>
         </dt>
         <dd className="text-lg font-semibold tabular-nums">{total}</dd>
       </div>
     </dl>
+  );
+}
+
+type NairaCheckoutResponse = { url?: string; checkoutId?: string; error?: string };
+
+/**
+ * Pay the plan's naira price on Bachs (card or bank transfer), shown when
+ * prices are in naira. Prepaid: a month or a year, renewed from Billing.
+ */
+function NairaCheckout({
+  disabled,
+  interval,
+  orgId,
+  tier,
+}: {
+  disabled: boolean;
+  interval: PlanBillingInterval;
+  orgId: string;
+  tier: PaidPlanTier;
+}) {
+  const [opening, setOpening] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const priceNgn = CENCORI_PAID_PLANS[tier].ngnPrices?.[interval];
+  if (!priceNgn) return null;
+
+  const label = formatCurrency(priceNgn, "NGN", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
+
+  const openCheckout = async () => {
+    if (opening) return;
+    setOpening(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/billing/checkout/naira", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orgId, interval }),
+      });
+      const data: NairaCheckoutResponse = await response.json().catch(() => ({}));
+      if (!response.ok || !data.url) {
+        throw new Error(data.error || "Couldn't open naira checkout. Try again.");
+      }
+      if (data.checkoutId) {
+        try {
+          sessionStorage.setItem(`cencori:checkout:${data.checkoutId}`, tier);
+        } catch {
+          // Storage can be unavailable; the billing page still refreshes.
+        }
+      }
+      window.location.assign(data.url);
+    } catch (checkoutError) {
+      setError(
+        checkoutError instanceof Error
+          ? checkoutError.message
+          : "Couldn't open naira checkout. Try again.",
+      );
+      setOpening(false);
+    }
+  };
+
+  return (
+    <section
+      aria-label="Pay in naira"
+      className="mx-5 mt-8 space-y-3 rounded-lg border border-border/60 p-4 sm:mx-8 lg:mx-10"
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h3 className="text-xs font-medium">Pay {label} in naira</h3>
+          <p className="mt-1 text-[11px] leading-4 text-muted-foreground">
+            Card or bank transfer, charged exactly {label}. Covers one {interval};
+            renew from Billing.
+          </p>
+        </div>
+        <Button
+          type="button"
+          size="sm"
+          className="h-7 shrink-0 text-xs"
+          onClick={openCheckout}
+          disabled={disabled || opening}
+        >
+          {opening ? (
+            <>
+              <Spinner className="size-3.5 animate-spin" aria-hidden="true" />
+              Opening
+            </>
+          ) : (
+            <>
+              Pay in naira
+              <ArrowRight className="size-3.5" aria-hidden="true" />
+            </>
+          )}
+        </Button>
+      </div>
+      {error && <CheckoutError message={error} />}
+      <p className="border-t border-border/40 pt-3 text-[11px] text-muted-foreground">
+        Or pay by card in US dollars below.
+      </p>
+    </section>
   );
 }
 

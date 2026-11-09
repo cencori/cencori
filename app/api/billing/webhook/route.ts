@@ -25,6 +25,12 @@ import { bachsPaymentRow, recordPaymentSafely } from '@/lib/billing/payments-led
 import { getBachsTopupVerificationFailure, verifyBachsNgnTopupCharge } from '@/lib/billing/verify-paid-topups';
 import { CARD_TOPUP_FEE_PERCENT, CREDIT_NGN_PER_USD, ngnTopupCredits } from '@/lib/billing/credit-pricing';
 import {
+  NAIRA_PLAN_PASS_PURCHASE_TYPE,
+  canBuyNairaPass,
+  nairaPassPeriod,
+  verifyNairaPassCharge,
+} from '@/lib/billing/naira-plan-pass';
+import {
   buildOrganizationSubscriptionUpdate,
   type SubscriptionLifecycleEventType,
 } from '@/lib/billing/subscription-reconciliation';
@@ -87,6 +93,82 @@ async function handleNgnCreditsTopup(
   }
 }
 
+/**
+ * Pro paid in naira. Only the charge fetched back from Bachs grants it, and
+ * one charge grants it once. See lib/billing/naira-plan-pass.ts.
+ */
+async function handleNairaPlanPass(
+  data: BachsCollectionData,
+  supabase: ReturnType<typeof createAdminClient>
+) {
+  const orgId = data.metadata?.org_id;
+  if (!orgId) throw new Error('Bachs naira Pro has no organization ID');
+  if (!data.charge_id) throw new Error('Bachs naira Pro has no charge ID');
+
+  const { data: applied, error: appliedError } = await supabase
+    .from('webhook_events')
+    .select('id')
+    .eq('charge_id', data.charge_id)
+    .eq('event_type', 'collection.succeeded')
+    .limit(1)
+    .maybeSingle();
+  if (appliedError) throw appliedError;
+  if (applied) return;
+
+  const charge = await getCharge(data.charge_id);
+  const verified = verifyNairaPassCharge({
+    charge,
+    chargeId: data.charge_id,
+    organizationId: orgId,
+    metadata: data.metadata,
+  });
+  if (!verified.ok) {
+    console.error('[Bachs Webhook] Naira Pro charge failed verification', {
+      charge_id: data.charge_id,
+      reason: verified.reason,
+      status: charge?.status ?? null,
+      currency: charge?.currency ?? null,
+      amount: charge?.amount ?? null,
+    });
+    throw new Error(`Bachs naira Pro charge did not verify: ${verified.reason}`);
+  }
+
+  const { data: organization, error: orgError } = await supabase
+    .from('organizations')
+    .select('id, subscription_tier, subscription_status, subscription_current_period_end, billing_provider')
+    .eq('id', orgId)
+    .maybeSingle();
+  if (orgError) throw orgError;
+  if (!organization) throw new Error(`Bachs naira Pro: organization ${orgId} not found`);
+
+  if (!canBuyNairaPass(organization)) {
+    // Paid, but the org already pays for its plan by card (the checkout
+    // route refuses this, so it means a race). Don't overwrite the Stripe
+    // subscription; the payment is in the ledger for a refund.
+    console.error('[Bachs Webhook] Naira Pro paid by an org that cannot take it; refund needed', {
+      charge_id: data.charge_id,
+      org_id: orgId,
+      tier: organization.subscription_tier,
+      billing_provider: organization.billing_provider,
+    });
+    return;
+  }
+
+  const period = nairaPassPeriod(organization, verified.interval);
+  const { error } = await supabase
+    .from('organizations')
+    .update({
+      billing_provider: 'bachs',
+      subscription_tier: verified.tier,
+      subscription_status: 'active',
+      subscription_current_period_start: period.start,
+      subscription_current_period_end: period.end,
+      bachs_customer_id: data.customer.id,
+    })
+    .eq('id', orgId);
+  if (error) throw new Error(`Could not apply naira Pro: ${error.message}`);
+}
+
 async function handleCollectionSucceeded(
   data: BachsCollectionData,
   supabase: ReturnType<typeof createAdminClient>
@@ -94,6 +176,12 @@ async function handleCollectionSucceeded(
   // Naira top-up of any amount: a product-less checkout, so no cart.
   if (data.metadata?.purchase_type === 'credits_topup_ngn') {
     await handleNgnCreditsTopup(data, supabase);
+    return;
+  }
+
+  // Pro paid in naira (a prepaid month or year): product-less too.
+  if (data.metadata?.purchase_type === NAIRA_PLAN_PASS_PURCHASE_TYPE) {
+    await handleNairaPlanPass(data, supabase);
     return;
   }
 

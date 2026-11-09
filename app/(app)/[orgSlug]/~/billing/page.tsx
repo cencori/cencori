@@ -31,6 +31,7 @@ interface Organization {
     subscription_status: string;
     monthly_requests_used: number;
     subscription_current_period_end: string | null;
+    billing_provider: string | null;
     credits_balance: number;
     billing_email: string;
     billing_address_line1: string | null;
@@ -69,7 +70,7 @@ function useBillingData(orgSlug: string) {
         queryFn: async () => {
             const { data, error } = await supabase
                 .from('organizations')
-                .select('id, name, subscription_tier, subscription_status, monthly_requests_used, subscription_current_period_end, credits_balance, billing_email, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip, billing_country, billing_tax_id')
+                .select('id, name, subscription_tier, subscription_status, monthly_requests_used, subscription_current_period_end, billing_provider, credits_balance, billing_email, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip, billing_country, billing_tax_id')
                 .eq('slug', orgSlug)
                 .single();
 
@@ -147,6 +148,8 @@ export default function BillingPage({ params }: PageProps) {
     const searchParams = useSearchParams();
     const [checkoutNotice, setCheckoutNotice] = useState<CheckoutNotice>(null);
     const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
+    const [renewing, setRenewing] = useState(false);
+    const [renewError, setRenewError] = useState<string | null>(null);
     const { org, projects, transactions, invoices, paymentMethods, isLoading, error, refetchOrg } = useBillingData(orgSlug);
     const businessPlan = useBusinessPlan(org?.id);
     const checkoutId = searchParams.get('checkout_session_id') || searchParams.get('checkout_id');
@@ -188,6 +191,31 @@ export default function BillingPage({ params }: PageProps) {
             sessionStorage.removeItem(`cencori:checkout:${checkoutId}`);
         }
     }, [checkoutConfirmed, checkoutId]);
+
+    // Pro paid in naira is prepaid: renew it here (another month, added to
+    // the end of the current one).
+    const nairaPro = org?.subscription_tier === 'pro' && org.billing_provider === 'bachs';
+    const renewNairaPro = async () => {
+        if (!org || renewing) return;
+        setRenewing(true);
+        setRenewError(null);
+        try {
+            const response = await fetch('/api/billing/checkout/naira', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ orgId: org.id, interval: 'month' }),
+            });
+            const data = await response.json().catch(() => ({})) as { url?: string; checkoutId?: string; error?: string };
+            if (!response.ok || !data.url) throw new Error(data.error || "Couldn't open checkout. Try again.");
+            if (data.checkoutId) {
+                try { sessionStorage.setItem(`cencori:checkout:${data.checkoutId}`, 'pro'); } catch { /* storage unavailable */ }
+            }
+            window.location.assign(data.url);
+        } catch (renewError) {
+            setRenewError(renewError instanceof Error ? renewError.message : "Couldn't open checkout. Try again.");
+            setRenewing(false);
+        }
+    };
 
     // Mapping for project budget format
     const formattedProjects = projects.map(p => ({
@@ -298,6 +326,11 @@ export default function BillingPage({ params }: PageProps) {
             ) : (
             <div>
                 <div data-copilot-spot="plan">
+                    {renewError && (
+                        <div role="alert" className="mb-3 rounded-md border border-red-500/25 bg-red-500/[0.06] px-3 py-2.5 text-xs text-red-500">
+                            {renewError}
+                        </div>
+                    )}
                     <PlanDetails
                         tier={org.subscription_tier}
                         status={org.subscription_status}
@@ -307,8 +340,8 @@ export default function BillingPage({ params }: PageProps) {
                         projectCount={projects.length}
                         projectLimit={org.subscription_tier === 'free' ? 1 : 999999}
                         creditBalance={org.credits_balance || 0}
-                        actionLabel={org.subscription_tier === 'free' ? 'Upgrade Plan' : 'Current Plan'}
-                        onAction={org.subscription_tier === 'free' ? () => setShowUpgradeDialog(true) : undefined}
+                        actionLabel={org.subscription_tier === 'free' ? 'Upgrade Plan' : nairaPro ? (renewing ? 'Opening…' : 'Renew in naira') : 'Current Plan'}
+                        onAction={org.subscription_tier === 'free' ? () => setShowUpgradeDialog(true) : nairaPro ? () => void renewNairaPro() : undefined}
                     />
                 </div>
 
