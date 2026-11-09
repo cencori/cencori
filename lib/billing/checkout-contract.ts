@@ -21,7 +21,15 @@ export function parseCheckoutSelection(input: {
   return { tier: input.tier, interval: input.interval };
 }
 
-export function getStripeCheckoutReturnUrl(baseUrl: string, orgSlug: string) {
+/**
+ * Where a hosted Bachs checkout returns to: the org's billing page, which
+ * reads checkout_id to show "activating" until the webhook has given the plan.
+ */
+export function getCheckoutReturnUrls(baseUrl: string, orgSlug: string, reference: string) {
   const billingUrl = new URL(`/${orgSlug}/~/billing`, baseUrl);
-  return `${billingUrl.toString()}?checkout_session_id={CHECKOUT_SESSION_ID}`;
+  const success = new URL(billingUrl);
+  success.searchParams.set("checkout_id", reference);
+  const cancel = new URL(billingUrl);
+  cancel.searchParams.set("checkout", "cancelled");
+  return { successUrl: success.toString(), cancelUrl: cancel.toString() };
 }

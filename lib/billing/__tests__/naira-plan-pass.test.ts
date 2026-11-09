@@ -112,6 +112,10 @@ describe('canBuyNairaPass', () => {
         expect(canBuyNairaPass({ subscription_tier: 'pro', billing_provider: 'bachs' })).toBe(true);
     });
 
+    it('blocks orgs with a card subscription on Bachs', () => {
+        expect(canBuyNairaPass({ subscription_tier: 'pro', billing_provider: 'bachs', subscription_id: 'sub_1' })).toBe(false);
+    });
+
     it('blocks orgs paying for Pro through Stripe, and Team or Enterprise', () => {
         expect(canBuyNairaPass({ subscription_tier: 'pro', billing_provider: 'stripe' })).toBe(false);
         expect(canBuyNairaPass({ subscription_tier: 'team', billing_provider: 'bachs' })).toBe(false);

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import {
-  getStripeCheckoutReturnUrl,
+  getCheckoutReturnUrls,
   parseCheckoutSelection,
 } from "@/lib/billing/checkout-contract";
 import {
@@ -20,9 +20,10 @@ describe("Cencori checkout contract", () => {
   });
 
   test("returns customers to the organization billing route", () => {
-    expect(getStripeCheckoutReturnUrl("https://console.cencori.com", "arcie")).toBe(
-      "https://console.cencori.com/arcie/~/billing?checkout_session_id={CHECKOUT_SESSION_ID}",
-    );
+    expect(getCheckoutReturnUrls("https://console.cencori.com", "arcie", "pro_abc")).toEqual({
+      successUrl: "https://console.cencori.com/arcie/~/billing?checkout_id=pro_abc",
+      cancelUrl: "https://console.cencori.com/arcie/~/billing?checkout=cancelled",
+    });
   });
 
   test("keeps the public plan promise in the checkout source of truth", () => {

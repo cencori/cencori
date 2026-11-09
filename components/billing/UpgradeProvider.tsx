@@ -61,9 +61,8 @@ export function UpgradeProvider({ org, children }: { org: UpgradeOrg | null | un
     const openUpgrade = useCallback((value?: unknown) => {
         if (!canUpgrade) return;
         setReason(isUpgradeReason(value) ? value : undefined);
-        // Stay mounted from now on: closing keeps the Stripe session and card
-        // form, so opening again is instant. It loads afresh only on a page
-        // load (or an org switch, which starts a new checkout).
+        // Stay mounted from now on, so opening again is instant and the
+        // Bachs checkout script is already loaded.
         setPreload(true);
         setOpen(true);
     }, [canUpgrade]);

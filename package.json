@@ -82,8 +82,6 @@
     "@sendbyte/node": "^0.2.1",
     "@shikijs/transformers": "^4.2.0",
     "@solar-icons/react": "2.3.2",
-    "@stripe/react-stripe-js": "^6.8.0",
-    "@stripe/stripe-js": "^9.10.0",
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.75.0",
     "@tanstack/react-query": "^5.90.12",

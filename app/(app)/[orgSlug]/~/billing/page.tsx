@@ -6,20 +6,22 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { supabase } from '@/lib/supabaseClient';
 import { useSearchParams } from 'next/navigation';
-import { getInvoices, getPaymentMethods } from './actions';
+import { getInvoices } from './actions';
 import { CreditCard, Info } from 'lucide-react';
 import { motion, AnimatePresence } from "framer-motion";
 import Link from 'next/link';
 import { UpgradeDialog } from "@/components/billing/UpgradeDialog";
 import { CurrencyToggle } from "@/components/dashboard/CurrencyToggle";
 import { CENCORI_PAID_PLANS, isPaidPlanTier, type PaidPlanTier } from '@/lib/billing/plans';
+import { isNairaPassOrg } from '@/lib/billing/naira-plan-pass';
+import { forgetPendingCheckout, readPendingCheckout, startBachsCheckout } from '@/lib/billing/bachs-overlay';
 
 import { PlanDetails } from "@/components/dashboard/billing/PlanDetails";
 import { CostControl } from "@/components/dashboard/billing/CostControl";
 import { CreditBalance } from "@/components/dashboard/billing/CreditBalance";
 import { InvoiceHistory } from "@/components/dashboard/billing/InvoiceHistory";
 import { BillingCommunication } from "@/components/dashboard/billing/BillingCommunication";
-import { PaymentMethods } from "@/components/dashboard/billing/PaymentMethods";
+import { BillingPortal } from "@/components/dashboard/billing/BillingPortal";
 import { OperationalControls } from "./OperationalControls";
 import { BusinessPlan, useBusinessPlan } from "@/components/dashboard/billing/BusinessPlan";
 
@@ -32,6 +34,8 @@ interface Organization {
     monthly_requests_used: number;
     subscription_current_period_end: string | null;
     billing_provider: string | null;
+    subscription_id: string | null;
+    bachs_customer_id: string | null;
     credits_balance: number;
     billing_email: string;
     billing_address_line1: string | null;
@@ -70,7 +74,7 @@ function useBillingData(orgSlug: string) {
         queryFn: async () => {
             const { data, error } = await supabase
                 .from('organizations')
-                .select('id, name, subscription_tier, subscription_status, monthly_requests_used, subscription_current_period_end, billing_provider, credits_balance, billing_email, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip, billing_country, billing_tax_id')
+                .select('id, name, subscription_tier, subscription_status, monthly_requests_used, subscription_current_period_end, billing_provider, subscription_id, bachs_customer_id, credits_balance, billing_email, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip, billing_country, billing_tax_id')
                 .eq('slug', orgSlug)
                 .single();
 
@@ -115,31 +119,23 @@ function useBillingData(orgSlug: string) {
         queryFn: () => getInvoices(orgSlug)
     });
 
-    const paymentMethodsQuery = useQuery({
-        queryKey: ["orgPaymentMethods", orgSlug],
-        queryFn: () => getPaymentMethods(orgSlug)
-    });
-
     return {
         org: orgQuery.data,
         projects: projectsQuery.data || [],
         transactions: creditsQuery.data || [],
         invoices: invoicesQuery.data || [],
-        paymentMethods: paymentMethodsQuery.data || [],
         isLoading: orgQuery.isLoading
             || projectsQuery.isLoading
-            || invoicesQuery.isLoading
-            || paymentMethodsQuery.isLoading,
+            || invoicesQuery.isLoading,
         refetchOrg: orgQuery.refetch,
         error: orgQuery.error
             || projectsQuery.error
             || invoicesQuery.error
-            || paymentMethodsQuery.error
     };
 }
 
 type CheckoutNotice =
-    | { kind: 'confirming'; expectedTier: PaidPlanTier | null }
+    | { kind: 'confirming'; expectedTier: PaidPlanTier | null; previousPeriodEnd: string | null }
     | { kind: 'cancelled' }
     | null;
 
@@ -150,27 +146,33 @@ export default function BillingPage({ params }: PageProps) {
     const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
     const [renewing, setRenewing] = useState(false);
     const [renewError, setRenewError] = useState<string | null>(null);
-    const { org, projects, transactions, invoices, paymentMethods, isLoading, error, refetchOrg } = useBillingData(orgSlug);
+    const [openingPortal, setOpeningPortal] = useState(false);
+    const { org, projects, transactions, invoices, isLoading, error, refetchOrg } = useBillingData(orgSlug);
     const businessPlan = useBusinessPlan(org?.id);
     const checkoutId = searchParams.get('checkout_session_id') || searchParams.get('checkout_id');
     const checkoutCancelled = searchParams.get('checkout') === 'cancelled';
+    // Confirmed once the webhook has applied the payment: the plan is on, and
+    // for a renewal the paid period has moved past where it was before paying.
     const checkoutConfirmed = checkoutNotice?.kind === 'confirming'
         && checkoutNotice.expectedTier !== null
         && org?.subscription_tier === checkoutNotice.expectedTier
-        && org.subscription_status === 'active';
+        && org.subscription_status === 'active'
+        && (checkoutNotice.previousPeriodEnd === null
+            || org.subscription_current_period_end !== checkoutNotice.previousPeriodEnd);
 
     useEffect(() => {
         if (checkoutId) {
-            const storedTier = sessionStorage.getItem(`cencori:stripe-checkout:${checkoutId}`)
-                || sessionStorage.getItem(`cencori:checkout:${checkoutId}`);
+            const pending = readPendingCheckout(checkoutId);
             setCheckoutNotice({
                 kind: 'confirming',
-                expectedTier: isPaidPlanTier(storedTier) ? storedTier : null,
+                expectedTier: isPaidPlanTier(pending?.tier) ? pending.tier : null,
+                previousPeriodEnd: pending?.previousPeriodEnd ?? null,
             });
 
+            // Card payments land in seconds; bank transfers can take a minute.
             void refetchOrg();
-            const refreshTimer = window.setInterval(() => void refetchOrg(), 2_000);
-            const stopTimer = window.setTimeout(() => window.clearInterval(refreshTimer), 10_000);
+            const refreshTimer = window.setInterval(() => void refetchOrg(), 3_000);
+            const stopTimer = window.setTimeout(() => window.clearInterval(refreshTimer), 90_000);
             window.history.replaceState({}, '', window.location.pathname);
 
             return () => {
@@ -186,36 +188,64 @@ export default function BillingPage({ params }: PageProps) {
     }, [checkoutCancelled, checkoutId, refetchOrg]);
 
     useEffect(() => {
-        if (checkoutConfirmed && checkoutId) {
-            sessionStorage.removeItem(`cencori:stripe-checkout:${checkoutId}`);
-            sessionStorage.removeItem(`cencori:checkout:${checkoutId}`);
-        }
+        if (checkoutConfirmed && checkoutId) forgetPendingCheckout(checkoutId);
     }, [checkoutConfirmed, checkoutId]);
 
+    const paidTier = org?.subscription_tier === 'pro' || org?.subscription_tier === 'team';
     // Pro paid in naira is prepaid: renew it here (another month, added to
     // the end of the current one).
-    const nairaPro = org?.subscription_tier === 'pro' && org.billing_provider === 'bachs';
+    const nairaPro = isNairaPassOrg(org);
+    // A Pro subscription by card on Bachs: managed in the Bachs portal.
+    const cardSubscription = paidTier && org?.billing_provider === 'bachs' && Boolean(org.subscription_id);
+    // Still on the retired Stripe billing: subscribing on Bachs moves it.
+    const legacyStripe = paidTier && org?.billing_provider === 'stripe';
+    const canSubscribe = org?.subscription_tier === 'free' || legacyStripe;
+
     const renewNairaPro = async () => {
         if (!org || renewing) return;
         setRenewing(true);
         setRenewError(null);
         try {
-            const response = await fetch('/api/billing/checkout/naira', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ orgId: org.id, interval: 'month' }),
+            const done = await startBachsCheckout({
+                endpoint: '/api/billing/checkout/naira',
+                body: { orgId: org.id, interval: 'month' },
+                tier: 'pro',
+                orgSlug,
+                previousPeriodEnd: org.subscription_current_period_end,
             });
-            const data = await response.json().catch(() => ({})) as { url?: string; checkoutId?: string; error?: string };
-            if (!response.ok || !data.url) throw new Error(data.error || "Couldn't open checkout. Try again.");
-            if (data.checkoutId) {
-                try { sessionStorage.setItem(`cencori:checkout:${data.checkoutId}`, 'pro'); } catch { /* storage unavailable */ }
-            }
-            window.location.assign(data.url);
+            if (!done) setRenewing(false);
         } catch (renewError) {
             setRenewError(renewError instanceof Error ? renewError.message : "Couldn't open checkout. Try again.");
             setRenewing(false);
         }
     };
+
+    const openBillingPortal = async () => {
+        if (!org || openingPortal) return;
+        setOpeningPortal(true);
+        setRenewError(null);
+        try {
+            const response = await fetch('/api/billing/portal', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ orgId: org.id }),
+            });
+            const data = await response.json().catch(() => ({})) as { url?: string; error?: string };
+            if (!response.ok || !data.url) throw new Error(data.error || "Couldn't open the billing portal. Try again.");
+            window.location.assign(data.url);
+        } catch (portalError) {
+            setRenewError(portalError instanceof Error ? portalError.message : "Couldn't open the billing portal. Try again.");
+            setOpeningPortal(false);
+        }
+    };
+
+    const planAction = canSubscribe
+        ? { label: legacyStripe ? 'Renew Pro' : 'Upgrade Plan', onAction: () => setShowUpgradeDialog(true) }
+        : nairaPro
+            ? { label: renewing ? 'Opening…' : 'Renew in naira', onAction: () => void renewNairaPro() }
+            : cardSubscription
+                ? { label: openingPortal ? 'Opening…' : 'Manage subscription', onAction: () => void openBillingPortal() }
+                : { label: 'Current Plan', onAction: undefined };
 
     // Mapping for project budget format
     const formattedProjects = projects.map(p => ({
@@ -326,6 +356,15 @@ export default function BillingPage({ params }: PageProps) {
             ) : (
             <div>
                 <div data-copilot-spot="plan">
+                    {legacyStripe && (
+                        <div className="mb-3 rounded-md border border-border/60 bg-muted/30 px-3 py-2.5 text-xs leading-5 text-muted-foreground">
+                            We&apos;ve moved billing to a new payment provider, and your old card subscription won&apos;t renew.
+                            {org.subscription_current_period_end
+                                ? <> Pro stays on until {new Date(org.subscription_current_period_end).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })}.</>
+                                : null}{' '}
+                            Renew Pro here to keep it after that.
+                        </div>
+                    )}
                     {renewError && (
                         <div role="alert" className="mb-3 rounded-md border border-red-500/25 bg-red-500/[0.06] px-3 py-2.5 text-xs text-red-500">
                             {renewError}
@@ -340,8 +379,8 @@ export default function BillingPage({ params }: PageProps) {
                         projectCount={projects.length}
                         projectLimit={org.subscription_tier === 'free' ? 1 : 999999}
                         creditBalance={org.credits_balance || 0}
-                        actionLabel={org.subscription_tier === 'free' ? 'Upgrade Plan' : nairaPro ? (renewing ? 'Opening…' : 'Renew in naira') : 'Current Plan'}
-                        onAction={org.subscription_tier === 'free' ? () => setShowUpgradeDialog(true) : nairaPro ? () => void renewNairaPro() : undefined}
+                        actionLabel={planAction.label}
+                        onAction={planAction.onAction}
                     />
                 </div>
 
@@ -354,18 +393,10 @@ export default function BillingPage({ params }: PageProps) {
                 </div>
 
                 <div data-copilot-spot="payment_methods">
-                    <PaymentMethods
-                        orgSlug={orgSlug}
-                        methods={paymentMethods}
-                        billingAddress={{
-                            name: org.name,
-                            line1: org.billing_address_line1 || '',
-                            line2: org.billing_address_line2 || '',
-                            city: org.billing_city || '',
-                            state: org.billing_state || '',
-                            zip: org.billing_zip || '',
-                            country: org.billing_country || '',
-                        }}
+                    <BillingPortal
+                        hasAccount={Boolean(org.bachs_customer_id)}
+                        opening={openingPortal}
+                        onOpen={() => void openBillingPortal()}
                     />
                 </div>
 
@@ -398,7 +429,7 @@ export default function BillingPage({ params }: PageProps) {
                     orgId={org.id}
                     orgSlug={orgSlug}
                     orgName={org.name}
-                    currentTier={org.subscription_tier === 'pro' || org.subscription_tier === 'team' ? org.subscription_tier : 'free'}
+                    currentTier={canSubscribe ? 'free' : paidTier ? org.subscription_tier as PaidPlanTier : 'free'}
                 />
 
                 <div className="flex flex-col gap-4 border-t border-border/30 py-8 sm:flex-row sm:items-center sm:justify-between">

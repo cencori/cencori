@@ -29,9 +29,37 @@ export type BachsProductType =
 export type SubscriptionTier = 'pro' | 'team';
 export type BillingInterval = 'month' | 'year';
 
-export interface BachsCustomerInput {
+/** A new customer by email and name, or an existing one by id (required for recurring products). */
+export type BachsCustomerInput =
+  | { email: string; name: string }
+  | { customer_id: string };
+
+export interface BachsBillingAddress {
+  line1: string;
+  line2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postal_code?: string | null;
+  /** ISO 3166-1 alpha-2. */
+  country: string;
+}
+
+export interface BachsCustomerRecord {
+  customer_id: string;
   email: string;
+  name?: string | null;
+  metadata?: Record<string, string> | null;
+  billing_address?: BachsBillingAddress | null;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface BachsProduct {
+  id: string;
   name: string;
+  status?: string;
+  price: { currency: string; price_type: string; amount: string | null } | null;
+  billing_cycle: { interval: 'day' | 'week' | 'month' | 'year'; frequency: number } | null;
 }
 
 export interface BachsProductCartItem {
@@ -59,6 +87,8 @@ export interface CreateCheckoutSessionInput {
   expires_in_minutes?: number;
   /** The currency the customer pays in, e.g. NGN. */
   billing_currency?: string;
+  /** Keep the card for later charges (subscriptions save it regardless). */
+  save_payment_method?: boolean;
 }
 
 export interface BachsCheckoutSession {
@@ -145,6 +175,24 @@ export interface BachsSubscriptionData {
   metadata: Record<string, string>;
 }
 
+/** invoice.created / invoice.paid / invoice.payment_failed: one subscription period's bill. */
+export interface BachsInvoiceData {
+  invoice_id: string;
+  subscription: { subscription_id: string } | null;
+  customer: { customer_id: string; email?: string; name?: string };
+  charge: string | null;
+  status: 'draft' | 'open' | 'paid' | 'uncollectible' | 'void';
+  currency: string;
+  total: string;
+  amount_paid: string;
+  period_start: string | null;
+  period_end: string | null;
+  attempt_count?: number;
+  next_payment_attempt?: string | null;
+  created_at: string;
+  metadata: Record<string, string> | null;
+}
+
 type BachsWebhookEnvelope = {
   id: string;
   created_at: string;
@@ -166,6 +214,10 @@ export type BachsWebhookEvent = BachsWebhookEnvelope & (
         | 'customer.subscription.updated'
         | 'customer.subscription.deleted';
       data: BachsSubscriptionData;
+    }
+  | {
+      type: 'invoice.created' | 'invoice.paid' | 'invoice.payment_failed';
+      data: BachsInvoiceData;
     }
 );
 
@@ -241,6 +293,53 @@ export async function createCheckoutSession(
 
 export async function getCharge(chargeId: string): Promise<BachsCharge> {
   return bachsFetch<BachsCharge>(`/payments/charges/${chargeId}`);
+}
+
+export async function createCustomer(input: {
+  email: string;
+  name?: string;
+  metadata?: Record<string, string>;
+  billing_address?: BachsBillingAddress;
+}): Promise<BachsCustomerRecord> {
+  return bachsFetch<BachsCustomerRecord>('/customers', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+/**
+ * Only the fields sent change, except billing_address, which replaces the
+ * whole address (null clears it; leave it out to keep it).
+ */
+export async function updateCustomer(
+  customerId: string,
+  input: {
+    email?: string;
+    name?: string;
+    metadata?: Record<string, string>;
+    billing_address?: BachsBillingAddress | null;
+  },
+): Promise<BachsCustomerRecord> {
+  return bachsFetch<BachsCustomerRecord>(`/customers/${encodeURIComponent(customerId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
+}
+
+/**
+ * A link to the Bachs customer portal, where the customer manages their
+ * subscription, cards and invoices. What they can do there, and where it
+ * returns to, are portal settings in the Bachs dashboard.
+ */
+export async function createPortalSession(customerId: string): Promise<{ id: string; url: string }> {
+  return bachsFetch<{ id: string; url: string }>(
+    `/customers/${encodeURIComponent(customerId)}/portal-sessions`,
+    { method: 'POST' },
+  );
+}
+
+export async function getProduct(productId: string): Promise<BachsProduct> {
+  return bachsFetch<BachsProduct>(`/products/${encodeURIComponent(productId)}`);
 }
 
 export async function listPayins(params?: {

@@ -339,7 +339,7 @@ export default function AuditLogPage({ params }: PageProps) {
             if (result.data && hasFeature(result.data.subscription_tier, "auditLogs")) {
                 completed = true;
                 window.clearInterval(refreshTimer);
-                sessionStorage.removeItem(`cencori:stripe-checkout:${checkoutId}`);
+                sessionStorage.removeItem(`cencori:checkout:${checkoutId}`);
 
                 const currentUrl = new URL(window.location.href);
                 currentUrl.searchParams.delete("checkout_session_id");

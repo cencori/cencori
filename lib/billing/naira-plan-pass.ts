@@ -101,6 +101,7 @@ export type NairaPassOrg = {
   subscription_status?: string | null;
   subscription_current_period_end?: string | null;
   billing_provider?: string | null;
+  subscription_id?: string | null;
 };
 
 function addInterval(from: Date, interval: PlanBillingInterval): Date {
@@ -124,8 +125,7 @@ export function nairaPassPeriod(
     ? new Date(org.subscription_current_period_end)
     : null;
   const extending =
-    org?.billing_provider === "bachs" &&
-    org.subscription_tier === "pro" &&
+    isNairaPassOrg(org) &&
     currentEnd !== null &&
     !Number.isNaN(currentEnd.getTime()) &&
     currentEnd.getTime() > now.getTime();
@@ -133,13 +133,18 @@ export function nairaPassPeriod(
   return { start: now.toISOString(), end: addInterval(from, interval).toISOString() };
 }
 
+/** Naira Pro: Pro on Bachs as a prepaid pass, which has no subscription id. */
+export function isNairaPassOrg(org: NairaPassOrg | null | undefined): boolean {
+  return org?.subscription_tier === "pro" && org.billing_provider === "bachs" && !org.subscription_id;
+}
+
 /**
  * Whether this org can buy a naira pass: a Free org upgrading, or an org
- * already on a naira (Bachs) Pro renewing. An org paying Stripe for Pro
- * can't, or it would pay twice for the same plan.
+ * already on naira Pro renewing. An org with a card subscription can't, or
+ * it would pay twice for the same plan.
  */
 export function canBuyNairaPass(org: NairaPassOrg | null | undefined): boolean {
   const tier = org?.subscription_tier ?? "free";
   if (tier === "free") return true;
-  return tier === "pro" && org?.billing_provider === "bachs";
+  return isNairaPassOrg(org);
 }

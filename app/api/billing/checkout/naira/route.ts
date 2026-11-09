@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
   const admin = createAdminClient();
   const { data: organization, error: orgError } = await admin
     .from("organizations")
-    .select("id, slug, name, owner_id, billing_email, subscription_tier, subscription_status, subscription_current_period_end, billing_provider, account_type")
+    .select("id, slug, name, owner_id, billing_email, subscription_tier, subscription_status, subscription_current_period_end, subscription_id, billing_provider, account_type")
     .eq("id", orgId)
     .maybeSingle();
   if (orgError || !organization) return fail("Organization not found", 404);
@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
     return fail("Business organizations are billed on business plans", 409);
   }
   if (!canBuyNairaPass(organization)) {
-    return fail("This organization already pays for its plan by card. Manage it from Billing.", 409);
+    return fail("This organization already has a Pro subscription by card. Manage it from Billing.", 409);
   }
 
   // The billing page reads checkout_id to show "activating" and poll until

@@ -13,9 +13,11 @@ import {
   netCreditsAfterFee,
   computePeriodEnd,
   type BachsCollectionData,
+  type BachsInvoiceData,
   type BachsSubscriptionData,
   type BachsWebhookEvent,
 } from '@/lib/bachsClient';
+import { verifySubscriptionCharge } from '@/lib/billing/bachs-plans';
 import {
   applyVerifiedTensorPayment,
   majorAmountToMinor,
@@ -135,16 +137,16 @@ async function handleNairaPlanPass(
 
   const { data: organization, error: orgError } = await supabase
     .from('organizations')
-    .select('id, subscription_tier, subscription_status, subscription_current_period_end, billing_provider')
+    .select('id, account_type, subscription_tier, subscription_status, subscription_current_period_end, subscription_id, billing_provider')
     .eq('id', orgId)
     .maybeSingle();
   if (orgError) throw orgError;
   if (!organization) throw new Error(`Bachs naira Pro: organization ${orgId} not found`);
 
-  if (!canBuyNairaPass(organization)) {
-    // Paid, but the org already pays for its plan by card (the checkout
-    // route refuses this, so it means a race). Don't overwrite the Stripe
-    // subscription; the payment is in the ledger for a refund.
+  if (organization.account_type === 'business' || !canBuyNairaPass(organization)) {
+    // Paid, but the org is a business org or already has a card
+    // subscription (the checkout route refuses both, so it means a race).
+    // Don't overwrite its plan; the payment is in the ledger for a refund.
     console.error('[Bachs Webhook] Naira Pro paid by an org that cannot take it; refund needed', {
       charge_id: data.charge_id,
       org_id: orgId,
@@ -163,7 +165,10 @@ async function handleNairaPlanPass(
       subscription_status: 'active',
       subscription_current_period_start: period.start,
       subscription_current_period_end: period.end,
-      bachs_customer_id: data.customer.id,
+      // A prepaid pass, not a subscription: no subscription id. That's how
+      // naira Pro is told apart from a card subscription on Bachs.
+      subscription_id: null,
+      ...(data.customer?.id ? { bachs_customer_id: data.customer.id } : {}),
     })
     .eq('id', orgId);
   if (error) throw new Error(`Could not apply naira Pro: ${error.message}`);
@@ -218,17 +223,41 @@ async function handleCollectionSucceeded(
       }
 
       const tier = getSubscriptionTierFromProductId(productId);
-      if (!tier) {
+      const interval = getBillingInterval(productId);
+      if (tier !== 'pro' || !interval) {
         console.warn('[Bachs Webhook] Unknown subscription product', productId);
         return;
       }
+      if (!data.charge_id) throw new Error('Bachs subscription payment has no charge ID');
 
-      const interval = getBillingInterval(productId);
+      // Only the charge fetched back from Bachs grants the plan, and one
+      // charge grants it once.
+      const { data: applied, error: appliedError } = await supabase
+        .from('webhook_events')
+        .select('id')
+        .eq('charge_id', data.charge_id)
+        .eq('event_type', 'collection.succeeded')
+        .limit(1)
+        .maybeSingle();
+      if (appliedError) throw appliedError;
+      if (applied) return;
+
+      const charge = await getCharge(data.charge_id);
+      const verified = verifySubscriptionCharge({ charge, chargeId: data.charge_id, tier, interval });
+      if (!verified.ok) {
+        console.error('[Bachs Webhook] Subscription charge failed verification', {
+          charge_id: data.charge_id,
+          reason: verified.reason,
+          status: charge?.status ?? null,
+          currency: charge?.currency ?? null,
+          amount: charge?.amount ?? null,
+        });
+        throw new Error(`Bachs subscription charge did not verify: ${verified.reason}`);
+      }
+
+      // The subscription's own dates arrive with customer.subscription.*
+      // and invoice.paid; until then, one interval from now.
       const now = new Date();
-      const periodEnd = interval
-        ? computePeriodEnd(interval, now)
-        : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-
       const { error } = await supabase
         .from('organizations')
         .update({
@@ -236,14 +265,12 @@ async function handleCollectionSucceeded(
           subscription_tier: tier,
           subscription_status: 'active',
           subscription_current_period_start: now.toISOString(),
-          subscription_current_period_end: periodEnd.toISOString(),
-          bachs_customer_id: data.customer.id,
+          subscription_current_period_end: computePeriodEnd(interval, now).toISOString(),
+          ...(data.customer?.id ? { bachs_customer_id: data.customer.id } : {}),
         })
         .eq('id', orgId);
 
-      if (error) {
-        console.error('[Bachs Webhook] Failed to update org subscription', error);
-      }
+      if (error) throw new Error(`Could not apply the subscription: ${error.message}`);
       break;
     }
 
@@ -447,101 +474,144 @@ async function recordCollectionPayment(
   }
 }
 
-async function handleCollectionFailed(
-  data: BachsCollectionData,
-  supabase: ReturnType<typeof createAdminClient>
-) {
-  const customerId = data.customer.id;
-  if (!customerId) return;
-
-  const { data: org } = await supabase
-    .from('organizations')
-    .select('id, billing_provider')
-    .eq('bachs_customer_id', customerId)
-    .maybeSingle();
-
-  if (org && org.billing_provider !== 'stripe') {
-    await supabase
-      .from('organizations')
-      .update({ subscription_status: 'past_due' })
-      .eq('id', org.id);
-  }
+async function handleCollectionFailed(data: BachsCollectionData) {
+  // A failed one-off charge (a declined top-up, an abandoned checkout) says
+  // nothing about the plan, so it never marks the org past due. Failed
+  // renewals arrive as invoice.payment_failed.
+  console.warn('[Bachs Webhook] Collection failed', {
+    charge_id: data.charge_id,
+    customer_id: data.customer?.id ?? null,
+    purchase_type: data.metadata?.purchase_type ?? null,
+    reason: data.reason ?? null,
+  });
 }
 
-async function resolveSubscriptionOrganizationId(
-  data: BachsSubscriptionData,
-  supabase: ReturnType<typeof createAdminClient>
-): Promise<string | null> {
-  if (data.metadata?.org_id) return data.metadata.org_id;
+type AdminClient = ReturnType<typeof createAdminClient>;
 
-  const { data: subscriptionOrg } = await supabase
-    .from('organizations')
-    .select('id')
-    .eq('subscription_id', data.subscription_id)
-    .maybeSingle();
-  if (subscriptionOrg?.id) return subscriptionOrg.id;
+type SubscriptionOrg = {
+  id: string;
+  subscription_id: string | null;
+  billing_provider: string | null;
+};
 
-  const { data: customerOrg } = await supabase
-    .from('organizations')
-    .select('id')
-    .eq('bachs_customer_id', data.customer.customer_id)
-    .maybeSingle();
-
-  return customerOrg?.id || null;
+async function findSubscriptionOrg(
+  supabase: AdminClient,
+  ids: { orgId?: string | null; subscriptionId?: string | null; customerId?: string | null },
+): Promise<SubscriptionOrg | null> {
+  const columns = 'id, subscription_id, billing_provider';
+  const lookups: Array<[string, string | null | undefined]> = [
+    ['subscription_id', ids.subscriptionId],
+    ['id', ids.orgId],
+    ['bachs_customer_id', ids.customerId],
+  ];
+  for (const [column, value] of lookups) {
+    if (!value) continue;
+    const { data, error } = await supabase
+      .from('organizations')
+      .select(columns)
+      .eq(column, value)
+      .limit(1)
+      .maybeSingle();
+    if (error) throw error;
+    if (data) return data as SubscriptionOrg;
+  }
+  return null;
 }
 
 async function handleSubscriptionLifecycle(
   data: BachsSubscriptionData,
   eventType: SubscriptionLifecycleEventType,
-  supabase: ReturnType<typeof createAdminClient>
+  supabase: AdminClient
 ) {
-  const productType = getProductTypeFromId(data.product_id);
+  // Standalone Scan is retired: its product ids resolve to null and are ignored.
+  if (getProductTypeFromId(data.product_id) !== 'subscription') return;
 
-  if (productType === 'subscription') {
-    const orgId = await resolveSubscriptionOrganizationId(data, supabase);
-    if (!orgId) {
-      console.warn('[Bachs Webhook] Could not resolve org for subscription event', {
-        subscriptionId: data.subscription_id,
-        eventType,
-      });
-      return;
-    }
+  const org = await findSubscriptionOrg(supabase, {
+    subscriptionId: data.subscription_id,
+    orgId: data.metadata?.org_id,
+    customerId: data.customer?.customer_id,
+  });
+  if (!org) {
+    // Thrown so Bachs retries: the org may be found once its customer id is saved.
+    throw new Error(`Bachs ${eventType}: no organization for subscription ${data.subscription_id}`);
+  }
 
-    const tier = getSubscriptionTierFromProductId(data.product_id);
-    const update = buildOrganizationSubscriptionUpdate(data, eventType, tier);
-    if (!update) {
-      console.warn('[Bachs Webhook] Unknown subscription product', data.product_id);
-      return;
-    }
-
-    const { data: organization } = await supabase
-      .from('organizations')
-      .select('billing_provider')
-      .eq('id', orgId)
-      .maybeSingle();
-
-    if (organization?.billing_provider === 'stripe') {
-      console.warn('[Bachs Webhook] Ignoring legacy subscription event for Stripe organization', {
-        orgId,
-        subscriptionId: data.subscription_id,
-        eventType,
-      });
-      return;
-    }
-
-    const { error } = await supabase
-      .from('organizations')
-      .update(update)
-      .eq('id', orgId);
-
-    if (error) {
-      console.error('[Bachs Webhook] Failed to reconcile subscription', error);
-    }
+  // An update or cancellation of a subscription the org has since replaced
+  // must not touch the current one (e.g. the old one ending after a re-subscribe).
+  if (
+    eventType !== 'customer.subscription.created'
+    && org.billing_provider === 'bachs'
+    && org.subscription_id
+    && org.subscription_id !== data.subscription_id
+  ) {
+    console.warn('[Bachs Webhook] Ignoring event for a replaced subscription', {
+      orgId: org.id,
+      current: org.subscription_id,
+      event: data.subscription_id,
+      eventType,
+    });
     return;
   }
 
-  // Standalone Scan is deprecated and removed. Legacy scan product IDs now
-  // resolve to null via getProductTypeFromId and fall through (ignored).
+  const tier = getSubscriptionTierFromProductId(data.product_id);
+  const update = buildOrganizationSubscriptionUpdate(data, eventType, tier);
+  if (!update) {
+    console.warn('[Bachs Webhook] Unknown subscription product', data.product_id);
+    return;
+  }
+
+  const { error } = await supabase.from('organizations').update(update).eq('id', org.id);
+  if (error) throw new Error(`Could not reconcile the subscription: ${error.message}`);
+}
+
+/**
+ * Renewals: Bachs bills each new period as an invoice. invoice.paid moves the
+ * paid period forward and records the payment; invoice.payment_failed marks
+ * the org past due (plan-state then gives 7 days of grace from the end of
+ * the last paid period).
+ */
+async function handleSubscriptionInvoice(
+  data: BachsInvoiceData,
+  eventType: 'invoice.paid' | 'invoice.payment_failed',
+  supabase: AdminClient
+) {
+  const subscriptionId = data.subscription?.subscription_id;
+  if (!subscriptionId) return; // Not a subscription invoice.
+
+  const org = await findSubscriptionOrg(supabase, { subscriptionId });
+  if (!org) {
+    // The first invoice can arrive before customer.subscription.created has
+    // saved the subscription id; Bachs retries.
+    throw new Error(`Bachs ${eventType}: no organization for subscription ${subscriptionId}`);
+  }
+
+  if (eventType === 'invoice.payment_failed') {
+    const { error } = await supabase
+      .from('organizations')
+      .update({ subscription_status: 'past_due' })
+      .eq('id', org.id);
+    if (error) throw new Error(`Could not mark the subscription past due: ${error.message}`);
+    return;
+  }
+
+  const update: Record<string, string> = { subscription_status: 'active' };
+  if (data.period_start) update.subscription_current_period_start = data.period_start;
+  if (data.period_end) update.subscription_current_period_end = data.period_end;
+  const { error } = await supabase.from('organizations').update(update).eq('id', org.id);
+  if (error) throw new Error(`Could not apply the renewal: ${error.message}`);
+
+  if (data.charge) {
+    try {
+      const row = bachsPaymentRow(await getCharge(data.charge));
+      if (row) {
+        row.organization_id = row.organization_id ?? org.id;
+        if (row.product_type === 'other') row.product_type = 'subscription';
+      }
+      await recordPaymentSafely(supabase, row, 'Bachs invoice.paid');
+    } catch (recordError) {
+      console.error('[Bachs Webhook] Could not record renewal payment', { charge: data.charge, recordError });
+    }
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -578,7 +648,7 @@ export async function POST(req: NextRequest) {
         await recordCollectionPayment(event.data, supabase);
         break;
       case 'collection.failed':
-        await handleCollectionFailed(event.data, supabase);
+        await handleCollectionFailed(event.data);
         break;
       case 'collection.abandoned':
       case 'collection.underpaid':
@@ -587,6 +657,12 @@ export async function POST(req: NextRequest) {
       case 'customer.subscription.updated':
       case 'customer.subscription.deleted':
         await handleSubscriptionLifecycle(event.data, event.type, supabase);
+        break;
+      case 'invoice.paid':
+      case 'invoice.payment_failed':
+        await handleSubscriptionInvoice(event.data, event.type, supabase);
+        break;
+      case 'invoice.created':
         break;
     }
 

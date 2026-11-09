@@ -6,17 +6,7 @@ import { createAdminClient } from "@/lib/supabaseAdmin";
 import { adjustCredits } from "@/lib/credits";
 import { revalidatePath } from "next/cache";
 import { listBachsTopups, toInvoiceSummary } from "@/lib/billing/bachs-invoices";
-import { getStripeBillingClient } from "@/lib/stripe-billing";
-import {
-    upsertStripeCustomerProfile,
-    syncStripeCustomerTaxId,
-    type BillingProfileAddress,
-} from "@/lib/billing/stripe-customer-profile";
-import {
-    getBillingTaxIdOptions,
-    isBillingTaxIdType,
-    type BillingTaxIdType,
-} from "@/lib/billing/tax-id-types";
+import { updateCustomer } from "@/lib/bachsClient";
 
 type OrgBillingDetails = {
     id: string;
@@ -32,7 +22,6 @@ type OrgBillingDetails = {
     billing_country: string | null;
     billing_tax_id: string | null;
     bachs_customer_id: string | null;
-    stripe_customer_id: string | null;
     billing_provider: 'stripe' | 'bachs' | 'polar' | null;
     subscription_id: string | null;
     subscription_tier: 'free' | 'pro' | 'team' | 'enterprise';
@@ -56,15 +45,6 @@ export type BillingInvoice = {
     amount: number;
     status: 'paid' | 'pending' | 'failed' | 'refunded';
     pdfUrl: string | null;
-};
-
-export type BillingPaymentMethod = {
-    id: string;
-    brand: string;
-    last4: string;
-    expMonth: number;
-    expYear: number;
-    isDefault: boolean;
 };
 
 export type BillingAuditEvent = {
@@ -95,7 +75,7 @@ async function getAuthorizedOrgBillingDetails(orgSlug: string): Promise<{ org: O
 
     const { data: org, error: orgError } = await supabase
         .from('organizations')
-        .select('id, slug, name, owner_id, billing_email, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip, billing_country, billing_tax_id, bachs_customer_id, stripe_customer_id, billing_provider, subscription_id, subscription_tier')
+        .select('id, slug, name, owner_id, billing_email, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip, billing_country, billing_tax_id, bachs_customer_id, billing_provider, subscription_id, subscription_tier')
         .eq('slug', orgSlug)
         .maybeSingle();
 
@@ -139,7 +119,7 @@ async function getAuthorizedOrgOperatorContext(orgSlug: string): Promise<Operato
 
     const { data: org, error: orgError } = await supabase
         .from('organizations')
-        .select('id, slug, name, owner_id, billing_email, bachs_customer_id, stripe_customer_id, billing_provider, subscription_id, subscription_tier, billing_frozen, billing_freeze_reason, billing_frozen_at')
+        .select('id, slug, name, owner_id, billing_email, bachs_customer_id, billing_provider, subscription_id, subscription_tier, billing_frozen, billing_freeze_reason, billing_frozen_at')
         .eq('slug', orgSlug)
         .maybeSingle();
 
@@ -216,94 +196,20 @@ export async function getInvoices(orgSlug: string) {
     }
     const { org } = orgResult;
 
-    const [stripeInvoices, bachsInvoices] = await Promise.all([
-        getStripeInvoices(org.stripe_customer_id),
-        listBachsTopups(createAdminClient(), org.id)
-            .then((topups) => topups.map((topup): BillingInvoice => toInvoiceSummary(org.slug, topup)))
-            .catch((error) => {
-                console.error("Error fetching Bachs invoices:", error);
-                return [];
-            }),
-    ]);
-
-    return [...stripeInvoices, ...bachsInvoices].sort((a, b) => b.date.localeCompare(a.date));
-}
-
-async function getStripeInvoices(customerId: string | null): Promise<BillingInvoice[]> {
-    if (!customerId) return [];
     try {
-        const stripe = getStripeBillingClient();
-        const invoices = await stripe.invoices.list({
-            customer: customerId,
-            limit: 20,
-        });
-
-        return invoices.data.map((invoice): BillingInvoice => {
-            const status: BillingInvoice['status'] = invoice.status === 'paid'
-                ? 'paid'
-                : invoice.status === 'open' || invoice.status === 'draft'
-                    ? 'pending'
-                    : invoice.status === 'void'
-                        ? 'refunded'
-                        : 'failed';
-
-            return {
-                id: invoice.number || invoice.id,
-                orderId: invoice.id,
-                date: new Date(invoice.created * 1000).toISOString(),
-                amount: (invoice.amount_paid || invoice.amount_due) / 100,
-                status,
-                pdfUrl: invoice.invoice_pdf || invoice.hosted_invoice_url || null,
-            };
-        });
-    } catch (stripeError) {
-        console.error("Error fetching Stripe invoices:", stripeError);
-        return [];
-    }
-}
-
-export async function getPaymentMethods(
-    orgSlug: string
-): Promise<BillingPaymentMethod[]> {
-    try {
-        const orgResult = await getAuthorizedOrgBillingDetails(orgSlug);
-        if ('error' in orgResult || !orgResult.org.stripe_customer_id) {
-            return [];
-        }
-
-        const stripe = getStripeBillingClient();
-        const customerId = orgResult.org.stripe_customer_id;
-        const [customer, methods] = await Promise.all([
-            stripe.customers.retrieve(customerId),
-            stripe.paymentMethods.list({ customer: customerId, type: 'card' }),
-        ]);
-        const defaultPaymentMethod = !customer.deleted
-            ? customer.invoice_settings.default_payment_method
-            : null;
-        const defaultPaymentMethodId = typeof defaultPaymentMethod === 'string'
-            ? defaultPaymentMethod
-            : defaultPaymentMethod?.id || null;
-
-        return methods.data.flatMap((method): BillingPaymentMethod[] => {
-            if (!method.card) return [];
-            return [{
-                id: method.id,
-                brand: method.card.brand,
-                last4: method.card.last4,
-                expMonth: method.card.exp_month,
-                expYear: method.card.exp_year,
-                isDefault: method.id === defaultPaymentMethodId,
-            }];
-        });
+        const topups = await listBachsTopups(createAdminClient(), org.id);
+        return topups
+            .map((topup): BillingInvoice => toInvoiceSummary(org.slug, topup))
+            .sort((a, b) => b.date.localeCompare(a.date));
     } catch (error) {
-        console.error("Error fetching Stripe payment methods:", error);
+        console.error("Error fetching Bachs invoices:", error);
         return [];
     }
 }
 
-export type BillingAddressProfileUpdate = {
+type BillingProfileAddress = {
     line1: string;
-    line2?: string | null;
+    line2: string;
     city: string;
     state: string;
     postalCode: string;
@@ -319,7 +225,7 @@ function toNullableText(value: unknown): string | null {
     return normalized.length > 0 ? normalized : null;
 }
 
-function toBillingProfileAddress(input: BillingAddressProfileUpdate): BillingProfileAddress {
+function toBillingProfileAddress(input: BillingProfileAddress): BillingProfileAddress {
     return {
         line1: normalizeText(input.line1),
         line2: normalizeText(input.line2),
@@ -328,44 +234,6 @@ function toBillingProfileAddress(input: BillingAddressProfileUpdate): BillingPro
         postalCode: normalizeText(input.postalCode),
         country: normalizeText(input.country).toUpperCase(),
     };
-}
-
-async function persistStripeCustomerId(organizationId: string, customerId: string): Promise<string | null> {
-    const admin = createAdminClient();
-    const { error } = await admin
-        .from('organizations')
-        .update({ stripe_customer_id: customerId })
-        .eq('id', organizationId);
-
-    if (error) {
-        console.error('[Billing Actions] Failed to persist Stripe customer ID:', error);
-        return 'Stripe was updated, but its customer reference could not be saved locally.';
-    }
-
-    return null;
-}
-
-export async function getBillingTaxIdType(orgSlug: string): Promise<BillingTaxIdType | null> {
-    const orgResult = await getAuthorizedOrgBillingDetails(orgSlug);
-    if ('error' in orgResult || !orgResult.org.stripe_customer_id || !orgResult.org.billing_tax_id) {
-        return null;
-    }
-
-    try {
-        const stripe = getStripeBillingClient();
-        const taxIds = await stripe.customers.listTaxIds(orgResult.org.stripe_customer_id, { limit: 100 });
-        const normalizedValue = orgResult.org.billing_tax_id.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-        const matchingTaxId = taxIds.data.find((item) => (
-            item.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase() === normalizedValue
-        ));
-
-        return matchingTaxId && isBillingTaxIdType(matchingTaxId.type)
-            ? matchingTaxId.type
-            : null;
-    } catch (error) {
-        console.error('[Billing Actions] Failed to read Stripe tax ID type:', error);
-        return null;
-    }
 }
 
 export async function updateBillingDetails(orgSlug: string, formData: FormData) {
@@ -385,27 +253,11 @@ export async function updateBillingDetails(orgSlug: string, formData: FormData) 
         postalCode: normalizeText(formData.get('zip')),
         country: normalizeText(formData.get('country')),
     });
+    // Kept in Cencori and printed on invoices; Bachs has no tax ID field.
     const taxId = normalizeText(formData.get('taxId'));
-    const requestedTaxType = normalizeText(formData.get('taxType'));
 
     if (!name || !email) {
         return { error: 'Organization name and billing email are required.' };
-    }
-
-    const taxTypeOptions = getBillingTaxIdOptions(address.country);
-    const requestedTypeIsValid = requestedTaxType
-        && isBillingTaxIdType(requestedTaxType)
-        && taxTypeOptions.some((option) => option.value === requestedTaxType);
-    const taxType = taxId
-        ? requestedTypeIsValid
-            ? requestedTaxType as BillingTaxIdType
-            : taxTypeOptions.length === 1
-                ? taxTypeOptions[0].value
-                : null
-        : null;
-
-    if (taxId && taxTypeOptions.length > 0 && !taxType) {
-        return { error: 'Select the tax ID type before saving.' };
     }
 
     const { error } = await supabase
@@ -428,97 +280,31 @@ export async function updateBillingDetails(orgSlug: string, formData: FormData) 
         return { error: error.message };
     }
 
-    const warnings: string[] = [];
-    try {
-        const customer = await upsertStripeCustomerProfile({
-            customerId: orgResult.org.stripe_customer_id,
-            organizationId: orgResult.org.id,
-            organizationSlug: orgResult.org.slug,
-            name,
-            email,
-            address,
-            clearEmptyAddress: true,
-            validateTaxLocation: true,
-        });
-
-        if (!orgResult.org.stripe_customer_id) {
-            const persistenceWarning = await persistStripeCustomerId(orgResult.org.id, customer.id);
-            if (persistenceWarning) warnings.push(persistenceWarning);
-        }
-
-        if (!taxId || taxType) {
-            await syncStripeCustomerTaxId({
-                customer,
-                previousTaxId: orgResult.org.billing_tax_id,
-                taxId: taxId || null,
-                taxType,
-            });
-        } else {
-            warnings.push('The billing profile was saved, but Stripe does not support a tax ID type for the selected country.');
-        }
-    } catch (stripeError) {
-        console.error('[Billing Actions] Stripe billing profile sync failed:', stripeError);
-        warnings.push('Billing details were saved locally, but Stripe could not be updated.');
-    }
-
-    revalidatePath(`/${orgSlug}/~/billing`);
-    return {
-        success: true,
-        warning: warnings.length > 0 ? warnings.join(' ') : undefined,
-    };
-}
-
-export async function updateBillingAddressFromPaymentMethod(
-    orgSlug: string,
-    input: BillingAddressProfileUpdate,
-) {
-    const orgResult = await getAuthorizedOrgBillingDetails(orgSlug);
-    if ('error' in orgResult) {
-        return { error: orgResult.error };
-    }
-
-    const address = toBillingProfileAddress(input);
-    if (!address.country || !/^[A-Z]{2}$/.test(address.country)) {
-        return { error: 'A valid billing country is required.' };
-    }
-
-    const supabase = await createServerClient();
-    const { error } = await supabase
-        .from('organizations')
-        .update({
-            billing_address_line1: toNullableText(address.line1),
-            billing_address_line2: toNullableText(address.line2),
-            billing_city: toNullableText(address.city),
-            billing_state: toNullableText(address.state),
-            billing_zip: toNullableText(address.postalCode),
-            billing_country: address.country,
-        })
-        .eq('id', orgResult.org.id);
-
-    if (error) {
-        console.error('[Billing Actions] Failed to update the billing address:', error);
-        return { error: error.message };
-    }
-
+    // Keep the Bachs customer (receipts, the billing portal) in step. Bachs
+    // replaces the whole address and needs line 1 and the country, so an
+    // incomplete address clears it there.
     let warning: string | undefined;
-    try {
-        const customer = await upsertStripeCustomerProfile({
-            customerId: orgResult.org.stripe_customer_id,
-            organizationId: orgResult.org.id,
-            organizationSlug: orgResult.org.slug,
-            name: orgResult.org.name,
-            email: orgResult.org.billing_email || '',
-            address,
-            preserveEmptyEmail: true,
-            validateTaxLocation: true,
-        });
-
-        if (!orgResult.org.stripe_customer_id) {
-            warning = await persistStripeCustomerId(orgResult.org.id, customer.id) || undefined;
+    if (orgResult.org.bachs_customer_id) {
+        try {
+            const country = address.country;
+            await updateCustomer(orgResult.org.bachs_customer_id, {
+                name,
+                email,
+                billing_address: address.line1 && /^[A-Z]{2}$/.test(country)
+                    ? {
+                        line1: address.line1,
+                        line2: toNullableText(address.line2),
+                        city: toNullableText(address.city),
+                        state: toNullableText(address.state),
+                        postal_code: toNullableText(address.postalCode),
+                        country,
+                    }
+                    : null,
+            });
+        } catch (bachsError) {
+            console.error('[Billing Actions] Bachs customer sync failed:', bachsError);
+            warning = 'Billing details were saved, but receipts may show the old details until the next update.';
         }
-    } catch (stripeError) {
-        console.error('[Billing Actions] Stripe address sync failed:', stripeError);
-        warning = 'The invoice address was saved locally, but Stripe could not be updated.';
     }
 
     revalidatePath(`/${orgSlug}/~/billing`);

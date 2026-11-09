@@ -145,7 +145,7 @@ export default function TeamsPage({ params }: PageProps) {
             if (result.data?.subscription_tier && result.data.subscription_tier !== "free") {
                 completed = true;
                 window.clearInterval(refreshTimer);
-                sessionStorage.removeItem(`cencori:stripe-checkout:${checkoutId}`);
+                sessionStorage.removeItem(`cencori:checkout:${checkoutId}`);
                 window.history.replaceState({}, "", window.location.pathname);
                 toast.success("Team collaboration unlocked");
             }

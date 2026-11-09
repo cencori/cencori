@@ -1,12 +1,9 @@
 "use client";
 
 import React from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 
-import {
-    getBillingTaxIdType,
-    updateBillingDetails,
-} from "@/app/(app)/[orgSlug]/~/billing/actions";
+import { updateBillingDetails } from "@/app/(app)/[orgSlug]/~/billing/actions";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -18,12 +15,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/toast";
-import {
-    getBillingTaxIdOptions,
-    type BillingTaxIdType,
-} from "@/lib/billing/tax-id-types";
-
-import { BillingChoiceSelect } from "./BillingChoiceSelect";
 import { CountrySelector } from "./CountrySelector";
 
 interface BillingEditDialogProps {
@@ -53,20 +44,9 @@ export function BillingEditDialog({
     orgSlug,
 }: BillingEditDialogProps) {
     const [country, setCountry] = React.useState(initialData.country || "");
-    const [taxType, setTaxType] = React.useState<BillingTaxIdType>();
     const [isPending, startTransition] = React.useTransition();
     const titleRef = React.useRef<HTMLHeadingElement>(null);
     const queryClient = useQueryClient();
-    const taxTypeOptions = React.useMemo(
-        () => getBillingTaxIdOptions(country),
-        [country],
-    );
-    const { data: savedTaxType } = useQuery({
-        queryKey: ["orgBillingTaxIdType", orgSlug],
-        queryFn: () => getBillingTaxIdType(orgSlug),
-        enabled: open && Boolean(initialData.taxId),
-        staleTime: 60_000,
-    });
 
     React.useEffect(() => {
         if (open) {
@@ -74,27 +54,6 @@ export function BillingEditDialog({
         }
     }, [initialData.country, open]);
 
-    React.useEffect(() => {
-        if (!open) return;
-
-        if (savedTaxType && taxTypeOptions.some((option) => option.value === savedTaxType)) {
-            setTaxType(savedTaxType);
-            return;
-        }
-
-        setTaxType(taxTypeOptions.length === 1 ? taxTypeOptions[0].value : undefined);
-    }, [open, savedTaxType, taxTypeOptions]);
-
-    const handleCountryChange = (nextCountry: string) => {
-        const nextOptions = getBillingTaxIdOptions(nextCountry);
-        setCountry(nextCountry);
-        setTaxType((current) => {
-            if (current && nextOptions.some((option) => option.value === current)) {
-                return current;
-            }
-            return nextOptions.length === 1 ? nextOptions[0].value : undefined;
-        });
-    };
 
     const handleOpenChange = (nextOpen: boolean) => {
         if (!nextOpen && isPending) return;
@@ -138,8 +97,6 @@ export function BillingEditDialog({
             );
 
             void queryClient.invalidateQueries({ queryKey: ["orgBilling", orgSlug] });
-            void queryClient.invalidateQueries({ queryKey: ["orgPortalUrl", orgSlug] });
-            void queryClient.invalidateQueries({ queryKey: ["orgBillingTaxIdType", orgSlug] });
 
             toast.success("Billing details updated");
             if (result.warning) {
@@ -261,7 +218,7 @@ export function BillingEditDialog({
                                     <Label className={labelClassName}>
                                         Country
                                     </Label>
-                                    <CountrySelector value={country} onValueChange={handleCountryChange} />
+                                    <CountrySelector value={country} onValueChange={setCountry} />
                                     <input type="hidden" name="country" value={country} />
                                 </div>
                                 <div className="space-y-1.5">
@@ -317,31 +274,13 @@ export function BillingEditDialog({
                                 <Label htmlFor="billing-tax-id" className={labelClassName}>
                                     Tax ID
                                 </Label>
-                                <div className={taxTypeOptions.length > 0 ? "grid gap-2 sm:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]" : undefined}>
-                                    {taxTypeOptions.length > 0 && (
-                                        <BillingChoiceSelect
-                                            value={taxType}
-                                            options={taxTypeOptions}
-                                            onValueChange={setTaxType}
-                                            ariaLabel="Tax ID type"
-                                            menuLabel="Tax ID type"
-                                            placeholder="Select tax ID type"
-                                        />
-                                    )}
-                                    <Input
-                                        id="billing-tax-id"
-                                        name="taxId"
-                                        defaultValue={initialData.taxId}
-                                        placeholder="Tax identifier"
-                                        className={inputClassName}
-                                    />
-                                </div>
-                                <input type="hidden" name="taxType" value={taxType || ""} />
-                                {country && taxTypeOptions.length === 0 && (
-                                    <p className="text-[10px] leading-4 text-muted-foreground">
-                                        This country does not currently have a supported Stripe tax ID type. The value will remain in your Cencori billing profile only.
-                                    </p>
-                                )}
+                                <Input
+                                    id="billing-tax-id"
+                                    name="taxId"
+                                    defaultValue={initialData.taxId}
+                                    placeholder="VAT, GST or TIN number"
+                                    className={inputClassName}
+                                />
                             </div>
                         </section>
                     </div>

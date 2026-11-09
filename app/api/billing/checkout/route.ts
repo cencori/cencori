@@ -1,209 +1,131 @@
+/**
+ * POST /api/billing/checkout  { orgId, tier, interval }
+ *
+ * Pro by card, as a Bachs subscription in US dollars. Returns the Bachs
+ * checkout URL, which the upgrade dialog opens in the Bachs overlay (or
+ * redirects to). The webhook gives Pro when Bachs reports the subscription;
+ * see app/api/billing/webhook/route.ts.
+ */
+
 import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { NextRequest, NextResponse } from "next/server";
-import { getStripeCheckoutReturnUrl, parseCheckoutSelection } from "@/lib/billing/checkout-contract";
+import { randomBytes } from "node:crypto";
+import { getCheckoutReturnUrls, parseCheckoutSelection } from "@/lib/billing/checkout-contract";
 import { resolveConsoleBaseUrl } from "@/lib/auth-redirect";
-import { getAvailableUpgradePlans } from "@/lib/billing/plans";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { createServerClient } from "@/lib/supabaseServer";
+import { resolvePublicOrigin } from "@/lib/public-origin";
+import { createCheckoutSession } from "@/lib/bachsClient";
 import {
-  getStripeBillingClient,
-  getStripePlanPriceId,
-} from "@/lib/stripe-billing";
-import { resolvePublicOrigin } from '@/lib/public-origin';
+  canStartCardSubscription,
+  ensureBachsCustomer,
+  getVerifiedPlanProductId,
+} from "@/lib/billing/bachs-plans";
 
-type CheckoutRequestBody = {
-  orgId?: unknown;
-  interval?: unknown;
-  tier?: unknown;
-};
-
-function getAppBaseUrl(req: NextRequest): string {
-  // Stripe return URLs land in the dashboard, which is console-only.
-  // Resolve the console origin so customers return to console.cencori.com
-  // (scoped URL seeds the active workspace via the console canonical redirect).
-  return resolveConsoleBaseUrl(resolvePublicOrigin(req));
-}
-
-function getIdempotencyKey(req: NextRequest, orgId: string): string | undefined {
-  const requestKey = req.headers.get("x-checkout-idempotency-key")?.trim();
-  if (!requestKey || !/^[a-zA-Z0-9_-]{16,100}$/.test(requestKey)) return undefined;
-  return `cencori-plan-${orgId}-${requestKey}`;
-}
+const fail = (error: string, status = 400) => NextResponse.json({ error }, { status });
 
 export async function POST(req: NextRequest) {
-  try {
-    const supabase = await createServerClient();
-    const {
-      data: { user },
-      error: userError,
-    } = await getAuthUser(supabase);
+  const supabase = await createServerClient();
+  const {
+    data: { user },
+    error: userError,
+  } = await getAuthUser(supabase);
+  if (userError || !user?.email) return fail("Unauthorized", 401);
 
-    if (userError || !user?.email) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  const body = (await req.json().catch(() => null)) as
+    | { orgId?: unknown; tier?: unknown; interval?: unknown }
+    | null;
+  const orgId = typeof body?.orgId === "string" ? body.orgId : null;
+  const selection = body ? parseCheckoutSelection(body) : null;
+  if (!orgId || !selection) return fail("Choose a valid organization, plan, and billing interval");
+  if (selection.tier !== "pro") return fail("Only Pro can be bought here. Contact sales for more.", 409);
 
-    let body: CheckoutRequestBody;
-    try {
-      body = (await req.json()) as CheckoutRequestBody;
-    } catch {
-      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
-    }
+  const admin = createAdminClient();
+  const { data: organization, error: orgError } = await admin
+    .from("organizations")
+    .select(
+      "id, slug, name, owner_id, billing_email, account_type, subscription_tier, subscription_status, subscription_id, subscription_current_period_end, billing_provider, bachs_customer_id",
+    )
+    .eq("id", orgId)
+    .maybeSingle();
+  if (orgError || !organization) return fail("Organization not found", 404);
 
-    const orgId = typeof body.orgId === "string" ? body.orgId : null;
-    const selection = parseCheckoutSelection(body);
-    if (!orgId || !selection) {
-      return NextResponse.json(
-        { error: "Choose a valid organization, plan, and billing interval" },
-        { status: 400 },
-      );
-    }
-
-    const admin = createAdminClient();
-    const { data: organization, error: orgError } = await admin
-      .from("organizations")
-      .select(
-        "id, slug, name, owner_id, billing_email, subscription_tier, subscription_status, subscription_id, billing_provider, stripe_customer_id",
-      )
-      .eq("id", orgId)
+  let canManageBilling = organization.owner_id === user.id;
+  if (!canManageBilling) {
+    const { data: membership, error: membershipError } = await admin
+      .from("organization_members")
+      .select("role")
+      .eq("organization_id", orgId)
+      .eq("user_id", user.id)
       .maybeSingle();
-
-    if (orgError || !organization) {
-      return NextResponse.json({ error: "Organization not found" }, { status: 404 });
+    if (membershipError) {
+      console.error("[Checkout] Billing permission lookup failed:", membershipError);
+      return fail("Could not verify billing permissions", 500);
     }
+    canManageBilling = membership?.role === "owner" || membership?.role === "admin";
+  }
+  if (!canManageBilling) return fail("Only organization owners and admins can change the plan", 403);
 
-    let canManageBilling = organization.owner_id === user.id;
-    if (!canManageBilling) {
-      const { data: membership, error: membershipError } = await admin
-        .from("organization_members")
-        .select("role")
-        .eq("organization_id", orgId)
-        .eq("user_id", user.id)
-        .maybeSingle();
+  if (organization.account_type === "business") {
+    return fail("Business organizations are billed on business plans", 409);
+  }
+  const eligible = canStartCardSubscription(organization);
+  if (!eligible.ok) {
+    return fail(
+      eligible.reason === "naira_period_running"
+        ? "This organization's naira Pro is still running. Renew it in naira from Billing, or subscribe by card after it ends."
+        : eligible.reason === "not_self_serve"
+          ? "This organization's plan is managed by Cencori. Contact support to change it."
+          : "This organization already has a Pro subscription. Manage it from Billing.",
+      409,
+    );
+  }
 
-      if (membershipError) {
-        console.error("[Stripe Checkout] Billing permission lookup failed:", membershipError);
-        return NextResponse.json(
-          { error: "Could not verify billing permissions" },
-          { status: 500 },
-        );
-      }
+  let productId: string;
+  try {
+    productId = await getVerifiedPlanProductId(selection.tier, selection.interval);
+  } catch (error) {
+    // Never open a checkout for a product that doesn't match the plan.
+    console.error("[Checkout] Plan product failed verification:", error);
+    return fail("Checkout is temporarily unavailable. Please try again later.", 503);
+  }
 
-      canManageBilling = membership?.role === "owner" || membership?.role === "admin";
-    }
+  try {
+    const customerId = await ensureBachsCustomer(admin, organization, {
+      email: user.email,
+      name: user.user_metadata?.full_name || user.email.split("@")[0],
+    });
 
-    if (!canManageBilling) {
-      return NextResponse.json(
-        { error: "Only organization owners and admins can change the plan" },
-        { status: 403 },
-      );
-    }
-
-    const currentTier =
-      organization.subscription_tier === "pro" || organization.subscription_tier === "team"
-        ? organization.subscription_tier
-        : "free";
-
-    if (!getAvailableUpgradePlans(currentTier).includes(selection.tier)) {
-      return NextResponse.json(
-        { error: "This plan is not a valid upgrade for the organization" },
-        { status: 409 },
-      );
-    }
-
-    if (currentTier !== "free") {
-      return NextResponse.json(
-        { error: "Plan changes for an active subscription must be managed from Billing" },
-        { status: 409 },
-      );
-    }
-
-    const stripe = getStripeBillingClient();
-    let stripeCustomerId = organization.stripe_customer_id as string | null;
-
-    if (!stripeCustomerId) {
-      const customer = await stripe.customers.create(
-        {
-          email: organization.billing_email || user.email,
-          name: user.user_metadata?.full_name || organization.name || user.email.split("@")[0],
-          metadata: {
-            org_id: organization.id,
-            org_slug: organization.slug,
-          },
-        },
-        { idempotencyKey: `cencori-org-${organization.id}-customer` },
-      );
-      stripeCustomerId = customer.id;
-
-      const { error: customerUpdateError } = await admin
-        .from("organizations")
-        .update({ stripe_customer_id: stripeCustomerId })
-        .eq("id", organization.id);
-
-      if (customerUpdateError) {
-        console.error("[Stripe Checkout] Failed to save Stripe customer:", customerUpdateError);
-        return NextResponse.json(
-          { error: "Could not prepare the billing profile" },
-          { status: 500 },
-        );
-      }
-    }
-
-    const metadata = {
-      org_id: organization.id,
-      org_slug: organization.slug,
-      tier: selection.tier,
-      interval: selection.interval,
-      purchase_type: "subscription",
-    };
-
-    const session = await stripe.checkout.sessions.create(
-      {
-        mode: "subscription",
-        ui_mode: "custom",
-        customer: stripeCustomerId,
-        billing_address_collection: "required",
-        customer_update: {
-          address: "auto",
-          name: "auto",
-        },
-        client_reference_id: organization.id,
-        line_items: [
-          {
-            price: getStripePlanPriceId(selection.tier, selection.interval),
-            quantity: 1,
-          },
-        ],
-        payment_method_types: ["card"],
-        return_url: getStripeCheckoutReturnUrl(
-          getAppBaseUrl(req),
-          organization.slug,
-        ),
-        metadata,
-        subscription_data: {
-          metadata,
-        },
-      },
-      {
-        idempotencyKey: getIdempotencyKey(req, organization.id),
-      },
+    const reference = `sub_${orgId.replace(/-/g, "").slice(0, 16)}_${selection.interval}_${randomBytes(6).toString("hex")}`;
+    const { successUrl, cancelUrl } = getCheckoutReturnUrls(
+      resolveConsoleBaseUrl(resolvePublicOrigin(req)),
+      organization.slug,
+      reference,
     );
 
-    if (!session.client_secret) {
-      throw new Error("Stripe did not return a Checkout Session client secret");
-    }
+    const session = await createCheckoutSession({
+      product_cart: [{ product_id: productId, quantity: 1 }],
+      customer: { customer_id: customerId },
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      reference,
+      // Copied onto the subscription by Bachs; the webhook also finds the
+      // org by customer id when it isn't.
+      metadata: {
+        org_id: organization.id,
+        org_slug: organization.slug,
+        tier: selection.tier,
+        interval: selection.interval,
+        purchase_type: "subscription",
+      },
+    });
 
     return NextResponse.json(
-      {
-        clientSecret: session.client_secret,
-        sessionId: session.id,
-      },
+      { url: session.checkout_url, checkoutId: reference },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {
-    console.error("[Stripe Checkout] Session creation failed:", error);
-    return NextResponse.json(
-      { error: "Checkout is temporarily unavailable. Please try again." },
-      { status: 502 },
-    );
+    console.error("[Checkout] Bachs checkout failed:", error);
+    return fail("Checkout is temporarily unavailable. Please try again.", 502);
   }
 }
