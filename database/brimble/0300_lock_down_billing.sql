@@ -16,8 +16,9 @@
 -- 4. Users could insert or update their own scan_subscriptions row (paid
 --    Scan tiers). Only Cencori's billing code writes it, as the service role.
 --
--- Idempotent: runs before every deploy, so functions added later are locked
--- too. Only GRANT/REVOKE here: unlike CREATE TRIGGER or DROP POLICY they
+-- brimble:every-deploy
+-- Idempotent: runs on every deploy, after the other files (see
+-- scripts/brimble-apply-sql.mjs), so functions added later are locked too. Only GRANT/REVOKE here: unlike CREATE TRIGGER or DROP POLICY they
 -- don't wait for open transactions on these hot tables (a long-open one
 -- blocked the trigger version of this file on 2026-11-01).
 

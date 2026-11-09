@@ -5,8 +5,9 @@
 -- any role that still had a grant. Better Auth connects as the owner, not
 -- through PostgREST, so it is unaffected.
 --
--- Sorted last on purpose: re-applied after every other file on each deploy,
--- so a schema restore can't silently re-open them.
+-- brimble:every-deploy
+-- Re-applied on every deploy (scripts/brimble-apply-sql.mjs otherwise runs a
+-- file only when it changes), so a schema restore can't silently re-open them.
 
 do $$
 declare
