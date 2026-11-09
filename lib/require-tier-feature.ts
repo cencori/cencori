@@ -56,21 +56,15 @@ export function featureGateResponse(
   feature: keyof TierFeatures,
   requiredTier: 'paid' | 'team' | 'enterprise' = 'paid',
 ): NextResponse {
-  const requirement = requiredTier === 'enterprise'
-    ? 'the Enterprise plan'
-    : requiredTier === 'team'
-      ? 'the Enterprise plan'
-      : 'a paid plan';
+  // 'team' is accepted for older callers; Team isn't sold, so it means Enterprise.
+  const enterprise = requiredTier === 'enterprise' || requiredTier === 'team';
+  const requirement = enterprise ? 'the Enterprise plan' : 'the Pro plan';
 
   return NextResponse.json(
     {
       error: `${FEATURE_NAMES[feature]} requires ${requirement}`,
       code: 'FEATURE_NOT_INCLUDED',
-      required_tier: requiredTier === 'enterprise'
-        ? 'enterprise'
-        : requiredTier === 'team'
-          ? 'team'
-          : 'pro',
+      required_tier: enterprise ? 'enterprise' : 'pro',
       upgrade_url: '/billing',
     },
     { status: 403 }

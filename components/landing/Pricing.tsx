@@ -44,9 +44,11 @@ const tiers: Array<{
         features: [
             "100+ AI models, pay as you go",
             "Bring your own provider keys",
-            "2 agents running at once",
+            "1 agent",
+            "5 knowledge bases",
             "1,000 memories per project",
             "1 project",
+            "Just you (no team members)",
             "Community support",
         ],
         cta: "Start building",
@@ -65,11 +67,11 @@ const tiers: Array<{
         },
         features: [
             "Everything in Free",
-            "10 agents running at once",
+            "10 agents, 10 running at once",
             "50,000 memories per project",
             "Unlimited projects",
             "PII masking, jailbreak detection & audit trails",
-            "Team seats",
+            "Invite your team",
             "Priority support",
         ],
         highlighted: true,
@@ -115,8 +117,12 @@ const matrixSections: Array<{
         description: "Build agents, and embed them in your own product.",
         rows: [
             {
+                feature: "Agents",
+                values: { free: "1", pro: "10", enterprise: "Custom" },
+            },
+            {
                 feature: "Agents running at once",
-                values: { free: "2", pro: "10", enterprise: "Custom" },
+                values: { free: "1", pro: "10", enterprise: "Custom" },
             },
             {
                 feature: "Skills",
@@ -124,11 +130,11 @@ const matrixSections: Array<{
             },
             {
                 feature: "Knowledge bases",
-                values: { free: "10", pro: "100", enterprise: "Custom" },
+                values: { free: "5", pro: "100", enterprise: "Custom" },
             },
             {
                 feature: "Customers (per project)",
-                values: { free: "10", pro: "100", enterprise: "Custom" },
+                values: { free: "5", pro: "100", enterprise: "Custom" },
             },
         ],
     },
@@ -196,8 +202,8 @@ const matrixSections: Array<{
                 values: { free: "1", pro: "Unlimited", enterprise: "Unlimited" },
             },
             {
-                feature: "Team seats",
-                values: { free: false, pro: true, enterprise: true },
+                feature: "Team members",
+                values: { free: "Just you", pro: "Unlimited", enterprise: "Unlimited" },
             },
             {
                 feature: "Enforced SSO (SAML)",

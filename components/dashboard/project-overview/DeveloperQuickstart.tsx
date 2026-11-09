@@ -6,7 +6,8 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { BundledLanguage } from "shiki";
-import { AudioLines, X } from "lucide-react";
+import { AudioLines, Lock, X } from "lucide-react";
+import { useUpgrade } from "@/components/billing/UpgradeProvider";
 import { HugeiconsIcon } from "@hugeicons/react";
 import Chat01Icon from "@hugeicons/core-free-icons/Chat01Icon";
 import Copy01Icon from "@hugeicons/core-free-icons/Copy01Icon";
@@ -89,6 +90,8 @@ const CHART_PERIODS = [
   { value: "30d", label: "30 days" },
   { value: "all", label: "All time" },
 ] as const;
+
+const PRO_ONLY_PERIODS = new Set(["30d", "all"]);
 
 function ModalityIcon({ id }: { id: ModalityId }) {
   if (id === "chat") {
@@ -443,6 +446,13 @@ export function DeveloperQuickstart({
   const [promptCopied, setPromptCopied] = useState(false);
   const [showGenerateKeyDialog, setShowGenerateKeyDialog] = useState(false);
   const [chartPeriod, setChartPeriod] = useState("7d");
+  // 30 days and All time are Pro: on Free they show a lock and open the checkout.
+  const upgrade = useUpgrade();
+  const periodLocked = (value: string) => upgrade.canUpgrade && PRO_ONLY_PERIODS.has(value);
+  const choosePeriod = (value: string) => {
+    if (periodLocked(value)) upgrade.openUpgrade();
+    else setChartPeriod(value);
+  };
   // Dismissing hides the quick start and agent prompt for this project in
   // this browser. Read after mount so server and client render the same.
   const quickstartDismissedKey = `cencori:quickstart-dismissed:${orgSlug}/${projectSlug}`;
@@ -765,7 +775,7 @@ Instructions:
           >
             Usage
           </h2>
-          <Select value={chartPeriod} onValueChange={setChartPeriod}>
+          <Select value={chartPeriod} onValueChange={choosePeriod} onOpenChange={(open) => { if (open) upgrade.preloadUpgrade(); }}>
             <SelectTrigger
               aria-label="Select usage period"
               className="h-8 w-[8.5rem] rounded-md border-border/45 bg-muted/20 px-3 text-[11px] shadow-none"
@@ -779,7 +789,10 @@ Instructions:
                   value={option.value}
                   className="text-xs"
                 >
-                  {option.label}
+                  <span className="flex w-full items-center gap-2">
+                    {option.label}
+                    {periodLocked(option.value) && <Lock className="ml-auto h-3 w-3 text-muted-foreground" aria-label="Pro" />}
+                  </span>
                 </SelectItem>
               ))}
             </SelectContent>

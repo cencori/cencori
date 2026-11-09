@@ -1,5 +1,6 @@
 'use client';
 
+import { useUpgrade } from '@/components/billing/UpgradeProvider';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
@@ -78,6 +79,7 @@ function ToggleRow({
     note?: string;
     onChange: (enabled: boolean) => void;
 }) {
+    const upgrade = useUpgrade();
     return (
         <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 py-3 gap-2 md:gap-4">
             <div className="space-y-0.5">
@@ -87,6 +89,16 @@ function ToggleRow({
             </div>
             {loading ? (
                 <Skeleton className="h-5 w-9 rounded-full" />
+            ) : note && upgrade.canUpgrade ? (
+                // Not on this plan: the way to it, right here.
+                <button
+                    type="button"
+                    onClick={upgrade.openUpgrade}
+                    onMouseEnter={upgrade.preloadUpgrade}
+                    className="h-7 shrink-0 rounded-md bg-foreground px-3 text-xs font-medium text-background transition-opacity hover:opacity-90"
+                >
+                    Upgrade to Pro
+                </button>
             ) : (
                 <Switch checked={enabled} disabled={disabled} onCheckedChange={onChange} aria-label={title} />
             )}

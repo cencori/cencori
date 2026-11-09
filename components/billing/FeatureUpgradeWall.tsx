@@ -6,6 +6,7 @@ import LockedIcon from '@hugeicons/core-free-icons/LockedIcon';
 import { BorderBeam } from 'border-beam';
 import { Button } from '@/components/ui/button';
 import { UpgradeDialog } from '@/components/billing/UpgradeDialog';
+import { useUpgrade } from '@/components/billing/UpgradeProvider';
 import { cn } from '@/lib/utils';
 import type { PaidPlanTier } from '@/lib/billing/plans';
 
@@ -41,8 +42,11 @@ export function FeatureUpgradeWall({
     returnPath,
 }: FeatureUpgradeWallProps) {
     const [upgradeOpen, setUpgradeOpen] = useState(false);
+    // Inside the console the shared checkout is already mounted: open that.
+    const shared = useUpgrade();
+    const openUpgrade = () => (shared.canUpgrade ? shared.openUpgrade() : setUpgradeOpen(true));
     const checkoutTier = currentTier === 'pro' || currentTier === 'team' ? currentTier : 'free';
-    const upgradeDialog = (
+    const upgradeDialog = shared.canUpgrade ? null : (
         <UpgradeDialog
             open={upgradeOpen}
             onOpenChange={setUpgradeOpen}
@@ -73,7 +77,7 @@ export function FeatureUpgradeWall({
                                 {message || `Upgrade your plan to unlock ${feature.toLowerCase()}.`}
                             </p>
                         </div>
-                        <Button size="sm" className="h-8 shrink-0 text-xs" onClick={() => setUpgradeOpen(true)}>
+                        <Button size="sm" className="h-8 shrink-0 text-xs" onClick={openUpgrade} onMouseEnter={shared.preloadUpgrade}>
                             Upgrade
                         </Button>
                     </div>
@@ -94,11 +98,11 @@ export function FeatureUpgradeWall({
                 <div className="w-10 h-10 rounded-md bg-secondary flex items-center justify-center mb-3">
                     <HugeiconsIcon icon={LockedIcon} className="h-5 w-5 text-muted-foreground" />
                 </div>
-                <p className="text-sm font-medium">{feature} is available on paid plans</p>
+                <p className="text-sm font-medium">{feature} is available on Pro</p>
                 <p className="text-xs text-muted-foreground mt-1 max-w-sm">
                     {message || `Upgrade your plan to unlock ${feature.toLowerCase()} for this project.`}
                 </p>
-                <Button size="sm" className="mt-4 h-8 text-xs" onClick={() => setUpgradeOpen(true)}>
+                <Button size="sm" className="mt-4 h-8 text-xs" onClick={openUpgrade} onMouseEnter={shared.preloadUpgrade}>
                     Upgrade plan
                 </Button>
             </div>

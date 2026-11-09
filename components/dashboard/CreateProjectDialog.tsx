@@ -149,7 +149,12 @@ export function CreateProjectDialog({
             .select("id, slug")
             .single();
 
-        if (error) {
+        if (error?.message?.includes("project_limit_reached")) {
+            // The Free plan's project limit, enforced by the database.
+            setUpgradeOpen(true);
+            setLoading(false);
+            return;
+        } else if (error) {
             console.error("Error creating project:", error.message);
             toast.error("Failed to create project. " + error.message);
             setLoading(false);

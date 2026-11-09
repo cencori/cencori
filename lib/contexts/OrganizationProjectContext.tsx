@@ -13,6 +13,7 @@ export interface Organization {
     slug: string;
     description?: string;
     subscription_tier?: string;
+    account_type?: string | null;
     credits_balance?: number | string | null;
 }
 
@@ -144,7 +145,7 @@ export const OrganizationProjectProvider = ({ children }: { children: ReactNode 
             // can paint from this payload instead of its own round trip).
             const orgsPromise = supabase
                 .from("organizations")
-                .select("id, name, slug, subscription_tier, credits_balance");
+                .select("id, name, slug, subscription_tier, credits_balance, account_type");
 
             const [{ data: orgsData, error: orgsError }, contextPayload] = await Promise.all([
                 orgsPromise,

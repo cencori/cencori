@@ -9,7 +9,7 @@ export type LimitCheck = {
     tier: SubscriptionTier;
 } | {
     ok: false;
-    code: 'tenant_limit_exceeded' | 'installation_limit_exceeded' | 'provider_connection_limit_exceeded' | 'knowledge_limit_exceeded' | 'run_rate_exceeded' | 'run_concurrency_exceeded';
+    code: 'agent_limit_exceeded' | 'tenant_limit_exceeded' | 'installation_limit_exceeded' | 'provider_connection_limit_exceeded' | 'knowledge_limit_exceeded' | 'run_rate_exceeded' | 'run_concurrency_exceeded';
     message: string;
     retryAfterSeconds?: number;
 };
@@ -29,6 +29,43 @@ async function count(supabase: Admin, table: string, filters: Record<string, str
     }
     const { count: n } = (await (query as unknown as Promise<{ count: number | null }>)) ?? { count: null };
     return n ?? 0;
+}
+
+/**
+ * Agents per organization. Counted across the org's projects, so a Free org
+ * can't get round it with a second project. Business accounts have their own
+ * agent allowance (lib/business/plans.ts) and aren't counted here.
+ */
+export async function checkAgentCap(supabase: Admin, projectId: string): Promise<LimitCheck> {
+    const db = supabase as unknown as {
+        from(t: string): {
+            select(c: string, o?: Record<string, unknown>): {
+                eq(c: string, v: string): { maybeSingle(): Promise<{ data: Record<string, unknown> | null }> } & PromiseLike<{ data: Array<{ id: string }> | null }>;
+                in(c: string, v: string[]): PromiseLike<{ count: number | null }>;
+            };
+        };
+    };
+    const { data: project } = await db.from('projects').select('organization_id, organizations!inner(subscription_tier, account_type)').eq('id', projectId).maybeSingle();
+    const org = (project?.organizations ?? null) as { subscription_tier?: string | null; account_type?: string | null } | null;
+    const tier = ((org?.subscription_tier as SubscriptionTier) || 'free');
+    if (!project || org?.account_type === 'business') return { ok: true, tier };
+    const limit = getEmbeddedLimits(tier).maxAgents;
+    if (!Number.isFinite(limit)) return { ok: true, tier };
+    const { data: projects } = await db.from('projects').select('id').eq('organization_id', project.organization_id as string);
+    const { count: n } = await db.from('agents').select('id', { count: 'exact', head: true }).in('project_id', (projects ?? []).map((p) => p.id));
+    if ((n ?? 0) >= limit) {
+        return { ok: false, code: 'agent_limit_exceeded', message: `Your plan includes ${limit} agent${limit === 1 ? '' : 's'}. Upgrade for more agents.` };
+    }
+    return { ok: true, tier };
+}
+
+export async function checkKnowledgeBaseCap(supabase: Admin, projectId: string, tier: SubscriptionTier): Promise<LimitCheck> {
+    const limits = getEmbeddedLimits(tier);
+    const current = await count(supabase, 'knowledge_bases', { project_id: projectId });
+    if (current >= limits.maxKnowledgeBases) {
+        return { ok: false, code: 'knowledge_limit_exceeded', message: `Your plan includes ${limits.maxKnowledgeBases} knowledge bases. Upgrade to Pro for more.` };
+    }
+    return { ok: true, tier };
 }
 
 export async function checkTenantCap(supabase: Admin, projectId: string, tier: SubscriptionTier): Promise<LimitCheck> {

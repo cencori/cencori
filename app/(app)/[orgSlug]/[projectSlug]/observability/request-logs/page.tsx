@@ -202,11 +202,13 @@ export default function RequestLogsPage({ params }: PageProps) {
                         <RefreshCw className={cn('h-3.5 w-3.5', isFetching && !isFetchingNextPage && 'animate-spin')} />
                     </button>
                     {projectId && (
-                        <ExportButton
-                            projectId={projectId}
-                            filters={{ status: filters.status ?? 'all', model: filters.model ?? 'all', time_range: filters.range, search: filters.q }}
-                            environment="production"
-                        />
+                        <span data-copilot-spot="logs_export" className="inline-flex">
+                            <ExportButton
+                                projectId={projectId}
+                                filters={{ status: filters.status ?? 'all', model: filters.model ?? 'all', time_range: filters.range, search: filters.q }}
+                                environment="production"
+                            />
+                        </span>
                     )}
                 </div>
                 {meta?.time_range_clamped && (

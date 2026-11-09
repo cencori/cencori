@@ -17,6 +17,9 @@ vi.mock('@supabase/supabase-js', () => ({
     })),
 }));
 
+const agentCap = vi.hoisted(() => ({ check: vi.fn(async () => ({ ok: true as const, tier: 'pro' })) }));
+vi.mock('@/lib/embedded/limits', () => ({ checkAgentCap: agentCap.check }));
+
 vi.mock('@/lib/supabaseAdmin', () => ({
     createAdminClient: vi.fn(() => ({ from: mocks.from })),
 }));
@@ -109,6 +112,23 @@ describe('/v1/agents authorization and body handling', () => {
             agent_id: 'agent-1',
             model: 'gpt-4o-mini',
         }));
+    });
+
+    it('refuses with 402 when the plan\'s agent limit is reached', async () => {
+        agentCap.check.mockResolvedValueOnce({ ok: false, code: 'agent_limit_exceeded', message: 'Your plan includes 1 agent. Upgrade for more agents.' } as never);
+        const projectQuery = queryReturning({ data: { id: 'project-1', organization_id: 'org-1', organizations: { owner_id: 'user-1' } }, error: null });
+        mocks.from.mockImplementation((table: string) => {
+            if (table === 'projects') return projectQuery;
+            throw new Error(`Unexpected table: ${table}`);
+        });
+        const request = new NextRequest('https://api.cencori.com/v1/agents', {
+            method: 'POST',
+            headers: { Authorization: 'Bearer jwt' },
+            body: JSON.stringify({ project_id: 'project-1', name: 'Second' }),
+        });
+        const res = await POST(request);
+        expect(res.status).toBe(402);
+        expect((await res.json()).error).toMatchObject({ code: 'agent_limit_exceeded' });
     });
 
     it('rejects JWT list access when the user is not an owner or member', async () => {

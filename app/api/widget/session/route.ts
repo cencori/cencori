@@ -102,6 +102,14 @@ async function open(req: NextRequest, crossOrigin: string | null): Promise<NextR
     const activity = await checkAgentActivity(db as never, widget.project_id, widget.agent_id);
     if ('unavailable' in activity) return fail(503, 'widget_unavailable', 'This chat is unavailable right now. Try again shortly.');
     if (!activity.active) return fail(409, 'widget_unavailable', 'This chat is turned off.');
+    // A lapsed Pro subscription past its grace period pauses the org's projects.
+    {
+        const { data: owner } = await db.from('projects').select('organization_id').eq('id', widget.project_id).maybeSingle();
+        const { pausedPlanBody } = await import('@/lib/billing/plan-gate');
+        if (await pausedPlanBody(owner?.organization_id as string | undefined, db as never)) {
+            return fail(402, 'widget_unavailable', 'This chat is unavailable right now. Please contact the business directly.');
+        }
+    }
 
     // Resume the visitor's conversation when it's still open.
     let sessionId: string | null = null;

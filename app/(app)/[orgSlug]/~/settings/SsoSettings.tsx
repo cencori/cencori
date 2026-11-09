@@ -3,6 +3,7 @@
 import { type ReactNode, useRef, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { hasFeature, type SubscriptionTier } from "@/lib/entitlements";
 import { Google, Microsoft } from "@/components/icons/provider-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import Key02Icon from "@hugeicons/core-free-icons/Key02Icon";
@@ -145,7 +146,7 @@ export function SsoSettings({ orgSlug, orgName }: SsoSettingsProps) {
     }
 
     const isConfigured = configuration.sso_enabled && !!configuration.sso_provider_id;
-    const canConfigure = ["team", "enterprise"].includes(configuration.subscription_tier || "");
+    const canConfigure = hasFeature((configuration.subscription_tier || "free") as SubscriptionTier, "sso");
 
     const refreshSso = async () => {
         await Promise.all([
@@ -251,7 +252,7 @@ function SsoOverview({
                 <div className="flex items-start gap-2 border-t border-border/30 bg-background/20 px-5 py-3">
                     <HugeiconsIcon icon={InformationCircleIcon} className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
                     <p className="text-[11px] leading-5 text-muted-foreground">
-                        SAML SSO is available on Team and Enterprise. The controls remain visible so you can evaluate the complete setup before upgrading.
+                        SAML SSO is available on the Enterprise plan. The controls remain visible so you can evaluate the complete setup before upgrading.
                     </p>
                 </div>
             )}

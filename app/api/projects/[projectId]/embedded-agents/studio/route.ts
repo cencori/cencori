@@ -239,6 +239,11 @@ export async function POST(request: Request, ctx: Context) {
                 const { data: orgProjects } = await db.from('projects').select('id').eq('organization_id', access.organizationId);
                 const { count } = await db.from('agents').select('id', { count: 'exact', head: true }).in('project_id', (orgProjects ?? []).map((p) => p.id as string));
                 if ((count ?? 0) >= limit) return fail(`Your plan includes ${limit} agent${limit === 1 ? '' : 's'}. Upgrade to add another.`, 402);
+            } else {
+                // Developer plans: agents per organization (Free 1).
+                const { checkAgentCap } = await import('@/lib/embedded/limits');
+                const cap = await checkAgentCap(db as never, projectId);
+                if (!cap.ok) return fail(cap.message, 402);
             }
             // Every new agent starts on the default model; below Business it's the only one.
             const requested = cleanText(body.model, 200);

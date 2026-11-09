@@ -55,8 +55,20 @@ describe("subscription entitlements", () => {
         },
     );
 
-    it.each(["auditLogIdentityEvents", "auditLogExtendedHistory", "auditLogExports"] as const)(
-        "reserves %s for Team and Enterprise",
+    // Team folded into Pro (2026-11-09): its audit-log extras are Pro now.
+    it.each(["auditLogIdentityEvents", "auditLogExtendedHistory"] as const)(
+        "includes %s on Pro and up",
+        (feature) => {
+            expect(hasFeature("free", feature)).toBe(false);
+            expect(hasFeature("pro", feature)).toBe(true);
+            expect(hasFeature("team", feature)).toBe(true);
+            expect(hasFeature("enterprise", feature)).toBe(true);
+        },
+    );
+
+    // Sold as Enterprise-only on the pricing page; grandfathered Team orgs keep them.
+    it.each(["auditLogExports", "sso", "governanceControls"] as const)(
+        "reserves %s for Enterprise (and grandfathered Team)",
         (feature) => {
             expect(hasFeature("free", feature)).toBe(false);
             expect(hasFeature("pro", feature)).toBe(false);
@@ -85,7 +97,7 @@ describe("subscription entitlements", () => {
 
         expect(response.status).toBe(403);
         await expect(response.json()).resolves.toMatchObject({
-            error: "Organization audit log requires a paid plan",
+            error: "Organization audit log requires the Pro plan",
             code: "FEATURE_NOT_INCLUDED",
             required_tier: "pro",
             upgrade_url: "/billing",
@@ -99,7 +111,7 @@ describe("subscription entitlements", () => {
         await expect(response.json()).resolves.toMatchObject({
             error: "Governance control access requires the Enterprise plan",
             code: "FEATURE_NOT_INCLUDED",
-            required_tier: "team",
+            required_tier: "enterprise",
             upgrade_url: "/billing",
         });
     });
@@ -111,7 +123,7 @@ describe("subscription entitlements", () => {
         await expect(response.json()).resolves.toMatchObject({
             error: "Extended audit-log history requires the Enterprise plan",
             code: "FEATURE_NOT_INCLUDED",
-            required_tier: "team",
+            required_tier: "enterprise",
         });
     });
 
@@ -135,5 +147,17 @@ describe("subscription entitlements", () => {
             code: "FEATURE_NOT_INCLUDED",
             required_tier: "enterprise",
         });
+    });
+});
+
+describe("Free plan agent limits (pricing page, 2026-11-09)", () => {
+    it("allows 1 agent, 1 running at once, 5 knowledge bases and 5 customers on Free", async () => {
+        const { getEmbeddedLimits } = await import("../entitlements");
+        expect(getEmbeddedLimits("free")).toMatchObject({ maxAgents: 1, maxConcurrentRuns: 1, maxKnowledgeBases: 5, maxTenants: 5 });
+    });
+    it("gives Pro 10 agents", async () => {
+        const { getEmbeddedLimits } = await import("../entitlements");
+        expect(getEmbeddedLimits("pro").maxAgents).toBe(10);
+        expect(getEmbeddedLimits("pro")).toMatchObject({ maxConcurrentRuns: 10, maxKnowledgeBases: 100, maxTenants: 100 });
     });
 });

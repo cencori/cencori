@@ -93,16 +93,16 @@ export async function GET(
     const perPage = Math.min(parseInt(url.searchParams.get("per_page") || "50"), 100);
 
     if (format && !hasFeature(effectiveTier, "auditLogExports")) {
-        return featureGateResponse("auditLogExports", "team");
+        return featureGateResponse("auditLogExports", "enterprise");
     }
     if (TEAM_ONLY_TIME_RANGES.has(timeRange) && !hasFeature(effectiveTier, "auditLogExtendedHistory")) {
-        return featureGateResponse("auditLogExtendedHistory", "team");
+        return featureGateResponse("auditLogExtendedHistory");
     }
     if (timeRange === "all" && !hasFeature(effectiveTier, "auditLogAllTimeHistory")) {
         return featureGateResponse("auditLogAllTimeHistory", "enterprise");
     }
     if (TEAM_ONLY_CATEGORIES.has(category) && !hasFeature(effectiveTier, "auditLogIdentityEvents")) {
-        return featureGateResponse("auditLogIdentityEvents", "team");
+        return featureGateResponse("auditLogIdentityEvents");
     }
 
     const startDate = parseTimeRange(timeRange);

@@ -92,17 +92,24 @@ const ALL_FEATURES_ENABLED: TierFeatures = {
 //
 // Explicit existence gates:
 //   - security, piiMasking, customDataRules, outputScanning,
-//     securityIncidents, auditTrails — Pro, Team, and Enterprise
-//   - teams — Pro, Team, and Enterprise
-//   - auditLogs — Pro, Team, and Enterprise
-//   - auditLogIdentityEvents, auditLogExtendedHistory, auditLogExports — Team and Enterprise
+//     securityIncidents, auditTrails — Pro and Enterprise
+//   - teams — Pro and Enterprise
+//   - auditLogs — Pro and Enterprise
+//   - auditLogIdentityEvents, auditLogExtendedHistory — Pro and Enterprise
+//   - auditLogExports — Enterprise
 //   - auditLogAllTimeHistory, auditLogApiAccess, auditLogSiemStreaming,
 //     auditLogComplianceArchives — Enterprise
-//   - governanceControls — Team and Enterprise. Governance remains
+//   - governanceControls — Enterprise. Governance remains
 //     readable on Free; organization-wide policy mutations are gated.
 //   - governanceCustomFrameworks, governanceAdvancedEvidence,
 //     governanceBespokeControls — Enterprise. These sit alongside the
 //     Enterprise-only SIEM and compliance-archive infrastructure above.
+//
+// Team tier (2026-11-09, founder decision): no longer sold or shown. It
+// folded into Pro (audit-log identity events and 30/90-day audit history are
+// now Pro), and the items the pricing page sells as Enterprise-only stay
+// Enterprise: governance controls, audit exports, SSO, all-time history.
+// Orgs already on 'team' keep exactly what they had (grandfathered).
 //
 // Still enforced (depth limits, not existence gates):
 //   - MEMORY_QUOTA (below) — memory count per project
@@ -112,6 +119,7 @@ const ALL_FEATURES_ENABLED: TierFeatures = {
 export const TIER_FEATURES: Record<SubscriptionTier, TierFeatures> = {
   free: {
     ...ALL_FEATURES_ENABLED,
+    sso: false,
     security: false,
     piiMasking: false,
     customDataRules: false,
@@ -134,8 +142,7 @@ export const TIER_FEATURES: Record<SubscriptionTier, TierFeatures> = {
   },
   pro: {
     ...ALL_FEATURES_ENABLED,
-    auditLogIdentityEvents: false,
-    auditLogExtendedHistory: false,
+    sso: false,
     auditLogAllTimeHistory: false,
     auditLogExports: false,
     auditLogApiAccess: false,
@@ -146,6 +153,7 @@ export const TIER_FEATURES: Record<SubscriptionTier, TierFeatures> = {
     governanceAdvancedEvidence: false,
     governanceBespokeControls: false,
   },
+  // Legacy, grandfathered: see the Team note above.
   team: {
     ...ALL_FEATURES_ENABLED,
     auditLogAllTimeHistory: false,
@@ -253,6 +261,8 @@ export function getMemoryOpsUserDailyQuota(tier: SubscriptionTier): MemoryOpsQuo
 // the gate. Metered per project/tenant/installation; runs additionally carry a
 // per-minute rate + concurrency cap for fair scheduling across tenants.
 export interface EmbeddedLimits {
+  /** Agents per organization (Free 1, Pro 10; set 2026-11-09). */
+  maxAgents: number;
   maxTenants: number;
   maxInstallationsPerTenant: number;
   maxProviderConnections: number;
@@ -264,10 +274,10 @@ export interface EmbeddedLimits {
 }
 
 export const EMBEDDED_LIMITS: Record<SubscriptionTier, EmbeddedLimits> = {
-  free: { maxTenants: 10, maxInstallationsPerTenant: 5, maxProviderConnections: 2, maxKnowledgeBases: 10, maxSkills: 20, maxDelegationDepth: 1, runsPerMinute: 10, maxConcurrentRuns: 2 },
-  pro: { maxTenants: 100, maxInstallationsPerTenant: 20, maxProviderConnections: 10, maxKnowledgeBases: 100, maxSkills: 200, maxDelegationDepth: 3, runsPerMinute: 60, maxConcurrentRuns: 10 },
-  team: { maxTenants: 1000, maxInstallationsPerTenant: 50, maxProviderConnections: 25, maxKnowledgeBases: 500, maxSkills: 1000, maxDelegationDepth: 5, runsPerMinute: 300, maxConcurrentRuns: 25 },
-  enterprise: { maxTenants: Number.POSITIVE_INFINITY, maxInstallationsPerTenant: Number.POSITIVE_INFINITY, maxProviderConnections: Number.POSITIVE_INFINITY, maxKnowledgeBases: Number.POSITIVE_INFINITY, maxSkills: Number.POSITIVE_INFINITY, maxDelegationDepth: Number.POSITIVE_INFINITY, runsPerMinute: Number.POSITIVE_INFINITY, maxConcurrentRuns: Number.POSITIVE_INFINITY },
+  free: { maxAgents: 1, maxTenants: 5, maxInstallationsPerTenant: 5, maxProviderConnections: 2, maxKnowledgeBases: 5, maxSkills: 20, maxDelegationDepth: 1, runsPerMinute: 10, maxConcurrentRuns: 1 },
+  pro: { maxAgents: 10, maxTenants: 100, maxInstallationsPerTenant: 20, maxProviderConnections: 10, maxKnowledgeBases: 100, maxSkills: 200, maxDelegationDepth: 3, runsPerMinute: 60, maxConcurrentRuns: 10 },
+  team: { maxAgents: Number.POSITIVE_INFINITY, maxTenants: 1000, maxInstallationsPerTenant: 50, maxProviderConnections: 25, maxKnowledgeBases: 500, maxSkills: 1000, maxDelegationDepth: 5, runsPerMinute: 300, maxConcurrentRuns: 25 },
+  enterprise: { maxAgents: Number.POSITIVE_INFINITY, maxTenants: Number.POSITIVE_INFINITY, maxInstallationsPerTenant: Number.POSITIVE_INFINITY, maxProviderConnections: Number.POSITIVE_INFINITY, maxKnowledgeBases: Number.POSITIVE_INFINITY, maxSkills: Number.POSITIVE_INFINITY, maxDelegationDepth: Number.POSITIVE_INFINITY, runsPerMinute: Number.POSITIVE_INFINITY, maxConcurrentRuns: Number.POSITIVE_INFINITY },
 };
 
 export function getEmbeddedLimits(tier: SubscriptionTier): EmbeddedLimits {

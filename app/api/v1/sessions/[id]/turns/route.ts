@@ -150,6 +150,10 @@ export async function POST(
                 // Who pays for this reply: a business plan covers it; otherwise it needs credits,
                 // like an API-key call (client tokens never pass through that preflight).
                 const organizationId = (project.organization_id as string) ?? '';
+                // A lapsed Pro subscription past its grace period pauses the org's projects.
+                const { pausedPlanBody } = await import('@/lib/billing/plan-gate');
+                const paused = await pausedPlanBody(organizationId, admin as never);
+                if (paused) return respondError(402, paused.message, paused.code);
                 const { getOrganizationPlan } = await import('@/lib/business/plans');
                 const plan = await getOrganizationPlan(admin as never, organizationId);
                 if (plan.accountType === 'business' && !plan.active) {

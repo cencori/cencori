@@ -69,6 +69,12 @@ async function authOrError(req: NextRequest): Promise<AuthResult> {
             if (!project) {
                 return { gatewayCtx: null, embeddedScope: null, respond, respondError, method, startedAt, callerIdentity, errorResponse: respondError(401, 'Invalid client token project', 'client_token_revoked') };
             }
+            // A lapsed Pro subscription past its grace period pauses the org's projects.
+            const { pausedPlanBody } = await import('@/lib/billing/plan-gate');
+            const paused = await pausedPlanBody(project.organization_id as string, admin as never);
+            if (paused) {
+                return { gatewayCtx: null, embeddedScope: null, respond, respondError, method, startedAt, callerIdentity, errorResponse: respondError(402, paused.message, paused.code) };
+            }
             const { data: tenant } = await admin.from('platform_tenants').select('id, status').eq('id', dePrefixId(verified.claims.tenant_id)).eq('project_id', verified.claims.project_id).maybeSingle();
             if (!tenant || (tenant.status as string) !== 'active') {
                 return { gatewayCtx: null, embeddedScope: null, respond, respondError, method, startedAt, callerIdentity, errorResponse: respondError(403, 'Tenant is not active', 'tenant_suspended') };

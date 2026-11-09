@@ -1,5 +1,6 @@
 "use client";
 
+import { useUpgrade } from "@/components/billing/UpgradeProvider";
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -213,6 +214,7 @@ export function CommandPalette({
   consoleMode = false,
 }: CommandPaletteProps) {
   const router = useRouter();
+  const upgrade = useUpgrade();
   const isMobile = useIsMobile();
   const { organizations, projects } = useOrganizationProject();
   const orgName = organizations.find((org) => org.slug === orgSlug)?.name ?? orgSlug ?? undefined;
@@ -638,9 +640,29 @@ export function CommandPalette({
       ],
     });
 
+    // On Free: Pro is one search away ("upgrade", "pro", "pricing").
+    if (upgrade.canUpgrade) {
+      groups.unshift({
+        id: "plan",
+        label: "PLAN",
+        items: [
+          {
+            id: "upgrade-to-pro",
+            label: "Upgrade to Pro",
+            icon: navIcon(BadgeDollarSignIcon),
+            action: () => {
+              onOpenChange(false);
+              upgrade.openUpgrade();
+            },
+            keywords: ["upgrade", "pro", "plan", "pricing", "subscribe", "pay", "billing"],
+          },
+        ],
+      });
+    }
+
     return groups;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router, onOpenChange, orgSlug, projectSlug, consoleMode, orgName, projectName]);
+  }, [router, onOpenChange, orgSlug, projectSlug, consoleMode, orgName, projectName, upgrade.canUpgrade]);
 
   // Smart search: filter items based on label and keywords
   const filteredGroups = React.useMemo(() => {

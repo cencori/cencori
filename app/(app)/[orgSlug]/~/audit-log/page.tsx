@@ -474,7 +474,7 @@ export default function AuditLogPage({ params }: PageProps) {
                     orgName={organizationContext.name}
                     currentTier={organizationContext.subscription_tier}
                     feature="Audit log"
-                    message="Audit logs are available on Pro, Team, and Enterprise. Upgrade to keep a searchable record of administrative changes."
+                    message="Audit logs are available on Pro and Enterprise. Upgrade to keep a searchable record of administrative changes."
                     returnPath={`/${orgSlug}/~/audit-log${routeCategory ? `?category=${encodeURIComponent(routeCategory)}` : ""}`}
                 />
             </div>

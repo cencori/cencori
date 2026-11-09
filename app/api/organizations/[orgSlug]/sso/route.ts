@@ -1,3 +1,4 @@
+import { hasFeature, type SubscriptionTier } from "@/lib/entitlements";
 import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabaseServer";
@@ -67,9 +68,9 @@ export async function POST(
 
     const { org, user } = result;
 
-    if (!["enterprise", "team"].includes(org.subscription_tier || "")) {
+    if (!hasFeature((org.subscription_tier || "free") as SubscriptionTier, "sso")) {
         return NextResponse.json(
-            { error: "SSO is available on Team and Enterprise plans" },
+            { error: "SSO is available on the Enterprise plan" },
             { status: 403 }
         );
     }
@@ -182,9 +183,9 @@ export async function PATCH(
     if (typeof body.sso_enforce !== "boolean") {
         return NextResponse.json({ error: "sso_enforce must be a boolean" }, { status: 400 });
     }
-    if (body.sso_enforce && !["enterprise", "team"].includes(org.subscription_tier || "")) {
+    if (body.sso_enforce && !hasFeature((org.subscription_tier || "free") as SubscriptionTier, "sso")) {
         return NextResponse.json(
-            { error: "SSO enforcement is available on Team and Enterprise plans" },
+            { error: "SSO enforcement is available on the Enterprise plan" },
             { status: 403 }
         );
     }

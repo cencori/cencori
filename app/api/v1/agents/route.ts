@@ -154,6 +154,13 @@ export async function POST(req: NextRequest) {
             }
         }
 
+        // Plan cap: agents per organization (Free 1).
+        {
+            const { checkAgentCap } = await import('@/lib/embedded/limits');
+            const cap = await checkAgentCap(adminClient as never, projectId);
+            if (!cap.ok) return respondError(402, cap.message, cap.code);
+        }
+
         const { data: agent, error: agentError } = await adminClient
             .from('agents')
             .insert({

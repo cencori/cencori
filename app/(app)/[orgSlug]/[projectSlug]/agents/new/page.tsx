@@ -1,5 +1,6 @@
 "use client";
 
+import { useUpgrade } from "@/components/billing/UpgradeProvider";
 import { use, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -52,6 +53,7 @@ export default function NewAgentPage({ params }: { params: Promise<{ orgSlug: st
         setError(null);
     };
 
+    const upgrade = useUpgrade();
     const create = async (event: React.FormEvent) => {
         event.preventDefault();
         if (!projectId) return;
@@ -64,6 +66,8 @@ export default function NewAgentPage({ params }: { params: Promise<{ orgSlug: st
         } catch (cause) {
             setError(cause instanceof Error ? cause.message : "That didn't work. Try again.");
             setBusy(false);
+            // A plan limit: offer Pro right away.
+            if ((cause as { status?: number })?.status === 402) upgrade.openUpgrade();
         }
     };
 

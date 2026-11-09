@@ -157,7 +157,10 @@ export default function NewProjectPage({ params }: PageProps) {
       region: values.region,
     });
 
-    if (error) {
+    if (error?.message?.includes("project_limit_reached")) {
+      // The Free plan's project limit, enforced by the database.
+      setUpgradeOpen(true);
+    } else if (error) {
       console.error("Error creating project:", error.message);
       toast.error("Failed to create project. " + error.message);
     } else {

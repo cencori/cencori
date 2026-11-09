@@ -7,6 +7,7 @@ import { extractBearerToken, extractCencoriApiKeyFromHeaders } from '@/lib/api-k
 import { verifyClientToken } from './client-tokens';
 import { CLIENT_TOKEN_PREFIX } from './types';
 import { dePrefixId } from './http';
+import { pausedPlanBody } from '@/lib/billing/plan-gate';
 
 export interface EmbeddedSessionAuth {
     gatewayCtx: GatewayContext;
@@ -43,6 +44,9 @@ export async function authSessionRequest(
             const admin = createAdminClient();
             const { data: project } = await admin.from('projects').select('id, organization_id').eq('id', verified.claims.project_id).maybeSingle();
             if (!project) return fail(401, 'Invalid client token project', 'client_token_revoked');
+            // A lapsed Pro subscription past its grace period pauses the org's projects.
+            const paused = await pausedPlanBody(project.organization_id as string, admin);
+            if (paused) return fail(402, paused.message, paused.code);
             const { data: tenant } = await admin.from('platform_tenants').select('id, status').eq('id', dePrefixId(verified.claims.tenant_id)).eq('project_id', verified.claims.project_id).maybeSingle();
             if (!tenant || (tenant.status as string) !== 'active') return fail(403, 'Tenant is not active', 'tenant_suspended');
             const requestId = crypto.randomUUID();
@@ -166,6 +170,8 @@ export async function authClientTokenAction(
     const admin = createAdminClient();
     const { data: project } = await admin.from('projects').select('id, organization_id').eq('id', verified.claims.project_id).maybeSingle();
     if (!project) return { ok: false, status: 401, message: 'Invalid client token project', code: 'client_token_revoked' };
+    const paused = await pausedPlanBody(project.organization_id as string, admin);
+    if (paused) return { ok: false, status: 402, message: paused.message, code: paused.code };
     const { data: tenant } = await admin.from('platform_tenants').select('id, status').eq('id', dePrefixId(verified.claims.tenant_id)).eq('project_id', verified.claims.project_id).maybeSingle();
     if (!tenant || (tenant.status as string) !== 'active') return { ok: false, status: 403, message: 'Tenant is not active', code: 'tenant_suspended' };
     const embeddedScope = { tenantId: tenant.id as string, externalUserId: verified.claims.external_user_id, installationIds: verified.claims.installation_ids?.map(dePrefixId), permissions: verified.claims.permissions };

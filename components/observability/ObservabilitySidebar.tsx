@@ -10,7 +10,7 @@ import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react';
 import BinocularsIcon from '@hugeicons/core-free-icons/BinocularsIcon';
 import LeftToRightListDashIcon from '@hugeicons/core-free-icons/LeftToRightListDashIcon';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { FilterGroup, FilterOption, SessionFiltersPanel } from '@/components/sessions/SessionFilters';
+import { FilterGroup, FilterOption, SessionFiltersPanel, useRangeChoice } from '@/components/sessions/SessionFilters';
 import { supabase } from '@/lib/supabaseClient';
 import { useProjectIdBySlug } from '@/lib/hooks/useQueries';
 import {
@@ -87,6 +87,7 @@ function RequestLogFiltersPanel({ projectId, listPath }: { projectId?: string; l
     const searchParams = useSearchParams();
     const filters = readRequestLogFilters(searchParams);
     const [open, setOpen] = useState<Record<string, boolean>>({ timeline: true, status: true, model: false, key: false });
+    const rangeChoice = useRangeChoice();
     const flip = (id: string) => setOpen((o) => ({ ...o, [id]: !o[id] }));
 
     // Open a group that has a filter set, so the choice is visible.
@@ -122,7 +123,7 @@ function RequestLogFiltersPanel({ projectId, listPath }: { projectId?: string; l
     });
 
     return (
-        <div className="mt-4">
+        <div className="mt-4" data-copilot-spot="logs_filters">
             <div className="mb-1 flex items-center justify-between px-2">
                 <span className="text-sm font-medium">Filters</span>
                 {hasActiveRequestLogFilters(filters) && (
@@ -132,9 +133,13 @@ function RequestLogFiltersPanel({ projectId, listPath }: { projectId?: string; l
                 )}
             </div>
             <FilterGroup title="Timeline" open={open.timeline} onToggle={() => flip('timeline')}>
-                {REQUEST_LOG_RANGES.map((r) => (
-                    <FilterOption key={r.value} radio selected={filters.range === r.value} label={r.label} onClick={() => update({ ...filters, range: r.value })} onHover={() => prefetch({ ...filters, range: r.value })} />
-                ))}
+                {REQUEST_LOG_RANGES.map((r) => {
+                    const choice = rangeChoice(r.value, () => update({ ...filters, range: r.value }));
+                    return (
+                        <FilterOption key={r.value} radio selected={filters.range === r.value} label={r.label} lock={choice.lock} onClick={choice.onClick}
+                            onHover={choice.lock ? choice.onHover : () => prefetch({ ...filters, range: r.value })} />
+                    );
+                })}
             </FilterGroup>
             <FilterGroup title="Status" count={filters.status ? 1 : 0} open={open.status} onToggle={() => flip('status')}>
                 <FilterOption radio selected={!filters.status} label="All statuses" onClick={() => update({ ...filters, status: null })} onHover={() => prefetch({ ...filters, status: null })} />

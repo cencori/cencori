@@ -1,4 +1,5 @@
 "use client";
+import { useUpgrade } from "@/components/billing/UpgradeProvider";
 import { browserAuth } from "@/lib/auth/browser-auth";
 
 import { usePathname, useRouter } from "next/navigation";
@@ -136,10 +137,13 @@ export function UserMenu({ organization, variant = "sidebar" }: UserMenuProps) {
     const canUpgrade = currentTier === "free";
     const upgradeLabel = "Upgrade to Pro";
 
+    // Inside the console the shared checkout is already mounted (UpgradeProvider).
+    const sharedUpgrade = useUpgrade();
     const openUpgrade = () => {
         if (!organization || !canUpgrade) return;
         setMenuOpen(false);
-        setUpgradeOpen(true);
+        if (sharedUpgrade.canUpgrade) sharedUpgrade.openUpgrade();
+        else setUpgradeOpen(true);
     };
 
     const switchOrganization = async (organizationId: string) => {
@@ -331,8 +335,8 @@ export function UserMenu({ organization, variant = "sidebar" }: UserMenuProps) {
                                 <button
                                     type="button"
                                     onClick={openUpgrade}
-                                    onPointerEnter={() => setUpgradePreload(true)}
-                                    onFocus={() => setUpgradePreload(true)}
+                                    onPointerEnter={() => { setUpgradePreload(true); sharedUpgrade.preloadUpgrade(); }}
+                                    onFocus={() => { setUpgradePreload(true); sharedUpgrade.preloadUpgrade(); }}
                                     disabled={!organization}
                                     className="flex h-7 w-full items-center justify-center rounded-md bg-foreground px-3 text-[11px] font-medium text-background transition-colors hover:bg-foreground/90 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
@@ -375,7 +379,7 @@ export function UserMenu({ organization, variant = "sidebar" }: UserMenuProps) {
                 </DropdownMenuContent>
             </DropdownMenu>
 
-            {organization && canUpgrade && (upgradePreload || upgradeOpen) && (
+            {organization && canUpgrade && !sharedUpgrade.canUpgrade && (upgradePreload || upgradeOpen) && (
                 <UpgradeDialog
                     open={upgradeOpen}
                     onOpenChange={setUpgradeOpen}

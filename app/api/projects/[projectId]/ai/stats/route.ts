@@ -41,7 +41,7 @@ export async function GET(
     try {
         const { projectId } = await params;
         const { searchParams } = new URL(req.url);
-        const period = searchParams.get('period') || '7d';
+        let period = searchParams.get('period') || '7d';
 
         const { data: project, error: projectError } = await supabase
             .from('projects')
@@ -62,6 +62,12 @@ export async function GET(
 
         if (memberError || !member) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+        }
+
+        // 30 days and All time are Pro: Free sees at most 7 days.
+        if (period === '30d' || period === 'all') {
+            const { data: org } = await supabase.from('organizations').select('subscription_tier').eq('id', project.organization_id).maybeSingle();
+            if ((org?.subscription_tier ?? 'free') === 'free') period = '7d';
         }
 
         const now = new Date();

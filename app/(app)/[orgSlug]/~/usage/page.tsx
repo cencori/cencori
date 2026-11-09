@@ -1,7 +1,7 @@
 "use client";
 
 import React, { use } from 'react';
-import Link from 'next/link';
+import { useUpgrade } from '@/components/billing/UpgradeProvider';
 import { useQuery } from '@tanstack/react-query';
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn as clsx } from "@/lib/utils";
@@ -269,6 +269,7 @@ function useUsageStats(orgSlug: string, timeRange: string) {
 
 export default function UsagePage({ params }: PageProps) {
     const { orgSlug } = use(params);
+    const upgrade = useUpgrade();
     const [timeRange, setTimeRange] = React.useState('7d');
     const [isExporting, setIsExporting] = React.useState(false);
     const [hoveredActivityIndex, setHoveredActivityIndex] = React.useState<number | null>(null);
@@ -415,13 +416,15 @@ export default function UsagePage({ params }: PageProps) {
                                                 className="rounded-md border border-border/30 bg-[#f0f0ee] p-3.5 shadow-2xl dark:bg-[#191919]"
                                             >
                                                 <p className="text-[11px] font-medium text-popover-foreground">Unlock 30-day history</p>
-                                                <p className="mt-1 text-[10px] leading-4 text-muted-foreground">Available on Pro, Team, and Enterprise plans.</p>
-                                                <Link
-                                                    href={`/${orgSlug}/~/billing`}
+                                                <p className="mt-1 text-[10px] leading-4 text-muted-foreground">Available on Pro and Enterprise plans.</p>
+                                                <button
+                                                    type="button"
+                                                    onClick={upgrade.openUpgrade}
+                                                    onMouseEnter={upgrade.preloadUpgrade}
                                                     className="mt-3 inline-flex text-[10px] font-medium text-popover-foreground underline underline-offset-4 transition-opacity hover:opacity-70 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                                                 >
-                                                    Upgrade plan
-                                                </Link>
+                                                    Upgrade to Pro
+                                                </button>
                                             </div>
                                         </div>
                                     </div>

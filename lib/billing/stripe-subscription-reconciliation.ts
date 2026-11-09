@@ -19,10 +19,14 @@ export type StripeSubscriptionSnapshot = {
   currentPeriodEnd: string | null;
 };
 
+// Statuses that keep the paid tier on the org. past_due and unpaid keep it so
+// lib/billing/plan-state.ts can give the 7-day grace and then pause the org's
+// projects; dropping to Free here would let a non-payer skip the pause.
 const ENTITLED_STATUSES = new Set<StripeSubscriptionSnapshot["status"]>([
   "active",
   "past_due",
   "trialing",
+  "unpaid",
 ]);
 
 export function normalizeStripeSubscriptionStatus(

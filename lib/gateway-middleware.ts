@@ -1,3 +1,5 @@
+import { planPausedBody, planState, type OrgPlanColumns } from '@/lib/billing/plan-state';
+import { orgRequiresPro } from '@/lib/billing/plan-gate';
 import { getAuthUser } from "@/lib/auth/get-auth-user";
 /**
  * Shared Gateway Middleware
@@ -249,7 +251,12 @@ export async function loadApiKeyConfig(supabase: ReturnType<typeof createAdminCl
                     subscription_tier,
                     monthly_requests_used,
                     credits_balance,
-                    billing_frozen
+                    billing_frozen,
+                    subscription_status,
+                    subscription_current_period_start,
+                    subscription_current_period_end,
+                    billing_provider,
+                    account_type
                 )
             )
         `)
@@ -336,7 +343,12 @@ export async function validateGatewayRequest(
                                 subscription_tier,
                                 monthly_requests_used,
                                 credits_balance,
-                                billing_frozen
+                                billing_frozen,
+                                subscription_status,
+                                subscription_current_period_start,
+                                subscription_current_period_end,
+                                billing_provider,
+                                account_type
                             )
                         `)
                         .eq('id', playgroundProjectId)
@@ -367,7 +379,7 @@ export async function validateGatewayRequest(
                             monthly_requests_used: number;
                             credits_balance: string | number | null;
                             billing_frozen: boolean | null;
-                        };
+                        } & OrgPlanColumns;
 
                         const organizationId = organization.id;
                         const tier = organization.subscription_tier || 'free';
@@ -384,6 +396,14 @@ export async function validateGatewayRequest(
                         });
                         if (organization.billing_frozen) {
                             return deny(403, 'billing_frozen', 'Billing account frozen', 'Billing is currently frozen for this organization. Contact support.');
+                        }
+                        const sessionPlan = planState({
+                            ...organization,
+                            requires_pro: (organization.subscription_tier || 'free') === 'free' ? await orgRequiresPro(organization.id) : false,
+                        });
+                        if (sessionPlan.standing === 'paused') {
+                            const body = planPausedBody(sessionPlan);
+                            return deny(402, body.code, body.error, body.message);
                         }
                         const route = req.nextUrl.pathname;
                         if (tier !== 'enterprise' && isMeteredGatewayRequest(req.method, route)) {
@@ -548,7 +568,7 @@ export async function validateGatewayRequest(
             monthly_requests_used: number;
             credits_balance: string | number | null;
             billing_frozen: boolean | null;
-        };
+        } & OrgPlanColumns;
     };
 
     const organization = project.organizations;
@@ -592,6 +612,19 @@ export async function validateGatewayRequest(
                 ),
                 { requestId }
             ),
+        };
+    }
+
+    // A lapsed Pro subscription past its grace period pauses the org's projects.
+    const keyPlan = planState({
+        ...organization,
+        // One Free org per person: an extra Free org is paused until it's on Pro.
+        requires_pro: tier === 'free' ? await orgRequiresPro(organizationId) : false,
+    });
+    if (keyPlan.standing === 'paused' && !fullySponsoredKey) {
+        return {
+            success: false,
+            response: addGatewayHeaders(NextResponse.json(planPausedBody(keyPlan), { status: 402 }), { requestId }),
         };
     }
 

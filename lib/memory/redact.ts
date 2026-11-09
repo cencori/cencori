@@ -6,6 +6,7 @@
 
 import type { createAdminClient } from '@/lib/supabaseAdmin';
 import { fetchAndProcessCustomRules } from '@/lib/gateway/custom-rules';
+import { projectIncludesSecurity } from '@/lib/safety/utils';
 
 type SupabaseAdmin = ReturnType<typeof createAdminClient>;
 
@@ -21,6 +22,10 @@ export async function redactFact(
     text: string
 ): Promise<RedactedFact> {
     try {
+        // Custom data rules are a Pro security feature: off the plan, nothing to apply.
+        if (!(await projectIncludesSecurity(supabase, projectId))) {
+            return { content: text, redactions: 0, blocked: false };
+        }
         const { inputResult } = await fetchAndProcessCustomRules(supabase, projectId, text);
 
         return {

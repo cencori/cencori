@@ -24,10 +24,10 @@ export const CENCORI_PAID_PLANS: Record<PaidPlanTier, PaidPlan> = {
     },
     features: [
       "Unlimited projects",
-      "More agents running at once",
+      "10 agents",
       "50,000 memories per project",
       "Full security pipeline",
-      "Team seats",
+      "Invite your team",
       "Priority support",
     ],
   },

@@ -1,4 +1,5 @@
 "use client";
+import { UpgradeProvider } from "@/components/billing/UpgradeProvider";
 import { browserAuth } from "@/lib/auth/browser-auth";
 
 import React, { useEffect, useMemo, useState } from "react";
@@ -423,6 +424,7 @@ function LayoutContent({ user, avatar, name, children, initialAgentOpen, initial
   };
 
   return (
+    <UpgradeProvider org={currentOrg ? { id: currentOrg.id, slug: currentOrg.slug, name: currentOrg.name, tier: currentOrg.subscription_tier, accountType: currentOrg.account_type } : null}>
     <div
       className={cn(
         // pt: room for the maintenance banner above the fixed header.
@@ -603,5 +605,6 @@ function LayoutContent({ user, avatar, name, children, initialAgentOpen, initial
         {...agentProps}
       />
     </div>
+    </UpgradeProvider>
   );
 }

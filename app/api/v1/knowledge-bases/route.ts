@@ -58,6 +58,13 @@ export async function POST(req: NextRequest) {
         return addGatewayHeaders(embeddedError(400, 'invalid_request_error', 'Invalid scope_type', { requestId }), { requestId });
     }
 
+    // Plan cap: knowledge bases per project (Free 5).
+    {
+        const { checkKnowledgeBaseCap } = await import('@/lib/embedded/limits');
+        const cap = await checkKnowledgeBaseCap(supabase as never, validation.context.projectId, (validation.context.tier as import('@/lib/entitlements').SubscriptionTier) ?? 'free');
+        if (!cap.ok) return addGatewayHeaders(embeddedError(402, cap.code, cap.message, { requestId }), { requestId });
+    }
+
     const { data, error } = await supabase
         .from('knowledge_bases')
         .insert({ project_id: validation.context.projectId, tenant_id: tenantId, name: body.name.trim(), scope_type: scope, region: body.region ?? null, retention_policy: body.retention_policy ?? {} })

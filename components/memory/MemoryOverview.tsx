@@ -1,5 +1,6 @@
 'use client';
 
+import { useUpgrade } from '@/components/billing/UpgradeProvider';
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useReducedMotion } from 'framer-motion';
@@ -244,6 +245,7 @@ function LatestSearches({ searches }: { searches: NonNullable<OverviewResponse['
 }
 
 export function MemoryOverview({ projectId, onViewMemories }: MemoryOverviewProps) {
+    const upgrade = useUpgrade();
     const reduceMotion = useReducedMotion();
     const { data, isLoading, error } = useMemoryOverview(projectId);
     // Fetched alongside the stats, so the page appears in one go instead of
@@ -363,6 +365,14 @@ export function MemoryOverview({ projectId, onViewMemories }: MemoryOverviewProp
                                     style={{ width: `${Math.max(Math.min(quota?.percent ?? 0, 100), (quota?.used ?? 0) > 0 ? 1 : 0)}%` }}
                                 />
                             </span>
+                            {(quota?.percent ?? 0) >= 80 && upgrade.canUpgrade && (
+                                <p className="mt-2 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+                                    {(quota?.percent ?? 0) >= 100 ? 'New memories aren\u2019t being saved.' : 'Nearly at your memory limit.'}
+                                    <button type="button" onClick={upgrade.openUpgrade} onMouseEnter={upgrade.preloadUpgrade} className="font-medium text-foreground underline underline-offset-2">
+                                        Upgrade to Pro for 50,000
+                                    </button>
+                                </p>
+                            )}
                         </div>
                     )}
                     <dl className="mt-4 grid grid-cols-2 border-t border-border/40 md:grid-cols-4">

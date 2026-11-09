@@ -1,4 +1,6 @@
 "use client";
+import { useUpgrade } from "@/components/billing/UpgradeProvider";
+import { Lock } from "lucide-react";
 import { getBrowserAuthUser } from "@/lib/auth/get-browser-auth-user";
 
 import React, { useEffect, useState, use } from "react";
@@ -109,6 +111,7 @@ function useCurrentUser() {
 }
 
 export default function TeamsPage({ params }: PageProps) {
+    const upgrade = useUpgrade();
     const { orgSlug } = use(params);
     const searchParams = useSearchParams();
     const queryClient = useQueryClient();
@@ -265,7 +268,7 @@ export default function TeamsPage({ params }: PageProps) {
                     orgName={org.name}
                     currentTier={org.subscription_tier}
                     feature="Invite members"
-                    message="Team collaboration is available on Pro, Team, and Enterprise."
+                    message="Team collaboration is available on Pro and Enterprise."
                     variant="inline"
                     className="mb-4"
                     returnPath={`/${orgSlug}/~/teams`}
@@ -342,12 +345,15 @@ export default function TeamsPage({ params }: PageProps) {
                         </Dialog>
                     )}
                     {canManageMembers && !teamsEnabled && (
+                        // Team members are Pro: the button opens the checkout instead of doing nothing.
                         <Button
                             size="sm"
-                            className="h-8 text-xs"
-                            disabled
-                            title="Available on Pro, Team, and Enterprise"
+                            className="h-8 gap-1.5 text-xs"
+                            onClick={upgrade.openUpgrade}
+                            onMouseEnter={upgrade.preloadUpgrade}
+                            title="Inviting members is a Pro feature"
                         >
+                            <Lock className="h-3 w-3" />
                             Invite member
                         </Button>
                     )}

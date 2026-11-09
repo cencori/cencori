@@ -53,7 +53,7 @@ export async function requireGovernanceAuth(
     if (!check.ok) return { ok: false, response: check.response };
 
     if (options?.requirePaidControls) {
-        const planGate = await requireTierFeatureForOrg(orgId, 'governanceControls', 'team');
+        const planGate = await requireTierFeatureForOrg(orgId, 'governanceControls', 'enterprise');
         if (planGate) return { ok: false, response: planGate };
     }
 

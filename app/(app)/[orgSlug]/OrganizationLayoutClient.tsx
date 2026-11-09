@@ -1,5 +1,6 @@
 "use client";
 
+import { PlanStandingBanner } from "@/components/billing/PlanStandingBanner";
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useParams, useSearchParams } from "next/navigation";
@@ -87,7 +88,7 @@ function useOrganization(orgSlug: string) {
         queryFn: async () => {
             const { data: orgData, error: orgError } = await supabase
                 .from("organizations")
-                .select("id, name, slug, subscription_tier")
+                .select("id, name, slug, subscription_tier, subscription_status, subscription_current_period_start, subscription_current_period_end, billing_provider, account_type")
                 .eq("slug", orgSlug)
                 .single();
 
@@ -1028,6 +1029,7 @@ export default function OrganizationLayoutClient({
             </Drawer.Root>
 
             <main className="flex min-h-0 w-full flex-1 flex-col overflow-hidden">
+                <PlanStandingBanner org={organization} orgSlug={orgSlug} />
                 <div
                     key={pathname}
                     className={isFixedWorkspace

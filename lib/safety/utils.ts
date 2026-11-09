@@ -4,6 +4,7 @@
  * Functions used across multiple AI gateway routes for security config.
  */
 
+import { hasFeature } from '@/lib/entitlements';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { ProjectSecurityConfig } from '@/lib/safety/multi-layer-check';
 import type { SubscriptionTier } from '@/lib/entitlements';
@@ -72,10 +73,11 @@ export function toCachedSecuritySettings(row: SecuritySettingsRow): CachedSecuri
 /**
  * Get project security configuration from database.
  *
- * Explicit opt-in only: scanning runs iff the project enabled it on the
- * dashboard (`security_settings.security_enabled`). No row or an unset flag
- * means every scanner is off, on every tier. The cached value carries the
- * switch, so tier plays no role in the decision.
+ * Explicit opt-in, and Pro only: scanning runs iff the project enabled it on
+ * the dashboard (`security_settings.security_enabled`) AND the org's plan
+ * includes security. An org that turned it on and then left Pro stops being
+ * scanned. The plan is read here from the project's org, not taken from the
+ * caller, because several paths pass a placeholder tier ('embedded') or none.
  */
 export async function getProjectSecurityConfig(
     supabase: ReturnType<typeof createAdminClient>,
@@ -83,9 +85,10 @@ export async function getProjectSecurityConfig(
     _tier: SubscriptionTier = 'free'
 ): Promise<ProjectSecurityConfig> {
     // Only PII protection remains; the other cached flags are ignored.
+    const securityIncluded = await projectIncludesSecurity(supabase, projectId);
     const applyExplicit = (settings: CachedSecuritySettings): ProjectSecurityConfig => ({
-        enabled: settings.enabled,
-        filterPII: settings.filterPII,
+        enabled: securityIncluded && settings.enabled,
+        filterPII: securityIncluded && settings.filterPII,
     });
 
     const cached = await getCachedSecurityConfig(projectId);
@@ -108,5 +111,32 @@ export async function getProjectSecurityConfig(
     } catch (error) {
         console.warn('[Security] Failed to fetch security settings:', error);
         return applyExplicit({ ...DISABLED_SECURITY_SETTINGS });
+    }
+}
+
+// ── Plan check for security ──
+// Short in-process memo: the plan changes rarely, and this runs on every request.
+const PLAN_MEMO_MS = 60_000;
+const planMemo = new Map<string, { included: boolean; at: number }>();
+
+/** Whether the project's org plan includes security (Pro and up; business accounts follow their own setting). */
+export async function projectIncludesSecurity(supabase: ReturnType<typeof createAdminClient>, projectId: string): Promise<boolean> {
+    const hit = planMemo.get(projectId);
+    if (hit && Date.now() - hit.at < PLAN_MEMO_MS) return hit.included;
+    try {
+        const { data } = await supabase
+            .from('projects')
+            .select('organizations!inner(subscription_tier, account_type)')
+            .eq('id', projectId)
+            .maybeSingle();
+        const org = (data as { organizations?: { subscription_tier?: string | null; account_type?: string | null } } | null)?.organizations;
+        // Unknown project/org: keep the explicit setting rather than silently unprotect.
+        if (!org) return true;
+        const included = org.account_type === 'business' || hasFeature((org.subscription_tier || 'free') as SubscriptionTier, 'security');
+        planMemo.set(projectId, { included, at: Date.now() });
+        return included;
+    } catch {
+        // A read failure must not switch protection off.
+        return true;
     }
 }

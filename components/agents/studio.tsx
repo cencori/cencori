@@ -93,7 +93,10 @@ export async function postStudioAction(projectId: string, action: string, payloa
         body: JSON.stringify({ action, ...payload }),
     });
     const result = await response.json().catch(() => ({})) as Record<string, unknown>;
-    if (!response.ok) throw new Error(typeof result.error === "string" ? result.error : "That didn't work. Try again.");
+    if (!response.ok) {
+        // The status lets callers tell a plan limit (402) from other failures.
+        throw Object.assign(new Error(typeof result.error === "string" ? result.error : "That didn't work. Try again."), { status: response.status });
+    }
     return result;
 }
 
