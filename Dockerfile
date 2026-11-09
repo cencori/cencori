@@ -4,3 +4,4 @@
 # pointing this at an older tag. Edit a comment to redeploy the same image.
 # Redeploy: 2026-11-08 (db72b287 did not roll out).
 FROM ghcr.io/cencori/cencori:05b518770022b9491ad056742bb5707483a15fc8
+# redeploy 2026-11-09T03:00Z
