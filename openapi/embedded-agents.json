@@ -7683,6 +7683,249 @@
         }
       ]
     },
+    "/v1/sessions/{sessionId}/human": {
+      "get": {
+        "summary": "Who is handling the conversation, and messages since a human handoff (secret key or the session's client token)",
+        "operationId": "getSessionsBySessionIdHuman",
+        "tags": [
+          "Sessions"
+        ],
+        "parameters": [
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "handled_by": {
+                      "type": "string",
+                      "enum": [
+                        "human",
+                        "agent"
+                      ]
+                    },
+                    "handoff": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "reason": {
+                          "type": "string"
+                        },
+                        "at": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    },
+                    "messages": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "from": {
+                            "type": "string",
+                            "enum": [
+                              "user",
+                              "human",
+                              "agent"
+                            ]
+                          },
+                          "text": {
+                            "type": "string"
+                          },
+                          "at": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "from",
+                          "text",
+                          "at"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "handled_by",
+                    "handoff",
+                    "messages"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "post": {
+        "summary": "Hand the conversation to a person, reply as the team, or hand it back to the agent (secret key)",
+        "operationId": "postSessionsBySessionIdHuman",
+        "tags": [
+          "Sessions"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "handoff",
+                      "reply",
+                      "release"
+                    ]
+                  },
+                  "reason": {
+                    "type": "string",
+                    "description": "For handoff: why, for the person picking it up."
+                  },
+                  "text": {
+                    "type": "string",
+                    "maxLength": 4000,
+                    "description": "For reply: the team's message."
+                  }
+                },
+                "required": [
+                  "action"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "handled_by": {
+                      "type": "string",
+                      "enum": [
+                        "human",
+                        "agent"
+                      ]
+                    },
+                    "handoff": {
+                      "type": "object",
+                      "properties": {
+                        "reason": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "message": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "from": {
+                          "type": "string",
+                          "enum": [
+                            "user",
+                            "human",
+                            "agent"
+                          ]
+                        },
+                        "text": {
+                          "type": "string"
+                        },
+                        "at": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "from",
+                        "text",
+                        "at"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Reply saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "handled_by": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "from": {
+                          "type": "string",
+                          "enum": [
+                            "user",
+                            "human",
+                            "agent"
+                          ]
+                        },
+                        "text": {
+                          "type": "string"
+                        },
+                        "at": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "from",
+                        "text",
+                        "at"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/SessionId"
+        }
+      ]
+    },
     "/v1/sessions/{sessionId}/reject": {
       "post": {
         "summary": "Reject paused tool call (secret-key)",

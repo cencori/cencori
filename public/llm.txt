@@ -63,6 +63,7 @@ Current minimum versions:
 - Embedded Agents MCP inspection: `@cencori/mcp@0.8.0`
 - Agents SDK + Agent UI (`cencori/agents`, `cencori/react`), incl. MCP servers on agents: `cencori@1.13.0`
 - Human handoff, images/files in `run()`, attachments in `<AgentChat>`: `cencori@1.14.0`
+- `webSearch()` / `webFetch()` web tools for agents: `cencori@1.15.0`
 
 ## Setup Decision
 
@@ -1006,6 +1007,10 @@ Cencori Web is the first-party web intelligence layer for agents. It does not ca
 
 Install `cencori@1.6.1` or later:
 
+Pricing (charged from credits on every plan, including projects on their own model keys; failed calls are free): search $0.005, fetch $0.001 per page, extract $0.002 per page, crawl $0.002 per page indexed. Removal requests are free. A zero credit balance returns `402` until the project tops up.
+
+Searches per minute per project (Web API and the built-in `web_search_preview` tool together): Free 5, Pro 20, Enterprise 60; over that, search returns `429` with `details.retry_after_seconds`. The built-in `web_search_preview` tool (Responses, sessions, stored agents) searches the live web first, merges Cencori's index, and is charged like a Web API search; over the limit it answers from the index alone, free.
+
 ```bash
 npm install cencori@latest
 ```
@@ -1306,6 +1311,7 @@ result.sessionId;   // pass back as { sessionId } to continue the conversation
 - Approvals: `tool({ ..., needsApproval: true | (args, ctx) => boolean })` pauses the run (`result.interruptions`); approve/reject on `result.state`, then `run(agent, result.state)`.
 - Orchestration: `handoffs: [otherAgent]` moves the conversation; `otherAgent.asTool()` calls an agent as a tool.
 - MCP servers (tools from remote/local MCP servers, connected from your process): `new MCPServerStreamableHttp({ url, headers? })`, `new MCPServerStdio({ command, args })`; pass as `mcpServers: [...]`.
+- Live web (cencori@1.15.0+): `tools: [webSearch({ limit?, domain? }), webFetch({ maxChars? })]` from `cencori/agents`. Billed as Cencori Web calls (search $0.005, page read $0.002); results are untrusted evidence.
 - Errors: `CencoriRunError` (`code`, `status`, `sessionId`), `MaxTurnsExceededError`, `GuardrailTripwireTriggered`.
 
 ### Images and files in `run()` (cencori@1.14.0+)

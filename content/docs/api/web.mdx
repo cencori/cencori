@@ -31,6 +31,29 @@ const cencori = new Cencori({
 
 All Web endpoints require a secret project key. Keep `CENCORI_API_KEY` on the server.
 
+## Pricing
+
+Web calls are charged from your credits, on every plan. There's no provider key to bring, so projects that use their own model keys pay for Web too.
+
+| Call | Price |
+| --- | --- |
+| Search | $0.005 per search |
+| Fetch | $0.001 per page |
+| Extract | $0.002 per page |
+| Crawl | $0.002 per page indexed |
+
+Failed calls and pages that fail to index are free. Removal requests are free. With no credits left, Web calls return `402` until you top up. Each call's charge shows in **Observability → Request logs**.
+
+Each project can run a number of searches a minute, shared by the Web API and the built-in `web_search_preview` tool:
+
+| Plan | Searches per minute |
+| --- | --- |
+| Free | 5 |
+| Pro | 20 |
+| Enterprise | 60 |
+
+Over that, search returns `429` with `retry_after_seconds`.
+
 ## Search the web
 
 ```ts

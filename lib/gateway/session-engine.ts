@@ -844,7 +844,7 @@ export async function executeSessionTurn(params: TurnExecuteParams): Promise<Tur
         const messages: UnifiedMessage[] = [...history, ...inputMessages];
 
         const pre = builtInTools.length > 0
-            ? await preProcessBuiltInTools(inputText, builtInTools, gatewayCtx.projectId, params.networkPolicy)
+            ? await preProcessBuiltInTools(inputText, builtInTools, gatewayCtx.projectId, params.networkPolicy, { organizationId: gatewayCtx.organizationId, tier: gatewayCtx.tier, requestId: gatewayCtx.requestId, covered: gatewayCtx.businessPlanCovered === true })
             : { systemContext: '', toolOutputs: [] as ToolCallOutput[] };
 
         if (pre.systemContext) {

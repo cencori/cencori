@@ -537,7 +537,9 @@ export async function runV1ResponsesExecution(
             ? await preProcessBuiltInTools(
                   userInputText || inputText,
                   builtInTools,
-                  gatewayCtx.projectId
+                  gatewayCtx.projectId,
+                  undefined,
+                  { organizationId: gatewayCtx.organizationId, tier: gatewayCtx.tier, requestId: gatewayCtx.requestId, covered: gatewayCtx.businessPlanCovered === true },
               )
             : { systemContext: '', toolOutputs: [] as ToolCallOutput[] };
 

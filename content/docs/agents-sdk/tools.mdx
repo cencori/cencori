@@ -94,6 +94,27 @@ const showOrder = tool({
 });
 ```
 
+## Web search
+
+Give an agent the live web with two ready-made tools:
+
+```ts
+import { Agent, webFetch, webSearch } from 'cencori/agents';
+
+const researcher = new Agent({
+    name: 'Researcher',
+    instructions: 'Answer with sources. Search first, then read the best pages.',
+    tools: [webSearch(), webFetch()],
+});
+```
+
+| Tool | What it does | Options |
+| --- | --- | --- |
+| `webSearch()` | Searches the live web: titles, URLs and snippets | `limit` (default 8), `domain` to stay on one site |
+| `webFetch()` | Reads a page as clean text | `maxChars` (default 20,000) |
+
+Both are [Cencori Web](/docs/api/web#pricing) calls, charged from credits ($0.005 a search, $0.002 a page read), and count towards the project's searches per minute. What they return is marked as untrusted, so the model uses it as evidence and never follows instructions inside a page. Needs `cencori@1.15.0`.
+
 ## Agents as tools
 
 Another agent can be a tool: it answers a question and the calling agent keeps the conversation. See [Orchestration](/docs/agents-sdk/orchestration).

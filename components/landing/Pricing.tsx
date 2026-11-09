@@ -9,6 +9,8 @@ import { supabase } from "@/lib/supabaseClient";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/currency";
 import { CENCORI_PAID_PLANS } from "@/lib/billing/plans";
+import { WEB_PRICES_USD } from "@/lib/web/pricing";
+import { CREDIT_NGN_PER_USD } from "@/lib/billing/credit-pricing";
 import { CurrencyToggle } from "@/components/dashboard/CurrencyToggle";
 import { useDisplayCurrency } from "@/hooks/useDisplayCurrency";
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
@@ -16,12 +18,14 @@ import BotIcon from "@hugeicons/core-free-icons/BotIcon";
 import BrainIcon from "@hugeicons/core-free-icons/BrainIcon";
 import SecurityCheckIcon from "@hugeicons/core-free-icons/SecurityCheckIcon";
 import Layers01Icon from "@hugeicons/core-free-icons/Layers01Icon";
+import GlobeIcon from "@hugeicons/core-free-icons/GlobeIcon";
 import { Spinner } from "@/components/ui/spinner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type Tier = "free" | "pro" | "enterprise";
 type Currency = "USD" | "NGN";
-type MatrixValue = boolean | string;
+// A function value follows the USD/NGN switch (Web prices).
+type MatrixValue = boolean | string | ((currency: Currency) => string);
 
 const tiers: Array<{
     name: Tier;
@@ -97,6 +101,22 @@ const tiers: Array<{
     },
 ];
 
+// A Web price, the same on Free and Pro (from lib/web/pricing.ts);
+// Enterprise is billed under its contract.
+/** ₦3, or ₦7.50 when there's kobo. */
+function nairaAmount(naira: number): string {
+    const digits = Number.isInteger(naira) ? 0 : 2;
+    return naira.toLocaleString("en-NG", { minimumFractionDigits: digits, maximumFractionDigits: digits });
+}
+
+function webPrice(endpoint: keyof typeof WEB_PRICES_USD, unit: string): Record<Tier, MatrixValue> {
+    // Naira at the credit rate (₦1,500 per $1), as the dashboard shows money.
+    const price = (currency: Currency) => currency === "NGN"
+        ? `₦${nairaAmount(WEB_PRICES_USD[endpoint] * CREDIT_NGN_PER_USD)} ${unit}`
+        : `$${WEB_PRICES_USD[endpoint]} ${unit}`;
+    return { free: price, pro: price, enterprise: "Custom" };
+}
+
 // Every value here mirrors lib/entitlements.ts (TIER_FEATURES,
 // EMBEDDED_LIMITS, MEMORY_QUOTA, MEMORY_OPS_QUOTA, LOG_RETENTION_RANGE).
 // Change both together.
@@ -153,6 +173,17 @@ const matrixSections: Array<{
                 feature: "Memory saves per month",
                 values: { free: "1,000", pro: "5,000", enterprise: "Unlimited" },
             },
+        ],
+    },
+    {
+        title: "Web",
+        icon: GlobeIcon,
+        description: "Search, fetch and crawl the web for your agents. Paid from credits.",
+        rows: [
+            { feature: "Search", values: webPrice("web/search", "/ search") },
+            { feature: "Fetch", values: webPrice("web/fetch", "/ page") },
+            { feature: "Extract", values: webPrice("web/extract", "/ page") },
+            { feature: "Crawl", values: webPrice("web/crawl", "/ page indexed") },
         ],
     },
     {
@@ -227,7 +258,8 @@ const matrixSections: Array<{
     },
 ];
 
-function renderMatrixValue(value: MatrixValue) {
+function renderMatrixValue(value: MatrixValue, currency: Currency) {
+    if (typeof value === "function") value = value(currency);
     if (value === true) {
         return <Check className="mx-auto h-4 w-4 text-foreground" aria-hidden="true" />;
     }
@@ -464,7 +496,7 @@ export function Pricing() {
                                                 <td className="px-4 py-3 text-sm text-foreground md:px-5">{row.feature}</td>
                                                 {tiers.map((tier) => (
                                                     <td key={tier.name} className={cn("px-4 py-3 text-center md:table-cell md:px-5", tier.name !== mobilePlan && "hidden")}>
-                                                        {renderMatrixValue(row.values[tier.name])}
+                                                        {renderMatrixValue(row.values[tier.name], currency)}
                                                     </td>
                                                 ))}
                                             </tr>

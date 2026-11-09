@@ -24,6 +24,8 @@ export async function POST(req: NextRequest) {
         });
         return {
             body: result,
+            // Charged per page indexed; failed pages are free.
+            billableUnits: result.indexed,
             metadata: {
                 seeds: body.seeds.length,
                 indexed: result.indexed,

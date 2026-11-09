@@ -84,18 +84,31 @@ export type ToolCallOutput = {
 
 // ── Web Search Preview ──
 
+/**
+ * Who pays for a live search. Without it the tool searches only the Cencori
+ * index (as it did before live search); with it, the live web comes first.
+ */
+export interface WebSearchBilling {
+    organizationId: string;
+    tier: string;
+    requestId: string;
+    /** A business plan that covers usage: searches aren't charged. */
+    covered?: boolean;
+}
+
 export async function executeWebSearch(
     query: string,
     config: WebSearchToolConfig,
     projectId: string,
     networkPolicy?: NetworkPolicy,
+    billing?: WebSearchBilling,
 ): Promise<ToolCallOutput> {
     const callId = `ws_${crypto.randomUUID().replace(/-/g, '').slice(0, 20)}`;
     try {
         if (networkPolicy && (networkPolicy.mode !== 'allowlist' || networkPolicy.allowed_hosts.length === 0)) {
             throw new Error('Web search denied by the installed agent network policy');
         }
-        const results = await performWebSearch(query, config.search_context_size || 'medium', projectId, networkPolicy);
+        const results = await performWebSearch(query, config.search_context_size || 'medium', projectId, networkPolicy, billing);
         return {
             type: 'web_search_call',
             id: callId,
@@ -130,11 +143,49 @@ async function performWebSearch(
     contextSize: 'low' | 'medium' | 'high',
     projectId: string,
     networkPolicy?: NetworkPolicy,
+    billing?: WebSearchBilling,
 ): Promise<Array<{ title: string; url: string; snippet: string }>> {
     const numResults = contextSize === 'low' ? 3 : contextSize === 'medium' ? 8 : 15;
-    const { searchWebIndex } = await import('@/lib/web/index');
-    const { createWebDataStore } = await import('@/lib/web/store');
-    const results = await searchWebIndex(createWebDataStore(createAdminClient()), projectId, query, { limit: numResults });
+
+    // The live web first (charged like a Web API search), then the Cencori
+    // index for anything it adds. Over the project's per-minute allowance, or
+    // if live search fails, the index alone answers, free.
+    let live: Array<{ title: string; canonicalUrl: string; snippet: string }> = [];
+    if (billing) {
+        try {
+            const { liveWebSearch, takeWebSearchSlot } = await import('@/lib/web/live-search');
+            const slot = await takeWebSearchSlot(projectId, billing.tier);
+            if (slot.allowed) {
+                live = await liveWebSearch(query, { limit: numResults });
+                const { webCharge } = await import('@/lib/web/pricing');
+                const { chargeProjectUsageCredits } = await import('@/lib/project-credit-billing');
+                if (!billing.covered) {
+                    await chargeProjectUsageCredits(billing.organizationId, billing.tier, webCharge('web/search'), 'web/search', `${billing.requestId}:web_search`);
+                }
+            }
+        } catch (error) {
+            console.warn('[web_search_preview] live search failed; using the Cencori index', error instanceof Error ? error.message : error);
+            live = [];
+        }
+    }
+
+    let indexed: Array<{ title: string; canonicalUrl: string; snippet: string }> = [];
+    try {
+        const { searchWebIndex } = await import('@/lib/web/index');
+        const { createWebDataStore } = await import('@/lib/web/store');
+        indexed = await searchWebIndex(createWebDataStore(createAdminClient()), projectId, query, { limit: numResults });
+    } catch (error) {
+        // With live results in hand, an index failure isn't fatal.
+        if (live.length === 0) throw error;
+    }
+
+    const seen = new Set<string>();
+    const results = [...live, ...indexed].filter((result) => {
+        if (seen.has(result.canonicalUrl)) return false;
+        seen.add(result.canonicalUrl);
+        return true;
+    }).slice(0, numResults);
+
     const visible: Array<{ title: string; url: string; snippet: string }> = [];
     for (const result of results) {
         if (networkPolicy) {
@@ -266,6 +317,7 @@ export async function preProcessBuiltInTools(
     tools: ResponsesBuiltInTool[],
     projectId: string,
     networkPolicy?: NetworkPolicy,
+    billing?: WebSearchBilling,
 ): Promise<ToolPreProcessResult> {
     const systemContexts: string[] = [];
     const toolOutputs: ToolCallOutput[] = [];
@@ -273,7 +325,7 @@ export async function preProcessBuiltInTools(
     for (const tool of tools) {
         switch (tool.type) {
             case 'web_search_preview': {
-                const result = await executeWebSearch(input, tool, projectId, networkPolicy);
+                const result = await executeWebSearch(input, tool, projectId, networkPolicy, billing);
                 toolOutputs.push(result);
                 if (result.status === 'completed' && result.output?.results) {
                     systemContexts.push(

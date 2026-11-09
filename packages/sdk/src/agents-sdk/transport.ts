@@ -123,6 +123,12 @@ export class Transport {
         }, sessionId);
     }
 
+    /** Cencori Web: search or read pages (POST /api/v1/web/search | extract). */
+    async web(endpoint: 'search' | 'extract', body: Record<string, unknown>): Promise<unknown> {
+        const response = await this.post(`/api/v1/web/${endpoint}`, body);
+        return response.json();
+    }
+
     /** Human handoff: hand over, reply as a person, or release (POST /v1/sessions/:id/human). */
     async human(sessionId: string, body: { action: 'handoff' | 'reply' | 'release'; reason?: string; text?: string }): Promise<unknown> {
         const response = await this.post(`/v1/sessions/${encodeURIComponent(sessionId)}/human`, body, sessionId);

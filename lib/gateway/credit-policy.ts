@@ -17,7 +17,8 @@ export function isMeteredGatewayRequest(method: string, pathname: string): boole
     if (/^\/api\/v1\/agents\/[^/]+\/runs$/.test(pathname)) return true;
     if (/^\/api\/v1\/agents\/[^/]+\/versions\/[^/]+\/test$/.test(pathname)) return true;
     if (/^\/api\/v1\/knowledge-bases\/[^/]+\/search$/.test(pathname)) return true;
-    return pathname === '/api/v1/web/browse';
+    // Cencori Web is priced per call (lib/web/pricing.ts); takedown requests are free.
+    return /^\/api\/v1\/web\/(search|fetch|extract|crawl|browse)$/.test(pathname);
 }
 
 /**

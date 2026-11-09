@@ -7,11 +7,14 @@ import {
     type GatewayContext,
 } from '@/lib/gateway-middleware';
 import { WebRuntimeError } from './errors';
+import { webCharge } from './pricing';
 
 export interface WebRouteResult {
     body: unknown;
     status?: number;
     metadata?: Record<string, unknown>;
+    /** How many priced units this call used (crawl: pages indexed). Default 1. */
+    billableUnits?: number;
 }
 
 export async function runWebRoute(
@@ -41,17 +44,23 @@ export async function runWebRoute(
 
         bodyForLog = body as Record<string, unknown>;
         const result = await operation(body as Record<string, unknown>, ctx);
+        // Priced per call (lib/web/pricing.ts); only a successful call is charged.
+        const charge = webCharge(endpoint, result.billableUnits ?? 1);
         await logGatewayRequest(ctx, {
             endpoint,
             model: 'cencori-web-v2',
             provider: 'cencori',
             status: 'success',
-            metadata: result.metadata,
+            costUsd: charge,
+            providerCostUsd: 0,
+            cencoriChargeUsd: charge,
+            markupPercentage: 0,
+            metadata: { ...result.metadata, billable_units: result.billableUnits ?? 1 },
             // Without these the console shows a web row with nothing to inspect.
             requestPayload: body as Record<string, unknown>,
             responsePayload: result.body as Record<string, unknown>,
         });
-        await incrementUsage(ctx, 0);
+        await incrementUsage(ctx, charge);
         return respond(result.body, result.status ?? 200);
     } catch (error) {
         const runtimeError = error instanceof WebRuntimeError

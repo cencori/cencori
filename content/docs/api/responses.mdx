@@ -158,7 +158,9 @@ Cencori supports all built-in tools from the OpenAI Responses API specification.
 
 ### web_search_preview
 
-Searches Cencori's first-party hybrid web index and injects evidence-bearing results as context for the model. No external search-provider key is required.
+Searches the live web, adds matching pages from Cencori's own web index, and gives the results to the model as evidence. No search-provider key is required.
+
+Each search is charged like a [Cencori Web](/docs/api/web#pricing) search ($0.005) and counts towards the project's searches per minute (Free 5, Pro 20, Enterprise 60). Over that, or if live search is unavailable, the tool answers from Cencori's index alone, free.
 
 ```json
 {

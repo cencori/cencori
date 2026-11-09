@@ -25,4 +25,6 @@ export type { MCPServer, MCPServerOptions, MCPServerStreamableHttpOptions, MCPSe
 export { humanHandoff, humanReply, releaseToAgent, humanStatus, HUMAN_HANDOFF_TOOL } from './human';
 export type { HumanHandoffOptions, HumanMessage, HumanStatus } from './human';
 export { image, file, inputText } from './input';
+export { webSearch, webFetch } from './web';
+export type { WebSearchToolOptions, WebFetchToolOptions } from './web';
 export type { AgentInput, AgentInputItem, InputContentPart } from './input';
