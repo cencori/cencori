@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireProjectAccess } from '@/lib/require-project-access';
+import { logRetentionCutoff } from '@/lib/entitlements';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { formatIncidentDetail } from '@/lib/security-incident-log';
 
@@ -11,25 +12,30 @@ export async function GET(
     const { projectId, requestId } = await params;
     const projectAccess = await requireProjectAccess(projectId);
     if (!projectAccess.ok) return projectAccess.response;
+    // Older than the plan keeps visible (Free 7 days, Pro 30): not found,
+    // the same as in the list.
+    const cutoff = logRetentionCutoff(projectAccess.subscriptionTier);
 
     try {
-        const { data: request, error } = await supabaseAdmin
+        let requestQuery = supabaseAdmin
             .from('ai_requests')
             .select('*')
             .eq('id', requestId)
-            .eq('project_id', projectId)
-            .single();
+            .eq('project_id', projectId);
+        if (cutoff) requestQuery = requestQuery.gte('created_at', cutoff);
+        const { data: request, error } = await requestQuery.single();
 
         if (error || !request) {
             // The logs feed also lists security incidents, which live in their own
             // table and never produced an ai_requests row (blocked before the
             // provider call). Fall back to those before giving up.
-            const { data: incident } = await supabaseAdmin
+            let incidentQuery = supabaseAdmin
                 .from('security_incidents')
                 .select('*')
                 .eq('id', requestId)
-                .eq('project_id', projectId)
-                .single();
+                .eq('project_id', projectId);
+            if (cutoff) incidentQuery = incidentQuery.gte('created_at', cutoff);
+            const { data: incident } = await incidentQuery.single();
 
             if (incident) {
                 let incidentKeyInfo = null;

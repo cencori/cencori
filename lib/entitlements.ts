@@ -184,6 +184,21 @@ export const LOG_RETENTION_RANGE: Record<SubscriptionTier, TimeRange> = {
   enterprise: 'all',
 };
 
+const RETENTION_DAYS: Record<TimeRange, number | null> = {
+  '1h': 1 / 24, '24h': 1, '7d': 7, '30d': 30, '90d': 90, all: null,
+};
+
+/**
+ * The oldest request log a plan can see or export (Free 7 days, Pro 30,
+ * Team 90, Enterprise everything), as an ISO time, or null for no limit.
+ * Every read of request logs (list, single request, export) starts here.
+ */
+export function logRetentionCutoff(tier: SubscriptionTier | string | null | undefined, now = Date.now()): string | null {
+  const range = LOG_RETENTION_RANGE[(tier as SubscriptionTier)] ?? LOG_RETENTION_RANGE.free;
+  const days = RETENTION_DAYS[range];
+  return days === null ? null : new Date(now - days * 86_400_000).toISOString();
+}
+
 /**
  * Clamp a requested time range to the tier's retention window.
  * Unknown values fall back to the tier's maximum.

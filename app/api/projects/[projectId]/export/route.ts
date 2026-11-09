@@ -1,8 +1,8 @@
-import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
-import { createServerClient } from '@/lib/supabaseServer';
 import { fetchAllRows } from '@/lib/supabase-paginate';
+import { requireProjectAccess } from '@/lib/require-project-access';
+import { logRetentionCutoff } from '@/lib/entitlements';
 
 interface RouteParams {
     params: Promise<{ projectId: string }>;
@@ -28,28 +28,20 @@ function toCSV(data: Record<string, unknown>[], columns: string[]): string {
 }
 export async function GET(req: NextRequest, { params }: RouteParams) {
     const { projectId } = await params;
-    const supabase = await createServerClient();
+    // Members of the project's organization only: this reads with the admin
+    // client, so nothing else stands between a caller and the data.
+    const access = await requireProjectAccess(projectId);
+    if (!access.ok) return access.response;
     const supabaseAdmin = createAdminClient();
-
-    const { data: { user }, error: userError } = await getAuthUser(supabase);
-    if (userError || !user) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: project, error: projectError } = await supabaseAdmin
-        .from('projects')
-        .select('id, name, organization_id')
-        .eq('id', projectId)
-        .single();
-
-    if (projectError || !project) {
-        return NextResponse.json({ error: 'Project not found' }, { status: 404 });
-    }
 
     const searchParams = req.nextUrl.searchParams;
     const type = searchParams.get('type') || 'logs';
     const format = searchParams.get('format') || 'csv';
-    const from = searchParams.get('from');
+    // Never further back than the plan keeps visible (Free 7 days, Pro 30,
+    // Enterprise all), whatever `from` asks for.
+    const cutoff = logRetentionCutoff(access.subscriptionTier);
+    const requestedFrom = searchParams.get('from');
+    const from = cutoff && (!requestedFrom || !(Date.parse(requestedFrom) >= Date.parse(cutoff))) ? cutoff : requestedFrom;
     const to = searchParams.get('to');
     const environment = searchParams.get('environment') || 'production';
 

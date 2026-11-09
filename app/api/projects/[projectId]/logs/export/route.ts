@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireProjectAccess } from '@/lib/require-project-access';
+import { logRetentionCutoff } from '@/lib/entitlements';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { fetchAllRows } from '@/lib/supabase-paginate';
 
@@ -34,6 +35,10 @@ export async function POST(
                     startTime = new Date(now.getTime() - 24 * 60 * 60 * 1000);
             }
         }
+        // Never further back than the plan keeps visible (Free 7 days, Pro 30,
+        // Enterprise all), whatever range was asked for.
+        const cutoff = logRetentionCutoff(projectAccess.subscriptionTier);
+        if (cutoff && (!startTime || startTime.getTime() < Date.parse(cutoff))) startTime = new Date(cutoff);
 
         // Only the exported columns, paginated (a single select stops at 1,000
         // rows whatever .limit() says). CSV never includes payloads, so it
