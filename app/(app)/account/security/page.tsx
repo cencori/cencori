@@ -1,12 +1,12 @@
 "use client";
-import { browserAuth } from "@/lib/auth/browser-auth";
+import { authClient } from "@/lib/auth/auth-client";
+import { ChangePasswordDialog } from "./change-password-dialog";
 
 import React, { useState, useEffect } from "react";
 import { ShieldCheck, Key, Smartphone, Monitor, Tablet } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
-import { supabase } from "@/lib/supabaseClient";
 
 function parseUserAgent(ua: string) {
     let browser = "Unknown Browser";
@@ -48,18 +48,27 @@ export default function SecurityPage() {
         deviceType: "mobile" | "tablet" | "desktop";
     } | null>(null);
     const [isSigningOut, setIsSigningOut] = useState(false);
+    const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+    // null until loaded; false = signs in only with Google/GitHub/Apple.
+    const [hasPassword, setHasPassword] = useState<boolean | null>(null);
+    const { data: session } = authClient.useSession();
 
     useEffect(() => {
         if (typeof window !== "undefined") {
             const info = parseUserAgent(navigator.userAgent);
             setSessionInfo(info);
         }
+        authClient
+            .listAccounts()
+            .then(({ data }) => setHasPassword(!!data?.some((a) => a.providerId === "credential")))
+            .catch(() => setHasPassword(true));
     }, []);
 
     const handleSignOutOtherDevices = async () => {
         setIsSigningOut(true);
         try {
-            const { error } = await browserAuth.signOut({ scope: "others" });
+            // Revokes every session except this one (signOut() would end this one too).
+            const { error } = await authClient.revokeOtherSessions();
 
             if (error) throw error;
 
@@ -91,7 +100,9 @@ export default function SecurityPage() {
                             <div>
                                 <p className="text-sm font-medium">Password</p>
                                 <p className="text-xs text-muted-foreground">
-                                    Last changed: Never
+                                    {hasPassword === false
+                                        ? "Not set — you sign in with a connected account"
+                                        : "Used to sign in with your email"}
                                 </p>
                             </div>
                         </div>
@@ -99,13 +110,21 @@ export default function SecurityPage() {
                             variant="outline"
                             size="sm"
                             className="h-8 text-xs"
-                            onClick={() => toast.info("Password change coming soon!")}
+                            onClick={() => setPasswordDialogOpen(true)}
+                            disabled={hasPassword === null}
                         >
-                            Change password
+                            {hasPassword === false ? "Set password" : "Change password"}
                         </Button>
                     </div>
                 </div>
             </section>
+
+            <ChangePasswordDialog
+                open={passwordDialogOpen}
+                onOpenChange={setPasswordDialogOpen}
+                hasPassword={hasPassword !== false}
+                email={session?.user?.email ?? null}
+            />
 
             <section className="space-y-3">
                 <h2 className="text-sm font-medium">Two-Factor Authentication</h2>
