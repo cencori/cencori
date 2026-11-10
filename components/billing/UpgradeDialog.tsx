@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { ArrowRight, Check, LockKeyhole, X } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
@@ -230,10 +231,20 @@ export function UpgradeDialog({
     <OrderTotals dueNow={dueNow} inNaira={inNaira} interval={checkoutInterval} tier={checkoutTier} />
   );
 
-  // Desktop: a panel docked to the right. Mobile (below sm): a bottom sheet
-  // pinned to the bottom edge. Either way the scrolling body and pinned
-  // footer stack in a flex column capped in height.
+  // Desktop: a centered dialog. Mobile (below sm): a bottom sheet pinned to
+  // the bottom edge. Either way the scrolling body and pinned footer stack in
+  // a flex column capped in height.
+  //
+  // Non-modal on purpose: a modal dialog makes everything outside it inert,
+  // including the Bachs checkout that opens on top. So the dimmed backdrop
+  // is drawn here (Radix only draws one for modal dialogs); clicking it is an
+  // outside click, which closes the dialog unless a checkout is open.
   return (
+    <>
+    {open && typeof document !== "undefined" && createPortal(
+      <div aria-hidden="true" className="fixed inset-0 z-[49] bg-black/70 backdrop-blur-[1px]" />,
+      document.body,
+    )}
     <Dialog open={open} onOpenChange={handleOpenChange} modal={false}>
       <DialogContent
         animated={false}
@@ -247,7 +258,7 @@ export function UpgradeDialog({
         onInteractOutside={(event) => {
           if (paying) event.preventDefault();
         }}
-        className="flex max-h-[min(52rem,calc(100%-4rem-var(--maintenance-banner-height,0px)))] flex-col gap-0 overflow-hidden border-border/30 p-0 shadow-2xl max-sm:top-auto max-sm:bottom-0 max-sm:left-0 max-sm:max-h-[90dvh] max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-b-none max-sm:border-x-0 max-sm:border-b-0 sm:top-[calc(var(--maintenance-banner-height,0px)+3rem)] sm:bottom-0 sm:right-0 sm:left-auto sm:max-h-none sm:max-w-[440px] sm:translate-x-0 sm:translate-y-0 sm:rounded-none sm:border-y-0 sm:border-r-0"
+        className="flex max-h-[min(52rem,calc(100dvh-4rem-var(--maintenance-banner-height,0px)))] flex-col gap-0 overflow-hidden border-border/30 p-0 shadow-2xl max-sm:top-auto max-sm:bottom-0 max-sm:left-0 max-sm:max-h-[90dvh] max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-b-none max-sm:border-x-0 max-sm:border-b-0 sm:max-w-[480px] sm:rounded-xl"
       >
         {/* Grab handle on the bottom sheet; tapping outside or Escape closes it. */}
         <div
@@ -321,6 +332,7 @@ export function UpgradeDialog({
         </div>
       </DialogContent>
     </Dialog>
+    </>
   );
 }
 
