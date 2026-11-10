@@ -1,5 +1,5 @@
 import { createAdminClient } from '@/lib/supabaseAdmin';
-import { deliverWebhook, createWebhookEvent, WEBHOOK_EVENTS, type WebhookEventType } from './deliver';
+import { deliverWebhook, createWebhookEvent, webhookEventPatterns, WEBHOOK_EVENTS, type WebhookEventType } from './deliver';
 
 interface Webhook {
     id: string;
@@ -20,13 +20,14 @@ export async function triggerWebhooks(
 ): Promise<{ triggered: number; succeeded: number; failed: number }> {
     const supabase = createAdminClient();
 
-    // Fetch active webhooks subscribed to this event
+    // Fetch active webhooks subscribed to this event, by exact name or family
+    // wildcard (`run.*`), which is what the API tells callers to subscribe to.
     const { data: webhooks, error } = await supabase
         .from('webhooks')
         .select('id, name, url, secret, events, is_active')
         .eq('project_id', projectId)
         .eq('is_active', true)
-        .contains('events', [eventType]);
+        .overlaps('events', webhookEventPatterns(eventType));
 
     if (error || !webhooks || webhooks.length === 0) {
         return { triggered: 0, succeeded: 0, failed: 0 };

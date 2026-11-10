@@ -71,6 +71,7 @@ export {
 export type { MemoryInjectionVerdict } from './guards';
 export {
     fetchMemoryById,
+    unexpiredMemoryFilter,
     executeMemoryFetchTool,
     MEMORY_FETCH_TOOL,
     MEMORY_FETCH_TOOL_NAME,

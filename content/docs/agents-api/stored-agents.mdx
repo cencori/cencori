@@ -38,6 +38,35 @@ CENCORI_API_KEY: csk_...
 
 `config.tools` holds built-in tools (`web_search_preview` and others). Your own function tools stay in your code: add them when you run the agent from the SDK.
 
+## Shadow mode
+
+Every new agent starts with `shadow_mode: true`. Shadow mode is a safety setting for tool calls: the agent can decide to call a tool, but a person approves the call before your code runs it. It lets you watch what a new agent would do before you let it act.
+
+It applies to requests bound to the agent on `/v1/chat/completions` and `/v1/responses` (an agent key, or the `X-Agent-ID` header). It changes nothing about plain text replies.
+
+| | Shadow mode on (default) | Shadow mode off |
+| --- | --- | --- |
+| Agent replies with text | Normal | Normal |
+| Agent calls a tool | Recorded as a `pending` action. Wait for approval before running it | Recorded for audit. Run it straight away |
+
+With shadow mode on, a streamed response that contains tool calls ends with a `shadow_mode` event:
+
+```json
+{ "type": "shadow_approval_required", "agent_id": "fea49590-...", "pending_action_ids": ["a1", "a2"], "poll_url": "/api/v1/agent/actions/poll?ids=a1,a2" }
+```
+
+Poll `GET /v1/agent/actions/poll?ids=a1,a2` until each action is `approved` or `rejected`. Approve or reject them on the agent's page in the dashboard. Run the tool only when its action is `approved`.
+
+When you trust the agent, turn shadow mode off:
+
+```http
+PATCH /v1/agents/:id
+
+{ "shadow_mode": false }
+```
+
+Sessions and runs do not use shadow mode. They pause on tools marked `needsApproval` instead: see [Tool calls and approvals](/docs/agents-api/tool-calls).
+
 ## Run it
 
 **From the SDK**, with your own tools on top:

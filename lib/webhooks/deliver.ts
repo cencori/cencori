@@ -103,6 +103,16 @@ export function createWebhookEvent(
 }
 
 /**
+ * Subscription entries that match an event: the exact name, its family
+ * wildcard (`run.*` for `run.completed`), and the catch-all `*`.
+ */
+export function webhookEventPatterns(eventType: string): string[] {
+    const dot = eventType.indexOf('.');
+    const family = dot > 0 ? `${eventType.slice(0, dot)}.*` : null;
+    return family ? [eventType, family, '*'] : [eventType, '*'];
+}
+
+/**
  * Event types
  */
 export const WEBHOOK_EVENTS = {

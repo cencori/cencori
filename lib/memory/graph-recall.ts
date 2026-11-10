@@ -19,6 +19,7 @@
 
 import type { createAdminClient } from '@/lib/supabaseAdmin';
 import { findSeedEntities, type EntitySurfaceForms } from './entities';
+import { unexpiredMemoryFilter } from './fetch';
 import { traverseGraph, type GraphEdge } from './graph';
 import { toMemoryId, type MemoryScope, type RetrievedMemory } from './types';
 
@@ -149,6 +150,7 @@ export async function retrieveGraphMemories(params: GraphRecallParams): Promise<
             .eq('organization_id', organizationId)
             .eq('project_id', projectId)
             .eq('status', 'active')
+            .or(unexpiredMemoryFilter())
             .in('id', [...hopsByMemory.keys()]);
         if (memoryErr || !memoryRows?.length) {
             if (memoryErr) console.warn('[Memory] Graph memory load failed:', memoryErr.message);

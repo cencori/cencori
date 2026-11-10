@@ -88,6 +88,8 @@ export interface WriteScopedMemoryOptions extends MemoryScopeKeys {
     namespace?: string;
     metadata?: Record<string, unknown>;
     importance?: number;
+    /** When the memory stops existing. A future `Date` or ISO-8601 string; omit to keep it until forgotten. */
+    expiresAt?: string | Date;
 }
 
 export interface ScopedMemory {
@@ -212,7 +214,8 @@ export interface WriteBatchOptions extends MemoryScopeKeys {
     scope?: MemoryScope;
     namespace?: string;
     metadata?: Record<string, unknown>;
-    expiresAt?: string;
+    /** When every memory in the batch stops existing. A future `Date` or ISO-8601 string. */
+    expiresAt?: string | Date;
     memories: Array<{ content: string; importance?: number }>;
 }
 

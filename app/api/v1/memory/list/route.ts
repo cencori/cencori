@@ -16,6 +16,7 @@ import {
     normalizeDirectiveScope,
     parseMemoryDirective,
     toMemoryId,
+    unexpiredMemoryFilter,
 } from '@/lib/memory';
 
 export async function OPTIONS() {
@@ -79,6 +80,7 @@ export async function GET(req: NextRequest) {
             .eq('project_id', ctx.projectId)
             .eq('scope', directive.scope)
             .eq('scope_key', directive.scopeKey)
+            .or(unexpiredMemoryFilter())
             .order('created_at', { ascending: false })
             .limit(limit);
 

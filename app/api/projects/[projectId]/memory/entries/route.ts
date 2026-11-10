@@ -9,7 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireProjectAccess } from '@/lib/require-project-access';
 import { createAdminClient } from '@/lib/supabaseAdmin';
-import { toMemoryId } from '@/lib/memory';
+import { toMemoryId, unexpiredMemoryFilter } from '@/lib/memory';
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
@@ -82,7 +82,8 @@ export async function GET(
             .from('gateway_memories')
             .select('id, content, scope, scope_key, namespace, importance, access_count, status, created_at, last_accessed_at, valid_from, valid_to, metadata', { count: 'estimated' })
             .eq('organization_id', access.organizationId)
-            .eq('project_id', projectId);
+            .eq('project_id', projectId)
+            .or(unexpiredMemoryFilter());
 
         if (status !== 'all') query = query.eq('status', status);
         if (scopeKey) query = query.eq('scope_key', scopeKey);

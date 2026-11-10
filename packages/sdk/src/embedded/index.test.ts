@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { CencoriEmbeddedApiError, RunsNamespace, TenantsNamespace } from './index';
+import { createHmac } from 'node:crypto';
+import { AgentVersionsNamespace, CencoriEmbeddedApiError, RunsNamespace, TenantsNamespace, parseWebhook, verifyWebhookSignature } from './index';
 
 const config = { apiKey: 'csk_test', baseUrl: 'https://cencori.com', headers: {} };
 
@@ -122,5 +123,59 @@ describe('knowledge file upload', () => {
         const form = init.body as FormData;
         expect((form.get('file') as File).name).toBe('handbook.pdf');
         expect(form.get('metadata')).toBe('{"team":"support"}');
+    });
+});
+
+describe('version validation failures', () => {
+    it('surfaces the server message and the individual errors', async () => {
+        vi.spyOn(global, 'fetch').mockResolvedValueOnce(new Response(JSON.stringify({
+            valid: false,
+            errors: ['model is required', "skill version 'skv_1' is not published"],
+            error: { type: 'invalid_request_error', code: 'validation_failed', message: "Version failed validation: model is required; skill version 'skv_1' is not published", request_id: 'req_v' },
+        }), { status: 422 }));
+        const error = await new AgentVersionsNamespace(config).validate('agt_1', '1.0.0').catch((e) => e) as CencoriEmbeddedApiError;
+        expect(error.status).toBe(422);
+        expect(error.code).toBe('validation_failed');
+        expect(error.message).toContain('model is required');
+        expect(error.errors).toEqual(['model is required', "skill version 'skv_1' is not published"]);
+    });
+
+    it('never throws a blank message when the body has only an errors list and no status text', async () => {
+        vi.spyOn(global, 'fetch').mockResolvedValueOnce(new Response(JSON.stringify({
+            valid: false, errors: ['model is required'],
+        }), { status: 422, statusText: '' }));
+        const error = await new AgentVersionsNamespace(config).validate('agt_1', '1.0.0').catch((e) => e) as CencoriEmbeddedApiError;
+        expect(error.message).toBe('Cencori API error: model is required');
+    });
+
+    it('falls back to the status code when the body says nothing', async () => {
+        vi.spyOn(global, 'fetch').mockResolvedValueOnce(new Response('{}', { status: 422, statusText: '' }));
+        const error = await new AgentVersionsNamespace(config).validate('agt_1', '1.0.0').catch((e) => e) as CencoriEmbeddedApiError;
+        expect(error.message).toBe('Cencori API error: Request failed with status 422');
+    });
+});
+
+describe('webhook verification', () => {
+    const secret = 'whsec_0123456789abcdef';
+    const sign = (body: string, key = secret) => `sha256=${createHmac('sha256', key).update(body).digest('hex')}`;
+
+    it('accepts the signature Cencori sends and rejects anything else', async () => {
+        const body = JSON.stringify({ event: 'run.completed', project_id: 'p', timestamp: new Date().toISOString(), data: { run_id: 'r' } });
+        expect(await verifyWebhookSignature(body, sign(body), secret)).toBe(true);
+        expect(await verifyWebhookSignature(body, sign(body).toUpperCase().replace('SHA256', 'sha256'), secret)).toBe(true);
+        expect(await verifyWebhookSignature(body + ' ', sign(body), secret)).toBe(false);
+        expect(await verifyWebhookSignature(body, sign(body, 'another-secret-value'), secret)).toBe(false);
+        for (const bad of [undefined, null, '', 'bad', 'sha256=abc', sign(body).slice(7)]) {
+            expect(await verifyWebhookSignature(body, bad, secret)).toBe(false);
+        }
+    });
+
+    it('parses a fresh delivery and rejects a stale one', async () => {
+        const fresh = JSON.stringify({ event: 'run.completed', project_id: 'p', timestamp: new Date().toISOString(), data: { run_id: 'r' } });
+        expect(await parseWebhook(fresh, sign(fresh), secret)).toMatchObject({ event: 'run.completed', data: { run_id: 'r' } });
+        const stale = JSON.stringify({ event: 'run.completed', project_id: 'p', timestamp: new Date(Date.now() - 3_600_000).toISOString(), data: {} });
+        expect(await parseWebhook(stale, sign(stale), secret)).toBeNull();
+        expect(await parseWebhook(stale, sign(stale), secret, { toleranceSeconds: 0 })).not.toBeNull();
+        expect(await parseWebhook(fresh, 'sha256=' + '0'.repeat(64), secret)).toBeNull();
     });
 });

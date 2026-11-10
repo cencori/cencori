@@ -5,13 +5,82 @@ section: "Embedded Agents"
 order: 6
 ---
 
-## Event families
+## Events
 
-`provider_connection.*`, `provider_model_sync.*`, `tenant.*`, `agent.*`, `installation.*`, `knowledge_source.*`, `connection.*`, `session.*`, `run.*` (+ `subagent.*`), `action.*`, `usage.*`. Subscribe with `POST /v1/webhooks` (secret-key only); filter by family. Inspect the delivery log at `GET /v1/webhook-deliveries` and replay any delivery with `POST .../:id/replay`.
+| Event | Sent when |
+| --- | --- |
+| `run.queued` | A run is accepted |
+| `run.started` | A run begins executing |
+| `run.completed` | A run finishes with a result |
+| `run.failed` | A run ends in an error |
+| `run.cancelled` | A run is cancelled |
+| `action.required` | A tool call is waiting for approval |
+| `action.approved` / `action.rejected` | A person decides an action |
+| `action.executed` / `action.failed` | An approved action ran, or failed |
+| `action.expired` | An action passed its approval deadline |
+| `subagent.called` / `subagent.completed` / `subagent.failed` | A run delegates to a subagent |
+| `knowledge_source.queued` / `knowledge_source.ready` / `knowledge_source.failed` | A knowledge source is ingested |
+| `connection.active` | A tenant finishes connecting an app |
+| `tenant.deleted` | A tenant and its data are deleted |
+| `budget.pause` | A budget stops an agent |
+| `cost.threshold` | Project spend crosses a budget threshold |
+| `anomaly.detected` | Usage anomaly detection fires |
+
+The same list is in the SDK as `WEBHOOK_EVENTS` (and `cencori.webhooks.events`), typed as `WebhookEvent`.
+
+Subscribe to exact names, to a whole family with a wildcard (`run.*`, `action.*`), or to everything with `*`.
+
+## Subscribe
+
+```typescript
+const endpoint = await cencori.webhooks.create({
+  name: 'Production',
+  url: 'https://example.com/webhooks/cencori',
+  events: ['run.*', 'action.required'],
+});
+
+endpoint.secret; // the signing secret. Returned once, here. Store it.
+```
+
+`create` is the only call that returns the signing secret; `list` and `update` never show it again. To set the secret yourself, pass `secret` (16 to 256 characters). If you lose it, delete the endpoint and create a new one. Webhooks are managed with a secret key only.
+
+Inspect the delivery log with `cencori.webhooks.deliveries()` and replay any delivery with `cencori.webhooks.replay(deliveryId)`.
+
+## Payload
+
+```json
+{
+  "event": "run.completed",
+  "project_id": "5b1f...",
+  "timestamp": "2026-11-09T10:15:00.000Z",
+  "data": { "event_id": "evt_mh2k9x4a1b2c", "run_id": "...", "agent_id": "..." }
+}
+```
 
 ## Verification
 
-Every delivery carries `X-Webhook-Signature: sha256=<hex>`, `X-Webhook-Event`, and `X-Webhook-Timestamp`. The signature is HMAC-SHA256 over the exact JSON body with your endpoint secret:
+Every delivery carries `X-Webhook-Signature: sha256=<hex>`, `X-Webhook-Event`, and `X-Webhook-Timestamp`. The signature is HMAC-SHA256 over the exact JSON body with your endpoint secret. A request without a valid signature did not come from Cencori.
+
+With the SDK, verify and parse in one call:
+
+```typescript
+import { parseWebhook } from 'cencori';
+
+export async function POST(req: Request) {
+  const rawBody = await req.text(); // the raw body, before any JSON parsing
+  const event = await parseWebhook(rawBody, req.headers.get('x-webhook-signature'), process.env.CENCORI_WEBHOOK_SECRET!);
+  if (!event) return new Response('Invalid signature', { status: 401 });
+
+  if (event.event === 'run.completed') {
+    // event.data.run_id, event.data.agent_id
+  }
+  return new Response('ok');
+}
+```
+
+`parseWebhook` returns `null` when the signature is wrong or the signed timestamp is more than 5 minutes old (change that with `{ toleranceSeconds }`). `verifyWebhookSignature(rawBody, signature, secret)` does the signature check alone and returns a boolean. Both run on Node 18+ and edge runtimes.
+
+Without the SDK, in any language, compute the same HMAC yourself:
 
 ```typescript
 import crypto from 'crypto';

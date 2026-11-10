@@ -23,6 +23,35 @@ export function embeddedError(
     );
 }
 
+/**
+ * 422 for a version that failed manifest or capability checks. Carries the
+ * standard `error` envelope (so SDKs and generic clients surface a message)
+ * alongside the top-level `valid`/`errors`/`warnings` fields older callers read.
+ */
+export function embeddedValidationFailure(
+    requestId: string,
+    errors: string[],
+    extra: Record<string, unknown> = {},
+) {
+    const shown = errors.slice(0, 3).join('; ');
+    const more = errors.length > 3 ? ` (+${errors.length - 3} more)` : '';
+    return NextResponse.json(
+        {
+            ...extra,
+            valid: false,
+            errors,
+            error: {
+                type: 'invalid_request_error',
+                code: 'validation_failed',
+                message: errors.length > 0 ? `Version failed validation: ${shown}${more}` : 'Version failed validation',
+                request_id: requestId,
+                details: { errors },
+            },
+        },
+        { status: 422 },
+    );
+}
+
 export function getIdempotencyKey(headers: Headers): string | null {
     const v = headers.get('Idempotency-Key')?.trim();
     return v ? v : null;

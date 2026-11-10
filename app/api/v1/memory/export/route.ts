@@ -23,6 +23,7 @@ import {
     normalizeDirectiveScope,
     parseMemoryDirective,
     toMemoryId,
+    unexpiredMemoryFilter,
 } from '@/lib/memory';
 import type { SubscriptionTier } from '@/lib/entitlements';
 
@@ -121,6 +122,7 @@ export async function POST(req: NextRequest) {
             .eq('project_id', ctx.projectId)
             .eq('scope', directive.scope)
             .eq('scope_key', directive.scopeKey)
+            .or(unexpiredMemoryFilter())
             .order('created_at', { ascending: true })
             .limit(limit + 1);
 

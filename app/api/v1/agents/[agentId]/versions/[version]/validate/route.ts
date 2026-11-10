@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { validateGatewayRequest, addGatewayHeaders, handleCorsPreFlight } from '@/lib/gateway-middleware';
-import { embeddedError } from '@/lib/embedded/http';
+import { embeddedError, embeddedValidationFailure } from '@/lib/embedded/http';
 import { validateVersionConfig } from '@/lib/embedded/agents';
 import crypto from 'crypto';
 
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ agentId: s
     const result = await validateManifest(supabase as never, { projectId: validation.context.projectId, agentId, manifest });
     if (!result.valid) {
         return addGatewayHeaders(
-            NextResponse.json({ id: row.id, version: row.version, status: row.status, valid: false, errors: result.errors, warnings: result.warnings }, { status: 422 }),
+            embeddedValidationFailure(requestId, result.errors, { id: row.id, version: row.version, status: row.status, warnings: result.warnings }),
             { requestId },
         );
     }

@@ -35,6 +35,7 @@ function mockSupabase(result: { data: unknown; error: unknown }) {
     const chain = {
         select: vi.fn(() => chain),
         eq: vi.fn((col: string, val: unknown) => { eqCalls.push([col, val]); return chain; }),
+        or: vi.fn(() => chain),
         maybeSingle: vi.fn(async () => result),
     };
     return { supabase: { from: vi.fn(() => chain) } as never, eqCalls, chain };
@@ -51,6 +52,13 @@ describe('fetchMemoryById', () => {
             ['project_id', 'proj_1'],
         ]);
         expect(mem).toMatchObject({ id: 'mem_' + ROW.id, content: 'User uses Rust', accessCount: 3, scopeKey: 'user_1' });
+    });
+
+    it('never serves a memory past its expiry, whether or not cleanup has run', async () => {
+        const { supabase, chain } = mockSupabase({ data: ROW, error: null });
+        await fetchMemoryById(supabase, 'org_1', 'proj_1', 'mem_' + ROW.id);
+        expect(chain.or).toHaveBeenCalledTimes(1);
+        expect(chain.or.mock.calls[0][0]).toMatch(/^expires_at\.is\.null,expires_at\.gt\."\d{4}-\d{2}-\d{2}T[\d:.]+Z"$/);
     });
 
     it('returns null when the row is absent (cross-tenant id behaves like missing)', async () => {

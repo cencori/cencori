@@ -13,6 +13,8 @@ export class CencoriEmbeddedApiError extends Error {
         readonly type: string | null,
         readonly param: string | null,
         readonly retryAfterSeconds: number | null = null,
+        /** Individual failures when the API rejects something for several reasons (e.g. version validation). */
+        readonly errors: string[] = [],
     ) {
         super(`Cencori API error: ${message}`);
     }
@@ -66,13 +68,19 @@ async function request<T>(config: Required<CencoriConfig>, method: string, path:
             request_id?: unknown; requestId?: unknown;
             type?: unknown; param?: unknown;
             retry_after_ms?: unknown; retry_after?: unknown; retry_after_seconds?: unknown;
+            errors?: unknown;
         };
+        const errorList = Array.isArray(errorData.errors)
+            ? errorData.errors.filter((e): e is string => typeof e === 'string')
+            : [];
         const message =
             typeof errorData.error === 'string'
                 ? errorData.error
                 : errorData.error?.message
                     ?? (typeof errorData.message === 'string' ? errorData.message : null)
-                    ?? response.statusText;
+                    ?? (errorList.length > 0 ? errorList.join('; ') : null)
+                    // HTTP/2 responses have an empty statusText; never throw a blank message.
+                    ?? (response.statusText || `Request failed with status ${response.status}`);
         const details = typeof errorData.error === 'object' ? errorData.error : null;
         const topCode = typeof errorData.code === 'string' ? errorData.code : null;
         const topRequestId =
@@ -104,7 +112,7 @@ async function request<T>(config: Required<CencoriConfig>, method: string, path:
                 }
             }
         }
-        throw new CencoriEmbeddedApiError(message, response.status, details?.code ?? topCode, details?.request_id ?? topRequestId ?? response.headers.get('X-Request-Id'), details?.type ?? topType, details?.param ?? topParam, retryAfterSeconds);
+        throw new CencoriEmbeddedApiError(message, response.status, details?.code ?? topCode, details?.request_id ?? topRequestId ?? response.headers.get('X-Request-Id'), details?.type ?? topType, details?.param ?? topParam, retryAfterSeconds, errorList);
     }
     if (response.status === 204) return undefined as T;
     return response.json() as Promise<T>;
@@ -454,6 +462,14 @@ export class SkillsNamespace {
     update(skillId: string, params: { name?: string; description?: string; visibility?: string; status?: string }): Promise<unknown> {
         return request(this.config, 'PATCH', `/v1/skills/${skillId}`, params);
     }
+    /**
+     * Permanently delete a skill and all its versions. Fails with `409 skill_in_use`
+     * while an agent version pins it; pass `{ force: true }` to unpin and delete
+     * (those agent versions keep running without the skill). To keep history, archive instead.
+     */
+    remove(skillId: string, params?: { force?: boolean }): Promise<{ id: string; deleted: boolean; versions_deleted: number; agent_versions_unpinned: number }> {
+        return request(this.config, 'DELETE', `/v1/skills/${skillId}${qs({ force: params?.force ? true : undefined })}`);
+    }
     createVersion(skillId: string, params: { version: string; content?: string; files?: Array<{ path?: string; content?: string }> }): Promise<unknown> {
         return request(this.config, 'POST', `/v1/skills/${skillId}/versions`, params);
     }
@@ -574,15 +590,126 @@ export class MarketplaceNamespace {
 
 // ── Webhooks + usage + billing admin ───────────────────────
 
+/**
+ * Every event Cencori delivers to a webhook endpoint. Subscribe to exact
+ * names, a family wildcard (`run.*`), or `*` for everything.
+ */
+export const WEBHOOK_EVENTS = [
+    'run.queued', 'run.started', 'run.completed', 'run.failed', 'run.cancelled',
+    'action.required', 'action.approved', 'action.rejected', 'action.expired', 'action.executed', 'action.failed',
+    'subagent.called', 'subagent.completed', 'subagent.failed',
+    'knowledge_source.queued', 'knowledge_source.ready', 'knowledge_source.failed',
+    'connection.active',
+    'tenant.deleted',
+    'budget.pause',
+    'cost.threshold',
+    'anomaly.detected',
+] as const;
+
+export type WebhookEvent = typeof WEBHOOK_EVENTS[number];
+/** An exact event, a family wildcard such as `run.*`, or `*`. */
+export type WebhookSubscription = WebhookEvent | `${string}.*` | '*';
+
+export interface Webhook {
+    id: string;
+    project_id?: string;
+    name: string;
+    url: string;
+    events: string[];
+    is_active: boolean;
+    failure_count?: number;
+    last_triggered_at?: string | null;
+    created_at?: string;
+}
+
+/** `create` is the only call that returns the signing secret. Store it. */
+export interface CreatedWebhook extends Webhook {
+    secret: string;
+}
+
+/** The JSON body of every delivery. */
+export interface WebhookPayload<T = Record<string, unknown>> {
+    event: WebhookEvent | (string & {});
+    project_id: string;
+    /** ISO-8601 send time. Covered by the signature, unlike the `X-Webhook-Timestamp` header. */
+    timestamp: string;
+    data: T & { event_id?: string };
+}
+
+/**
+ * Check that a delivery really came from Cencori.
+ *
+ * Pass the raw request body exactly as received (not re-serialized JSON), the
+ * `X-Webhook-Signature` header, and the endpoint's signing secret. Returns
+ * `false` for a missing, malformed or wrong signature; never throws.
+ * Runs anywhere Web Crypto does (Node 18+, edge runtimes, Deno, Bun).
+ */
+export async function verifyWebhookSignature(
+    rawBody: string,
+    signature: string | null | undefined,
+    secret: string,
+): Promise<boolean> {
+    if (typeof rawBody !== 'string' || !secret || !signature) return false;
+    const match = /^sha256=([0-9a-f]{64})$/i.exec(signature.trim());
+    if (!match) return false;
+    try {
+        const encoder = new TextEncoder();
+        const key = await crypto.subtle.importKey('raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+        const digest = new Uint8Array(await crypto.subtle.sign('HMAC', key, encoder.encode(rawBody)));
+        const given = match[1].toLowerCase();
+        let diff = 0;
+        for (let i = 0; i < digest.length; i++) {
+            diff |= digest[i] ^ parseInt(given.slice(i * 2, i * 2 + 2), 16);
+        }
+        return diff === 0;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Verify a delivery and return its parsed payload, or `null` if it should be
+ * rejected. Also rejects deliveries whose signed timestamp is older than
+ * `toleranceSeconds` (default 5 minutes; pass 0 to skip the freshness check).
+ */
+export async function parseWebhook<T = Record<string, unknown>>(
+    rawBody: string,
+    signature: string | null | undefined,
+    secret: string,
+    options: { toleranceSeconds?: number } = {},
+): Promise<WebhookPayload<T> | null> {
+    if (!(await verifyWebhookSignature(rawBody, signature, secret))) return null;
+    let payload: WebhookPayload<T>;
+    try {
+        payload = JSON.parse(rawBody) as WebhookPayload<T>;
+    } catch {
+        return null;
+    }
+    if (!payload || typeof payload !== 'object' || typeof payload.event !== 'string') return null;
+    const tolerance = options.toleranceSeconds ?? 300;
+    if (tolerance > 0) {
+        const sentAt = Date.parse(payload.timestamp);
+        if (!Number.isFinite(sentAt) || Math.abs(Date.now() - sentAt) > tolerance * 1000) return null;
+    }
+    return payload;
+}
+
 export class WebhooksNamespace {
     constructor(private config: Required<CencoriConfig>) {}
-    create(params: { name: string; url: string; events?: string[] }): Promise<unknown> {
+    /** Lists every event name you can subscribe to. */
+    readonly events = WEBHOOK_EVENTS;
+    /**
+     * Register an endpoint. The response includes `secret` once; store it and
+     * pass it to `verify` on every delivery. Supply your own `secret`
+     * (16-256 characters) to control it yourself.
+     */
+    create(params: { name: string; url: string; events?: WebhookSubscription[]; secret?: string }): Promise<CreatedWebhook> {
         return request(this.config, 'POST', '/v1/webhooks', params);
     }
-    update(webhookId: string, params: { name?: string; url?: string; events?: string[]; is_active?: boolean }): Promise<unknown> {
+    update(webhookId: string, params: { name?: string; url?: string; events?: WebhookSubscription[]; is_active?: boolean }): Promise<Webhook> {
         return request(this.config, 'PATCH', `/v1/webhooks/${webhookId}`, params);
     }
-    list(): Promise<{ data: unknown[]; next_cursor: string | null }> {
+    list(): Promise<{ data: Webhook[]; next_cursor: string | null }> {
         return request(this.config, 'GET', '/v1/webhooks');
     }
     remove(webhookId: string): Promise<{ deleted: boolean }> {
@@ -593,6 +720,14 @@ export class WebhooksNamespace {
     }
     replay(deliveryId: string): Promise<unknown> {
         return request(this.config, 'POST', `/v1/webhook-deliveries/${deliveryId}/replay`, {});
+    }
+    /** Check a delivery's `X-Webhook-Signature` against the raw body. See {@link verifyWebhookSignature}. */
+    verify(rawBody: string, signature: string | null | undefined, secret: string): Promise<boolean> {
+        return verifyWebhookSignature(rawBody, signature, secret);
+    }
+    /** Verify and parse a delivery in one step. See {@link parseWebhook}. */
+    parse<T = Record<string, unknown>>(rawBody: string, signature: string | null | undefined, secret: string, options?: { toleranceSeconds?: number }): Promise<WebhookPayload<T> | null> {
+        return parseWebhook<T>(rawBody, signature, secret, options);
     }
 }
 

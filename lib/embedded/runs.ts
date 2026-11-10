@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { triggerWebhooks } from '@/lib/webhooks/trigger';
+import { webhookEventPatterns } from '@/lib/webhooks/deliver';
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -29,7 +30,7 @@ export async function emitEmbeddedEvent(projectId: string, eventType: string, da
         failed += 1;
     }
     try {
-        const { data: endpoints } = await supabase.from('webhooks').select('id').eq('project_id', projectId).eq('is_active', true).contains('events', [eventType]);
+        const { data: endpoints } = await supabase.from('webhooks').select('id').eq('project_id', projectId).eq('is_active', true).overlaps('events', webhookEventPatterns(eventType));
         for (const ep of (endpoints ?? []) as Array<{ id: string }>) {
             await supabase.from('webhook_deliveries').insert({
                 endpoint_id: ep.id,

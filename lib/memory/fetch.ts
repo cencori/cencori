@@ -33,6 +33,15 @@ export interface FetchedMemory {
  * Fetch one memory by id, scoped to the caller's org+project. Accepts a
  * mem_-prefixed or raw id. Returns null if it does not exist in this tenant.
  */
+/**
+ * PostgREST `or` filter that hides memories past their `expires_at`.
+ * Expiry is enforced on every read: the cleanup cron only reclaims storage,
+ * so a row can outlive its expiry by up to an hour and must never be served.
+ */
+export function unexpiredMemoryFilter(now: Date = new Date()): string {
+    return `expires_at.is.null,expires_at.gt."${now.toISOString()}"`;
+}
+
 export async function fetchMemoryById(
     supabase: SupabaseAdmin,
     organizationId: string,
@@ -45,6 +54,7 @@ export async function fetchMemoryById(
         .eq('id', fromMemoryId(memId))
         .eq('organization_id', organizationId)
         .eq('project_id', projectId)
+        .or(unexpiredMemoryFilter())
         .maybeSingle();
 
     if (error || !data) return null;

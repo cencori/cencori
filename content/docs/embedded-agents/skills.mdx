@@ -17,6 +17,7 @@ author/paste → draft version → validate → staged import → review → pub
 
 - `POST /v1/skills` creates the stable identity (name, slug, visibility).
 - `POST /v1/skills/:id/versions` drafts content; every draft carries scan findings and a `blocked` flag.
+- `DELETE /v1/skills/:id` removes a skill and its versions (see [Archive or delete](#archive-or-delete)).
 - `POST .../publish` requires zero blocking findings. Published versions are immutable; tenants keep working when you deprecate and replace.
 - Agent versions pin skill versions in their manifest (`skills: [{ skill_version_id }]`). Publishing an agent validates that each referenced skill version is published.
 
@@ -30,12 +31,71 @@ Plain web pages passed as `url` have readable text extracted (reported as an `ht
 
 The scanner flags secrets (AWS keys, private keys, tokens), prompt-injection patterns, binaries, archive bombs, and oversized packages as blockers; external links are warnings. `POST .../publish` with `name` creates the skill and emits an immutable published version pinned to the scanned checksum.
 
+## Attach a skill to an agent
+
+A skill does nothing until an agent version pins it. Pin a **published skill version** in the agent version's `config.skills`, publish that agent version, and install it. There is no separate "attach" call.
+
+```typescript
+// 1. Author and publish the skill
+const skill = await cencori.skills.create({ name: 'Refund policy' });
+const draft = await cencori.skills.createVersion(skill.id, { version: '1.0.0', content: '# Refunds\n\n30 days.' });
+await cencori.skills.publishVersion(skill.id, '1.0.0', { reviewed_by: 'bola' });
+
+// 2. Pin that skill version in an agent version
+await cencori.agentVersions.create(agentId, {
+  version: '2.0.0',
+  config: {
+    model: 'gpt-oss-120b',
+    instructions: 'You are a support agent.',
+    skills: [{ skill_version_id: draft.id }],
+  },
+});
+
+// 3. Validate, then publish. Publishing is what records the pin.
+await cencori.agentVersions.validate(agentId, '2.0.0');
+await cencori.agentVersions.publish(agentId, '2.0.0');
+```
+
+Installations on the `stable` channel move to the new version when it publishes. Installations pinned to an older version keep the skills that version had.
+
+What to know:
+
+- You pin a **skill version**, not a skill. To ship new skill content, publish a new skill version and a new agent version that pins it.
+- `validate` fails with a `422` naming the reference if a skill version is missing, unpublished, in another project, or belongs to an archived skill.
+- An agent version loads at most 5 skills and 4,000 characters of skill content per turn. Content past the cap is cut off, so keep skills short and specific.
+- Skills load for sessions and runs that go through an **installation**. A call with no installation loads none.
+- A tenant-private skill loads only for that tenant.
+
+## Check that the agent used a skill
+
+A finished run reports the skill versions that were loaded into its context:
+
+```typescript
+const run = await cencori.runs.get(runId);
+run.output.skills_used;   // ['<skill version id>', ...]
+run.output.skills_failed; // true if skills could not be read; the run continued without them
+```
+
+An empty `skills_used` means no skill was loaded. Check, in order: the agent version that ran (`run.output.agent_version`) is the one that pins the skill, that version is published, the run used an installation, and the skill is not archived.
+
+## Archive or delete
+
+**Archive** to switch a skill off and keep its history: `cencori.skills.update(skillId, { status: 'archived' })`. An archived skill stops loading at turn time straight away, on every installation, and no new agent version can pin it. Set `status: 'active'` to bring it back. To retire one version and keep the skill, use `cencori.skills.deprecateVersion(skillId, version)`.
+
+**Delete** to remove a skill and all its versions for good:
+
+```typescript
+await cencori.skills.remove(skillId);
+```
+
+If an agent version still pins the skill, the call fails with `409 skill_in_use` and lists the agent versions under `error.details.agent_version_ids`. To delete anyway:
+
+```typescript
+await cencori.skills.remove(skillId, { force: true });
+```
+
+`force` unpins the skill first. Those agent versions keep running; they stop loading the skill. A delete cannot be undone, and past runs that list the skill in `skills_used` will point at an id that no longer exists.
+
 ## Turn-time loading
 
 Sessions installed from a version with skill pins load published skill contents into context (capped, tenant-private skills only for their tenant). Skills never carry credentials.
-
-```typescript
-const skill = await cencori.skills.create({ name: 'Refund policy' });
-await cencori.skills.createVersion(skill.id, { version: '1.0.0', content: '# Refunds\n\n30 days.' });
-await cencori.skills.publishVersion(skill.id, '1.0.0', { reviewed_by: 'bola' });
-```

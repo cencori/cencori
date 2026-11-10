@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { validateGatewayRequest, addGatewayHeaders, handleCorsPreFlight } from '@/lib/gateway-middleware';
-import { embeddedError, dePrefixId } from '@/lib/embedded/http';
+import { embeddedError, dePrefixId, embeddedValidationFailure } from '@/lib/embedded/http';
 import crypto from 'crypto';
 
 export async function OPTIONS() {
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ agentId: s
     const check = await validateManifest(supabase as never, { projectId: validation.context.projectId, agentId, manifest });
     if (!check.valid) {
         return addGatewayHeaders(
-            NextResponse.json({ valid: false, errors: check.errors, warnings: check.warnings }, { status: 422 }),
+            embeddedValidationFailure(requestId, check.errors, { warnings: check.warnings }),
             { requestId },
         );
     }
@@ -96,7 +96,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ agentId: s
     }
     if (capabilityErrors.length > 0) {
         await supabase.from('agent_versions').update({ last_tested_at: new Date().toISOString(), last_test_passed: false }).eq('id', target.id as string);
-        return addGatewayHeaders(NextResponse.json({ valid: false, errors: capabilityErrors, capabilities }, { status: 422 }), { requestId });
+        return addGatewayHeaders(embeddedValidationFailure(requestId, capabilityErrors, { capabilities }), { requestId });
     }
 
     const { data: project } = await supabase.from('projects').select('organization_id, organizations!inner(subscription_tier)').eq('id', validation.context.projectId).maybeSingle();

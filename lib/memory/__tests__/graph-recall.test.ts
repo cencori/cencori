@@ -49,6 +49,7 @@ function makeSupabase(overrides: Record<string, unknown[]> = {}) {
         chain.select = () => chain;
         chain.eq = () => chain;
         chain.limit = () => chain;
+        chain.or = () => chain;
         chain.in = (_column: string, values: string[]) => {
             inFilters[table] = values;
             return chain;

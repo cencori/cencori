@@ -90,6 +90,7 @@ function chainMock(finalResult: unknown) {
     self.lt = vi.fn(() => self);
     self.gt = vi.fn(() => self);
     self.in = vi.fn(() => self);
+    self.or = vi.fn(() => self);
     self.order = vi.fn(() => self);
     self.limit = vi.fn(async () => finalResult);
     self.select = vi.fn(() => self);

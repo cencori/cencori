@@ -55,6 +55,10 @@ export async function POST(req: NextRequest) {
     } catch (e) {
         return addGatewayHeaders(embeddedError(400, 'unsafe_provider_url', e instanceof Error ? e.message : 'Unsafe URL', { requestId }), { requestId });
     }
+    if (body.secret !== undefined && (typeof body.secret !== 'string' || body.secret.length < 16 || body.secret.length > 256)) {
+        return addGatewayHeaders(embeddedError(400, 'invalid_request_error', 'secret must be a string of 16–256 characters', { requestId, param: 'secret' }), { requestId });
+    }
+    const secret = body.secret ?? crypto.randomBytes(32).toString('hex');
     const supabase = createAdminClient();
     const { data, error } = await supabase
         .from('webhooks')
@@ -63,7 +67,7 @@ export async function POST(req: NextRequest) {
             name: body.name.trim(),
             url: body.url.trim(),
             events: body.events ?? ['run.completed'],
-            secret: body.secret ?? crypto.randomBytes(32).toString('hex'),
+            secret,
             is_active: true,
         })
         .select('id, project_id, name, url, events, is_active, created_at')
@@ -71,5 +75,8 @@ export async function POST(req: NextRequest) {
     if (error || !data) {
         return addGatewayHeaders(embeddedError(500, 'invalid_request_error', error?.message ?? 'Failed to create webhook', { requestId }), { requestId });
     }
-    return addGatewayHeaders(NextResponse.json({ ...serialize(data as Record<string, unknown>), api_version: '2026-09-21', event_families: M1_EVENT_FAMILIES }, { status: 201 }), { requestId });
+    // The signing secret is returned exactly once, here. List and update never
+    // echo it; without this a caller who let us generate it could not verify
+    // a single delivery.
+    return addGatewayHeaders(NextResponse.json({ ...serialize(data as Record<string, unknown>), secret, api_version: '2026-09-21', event_families: M1_EVENT_FAMILIES }, { status: 201 }), { requestId });
 }
