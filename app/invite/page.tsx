@@ -26,6 +26,7 @@ function InvitePageContent() {
     const [inviteDetails, setInviteDetails] = useState<InviteDetails | null>(null);
     const [errorMessage, setErrorMessage] = useState<string>("");
     const [isAccepting, setIsAccepting] = useState(false);
+    const [isSwitchingAccount, setIsSwitchingAccount] = useState(false);
     const [user, setUser] = useState<{ email: string } | null>(null);
     const [authChecked, setAuthChecked] = useState(false);
     const [, setOrgSlug] = useState<string | null>(null);
@@ -123,6 +124,22 @@ function InvitePageContent() {
             toast.error("Something went wrong");
             setIsAccepting(false);
         }
+    };
+
+    // The login page sends signed-in users straight to ?redirect=, which is
+    // this page, so sign out first or the button just loops back here.
+    const handleSwitchAccount = async () => {
+        if (!token) return;
+        setIsSwitchingAccount(true);
+        const { error } = await browserAuth.signOut({ scope: "local" }).catch((e: Error) => ({ error: e }));
+        if (error) {
+            toast.error("Couldn't sign you out. Try again.");
+            setIsSwitchingAccount(false);
+            return;
+        }
+        const redirect = `/invite?token=${encodeURIComponent(token)}`;
+        // Full navigation so the server sees the cleared session cookie.
+        window.location.assign(`/login?redirect=${encodeURIComponent(redirect)}`);
     };
 
     if (status === "loading") {
@@ -225,10 +242,20 @@ function InvitePageContent() {
                                 <p className="text-sm text-amber-500 text-center">
                                     You're logged in as {user.email}. This invite is for {inviteDetails?.email}.
                                 </p>
-                                <Button variant="outline" className="w-full" asChild>
-                                    <Link href={`/login?redirect=/invite?token=${token}`}>
-                                        Log in with different account
-                                    </Link>
+                                <Button
+                                    variant="outline"
+                                    className="w-full"
+                                    disabled={isSwitchingAccount}
+                                    onClick={handleSwitchAccount}
+                                >
+                                    {isSwitchingAccount ? (
+                                        <>
+                                            <Spinner className="h-4 w-4 mr-2 animate-spin" />
+                                            Signing out...
+                                        </>
+                                    ) : (
+                                        "Log in with different account"
+                                    )}
                                 </Button>
                             </div>
                         )
