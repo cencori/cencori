@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { Check, X } from "lucide-react";
+import { Check } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import {
@@ -257,15 +257,8 @@ export function UpgradeDialog({
           Upgrade {organizationLabel} to {plan.name}
         </DialogDescription>
 
-        <button
-          type="button"
-          onClick={() => handleOpenChange(false)}
-          aria-label="Close"
-          className="absolute top-3 right-3 z-10 hidden size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 sm:flex"
-        >
-          <X className="size-4" aria-hidden="true" />
-        </button>
-
+        {/* No close button: Escape or a click on the backdrop closes it (on
+            phones, the bottom sheet's grab handle and a tap outside). */}
         {/* One column: the price, what the plan includes, then the payment. */}
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
           <PlanPrice
