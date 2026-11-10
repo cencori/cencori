@@ -240,10 +240,14 @@ export function UpgradeDialog({
         // Opening focuses the close button by default, drawing a focus ring
         // around it; leave focus where it was instead.
         onOpenAutoFocus={(event) => event.preventDefault()}
-        // The Bachs overlay sits on top while paying; clicks in it aren't
-        // "outside" this panel.
+        // Only a click on the backdrop (or Escape) closes it, never focus
+        // moving elsewhere: opened from a menu, the menu closes and hands focus
+        // back to its trigger, outside this dialog, which used to close it
+        // again at once. While paying, the Bachs overlay sits on top and clicks
+        // in it aren't "outside" this dialog.
+        onFocusOutside={(event) => event.preventDefault()}
         onInteractOutside={(event) => {
-          if (paying) event.preventDefault();
+          if (paying || event.type !== "dismissableLayer.pointerDownOutside") event.preventDefault();
         }}
         className="flex max-h-[min(52rem,calc(100dvh-4rem-var(--maintenance-banner-height,0px)))] flex-col gap-0 overflow-hidden border-border/30 bg-popover p-0 shadow-2xl max-sm:top-auto max-sm:bottom-0 max-sm:left-0 max-sm:max-h-[90dvh] max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-b-none max-sm:border-x-0 max-sm:border-b-0 sm:max-w-[480px] sm:rounded-xl"
       >
