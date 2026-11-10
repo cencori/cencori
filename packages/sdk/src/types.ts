@@ -215,20 +215,36 @@ export interface ModerationRequest {
     input: string | string[] | ModerationInputPart[];
     /** OpenAI model for the standard categories. Defaults to 'omni-moderation-latest'. */
     model?: string;
-    /** Which layers to run. Defaults to both. 'rules' alone is fastest and never calls OpenAI. */
-    layers?: Array<'rules' | 'openai'>;
+    /** Which layers to run. Default all three. ['rules'] alone is fastest and free. */
+    layers?: Array<'rules' | 'openai' | 'llm'>;
     /** Flag thresholds per category (0–1); '*' sets the default. Default 0.5. */
     thresholds?: Record<string, number>;
     /** Score at which the recommended action becomes 'block'. Default 0.8. */
     blockThreshold?: number;
+    /** When the paid model layer runs: 'auto' (unclear items and custom categories), 'always' or 'never'. */
+    escalate?: 'auto' | 'always' | 'never';
+    /** Model for the llm layer. Default 'gemini-2.5-flash-lite'. */
+    llmModel?: string;
+    /** Your own categories, judged by the model and returned as 'custom/<name>'. */
+    customCategories?: Array<{ name: string; description: string; threshold?: number }>;
+    /** Terms that always block (category 'custom/blocklist'). */
+    blocklist?: string[];
+    /** Your own terms that look like scam words, removed before the rules run. */
+    allowlist?: string[];
+    /** Your brand and product names, to catch people posing as your staff. */
+    brandNames?: string[];
+    /** One or two sentences about your platform, given to the model layer. */
+    context?: string;
 }
 
 export interface ModerationMatch {
-    layer: 'rules' | 'openai';
+    layer: 'rules' | 'openai' | 'llm';
     category: string;
     score: number;
     rule?: string;
     text?: string;
+    /** The model's one-line reason, for llm matches. */
+    reason?: string;
 }
 
 export interface ModerationResult {
@@ -239,6 +255,7 @@ export interface ModerationResult {
     categoryScores: Record<string, number>;
     flaggedCategories: string[];
     matches: ModerationMatch[];
+    layersApplied: Array<'rules' | 'openai' | 'llm'>;
 }
 
 export interface ModerationResponse {
@@ -247,7 +264,15 @@ export interface ModerationResponse {
     /** True when any result is flagged. */
     flagged: boolean;
     results: ModerationResult[];
-    layers: Partial<Record<'rules' | 'openai', 'ok' | 'skipped' | 'error'>>;
+    layers: Partial<Record<'rules' | 'openai' | 'llm', 'ok' | 'skipped' | 'error'>>;
+    usage: {
+        llmItems: number;
+        llmCachedItems: number;
+        llmCalls: number;
+        llmModel: string | null;
+        /** What this request cost. Only the llm layer is billed. */
+        costUsd: number;
+    };
     errors?: string[];
 }
 

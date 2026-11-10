@@ -27,7 +27,7 @@ export const CENCORI_CATEGORIES = {
     fraud: 'Any fraud or scam signal below (the highest fraud/* score).',
     'fraud/phishing': 'Asking for an OTP, PIN, password, BVN, NIN, card details or login, or a fake "verify your account".',
     'fraud/off_platform_payment': 'Moving money outside the platform: bank account numbers, transfers to a personal account, fintech wallets, crypto addresses.',
-    'fraud/off_platform_contact': 'Pulling users to another channel: phone numbers, WhatsApp, Telegram and similar handles or links.',
+    'fraud/off_platform_contact': 'Pulling users to another channel: phone numbers, WhatsApp, Telegram and similar handles or links. A risk signal: on its own it means review, never block, and is not counted in "fraud".',
     'fraud/advance_fee': 'Pay-to-receive scams: "send 5k and get 50k back", processing or release fees, fake winnings, inheritance and grants.',
     'fraud/investment': 'Ponzi and "double your money" schemes, guaranteed returns, sure betting odds and fixed matches.',
     'fraud/giveaway': 'Fake giveaways and reward claims ("first 50 people", "claim your free 100k").',

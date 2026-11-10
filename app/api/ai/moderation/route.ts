@@ -10,6 +10,8 @@ import {
     incrementUsage,
 } from '@/lib/gateway-middleware';
 import { promptPayload, toLoggedText } from '@/lib/gateway/log-payload';
+import { executeGatewayChat } from '@/lib/gateway/chat-executor';
+import type { SubscriptionTier } from '@/lib/entitlements';
 import {
     moderate,
     ModerationInputError,
@@ -17,11 +19,14 @@ import {
     MAX_ITEMS,
     type ModerationLayer,
     type ModerationOptions,
+    type EscalationMode,
 } from '@/lib/moderation';
+import { DEFAULT_LLM_MODEL } from '@/lib/moderation/llm';
 import { CENCORI_CATEGORIES, OPENAI_CATEGORIES, DEFAULT_BLOCK_THRESHOLD, DEFAULT_FLAG_THRESHOLD } from '@/lib/moderation/categories';
 import { RULES_VERSION } from '@/lib/moderation/rules';
 
-const LAYERS: ModerationLayer[] = ['rules', 'openai'];
+const LAYERS: ModerationLayer[] = ['rules', 'openai', 'llm'];
+const ESCALATION: EscalationMode[] = ['auto', 'always', 'never'];
 
 export async function OPTIONS() {
     return handleCorsPreFlight();
@@ -73,12 +78,28 @@ export async function POST(req: NextRequest) {
             return badRequest('thresholds must be an object of category → number', ctx.requestId);
         }
 
+        if (body.escalate !== undefined && !ESCALATION.includes(body.escalate as EscalationMode)) {
+            return badRequest('escalate must be "auto", "always" or "never"', ctx.requestId);
+        }
+        if (body.llm_model !== undefined && typeof body.llm_model !== 'string') {
+            return badRequest('llm_model must be a string', ctx.requestId);
+        }
+
         const options: ModerationOptions = {
             model,
             layers: layers as ModerationLayer[] | undefined,
             thresholds: thresholds as ModerationOptions['thresholds'],
             block_threshold: typeof body.block_threshold === 'number' ? body.block_threshold : undefined,
+            escalate: body.escalate as EscalationMode | undefined,
+            llm_model: body.llm_model as string | undefined,
+            custom_categories: body.custom_categories as ModerationOptions['custom_categories'],
+            blocklist: body.blocklist as string[] | undefined,
+            allowlist: body.allowlist as string[] | undefined,
+            brand_names: body.brand_names as string[] | undefined,
+            context: body.context as string | undefined,
         };
+        const tier = (ctx.tier || 'free') as SubscriptionTier;
+        let llmProvider: string | null = null;
 
         const response = await moderate(input, options, {
             getOpenAI: async () => {
@@ -95,7 +116,30 @@ export async function POST(req: NextRequest) {
                     : process.env.OPENAI_API_KEY ?? null;
                 return key ? new OpenAI({ apiKey: key, timeout: 20_000, maxRetries: 1 }) : null;
             },
+            // Billed like any gateway call: provider cost plus the usual markup.
+            llm: async ({ model: llmModel, system, user, maxTokens }) => {
+                const res = await executeGatewayChat({
+                    supabase: ctx.supabase,
+                    projectId: ctx.projectId,
+                    organizationId: ctx.organizationId,
+                    tier,
+                    requestId: ctx.requestId,
+                    request: {
+                        model: llmModel,
+                        temperature: 0,
+                        maxTokens,
+                        userId: ctx.projectId,
+                        messages: [
+                            { role: 'system', content: system },
+                            { role: 'user', content: user },
+                        ],
+                    },
+                });
+                llmProvider = res.actualProvider;
+                return { content: res.content ?? '', model: res.actualModel, costUsd: res.cost.cencoriChargeUsd ?? 0 };
+            },
         });
+        const chargeUsd = response.usage.cost_usd;
 
         const flagged = response.results.filter((r) => r.flagged);
         const flaggedCategories = [...new Set(flagged.flatMap((r) => r.flagged_categories))];
@@ -105,21 +149,20 @@ export async function POST(req: NextRequest) {
         await logGatewayRequest(ctx, {
             endpoint: 'moderation',
             model: response.model,
-            provider: response.layers.openai === 'ok' ? 'openai' : 'cencori',
+            provider: response.layers.openai === 'ok' ? 'openai' : llmProvider ?? 'cencori',
             status: flagged.length ? 'filtered' : 'success',
             promptTokens: estimatedTokens,
             totalTokens: estimatedTokens,
-            // Both layers are free to run, so moderation is not billed.
-            costUsd: 0,
-            providerCostUsd: 0,
-            cencoriChargeUsd: 0,
-            markupPercentage: 0,
+            // Rules and OpenAI are free; only the model layer costs anything.
+            costUsd: chargeUsd,
+            cencoriChargeUsd: chargeUsd,
             metadata: {
                 flagged: flagged.length > 0,
                 results_count: response.results.length,
                 flagged_count: flagged.length,
                 categories: flaggedCategories,
                 layers: response.layers,
+                usage: response.usage,
             },
             requestPayload: promptPayload(inputForLog, { model }),
             responsePayload: {
@@ -131,7 +174,7 @@ export async function POST(req: NextRequest) {
                 })),
             },
         });
-        await incrementUsage(ctx);
+        await incrementUsage(ctx, chargeUsd > 0 ? chargeUsd : undefined);
 
         if (flagged.length) {
             await ctx.supabase.from('security_incidents').insert({
@@ -191,7 +234,9 @@ export async function GET() {
         layers: {
             rules: `Cencori fraud and local-language rules (${RULES_VERSION}). Free, runs locally.`,
             openai: 'OpenAI moderation for the standard safety categories. Free.',
+            llm: `A cheap model (default ${DEFAULT_LLM_MODEL}) for unclear items and custom categories. Billed per token; batched and cached.`,
         },
+        default_llm_model: DEFAULT_LLM_MODEL,
         max_items: MAX_ITEMS,
         default_flag_threshold: DEFAULT_FLAG_THRESHOLD,
         default_block_threshold: DEFAULT_BLOCK_THRESHOLD,

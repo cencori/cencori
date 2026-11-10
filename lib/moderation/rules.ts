@@ -420,7 +420,7 @@ const RULES: Rule[] = [
 
 // ── Text preparation ────────────────────────────────────────────────────────
 
-function normalize(text: string): string {
+export function normalize(text: string): string {
     return text
         .normalize('NFKC')
         .replace(/[​-‍⁠﻿­]/g, '')
@@ -448,7 +448,37 @@ const FRAUD_PREFIX = 'fraud/';
 
 // ── Scoring ─────────────────────────────────────────────────────────────────
 
-export function runRules(input: string): RulesResult {
+export interface RulesOptions {
+    /** The customer's own brand and product names, to catch staff impersonation. */
+    brandNames?: string[];
+}
+
+function escapeRegex(s: string): string {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+const brandRuleCache = new Map<string, Rule[]>();
+function brandRules(names: string[] | undefined): Rule[] {
+    const clean = (names ?? []).map((n) => normalize(n).trim()).filter((n) => n.length >= 2).slice(0, 20);
+    if (!clean.length) return [];
+    const key = clean.join('\u0000');
+    const cached = brandRuleCache.get(key);
+    if (cached) return cached;
+    const alt = clean.map((n) => escapeRegex(n).replace(/\s+/g, '\\s*')).join('|');
+    const rules: Rule[] = [
+        {
+            id: 'brand_staff_claim',
+            pattern: r(`(?:${alt})\\s*(?:'s\\s*)?(?:admin|administrator|moderator|support|customer care|customer service|staff|team|official|management|developer|dev team|ceo|founder)\\b|\\b(?:admin|moderator|support|staff|team|ceo|founder|official)\\s+(?:of|for|from|at)\\s+(?:${alt})`),
+            weights: { 'fraud/impersonation': 0.6 },
+            leet: true,
+        },
+    ];
+    if (brandRuleCache.size > 500) brandRuleCache.clear();
+    brandRuleCache.set(key, rules);
+    return rules;
+}
+
+export function runRules(input: string, options: RulesOptions = {}): RulesResult {
     const base = normalize(input);
     if (!base.trim()) return { scores: {}, matches: [] };
     const leet = deLeet(base);
@@ -456,7 +486,7 @@ export function runRules(input: string): RulesResult {
     const evidence = new Map<ModerationCategory, number[]>();
     const matches: RuleMatch[] = [];
 
-    for (const rule of RULES) {
+    for (const rule of [...RULES, ...brandRules(options.brandNames)]) {
         let m = rule.pattern.exec(base);
         let source = base;
         if (!m && rule.leet && leet !== base) {
@@ -496,7 +526,7 @@ export function runRules(input: string): RulesResult {
 
     let fraud = 0;
     for (const [category, score] of Object.entries(scores)) {
-        if (category.startsWith(FRAUD_PREFIX)) fraud = Math.max(fraud, score ?? 0);
+        if (category.startsWith(FRAUD_PREFIX) && category !== 'fraud/off_platform_contact') fraud = Math.max(fraud, score ?? 0);
     }
     if (fraud > 0) scores.fraud = fraud;
 

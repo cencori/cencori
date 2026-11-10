@@ -290,11 +290,24 @@ describe('AINamespace moderation', () => {
             }],
         }), { status: 200 }));
 
-        const res = await ns.moderation({ input: 'send 5k and get 50k', blockThreshold: 0.7, layers: ['rules'] });
+        const res = await ns.moderation({
+            input: 'send 5k and get 50k',
+            blockThreshold: 0.7,
+            layers: ['rules'],
+            brandNames: ['Lagos Life'],
+            customCategories: [{ name: 'politics', description: 'Election campaigning' }],
+        });
 
         const [url, init] = fetchSpy.mock.calls[0];
         expect(String(url)).toBe('https://cencori.com/api/ai/moderation');
-        expect(JSON.parse(String((init as RequestInit).body))).toMatchObject({ input: 'send 5k and get 50k', block_threshold: 0.7, layers: ['rules'] });
+        expect(JSON.parse(String((init as RequestInit).body))).toMatchObject({
+            input: 'send 5k and get 50k',
+            block_threshold: 0.7,
+            layers: ['rules'],
+            brand_names: ['Lagos Life'],
+            custom_categories: [{ name: 'politics', description: 'Election campaigning' }],
+        });
+        expect(res.usage.costUsd).toBe(0);
         expect(res.flagged).toBe(true);
         expect(res.results[0].action).toBe('block');
         expect(res.results[0].categoryScores['fraud/advance_fee']).toBe(0.9);

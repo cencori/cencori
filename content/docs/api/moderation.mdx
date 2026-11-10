@@ -7,18 +7,21 @@ order: 13
 
 Check user content for safety problems and scams before it reaches other users or a model. It returns the same response shape as OpenAI's moderation API, plus fraud and scam categories that OpenAI doesn't cover, a recommended action, and the evidence for each flag.
 
-Moderation is free.
+Most requests are free. You pay only when a message is unclear enough to need a model, and those messages are batched and cached.
 
 ## How it works
 
-Every request runs two layers and takes the highest score per category:
+Three layers run, cheapest first:
 
-| Layer | What it catches | Cost |
-|-------|-----------------|------|
-| `rules` | Fraud and scams, off-platform payment and contact, cheating, ethnic hate, grooming, and insults and threats in Nigerian English, Pidgin, Yoruba, Igbo and Hausa | Free, runs on Cencori in about 1 ms |
+| Layer | What it does | Cost |
+|-------|--------------|------|
+| `rules` | Fraud and scams, off-platform payment and contact, cheating, ethnic hate, grooming, and insults and threats in Nigerian English, Pidgin, Yoruba, Igbo and Hausa. Also applies your block list | Free, runs on Cencori in about 0.01 ms per message |
 | `openai` | OpenAI `omni-moderation-latest`: harassment, hate, illicit, self-harm, sexual, violence, for text and images | Free |
+| `llm` | A cheap model (default `gemini-2.5-flash-lite`) that reads context. Runs only for messages the rules found unclear (a signal, but not enough to block) and for your custom categories | Model price plus the usual gateway markup. About $0.00003 per message, and $0 for a repeat |
 
-If OpenAI is unavailable, you still get the `rules` results. The response then has `layers.openai: "error"` and the `X-Cencori-Moderation-Degraded: openai` header.
+For a message the model reviewed, its judgement replaces the rules' score for the categories it checked: it can clear a false positive ("send me your number, we dey plan football") or confirm a scam. Messages the rules already block never reach the model.
+
+If OpenAI or the model fails, you still get the other layers' results. The response lists the failure in `errors` and `layers` (for example `"openai": "error"`). An OpenAI failure also adds the `X-Cencori-Moderation-Degraded: openai` header.
 
 ## Basic request
 
@@ -44,6 +47,15 @@ if (r.action === 'block') {
 | `layers` | `("rules" \| "openai")[]` | No | Which layers to run. Default both. `["rules"]` never calls OpenAI and responds in milliseconds |
 | `thresholds` | object | No | Flag threshold per category, 0–1, e.g. `{"fraud/off_platform_contact": 0.3}`. `"*"` sets the default. Default `0.5` |
 | `block_threshold` | number | No | Score at which `action` becomes `block`. Default `0.8`. The SDK option is `blockThreshold` |
+| `escalate` | `"auto" \| "always" \| "never"` | No | When the `llm` layer runs. `auto` (default) sends only unclear messages and custom categories |
+| `llm_model` | string | No | Model for the `llm` layer. Default `gemini-2.5-flash-lite` |
+| `custom_categories` | array | No | Up to 20 of `{name, description, threshold?}`. The model scores each message against your description; results come back as `custom/<name>` |
+| `blocklist` | string[] | No | Terms that always block, as `custom/blocklist` |
+| `allowlist` | string[] | No | Your own terms that look like scam words (a "Lagos Life Bank" location, for example). Removed before the rules run |
+| `brand_names` | string[] | No | Your brand and product names. Catches people posing as your staff ("Lagos Life admin here") |
+| `context` | string | No | One or two sentences about your platform, given to the model, e.g. "Game naira is fictional; selling it for real money is banned" |
+
+SDK options use camelCase: `blockThreshold`, `llmModel`, `customCategories`, `brandNames`.
 
 Image URLs must be `https://` or a base64 `data:image/...` URL. Images need the `openai` layer.
 
@@ -55,6 +67,7 @@ Image URLs must be `https://` or a base64 `data:image/...` URL. Images need the 
   "model": "omni-moderation-latest",
   "layers": { "rules": "ok", "openai": "ok" },
   "rules_version": "cencori-rules-2026-11-10",
+  "usage": { "llm_items": 0, "llm_cached_items": 0, "llm_calls": 0, "llm_model": null, "cost_usd": 0 },
   "results": [
     {
       "flagged": true,
@@ -70,7 +83,8 @@ Image URLs must be `https://` or a base64 `data:image/...` URL. Images need the 
           "rule": "send_to_receive",
           "text": "send 5k to my opay 8123456789 and receive 50k"
         }
-      ]
+      ],
+      "layers_applied": ["openai", "rules"]
     }
   ]
 }
@@ -78,7 +92,9 @@ Image URLs must be `https://` or a base64 `data:image/...` URL. Images need the 
 
 - `action` is `allow`, `review` (flagged, below the block threshold) or `block`.
 - `categories` and `category_scores` include every category below, so code written for OpenAI keeps working.
-- `matches` says which layer and rule flagged the content, and on what text, so moderators can see why.
+- `matches` says which layer and rule flagged the content, and on what text. Model matches include a one-line `reason`. Moderators can see why.
+- `usage.cost_usd` is what the request cost. It is 0 unless the `llm` layer ran.
+- `fraud/off_platform_contact` is a risk signal: on its own it gives `review`, never `block`, and it doesn't count toward `fraud`. Next to a scam signal, it raises that score.
 
 ## Categories
 
@@ -105,6 +121,21 @@ Cencori:
 
 `GET /v1/moderations` lists the categories, models and defaults.
 
+## Configure it for your platform
+
+```typescript
+const result = await cencori.ai.moderation({
+  input: messages,
+  brandNames: ['Lagos Life', 'Vatar'],
+  allowlist: ['Lagos Life Bank'],
+  blocklist: ['blue gate'],
+  context: 'A life simulator set in Lagos. Game naira is fictional and cannot be withdrawn.',
+  customCategories: [
+    { name: 'politics', description: 'Partisan political campaigning or election content', threshold: 0.7 },
+  ],
+});
+```
+
 ## Batch requests
 
 Send up to 100 strings at once. Results come back in the same order.
@@ -112,7 +143,7 @@ Send up to 100 strings at once. Results come back in the same order.
 ```typescript
 const { results } = await cencori.ai.moderation({
   input: messages.map((m) => m.text),
-  layers: ['rules'], // fast path for high-volume chat
+  layers: ['rules'], // free and instant; skip OpenAI and the model
 });
 ```
 

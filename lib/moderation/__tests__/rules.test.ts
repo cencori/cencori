@@ -104,7 +104,7 @@ describe('moderation pipeline', () => {
         expect(res.results[0].action).toBe('block');
         expect(res.results[0].matches.some((m) => m.layer === 'rules')).toBe(true);
         expect(res.results[1]).toMatchObject({ flagged: false, action: 'allow' });
-        expect(res.layers).toEqual({ rules: 'ok', openai: 'skipped' });
+        expect(res.layers).toEqual({ rules: 'ok', openai: 'skipped', llm: 'skipped' });
     });
 
     test('a failing OpenAI layer degrades to rules and reports it', async () => {

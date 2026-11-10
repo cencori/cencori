@@ -358,7 +358,9 @@ export class AINamespace {
      * Check text or images for safety, fraud and scam signals.
      * Covers OpenAI's moderation categories plus fraud/* (phishing, advance-fee,
      * investment, giveaway, impersonation, real-money trading, off-platform
-     * payment and contact), cheating/exploit, hate/ethnic and child_safety/grooming.
+     * payment and contact), cheating/exploit, hate/ethnic and child_safety/grooming,
+     * and any custom categories you describe. Only unclear items reach the paid
+     * model layer.
      *
      * @example
      * const { results } = await cencori.ai.moderation({ input: 'Send 5k to my opay and get 50k back' });
@@ -378,6 +380,13 @@ export class AINamespace {
                 layers: request.layers,
                 thresholds: request.thresholds,
                 block_threshold: request.blockThreshold,
+                escalate: request.escalate,
+                llm_model: request.llmModel,
+                custom_categories: request.customCategories,
+                blocklist: request.blocklist,
+                allowlist: request.allowlist,
+                brand_names: request.brandNames,
+                context: request.context,
             }),
         });
 
@@ -390,6 +399,7 @@ export class AINamespace {
             id: string;
             model: string;
             layers: ModerationResponse['layers'];
+            usage?: { llm_items: number; llm_cached_items: number; llm_calls: number; llm_model: string | null; cost_usd: number };
             errors?: string[];
             results: Array<{
                 flagged: boolean;
@@ -398,6 +408,7 @@ export class AINamespace {
                 category_scores: Record<string, number>;
                 flagged_categories: string[];
                 matches: ModerationResponse['results'][number]['matches'];
+                layers_applied?: ModerationResponse['results'][number]['layersApplied'];
             }>;
         };
 
@@ -408,6 +419,7 @@ export class AINamespace {
             categoryScores: r.category_scores,
             flaggedCategories: r.flagged_categories,
             matches: r.matches,
+            layersApplied: r.layers_applied ?? [],
         }));
         return {
             id: data.id,
@@ -415,6 +427,13 @@ export class AINamespace {
             flagged: results.some((r) => r.flagged),
             results,
             layers: data.layers,
+            usage: {
+                llmItems: data.usage?.llm_items ?? 0,
+                llmCachedItems: data.usage?.llm_cached_items ?? 0,
+                llmCalls: data.usage?.llm_calls ?? 0,
+                llmModel: data.usage?.llm_model ?? null,
+                costUsd: data.usage?.cost_usd ?? 0,
+            },
             ...(data.errors ? { errors: data.errors } : {}),
         };
     }

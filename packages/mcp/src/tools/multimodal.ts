@@ -97,13 +97,20 @@ export function registerMultimodalTools(server: McpServer, client: PlatformClien
             inputSchema: {
                 input: z.union([z.string(), z.array(z.string()).max(100)]).describe('Text, or up to 100 texts (one result each).'),
                 model: z.string().optional().describe("OpenAI model for the standard categories. Default 'omni-moderation-latest'."),
-                layers: z.array(z.enum(['rules', 'openai'])).optional().describe("Layers to run. Default both; ['rules'] skips OpenAI."),
+                layers: z.array(z.enum(['rules', 'openai', 'llm'])).optional().describe("Layers to run. Default all; ['rules'] is free and instant."),
                 thresholds: z.record(z.string(), z.number().min(0).max(1)).optional().describe("Flag threshold per category; '*' sets the default (0.5)."),
+                custom_categories: z
+                    .array(z.object({ name: z.string().regex(/^[a-z0-9_]{1,40}$/), description: z.string(), threshold: z.number().min(0).max(1).optional() }))
+                    .max(20)
+                    .optional()
+                    .describe('Your own categories, judged by the model layer, returned as custom/<name>.'),
+                brand_names: z.array(z.string()).optional().describe('Your brand names, to catch staff impersonation.'),
+                context: z.string().max(1000).optional().describe('One or two sentences about the platform, for the model layer.'),
             },
             annotations: WRITE_ANNOTATIONS,
         },
-        async ({ input, model, layers, thresholds }) =>
-            jsonResult(await client.post('/ai/moderation', { input, model, layers, thresholds })),
+        async ({ input, model, layers, thresholds, custom_categories, brand_names, context }) =>
+            jsonResult(await client.post('/ai/moderation', { input, model, layers, thresholds, custom_categories, brand_names, context })),
     );
 
     server.registerTool(
