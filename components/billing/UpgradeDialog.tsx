@@ -245,7 +245,7 @@ export function UpgradeDialog({
         onInteractOutside={(event) => {
           if (paying) event.preventDefault();
         }}
-        className="flex max-h-[min(52rem,calc(100dvh-4rem-var(--maintenance-banner-height,0px)))] flex-col gap-0 overflow-hidden border-border/30 p-0 shadow-2xl max-sm:top-auto max-sm:bottom-0 max-sm:left-0 max-sm:max-h-[90dvh] max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-b-none max-sm:border-x-0 max-sm:border-b-0 sm:max-w-[480px] sm:rounded-xl"
+        className="flex max-h-[min(52rem,calc(100dvh-4rem-var(--maintenance-banner-height,0px)))] flex-col gap-0 overflow-hidden border-border/30 bg-popover p-0 shadow-2xl max-sm:top-auto max-sm:bottom-0 max-sm:left-0 max-sm:max-h-[90dvh] max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-b-none max-sm:border-x-0 max-sm:border-b-0 sm:max-w-[480px] sm:rounded-xl"
       >
         {/* Grab handle on the bottom sheet; tapping outside or Escape closes it. */}
         <div
@@ -554,7 +554,7 @@ function PanelFooter({
   children: ReactNode;
 }) {
   return (
-    <div className="sticky bottom-0 flex flex-col items-center gap-2 border-t border-border/30 bg-background px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-8 lg:px-10">
+    <div className="sticky bottom-0 flex flex-col items-center gap-2 border-t border-border/30 bg-popover px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-8 lg:px-10">
       <div className="shrink-0">{action}</div>
       <p className="text-center text-[11px] leading-4 text-muted-foreground">{children}</p>
     </div>
