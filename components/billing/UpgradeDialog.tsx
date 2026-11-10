@@ -554,9 +554,9 @@ function PanelFooter({
   children: ReactNode;
 }) {
   return (
-    <div className="sticky bottom-0 flex flex-col items-end gap-2 border-t border-border/30 bg-background px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-8 lg:px-10">
+    <div className="sticky bottom-0 flex flex-col items-center gap-2 border-t border-border/30 bg-background px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-8 lg:px-10">
       <div className="shrink-0">{action}</div>
-      <p className="text-right text-[11px] leading-4 text-muted-foreground">{children}</p>
+      <p className="text-center text-[11px] leading-4 text-muted-foreground">{children}</p>
     </div>
   );
 }
