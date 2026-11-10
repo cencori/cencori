@@ -8,9 +8,22 @@ import { createServerClient } from "@/lib/supabaseServer";
  * What an account is on. `free` is the trial: there is no free plan, but every account starts
  * there with a handful of tasks, and released desktop builds know the code by that name.
  */
-export type TensorPlanCode = "free" | "starter" | "builder" | "pro" | "enterprise";
-/** The passes that are for sale. */
-export type TensorPaidPlanCode = "starter" | "builder" | "pro";
+export type TensorPlanCode =
+  | "free"
+  | "starter"
+  | "builder"
+  | "pro"
+  | "max"
+  | "ultra"
+  | "enterprise";
+/**
+ * The plans that are for sale. On Starter, Builder and Pro Tensor picks the model and the
+ * allowance is tasks a week; on Max and Ultra the customer picks any model and the allowance is
+ * what those models cost.
+ */
+export type TensorPaidPlanCode = "starter" | "builder" | "pro" | "max" | "ultra";
+/** What a customer pays in: naira is what Nigeria is shown, dollars everyone else. */
+export type TensorCurrency = "NGN" | "USD";
 /** Every Tensor payment is taken by Bachs, in whichever currency the customer chooses there. */
 export type TensorPaymentProvider = "bachs";
 
@@ -44,6 +57,8 @@ export type TensorBillingAccount = {
   entitlement_starts_at: string | null;
   entitlement_ends_at: string | null;
   created_at: string;
+  /** The Bachs customer a card subscription is billed to, once there is one. */
+  provider_customer_id?: string | null;
 };
 
 export type TensorPlanRow = {
@@ -52,7 +67,7 @@ export type TensorPlanRow = {
   price_ngn_minor: number | null;
   price_usd_minor: number | null;
   billing_period_days: number;
-  /** Tasks in a pass; for the trial, tasks a month. Null is unlimited. */
+  /** Tasks in a week of a pass; for the trial, tasks a month. Null is unlimited. */
   task_limit: number | null;
   /** Provider cost one task may reach. */
   task_cost_cap_microusd: number | null;
@@ -63,27 +78,35 @@ export type TensorPlanRow = {
   enabled: boolean;
 };
 
-function isPaidPlan(value: unknown): value is TensorPaidPlanCode {
-  return value === "starter" || value === "builder" || value === "pro";
+export function isPaidPlan(value: unknown): value is TensorPaidPlanCode {
+  return (
+    value === "starter" ||
+    value === "builder" ||
+    value === "pro" ||
+    value === "max" ||
+    value === "ultra"
+  );
 }
 
 /**
- * The pass being bought.
+ * The plan being bought, and the currency it is being bought in.
  *
- * Every purchase is one payment for one 30-day pass, taken by Bachs. How it is paid — card, bank
- * transfer, naira or dollars — is chosen on Bachs's own checkout, so nothing about it is asked
- * for here; a plans page still open from before sends a provider and a method, and they are
- * ignored. `pack` is what that page called the same thing before passes.
+ * A plan is a month. Paid in dollars by card it renews by itself; paid in naira it is one payment
+ * for one month, because Bachs cannot yet bill naira on a schedule. A page that names no currency
+ * is one from before there was a choice, and opens the way it always did. `pack` is what that
+ * page called a plan, and the provider and method it sends are ignored.
  */
 export function parseTensorCheckoutInput(
   value: unknown,
-): { plan: TensorPaidPlanCode; returnUrl?: string } | null {
+): { plan: TensorPaidPlanCode; currency?: TensorCurrency; returnUrl?: string } | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const body = value as Record<string, unknown>;
   const plan = body.plan ?? body.pack;
   if (!isPaidPlan(plan)) return null;
+  const asked = typeof body.currency === "string" ? body.currency.toUpperCase() : null;
+  const currency = asked === "NGN" || asked === "USD" ? asked : undefined;
   const returnUrl = tensorCheckoutReturnUrl(body.return_url);
-  return returnUrl ? { plan, returnUrl } : { plan };
+  return { plan, ...(currency ? { currency } : {}), ...(returnUrl ? { returnUrl } : {}) };
 }
 
 /** The Tensor website's billing page, where a checkout started there comes back to. */
@@ -175,13 +198,16 @@ async function findUserOrganizationId(admin: Admin, userId: string): Promise<str
   return (membership?.organization_id as string | undefined) ?? null;
 }
 
+const TENSOR_ACCOUNT_COLUMNS =
+  "id, user_id, organization_id, plan_code, status, entitlement_starts_at, entitlement_ends_at, created_at, provider_customer_id";
+
 export async function getOrCreateTensorBillingAccount(
   admin: Admin,
   userId: string,
 ): Promise<TensorBillingAccount> {
   const { data: existing, error: readError } = await admin
     .from("basecode_billing_accounts")
-    .select("id, user_id, organization_id, plan_code, status, entitlement_starts_at, entitlement_ends_at, created_at")
+    .select(TENSOR_ACCOUNT_COLUMNS)
     .eq("user_id", userId)
     .maybeSingle();
   if (readError) throw new Error("Could not load the Tensor billing account.");
@@ -194,7 +220,7 @@ export async function getOrCreateTensorBillingAccount(
       { user_id: userId, organization_id: organizationId, plan_code: "free", status: "active" },
       { onConflict: "user_id" },
     )
-    .select("id, user_id, organization_id, plan_code, status, entitlement_starts_at, entitlement_ends_at, created_at")
+    .select(TENSOR_ACCOUNT_COLUMNS)
     .single();
   if (error || !data) throw new Error("Could not create the Tensor billing account.");
   return data as TensorBillingAccount;
@@ -217,14 +243,82 @@ export async function getTensorPlan(
 }
 
 /**
- * The plan code as desktop builds released before passes understand it.
+ * The plan code as desktop builds released before the ladder understand it.
  *
- * They accept free, builder, pro and enterprise and reject the whole snapshot for anything else,
- * which would blank the usage screen for everyone on Starter. Starter has the trial's models, so
- * it reads to them as `free` with the name "Starter"; newer builds read `tier` instead.
+ * They accept free, builder, pro and enterprise, reject the whole snapshot for anything else, and
+ * decide which models to offer from the code alone. So the code they are given says what the
+ * account may use rather than what it bought: `free` hides the model list, `builder` offers the
+ * open-weight models and `pro` everything. Newer builds read `tier` and `modelPolicy` instead.
  */
-export function legacyTensorPlanCode(code: TensorPlanCode): Exclude<TensorPlanCode, "starter"> {
-  return code === "starter" ? "free" : code;
+export function legacyTensorPlanCode(
+  code: TensorPlanCode,
+  modelPolicy: TensorPlanRow["model_policy"],
+): "free" | "builder" | "pro" | "enterprise" {
+  if (code === "free") return "free";
+  if (code === "enterprise" || modelPolicy === "custom") return "enterprise";
+  if (modelPolicy === "frontier") return "pro";
+  if (modelPolicy === "open_weight") return "builder";
+  return "free";
+}
+
+/** The period an account's tasks count against, as `basecode_allowance_period` reports it. */
+export function readAllowancePeriod(value: unknown): {
+  startsAt: string;
+  endsAt: string | null;
+  taskLimit: number | null;
+  passEndsAt: string | null;
+  passCostUsedMicrousd: number;
+  /** The models the account may use, which a pass bought before the ladder can differ on. */
+  modelPolicy: TensorPlanRow["model_policy"] | null;
+} | null {
+  if (typeof value !== "object" || value === null) return null;
+  const row = value as Record<string, unknown>;
+  if (typeof row.starts_at !== "string") return null;
+  const limit = row.task_limit === null || row.task_limit === undefined ? null : Number(row.task_limit);
+  const cost = Number(row.pass_cost_used_microusd ?? 0);
+  return {
+    startsAt: row.starts_at,
+    endsAt: typeof row.ends_at === "string" ? row.ends_at : null,
+    taskLimit: limit !== null && Number.isFinite(limit) ? limit : null,
+    passEndsAt: typeof row.pass_ends_at === "string" ? row.pass_ends_at : null,
+    // Postgres returns a bigint sum as a string once it is large.
+    passCostUsedMicrousd: Number.isFinite(cost) ? cost : 0,
+    modelPolicy:
+      row.model_policy === "auto" ||
+      row.model_policy === "open_weight" ||
+      row.model_policy === "frontier" ||
+      row.model_policy === "custom"
+        ? row.model_policy
+        : null,
+  };
+}
+
+/** The card subscription as the app shows it, or null when the account has none still running. */
+export function readTensorSubscription(value: unknown): {
+  status: "active" | "past_due" | "canceled";
+  renewsAt: string | null;
+  cancelAtPeriodEnd: boolean;
+  currency: TensorCurrency;
+} | null {
+  if (typeof value !== "object" || value === null) return null;
+  const row = value as Record<string, unknown>;
+  const raw = typeof row.status === "string" ? row.status : "";
+  // What Bachs calls a subscription still being collected on, whatever stage it is at.
+  const status =
+    raw === "active" || raw === "trialing"
+      ? "active"
+      : raw === "past_due" || raw === "unpaid"
+        ? "past_due"
+        : raw === "canceled" || raw === "paused"
+          ? "canceled"
+          : null;
+  if (!status) return null;
+  return {
+    status,
+    renewsAt: typeof row.current_period_end === "string" ? row.current_period_end : null,
+    cancelAtPeriodEnd: row.cancel_at_period_end === true,
+    currency: row.currency === "NGN" ? "NGN" : "USD",
+  };
 }
 
 /** How much of an allowance is gone, as a whole percentage. */
@@ -239,41 +333,46 @@ export async function getTensorBillingSnapshot(admin: Admin, userId: string) {
   const plan = await getTensorPlan(admin, planCode);
   const onTrial = planCode === "free";
 
-  // An allowance belongs to a pass, so its period starts exactly when the pass did; the trial's is
-  // the current month counted from the account's creation, worked out by the same function the
-  // reservation uses so the two cannot disagree on where a month starts. Matching the start
-  // rather than "whichever period covers today" is what keeps a period from the weekly model that
-  // came before from being read as the current one.
-  let periodStart = account.entitlement_starts_at ?? account.created_at;
-  let resetsAt = account.entitlement_ends_at;
-  if (onTrial) {
-    const { data: trialPeriod, error: trialError } = await admin
-      .rpc("basecode_trial_period", { p_created_at: account.created_at })
-      .single();
-    const window = trialPeriod as { starts_at?: unknown; ends_at?: unknown } | null;
-    if (trialError || typeof window?.starts_at !== "string" || typeof window.ends_at !== "string") {
-      throw new Error("Could not load the Tensor trial period.");
-    }
-    periodStart = window.starts_at;
-    resetsAt = window.ends_at;
-  }
+  // Which period the account is in is the database's to say: a week of the pass, counted from the
+  // moment it started, or the trial's month counted from the account's creation. The reservation
+  // reads the same function, so the meter and the limit cannot disagree on where a week starts.
+  const { data: allowanceRow, error: allowanceError } = await admin
+    .rpc("basecode_allowance_period", { p_account_id: account.id })
+    .single();
+  const allowance = readAllowancePeriod(allowanceRow);
+  if (allowanceError || !allowance) throw new Error("Could not load the Tensor allowance period.");
+
   const { data: period, error } = await admin
     .from("basecode_usage_periods")
     .select("ends_at, requests_used, cost_used_microusd")
     .eq("account_id", account.id)
     .eq("plan_code", planCode)
-    .eq("starts_at", periodStart)
+    .eq("starts_at", allowance.startsAt)
     .maybeSingle();
   if (error) throw new Error("Could not load Tensor usage.");
 
   const tasksUsed = Number(period?.requests_used ?? 0);
-  const tasksLimit = plan.task_limit;
-  // The pass also has a cost ceiling. It is not shown as a figure, but a pass that has reached it
-  // is used up, and the percentage has to say so or the app would offer tasks it cannot start.
-  const percentageUsed = Math.max(
-    percentageOf(tasksUsed, tasksLimit),
-    percentageOf(Number(period?.cost_used_microusd ?? 0), plan.pass_budget_microusd),
-  );
+  const tasksLimit = allowance.taskLimit;
+  // The pass also has a cost ceiling, counted across all its weeks. It is not shown as a figure,
+  // but a pass that has reached it is used up until it ends, and the percentage and the reset date
+  // have to say so or the app would offer tasks it cannot start.
+  const costPercentage = percentageOf(allowance.passCostUsedMicrousd, plan.pass_budget_microusd);
+  const percentageUsed = Math.max(percentageOf(tasksUsed, tasksLimit), costPercentage);
+  // A plan with no task count is all cost ceiling: nothing comes back until the month turns.
+  const resetsAt =
+    costPercentage >= 100 || tasksLimit === null ? allowance.passEndsAt : allowance.endsAt;
+  const modelPolicy = allowance.modelPolicy ?? plan.model_policy;
+
+  // The card subscription, when there is one. A naira month has none, and says when it ends.
+  const { data: subscriptionRow, error: subscriptionError } = await admin
+    .from("basecode_subscriptions")
+    .select("status, current_period_end, cancel_at_period_end, currency")
+    .eq("account_id", account.id)
+    .maybeSingle();
+  if (subscriptionError) {
+    console.error("[Tensor Billing] Subscription lookup failed", subscriptionError);
+  }
+  const subscription = readTensorSubscription(subscriptionRow);
   // Token spend across every device on this account. Deliberately separate from the meter above:
   // the plan is counted in tasks and provider cost, never in tokens. Left off entirely when the
   // account has no rows yet, because absent has to read as unknown rather than as zero.
@@ -287,12 +386,16 @@ export async function getTensorBillingSnapshot(admin: Admin, userId: string) {
 
   return {
     plan: {
-      code: legacyTensorPlanCode(plan.code),
+      code: legacyTensorPlanCode(plan.code, modelPolicy),
       tier: onTrial ? ("trial" as const) : plan.code,
       name: plan.name,
-      modelPolicy: plan.model_policy,
-      // When the allowance resets: the pass's end, or the trial's next month. The name is the one
-      // released builds read.
+      modelPolicy,
+      // When the paid month ends. With a subscription that renews this is the next charge; with
+      // none it is the day the plan stops unless it is paid for again.
+      endsAt: onTrial ? null : account.entitlement_ends_at,
+      renews: Boolean(subscription && subscription.status === "active" && !subscription.cancelAtPeriodEnd),
+      // When the allowance resets: the pass's next week, or the trial's next month. The name is the
+      // one released builds read.
       renewsAt: resetsAt,
       // Both currencies, because nothing here knows which one a given account pays in -- checkout
       // decides that from the payment provider, not from the account. The client picks; a plan
@@ -306,6 +409,7 @@ export async function getTensorBillingSnapshot(admin: Admin, userId: string) {
               usdMinor: plan.price_usd_minor,
             },
     },
+    subscription,
     usage: {
       percentageUsed,
       resetsAt,
@@ -425,3 +529,86 @@ export async function applyVerifiedTensorPayment(
     period_end?: string;
   };
 }
+
+/** One month a card subscription has paid for, as the provider reports it. */
+export type TensorSubscriptionPeriod = {
+  accountId: string;
+  planCode: TensorPaidPlanCode;
+  /** Null on a first charge that arrives before the provider has named the subscription. */
+  providerSubscriptionId: string | null;
+  /** The charge that paid for the month, or null when only its dates are being corrected. */
+  providerTransactionId: string | null;
+  reference: string | null;
+  amountMinor: number;
+  currency: TensorCurrency;
+  periodStart: string;
+  periodEnd: string;
+  providerPayload: Record<string, unknown>;
+};
+
+/**
+ * Puts a paid subscription month on the account. The payment is recorded once however many times
+ * the provider reports it; the month's dates are applied every time, so the invoice's exact dates
+ * replace the estimate made from the first charge.
+ */
+export async function applyTensorSubscriptionPeriod(admin: Admin, period: TensorSubscriptionPeriod) {
+  const { data, error } = await admin.rpc("basecode_apply_subscription_period", {
+    p_account_id: period.accountId,
+    p_plan_code: period.planCode,
+    p_provider_subscription_id: period.providerSubscriptionId,
+    p_provider_transaction_id: period.providerTransactionId,
+    p_reference: period.reference,
+    p_amount_minor: period.amountMinor,
+    p_currency: period.currency,
+    p_period_start: period.periodStart,
+    p_period_end: period.periodEnd,
+    p_provider_payload: period.providerPayload,
+  });
+  if (error) throw new Error(`Could not apply the Tensor subscription month: ${error.message}`);
+  return data as { applied: boolean; payment_recorded: boolean; account_id: string };
+}
+
+/** One calendar month on from a date, which is what a first charge pays for until its invoice says. */
+export function oneMonthAfter(start: Date): Date {
+  const end = new Date(start);
+  end.setUTCMonth(end.getUTCMonth() + 1);
+  // The 31st plus a month lands in the month after next; the last day of next month is meant.
+  if (end.getUTCDate() !== start.getUTCDate()) end.setUTCDate(0);
+  return end;
+}
+
+/**
+ * The account a subscription event is about: the one the checkout named, or failing that the one
+ * billed as this Bachs customer. Null when neither is known yet, which the caller retries.
+ */
+export async function findTensorSubscriptionAccount(
+  admin: Admin,
+  ids: { accountId?: string | null; customerId?: string | null; subscriptionId?: string | null },
+): Promise<{ id: string } | null> {
+  if (ids.subscriptionId) {
+    const { data, error } = await admin
+      .from("basecode_subscriptions")
+      .select("account_id")
+      .eq("provider", "bachs")
+      .eq("provider_subscription_id", ids.subscriptionId)
+      .maybeSingle();
+    if (error) throw new Error("Could not look up the Tensor subscription.");
+    if (data?.account_id) return { id: data.account_id as string };
+  }
+  for (const [column, value] of [
+    ["id", ids.accountId],
+    ["provider_customer_id", ids.customerId],
+  ] as const) {
+    if (!value) continue;
+    const { data, error } = await admin
+      .from("basecode_billing_accounts")
+      .select("id")
+      .eq(column, value)
+      .limit(1)
+      .maybeSingle();
+    if (error) throw new Error("Could not look up the Tensor billing account.");
+    if (data?.id) return { id: data.id as string };
+  }
+  return null;
+}
+

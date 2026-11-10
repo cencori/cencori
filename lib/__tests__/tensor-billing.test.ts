@@ -6,6 +6,9 @@ import {
   tensorPlanPriceMinor,
   majorAmountToMinor,
   parseTensorCheckoutInput,
+  oneMonthAfter,
+  readAllowancePeriod,
+  readTensorSubscription,
   resolveTensorCheckoutOrigin,
   tensorCheckoutReturnUrl,
   TENSOR_WEB_BILLING_URL,
@@ -71,11 +74,64 @@ describe("Tensor billing contracts", () => {
     expect(tensorPlanPriceMinor({ price_ngn_minor: 0, price_usd_minor: 0 }, "USD")).toBeNull();
   });
 
-  it("reports Starter to released desktop builds under the code they accept", () => {
-    expect(legacyTensorPlanCode("starter")).toBe("free");
-    expect(legacyTensorPlanCode("free")).toBe("free");
-    expect(legacyTensorPlanCode("builder")).toBe("builder");
-    expect(legacyTensorPlanCode("pro")).toBe("pro");
+  /**
+   * Older desktop builds decide which models to offer from the code alone, so the code they get
+   * says what the account may use: hidden model, open-weight, or everything.
+   */
+  it("reports a plan to released desktop builds by the models it may use", () => {
+    expect(legacyTensorPlanCode("free", "auto")).toBe("free");
+    expect(legacyTensorPlanCode("starter", "auto")).toBe("free");
+    expect(legacyTensorPlanCode("builder", "auto")).toBe("free");
+    expect(legacyTensorPlanCode("pro", "auto")).toBe("free");
+    expect(legacyTensorPlanCode("max", "frontier")).toBe("pro");
+    expect(legacyTensorPlanCode("ultra", "frontier")).toBe("pro");
+    // Passes bought before the ladder keep their models until they end.
+    expect(legacyTensorPlanCode("builder", "open_weight")).toBe("builder");
+    expect(legacyTensorPlanCode("pro", "frontier")).toBe("pro");
+    expect(legacyTensorPlanCode("enterprise", "custom")).toBe("enterprise");
+  });
+
+  it("sells Max and Ultra, in naira or dollars", () => {
+    expect(parseTensorCheckoutInput({ plan: "max", currency: "ngn" })).toEqual({
+      plan: "max",
+      currency: "NGN",
+    });
+    expect(parseTensorCheckoutInput({ plan: "ultra", currency: "USD" })).toEqual({
+      plan: "ultra",
+      currency: "USD",
+    });
+    // A currency Tensor does not sell in is not a reason to refuse the checkout.
+    expect(parseTensorCheckoutInput({ plan: "starter", currency: "EUR" })).toEqual({ plan: "starter" });
+  });
+
+  it("reads a subscription by whether it is still being collected on", () => {
+    expect(
+      readTensorSubscription({
+        status: "trialing",
+        current_period_end: "2026-12-10T00:00:00+00:00",
+        cancel_at_period_end: false,
+        currency: "USD",
+      }),
+    ).toEqual({
+      status: "active",
+      renewsAt: "2026-12-10T00:00:00+00:00",
+      cancelAtPeriodEnd: false,
+      currency: "USD",
+    });
+    expect(readTensorSubscription({ status: "unpaid" })?.status).toBe("past_due");
+    expect(readTensorSubscription({ status: "paused" })?.status).toBe("canceled");
+    expect(readTensorSubscription({ status: "something-new" })).toBeNull();
+    expect(readTensorSubscription(null)).toBeNull();
+  });
+
+  it("takes a first charge to pay for one calendar month", () => {
+    expect(oneMonthAfter(new Date("2026-11-10T08:00:00Z")).toISOString()).toBe(
+      "2026-12-10T08:00:00.000Z",
+    );
+    // The 31st has no counterpart next month; the month's last day is what is meant.
+    expect(oneMonthAfter(new Date("2027-01-31T08:00:00Z")).toISOString()).toBe(
+      "2027-02-28T08:00:00.000Z",
+    );
   });
 
   it("converts provider major-unit amounts without floating point drift", () => {
@@ -128,5 +184,40 @@ describe("Tensor billing contracts", () => {
     expect(
       resolveTensorCheckoutOrigin("https://cencori-feature.vercel.app", "preview"),
     ).toBe("https://cencori-feature.vercel.app");
+  });
+
+  /** The usage screen trusts this row for where the week starts, so a malformed one is refused. */
+  it("reads the allowance period the database reports, and refuses one without a start", () => {
+    expect(
+      readAllowancePeriod({
+        plan_code: "starter",
+        starts_at: "2026-11-10T00:00:00+00:00",
+        ends_at: "2026-11-17T00:00:00+00:00",
+        task_limit: 9,
+        pass_ends_at: "2026-12-10T00:00:00+00:00",
+        // A bigint sum arrives as a string.
+        pass_cost_used_microusd: "540000",
+      }),
+    ).toEqual({
+      startsAt: "2026-11-10T00:00:00+00:00",
+      endsAt: "2026-11-17T00:00:00+00:00",
+      taskLimit: 9,
+      passEndsAt: "2026-12-10T00:00:00+00:00",
+      passCostUsedMicrousd: 540000,
+      modelPolicy: null,
+    });
+    // Enterprise has no task limit and no end.
+    expect(
+      readAllowancePeriod({ starts_at: "2026-11-10T00:00:00+00:00", ends_at: null, task_limit: null }),
+    ).toEqual({
+      startsAt: "2026-11-10T00:00:00+00:00",
+      endsAt: null,
+      taskLimit: null,
+      passEndsAt: null,
+      passCostUsedMicrousd: 0,
+      modelPolicy: null,
+    });
+    expect(readAllowancePeriod(null)).toBeNull();
+    expect(readAllowancePeriod({ ends_at: "2026-11-17T00:00:00+00:00" })).toBeNull();
   });
 });

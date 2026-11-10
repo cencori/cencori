@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { sendDueSummaries } from '@/lib/embedded/owner-alerts';
 import { sendPlanReminders } from '@/lib/business/reminders';
+import { sendTensorRenewalReminders } from '@/lib/tensor-renewal-reminders';
 import { sendMorningBriefs } from '@/lib/studio/brief';
 import { syncAllStores } from '@/lib/embedded/store-sync';
 import { cronDisabled } from '@/lib/cron';
@@ -9,8 +10,8 @@ import { cronDisabled } from '@/lib/cron';
 /**
  * Hourly: send each agent owner's morning summary and each business's
  * morning brief once it's 8am where they are, and each business plan's
- * reminders (ending soon, ended, stopped), and sync each connected online
- * store's products.
+ * reminders (ending soon, ended, stopped), each Tensor month that will not
+ * renew by itself, and sync each connected online store's products.
  */
 async function run(req: NextRequest) {
     const off = cronDisabled();
@@ -26,8 +27,8 @@ async function run(req: NextRequest) {
     }
     try {
         const db = createAdminClient();
-        const [result, reminders, briefs, stores] = await Promise.all([sendDueSummaries(db), sendPlanReminders(db), sendMorningBriefs(db), syncAllStores(db)]);
-        return NextResponse.json({ success: true, ...result, plan_reminders: reminders.sent, briefs, stores, timestamp: new Date().toISOString() });
+        const [result, reminders, briefs, stores, tensorRenewals] = await Promise.all([sendDueSummaries(db), sendPlanReminders(db), sendMorningBriefs(db), syncAllStores(db), sendTensorRenewalReminders(db)]);
+        return NextResponse.json({ success: true, ...result, plan_reminders: reminders.sent, tensor_renewal_reminders: tensorRenewals.sent, briefs, stores, timestamp: new Date().toISOString() });
     } catch (error) {
         console.error('[Cron] Error sending owner summaries:', error);
         return NextResponse.json({ success: false, error: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });

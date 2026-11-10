@@ -22,6 +22,12 @@ import {
   applyVerifiedTensorPayment,
   majorAmountToMinor,
 } from '@/lib/tensor-billing';
+import {
+  handleTensorPassCharge,
+  handleTensorSubscriptionCharge,
+  handleTensorSubscriptionInvoice,
+  handleTensorSubscriptionLifecycle,
+} from '@/lib/tensor-subscription-events';
 import { applyPaidCreditTopup } from '@/lib/billing/paid-credit-topups';
 import { bachsPaymentRow, recordPaymentSafely } from '@/lib/billing/payments-ledger';
 import { getBachsTopupVerificationFailure, verifyBachsNgnTopupCharge } from '@/lib/billing/verify-paid-topups';
@@ -187,6 +193,12 @@ async function handleCollectionSucceeded(
   // Pro paid in naira (a prepaid month or year): product-less too.
   if (data.metadata?.purchase_type === NAIRA_PLAN_PASS_PURCHASE_TYPE) {
     await handleNairaPlanPass(data, supabase);
+    return;
+  }
+
+  // One month of a Tensor plan, at a price rather than a product: product-less too.
+  if (data.metadata?.purchase_type === 'tensor_pass') {
+    await handleTensorPassCharge(data, supabase);
     return;
   }
 
@@ -400,6 +412,10 @@ async function handleCollectionSucceeded(
       break;
     }
 
+    case 'tensor_subscription':
+      await handleTensorSubscriptionCharge(data, productId, supabase);
+      break;
+
     case 'basecode_subscription':
     case 'basecode_prepaid': {
       if (!data.charge_id) {
@@ -523,6 +539,9 @@ async function handleSubscriptionLifecycle(
   eventType: SubscriptionLifecycleEventType,
   supabase: AdminClient
 ) {
+  // Tensor's subscriptions belong to an account, not an organization.
+  if (await handleTensorSubscriptionLifecycle(data, eventType, supabase)) return;
+
   // Standalone Scan is retired: its product ids resolve to null and are ignored.
   if (getProductTypeFromId(data.product_id) !== 'subscription') return;
 
@@ -577,6 +596,9 @@ async function handleSubscriptionInvoice(
 ) {
   const subscriptionId = data.subscription?.subscription_id;
   if (!subscriptionId) return; // Not a subscription invoice.
+
+  // A Tensor subscription's invoice moves an account's month, not an organization's.
+  if (await handleTensorSubscriptionInvoice(data, eventType, supabase)) return;
 
   const org = await findSubscriptionOrg(supabase, { subscriptionId });
   if (!org) {

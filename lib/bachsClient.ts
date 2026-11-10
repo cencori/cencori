@@ -25,6 +25,7 @@ export type BachsProductType =
   | 'subscription'
   | 'credits_topup'
   | 'basecode_subscription'
+  | 'tensor_subscription'
   | 'business_pass';
 export type SubscriptionTier = 'pro' | 'team';
 export type BillingInterval = 'month' | 'year';
@@ -404,6 +405,13 @@ export const BACHS_CONFIG = {
     tensorStarterMonthly: process.env.BACHS_PRODUCT_BASECODE_STARTER_MONTHLY || '',
     tensorBuilderMonthly: process.env.BACHS_PRODUCT_BASECODE_BUILDER_MONTHLY || '',
     tensorProMonthly: process.env.BACHS_PRODUCT_BASECODE_PRO_MONTHLY || '',
+    // Recurring Tensor plans, billed monthly by card. A plan with no product here is sold as a
+    // single month instead, so each one starts renewing the day its product is configured.
+    tensorStarterSubscription: process.env.BACHS_PRODUCT_TENSOR_STARTER_SUBSCRIPTION || '',
+    tensorBuilderSubscription: process.env.BACHS_PRODUCT_TENSOR_BUILDER_SUBSCRIPTION || '',
+    tensorProSubscription: process.env.BACHS_PRODUCT_TENSOR_PRO_SUBSCRIPTION || '',
+    tensorMaxSubscription: process.env.BACHS_PRODUCT_TENSOR_MAX_SUBSCRIPTION || '',
+    tensorUltraSubscription: process.env.BACHS_PRODUCT_TENSOR_ULTRA_SUBSCRIPTION || '',
     // Business plans, as 30-day naira passes until Bachs enables NGN subscriptions.
     businessStarter: process.env.BACHS_PRODUCT_BUSINESS_STARTER || '',
     businessGrowth: process.env.BACHS_PRODUCT_BUSINESS_GROWTH || '',
@@ -474,6 +482,47 @@ export function getTensorProductId(tier: 'starter' | 'builder' | 'pro'): string 
         : BACHS_CONFIG.products.tensorProMonthly;
   if (!id) throw new Error(`No Bachs Tensor product configured for ${tier}`);
   return id;
+}
+
+export type TensorSubscriptionPlan = 'starter' | 'builder' | 'pro' | 'max' | 'ultra';
+
+function tensorSubscriptionProducts(): Record<TensorSubscriptionPlan, string> {
+  const p = BACHS_CONFIG.products;
+  return {
+    starter: p.tensorStarterSubscription,
+    builder: p.tensorBuilderSubscription,
+    pro: p.tensorProSubscription,
+    max: p.tensorMaxSubscription,
+    ultra: p.tensorUltraSubscription,
+  };
+}
+
+/** The recurring product a Tensor plan renews on, or null while none is configured for it. */
+export function getTensorSubscriptionProductId(plan: TensorSubscriptionPlan): string | null {
+  return tensorSubscriptionProducts()[plan] || null;
+}
+
+/** The Tensor plan a recurring product bills for, or null when it is not one of Tensor's. */
+export function getTensorPlanBySubscriptionProductId(
+  productId: string | null | undefined,
+): TensorSubscriptionPlan | null {
+  if (!productId) return null;
+  const match = Object.entries(tensorSubscriptionProducts()).find(([, id]) => id && id === productId);
+  return (match?.[0] as TensorSubscriptionPlan | undefined) ?? null;
+}
+
+/** A single month of Starter, Builder or Pro as a catalog product, when one is configured. */
+export function getTensorPassProductId(tier: string): string | null {
+  const p = BACHS_CONFIG.products;
+  const id =
+    tier === 'starter'
+      ? p.tensorStarterMonthly
+      : tier === 'builder'
+        ? p.tensorBuilderMonthly
+        : tier === 'pro'
+          ? p.tensorProMonthly
+          : '';
+  return id || null;
 }
 
 export function getTensorPlanByProductId(
@@ -560,6 +609,7 @@ export function getProductTypeFromId(
   ) {
     return 'basecode_subscription';
   }
+  if (getTensorPlanBySubscriptionProductId(productId)) return 'tensor_subscription';
   if (getBusinessPlanByProductId(productId)) return 'business_pass';
   return null;
 }
