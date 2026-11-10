@@ -77,9 +77,9 @@ const GROUPS: Array<{ id: "auto" | "choice"; title: string; note: string }> = [
   { id: "choice", title: "You pick the model", note: "Every model, frontier included, metered by what it costs to run." },
 ];
 
-// Launch gate: Max and Ultra need a funded frontier key behind them before they are sold.
-// Add "max" and "ultra" here the moment that lands — one-line flip.
-const ENABLED_PACKS: PackCode[] = ["starter", "builder", "pro"];
+// The plans on sale. Max and Ultra run on frontier models, so the frontier key has to stay funded.
+// Remove a code here to stop selling it.
+const ENABLED_PACKS: PackCode[] = ["starter", "builder", "pro", "max", "ultra"];
 
 /** Naira for a visitor in Nigeria, dollars for everyone else; either can switch. */
 function defaultCurrency(): Currency {
