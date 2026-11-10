@@ -206,6 +206,51 @@ export interface EmbeddingResponse {
     };
 }
 
+export type ModerationInputPart =
+    | { type: 'text'; text: string }
+    | { type: 'image_url'; image_url: { url: string } };
+
+export interface ModerationRequest {
+    /** A string, up to 100 strings (one result each), or text/image parts (one result). */
+    input: string | string[] | ModerationInputPart[];
+    /** OpenAI model for the standard categories. Defaults to 'omni-moderation-latest'. */
+    model?: string;
+    /** Which layers to run. Defaults to both. 'rules' alone is fastest and never calls OpenAI. */
+    layers?: Array<'rules' | 'openai'>;
+    /** Flag thresholds per category (0–1); '*' sets the default. Default 0.5. */
+    thresholds?: Record<string, number>;
+    /** Score at which the recommended action becomes 'block'. Default 0.8. */
+    blockThreshold?: number;
+}
+
+export interface ModerationMatch {
+    layer: 'rules' | 'openai';
+    category: string;
+    score: number;
+    rule?: string;
+    text?: string;
+}
+
+export interface ModerationResult {
+    flagged: boolean;
+    /** Recommended handling: allow, send to human review, or block. */
+    action: 'allow' | 'review' | 'block';
+    categories: Record<string, boolean>;
+    categoryScores: Record<string, number>;
+    flaggedCategories: string[];
+    matches: ModerationMatch[];
+}
+
+export interface ModerationResponse {
+    id: string;
+    model: string;
+    /** True when any result is flagged. */
+    flagged: boolean;
+    results: ModerationResult[];
+    layers: Partial<Record<'rules' | 'openai', 'ok' | 'skipped' | 'error'>>;
+    errors?: string[];
+}
+
 /**
  * Image generation request
  */

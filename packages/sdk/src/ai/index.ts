@@ -16,6 +16,8 @@ import type {
     KnowledgeCitation,
     EmbeddingRequest,
     EmbeddingResponse,
+    ModerationRequest,
+    ModerationResponse,
     GenerateObjectRequest,
     GenerateObjectResponse,
     ImageGenerationRequest,
@@ -349,6 +351,71 @@ export class AINamespace {
             usage: {
                 totalTokens: data.usage?.total_tokens ?? 0,
             },
+        };
+    }
+
+    /**
+     * Check text or images for safety, fraud and scam signals.
+     * Covers OpenAI's moderation categories plus fraud/* (phishing, advance-fee,
+     * investment, giveaway, impersonation, real-money trading, off-platform
+     * payment and contact), cheating/exploit, hate/ethnic and child_safety/grooming.
+     *
+     * @example
+     * const { results } = await cencori.ai.moderation({ input: 'Send 5k to my opay and get 50k back' });
+     * if (results[0].action === 'block') rejectMessage();
+     */
+    async moderation(request: ModerationRequest): Promise<ModerationResponse> {
+        const response = await fetchWithRetry(`${this.config.baseUrl}/api/ai/moderation`, {
+            method: 'POST',
+            headers: {
+                'CENCORI_API_KEY': this.config.apiKey,
+                'Content-Type': 'application/json',
+                ...this.config.headers,
+            },
+            body: JSON.stringify({
+                input: request.input,
+                model: request.model,
+                layers: request.layers,
+                thresholds: request.thresholds,
+                block_threshold: request.blockThreshold,
+            }),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+            throwCencoriError(response, errorData as Parameters<typeof throwCencoriError>[1]);
+        }
+
+        const data = await response.json() as {
+            id: string;
+            model: string;
+            layers: ModerationResponse['layers'];
+            errors?: string[];
+            results: Array<{
+                flagged: boolean;
+                action: 'allow' | 'review' | 'block';
+                categories: Record<string, boolean>;
+                category_scores: Record<string, number>;
+                flagged_categories: string[];
+                matches: ModerationResponse['results'][number]['matches'];
+            }>;
+        };
+
+        const results = data.results.map((r) => ({
+            flagged: r.flagged,
+            action: r.action,
+            categories: r.categories,
+            categoryScores: r.category_scores,
+            flaggedCategories: r.flagged_categories,
+            matches: r.matches,
+        }));
+        return {
+            id: data.id,
+            model: data.model,
+            flagged: results.some((r) => r.flagged),
+            results,
+            layers: data.layers,
+            ...(data.errors ? { errors: data.errors } : {}),
         };
     }
 

@@ -92,14 +92,18 @@ export function registerMultimodalTools(server: McpServer, client: PlatformClien
         'moderate_content',
         {
             title: 'Moderate content',
-            description: 'Classify text for policy violations via the moderation endpoint.',
+            description:
+                'Check text for safety problems and scams. Returns OpenAI moderation categories plus fraud/* (phishing, advance-fee, investment, giveaway, impersonation, real-money trading, off-platform payment and contact), cheating/exploit, hate/ethnic and child_safety/grooming, with a recommended action (allow, review, block) per input.',
             inputSchema: {
-                input: z.union([z.string(), z.array(z.string())]).describe('Text or array of texts to moderate.'),
-                model: z.string().optional(),
+                input: z.union([z.string(), z.array(z.string()).max(100)]).describe('Text, or up to 100 texts (one result each).'),
+                model: z.string().optional().describe("OpenAI model for the standard categories. Default 'omni-moderation-latest'."),
+                layers: z.array(z.enum(['rules', 'openai'])).optional().describe("Layers to run. Default both; ['rules'] skips OpenAI."),
+                thresholds: z.record(z.string(), z.number().min(0).max(1)).optional().describe("Flag threshold per category; '*' sets the default (0.5)."),
             },
             annotations: WRITE_ANNOTATIONS,
         },
-        async ({ input, model }) => jsonResult(await client.post('/ai/moderation', { input, model })),
+        async ({ input, model, layers, thresholds }) =>
+            jsonResult(await client.post('/ai/moderation', { input, model, layers, thresholds })),
     );
 
     server.registerTool(

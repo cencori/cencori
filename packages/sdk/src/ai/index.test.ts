@@ -272,3 +272,32 @@ describe('AINamespace knowledge bases', () => {
         expect(chunks[1].citations).toBeUndefined();
     });
 });
+
+describe('AINamespace moderation', () => {
+    it('posts options and maps the response to camelCase', async () => {
+        const ns = createNamespace();
+        const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValueOnce(new Response(JSON.stringify({
+            id: 'modr-1',
+            model: 'omni-moderation-latest',
+            layers: { rules: 'ok', openai: 'ok' },
+            results: [{
+                flagged: true,
+                action: 'block',
+                categories: { 'fraud/advance_fee': true },
+                category_scores: { 'fraud/advance_fee': 0.9 },
+                flagged_categories: ['fraud', 'fraud/advance_fee'],
+                matches: [{ layer: 'rules', category: 'fraud/advance_fee', score: 0.75, rule: 'send_to_receive', text: 'send 5k and get 50k' }],
+            }],
+        }), { status: 200 }));
+
+        const res = await ns.moderation({ input: 'send 5k and get 50k', blockThreshold: 0.7, layers: ['rules'] });
+
+        const [url, init] = fetchSpy.mock.calls[0];
+        expect(String(url)).toBe('https://cencori.com/api/ai/moderation');
+        expect(JSON.parse(String((init as RequestInit).body))).toMatchObject({ input: 'send 5k and get 50k', block_threshold: 0.7, layers: ['rules'] });
+        expect(res.flagged).toBe(true);
+        expect(res.results[0].action).toBe('block');
+        expect(res.results[0].categoryScores['fraud/advance_fee']).toBe(0.9);
+        expect(res.results[0].flaggedCategories).toContain('fraud/advance_fee');
+    });
+});

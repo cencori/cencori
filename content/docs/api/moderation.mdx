@@ -1,115 +1,131 @@
 ---
 title: "Moderation API"
-description: "Content safety filtering and policy compliance."
+description: "Content safety, fraud and scam detection for text and images."
 section: "API Reference"
 order: 13
 ---
 
-Check content for policy violations before or after AI generation.
+Check user content for safety problems and scams before it reaches other users or a model. It returns the same response shape as OpenAI's moderation API, plus fraud and scam categories that OpenAI doesn't cover, a recommended action, and the evidence for each flag.
 
-## Basic Request
+Moderation is free.
+
+## How it works
+
+Every request runs two layers and takes the highest score per category:
+
+| Layer | What it catches | Cost |
+|-------|-----------------|------|
+| `rules` | Fraud and scams, off-platform payment and contact, cheating, ethnic hate, grooming, and insults and threats in Nigerian English, Pidgin, Yoruba, Igbo and Hausa | Free, runs on Cencori in about 1 ms |
+| `openai` | OpenAI `omni-moderation-latest`: harassment, hate, illicit, self-harm, sexual, violence, for text and images | Free |
+
+If OpenAI is unavailable, you still get the `rules` results. The response then has `layers.openai: "error"` and the `X-Cencori-Moderation-Degraded: openai` header.
+
+## Basic request
 
 ```typescript
-const response = await cencori.ai.moderation({
-  input: 'Text to check for policy violations'
+const result = await cencori.ai.moderation({
+  input: 'Send 5k to my opay 8123456789 and receive 50k back in 1 hour',
 });
 
-if (response.flagged) {
-  console.log('Content flagged:', response.categories);
+const [r] = result.results;
+if (r.action === 'block') {
+  // drop the message
+} else if (r.action === 'review') {
+  // hide it until a moderator checks it
 }
 ```
 
-## Request Parameters
+## Request parameters
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `input` | string \| string[] | Yes | Text to moderate |
-| `model` | string | No | 'text-moderation-latest' |
+| `input` | `string \| string[] \| Part[]` | Yes | A string, up to 100 strings (one result each), or an array of `{type:"text",text}` / `{type:"image_url",image_url:{url}}` parts, which gives one result |
+| `model` | string | No | OpenAI model for the `openai` layer. Default `omni-moderation-latest` |
+| `layers` | `("rules" \| "openai")[]` | No | Which layers to run. Default both. `["rules"]` never calls OpenAI and responds in milliseconds |
+| `thresholds` | object | No | Flag threshold per category, 0–1, e.g. `{"fraud/off_platform_contact": 0.3}`. `"*"` sets the default. Default `0.5` |
+| `block_threshold` | number | No | Score at which `action` becomes `block`. Default `0.8`. The SDK option is `blockThreshold` |
+
+Image URLs must be `https://` or a base64 `data:image/...` URL. Images need the `openai` layer.
 
 ## Response
 
-```typescript
+```json
 {
-  id: 'modr-...',
-  model: 'text-moderation-latest',
-  results: [
+  "id": "modr-...",
+  "model": "omni-moderation-latest",
+  "layers": { "rules": "ok", "openai": "ok" },
+  "rules_version": "cencori-rules-2026-11-10",
+  "results": [
     {
-      flagged: false,
-      categories: {
-        hate: false,
-        'hate/threatening': false,
-        harassment: false,
-        'self-harm': false,
-        'self-harm/intent': false,
-        'self-harm/instructions': false,
-        sexual: false,
-        'sexual/minors': false,
-        violence: false,
-        'violence/graphic': false
-      },
-      categoryScores: {
-        hate: 0.00001,
-        harassment: 0.00002,
-        violence: 0.00003
-        // ...
-      }
+      "flagged": true,
+      "action": "block",
+      "flagged_categories": ["fraud", "fraud/off_platform_payment", "fraud/advance_fee"],
+      "categories": { "fraud/advance_fee": true, "harassment": false, "...": false },
+      "category_scores": { "fraud/advance_fee": 0.93, "harassment": 0.0001, "...": 0 },
+      "matches": [
+        {
+          "layer": "rules",
+          "category": "fraud/advance_fee",
+          "score": 0.75,
+          "rule": "send_to_receive",
+          "text": "send 5k to my opay 8123456789 and receive 50k"
+        }
+      ]
     }
   ]
 }
 ```
 
+- `action` is `allow`, `review` (flagged, below the block threshold) or `block`.
+- `categories` and `category_scores` include every category below, so code written for OpenAI keeps working.
+- `matches` says which layer and rule flagged the content, and on what text, so moderators can see why.
+
 ## Categories
 
-| Category | Description |
-|----------|-------------|
-| hate | Hateful content |
-| harassment | Harassing content |
-| self-harm | Self-harm content |
-| sexual | Sexual content |
-| violence | Violent content |
+From OpenAI: `harassment`, `harassment/threatening`, `hate`, `hate/threatening`, `illicit`, `illicit/violent`, `self-harm`, `self-harm/intent`, `self-harm/instructions`, `sexual`, `sexual/minors`, `violence`, `violence/graphic`. The `rules` layer also scores `harassment`, `hate` and `sexual` for Pidgin and local-language content.
+
+Cencori:
+
+| Category | Catches |
+|----------|---------|
+| `fraud` | The highest of the `fraud/*` scores below |
+| `fraud/phishing` | Asking for an OTP, PIN, password, BVN, NIN, card details or login; fake "verify your account" |
+| `fraud/off_platform_payment` | Bank account numbers, transfers to a personal account, OPay/PalmPay/Moniepoint and other wallets, crypto addresses |
+| `fraud/off_platform_contact` | Phone numbers (including spelled out), WhatsApp, Telegram and other handles |
+| `fraud/advance_fee` | "Send 5k and get 50k", processing or release fees, fake winnings, inheritance and grant scams |
+| `fraud/investment` | "Double your money", guaranteed returns, Ponzi schemes, sure odds and fixed matches |
+| `fraud/giveaway` | Fake giveaways, "first 50 people", "claim your free 100k" |
+| `fraud/impersonation` | Posing as staff, admins, support, a bank or EFCC/CBN/police; fake suspension notices |
+| `fraud/romance` | Sugar mummy/daddy connect and personal money requests |
+| `fraud/real_money_trading` | Selling in-game currency, items or accounts for real money |
+| `fraud/cybercrime` | Yahoo formats, picking, carding, bank logs, money rituals |
+| `cheating/exploit` | Money glitches, hacks, mod APKs, bots |
+| `hate/ethnic` | Ethnic slurs and generalisations, such as "all X people are thieves" |
+| `child_safety/grooming` | Secrecy requests, asking for pictures, moving to private meetings |
+
+`GET /v1/moderations` lists the categories, models and defaults.
+
+## Batch requests
+
+Send up to 100 strings at once. Results come back in the same order.
+
+```typescript
+const { results } = await cencori.ai.moderation({
+  input: messages.map((m) => m.text),
+  layers: ['rules'], // fast path for high-volume chat
+});
+```
 
 ## HTTP API
 
 ```bash
 curl -X POST https://api.cencori.com/v1/moderations \
-  -H "CENCORI_API_KEY: csk_..." \
+  -H "Authorization: Bearer csk_..." \
   -H "Content-Type: application/json" \
   -d '{
-    "input": "Text to moderate"
+    "input": "Abeg send me the OTP wey dem send you",
+    "thresholds": { "fraud/off_platform_contact": 0.3 }
   }'
 ```
 
-## Use Cases
-
-### Pre-Generation Filtering
-
-```typescript
-async function safeGenerate(userMessage: string) {
-  const modResult = await cencori.ai.moderation({ input: userMessage });
-  
-  if (modResult.results[0].flagged) {
-    return 'Sorry, I cannot process this request.';
-  }
-
-  return cencori.ai.chat({
-    model: 'gpt-4o',
-    messages: [{ role: 'user', content: userMessage }]
-  });
-}
-```
-
-### Post-Generation Filtering
-
-```typescript
-const response = await cencori.ai.chat({ ... });
-
-const modResult = await cencori.ai.moderation({
-  input: response.content
-});
-
-if (modResult.results[0].flagged) {
-  return 'Response filtered for policy compliance.';
-}
-
-return response.content;
-```
+To migrate from OpenAI, change the base URL and key. The request and response fields OpenAI uses are unchanged.
