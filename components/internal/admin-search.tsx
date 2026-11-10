@@ -9,6 +9,7 @@ import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react';
 import DashboardCircleIcon from '@hugeicons/core-free-icons/DashboardCircleIcon';
 import Analytics01Icon from '@hugeicons/core-free-icons/Analytics01Icon';
 import Wallet01Icon from '@hugeicons/core-free-icons/Wallet01Icon';
+import ComputerTerminal01Icon from '@hugeicons/core-free-icons/ComputerTerminal01Icon';
 import Mail01Icon from '@hugeicons/core-free-icons/Mail01Icon';
 import BubbleChatIcon from '@hugeicons/core-free-icons/BubbleChatIcon';
 import Settings02Icon from '@hugeicons/core-free-icons/Settings02Icon';
@@ -29,6 +30,7 @@ export const ADMIN_PAGES: { href: string; label: string; icon: IconSvgElement; k
     { href: '/', label: 'Overview', icon: DashboardCircleIcon, keywords: 'home requests spend tokens latency errors signups' },
     { href: '/analytics', label: 'Analytics', icon: Analytics01Icon, keywords: 'traffic usage platform charts' },
     { href: '/revenue', label: 'Revenue', icon: Wallet01Icon, keywords: 'payments mrr bachs sync money income' },
+    { href: '/tensor', label: 'Tensor', icon: ComputerTerminal01Icon, keywords: 'launch signups tasks active plans conversion desktop app' },
     { href: '/emails', label: 'Emails', icon: Mail01Icon, keywords: 'send compose newsletter campaign' },
     { href: '/feedback', label: 'Feedback', icon: BubbleChatIcon, keywords: 'suggestions users comments' },
     { href: '/settings', label: 'Settings', icon: Settings02Icon, keywords: 'team admins invite access' },

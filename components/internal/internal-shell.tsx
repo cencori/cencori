@@ -7,6 +7,7 @@ import { HugeiconsIcon } from '@hugeicons/react';
 import DashboardCircleIcon from '@hugeicons/core-free-icons/DashboardCircleIcon';
 import Analytics01Icon from '@hugeicons/core-free-icons/Analytics01Icon';
 import Wallet01Icon from '@hugeicons/core-free-icons/Wallet01Icon';
+import ComputerTerminal01Icon from '@hugeicons/core-free-icons/ComputerTerminal01Icon';
 import Mail01Icon from '@hugeicons/core-free-icons/Mail01Icon';
 import BubbleChatIcon from '@hugeicons/core-free-icons/BubbleChatIcon';
 import Settings02Icon from '@hugeicons/core-free-icons/Settings02Icon';
@@ -51,6 +52,7 @@ const NAV_ITEMS = [
     { href: '/', label: 'Overview', icon: DashboardCircleIcon, exact: true },
     { href: '/analytics', label: 'Analytics', icon: Analytics01Icon },
     { href: '/revenue', label: 'Revenue', icon: Wallet01Icon },
+    { href: '/tensor', label: 'Tensor', icon: ComputerTerminal01Icon },
     { href: '/emails', label: 'Emails', icon: Mail01Icon },
     { href: '/feedback', label: 'Feedback', icon: BubbleChatIcon },
     { href: '/settings', label: 'Settings', icon: Settings02Icon },
