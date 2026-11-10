@@ -545,7 +545,7 @@ function OrderTotals({
   );
 }
 
-/** The bar pinned to the bottom of the payment panel: the authorization note and the button. */
+/** The bar pinned to the bottom of the payment panel: the button, with the authorization note under it. */
 function PanelFooter({
   action,
   children,
@@ -554,9 +554,9 @@ function PanelFooter({
   children: ReactNode;
 }) {
   return (
-    <div className="sticky bottom-0 flex items-center justify-between gap-6 border-t border-border/30 bg-background px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-8 lg:px-10">
-      <p className="text-[11px] leading-4 text-muted-foreground">{children}</p>
+    <div className="sticky bottom-0 flex flex-col items-end gap-2 border-t border-border/30 bg-background px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-8 lg:px-10">
       <div className="shrink-0">{action}</div>
+      <p className="text-right text-[11px] leading-4 text-muted-foreground">{children}</p>
     </div>
   );
 }
