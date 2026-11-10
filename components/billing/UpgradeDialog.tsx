@@ -89,10 +89,13 @@ function getInitialTier(
 function PaymentPanel({
   action,
   error,
+  inNaira,
   totals,
 }: {
   action: ReactNode;
   error: string | null;
+  /** Paying the naira price (a prepaid period), not the dollar subscription. */
+  inNaira: boolean;
   totals: ReactNode;
 }) {
   return (
@@ -101,7 +104,9 @@ function PaymentPanel({
         <section aria-label="Payment" className="flex items-start gap-3 rounded-lg border border-border/60 p-4">
           <LockKeyhole className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
           <p className="text-xs leading-5 text-muted-foreground">
-            You&apos;ll pay by card on our payment partner&apos;s secure checkout, which opens over this page.
+            {inNaira
+              ? "You'll pay in naira, by card or bank transfer, on our payment partner's secure checkout, which opens over this page."
+              : "You'll pay by card on our payment partner's secure checkout, which opens over this page."}{" "}
             Your card details never reach Cencori.
           </p>
         </section>
@@ -112,14 +117,14 @@ function PaymentPanel({
       </div>
 
       <PanelFooter action={action}>
-        By subscribing, you authorize Cencori to charge you according to the{" "}
+        {inNaira ? "By subscribing, you agree to the" : "By subscribing, you authorize Cencori to charge you according to the"}{" "}
         <Link
           href="/terms-of-service"
           className="underline underline-offset-2 hover:text-foreground"
         >
           terms
-        </Link>{" "}
-        until you cancel. See our{" "}
+        </Link>
+        {inNaira ? "" : " until you cancel"}. See our{" "}
         <Link
           href="/privacy-policy"
           className="underline underline-offset-2 hover:text-foreground"
@@ -179,7 +184,12 @@ export function UpgradeDialog({
     onOpenChange(nextOpen);
   };
 
-  const payByCard = useCallback(async () => {
+  // The currency the price is shown in is the currency the customer pays:
+  // naira opens the naira checkout (a prepaid month or year, since Bachs
+  // can't bill naira subscriptions yet), dollars the card subscription.
+  const inNaira = displayCurrency === "NGN" && Boolean(plan.ngnPrices?.[checkoutInterval]);
+
+  const subscribe = useCallback(async () => {
     if (paying) return;
     if (!orgId) {
       setError("We couldn't identify this organization. Refresh and try again.");
@@ -188,13 +198,23 @@ export function UpgradeDialog({
     setPaying(true);
     setError(null);
     try {
-      const done = await startBachsCheckout({
-        endpoint: "/api/billing/checkout",
-        body: { orgId, tier: checkoutTier, interval: checkoutInterval },
-        tier: checkoutTier,
-        orgSlug,
-        returnPath,
-      });
+      const done = await startBachsCheckout(
+        inNaira
+          ? {
+              endpoint: "/api/billing/checkout/naira",
+              body: { orgId, interval: checkoutInterval },
+              tier: checkoutTier,
+              orgSlug,
+              returnPath,
+            }
+          : {
+              endpoint: "/api/billing/checkout",
+              body: { orgId, tier: checkoutTier, interval: checkoutInterval },
+              tier: checkoutTier,
+              orgSlug,
+              returnPath,
+            },
+      );
       if (!done) setPaying(false);
     } catch (checkoutError) {
       setError(
@@ -204,10 +224,10 @@ export function UpgradeDialog({
       );
       setPaying(false);
     }
-  }, [checkoutInterval, checkoutTier, orgId, orgSlug, paying, returnPath]);
+  }, [checkoutInterval, checkoutTier, inNaira, orgId, orgSlug, paying, returnPath]);
 
   const totals = (
-    <OrderTotals dueNow={dueNow} interval={checkoutInterval} tier={checkoutTier} />
+    <OrderTotals dueNow={dueNow} inNaira={inNaira} interval={checkoutInterval} tier={checkoutTier} />
   );
 
   // Desktop: a panel docked to the right. Mobile (below sm): a bottom sheet
@@ -272,35 +292,26 @@ export function UpgradeDialog({
               setSelectedTier={setSelectedTier}
             />
           )}
-          {displayCurrency === "NGN" && (
-            <NairaCheckout
-              orgId={orgId}
-              orgSlug={orgSlug}
-              returnPath={returnPath}
-              tier={checkoutTier}
-              interval={checkoutInterval}
-              disabled={paying || availablePlans.length === 0}
-            />
-          )}
           <PaymentPanel
             error={error}
+            inNaira={inNaira}
             totals={totals}
             action={
               <Button
                 type="button"
                 size="sm"
                 className="h-7 text-xs"
-                onClick={payByCard}
+                onClick={subscribe}
                 disabled={paying || availablePlans.length === 0}
               >
                 {paying ? (
                   <>
                     <Spinner className="size-3.5 animate-spin" aria-hidden="true" />
-                    Paying
+                    Opening
                   </>
                 ) : (
                   <>
-                    Pay by card
+                    Subscribe
                     <ArrowRight className="size-3.5" aria-hidden="true" />
                   </>
                 )}
@@ -503,18 +514,18 @@ function CheckoutSummary({
 /** The subtotal and total due today, under the payment note. */
 function OrderTotals({
   dueNow,
+  inNaira,
   interval,
   tier,
 }: {
   dueNow: number;
+  inNaira: boolean;
   interval: PlanBillingInterval;
   tier: PaidPlanTier;
 }) {
   const price = usePlanPrice(tier);
-  // Cards are charged in US dollars, so the card total is shown in dollars
-  // even when prices are shown in naira. Naira checkout charges naira.
-  const inNaira = price.currency === "NGN";
-  const total = inNaira ? formatCents(dueNow) : price.format(dueNow);
+  // Charged in the currency shown: the naira price, or the dollar price.
+  const total = inNaira ? price.format(dueNow) : formatCents(dueNow);
 
   return (
     <dl className="text-sm">
@@ -526,108 +537,14 @@ function OrderTotals({
         <dt>
           <span className="block font-medium">Total due today</span>
           <span className="mt-0.5 block text-xs text-muted-foreground">
-            Renews every {interval} until you cancel
-            {inNaira && (
-              <> · Card payments are charged in US dollars. Your bank sets the naira amount and may add fees.</>
-            )}
+            {inNaira
+              ? `Covers one ${interval}. Renew from Billing before it ends.`
+              : `Renews every ${interval} until you cancel`}
           </span>
         </dt>
         <dd className="text-lg font-semibold tabular-nums">{total}</dd>
       </div>
     </dl>
-  );
-}
-
-/**
- * Pay the plan's naira price on Bachs (card or bank transfer), shown when
- * prices are in naira. Prepaid: a month or a year, renewed from Billing.
- */
-function NairaCheckout({
-  disabled,
-  interval,
-  orgId,
-  orgSlug,
-  returnPath,
-  tier,
-}: {
-  disabled: boolean;
-  interval: PlanBillingInterval;
-  orgId: string;
-  orgSlug: string;
-  returnPath?: string;
-  tier: PaidPlanTier;
-}) {
-  const [opening, setOpening] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const priceNgn = CENCORI_PAID_PLANS[tier].ngnPrices?.[interval];
-  if (!priceNgn) return null;
-
-  const label = formatCurrency(priceNgn, "NGN", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  });
-
-  const openCheckout = async () => {
-    if (opening) return;
-    setOpening(true);
-    setError(null);
-    try {
-      const done = await startBachsCheckout({
-        endpoint: "/api/billing/checkout/naira",
-        body: { orgId, interval },
-        tier,
-        orgSlug,
-        returnPath,
-      });
-      if (!done) setOpening(false);
-    } catch (checkoutError) {
-      setError(
-        checkoutError instanceof Error
-          ? checkoutError.message
-          : "Couldn't open naira checkout. Try again.",
-      );
-      setOpening(false);
-    }
-  };
-
-  return (
-    <section
-      aria-label="Pay in naira"
-      className="mx-5 mt-8 space-y-3 rounded-lg border border-border/60 p-4 sm:mx-8 lg:mx-10"
-    >
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h3 className="text-xs font-medium">Pay {label} in naira</h3>
-          <p className="mt-1 text-[11px] leading-4 text-muted-foreground">
-            Card or bank transfer, charged exactly {label}. Covers one {interval};
-            renew from Billing.
-          </p>
-        </div>
-        <Button
-          type="button"
-          size="sm"
-          className="h-7 shrink-0 text-xs"
-          onClick={openCheckout}
-          disabled={disabled || opening}
-        >
-          {opening ? (
-            <>
-              <Spinner className="size-3.5 animate-spin" aria-hidden="true" />
-              Opening
-            </>
-          ) : (
-            <>
-              Pay in naira
-              <ArrowRight className="size-3.5" aria-hidden="true" />
-            </>
-          )}
-        </Button>
-      </div>
-      {error && <CheckoutError message={error} />}
-      <p className="border-t border-border/40 pt-3 text-[11px] text-muted-foreground">
-        Or pay by card in US dollars below.
-      </p>
-    </section>
   );
 }
 
