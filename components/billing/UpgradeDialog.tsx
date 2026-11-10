@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { ArrowRight, Check, LockKeyhole, X } from "lucide-react";
+import { Check, LockKeyhole, X } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import {
@@ -321,10 +321,7 @@ export function UpgradeDialog({
                     Opening
                   </>
                 ) : (
-                  <>
-                    Subscribe
-                    <ArrowRight className="size-3.5" aria-hidden="true" />
-                  </>
+                  "Subscribe"
                 )}
               </Button>
             }
