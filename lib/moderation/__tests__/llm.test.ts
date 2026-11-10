@@ -160,3 +160,71 @@ describe('signal-only categories', () => {
         expect(res.results[0].action).toBe('block');
     });
 });
+
+describe('banter-prone categories', () => {
+    test('romance asks, trash talk and custom categories review instead of block by default', async () => {
+        const llm = fakeLlm((t) =>
+            t.includes('2k') ? { 'fraud/romance': 0.95 } : t.includes('mumu') ? { harassment: 0.95 } : { 'custom/politics': 0.95 },
+        );
+        const res = await moderate(
+            ['baby abeg send me 2k for transport', 'una be mumu', 'vote APC'],
+            { layers: ['rules', 'llm'], escalate: 'always', custom_categories: [{ name: 'politics', description: 'Election campaigning' }] },
+            { ...noOpenAI, llm },
+        );
+        expect(res.results.map((r) => r.action)).toEqual(['review', 'review', 'review']);
+        expect(res.results[0].categories.fraud).toBe(true);
+    });
+
+    test('category_actions can raise a category to block', async () => {
+        const llm = fakeLlm(() => ({ 'custom/politics': 0.95 }));
+        const res = await moderate(
+            'vote APC',
+            {
+                layers: ['rules', 'llm'],
+                custom_categories: [{ name: 'politics', description: 'Election campaigning' }],
+                category_actions: { 'custom/politics': 'block' },
+            },
+            { ...noOpenAI, llm },
+        );
+        expect(res.results[0].action).toBe('block');
+    });
+
+    test('threats and real scams still block', async () => {
+        const res = await moderate(
+            ['I go kill you, I know where you dey', 'Send 5k to my opay 8123456789 and receive 50k back'],
+            { layers: ['rules'] },
+            noOpenAI,
+        );
+        expect(res.results[1].action).toBe('block');
+        // Rules alone score the threat 0.7 (review); OpenAI or the model push it over.
+        const fake = {
+            moderations: {
+                create: async () => ({
+                    id: 'm',
+                    model: 'omni-moderation-latest',
+                    results: [{ flagged: true, categories: { 'harassment/threatening': true }, category_scores: { 'harassment/threatening': 0.93 } }],
+                }),
+            },
+        };
+        const withOpenAI = await moderate('I go kill you, I know where you dey', { layers: ['rules', 'openai'] }, { getOpenAI: async () => fake as never });
+        expect(withOpenAI.results[0].action).toBe('block');
+    });
+});
+
+describe('conversation history', () => {
+    test('previous messages go to the model and change the cache key', async () => {
+        const llm = fakeLlm(() => ({}));
+        await moderate('add me on whatsapp', { layers: ['rules', 'llm'], previous_messages: ['who dey for match saturday?'] }, { ...noOpenAI, llm });
+        const user = llm.mock.calls[0][0].user;
+        expect(user).toContain('"previous":["who dey for match saturday?"]');
+        await moderate('add me on whatsapp', { layers: ['rules', 'llm'], previous_messages: ['send me money'] }, { ...noOpenAI, llm });
+        expect(llm).toHaveBeenCalledTimes(2);
+    });
+
+    test('one entry per input string', async () => {
+        const llm = fakeLlm(() => ({}));
+        await moderate(['add me on whatsapp', 'hi'], { layers: ['rules', 'llm'], previous_messages: [['a'], null] }, { ...noOpenAI, llm });
+        expect(llm.mock.calls[0][0].user).toContain('"previous":["a"]');
+        await expect(moderate(['a', 'b'], { previous_messages: [['x']] }, noOpenAI)).rejects.toThrow(/one entry/);
+    });
+});

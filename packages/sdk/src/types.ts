@@ -235,6 +235,18 @@ export interface ModerationRequest {
     brandNames?: string[];
     /** One or two sentences about your platform, given to the model layer. */
     context?: string;
+    /**
+     * Earlier messages in the same conversation, oldest first, so the model can
+     * tell banter from a real ask. One array (or null) per input string, or a
+     * flat array when the input is a single string.
+     */
+    previousMessages?: (string[] | null)[] | string[];
+    /**
+     * Strongest action a category may lead to. By default fraud/romance,
+     * fraud/off_platform_contact, harassment, hate and custom categories only
+     * go to review, because banter is common there.
+     */
+    categoryActions?: Record<string, 'review' | 'block'>;
 }
 
 export interface ModerationMatch {

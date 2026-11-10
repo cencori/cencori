@@ -97,6 +97,8 @@ export async function POST(req: NextRequest) {
             allowlist: body.allowlist as string[] | undefined,
             brand_names: body.brand_names as string[] | undefined,
             context: body.context as string | undefined,
+            previous_messages: body.previous_messages as ModerationOptions['previous_messages'],
+            category_actions: body.category_actions as ModerationOptions['category_actions'],
         };
         const tier = (ctx.tier || 'free') as SubscriptionTier;
         let llmProvider: string | null = null;

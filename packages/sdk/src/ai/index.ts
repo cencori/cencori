@@ -387,6 +387,8 @@ export class AINamespace {
                 allowlist: request.allowlist,
                 brand_names: request.brandNames,
                 context: request.context,
+                previous_messages: request.previousMessages,
+                category_actions: request.categoryActions,
             }),
         });
 

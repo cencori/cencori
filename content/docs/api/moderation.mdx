@@ -55,7 +55,29 @@ if (r.action === 'block') {
 | `brand_names` | string[] | No | Your brand and product names. Catches people posing as your staff ("Lagos Life admin here") |
 | `context` | string | No | One or two sentences about your platform, given to the model, e.g. "Game naira is fictional; selling it for real money is banned" |
 
-SDK options use camelCase: `blockThreshold`, `llmModel`, `customCategories`, `brandNames`.
+| `previous_messages` | array | No | Earlier messages in the same conversation, oldest first (up to 10 used), so the model can tell banter from a real ask. One array or `null` per input string; a flat array when the input is one string |
+| `category_actions` | object | No | The strongest action a category may lead to, `"review"` or `"block"`. See [Banter](#banter) |
+
+SDK options use camelCase: `blockThreshold`, `llmModel`, `customCategories`, `brandNames`, `previousMessages`, `categoryActions`.
+
+## Banter
+
+Nigerian chat is full of banter: mock begging ("baby abeg send me 2k for transport 😂"), trash talk ("una be mumu"), and sarcasm about politics and tribes. The model is told to score these low, to use high scores only when intent is unmistakable, and to give middle scores to messages that could go either way, so a person reviews them.
+
+Some categories are banter so often that, by default, a single message there leads to `review` at most, never `block`:
+
+| Category | Default strongest action |
+|----------|--------------------------|
+| `fraud/romance` | review |
+| `fraud/off_platform_contact` | review |
+| `harassment` | review |
+| `hate` | review |
+| `custom/*` | review |
+| everything else, including `harassment/threatening`, `hate/ethnic`, `hate/threatening` and the other `fraud/*` | block |
+
+Raise or lower any category with `category_actions`, e.g. `{ "custom/politics": "block", "fraud/real_money_trading": "review" }`.
+
+Send `previous_messages` when you have them. "Send me 2k" in reply to "who dey owe me?" reads differently from a cold message to a stranger.
 
 Image URLs must be `https://` or a base64 `data:image/...` URL. Images need the `openai` layer.
 
