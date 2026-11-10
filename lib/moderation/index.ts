@@ -500,7 +500,8 @@ export async function moderate(input: unknown, options: ModerationOptions, deps:
 
     return {
         id: openai?.id ?? `modr-cencori-${globalThis.crypto.randomUUID().replace(/-/g, '').slice(0, 24)}`,
-        model: openai?.model ?? (layers.has('openai') ? model : RULES_VERSION),
+        // The OpenAI model only when OpenAI actually answered.
+        model: openai?.model ?? usage.llm_model ?? RULES_VERSION,
         results,
         layers: layerStatus,
         ...(ruleResults ? { rules_version: RULES_VERSION } : {}),

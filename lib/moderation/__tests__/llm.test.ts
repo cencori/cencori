@@ -243,3 +243,25 @@ describe('default model', () => {
         expect(llm.mock.calls[0][0].model).toBe('deepseek-v4.1-flash');
     });
 });
+
+describe('regressions from production', () => {
+    test('a real-money offer for game cash reaches the model (2026-11-10)', async () => {
+        const llm = fakeLlm(() => ({ 'fraud/real_money_trading': 0.85 }));
+        const res = await moderate('who get 20m game cash? I go pay you 3k, send your acct', {}, { ...noOpenAI, llm });
+        expect(res.results[0].layers_applied).toContain('llm');
+        expect(res.results[0].action).toBe('block');
+    });
+
+    test('game money talk alone stays free and allowed', async () => {
+        const llm = fakeLlm(() => ({}));
+        const res = await moderate('I just spent all my game cash at the club 😭', {}, { ...noOpenAI, llm });
+        expect(llm).not.toHaveBeenCalled();
+        expect(res.results[0].action).toBe('allow');
+    });
+
+    test('model names OpenAI only when OpenAI answered', async () => {
+        const res = await moderate('hello', { layers: ['rules', 'openai'] }, noOpenAI);
+        expect(res.layers.openai).toBe('error');
+        expect(res.model).toMatch(/^cencori-rules/);
+    });
+});

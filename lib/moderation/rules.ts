@@ -281,6 +281,25 @@ const RULES: Rule[] = [
         leet: true,
     },
     {
+        // Weak on its own (game money is normal talk); escalates next to a payment signal.
+        id: 'game_currency_mention',
+        pattern: r('\\b(?:game (?:money|cash|naira|coins?|currency|gold)|in-?game (?:money|cash|currency|naira))\\b'),
+        weights: { 'fraud/real_money_trading': 0.15 },
+        leet: true,
+    },
+    {
+        id: 'offer_to_pay',
+        pattern: r("\\b(?:i|we) (?:go|will|can|fit|'ll) (?:pay|send|transfer|credit|dash)\\b[^.!?\\n]{0,10}\\b(?:you|u|una)\\b"),
+        weights: { 'fraud/off_platform_payment': 0.25 },
+        leet: true,
+    },
+    {
+        id: 'ask_for_account',
+        pattern: r('\\b(?:send|drop|give|share|forward|bring)\\s+(?:me\\s+)?(?:your|ur|una)\\s+(?:acct|acc|account|a\\/c|bank details|bank account|opay|palm ?pay|kuda|moniepoint)\\b'),
+        weights: { 'fraud/off_platform_payment': 0.45 },
+        leet: true,
+    },
+    {
         id: 'real_money_words',
         pattern: r('\\b(?:real (?:money|cash|naira)|withdraw(?:al)? to (?:your |my )?(?:bank|account)|cash ?out to (?:bank|account))\\b'),
         weights: { 'fraud/real_money_trading': 0.4 },
