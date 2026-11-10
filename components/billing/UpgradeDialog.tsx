@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { Check, LockKeyhole, X } from "lucide-react";
+import { Check, X } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import {
@@ -83,10 +83,7 @@ function getInitialTier(
     : (availablePlans[0] ?? "pro");
 }
 
-/**
- * The payment part of the checkout card: what happens next, the totals, and
- * the footer with the authorization note and the button.
- */
+/** The payment part of the checkout card: the totals, and the footer with the authorization note and the button. */
 function PaymentPanel({
   action,
   error,
@@ -102,16 +99,6 @@ function PaymentPanel({
   return (
     <div className="flex flex-1 flex-col">
       <div className="flex-1 space-y-8 px-5 py-8 sm:px-8 lg:px-10 lg:py-10">
-        <section aria-label="Payment" className="flex items-start gap-3 rounded-lg border border-border/60 p-4">
-          <LockKeyhole className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-          <p className="text-xs leading-5 text-muted-foreground">
-            {inNaira
-              ? "You'll pay in naira, by card or bank transfer, on our payment partner's secure checkout, which opens over this page."
-              : "You'll pay by card on our payment partner's secure checkout, which opens over this page."}{" "}
-            Your card details never reach Cencori.
-          </p>
-        </section>
-
         {totals}
 
         {error && <CheckoutError message={error} />}
