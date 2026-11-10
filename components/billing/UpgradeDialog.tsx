@@ -539,7 +539,8 @@ function OrderTotals({
           <span className="mt-0.5 block text-xs text-muted-foreground">
             {inNaira
               ? `Covers one ${interval}. Renew from Billing before it ends.`
-              : `Renews every ${interval} until you cancel`}
+              : `Renews every ${interval} until you cancel.`}{" "}
+            A payment processing fee is added at checkout.
           </span>
         </dt>
         <dd className="text-lg font-semibold tabular-nums">{total}</dd>
