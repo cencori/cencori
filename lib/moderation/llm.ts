@@ -9,7 +9,22 @@
 
 import crypto from 'crypto';
 
-export const DEFAULT_LLM_MODEL = 'gemini-2.5-flash-lite';
+/**
+ * DeepSeek V4.1 Flash with thinking off (see reasoningEffortFor). Chosen
+ * 2026-11-10 against gemini-2.5-flash-lite on Pidgin banter and scams: better
+ * calls (sarcasm, real-money trading) at about the same cost, and the fixed
+ * instructions are served from DeepSeek's prompt cache at ~2% of input price.
+ */
+export const DEFAULT_LLM_MODEL = 'deepseek-v4.1-flash';
+
+/**
+ * DeepSeek V4 thinks before every reply by default. For a classifier that
+ * doubles the latency, triples the cost and can use up the output budget
+ * before any answer is written, so turn it off. Other models: leave as is.
+ */
+export function reasoningEffortFor(model: string): 'none' | undefined {
+    return /^deepseek-v4/.test(model) ? 'none' : undefined;
+}
 const CHUNK_SIZE = 20;
 const MAX_PARALLEL_CHUNKS = 3;
 const MAX_ITEM_CHARS = 2000;

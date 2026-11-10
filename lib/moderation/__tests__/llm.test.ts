@@ -228,3 +228,18 @@ describe('conversation history', () => {
         await expect(moderate(['a', 'b'], { previous_messages: [['x']] }, noOpenAI)).rejects.toThrow(/one entry/);
     });
 });
+
+describe('default model', () => {
+    test('DeepSeek V4.1 Flash with thinking off', async () => {
+        const { DEFAULT_LLM_MODEL, reasoningEffortFor } = await import('@/lib/moderation/llm');
+        expect(DEFAULT_LLM_MODEL).toBe('deepseek-v4.1-flash');
+        expect(reasoningEffortFor('deepseek-v4.1-flash')).toBe('none');
+        expect(reasoningEffortFor('gemini-2.5-flash-lite')).toBeUndefined();
+    });
+
+    test('the default model is what the model layer is asked for', async () => {
+        const llm = fakeLlm(() => ({}));
+        await moderate('add me on whatsapp', { layers: ['rules', 'llm'] }, { ...noOpenAI, llm });
+        expect(llm.mock.calls[0][0].model).toBe('deepseek-v4.1-flash');
+    });
+});

@@ -17,7 +17,7 @@ Three layers run, cheapest first:
 |-------|--------------|------|
 | `rules` | Fraud and scams, off-platform payment and contact, cheating, ethnic hate, grooming, and insults and threats in Nigerian English, Pidgin, Yoruba, Igbo and Hausa. Also applies your block list | Free, runs on Cencori in about 0.01 ms per message |
 | `openai` | OpenAI `omni-moderation-latest`: harassment, hate, illicit, self-harm, sexual, violence, for text and images | Free |
-| `llm` | A cheap model (default `gemini-2.5-flash-lite`) that reads context. Runs only for messages the rules found unclear (a signal, but not enough to block) and for your custom categories | Model price plus the usual gateway markup. About $0.00003 per message, and $0 for a repeat |
+| `llm` | A cheap model (default DeepSeek `deepseek-v4.1-flash`, with thinking off) that reads context. Runs only for messages the rules found unclear (a signal, but not enough to block) and for your custom categories | Model price plus the usual gateway markup. About $0.00003 per message, and $0 for a repeat |
 
 For a message the model reviewed, its judgement replaces the rules' score for the categories it checked: it can clear a false positive ("send me your number, we dey plan football") or confirm a scam. Messages the rules already block never reach the model.
 
@@ -48,7 +48,7 @@ if (r.action === 'block') {
 | `thresholds` | object | No | Flag threshold per category, 0–1, e.g. `{"fraud/off_platform_contact": 0.3}`. `"*"` sets the default. Default `0.5` |
 | `block_threshold` | number | No | Score at which `action` becomes `block`. Default `0.8`. The SDK option is `blockThreshold` |
 | `escalate` | `"auto" \| "always" \| "never"` | No | When the `llm` layer runs. `auto` (default) sends only unclear messages and custom categories |
-| `llm_model` | string | No | Model for the `llm` layer. Default `gemini-2.5-flash-lite` |
+| `llm_model` | string | No | Model for the `llm` layer. Default `deepseek-v4.1-flash`. Any gateway chat model works, e.g. `gemini-2.5-flash-lite`, `gpt-5-nano`, `claude-haiku-5-5` |
 | `custom_categories` | array | No | Up to 20 of `{name, description, threshold?}`. The model scores each message against your description; results come back as `custom/<name>` |
 | `blocklist` | string[] | No | Terms that always block, as `custom/blocklist` |
 | `allowlist` | string[] | No | Your own terms that look like scam words (a "Lagos Life Bank" location, for example). Removed before the rules run |

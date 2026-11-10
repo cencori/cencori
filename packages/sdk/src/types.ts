@@ -223,7 +223,7 @@ export interface ModerationRequest {
     blockThreshold?: number;
     /** When the paid model layer runs: 'auto' (unclear items and custom categories), 'always' or 'never'. */
     escalate?: 'auto' | 'always' | 'never';
-    /** Model for the llm layer. Default 'gemini-2.5-flash-lite'. */
+    /** Model for the llm layer. Default 'deepseek-v4.1-flash'. */
     llmModel?: string;
     /** Your own categories, judged by the model and returned as 'custom/<name>'. */
     customCategories?: Array<{ name: string; description: string; threshold?: number }>;

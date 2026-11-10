@@ -21,7 +21,7 @@ import {
     type ModerationOptions,
     type EscalationMode,
 } from '@/lib/moderation';
-import { DEFAULT_LLM_MODEL } from '@/lib/moderation/llm';
+import { DEFAULT_LLM_MODEL, reasoningEffortFor } from '@/lib/moderation/llm';
 import { CENCORI_CATEGORIES, OPENAI_CATEGORIES, DEFAULT_BLOCK_THRESHOLD, DEFAULT_FLAG_THRESHOLD } from '@/lib/moderation/categories';
 import { RULES_VERSION } from '@/lib/moderation/rules';
 
@@ -130,6 +130,7 @@ export async function POST(req: NextRequest) {
                         model: llmModel,
                         temperature: 0,
                         maxTokens,
+                        reasoningEffort: reasoningEffortFor(llmModel),
                         userId: ctx.projectId,
                         messages: [
                             { role: 'system', content: system },
