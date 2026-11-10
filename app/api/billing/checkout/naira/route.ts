@@ -85,6 +85,8 @@ export async function POST(req: NextRequest) {
       // plan's price, never this request.
       pricing: { currency: "NGN", price_type: "fixed", amount: `${priceNgn}.00` },
       billing_currency: "NGN",
+      // Naira methods only: no dollar card or crypto on a naira price.
+      payment_method_types: ["NGN_CARD", "NGN_BANK_TRANSFER"],
       customer: {
         email: (organization.billing_email as string | null) || user.email,
         name: (organization.name as string | null) || user.user_metadata?.full_name || user.email.split("@")[0],

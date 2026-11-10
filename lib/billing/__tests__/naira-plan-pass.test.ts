@@ -39,7 +39,7 @@ describe('nairaPassPriceNgn', () => {
 describe('verifyNairaPassCharge', () => {
     it('accepts a paid naira charge for the full price', () => {
         expect(verifyNairaPassCharge({ charge: charge(), chargeId: 'ch_1', organizationId: ORG, metadata: monthly }))
-            .toEqual({ ok: true, tier: 'pro', interval: 'month', amountNgn: 20_000 });
+            .toEqual({ ok: true, tier: 'pro', interval: 'month', amount: 20_000, currency: 'NGN' });
     });
 
     it('accepts a charge with no metadata echo', () => {
@@ -50,7 +50,8 @@ describe('verifyNairaPassCharge', () => {
     it.each([
         ['underpaid', { amount: '19999.99' }, 'amount_below_price'],
         ['unpaid', { status: 'pending' }, 'unsettled_status'],
-        ['dollars', { currency: 'USD' }, 'currency_mismatch'],
+        ['in dollars, below the dollar price', { currency: 'USD', amount: '19.99' }, 'amount_below_price'],
+        ['in another currency', { currency: 'GHS' }, 'currency_mismatch'],
         ['other org', { metadata: { org_id: 'org-other' } }, 'metadata_org_mismatch'],
         ['other purchase', { metadata: { purchase_type: 'credits_topup_ngn' } }, 'metadata_purchase_type_mismatch'],
         ['other interval', { metadata: { interval: 'year' } }, 'metadata_interval_mismatch'],
@@ -59,6 +60,11 @@ describe('verifyNairaPassCharge', () => {
     ] as const)('rejects a charge that is %s', (_name, overrides, reason) => {
         const result = verifyNairaPassCharge({ charge: charge(overrides as Partial<BachsCharge>), chargeId: 'ch_1', organizationId: ORG, metadata: monthly });
         expect(result).toEqual({ ok: false, reason });
+    });
+
+    it('accepts a customer who switched to dollars and paid the dollar price', () => {
+        expect(verifyNairaPassCharge({ charge: charge({ currency: 'USD', amount: '20.00' }), chargeId: 'ch_1', organizationId: ORG, metadata: monthly }))
+            .toEqual({ ok: true, tier: 'pro', interval: 'month', amount: 20, currency: 'USD' });
     });
 
     it('needs the full annual price for a year', () => {

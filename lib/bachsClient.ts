@@ -89,6 +89,8 @@ export interface CreateCheckoutSessionInput {
   billing_currency?: string;
   /** Keep the card for later charges (subscriptions save it regardless). */
   save_payment_method?: boolean;
+  /** Limit the methods offered, e.g. ["NGN_CARD", "NGN_BANK_TRANSFER"]. */
+  payment_method_types?: string[];
 }
 
 export interface BachsCheckoutSession {

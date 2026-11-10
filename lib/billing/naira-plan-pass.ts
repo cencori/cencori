@@ -34,7 +34,7 @@ export function nairaPassPriceNgn(
 }
 
 export type NairaPassVerification =
-  | { ok: true; tier: NairaPassTier; interval: PlanBillingInterval; amountNgn: number }
+  | { ok: true; tier: NairaPassTier; interval: PlanBillingInterval; amount: number; currency: "NGN" | "USD" }
   | { ok: false; reason: string };
 
 const PAID_STATUSES = new Set(["succeeded", "successful", "paid"]);
@@ -65,14 +65,21 @@ export function verifyNairaPassCharge(params: {
   if (!PAID_STATUSES.has(String(charge.status ?? "").toLowerCase())) {
     return { ok: false, reason: "unsettled_status" };
   }
-  if (String(charge.currency ?? "").toUpperCase() !== "NGN") {
-    return { ok: false, reason: "currency_mismatch" };
-  }
-
   const amountMajor = Number(String(charge.amount ?? "").replace(/,/g, "").trim());
   if (!Number.isFinite(amountMajor) || amountMajor <= 0) return { ok: false, reason: "invalid_amount" };
-  const amountNgn = Math.floor(amountMajor);
-  if (amountNgn < priceNgn) return { ok: false, reason: "amount_below_price" };
+
+  // Bachs's checkout can show a currency switcher even on a naira price. A
+  // customer who switched to dollars still paid for the plan if they paid at
+  // least its dollar price; anything else is checked in naira.
+  const currency = String(charge.currency ?? "").toUpperCase();
+  if (currency === "USD") {
+    const cents = Math.round(amountMajor * 100);
+    if (cents < CENCORI_PAID_PLANS[tier].prices[interval]) return { ok: false, reason: "amount_below_price" };
+  } else if (currency === "NGN") {
+    if (Math.floor(amountMajor) < priceNgn) return { ok: false, reason: "amount_below_price" };
+  } else {
+    return { ok: false, reason: "currency_mismatch" };
+  }
 
   // A missing echo is fine (Bachs doesn't always return metadata on the
   // charge); a contradicting one is not.
@@ -93,7 +100,7 @@ export function verifyNairaPassCharge(params: {
     return { ok: false, reason: "unexpected_product_cart" };
   }
 
-  return { ok: true, tier, interval, amountNgn };
+  return { ok: true, tier, interval, amount: amountMajor, currency: currency as "NGN" | "USD" };
 }
 
 export type NairaPassOrg = {
