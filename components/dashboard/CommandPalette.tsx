@@ -1,5 +1,6 @@
 "use client";
 
+import { useObservabilityAccess } from "@/lib/flags/flagswift";
 import { useUpgrade } from "@/components/billing/UpgradeProvider";
 import * as React from "react";
 import { useRouter } from "next/navigation";
@@ -216,6 +217,7 @@ export function CommandPalette({
   const router = useRouter();
   const upgrade = useUpgrade();
   const isMobile = useIsMobile();
+  const { enabled: observabilityEnabled } = useObservabilityAccess();
   const { organizations, projects } = useOrganizationProject();
   const orgName = organizations.find((org) => org.slug === orgSlug)?.name ?? orgSlug ?? undefined;
   const projectName = projects.find((project) => project.slug === projectSlug && project.orgSlug === orgSlug)?.name ?? projectSlug ?? undefined;
@@ -344,24 +346,27 @@ export function CommandPalette({
               "reports",
             ],
           },
-          {
-            id: "logs",
-            label: "Request logs",
-            icon: navIcon(LeftToRightListDashIcon),
-            action: () => navigate(
-              consoleMode ? "/observability/request-logs" : `/${orgSlug}/${projectSlug}/observability/request-logs`,
-            ),
-            keywords: ["logs", "history", "requests", "debug", "observability", "model calls"],
-          },
-          {
-            id: "traces",
-            label: "Traces",
-            icon: navIcon(LeftToRightListDashIcon),
-            action: () => navigate(
-              consoleMode ? "/observability/traces" : `/${orgSlug}/${projectSlug}/observability/traces`,
-            ),
-            keywords: ["sessions", "agents", "tool calls", "handoffs", "approvals", "observability", "debug"],
-          },
+          // Observability is in beta: only organizations with the flag get its entries.
+          ...(observabilityEnabled ? [
+            {
+              id: "logs",
+              label: "Request logs",
+              icon: navIcon(LeftToRightListDashIcon),
+              action: () => navigate(
+                consoleMode ? "/observability/request-logs" : `/${orgSlug}/${projectSlug}/observability/request-logs`,
+              ),
+              keywords: ["logs", "history", "requests", "debug", "observability", "model calls"],
+            },
+            {
+              id: "traces",
+              label: "Traces",
+              icon: navIcon(LeftToRightListDashIcon),
+              action: () => navigate(
+                consoleMode ? "/observability/traces" : `/${orgSlug}/${projectSlug}/observability/traces`,
+              ),
+              keywords: ["sessions", "agents", "tool calls", "handoffs", "approvals", "observability", "debug"],
+            },
+          ] : []),
           {
             id: "byok",
             label: "BYOK provider keys",
@@ -662,7 +667,7 @@ export function CommandPalette({
 
     return groups;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router, onOpenChange, orgSlug, projectSlug, consoleMode, orgName, projectName, upgrade.canUpgrade]);
+  }, [router, onOpenChange, orgSlug, projectSlug, consoleMode, orgName, projectName, upgrade.canUpgrade, observabilityEnabled]);
 
   // Smart search: filter items based on label and keywords
   const filteredGroups = React.useMemo(() => {

@@ -38,6 +38,7 @@ import ChartRelationshipIcon from "@hugeicons/core-free-icons/ChartRelationshipI
 import ThreeDRotateIcon from "@hugeicons/core-free-icons/ThreeDRotateIcon";
 import Telescope02Icon from "@hugeicons/core-free-icons/Telescope02Icon";
 import { ObservabilitySidebar } from "@/components/observability/ObservabilitySidebar";
+import { FeatureFlagsProvider, useObservabilityAccess } from "@/lib/flags/flagswift";
 import Settings02Icon from "@hugeicons/core-free-icons/Settings02Icon";
 import GameController03Icon from "@hugeicons/core-free-icons/GameController03Icon";
 import LeftToRightListDashIcon from "@hugeicons/core-free-icons/LeftToRightListDashIcon";
@@ -148,11 +149,7 @@ function isAiGatewayPath(pathname: string): boolean {
     return pathname.includes("/ai-gateway") || /\/(revenue|monetization|end-user-billing)(\/|$)/.test(pathname);
 }
 
-export default function OrganizationLayoutClient({
-    children,
-    workspace,
-    consoleMode: consoleModeOverride = false,
-}: {
+interface OrganizationLayoutProps {
     children: React.ReactNode;
     consoleMode?: boolean;
     workspace?: {
@@ -160,7 +157,24 @@ export default function OrganizationLayoutClient({
         projectSlug: string;
         consoleMode?: boolean;
     };
-}) {
+}
+
+// Feature flags are resolved per organization, above everything that reads them.
+export default function OrganizationLayoutClient(props: OrganizationLayoutProps) {
+    const params = useParams<{ orgSlug?: string }>();
+    const orgSlug = props.workspace?.orgSlug ?? params.orgSlug ?? "";
+    return (
+        <FeatureFlagsProvider orgSlug={orgSlug}>
+            <OrganizationLayoutShell {...props} />
+        </FeatureFlagsProvider>
+    );
+}
+
+function OrganizationLayoutShell({
+    children,
+    workspace,
+    consoleMode: consoleModeOverride = false,
+}: OrganizationLayoutProps) {
     const params = useParams<{ orgSlug?: string; projectSlug?: string }>();
     const orgSlug = workspace?.orgSlug ?? params.orgSlug ?? "";
     const routeProjectSlug = workspace?.projectSlug ?? params.projectSlug ?? null;
@@ -321,7 +335,9 @@ export default function OrganizationLayoutClient({
     // Memory belongs to the selected project; without one there is no entry.
     const memoryHref = scopeProjectSlug ? scopedProjectHref("memory") : null;
     // Observability belongs to the selected project too; it opens on Sessions.
-    const observabilityBase = scopeProjectSlug ? scopedProjectHref("observability") : null;
+    // It is in beta: only organizations with the FlagSwift flag get the entry.
+    const { enabled: observabilityEnabled } = useObservabilityAccess();
+    const observabilityBase = scopeProjectSlug && observabilityEnabled ? scopedProjectHref("observability") : null;
     const observabilityHref = observabilityBase ? `${observabilityBase}/traces` : null;
     // Copilot's pages live under the selected project's address, like Memory.
     const copilotHref = scopeProjectSlug ? scopedProjectHref("copilot") : null;
@@ -773,6 +789,9 @@ export default function OrganizationLayoutClient({
                             >
                                 <HugeiconsIcon icon={Telescope02Icon} className="!h-5 !w-5" />
                                 <span className="text-sm">Observability</span>
+                                <span className="ml-1 rounded border border-emerald-500/30 bg-emerald-500/10 px-1 py-px text-[10px] font-medium leading-none text-emerald-600 dark:text-emerald-400 group-data-[collapsible=icon]:hidden">
+                                    Beta
+                                </span>
                                 <ChevronRight className="!h-3 !w-3 ml-auto text-muted-foreground/50" />
                             </Link>
                         </SidebarMenuButton>

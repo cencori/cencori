@@ -153,7 +153,7 @@ const securityHeaders: Record<string, string> = {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: https: blob:",
     "font-src 'self' data:",
-    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.bachs.io https://sandbox-api.bachs.io https://checkout.bachs.io https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://*.i.posthog.com https://vercel.live wss://vercel.live https://status.outray.app https://graph.facebook.com https://*.facebook.com",
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.bachs.io https://sandbox-api.bachs.io https://checkout.bachs.io https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://*.i.posthog.com https://vercel.live wss://vercel.live https://status.outray.app https://flagswift.com https://graph.facebook.com https://*.facebook.com",
     // cencori.com: the console previews the website widget, which is served from the main site.
     `frame-src 'self' https://cencori.com https://checkout.bachs.io https://www.youtube.com https://youtube.com https://www.facebook.com https://web.facebook.com https://*.facebook.com${process.env.NODE_ENV === "production" ? "" : " http://localhost:*"}`,
     "frame-ancestors 'none'",

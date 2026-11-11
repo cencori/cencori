@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireProjectAccess } from '@/lib/require-project-access';
+import { requireObservability } from '@/lib/flags/flagswift-server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 
 /**
@@ -22,6 +23,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ pro
     const { projectId, sessionId, turn } = await params;
     const access = await requireProjectAccess(projectId);
     if (!access.ok) return access.response;
+    // Traces are part of Observability, which is in beta behind a flag.
+    const notEnabled = await requireObservability(access.organizationSlug);
+    if (notEnabled) return notEnabled;
     const turnNumber = Number.parseInt(turn, 10);
     if (!Number.isFinite(turnNumber) || turnNumber < 1) return NextResponse.json({ error: 'Invalid turn' }, { status: 400 });
 

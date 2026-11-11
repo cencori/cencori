@@ -25,6 +25,8 @@ export type ProjectAccessResult =
         ok: true;
         userId: string;
         organizationId: string;
+        /** The organization's slug: what feature flags are targeted by. */
+        organizationSlug: string;
         /** The caller's role in the organization ('owner' for its owner). */
         role: string;
         /** The organization's developer plan. */
@@ -43,7 +45,7 @@ export async function requireProjectAccess(projectId: string): Promise<ProjectAc
     const supabaseAdmin = createAdminClient();
     const { data: project, error: projectError } = await supabaseAdmin
         .from('projects')
-        .select('id, organization_id, organizations!inner(owner_id, subscription_tier)')
+        .select('id, organization_id, organizations!inner(owner_id, subscription_tier, slug)')
         .eq('id', projectId)
         .single();
 
@@ -52,7 +54,7 @@ export async function requireProjectAccess(projectId: string): Promise<ProjectAc
     }
 
     const organizationId = project.organization_id as string;
-    const organization = project.organizations as { owner_id?: string; subscription_tier?: string } | null;
+    const organization = project.organizations as { owner_id?: string; subscription_tier?: string; slug?: string } | null;
     const ownerId = organization?.owner_id || null;
     const subscriptionTier = organization?.subscription_tier || 'free';
     let role = 'owner';
@@ -71,5 +73,5 @@ export async function requireProjectAccess(projectId: string): Promise<ProjectAc
         role = (membership.role as string | null) ?? 'member';
     }
 
-    return { ok: true, userId: user.id, organizationId, role, subscriptionTier };
+    return { ok: true, userId: user.id, organizationId, organizationSlug: organization?.slug ?? '', role, subscriptionTier };
 }

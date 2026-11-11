@@ -66,6 +66,7 @@
     "@base-ui/react": "^1.5.0",
     "@better-auth/infra": "0.4.21",
     "@carbon/icons-react": "^11.82.0",
+    "@flagswift/nextjs": "1.0.1",
     "@google/genai": "^1.40.0",
     "@google/generative-ai": "^0.24.1",
     "@heroicons/react": "^2.2.0",

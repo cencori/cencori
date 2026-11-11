@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireProjectAccess } from '@/lib/require-project-access';
+import { requireObservability } from '@/lib/flags/flagswift-server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { buildTimeline, sessionAgentLabel, sessionSource, type SessionEventRow } from '@/lib/sessions/observability';
 
@@ -15,6 +16,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ pro
     const { projectId, sessionId } = await params;
     const access = await requireProjectAccess(projectId);
     if (!access.ok) return access.response;
+    // Traces are part of Observability, which is in beta behind a flag.
+    const notEnabled = await requireObservability(access.organizationSlug);
+    if (notEnabled) return notEnabled;
 
     const admin = createAdminClient();
     const { data: session, error } = await admin

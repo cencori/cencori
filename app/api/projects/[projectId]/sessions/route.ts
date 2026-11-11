@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireProjectAccess } from '@/lib/require-project-access';
+import { requireObservability } from '@/lib/flags/flagswift-server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { getProjectTier } from '@/lib/require-tier-feature';
 import { clampTimeRange, LOG_RETENTION_RANGE } from '@/lib/entitlements';
@@ -60,6 +61,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ proj
     // Access and plan at once; nothing is returned until access is confirmed.
     const [access, projectTier] = await Promise.all([requireProjectAccess(projectId), getProjectTier(projectId)]);
     if (!access.ok) return access.response;
+    // Traces are part of Observability, which is in beta behind a flag.
+    const notEnabled = await requireObservability(access.organizationSlug);
+    if (notEnabled) return notEnabled;
 
     const sp = req.nextUrl.searchParams;
     const limit = Math.min(Math.max(parseInt(sp.get('limit') || '25', 10) || 25, 1), 100);
