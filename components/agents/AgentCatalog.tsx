@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "@/components/ui/toast";
 import { useAgentWorkspace } from "@/components/agents/AgentWorkspace";
 import { DockedPanel } from "@/components/agents/DockedPanel";
-import { postStudioAction, studioQueryKey } from "@/components/agents/studio";
+import { applyStudioResult, postStudioAction } from "@/components/agents/studio";
 import { readJson } from "@/components/agents/widget-preview";
 import { cn } from "@/lib/utils";
 import { formatPrice, importCatalogCsv, newProductId, parsePrice, type CatalogProduct } from "@/lib/embedded/catalog-format";
@@ -52,9 +52,16 @@ export function useCatalog(projectId: string) {
     });
 }
 
-/** Start the project's catalog (empty) and switch Sell products on in this agent's draft. */
+/**
+ * Add the products to this agent: Sell products goes on in its draft. The
+ * project's catalog is started (empty) the first time; one that's already
+ * there is left as it is.
+ */
 export async function startCatalog(projectId: string, agentId: string, version: { id: string; config_json: Record<string, unknown> } | null, editable: boolean): Promise<{ payload: CatalogPayload; note: string }> {
-    const payload = await readJson<CatalogPayload>(await fetch(catalogEndpoint(projectId), { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ products: [] }) }));
+    const existing = await readJson<CatalogPayload>(await fetch(catalogEndpoint(projectId), { cache: "no-store" }));
+    const payload = existing.catalog
+        ? existing
+        : await readJson<CatalogPayload>(await fetch(catalogEndpoint(projectId), { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ products: [] }) }));
     const current = (version?.config_json.system_tools ?? {}) as Record<string, unknown>;
     if (current.sell_products) return { payload, note: "" };
     if (!version || !editable) return { payload, note: "Turn on Sell products under Tools in a new draft." };
@@ -65,7 +72,8 @@ export async function startCatalog(projectId: string, agentId: string, version: 
 /**
  * The business's products, which its agents sell from, and the orders they
  * take: added by hand or imported from a spreadsheet (Bumpa, Selar, Shopify
- * exports or a sheet of its own). Project-level, so every agent shares it.
+ * exports or a sheet of its own). The list belongs to the project; it shows
+ * only on the agents it was added to (the ones with Sell products on).
  */
 export function AgentCatalog() {
     const { projectId, agent, version, editable, canManage, busy } = useAgentWorkspace();
@@ -82,7 +90,7 @@ export function AgentCatalog() {
     const fileRef = useRef<HTMLInputElement>(null);
     const locked = !manage || !!busy || !!working;
 
-    if (!catalog) return null;
+    if (!catalog || !sellOn) return null;
     const { products, orders, currency } = catalog;
     const toFulfil = orders.filter((o) => o.status === "paid" || o.status === "new").length;
 
@@ -149,16 +157,17 @@ export function AgentCatalog() {
         }
     };
 
-    const turnOnSelling = async () => {
+    /** Take the products off this agent; the list itself stays for the agents that sell from it. */
+    const removeFromAgent = async () => {
         if (!version) return;
         setWorking("tool");
+        setError(null);
         try {
-            const current = (version.config_json.system_tools ?? {}) as Record<string, unknown>;
-            await postStudioAction(projectId, "save_tools", { agent_id: agent.id, version_id: version.id, system_tools: { ...current, sell_products: {} } });
-            await queryClient.invalidateQueries({ queryKey: studioQueryKey(projectId) });
-            toast.success("Sell products is on", { description: "Publish to make it live." });
+            const rest = Object.fromEntries(Object.entries((version.config_json.system_tools ?? {}) as Record<string, unknown>).filter(([key]) => key !== "sell_products"));
+            applyStudioResult(queryClient, projectId, await postStudioAction(projectId, "save_tools", { agent_id: agent.id, version_id: version.id, system_tools: rest }));
+            toast.success(`Products removed from ${agent.name}`, { description: "Publish to make it live." });
         } catch (cause) {
-            setError(cause instanceof Error ? cause.message : "Couldn't turn it on.");
+            setError(cause instanceof Error ? cause.message : "Couldn't remove it. Try again.");
         } finally {
             setWorking(null);
         }
@@ -174,7 +183,6 @@ export function AgentCatalog() {
                         <span className="block truncate text-xs text-muted-foreground">
                             {products.length} product{products.length === 1 ? "" : "s"} · prices in {currency}
                             {toFulfil ? ` · ${toFulfil} order${toFulfil === 1 ? "" : "s"} to fulfil` : ""}
-                            {sellOn ? "" : " · Sell products off"}
                         </span>
                     </span>
                     <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} />
@@ -190,22 +198,16 @@ export function AgentCatalog() {
                             <Plus className="h-3.5 w-3.5" />
                             Add
                         </Button>
+                        {editable && (
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => void removeFromAgent()} disabled={locked} aria-label={`Remove products from ${agent.name}`} title="Remove from this agent">
+                                {working === "tool" ? <HugeiconsIcon icon={Loading03Icon} className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                            </Button>
+                        )}
                     </div>
                 )}
             </header>
             {open && (
                 <>
-                    {!sellOn && (
-                        <div className="flex items-center justify-between gap-3 border-b border-border/60 bg-amber-500/5 px-4 py-2.5 text-xs">
-                            <span className="text-muted-foreground">{agent.name} can&apos;t sell these until Sell products is on.</span>
-                            {editable && canManage && (
-                                <Button size="sm" className="h-7 gap-1.5 text-xs" onClick={() => void turnOnSelling()} disabled={locked}>
-                                    {working === "tool" && <HugeiconsIcon icon={Loading03Icon} className="h-3.5 w-3.5 animate-spin" />}
-                                    Turn on
-                                </Button>
-                            )}
-                        </div>
-                    )}
                     <div className="flex items-center justify-between gap-3 border-b border-border/60 px-4 py-2">
                         <div className="flex gap-1 text-xs">
                             {(["products", "orders"] as const).map((key) => (
