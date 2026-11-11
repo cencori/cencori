@@ -159,7 +159,6 @@ declare
   v_existing public.basecode_turn_reservations%rowtype;
   v_reservation public.basecode_turn_reservations%rowtype;
   v_allowance record;
-  v_active_count integer;
 begin
   if p_user_id is null or p_client_turn_key is null then
     raise exception 'invalid_basecode_reservation';
@@ -205,18 +204,11 @@ begin
     updated_at = now()
   returning * into v_period;
 
-  select count(*) into v_active_count
-  from public.basecode_turn_reservations
-  where account_id = v_account.id
-    and status in ('reserved', 'running')
-    and expires_at > now();
-
-  if v_active_count >= v_plan.max_concurrent_turns then
-    return jsonb_build_object(
-      'allowed', false, 'reason', 'concurrency_limit',
-      'plan', v_plan.code, 'reset_at', v_allowance.ends_at
-    );
-  end if;
+  -- No limit on how many tasks run at once (2026-11-11). Every plan may run several together:
+  -- each one still counts against the week's tasks and the month's cost, so running more at once
+  -- only uses the allowance sooner. The one-at-a-time rule this replaces also locked accounts out
+  -- for two hours whenever a finished task's release never arrived. max_concurrent_turns stays on
+  -- the plan and is no longer read.
 
   if v_allowance.task_limit is not null and v_period.requests_used >= v_allowance.task_limit then
     return jsonb_build_object(
@@ -959,7 +951,6 @@ declare
   v_existing public.basecode_turn_reservations%rowtype;
   v_reservation public.basecode_turn_reservations%rowtype;
   v_allowance record;
-  v_active_count integer;
 begin
   if p_user_id is null or p_client_turn_key is null then
     raise exception 'invalid_basecode_reservation';
@@ -1005,18 +996,11 @@ begin
     updated_at = now()
   returning * into v_period;
 
-  select count(*) into v_active_count
-  from public.basecode_turn_reservations
-  where account_id = v_account.id
-    and status in ('reserved', 'running')
-    and expires_at > now();
-
-  if v_active_count >= v_plan.max_concurrent_turns then
-    return jsonb_build_object(
-      'allowed', false, 'reason', 'concurrency_limit',
-      'plan', v_plan.code, 'reset_at', v_allowance.ends_at
-    );
-  end if;
+  -- No limit on how many tasks run at once (2026-11-11). Every plan may run several together:
+  -- each one still counts against the week's tasks and the month's cost, so running more at once
+  -- only uses the allowance sooner. The one-at-a-time rule this replaces also locked accounts out
+  -- for two hours whenever a finished task's release never arrived. max_concurrent_turns stays on
+  -- the plan and is no longer read.
 
   if v_allowance.task_limit is not null and v_period.requests_used >= v_allowance.task_limit then
     return jsonb_build_object(
