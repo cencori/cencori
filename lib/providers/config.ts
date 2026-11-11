@@ -110,7 +110,6 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
             // GPT-4.1 / GPT-4o Series
             { id: 'gpt-4.1', name: 'GPT-4.1', type: ['chat', 'code'], contextWindow: 1047576, description: 'Long-context GPT-4.1', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2025-04-14' },
             { id: 'gpt-4.1-mini', name: 'GPT-4.1 Mini', type: ['chat'], contextWindow: 1047576, description: 'Balanced GPT-4.1 model', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2025-04-14' },
-            { id: 'gpt-4.1-nano', name: 'GPT-4.1 Nano', type: ['chat'], contextWindow: 1047576, description: 'Fast GPT-4.1 nano model', capabilities: { tools: true, structuredOutput: true, fileInput: true, caching: true }, addedAt: '2025-04-14' },
             { id: 'gpt-4o', name: 'GPT-4o', type: ['chat'], contextWindow: 128000, description: 'Omni-modal model', capabilities: { tools: true, structuredOutput: true, fileInput: true, audioInput: true, caching: true }, addedAt: '2024-05-13' },
             { id: 'gpt-4o-mini', name: 'GPT-4o Mini', type: ['chat'], contextWindow: 128000, description: 'Fast and cost-effective', capabilities: { tools: true, structuredOutput: true, fileInput: true, audioInput: true, caching: true }, addedAt: '2024-07-18' },
             // O-Series Reasoning (latest)

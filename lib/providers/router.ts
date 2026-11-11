@@ -40,6 +40,10 @@ const MODEL_ALIASES: Record<string, string> = {
     // Billed at the successor's price.
     'maximo-atlas-1.2': 'maximo-atlas-1.5',
     'maximo-atlas-1.3': 'maximo-atlas-1.4',
+    // OpenAI retired GPT-4.1 Nano (2026-11-10: "model_not_found ... has been
+    // deprecated"). Its successor costs the same or less ($0.05/$0.40 vs
+    // $0.10/$0.40 per 1M), so callers still sending it keep working.
+    'gpt-4.1-nano': 'gpt-5-nano',
 };
 
 /**
