@@ -289,10 +289,10 @@ export async function removeStoreLink(db: Admin, projectId: string, provider: St
 /** Sync one store into the catalog now. */
 export async function syncStore(db: Admin, projectId: string, link: StoreLink): Promise<StoreLink> {
     try {
-        const [store, catalog] = await Promise.all([readStore(db, link.provider, link.integration, link.connection_id, projectId), getCatalog(db, projectId)]);
+        const [store, catalog] = await Promise.all([readStore(db, link.provider, link.integration, link.connection_id, projectId), getCatalog(db, projectId, null)]);
         const result = applyStoreSync(catalog?.metadata.products ?? [], store, link.links);
         if (result.added || result.updated || result.hidden) {
-            const saved = await saveProducts(db, projectId, { products: result.products, currency: catalog?.metadata.currency });
+            const saved = await saveProducts(db, projectId, null, { products: result.products, currency: catalog?.metadata.currency });
             if (!saved.ok) throw new Error(saved.message);
         }
         const next: StoreLink = { ...link, links: result.links, last_synced_at: new Date().toISOString(), last_error: null, last_counts: { added: result.added, updated: result.updated, hidden: result.hidden } };

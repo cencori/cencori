@@ -2,7 +2,7 @@ import "server-only";
 
 import type { createAdminClient } from "@/lib/supabaseAdmin";
 import { listBookings, type Booking } from "@/lib/embedded/bookings";
-import { getCatalog, orderSummary, type CatalogOrder } from "@/lib/embedded/catalog";
+import { getProjectCatalog, orderSummary, type CatalogOrder } from "@/lib/embedded/catalog";
 import { businessTimeZone } from "@/lib/studio/business-zone";
 import { describeStart } from "@/lib/studio/schedule-slots";
 import { appointmentsOf, phoneDigits } from "@/lib/studio/schedule";
@@ -102,7 +102,7 @@ export async function clientCard(db: Admin, projectId: string, phoneInput: strin
     const [{ data: sessions }, bookings, catalog, notes] = await Promise.all([
         db.from("sessions").select("id, metadata, created_at").eq("project_id", projectId).eq("external_user_id", `wa:${phone}`).order("created_at", { ascending: false }).limit(100),
         listBookings(db, projectId),
-        getCatalog(db, projectId).catch(() => null),
+        getProjectCatalog(db, projectId).catch(() => null),
         notesRow(db, projectId),
     ]);
     const chats = ((sessions ?? []) as Array<{ id: string; metadata: Record<string, unknown> | null; created_at: string }>);

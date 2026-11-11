@@ -2,7 +2,7 @@ import "server-only";
 
 import OpenAI from "openai";
 import type { createAdminClient } from "@/lib/supabaseAdmin";
-import { getCatalog } from "@/lib/embedded/catalog";
+import { getProjectCatalog } from "@/lib/embedded/catalog";
 import { listBookings } from "@/lib/embedded/bookings";
 import { pushToOwners } from "@/lib/studio/push";
 import { earnedSince, paidThroughAssistant } from "@/lib/studio/earned";
@@ -86,7 +86,7 @@ export async function briefFacts(db: Admin, projectId: string, business: string,
 
     const [money_, catalog, bookings, { data: sessions }] = await Promise.all([
         paidThroughAssistant(db, projectId),
-        getCatalog(db, projectId).catch(() => null),
+        getProjectCatalog(db, projectId).catch(() => null),
         listBookings(db, projectId).catch(() => []),
         // Customer chats active yesterday (or still open), never console previews.
         db.from("sessions").select("id, created_at, status, metadata, last_turn_number")

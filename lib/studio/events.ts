@@ -297,7 +297,7 @@ export async function buyTickets(db: Admin, event: StudioEvent, request: { tierI
 
     // How it'll be paid decides how long the seats are held.
     const [{ getPaymentsConnection, requestPayment }, { getTransfers, startTransfer }] = await Promise.all([import("@/lib/embedded/payments"), import("@/lib/embedded/transfers")]);
-    const [payments, transfers] = total > 0 ? await Promise.all([getPaymentsConnection(db, event.project_id), getTransfers(db, event.project_id)]) : [null, null];
+    const [payments, transfers] = total > 0 ? await Promise.all([getPaymentsConnection(db, event.project_id, null), getTransfers(db, event.project_id)]) : [null, null];
     const byCard = !!payments && payments.metadata.currency === event.currency;
     const byTransfer = !byCard && !!transfers && event.currency === "NGN";
     if (total > 0 && !byCard && !byTransfer) return { ok: false, message: "This event isn't taking payments yet. Contact the organiser." };

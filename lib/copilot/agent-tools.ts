@@ -8,6 +8,7 @@ import { readAgentIntegrations, readAgentMcpServers } from "@/lib/embedded/agent
 import { RESTAURANT_DEFAULTS, restaurantInstructions, type RestaurantDetails } from "@/lib/embedded/templates";
 import { getOwnerAlerts } from "@/lib/embedded/owner-alerts";
 import { getCatalog } from "@/lib/embedded/catalog";
+import { getPaymentsConnection } from "@/lib/embedded/payments";
 import { cleanProducts, PRODUCTS_MAX } from "@/lib/embedded/catalog-format";
 
 /**
@@ -181,7 +182,7 @@ export const AGENT_ACTIONS: ChatCompletionFunctionTool[] = [
         type: "function",
         function: {
             name: "set_agent_system_tools",
-            description: "Propose switching an agent's built-in actions on or off: end_conversation (closes the chat when the person is done), request_callback (takes a name, number and reason and emails the owner to call back) take_payments (sends payment links for deposits, tables and orders; needs a payment provider (Paystack, Flutterwave or Stripe) connected under the agent's Integrations) and sell_products (answers about the business's products, prices and stock, and takes orders; needs products added with add_products). Goes into a draft.",
+            description: "Propose switching an agent's built-in actions on or off: end_conversation (closes the chat when the person is done), request_callback (takes a name, number and reason and emails the owner to call back) take_payments (sends payment links for deposits, tables and orders; needs a payment provider (Paystack, Flutterwave or Stripe) connected under that agent's Integrations: each agent has its own account) and sell_products (answers about the business's products, prices and stock, and takes orders; needs products added with add_products). Goes into a draft.",
             parameters: {
                 type: "object",
                 properties: { agent: agentRef, end_conversation: { type: "boolean" }, request_callback: { type: "boolean" }, take_payments: { type: "boolean" }, sell_products: { type: "boolean" } },
@@ -193,7 +194,7 @@ export const AGENT_ACTIONS: ChatCompletionFunctionTool[] = [
         type: "function",
         function: {
             name: "add_products",
-            description: "Propose adding products to the project's catalog (shared by its agents), from a price list the user gave or attached. Products with the same name are updated. Agents sell from it once sell_products is on.",
+            description: "Propose adding products to an agent's own catalog (each agent has its own; nothing is shared between agents), from a price list the user gave or attached. Products with the same name are updated. The agent sells from it once sell_products is on.",
             parameters: {
                 type: "object",
                 properties: {
@@ -211,6 +212,7 @@ export const AGENT_ACTIONS: ChatCompletionFunctionTool[] = [
                             required: ["name", "price"],
                         },
                     },
+                    agent: { ...agentRef, description: "The agent the products are for (name or id). Needed when the project has more than one agent." },
                     currency: { type: "string", description: "Three-letter code; only when it isn't the catalog's current one (NGN by default)." },
                 },
                 required: ["products"],
@@ -369,8 +371,7 @@ export async function runAgentReadTool(name: string, args: Args, ctx: CopilotToo
         const versions = await versionsOf(ctx, found.agent.id);
         const working = workingVersion(versions);
         const config = working?.config_json ?? {};
-        const { data: paystack } = await ctx.admin.from("tool_connections").select("metadata").eq("project_id", ctx.project.id).eq("connector_slug", "payments").eq("status", "active").limit(1).maybeSingle();
-        const catalog = await getCatalog(ctx.admin, ctx.project.id);
+        const [paystack, catalog] = await Promise.all([getPaymentsConnection(ctx.admin, ctx.project.id, found.agent.id), getCatalog(ctx.admin, ctx.project.id, found.agent.id)]);
         const [{ data: kb }, channels] = await Promise.all([
             ctx.admin.from("knowledge_bases").select("id").eq("project_id", ctx.project.id).eq("agent_id", found.agent.id).is("tenant_id", null).maybeSingle(),
             channelState(ctx, found.agent.id),
@@ -570,7 +571,19 @@ export async function prepareAgentAction(name: string, args: Args, ctx: CopilotT
     }
 
     if (name === "add_products") {
-        const catalog = await getCatalog(ctx.admin, project.id);
+        // Each agent has its own catalog: the one named, or the project's only agent.
+        let seller: { id: string; name: string };
+        if (typeof args.agent === "string" && args.agent.trim()) {
+            const found = await findAgent(ctx, args.agent);
+            if ("error" in found) return found;
+            seller = found.agent;
+        } else {
+            const { data: agents } = await ctx.admin.from("agents").select("id, name").eq("project_id", project.id).order("created_at", { ascending: true }).limit(2);
+            if (!agents?.length) return { error: "Make an agent first: products belong to an agent." };
+            if (agents.length > 1) return { error: "Say which agent these products are for (agent: its name or id). Each agent has its own catalog." };
+            seller = agents[0] as { id: string; name: string };
+        }
+        const catalog = await getCatalog(ctx.admin, project.id, seller.id);
         const currency = text(args.currency, 3).toUpperCase();
         if (currency && !/^[A-Z]{3}$/.test(currency)) return { error: "currency is a three-letter code, like NGN." };
         const incoming = cleanProducts(args.products);
@@ -597,8 +610,8 @@ export async function prepareAgentAction(name: string, args: Args, ctx: CopilotT
                     { label: "Products", value: `${sample}${incoming.products.length > 4 ? `, and ${incoming.products.length - 4} more` : ""}` },
                     ...(currency && currency !== catalog?.metadata.currency ? [{ label: "Currency", value: currency }] : []),
                 ],
-                request: { method: "PUT", path: `/api/projects/${encodeURIComponent(project.id)}/catalog`, body: { products: [...byName.values()], ...(currency ? { currency } : {}) } },
-                doneMessage: `Added ${incoming.products.length} product${incoming.products.length === 1 ? "" : "s"} to the catalog (${byName.size} in total). Agents with sell_products on sell from it straight away.`,
+                request: { method: "PUT", path: `/api/projects/${encodeURIComponent(project.id)}/catalog?agent_id=${encodeURIComponent(seller.id)}`, body: { products: [...byName.values()], ...(currency ? { currency } : {}) } },
+                doneMessage: `Added ${incoming.products.length} product${incoming.products.length === 1 ? "" : "s"} to ${seller.name}'s catalog (${byName.size} in total). It sells from it once sell_products is on.`,
             },
         };
     }

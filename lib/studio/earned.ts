@@ -1,9 +1,9 @@
 import "server-only";
 
 import type { createAdminClient } from "@/lib/supabaseAdmin";
-import { getPaymentsConnection } from "@/lib/embedded/payments";
+import { getProjectPayments } from "@/lib/embedded/payments";
 import { transferHistory } from "@/lib/embedded/transfers";
-import { getCatalog } from "@/lib/embedded/catalog";
+import { getProjectCatalog } from "@/lib/embedded/catalog";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -16,9 +16,9 @@ export interface PaidEntry { amount: number; at: string }
  */
 export async function paidThroughAssistant(db: Admin, projectId: string): Promise<{ currency: string; connected: boolean; paid: PaidEntry[] }> {
     const [payments, transfers, catalog] = await Promise.all([
-        getPaymentsConnection(db, projectId).catch(() => null),
+        getProjectPayments(db, projectId).catch(() => null),
         transferHistory(db, projectId).catch(() => []),
-        getCatalog(db, projectId).catch(() => null),
+        getProjectCatalog(db, projectId).catch(() => null),
     ]);
     const currency = payments?.metadata.currency ?? "NGN";
     const paid = [

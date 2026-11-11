@@ -38,10 +38,10 @@ const CONNECT_WAIT_MS = 5 * 60_000;
 const CONNECT_POLL_MS = 2_000;
 
 const appsQueryKey = (projectId: string) => ["agent-integrations", projectId];
-const paymentsQueryKey = (projectId: string) => ["project-payments", projectId];
+const paymentsQueryKey = (projectId: string, agentId: string) => ["agent-payments", projectId, agentId];
 
 type PaymentProviderInfo = { id: string; name: string; key_help: string; key_placeholder: string; available: boolean };
-type ProjectPayment = { agent_id?: string; reference: string; amount: number; currency: string; description: string; status: "pending" | "paid" | "expired"; created_at: string; paid_at: string | null; customer: string | null };
+type ProjectPayment = { reference: string; amount: number; currency: string; description: string; status: "pending" | "paid" | "expired"; created_at: string; paid_at: string | null; customer: string | null };
 type PaymentsPayload = {
     providers: PaymentProviderInfo[];
     payments: { provider: string; provider_name: string; mode: "live" | "test"; currency: string; connected_at: string; recent: ProjectPayment[] } | null;
@@ -91,7 +91,8 @@ function openConnectWindow(appName: string): Window | null {
 /**
  * The agent's connected apps: business accounts (Google Calendar, WhatsApp,
  * Instagram…) connected once per project, and the tools of each the agent
- * may use. The page header owns the Add integration button once apps exist.
+ * may use; plus its own payment provider account and its own products, which
+ * belong to this agent alone. The page header owns the Add integration button once apps exist.
  */
 export function AgentIntegrations({ adding, onAddingChange }: { adding: boolean; onAddingChange: (adding: boolean) => void }) {
     const { projectId, agent, version, editable, canManage, busy } = useAgentWorkspace();
@@ -107,9 +108,10 @@ export function AgentIntegrations({ adding, onAddingChange }: { adding: boolean;
     const canEdit = canManage && editable;
     const locked = !canEdit || !!busy || !!working;
 
-    const paymentsEndpoint = `/api/projects/${projectId}/payments`;
+    // The agent's own account and catalog: nothing here is shared with the project's other agents.
+    const paymentsEndpoint = `/api/projects/${projectId}/payments?agent_id=${encodeURIComponent(agent.id)}`;
     const paymentsQuery = useQuery({
-        queryKey: paymentsQueryKey(projectId),
+        queryKey: paymentsQueryKey(projectId, agent.id),
         queryFn: async () => readJson<PaymentsPayload>(await fetch(paymentsEndpoint, { cache: "no-store" })),
         staleTime: 30_000,
     });
@@ -120,13 +122,8 @@ export function AgentIntegrations({ adding, onAddingChange }: { adding: boolean;
     const [paymentForm, setPaymentForm] = useState<PaymentProviderInfo | null>(null);
     const [paymentKey, setPaymentKey] = useState("");
 
-    const catalogQuery = useCatalog(projectId);
+    const catalogQuery = useCatalog(projectId, agent.id);
     const hasCatalog = !!catalogQuery.data?.catalog;
-    const sellProductsOn = !!(version?.config_json.system_tools as { sell_products?: unknown } | undefined)?.sell_products;
-    // The provider account and the product list belong to the project; each shows
-    // only on the agents it was added to (the ones with its tool switched on).
-    const paymentsOnAgent = !!payments && takePaymentsOn;
-    const catalogOnAgent = hasCatalog && sellProductsOn;
 
     const appsQuery = useQuery({
         queryKey: appsQueryKey(projectId),
@@ -287,7 +284,7 @@ export function AgentIntegrations({ adding, onAddingChange }: { adding: boolean;
         }
     };
 
-    /** Connect the project's payment provider, and switch Take payments on for this agent's draft. */
+    /** Connect this agent's own payment provider account, and switch Take payments on in its draft. */
     const connectPayments = async (provider: PaymentProviderInfo) => {
         setError(null);
         setWorking(`pay:${provider.id}`);
@@ -297,7 +294,7 @@ export function AgentIntegrations({ adding, onAddingChange }: { adding: boolean;
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ provider: provider.id, secret_key: paymentKey }),
             }));
-            queryClient.setQueryData(paymentsQueryKey(projectId), result);
+            queryClient.setQueryData(paymentsQueryKey(projectId, agent.id), result);
             setPaymentKey("");
             let note = takePaymentsOn ? `${agent.name} can take payments.` : "";
             if (!takePaymentsOn && version && editable) {
@@ -317,46 +314,13 @@ export function AgentIntegrations({ adding, onAddingChange }: { adding: boolean;
         }
     };
 
-    /** Add the project's connected provider to this agent: Take payments goes on in its draft. */
-    const addPaymentsToAgent = async (provider: PaymentProviderInfo) => {
-        if (!version) return;
-        setError(null);
-        setWorking(`pay:${provider.id}`);
-        try {
-            const current = (version.config_json.system_tools ?? {}) as Record<string, unknown>;
-            refetchAgent(await postStudioAction(projectId, "save_tools", { agent_id: agent.id, version_id: version.id, system_tools: { ...current, take_payments: {} } }));
-            toast.success(`${provider.name} added`, { description: "Take payments is on in this draft. Publish to make it live." });
-            onAddingChange(false);
-        } catch (cause) {
-            setError(cause instanceof Error ? cause.message : `Couldn't add ${provider.name}.`);
-        } finally {
-            setWorking(null);
-        }
-    };
-
-    /** Take the provider off this agent; the account stays connected for the agents that use it. */
-    const removePaymentsFromAgent = async () => {
-        if (!version || !payments) return;
-        setError(null);
-        setWorking("pay:remove");
-        try {
-            const rest = Object.fromEntries(Object.entries((version.config_json.system_tools ?? {}) as Record<string, unknown>).filter(([key]) => key !== "take_payments"));
-            refetchAgent(await postStudioAction(projectId, "save_tools", { agent_id: agent.id, version_id: version.id, system_tools: rest }));
-            toast.success(`${payments.provider_name} removed from ${agent.name}`, { description: "Publish to make it live." });
-        } catch (cause) {
-            setError(cause instanceof Error ? cause.message : "Couldn't remove it. Try again.");
-        } finally {
-            setWorking(null);
-        }
-    };
-
     const disconnectPayments = async () => {
         setError(null);
         setWorking("pay:disconnect");
         try {
             const result = await readJson<PaymentsPayload>(await fetch(paymentsEndpoint, { method: "DELETE" }));
-            queryClient.setQueryData(paymentsQueryKey(projectId), result);
-            toast.success("Payments disconnected");
+            queryClient.setQueryData(paymentsQueryKey(projectId, agent.id), result);
+            toast.success(`Payments disconnected from ${agent.name}`);
         } catch (cause) {
             setError(cause instanceof Error ? cause.message : "Couldn't disconnect. Try again.");
         } finally {
@@ -364,13 +328,13 @@ export function AgentIntegrations({ adding, onAddingChange }: { adding: boolean;
         }
     };
 
-    /** The business's own product list, sold from by its agents. */
+    /** This agent's own product list. */
     const addCatalog = async () => {
         setError(null);
         setWorking("catalog");
         try {
             const { payload, note } = await startCatalog(projectId, agent.id, version ?? null, editable);
-            queryClient.setQueryData(catalogQueryKey(projectId), payload);
+            queryClient.setQueryData(catalogQueryKey(projectId, agent.id), payload);
             refetchAgent();
             toast.success("Products added", { description: note || (payload.catalog?.products.length ? "" : "Add your products, or import a spreadsheet.") || undefined });
             onAddingChange(false);
@@ -399,7 +363,7 @@ export function AgentIntegrations({ adding, onAddingChange }: { adding: boolean;
 
     return (
         <div className="space-y-4">
-            {payments && paymentsOnAgent && (
+            {payments && (
                 <div className="overflow-hidden rounded-lg border border-border/60">
                     <header className={cn("flex items-center gap-3 px-4 py-3", expanded.has("payments") && "border-b border-border/60")}>
                         <button type="button" className="flex min-w-0 flex-1 items-center gap-3 text-left" onClick={() => toggleExpanded("payments")} aria-expanded={expanded.has("payments")} aria-label={`${expanded.has("payments") ? "Hide" : "Show"} recent payments`}>
@@ -407,31 +371,23 @@ export function AgentIntegrations({ adding, onAddingChange }: { adding: boolean;
                             <span className="min-w-0 flex-1">
                                 <span className="block truncate text-sm font-medium">{payments.provider_name}</span>
                                 <span className="block truncate text-xs text-muted-foreground">
-                                    Payments in {payments.currency}{payments.mode === "test" ? " · test mode" : ""} · Take payments on
+                                    Payments in {payments.currency}{payments.mode === "test" ? " · test mode" : ""} · {takePaymentsOn ? "Take payments on" : "Take payments off (turn it on under Tools)"}
                                 </span>
                             </span>
                             <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", expanded.has("payments") && "rotate-180")} />
                         </button>
-                        {canEdit && (
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => void removePaymentsFromAgent()} disabled={locked} aria-label={`Remove ${payments.provider_name} from ${agent.name}`} title="Remove from this agent">
-                                {working === "pay:remove" ? <HugeiconsIcon icon={Loading03Icon} className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                        {canEdit && paymentsQuery.data?.can_manage && (
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => void disconnectPayments()} disabled={locked} aria-label={`Disconnect ${payments.provider_name} from ${agent.name}`} title="Disconnect from this agent">
+                                {working === "pay:disconnect" ? <HugeiconsIcon icon={Loading03Icon} className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
                             </Button>
                         )}
                     </header>
-                    {expanded.has("payments") && canEdit && paymentsQuery.data?.can_manage && (
-                        <div className="flex items-center justify-between gap-3 border-b border-border/60 px-4 py-2 text-[11px] text-muted-foreground">
-                            <span>The {payments.provider_name} account is connected to the project. Only agents it&apos;s added to can use it.</span>
-                            <button type="button" onClick={() => void disconnectPayments()} disabled={locked} className="shrink-0 transition-colors hover:text-destructive disabled:opacity-50">
-                                {working === "pay:disconnect" ? "Disconnecting…" : "Disconnect account"}
-                            </button>
-                        </div>
-                    )}
                     {expanded.has("payments") && (
-                        payments.recent.filter((payment) => !payment.agent_id || payment.agent_id === agent.id).length === 0
+                        payments.recent.length === 0
                             ? <p className="px-4 py-3 text-xs text-muted-foreground">No payments yet. Links {agent.name} sends show up here.</p>
                             : (
                                 <ul className="divide-y divide-border/60">
-                                    {payments.recent.filter((payment) => !payment.agent_id || payment.agent_id === agent.id).map((payment) => (
+                                    {payments.recent.map((payment) => (
                                         <li key={payment.reference} className="flex items-start justify-between gap-4 px-4 py-2.5 text-xs">
                                             <span className="min-w-0">
                                                 <span className="font-medium">{formatMoney(payment.amount, payment.currency)}</span> · {payment.description}
@@ -466,7 +422,7 @@ export function AgentIntegrations({ adding, onAddingChange }: { adding: boolean;
                     ))}
                 </div>
             )}
-            {apps.length === 0 && !paymentsOnAgent && !catalogOnAgent && connectedMcpApps.length === 0 ? (
+            {apps.length === 0 && !payments && !hasCatalog && connectedMcpApps.length === 0 ? (
                 <div className="flex flex-col items-center rounded-lg border border-border/60 px-6 py-14 text-center">
                     <span className="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-muted/70 text-foreground"><HugeiconsIcon icon={PlugSocketIcon} className="h-5 w-5" /></span>
                     <p className="text-sm font-medium">No integrations yet</p>
@@ -569,7 +525,7 @@ export function AgentIntegrations({ adding, onAddingChange }: { adding: boolean;
                                 </span>
                                 <div>
                                     <p className="text-sm font-medium">Connect {paymentForm.name}</p>
-                                    <p className="text-xs text-muted-foreground">Payments go straight to your {paymentForm.name} account.</p>
+                                    <p className="text-xs text-muted-foreground">Payments {agent.name} takes go straight to this {paymentForm.name} account. Other agents don&apos;t use it.</p>
                                 </div>
                             </div>
                             <label className="block">
@@ -578,7 +534,7 @@ export function AgentIntegrations({ adding, onAddingChange }: { adding: boolean;
                                 <span className="mt-1.5 block text-[11px] leading-4 text-muted-foreground">{paymentForm.key_help}</span>
                             </label>
                             {payments && payments.provider !== paymentForm.id && (
-                                <p className="rounded-md bg-amber-500/10 px-3 py-2 text-[11px] text-amber-700 dark:text-amber-400">This replaces {payments.provider_name}: the project takes payments through one provider at a time.</p>
+                                <p className="rounded-md bg-amber-500/10 px-3 py-2 text-[11px] text-amber-700 dark:text-amber-400">This replaces {payments.provider_name}: {agent.name} takes payments through one provider at a time.</p>
                             )}
                             {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
                             <Button size="sm" className="h-8 w-full gap-1.5 text-xs" disabled={!paymentKey.trim() || !!working || !paymentsQuery.data?.can_manage} onClick={() => void connectPayments(paymentForm)}>
@@ -599,13 +555,12 @@ export function AgentIntegrations({ adding, onAddingChange }: { adding: boolean;
                                     <div className="grid grid-cols-2 gap-2">
                                         {visibleProviders.map((provider) => {
                                             const isConnected = payments?.provider === provider.id;
-                                            const onAgent = isConnected && takePaymentsOn;
                                             return (
                                                 <button
                                                     key={provider.id}
                                                     type="button"
-                                                    onClick={() => { setError(null); if (isConnected) void addPaymentsToAgent(provider); else setPaymentForm(provider); }}
-                                                    disabled={!provider.available || onAgent || locked}
+                                                    onClick={() => { setError(null); setPaymentForm(provider); }}
+                                                    disabled={!provider.available || isConnected || locked}
                                                     className="flex items-center gap-2.5 rounded-lg border border-border/60 p-3 text-left transition-colors hover:bg-muted/40 disabled:cursor-default disabled:opacity-60 disabled:hover:bg-transparent"
                                                 >
                                                     <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted/70">
@@ -614,7 +569,7 @@ export function AgentIntegrations({ adding, onAddingChange }: { adding: boolean;
                                                     </span>
                                                     <span className="min-w-0">
                                                         <span className="block truncate text-sm">{provider.name}</span>
-                                                        <span className="block truncate text-[11px] text-muted-foreground">{!provider.available ? "Coming soon" : onAgent ? "Added" : isConnected ? "Connected · add to this agent" : "Connect"}</span>
+                                                        <span className="block truncate text-[11px] text-muted-foreground">{!provider.available ? "Coming soon" : isConnected ? "Connected" : "Connect"}</span>
                                                     </span>
                                                 </button>
                                             );
@@ -635,7 +590,7 @@ export function AgentIntegrations({ adding, onAddingChange }: { adding: boolean;
                                                 <button
                                                     type="button"
                                                     onClick={() => void addCatalog()}
-                                                    disabled={locked || catalogOnAgent || !canManage}
+                                                    disabled={locked || hasCatalog || !canManage}
                                                     className="flex items-center gap-2.5 rounded-lg border border-border/60 p-3 text-left transition-colors hover:bg-muted/40 disabled:cursor-default disabled:opacity-60 disabled:hover:bg-transparent"
                                                 >
                                                     <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted/70">
@@ -643,7 +598,7 @@ export function AgentIntegrations({ adding, onAddingChange }: { adding: boolean;
                                                     </span>
                                                     <span className="min-w-0">
                                                         <span className="block truncate text-sm">Your products</span>
-                                                        <span className="block truncate text-[11px] text-muted-foreground">{catalogOnAgent ? "Added" : hasCatalog ? "Add to this agent" : "List or import them"}</span>
+                                                        <span className="block truncate text-[11px] text-muted-foreground">{hasCatalog ? "Added" : "List or import them"}</span>
                                                     </span>
                                                 </button>
                                             )}

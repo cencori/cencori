@@ -2,8 +2,9 @@
  * Agents selling from the business's product catalog: what's for sale, at
  * what price, what's in stock, and the orders customers place in a chat.
  *
- * - The catalog is project-level (shared by its agents): a `tool_connections`
- *   row, with the products and a rolling list of orders in metadata.
+ * - Each agent has its own catalog: a `tool_connections` row carrying the
+ *   agent (see ./agent-owned), with the products and a rolling list of orders
+ *   in metadata. One agent never sells from another's list.
  * - An order is priced from the catalog, never from the conversation. With
  *   payments connected it waits for the customer to pay through a link
  *   (see ./payments); stock comes off and the owner hears once it's paid.
@@ -13,6 +14,7 @@
 import { randomBytes } from 'crypto';
 import type { createAdminClient } from '@/lib/supabaseAdmin';
 import { cleanProducts, formatPrice, type CatalogProduct } from './catalog-format';
+import { ownedRow, ownedRows, primaryAgentId, type OwnedKind } from './agent-owned';
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -54,6 +56,8 @@ export interface CatalogOrder {
 
 export interface CatalogMetadata {
     kind: 'catalog';
+    /** The agent whose catalog this is. */
+    agent_id?: string;
     currency: string;
     products: CatalogProduct[];
     orders: CatalogOrder[];
@@ -78,9 +82,51 @@ function toCatalog(row: Record<string, unknown> | null): Catalog | null {
     };
 }
 
-export async function getCatalog(db: Admin, projectId: string): Promise<Catalog | null> {
-    const { data } = await db.from('tool_connections').select(COLUMNS).eq('project_id', projectId).eq('connector_slug', CATALOG_SLUG).eq('status', 'active').order('created_at', { ascending: false }).limit(1).maybeSingle();
-    return toCatalog(data as Record<string, unknown> | null);
+const CATALOG_KIND: OwnedKind = {
+    slug: CATALOG_SLUG,
+    tool: 'sell_products',
+    historyOf: (metadata, agentId) => (Array.isArray(metadata.orders) ? (metadata.orders as CatalogOrder[]).filter((o) => o.agent_id === agentId).length : 0),
+    withoutHistory: (metadata) => ({ ...metadata, orders: [] }),
+};
+
+/** The agent's own catalog. `agentId` null: the project's first agent, which Studio acts for. */
+export async function getCatalog(db: Admin, projectId: string, agentId: string | null): Promise<Catalog | null> {
+    return toCatalog(await ownedRow(db, projectId, agentId, CATALOG_KIND));
+}
+
+/** Every agent's catalog in the project. */
+async function listCatalogs(db: Admin, projectId: string): Promise<Catalog[]> {
+    return (await ownedRows(db, projectId, CATALOG_KIND)).map(toCatalog).filter((c): c is Catalog => !!c);
+}
+
+/**
+ * The business's selling in one view, for reading only: the first agent's
+ * catalog (its currency and products), with the orders of every agent's
+ * catalog in the project, oldest first. Changes go through the functions
+ * below, which find the catalog an order belongs to.
+ */
+export async function getProjectCatalog(db: Admin, projectId: string): Promise<Catalog | null> {
+    const first = await getCatalog(db, projectId, null);
+    const all = await listCatalogs(db, projectId);
+    const base = first ?? all[0];
+    if (!base) return null;
+    const orders = all.flatMap((c) => c.metadata.orders).sort((a, b) => a.created_at.localeCompare(b.created_at));
+    return { ...base, metadata: { ...base.metadata, orders } };
+}
+
+/** The catalog an order is in, whichever agent took it. */
+async function catalogWithOrder(db: Admin, projectId: string, match: (order: CatalogOrder) => boolean): Promise<Catalog | null> {
+    return (await listCatalogs(db, projectId)).find((catalog) => catalog.metadata.orders.some(match)) ?? null;
+}
+
+/** Delete the agent's catalog. Refused while it has orders still to pay for or fulfil. */
+export async function removeCatalog(db: Admin, projectId: string, agentId: string): Promise<{ ok: true } | { ok: false; status: number; message: string }> {
+    const catalog = await getCatalog(db, projectId, agentId);
+    if (!catalog) return { ok: true };
+    const open = catalog.metadata.orders.filter((o) => o.status === 'awaiting_payment' || o.status === 'paid' || o.status === 'new').length;
+    if (open > 0) return { ok: false, status: 409, message: `${open} order${open === 1 ? ' is' : 's are'} still open. Mark ${open === 1 ? 'it' : 'them'} done or cancelled first.` };
+    const { error } = await db.from('tool_connections').update({ status: 'revoked' }).eq('id', catalog.id);
+    return error ? { ok: false, status: 502, message: 'Couldn\'t delete the products. Try again.' } : { ok: true };
 }
 
 /** What the console sees: every product, the latest orders first. */
@@ -97,18 +143,20 @@ export function publicCatalog(catalog: Catalog | null) {
 export const isCurrency = (value: unknown): value is string => typeof value === 'string' && /^[A-Z]{3}$/.test(value);
 
 /** Replace the products (the console sends the whole list), creating the catalog the first time. */
-export async function saveProducts(db: Admin, projectId: string, input: { products: unknown; currency?: unknown }): Promise<{ ok: true; catalog: Catalog } | { ok: false; status: number; message: string }> {
+export async function saveProducts(db: Admin, projectId: string, agentId: string | null, input: { products: unknown; currency?: unknown }): Promise<{ ok: true; catalog: Catalog } | { ok: false; status: number; message: string }> {
     const cleaned = cleanProducts(input.products);
     if (!cleaned.ok) return { ok: false, status: 400, message: cleaned.message };
     if (input.currency !== undefined && !isCurrency(input.currency)) return { ok: false, status: 400, message: 'Currency is a three-letter code, like NGN.' };
-    const existing = await getCatalog(db, projectId);
-    const currency = (input.currency as string | undefined) ?? existing?.metadata.currency ?? await defaultCurrency(db, projectId);
+    const existing = await getCatalog(db, projectId, agentId);
+    const currency = (input.currency as string | undefined) ?? existing?.metadata.currency ?? await defaultCurrency(db, projectId, agentId);
     if (existing) {
         // Re-read the orders so one placed while the owner was editing isn't lost.
         const updated = await updateCatalog(db, existing.id, (metadata) => ({ ...metadata, currency, products: cleaned.products, updated_at: new Date().toISOString() }));
         return updated ? { ok: true, catalog: updated } : { ok: false, status: 502, message: 'Couldn\'t save the products. Try again.' };
     }
-    const metadata: CatalogMetadata = { kind: 'catalog', currency, products: cleaned.products, orders: [], updated_at: new Date().toISOString() };
+    const owner = agentId || await primaryAgentId(db, projectId);
+    if (!owner) return { ok: false, status: 404, message: 'Make an agent first: products belong to an agent.' };
+    const metadata: CatalogMetadata = { kind: 'catalog', agent_id: owner, currency, products: cleaned.products, orders: [], updated_at: new Date().toISOString() };
     const { data, error } = await db.from('tool_connections').insert({ project_id: projectId, connector_slug: CATALOG_SLUG, owner_type: 'platform', status: 'active', metadata }).select(COLUMNS).single();
     const catalog = toCatalog(data as Record<string, unknown> | null);
     if (error || !catalog) return { ok: false, status: 502, message: 'Couldn\'t save the products. Try again.' };
@@ -116,9 +164,9 @@ export async function saveProducts(db: Admin, projectId: string, input: { produc
 }
 
 /** The payment provider's currency when one is connected, so prices and links agree; naira otherwise. */
-async function defaultCurrency(db: Admin, projectId: string): Promise<string> {
+async function defaultCurrency(db: Admin, projectId: string, agentId: string | null): Promise<string> {
     const { getPaymentsConnection } = await import('./payments');
-    return (await getPaymentsConnection(db, projectId))?.metadata.currency ?? 'NGN';
+    return (await getPaymentsConnection(db, projectId, agentId))?.metadata.currency ?? 'NGN';
 }
 
 /** Change the catalog, re-reading it first so concurrent writes (orders, edits) aren't lost. */
@@ -134,7 +182,7 @@ async function updateCatalog(db: Admin, catalogId: string, change: (metadata: Ca
 
 /** The owner was paid another way (cash, transfer): the order counts as paid from now. */
 export async function markOrderPaidByOwner(db: Admin, projectId: string, orderId: string): Promise<Catalog | null> {
-    const catalog = await getCatalog(db, projectId);
+    const catalog = await catalogWithOrder(db, projectId, (o) => o.id === orderId);
     const order = catalog?.metadata.orders.find((o) => o.id === orderId);
     if (!catalog || !order || order.status === 'cancelled') return null;
     if (order.status === 'paid' || order.paid_at) return catalog;
@@ -153,8 +201,8 @@ export async function markOrderPaidByOwner(db: Admin, projectId: string, orderId
 
 /** Owner's changes to an order from the console: done or cancelled. */
 export async function setOrderStatus(db: Admin, projectId: string, orderId: string, status: 'done' | 'cancelled'): Promise<Catalog | null> {
-    const catalog = await getCatalog(db, projectId);
-    if (!catalog || !catalog.metadata.orders.some((o) => o.id === orderId)) return null;
+    const catalog = await catalogWithOrder(db, projectId, (o) => o.id === orderId);
+    if (!catalog) return null;
     return updateCatalog(db, catalog.id, (metadata) => ({ ...metadata, orders: metadata.orders.map((o) => (o.id === orderId ? { ...o, status } : o)) }));
 }
 
@@ -193,7 +241,7 @@ export interface OrderRequest {
  * the outcome is what the agent tells the customer.
  */
 export async function placeOrder(ctx: OrderContext, request: OrderRequest): Promise<{ ok: true; order: CatalogOrder; link: string | null; transfer: { reference: string; instructions: string } | null } | { ok: false; message: string }> {
-    const catalog = await getCatalog(ctx.db, ctx.projectId);
+    const catalog = await getCatalog(ctx.db, ctx.projectId, ctx.agentId || null);
     if (!catalog || catalog.metadata.products.length === 0) return { ok: false, message: 'This business hasn\'t added its products yet.' };
     if (!Array.isArray(request.items) || request.items.length === 0) return { ok: false, message: 'Add at least one item (product_id and quantity, from find_products).' };
     if (request.items.length > ITEMS_MAX) return { ok: false, message: `An order holds up to ${ITEMS_MAX} different items.` };
@@ -234,7 +282,7 @@ export async function placeOrder(ctx: OrderContext, request: OrderRequest): Prom
     };
 
     // Paid through a link when the business takes payments in the catalog's currency.
-    const payments = await getPaymentsConnection(ctx.db, ctx.projectId);
+    const payments = await getPaymentsConnection(ctx.db, ctx.projectId, ctx.agentId || null);
     let link: string | null = null;
     let transfer: { reference: string; instructions: string } | null = null;
     if (payments && payments.metadata.currency === currency && total > 0) {
@@ -286,7 +334,7 @@ export function describeOrder(order: CatalogOrder) {
  * the order (to tell the owner about it) or null when the payment wasn't one.
  */
 export async function markOrderPaid(db: Admin, projectId: string, paymentReference: string, paidAt: string): Promise<CatalogOrder | null> {
-    const catalog = await getCatalog(db, projectId);
+    const catalog = await catalogWithOrder(db, projectId, (o) => o.payment_reference === paymentReference);
     const order = catalog?.metadata.orders.find((o) => o.payment_reference === paymentReference);
     if (!catalog || !order) return null;
     if (order.status !== 'awaiting_payment') return order;
@@ -304,7 +352,7 @@ export async function markOrderPaid(db: Admin, projectId: string, paymentReferen
 
 /** A transfer for the order arrived (the owner confirmed it): mark it paid and take its stock. */
 export async function markOrderPaidByTransfer(db: Admin, projectId: string, orderId: string, paidAt: string): Promise<void> {
-    const catalog = await getCatalog(db, projectId);
+    const catalog = await catalogWithOrder(db, projectId, (o) => o.id === orderId);
     if (!catalog) return;
     await updateCatalog(db, catalog.id, (metadata) => {
         const current = metadata.orders.find((o) => o.id === orderId);
@@ -320,6 +368,5 @@ export async function markOrderPaidByTransfer(db: Admin, projectId: string, orde
 /** The latest order placed in a conversation, for "where's my order?". */
 export async function latestOrderIn(db: Admin, projectId: string, conversationId: string | null | undefined): Promise<CatalogOrder | null> {
     if (!conversationId) return null;
-    const catalog = await getCatalog(db, projectId);
-    return catalog?.metadata.orders.filter((o) => o.conversation_id === conversationId).at(-1) ?? null;
+    return (await getProjectCatalog(db, projectId))?.metadata.orders.filter((o) => o.conversation_id === conversationId).at(-1) ?? null;
 }

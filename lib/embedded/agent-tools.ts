@@ -414,7 +414,7 @@ async function findProductsTool(argumentsJson: string, context: AgentToolContext
         // list the catalog instead
     }
     const [{ getCatalog }, { describeProduct, searchProducts }, { createAdminClient }] = await Promise.all([import('./catalog'), import('./catalog-format'), import('@/lib/supabaseAdmin')]);
-    const catalog = await getCatalog(createAdminClient(), context.projectId);
+    const catalog = await getCatalog(createAdminClient(), context.projectId, context.agentId || null);
     const products = catalog?.metadata.products.filter((p) => p.available) ?? [];
     if (!catalog || products.length === 0) return { ok: false, output: 'The business hasn\'t added its products yet. Offer to take their details for the team instead.' };
     const found = searchProducts(products, query, query.trim() ? 10 : 30);
@@ -464,7 +464,7 @@ async function requestPaymentTool(argumentsJson: string, context: AgentToolConte
     const [{ requestPayment, getPaymentsConnection, customerOf }, { createAdminClient }] = await Promise.all([import('./payments'), import('@/lib/supabaseAdmin')]);
     const db = createAdminClient();
     // No payment provider connected, but the business takes transfers: give the account instead of a link.
-    if (!await getPaymentsConnection(db, context.projectId)) {
+    if (!await getPaymentsConnection(db, context.projectId, context.agentId || null)) {
         const { getTransfers, startTransfer } = await import('./transfers');
         if (await getTransfers(db, context.projectId)) {
             const customer = await customerOf(db, context.conversationId);

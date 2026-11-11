@@ -2,9 +2,10 @@
  * Agents taking payments (deposits, event tables, orders) through the
  * business's own payment provider account (Paystack, Flutterwave, Stripe).
  *
- * - The business connects a provider once with its secret key (project-level,
- *   shared by its agents): a `tool_connections` row, key encrypted, with the
- *   payments it has started in metadata (a rolling list).
+ * - Each agent has its own provider account, connected with that account's
+ *   secret key: a `tool_connections` row carrying the agent
+ *   (see ./agent-owned), key encrypted, with the payments it has started in
+ *   metadata (a rolling list). One agent never charges on another's key.
  * - The agent sends a payment link (request_payment). The provider sends the
  *   customer's browser back to /api/payments/return after paying: Cencori
  *   checks it with the provider, then tells the customer (on WhatsApp) and the
@@ -17,6 +18,7 @@ import type { createAdminClient } from '@/lib/supabaseAdmin';
 import { decryptApiKey, encryptApiKey } from '@/lib/encryption';
 import { getMainSiteUrl } from '@/lib/main-site-url';
 import { PAYMENT_PROVIDERS, PaymentProviderError, type PaymentProviderId } from '@/lib/integrations/payment-providers';
+import { ownedRow, ownedRows, type OwnedKind } from './agent-owned';
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -46,6 +48,8 @@ export interface PaymentEntry {
 
 export interface PaymentsMetadata {
     kind: 'payments';
+    /** The agent whose account this is. */
+    agent_id?: string;
     provider: PaymentProviderId;
     mode: 'live' | 'test';
     currency: string;
@@ -68,9 +72,35 @@ function toConnection(row: Record<string, unknown> | null): PaymentsConnection |
     return { id: row.id as string, projectId: row.project_id as string, keyEncrypted: row.encrypted_access_ref as string, metadata: { ...metadata, payments: Array.isArray(metadata.payments) ? metadata.payments : [] } };
 }
 
-export async function getPaymentsConnection(db: Admin, projectId: string): Promise<PaymentsConnection | null> {
-    const { data } = await db.from('tool_connections').select(COLUMNS).eq('project_id', projectId).eq('connector_slug', PAYMENTS_SLUG).eq('status', 'active').order('created_at', { ascending: false }).limit(1).maybeSingle();
-    return toConnection(data as Record<string, unknown> | null);
+const PAYMENTS_KIND: OwnedKind = {
+    slug: PAYMENTS_SLUG,
+    tool: 'take_payments',
+    historyOf: (metadata, agentId) => (Array.isArray(metadata.payments) ? (metadata.payments as PaymentEntry[]).filter((p) => p.agent_id === agentId).length : 0),
+    withoutHistory: (metadata) => ({ ...metadata, payments: [] }),
+};
+
+/** The agent's own provider account. `agentId` null: the project's first agent, which Studio acts for. */
+export async function getPaymentsConnection(db: Admin, projectId: string, agentId: string | null): Promise<PaymentsConnection | null> {
+    return toConnection(await ownedRow(db, projectId, agentId, PAYMENTS_KIND));
+}
+
+/** Every agent's provider account in the project. */
+export async function listPaymentsConnections(db: Admin, projectId: string): Promise<PaymentsConnection[]> {
+    return (await ownedRows(db, projectId, PAYMENTS_KIND)).map(toConnection).filter((c): c is PaymentsConnection => !!c);
+}
+
+/**
+ * The business's money in one view, for reading only: the first agent's
+ * account (its provider and currency), with the payments of every agent's
+ * account in the project, oldest first.
+ */
+export async function getProjectPayments(db: Admin, projectId: string): Promise<PaymentsConnection | null> {
+    const first = await getPaymentsConnection(db, projectId, null);
+    const all = await listPaymentsConnections(db, projectId);
+    const base = first ?? all[0];
+    if (!base) return null;
+    const payments = all.flatMap((c) => c.metadata.payments).sort((a, b) => a.created_at.localeCompare(b.created_at));
+    return { ...base, metadata: { ...base.metadata, payments } };
 }
 
 /** What the console sees: never the key. */
@@ -87,7 +117,7 @@ export function publicPayments(connection: PaymentsConnection | null) {
     };
 }
 
-export async function connectPayments(db: Admin, opts: { projectId: string; organizationId: string; provider: PaymentProviderId; secretKey: string }): Promise<{ ok: true; connection: PaymentsConnection } | { ok: false; status: number; message: string }> {
+export async function connectPayments(db: Admin, opts: { projectId: string; agentId: string; organizationId: string; provider: PaymentProviderId; secretKey: string }): Promise<{ ok: true; connection: PaymentsConnection } | { ok: false; status: number; message: string }> {
     const provider = PAYMENT_PROVIDERS[opts.provider];
     const key = opts.secretKey.trim();
     const mode = provider.keyMode(key);
@@ -98,8 +128,8 @@ export async function connectPayments(db: Admin, opts: { projectId: string; orga
     } catch (error) {
         return { ok: false, status: 422, message: error instanceof PaymentProviderError && error.status >= 400 && error.status < 500 ? `${provider.name} didn't accept that key.` : `Couldn't reach ${provider.name} to check the key. Try again.` };
     }
-    const existing = await getPaymentsConnection(db, opts.projectId);
-    const metadata: PaymentsMetadata = { kind: 'payments', provider: opts.provider, mode, currency, connected_at: new Date().toISOString(), payments: existing?.metadata.payments ?? [] };
+    const existing = await getPaymentsConnection(db, opts.projectId, opts.agentId);
+    const metadata: PaymentsMetadata = { kind: 'payments', agent_id: opts.agentId, provider: opts.provider, mode, currency, connected_at: new Date().toISOString(), payments: existing?.metadata.payments ?? [] };
     const row = {
         project_id: opts.projectId,
         connector_slug: PAYMENTS_SLUG,
@@ -119,8 +149,10 @@ export async function connectPayments(db: Admin, opts: { projectId: string; orga
     return { ok: true, connection };
 }
 
-export async function disconnectPayments(db: Admin, projectId: string): Promise<void> {
-    await db.from('tool_connections').update({ status: 'revoked', encrypted_access_ref: null }).eq('project_id', projectId).eq('connector_slug', PAYMENTS_SLUG).eq('status', 'active');
+/** Disconnect the agent's account; other agents' accounts are untouched. */
+export async function disconnectPayments(db: Admin, projectId: string, agentId: string): Promise<void> {
+    await getPaymentsConnection(db, projectId, agentId);
+    await db.from('tool_connections').update({ status: 'revoked', encrypted_access_ref: null }).eq('project_id', projectId).eq('connector_slug', PAYMENTS_SLUG).eq('status', 'active').eq('metadata->>agent_id', agentId);
 }
 
 async function organizationOf(db: Admin, projectId: string): Promise<string> {
@@ -173,7 +205,7 @@ export async function customerOf(db: Admin, conversationId: string | null | unde
  * what the agent tells them.
  */
 export async function requestPayment(ctx: PaymentContext, request: { amount: number; description: string; email: string | null }): Promise<{ ok: true; link: string; reference: string; amount: string } | { ok: false; message: string }> {
-    const connection = await getPaymentsConnection(ctx.db, ctx.projectId);
+    const connection = await getPaymentsConnection(ctx.db, ctx.projectId, ctx.agentId || null);
     if (!connection) return { ok: false, message: 'Payments aren\'t set up for this business yet.' };
     const provider = PAYMENT_PROVIDERS[connection.metadata.provider];
     const currency = connection.metadata.currency;
@@ -295,9 +327,10 @@ async function tellOwner(db: Admin, projectId: string, payment: PaymentEntry): P
 /** The latest payment started in a conversation, for "I've paid". */
 export async function latestPaymentIn(db: Admin, projectId: string, conversationId: string | null | undefined): Promise<{ connection: PaymentsConnection; payment: PaymentEntry } | null> {
     if (!conversationId) return null;
-    const connection = await getPaymentsConnection(db, projectId);
-    const payment = connection?.metadata.payments.filter((p) => p.conversation_id === conversationId).at(-1);
-    return connection && payment ? { connection, payment } : null;
+    const found = (await listPaymentsConnections(db, projectId))
+        .flatMap((connection) => connection.metadata.payments.filter((p) => p.conversation_id === conversationId).map((payment) => ({ connection, payment })))
+        .sort((a, b) => a.payment.created_at.localeCompare(b.payment.created_at));
+    return found.at(-1) ?? null;
 }
 
 /** Background check of unpaid links still in their window, for customers who never came back from checkout. */

@@ -29,7 +29,7 @@ async function view(projectId: string, fromText: string | null, daysText: string
         getSchedule(db, projectId),
         listBookings(db, projectId),
         businessTimeZone(db, projectId),
-        getPaymentsConnection(db, projectId).catch(() => null),
+        getPaymentsConnection(db, projectId, null).catch(() => null),
         getTransfers(db, projectId).catch(() => null),
     ]);
     const today = localDate(timeZone, new Date());

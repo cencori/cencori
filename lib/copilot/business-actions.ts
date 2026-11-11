@@ -1,5 +1,5 @@
 import type { ChatCompletionFunctionTool } from "openai/resources/chat/completions";
-import { getCatalog, orderSummary } from "@/lib/embedded/catalog";
+import { getProjectCatalog, orderSummary } from "@/lib/embedded/catalog";
 import { listBookings } from "@/lib/embedded/bookings";
 import { transferHistory } from "@/lib/embedded/transfers";
 import { getConversation } from "@/lib/studio/inbox";
@@ -207,7 +207,7 @@ export async function prepareBusinessAction(name: string, args: Record<string, u
             const amount = typeof args.amount === "number" && Number.isFinite(args.amount) ? Math.round(args.amount * 100) / 100 : 0;
             const description = clean(args.description, 200);
             if (!(amount > 0) || !description) return { error: "Give the amount and what it's for." };
-            const catalog = await getCatalog(db, project.id);
+            const catalog = await getProjectCatalog(db, project.id);
             const currency = catalog?.metadata.currency ?? "NGN";
             const message = clean(args.message, 1000);
             return {
@@ -244,7 +244,7 @@ export async function prepareBusinessAction(name: string, args: Record<string, u
         }
 
         case "update_order": {
-            const order = (await getCatalog(db, project.id))?.metadata.orders.find((item) => item.id === clean(args.order_id, 64));
+            const order = (await getProjectCatalog(db, project.id))?.metadata.orders.find((item) => item.id === clean(args.order_id, 64));
             if (!order) return { error: "That order wasn't found. Look it up with list_orders." };
             const change = args.change === "paid" || args.change === "done" || args.change === "cancelled" ? args.change : null;
             if (!change) return { error: "Say paid, done or cancelled." };

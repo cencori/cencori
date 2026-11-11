@@ -6,8 +6,8 @@
  */
 import { businessTimeZone } from '@/lib/studio/business-zone';
 import type { createAdminClient } from '@/lib/supabaseAdmin';
-import { getCatalog } from '@/lib/embedded/catalog';
-import { getPaymentsConnection } from '@/lib/embedded/payments';
+import { getProjectCatalog } from '@/lib/embedded/catalog';
+import { getProjectPayments } from '@/lib/embedded/payments';
 import { getTransfers, transferHistory } from '@/lib/embedded/transfers';
 import { summarizeMoney, type MoneyPeriod } from '@/lib/studio/money';
 
@@ -15,8 +15,8 @@ type Admin = ReturnType<typeof createAdminClient>;
 
 export async function loadMoney(db: Admin, projectId: string, period: MoneyPeriod) {
     const [payments, catalog, timeZone, transfers, history] = await Promise.all([
-        getPaymentsConnection(db, projectId).catch(() => null),
-        getCatalog(db, projectId),
+        getProjectPayments(db, projectId).catch(() => null),
+        getProjectCatalog(db, projectId),
         businessTimeZone(db, projectId),
         getTransfers(db, projectId).catch(() => null),
         transferHistory(db, projectId).catch(() => []),

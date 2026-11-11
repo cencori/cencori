@@ -33,8 +33,8 @@ type CatalogPayload = {
     can_manage: boolean;
 };
 
-export const catalogQueryKey = (projectId: string) => ["project-catalog", projectId];
-const catalogEndpoint = (projectId: string) => `/api/projects/${projectId}/catalog`;
+export const catalogQueryKey = (projectId: string, agentId: string) => ["agent-catalog", projectId, agentId];
+const catalogEndpoint = (projectId: string, agentId: string) => `/api/projects/${projectId}/catalog?agent_id=${encodeURIComponent(agentId)}`;
 
 const CURRENCIES = ["NGN", "GHS", "KES", "ZAR", "USD", "GBP", "EUR"];
 const ORDER_STATUS: Record<OrderStatus, string> = { awaiting_payment: "Waiting for payment", paid: "Paid, to fulfil", new: "New, not paid", done: "Done", cancelled: "Cancelled" };
@@ -44,24 +44,23 @@ type Draft = { id: string; name: string; price: string; options: string; stock: 
 const toDraft = (p: CatalogProduct): Draft => ({ id: p.id, name: p.name, price: String(p.price), options: p.options, stock: p.stock === null ? "" : String(p.stock), description: p.description, available: p.available });
 const emptyDraft = (): Draft => ({ id: newProductId(), name: "", price: "", options: "", stock: "", description: "", available: true });
 
-export function useCatalog(projectId: string) {
+export function useCatalog(projectId: string, agentId: string) {
     return useQuery({
-        queryKey: catalogQueryKey(projectId),
-        queryFn: async () => readJson<CatalogPayload>(await fetch(catalogEndpoint(projectId), { cache: "no-store" })),
+        queryKey: catalogQueryKey(projectId, agentId),
+        queryFn: async () => readJson<CatalogPayload>(await fetch(catalogEndpoint(projectId, agentId), { cache: "no-store" })),
         staleTime: 30_000,
     });
 }
 
 /**
- * Add the products to this agent: Sell products goes on in its draft. The
- * project's catalog is started (empty) the first time; one that's already
- * there is left as it is.
+ * Start this agent's own catalog (empty; one that's already there is left as
+ * it is) and switch Sell products on in its draft.
  */
 export async function startCatalog(projectId: string, agentId: string, version: { id: string; config_json: Record<string, unknown> } | null, editable: boolean): Promise<{ payload: CatalogPayload; note: string }> {
-    const existing = await readJson<CatalogPayload>(await fetch(catalogEndpoint(projectId), { cache: "no-store" }));
+    const existing = await readJson<CatalogPayload>(await fetch(catalogEndpoint(projectId, agentId), { cache: "no-store" }));
     const payload = existing.catalog
         ? existing
-        : await readJson<CatalogPayload>(await fetch(catalogEndpoint(projectId), { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ products: [] }) }));
+        : await readJson<CatalogPayload>(await fetch(catalogEndpoint(projectId, agentId), { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ products: [] }) }));
     const current = (version?.config_json.system_tools ?? {}) as Record<string, unknown>;
     if (current.sell_products) return { payload, note: "" };
     if (!version || !editable) return { payload, note: "Turn on Sell products under Tools in a new draft." };
@@ -72,13 +71,13 @@ export async function startCatalog(projectId: string, agentId: string, version: 
 /**
  * The business's products, which its agents sell from, and the orders they
  * take: added by hand or imported from a spreadsheet (Bumpa, Selar, Shopify
- * exports or a sheet of its own). The list belongs to the project; it shows
- * only on the agents it was added to (the ones with Sell products on).
+ * exports or a sheet of its own). Each agent has its own list and its own
+ * orders; nothing here is shared with the project's other agents.
  */
 export function AgentCatalog() {
     const { projectId, agent, version, editable, canManage, busy } = useAgentWorkspace();
     const queryClient = useQueryClient();
-    const catalogQuery = useCatalog(projectId);
+    const catalogQuery = useCatalog(projectId, agent.id);
     const catalog = catalogQuery.data?.catalog ?? null;
     const manage = canManage && !!catalogQuery.data?.can_manage;
     const sellOn = !!(version?.config_json.system_tools as { sell_products?: unknown } | undefined)?.sell_products;
@@ -87,19 +86,20 @@ export function AgentCatalog() {
     const [draft, setDraft] = useState<Draft | null>(null);
     const [working, setWorking] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [confirming, setConfirming] = useState(false);
     const fileRef = useRef<HTMLInputElement>(null);
     const locked = !manage || !!busy || !!working;
 
-    if (!catalog || !sellOn) return null;
+    if (!catalog) return null;
     const { products, orders, currency } = catalog;
     const toFulfil = orders.filter((o) => o.status === "paid" || o.status === "new").length;
 
-    const send = async (method: "PUT" | "PATCH", body: unknown, key: string) => {
+    const send = async (method: "PUT" | "PATCH" | "DELETE", body: unknown, key: string) => {
         setWorking(key);
         setError(null);
         try {
-            const payload = await readJson<CatalogPayload>(await fetch(catalogEndpoint(projectId), { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }));
-            queryClient.setQueryData(catalogQueryKey(projectId), payload);
+            const payload = await readJson<CatalogPayload>(await fetch(catalogEndpoint(projectId, agent.id), { method, ...(body === undefined ? {} : { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }) }));
+            queryClient.setQueryData(catalogQueryKey(projectId, agent.id), payload);
             return true;
         } catch (cause) {
             setError(cause instanceof Error ? cause.message : "Couldn't save. Try again.");
@@ -157,19 +157,35 @@ export function AgentCatalog() {
         }
     };
 
-    /** Take the products off this agent; the list itself stays for the agents that sell from it. */
-    const removeFromAgent = async () => {
+    const turnOnSelling = async () => {
         if (!version) return;
         setWorking("tool");
-        setError(null);
+        try {
+            const current = (version.config_json.system_tools ?? {}) as Record<string, unknown>;
+            applyStudioResult(queryClient, projectId, await postStudioAction(projectId, "save_tools", { agent_id: agent.id, version_id: version.id, system_tools: { ...current, sell_products: {} } }));
+            toast.success("Sell products is on", { description: "Publish to make it live." });
+        } catch (cause) {
+            setError(cause instanceof Error ? cause.message : "Couldn't turn it on.");
+        } finally {
+            setWorking(null);
+        }
+    };
+
+    /** Delete this agent's products (asked twice); Sell products goes off in the draft with them. */
+    const removeCatalog = async () => {
+        if (!confirming) {
+            setConfirming(true);
+            return;
+        }
+        setConfirming(false);
+        if (!await send("DELETE", undefined, "remove")) return;
+        toast.success(`${agent.name}'s products deleted`);
+        if (!version || !editable || !sellOn) return;
         try {
             const rest = Object.fromEntries(Object.entries((version.config_json.system_tools ?? {}) as Record<string, unknown>).filter(([key]) => key !== "sell_products"));
             applyStudioResult(queryClient, projectId, await postStudioAction(projectId, "save_tools", { agent_id: agent.id, version_id: version.id, system_tools: rest }));
-            toast.success(`Products removed from ${agent.name}`, { description: "Publish to make it live." });
-        } catch (cause) {
-            setError(cause instanceof Error ? cause.message : "Couldn't remove it. Try again.");
-        } finally {
-            setWorking(null);
+        } catch {
+            // The products are gone; the tool can be switched off under Tools.
         }
     };
 
@@ -183,6 +199,7 @@ export function AgentCatalog() {
                         <span className="block truncate text-xs text-muted-foreground">
                             {products.length} product{products.length === 1 ? "" : "s"} · prices in {currency}
                             {toFulfil ? ` · ${toFulfil} order${toFulfil === 1 ? "" : "s"} to fulfil` : ""}
+                            {sellOn ? "" : " · Sell products off"}
                         </span>
                     </span>
                     <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} />
@@ -198,9 +215,13 @@ export function AgentCatalog() {
                             <Plus className="h-3.5 w-3.5" />
                             Add
                         </Button>
-                        {editable && (
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => void removeFromAgent()} disabled={locked} aria-label={`Remove products from ${agent.name}`} title="Remove from this agent">
-                                {working === "tool" ? <HugeiconsIcon icon={Loading03Icon} className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                        {confirming ? (
+                            <Button variant="outline" size="sm" className="h-7 border-destructive/40 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => void removeCatalog()} onBlur={() => setConfirming(false)} disabled={locked} autoFocus>
+                                Delete {products.length} product{products.length === 1 ? "" : "s"}?
+                            </Button>
+                        ) : (
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => void removeCatalog()} disabled={locked} aria-label={`Delete ${agent.name}'s products`} title="Delete this agent's products">
+                                {working === "remove" ? <HugeiconsIcon icon={Loading03Icon} className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
                             </Button>
                         )}
                     </div>
@@ -208,6 +229,17 @@ export function AgentCatalog() {
             </header>
             {open && (
                 <>
+                    {!sellOn && (
+                        <div className="flex items-center justify-between gap-3 border-b border-border/60 bg-amber-500/5 px-4 py-2.5 text-xs">
+                            <span className="text-muted-foreground">{agent.name} can&apos;t sell these until Sell products is on.</span>
+                            {editable && canManage && (
+                                <Button size="sm" className="h-7 gap-1.5 text-xs" onClick={() => void turnOnSelling()} disabled={locked}>
+                                    {working === "tool" && <HugeiconsIcon icon={Loading03Icon} className="h-3.5 w-3.5 animate-spin" />}
+                                    Turn on
+                                </Button>
+                            )}
+                        </div>
+                    )}
                     <div className="flex items-center justify-between gap-3 border-b border-border/60 px-4 py-2">
                         <div className="flex gap-1 text-xs">
                             {(["products", "orders"] as const).map((key) => (

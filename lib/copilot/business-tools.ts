@@ -1,5 +1,5 @@
 import type { ChatCompletionFunctionTool } from "openai/resources/chat/completions";
-import { getCatalog, type CatalogOrder } from "@/lib/embedded/catalog";
+import { getProjectCatalog, type CatalogOrder } from "@/lib/embedded/catalog";
 import { listBookings, type Booking } from "@/lib/embedded/bookings";
 import { getConversation, listConversations, type InboxChannel } from "@/lib/studio/inbox";
 import { loadMoney } from "@/lib/studio/money-data";
@@ -215,7 +215,7 @@ export async function runBusinessTool(name: string, args: Record<string, unknown
         }
 
         case "list_orders": {
-            const orders = (await getCatalog(db, project.id))?.metadata.orders ?? [];
+            const orders = (await getProjectCatalog(db, project.id))?.metadata.orders ?? [];
             const search = text(args.search);
             const status = typeof args.status === "string" ? args.status : null;
             const matching = [...orders].reverse()
@@ -344,7 +344,7 @@ export async function runBusinessTool(name: string, args: Record<string, unknown
             if (!ctx.userId) return { error: "Customers aren't available here." };
             const [chats, catalog, bookings] = await Promise.all([
                 listConversations(db, project.id, { limit: 500, userId: ctx.userId }),
-                getCatalog(db, project.id),
+                getProjectCatalog(db, project.id),
                 listBookings(db, project.id),
             ]);
             const orders = catalog?.metadata.orders ?? [];

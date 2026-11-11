@@ -15,21 +15,24 @@ import { agentToolset } from '@/lib/embedded/agent-tools';
 
 /** tool_connections in memory: just the queries the catalog makes. */
 function fakeDb(rows: Array<Record<string, unknown>>) {
+    const read = (row: Record<string, unknown>, key: string) => (key === 'metadata->>agent_id' ? (row.metadata as Record<string, unknown>).agent_id ?? null : row[key]);
     return {
         from: () => {
             const filters: Array<[string, unknown]> = [];
             let patch: Record<string, unknown> | null = null;
-            const match = () => rows.filter((row) => filters.every(([key, value]) => row[key] === value));
+            const match = () => rows.filter((row) => filters.every(([key, value]) => read(row, key) === value));
             const builder = {
                 select: () => builder,
                 eq: (key: string, value: unknown) => { filters.push([key, value]); return builder; },
+                is: (key: string, value: unknown) => { filters.push([key, value]); return builder; },
                 order: () => builder,
                 limit: () => builder,
                 maybeSingle: async () => ({ data: match()[0] ?? null, error: null }),
                 update: (values: Record<string, unknown>) => { patch = values; return builder; },
                 then: (resolve: (value: unknown) => void) => {
-                    if (patch) for (const row of match()) Object.assign(row, patch);
-                    resolve({ error: null });
+                    const found = match();
+                    if (patch) for (const row of found) Object.assign(row, patch);
+                    resolve({ data: found, error: null });
                 },
             };
             return builder;
@@ -40,7 +43,7 @@ function fakeDb(rows: Array<Record<string, unknown>>) {
 const product = (overrides: Partial<CatalogProduct>): CatalogProduct => ({ id: 'p_aaaaaa', name: 'Ankara wrap dress', price: 25000, description: '', options: '', stock: null, available: true, ...overrides });
 
 function catalogRow(products: CatalogProduct[]) {
-    const metadata: CatalogMetadata = { kind: 'catalog', currency: 'NGN', products, orders: [], updated_at: '2026-10-26T00:00:00Z' };
+    const metadata: CatalogMetadata = { kind: 'catalog', agent_id: 'a1', currency: 'NGN', products, orders: [], updated_at: '2026-10-26T00:00:00Z' };
     return { id: 'c1', project_id: 'p1', connector_slug: 'catalog', status: 'active', metadata };
 }
 

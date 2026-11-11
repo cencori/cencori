@@ -124,7 +124,7 @@ const formatMoney = (amount: number, currency: string) => {
 /** How the business takes money: its currency (its payment provider's, else naira), and whether a deposit can be paid at all (a provider, or a bank account). */
 async function paymentOptions(db: Admin, projectId: string): Promise<{ currency: string; payable: boolean }> {
     const [{ getPaymentsConnection }, { getTransfers }] = await Promise.all([import("@/lib/embedded/payments"), import("@/lib/embedded/transfers")]);
-    const [link, transfer] = await Promise.all([getPaymentsConnection(db, projectId).catch(() => null), getTransfers(db, projectId).catch(() => null)]);
+    const [link, transfer] = await Promise.all([getPaymentsConnection(db, projectId, null).catch(() => null), getTransfers(db, projectId).catch(() => null)]);
     return { currency: link?.metadata.currency ?? "NGN", payable: !!link || !!transfer };
 }
 
@@ -218,7 +218,7 @@ export async function bookAppointment(ctx: BookContext, request: { service: unkn
 /** A payment link through the business's provider, or its bank account to transfer to. */
 async function startDeposit(ctx: BookContext, booking: Booking, amount: number, description: string): Promise<{ ok: true; deposit: NonNullable<Booking["deposit_due"]>; instructions: string } | { ok: false; message: string }> {
     const [{ getPaymentsConnection, requestPayment, customerOf }, transfers] = await Promise.all([import("@/lib/embedded/payments"), import("@/lib/embedded/transfers")]);
-    if (await getPaymentsConnection(ctx.db, ctx.projectId)) {
+    if (await getPaymentsConnection(ctx.db, ctx.projectId, ctx.agentId || null)) {
         const started = await requestPayment({ db: ctx.db, projectId: ctx.projectId, agentId: ctx.agentId, agentName: ctx.agentName, surface: ctx.surface, conversationId: ctx.conversationId }, { amount, description, email: null });
         if (!started.ok) return { ok: false, message: started.message };
         return { ok: true, instructions: "", deposit: { amount, currency: booking.currency ?? "NGN", reference: started.reference, method: "link", link: started.link, claimed_at: null, paid_at: null } };
