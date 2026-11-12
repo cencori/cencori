@@ -23,7 +23,7 @@ import { getCachedApiKeyConfig, getCachedTensorAccess, setCachedApiKeyConfig } f
 import { processUsageQueue } from '@/lib/queue';
 import { recordGatewayGovernanceDecision } from '@/lib/governance/record-decision';
 import { isFullySponsoredApiKey } from '@/lib/gateway/model-access';
-import { isMeteredGatewayRequest, isProvenByokRequest } from '@/lib/gateway/credit-policy';
+import { isMeteredGatewayRequest, mayProceedOnEmptyWallet } from '@/lib/gateway/credit-policy';
 import type { GatewayPerformanceTracker } from '@/lib/gateway/performance';
 import {
     isProjectIngressAllowed,
@@ -409,7 +409,7 @@ export async function validateGatewayRequest(
                         if (tier !== 'enterprise' && isMeteredGatewayRequest(req.method, route)) {
                             const { getCreditsBalanceForGate } = await import('@/lib/credits');
                             const balance = await getCreditsBalanceForGate(organizationId);
-                            if (isCreditBalanceExhausted(balance) && !await isProvenByokRequest({
+                            if (isCreditBalanceExhausted(balance) && !await mayProceedOnEmptyWallet({
                                 req,
                                 supabase,
                                 projectId: project.id,
@@ -768,7 +768,7 @@ export async function validateGatewayRequest(
     }
 
     const zeroBalanceByok = shouldEnforceCredits && isCreditBalanceExhausted(creditsBalance)
-        ? await timed('auth_byok', isProvenByokRequest({
+        ? await timed('auth_byok', mayProceedOnEmptyWallet({
             req,
             supabase,
             projectId: project.id,

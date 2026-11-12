@@ -6,7 +6,8 @@ vi.mock('@/lib/providers/custom-provider-routing', () => ({
     resolveCustomProviderForProject: vi.fn().mockResolvedValue(null),
 }));
 
-import { isMeteredGatewayRequest, isProvenByokRequest } from '@/lib/gateway/credit-policy';
+import { isMeteredGatewayRequest, isProvenByokRequest, mayProceedOnEmptyWallet } from '@/lib/gateway/credit-policy';
+import { canonicalGatewayPath } from '@/lib/gateway/canonical-path';
 
 type Fake = {
     /** A key saved in the console (provider_keys). */
@@ -122,5 +123,44 @@ describe('gateway credit policy', () => {
             .toBe(false);
         expect(await isProvenByokRequest({ ...base, req: turn(), supabase: fakeDb({ consoleKey: true, session: null }) as never }))
             .toBe(false);
+    });
+
+    it('reads a public /v1 path as the endpoint it is served from', () => {
+        expect(canonicalGatewayPath('/v1/chat/completions')).toBe('/api/v1/chat/completions');
+        expect(canonicalGatewayPath('/v1/sessions/s1/turns')).toBe('/api/v1/sessions/s1/turns');
+        expect(canonicalGatewayPath('/v1/embeddings')).toBe('/api/ai/embeddings');
+        expect(canonicalGatewayPath('/v1/images/generations')).toBe('/api/ai/images/generate');
+        expect(canonicalGatewayPath('/v1/audio/speech')).toBe('/api/ai/audio/speech');
+        expect(canonicalGatewayPath('/api/v1/chat/completions')).toBe('/api/v1/chat/completions');
+        expect(canonicalGatewayPath('/v1/not-a-route')).toBe('/v1/not-a-route');
+    });
+
+    it('meters a call the same whichever spelling of the path it came in on', () => {
+        expect(isMeteredGatewayRequest('POST', '/v1/chat/completions')).toBe(true);
+        expect(isMeteredGatewayRequest('POST', '/v1/embeddings')).toBe(true);
+        expect(isMeteredGatewayRequest('POST', '/v1/sessions/s1/turns')).toBe(true);
+        expect(isMeteredGatewayRequest('POST', '/v1/memory/search')).toBe(true);
+        expect(isMeteredGatewayRequest('POST', '/v1/moderations')).toBe(false);
+        expect(isMeteredGatewayRequest('POST', '/v1/sessions')).toBe(false);
+        expect(isMeteredGatewayRequest('GET', '/v1/sessions/s1')).toBe(false);
+    });
+
+    it('lets an empty wallet through only on its own key, or where the executor settles it', async () => {
+        const base = { projectId: 'project-1', organizationId: 'org-1', defaultModel: null };
+        const post = (path: string, body: unknown) => new NextRequest(`http://localhost${path}`, { method: 'POST', body: JSON.stringify(body) });
+        const noKey = () => fakeDb({ session: { agent_id: 'a1', installation_id: null } }) as never;
+
+        // Own key, public spelling of the path.
+        expect(await mayProceedOnEmptyWallet({ ...base, req: post('/v1/embeddings', { model: 'text-embedding-3-small', input: 'hi' }), supabase: fakeDb({ consoleKey: true }) as never })).toBe(true);
+        // No key for the model the request names: refused up front on either spelling.
+        expect(await mayProceedOnEmptyWallet({ ...base, req: post('/v1/chat/completions', { model: 'gpt-4o', messages: [] }), supabase: noKey() })).toBe(false);
+        expect(await mayProceedOnEmptyWallet({ ...base, req: post('/v1/embeddings', { model: 'text-embedding-3-small', input: 'hi' }), supabase: noKey() })).toBe(false);
+        // A stored agent picks the model: the executor decides, with the key it really resolves.
+        expect(await mayProceedOnEmptyWallet({ ...base, req: post('/v1/sessions/s1/turns', { input: 'hi' }), supabase: noKey() })).toBe(true);
+        expect(await mayProceedOnEmptyWallet({ ...base, req: post('/api/v1/agents/a1/runs', { input: 'hi' }), supabase: noKey() })).toBe(true);
+        expect(await mayProceedOnEmptyWallet({ ...base, req: post('/v1/chat/completions', { model: 'gpt-4o', messages: [] }), supabase: noKey(), agentId: 'a1' })).toBe(true);
+        // Nothing settles these later, so what can't be proven is refused.
+        expect(await mayProceedOnEmptyWallet({ ...base, req: post('/v1/memory/search', { query: 'hi' }), supabase: fakeDb({ consoleKey: true }) as never })).toBe(false);
+        expect(await mayProceedOnEmptyWallet({ ...base, req: post('/v1/embeddings', { model: 'text-embedding-3-small', input: 'hi' }), supabase: fakeDb({ consoleKey: true }) as never, agentId: 'a1' })).toBe(false);
     });
 });
