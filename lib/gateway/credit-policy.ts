@@ -5,7 +5,9 @@ import { resolveCustomProviderForProject } from '@/lib/providers/custom-provider
 import { isAutoRouterModel } from '@/lib/gateway/auto-router';
 import { resolveProviderKeyRow } from '@/lib/providers/byok-store';
 import { canonicalGatewayPath } from '@/lib/gateway/canonical-path';
+import { memoryEmbedsOnOwnKey } from '@/lib/memory/embeddings';
 
+const MEMORY_EMBEDDING_PATH = /^\/api\/v1\/(memory\/(remember|write|search)|knowledge-bases\/[^/]+\/search)$/;
 const SESSION_TURN_PATH = /^\/api\/v1\/sessions\/([^/]+)\/turns$/;
 
 type AdminClient = ReturnType<typeof createAdminClient>;
@@ -79,6 +81,15 @@ export async function mayProceedOnEmptyWallet(params: ByokParams): Promise<boole
 async function byokVerdict(params: ByokParams): Promise<'byok' | 'managed' | 'unknown'> {
     const pathname = canonicalGatewayPath(params.req.nextUrl.pathname);
     const sessionId = SESSION_TURN_PATH.exec(pathname)?.[1] ?? null;
+    // Memory and knowledge-base calls spend on one thing the executor doesn't
+    // settle: the embedding. That runs on the project's own key or it doesn't.
+    if (MEMORY_EMBEDDING_PATH.test(pathname)) {
+        try {
+            return await memoryEmbedsOnOwnKey(params.supabase as never, params.projectId) ? 'byok' : 'managed';
+        } catch {
+            return 'managed';
+        }
+    }
     const supported = Boolean(sessionId)
         || pathname === '/api/ai/chat'
         || pathname === '/api/ai/completions'

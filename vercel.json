@@ -194,6 +194,10 @@
             "destination": "/api/v1/telemetry/web"
         },
         {
+            "source": "/v1/web/:path*",
+            "destination": "/api/v1/web/:path*"
+        },
+        {
             "source": "/v1/embeddings",
             "destination": "/api/ai/embeddings"
         },

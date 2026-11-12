@@ -127,6 +127,22 @@ async function loadMemoryEmbeddingConfig(
 }
 
 /**
+ * Whether this project's memory embeddings run on its own OpenAI key rather
+ * than the managed one: the same answer loadMemoryEmbeddingConfig reaches, read
+ * without pinning anything. An unpinned project with an OpenAI key will pin to
+ * OpenAI on first use.
+ */
+export async function memoryEmbedsOnOwnKey(supabase: SupabaseAdmin, projectId: string): Promise<boolean> {
+    const [key, pin] = await Promise.all([
+        supabase.from('provider_keys').select('encrypted_key').eq('project_id', projectId).eq('provider', 'openai').eq('is_active', true).maybeSingle(),
+        supabase.from('project_memory_settings').select('embedding_provider').eq('project_id', projectId).maybeSingle(),
+    ]);
+    if (key.error || pin.error || !key.data?.encrypted_key) return false;
+    const pinned = (pin.data as { embedding_provider?: string | null } | null)?.embedding_provider ?? null;
+    return pinned === null || pinned === 'openai';
+}
+
+/**
  * Embed one or more strings for memory storage/search.
  * Throws on failure — callers decide whether to fail open (chat retrieval)
  * or surface the error (direct endpoints).

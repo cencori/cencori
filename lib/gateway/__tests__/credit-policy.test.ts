@@ -15,6 +15,8 @@ type Fake = {
     /** A key added through the API (provider_connections). */
     connection?: boolean;
     session?: { agent_id: string | null; installation_id: string | null } | null;
+    /** The embedding space the project's memory is pinned to. */
+    memoryPin?: 'openai' | 'google';
 };
 
 /** Answers each table the policy reads; filters are accepted and ignored. */
@@ -22,6 +24,7 @@ function fakeDb(fake: Fake) {
     const rows = (table: string): unknown => {
         if (table === 'provider_keys') return fake.consoleKey ? { encrypted_key: 'encrypted', is_active: true } : null;
         if (table === 'sessions') return fake.session ?? null;
+        if (table === 'project_memory_settings') return fake.memoryPin ? { embedding_provider: fake.memoryPin } : null;
         if (table === 'provider_connections') {
             return fake.connection
                 ? [{ id: 'c1', provider: 'openai', status: 'active', base_url: null, encrypted_key_ref: 'encrypted', created_at: '2026-01-01' }]
@@ -131,6 +134,7 @@ describe('gateway credit policy', () => {
         expect(canonicalGatewayPath('/v1/embeddings')).toBe('/api/ai/embeddings');
         expect(canonicalGatewayPath('/v1/images/generations')).toBe('/api/ai/images/generate');
         expect(canonicalGatewayPath('/v1/audio/speech')).toBe('/api/ai/audio/speech');
+        expect(canonicalGatewayPath('/v1/web/search')).toBe('/api/v1/web/search');
         expect(canonicalGatewayPath('/api/v1/chat/completions')).toBe('/api/v1/chat/completions');
         expect(canonicalGatewayPath('/v1/not-a-route')).toBe('/v1/not-a-route');
     });
@@ -140,6 +144,8 @@ describe('gateway credit policy', () => {
         expect(isMeteredGatewayRequest('POST', '/v1/embeddings')).toBe(true);
         expect(isMeteredGatewayRequest('POST', '/v1/sessions/s1/turns')).toBe(true);
         expect(isMeteredGatewayRequest('POST', '/v1/memory/search')).toBe(true);
+        expect(isMeteredGatewayRequest('POST', '/v1/web/search')).toBe(true);
+        expect(isMeteredGatewayRequest('POST', '/v1/web/takedown')).toBe(false);
         expect(isMeteredGatewayRequest('POST', '/v1/moderations')).toBe(false);
         expect(isMeteredGatewayRequest('POST', '/v1/sessions')).toBe(false);
         expect(isMeteredGatewayRequest('GET', '/v1/sessions/s1')).toBe(false);
@@ -160,7 +166,18 @@ describe('gateway credit policy', () => {
         expect(await mayProceedOnEmptyWallet({ ...base, req: post('/api/v1/agents/a1/runs', { input: 'hi' }), supabase: noKey() })).toBe(true);
         expect(await mayProceedOnEmptyWallet({ ...base, req: post('/v1/chat/completions', { model: 'gpt-4o', messages: [] }), supabase: noKey(), agentId: 'a1' })).toBe(true);
         // Nothing settles these later, so what can't be proven is refused.
-        expect(await mayProceedOnEmptyWallet({ ...base, req: post('/v1/memory/search', { query: 'hi' }), supabase: fakeDb({ consoleKey: true }) as never })).toBe(false);
+        expect(await mayProceedOnEmptyWallet({ ...base, req: post('/api/memory/search', { query: 'hi' }), supabase: fakeDb({ consoleKey: true }) as never })).toBe(false);
         expect(await mayProceedOnEmptyWallet({ ...base, req: post('/v1/embeddings', { model: 'text-embedding-3-small', input: 'hi' }), supabase: fakeDb({ consoleKey: true }) as never, agentId: 'a1' })).toBe(false);
+    });
+
+    it('lets memory and knowledge-base calls through when embeddings run on the project\'s OpenAI key', async () => {
+        const base = { projectId: 'project-1', organizationId: 'org-1', defaultModel: null };
+        const post = (path: string) => new NextRequest(`http://localhost${path}`, { method: 'POST', body: JSON.stringify({ query: 'hi' }) });
+        const own = () => fakeDb({ consoleKey: true }) as never;
+        expect(await mayProceedOnEmptyWallet({ ...base, req: post('/v1/memory/search'), supabase: own() })).toBe(true);
+        expect(await mayProceedOnEmptyWallet({ ...base, req: post('/v1/knowledge-bases/kb1/search'), supabase: own() })).toBe(true);
+        // Pinned to the managed embedding space, or no key at all: that spend is ours.
+        expect(await mayProceedOnEmptyWallet({ ...base, req: post('/v1/memory/search'), supabase: fakeDb({ consoleKey: true, memoryPin: 'google' }) as never })).toBe(false);
+        expect(await mayProceedOnEmptyWallet({ ...base, req: post('/v1/memory/write'), supabase: fakeDb({}) as never })).toBe(false);
     });
 });
