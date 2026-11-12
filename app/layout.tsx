@@ -275,6 +275,13 @@ export default function RootLayout({
             __html: JSON.stringify(websiteSchema),
           }}
         />
+        {/* Quality widget - comments on the site. Inactive on hosts not enabled in Quality settings. */}
+        <script
+          async
+          src="https://embed.usequality.app/loader.js"
+          data-site-id="qs_live_73bcacfe6d638475b7092af9"
+          data-api-origin="https://server.usequality.app"
+        />
       </head>
       <body className="font-sans font-medium" suppressHydrationWarning>
         <ThemeProvider>
