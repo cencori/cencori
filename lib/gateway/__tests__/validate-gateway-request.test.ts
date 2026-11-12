@@ -534,12 +534,12 @@ describe('validateGatewayRequest', () => {
             if (table === 'provider_keys') {
                 return {
                     select: () => ({
-                        eq: () => ({ eq: () => ({ eq: () => ({
+                        eq: () => ({ eq: () => ({
                             maybeSingle: async () => ({
                                 data: { encrypted_key: 'encrypted', is_active: true },
                                 error: null,
                             }),
-                        }) }) }),
+                        }) }),
                     }),
                 };
             }

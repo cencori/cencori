@@ -384,7 +384,9 @@ export async function POST(req: NextRequest) {
             const headers = new Headers(req.headers);
             headers.set('Content-Type', 'application/json');
             headers.delete('content-length');
-            const turnRequest = new NextRequest(new URL(`/api/v1/sessions/${session.id}/turns`, req.url), {
+            // The public path, so the first turn is admitted exactly as a
+            // follow-up turn sent to /v1/sessions/:id/turns would be.
+            const turnRequest = new NextRequest(new URL(`/v1/sessions/${session.id}/turns`, req.url), {
                 method: 'POST',
                 headers,
                 body: JSON.stringify(body.turn),

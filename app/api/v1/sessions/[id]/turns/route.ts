@@ -15,6 +15,7 @@ import { CLIENT_TOKEN_PREFIX } from "@/lib/embedded/types";
 import { dePrefixId } from "@/lib/embedded/http";
 import { denyOnScopeMismatch, hasClientPermission } from "@/lib/embedded/session-auth";
 import { RENDER_UI_TOOL_NAME } from "@/lib/gateway/render-ui-tool";
+import { asNestedFunctionTool, unnamedFunctionToolIndex } from "@/lib/gateway/function-tools";
 import { checkEndUserQuota, recordEndUserUsage, type QuotaCheckResult } from "@/lib/end-user-billing";
 import type { UnifiedMessage } from "@/lib/providers/base";
 import {
@@ -713,7 +714,11 @@ export async function POST(
         }
         const tools: ResponsesRequest['tools'] = installedManifest
             ? installedTurnTools(installedManifest, effectiveNetworkPolicy ?? { mode: 'none', allowed_hosts: [] }, effectiveBrowserEnabled, mcpSnapshots, connectorSnapshots)
-            : [...(body.tools || [])];
+            : (Array.isArray(body.tools) ? body.tools : []).map((tool) => asNestedFunctionTool(tool)) as NonNullable<ResponsesRequest['tools']>;
+        const unnamedTool = unnamedFunctionToolIndex(tools);
+        if (unnamedTool !== -1) {
+            return respondError(400, `tools[${unnamedTool}] is a function tool without a name. Use { type: 'function', name, description, parameters } or { type: 'function', function: { name, description, parameters } }.`, 'invalid_tool');
+        }
         if (!installedManifest && agentId && agentConfig?.tools && agentConfig.tools.length > 0) {
             const existingTypes = new Set<string>(tools.map(t => t.type));
             for (const toolType of agentConfig.tools) {

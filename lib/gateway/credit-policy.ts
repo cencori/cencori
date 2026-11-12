@@ -3,6 +3,9 @@ import type { createAdminClient } from '@/lib/supabaseAdmin';
 import { ProviderRouter } from '@/lib/providers/router';
 import { resolveCustomProviderForProject } from '@/lib/providers/custom-provider-routing';
 import { isAutoRouterModel } from '@/lib/gateway/auto-router';
+import { resolveProviderKeyRow } from '@/lib/providers/byok-store';
+
+const SESSION_TURN_PATH = /^\/api\/v1\/sessions\/([^/]+)\/turns$/;
 
 type AdminClient = ReturnType<typeof createAdminClient>;
 
@@ -36,7 +39,9 @@ export async function isProvenByokRequest(params: {
     agentId?: string | null;
 }): Promise<boolean> {
     const pathname = params.req.nextUrl.pathname;
-    const supported = pathname === '/api/ai/chat'
+    const sessionId = SESSION_TURN_PATH.exec(pathname)?.[1] ?? null;
+    const supported = Boolean(sessionId)
+        || pathname === '/api/ai/chat'
         || pathname === '/api/ai/completions'
         || pathname === '/api/v1/chat/completions'
         || pathname === '/api/v1/responses'
@@ -55,6 +60,22 @@ export async function isProvenByokRequest(params: {
         return false;
     }
     if (body.agent_id || body.agentId || body.agent) return false;
+
+    // A turn in a session bound to a stored agent or an installation runs that
+    // agent's model, not the body's, so only a plain session can be proven here.
+    if (sessionId) {
+        try {
+            const { data: session, error } = await params.supabase
+                .from('sessions')
+                .select('agent_id, installation_id')
+                .eq('id', sessionId)
+                .eq('project_id', params.projectId)
+                .maybeSingle();
+            if (error || !session || session.agent_id || session.installation_id) return false;
+        } catch {
+            return false;
+        }
+    }
 
     const explicitModel = typeof body.model === 'string' && body.model.trim()
         ? body.model.trim() : null;
@@ -80,7 +101,8 @@ export async function isProvenByokRequest(params: {
     }
 
     try {
-        if (pathname === '/api/ai/chat'
+        if (sessionId
+            || pathname === '/api/ai/chat'
             || pathname === '/api/ai/completions'
             || pathname === '/api/v1/chat/completions'
             || pathname === '/api/v1/responses') {
@@ -102,14 +124,12 @@ export async function isProvenByokRequest(params: {
                 : pathname.startsWith('/api/ai/vision') && /^o[13]/i.test(model)
                     ? 'openai'
                     : new ProviderRouter().detectProvider(model);
-        const { data, error } = await params.supabase
-            .from('provider_keys')
-            .select('encrypted_key, is_active')
-            .eq('project_id', params.projectId)
-            .eq('provider', provider)
-            .eq('is_active', true)
-            .maybeSingle();
-        return !error && Boolean(data?.encrypted_key && data.is_active);
+        // The same lookup the gateway runs when it picks the key for the call:
+        // a key saved in the console, else one added through the API
+        // (provider_connections). Reading only the first refused calls the
+        // gateway would have served with the customer's own key.
+        const key = await resolveProviderKeyRow(params.supabase, { projectId: params.projectId, provider });
+        return Boolean(key?.row.encrypted_key);
     } catch {
         return false;
     }

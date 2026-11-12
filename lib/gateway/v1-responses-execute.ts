@@ -5,6 +5,7 @@
  */
 
 import { customToolInput, translateCustomTools } from '@/lib/gateway/responses-custom-tools';
+import { asNestedFunctionTool } from '@/lib/gateway/function-tools';
 import { createHash } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { recoverXmlToolCalls, releasableLength } from '@/lib/gateway/tool-call-xml';
@@ -259,7 +260,8 @@ function extractTools(tools?: ResponsesTool[]): {
 
     if (!tools) return { functionTools, builtInTools };
 
-    for (const tool of tools) {
+    for (const given of tools) {
+        const tool = asNestedFunctionTool(given);
         if (tool.type === 'function') {
             functionTools.push(tool as Tool);
         } else {

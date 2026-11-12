@@ -4,6 +4,7 @@ import type { GatewayContext } from '@/lib/gateway-middleware';
 import type { SubscriptionTier } from '@/lib/entitlements';
 import type { NetworkPolicy } from '@/lib/embedded/net-policy';
 import { streamGatewayChat } from '@/lib/gateway/chat-executor';
+import { asNestedFunctionTool } from '@/lib/gateway/function-tools';
 import {
     resolveGatewayProvider,
     type ResolvedGatewayProvider,
@@ -168,7 +169,8 @@ function extractTools(tools?: ResponsesTool[]) {
     const functionTools: Tool[] = [];
     const builtInTools: ResponsesBuiltInTool[] = [];
     if (!tools) return { functionTools, builtInTools };
-    for (const t of tools) {
+    for (const given of tools) {
+        const t = asNestedFunctionTool(given);
         if (t.type === 'function') functionTools.push(t as Tool);
         else builtInTools.push(t as ResponsesBuiltInTool);
     }
@@ -833,12 +835,8 @@ export async function executeSessionTurn(params: TurnExecuteParams): Promise<Tur
             functionTools.push(RENDER_UI_TOOL);
         }
         const needsApprovalToolNames = new Set<string>();
-        if (tools) {
-            for (const t of tools) {
-                if (t.type === 'function' && (t as Tool).needsApproval) {
-                    needsApprovalToolNames.add(t.function.name);
-                }
-            }
+        for (const t of functionTools) {
+            if (t.needsApproval) needsApprovalToolNames.add(t.function.name);
         }
         const history = await loadSessionHistory(supabase, sessionId);
         const messages: UnifiedMessage[] = [...history, ...inputMessages];
