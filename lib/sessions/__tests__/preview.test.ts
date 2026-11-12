@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { displaySessionStatus, IDLE_AFTER_MS, sessionPreview } from '../preview';
+import { sessionPreview } from '../preview';
 
 describe('sessionPreview', () => {
     it('shows what the user wrote and names the files', () => {
@@ -14,18 +14,5 @@ describe('sessionPreview', () => {
     });
     it('handles no input', () => {
         expect(sessionPreview(null)).toEqual({ text: null, files: [] });
-    });
-});
-
-describe('displaySessionStatus', () => {
-    const now = Date.parse('2026-11-08T18:00:00Z');
-    it('keeps a recently used session active', () => {
-        expect(displaySessionStatus('active', new Date(now - 60_000).toISOString(), now)).toBe('active');
-    });
-    it('shows an unused session as idle', () => {
-        expect(displaySessionStatus('active', new Date(now - IDLE_AFTER_MS - 1).toISOString(), now)).toBe('idle');
-    });
-    it('leaves other statuses alone', () => {
-        expect(displaySessionStatus('paused', new Date(0).toISOString(), now)).toBe('paused');
     });
 });

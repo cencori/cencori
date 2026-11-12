@@ -4,7 +4,7 @@ import { requireObservability } from '@/lib/flags/flagswift-server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { getProjectTier } from '@/lib/require-tier-feature';
 import { clampTimeRange, LOG_RETENTION_RANGE } from '@/lib/entitlements';
-import { displaySessionStatus, IDLE_AFTER_MS, sessionPreview } from '@/lib/sessions/preview';
+import { sessionPreview } from '@/lib/sessions/preview';
 import { sessionAgentLabel, sessionSource, type SessionSource } from '@/lib/sessions/observability';
 
 /**
@@ -21,7 +21,7 @@ const RANGE_MS: Record<string, number | null> = {
     '90d': 90 * 24 * 60 * 60 * 1000,
     all: null,
 };
-const STATUSES = new Set(['active', 'idle', 'paused', 'completed', 'failed']);
+const STATUSES = new Set(['active', 'paused', 'completed', 'failed']);
 /** PostgREST filters per source, OR-ed together when several are picked. */
 const SOURCE_FILTERS: Record<string, string> = {
     sdk: 'metadata->>sdk.eq.cencori/agents',
@@ -83,13 +83,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ proj
     const filtered = <Q,>(q: Q): Q => {
         let out = q as unknown as FilterBuilder;
         if (since) out = out.gte('updated_at', since);
-        if (statuses.length) {
-            // Active and idle are both stored as active; idle means no activity for a while.
-            const cutoff = new Date(Date.now() - IDLE_AFTER_MS).toISOString();
-            out = out.or(statuses.map((v) => v === 'active' ? `and(status.eq.active,updated_at.gte.${cutoff})`
-                : v === 'idle' ? `and(status.eq.active,updated_at.lt.${cutoff})`
-                : `status.eq.${v}`).join(','));
-        }
+        if (statuses.length) out = out.in('status', statuses);
         if (sources.length) out = out.or(sources.map((v) => SOURCE_FILTERS[v]).join(','));
         if (search) {
             if (UUID.test(search)) out = out.eq('id', search);
@@ -142,7 +136,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ proj
         const preview = sessionPreview(previews.get(r.id as string));
         return {
             id: r.id as string,
-            status: displaySessionStatus(r.status as string, r.updated_at as string),
+            status: r.status as string,
             source: sessionSource(r),
             agent: sessionAgentLabel(r, agentNames, r.agent_id as string | null),
             turns: (r.last_turn_number as number | null) ?? 0,

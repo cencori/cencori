@@ -19,12 +19,3 @@ export function sessionPreview(input: string | null | undefined): { text: string
     const text = (first === -1 ? input : input.slice(0, first)).replace(/\s+/g, ' ').trim();
     return { text: text ? text.slice(0, 200) : null, files };
 }
-
-/** An open session with no activity for this long shows as Idle, not Active. */
-export const IDLE_AFTER_MS = 30 * 60 * 1000;
-
-/** The status to show: an active session nobody has used for a while is idle. */
-export function displaySessionStatus(status: string, updatedAt: string, now = Date.now()): string {
-    if (status !== 'active') return status;
-    return now - Date.parse(updatedAt) > IDLE_AFTER_MS ? 'idle' : 'active';
-}

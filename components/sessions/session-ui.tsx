@@ -2,7 +2,6 @@ import { cn } from '@/lib/utils';
 
 const STATUS: Record<string, { label: string; className: string }> = {
     active: { label: 'Active', className: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' },
-    idle: { label: 'Idle', className: 'bg-muted text-muted-foreground border-border/60' },
     paused: { label: 'Waiting', className: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' },
     completed: { label: 'Ended', className: 'bg-muted text-muted-foreground border-border/60' },
     failed: { label: 'Failed', className: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20' },
