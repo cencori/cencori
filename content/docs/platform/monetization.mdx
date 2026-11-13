@@ -247,7 +247,25 @@ Each plan can set:
 
 ### Rate Plan API
 
-Rate plans are managed via the dashboard or the management API (session-cookie auth).
+Rate plans are managed in the dashboard, or from your backend with a secret key.
+
+**From your backend (secret key):**
+
+```bash
+# List plans
+curl https://api.cencori.com/v1/rate-plans \
+  -H "Authorization: Bearer csk_your_secret_key"
+
+# Create a plan
+curl -X POST https://api.cencori.com/v1/rate-plans \
+  -H "Authorization: Bearer csk_your_secret_key" \
+  -H "Content-Type: application/json" \
+  -d '{ "name": "Pro", "markup_percentage": 20, "flat_rate_per_request": 0.002 }'
+```
+
+Creating a plan this way sets `name` (required), `slug` (derived from the name if omitted), `markup_percentage`, `flat_rate_per_request` and `currency`. Limits, allowed models and the default-plan flag are set in the dashboard, or through the endpoints below.
+
+**From the dashboard session (session-cookie auth):**
 
 **Create a plan:**
 
@@ -311,12 +329,33 @@ When multiple plans could apply to a user, the plan explicitly assigned to the u
 
 Users are created automatically when usage is recorded for the first time, either by the AI Gateway after a successful request or by the Usage Events API. A quota check by itself does not create an `end_users` row.
 
-You can also manage users explicitly through the dashboard.
-
-> [!NOTE]
-> Managing users from your own code isn't available yet: use the dashboard, or the End-User API below for usage and quotas.
+You can also create users ahead of usage and assign them a plan, from the dashboard or from your backend.
 
 ### End-User API
+
+**From your backend (secret key):**
+
+```bash
+# Create or update a user (upsert by external_id)
+curl -X POST https://api.cencori.com/v1/end-users \
+  -H "Authorization: Bearer csk_your_secret_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "external_id": "user_123",
+    "display_name": "Jane Doe",
+    "email": "jane@example.com",
+    "rate_plan_id": "uuid-of-rate-plan",
+    "is_blocked": false
+  }'
+
+# List users (newest first; limit 1-100, default 20)
+curl "https://api.cencori.com/v1/end-users?limit=50" \
+  -H "Authorization: Bearer csk_your_secret_key"
+```
+
+Only `external_id` is required. Posting an `external_id` that already exists updates that user, so the same call assigns a plan or blocks a user. Both endpoints need a secret key; a publishable key gets `403 secret_key_required`. Deleting a user and reading their usage history are done from the dashboard.
+
+**From the dashboard session (session-cookie auth):**
 
 **Create or update a user (upsert by `external_id`):**
 

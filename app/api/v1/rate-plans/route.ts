@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
     if (!validation.success) return validation.response;
     if (validation.context.keyType !== 'secret') return addGatewayHeaders(embeddedError(403, 'secret_key_required', 'This operation requires a secret project key', { requestId }), { requestId });
     const supabase = createAdminClient();
-    let body: { name?: string; slug?: string; markup_percentage?: number; flat_rate?: number; currency?: string };
+    let body: { name?: string; slug?: string; markup_percentage?: number; flat_rate_per_request?: number | null; flat_rate?: number | null; currency?: string };
     try {
         body = await req.json();
     } catch {
@@ -39,7 +39,8 @@ export async function POST(req: NextRequest) {
         name: body.name.trim(),
         slug: body.slug ?? body.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-'),
         markup_percentage: body.markup_percentage ?? 0,
-        flat_rate: body.flat_rate ?? 0,
+        // The column is flat_rate_per_request; `flat_rate` is the name the SDK sends.
+        flat_rate_per_request: body.flat_rate_per_request ?? body.flat_rate ?? null,
         currency: body.currency ?? 'USD',
     }).select('*').single();
     if (error || !data) return addGatewayHeaders(embeddedError(500, 'invalid_request_error', error?.message ?? 'Create failed', { requestId }), { requestId });
