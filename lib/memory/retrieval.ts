@@ -8,7 +8,7 @@
  */
 
 import type { createAdminClient } from '@/lib/supabaseAdmin';
-import type { SubscriptionTier } from '@/lib/entitlements';
+import { planIncludesMemory, type SubscriptionTier } from '@/lib/entitlements';
 import { embedForMemory, type MemoryEmbeddingResult } from './embeddings';
 import { checkMemoryOpsQuota, isMemoryOpsExceededError, MemoryOpsExceededError } from './ops-quota';
 import { filterInjectedFacts } from './guards';
@@ -106,7 +106,8 @@ export async function retrieveMemories(params: {
                 await onEmbeddingUsage({
                     totalTokens: embeddingResult.totalTokens,
                     providerCostUsd: embeddingResult.providerCostUsd,
-                    cencoriChargeUsd: embeddingResult.cencoriChargeUsd,
+                    // A paid plan's price covers memory; nothing is charged.
+                    cencoriChargeUsd: planIncludesMemory(params.tier) ? 0 : embeddingResult.cencoriChargeUsd,
                     markupPercentage: embeddingResult.markupPercentage,
                     model: embeddingResult.model,
                     provider: embeddingResult.provider,

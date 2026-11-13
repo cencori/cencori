@@ -8,7 +8,7 @@ import type { GatewayContext } from '@/lib/gateway-middleware';
 import { toLoggedMessages, toLoggedText } from '@/lib/gateway/log-payload';
 import { logGatewayRequest, incrementUsage } from '@/lib/gateway-middleware';
 import type { createAdminClient } from '@/lib/supabaseAdmin';
-import type { SubscriptionTier } from '@/lib/entitlements';
+import { planIncludesMemory, type SubscriptionTier } from '@/lib/entitlements';
 import { embedForMemory } from './embeddings';
 import { runEntityGraphWriteback, type EntityGraphWritebackResult } from './entity-persist';
 import { extractFacts } from './extraction';
@@ -143,7 +143,9 @@ export async function writeMemories(params: WriteMemoriesParams): Promise<WriteM
     const embeddingByContent = new Map<string, number[]>();
     safe.forEach((f, i) => embeddingByContent.set(f.content, embedding.embeddings[i]));
 
-    let totalCostUsd = embedding.cencoriChargeUsd;
+    // A paid plan's price covers memory; nothing is charged.
+    const planCovered = planIncludesMemory(tier);
+    let totalCostUsd = planCovered ? 0 : embedding.cencoriChargeUsd;
 
     // ── Layer 1: reconcile against existing memories ─────────────────────────
     const reconcileEnabled = params.reconcile !== false;
@@ -223,7 +225,7 @@ export async function writeMemories(params: WriteMemoriesParams): Promise<WriteM
             organizationId,
             plan.updates.map(u => u.content)
         );
-        totalCostUsd += updateEmbedding.cencoriChargeUsd;
+        if (!planCovered) totalCostUsd += updateEmbedding.cencoriChargeUsd;
         for (let i = 0; i < plan.updates.length; i++) {
             const u = plan.updates[i];
             const content = u.content.slice(0, MEMORY_CONTENT_MAX_CHARS);

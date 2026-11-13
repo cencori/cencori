@@ -416,6 +416,7 @@ export async function validateGatewayRequest(
                                 organizationId,
                                 defaultModel: project.default_model,
                                 agentId: null,
+                                tier,
                             })) {
                                 return deny(403, 'credit_balance_exhausted', 'Credit balance exhausted', 'Your organization has run out of credits. Top up to continue.');
                             }
@@ -775,6 +776,7 @@ export async function validateGatewayRequest(
             organizationId,
             defaultModel: project.default_model,
             agentId: keyData.agent_id,
+            tier,
         }))
         : false;
 

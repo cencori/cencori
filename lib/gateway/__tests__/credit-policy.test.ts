@@ -180,4 +180,17 @@ describe('gateway credit policy', () => {
         expect(await mayProceedOnEmptyWallet({ ...base, req: post('/v1/memory/search'), supabase: fakeDb({ consoleKey: true, memoryPin: 'google' }) as never })).toBe(false);
         expect(await mayProceedOnEmptyWallet({ ...base, req: post('/v1/memory/write'), supabase: fakeDb({}) as never })).toBe(false);
     });
+
+    it('lets memory through on a paid plan: the plan price covers it', async () => {
+        const base = { projectId: 'project-1', organizationId: 'org-1', defaultModel: null };
+        const post = (path: string) => new NextRequest(`http://localhost${path}`, { method: 'POST', body: JSON.stringify({ query: 'hi' }) });
+        const noKey = () => fakeDb({}) as never;
+        for (const path of ['/v1/memory/search', '/v1/memory/remember', '/api/v1/memory/write']) {
+            expect(await mayProceedOnEmptyWallet({ ...base, tier: 'pro', req: post(path), supabase: noKey() })).toBe(true);
+            expect(await mayProceedOnEmptyWallet({ ...base, tier: 'free', req: post(path), supabase: noKey() })).toBe(false);
+        }
+        // The plan covers memory, not model usage or knowledge-base search.
+        expect(await mayProceedOnEmptyWallet({ ...base, tier: 'pro', req: post('/v1/embeddings'), supabase: noKey() })).toBe(false);
+        expect(await mayProceedOnEmptyWallet({ ...base, tier: 'pro', req: post('/v1/knowledge-bases/kb1/search'), supabase: noKey() })).toBe(false);
+    });
 });

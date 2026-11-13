@@ -27,7 +27,7 @@
 import { executeGatewayChat } from '@/lib/gateway/chat-executor';
 import { getMemoryProviderKey } from '@/lib/providers/google-env';
 import type { createAdminClient } from '@/lib/supabaseAdmin';
-import type { SubscriptionTier } from '@/lib/entitlements';
+import { planIncludesMemory, type SubscriptionTier } from '@/lib/entitlements';
 
 type SupabaseAdmin = ReturnType<typeof createAdminClient>;
 
@@ -106,6 +106,8 @@ function orderedChain(preferModel?: string): string[] {
  */
 export async function callMemoryLlm(params: MemoryLlmParams): Promise<MemoryLlmResult> {
     const chain = orderedChain(params.preferModel);
+    // On a paid plan memory is part of the plan price: no wallet needed, no charge.
+    const planCovered = planIncludesMemory(params.tier);
     let attempts = 0;
     const attemptErrors: string[] = [];
 
@@ -117,6 +119,7 @@ export async function callMemoryLlm(params: MemoryLlmParams): Promise<MemoryLlmR
                 projectId: params.projectId,
                 organizationId: params.organizationId,
                 tier: params.tier,
+                planCovered,
                 requestId: params.requestId,
                 // Each provider uses its dedicated memory key when configured.
                 memoryProviderKeys: memoryProviderKeys(),
@@ -133,7 +136,7 @@ export async function callMemoryLlm(params: MemoryLlmParams): Promise<MemoryLlmR
                 content: response.content ?? '',
                 model: response.actualModel ?? model,
                 provider: response.actualProvider,
-                costUsd: response.cost?.cencoriChargeUsd ?? 0,
+                costUsd: planCovered ? 0 : response.cost?.cencoriChargeUsd ?? 0,
                 attemptErrors,
             };
         } catch (error) {

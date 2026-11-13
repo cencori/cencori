@@ -6,8 +6,10 @@ import { isAutoRouterModel } from '@/lib/gateway/auto-router';
 import { resolveProviderKeyRow } from '@/lib/providers/byok-store';
 import { canonicalGatewayPath } from '@/lib/gateway/canonical-path';
 import { memoryEmbedsOnOwnKey } from '@/lib/memory/embeddings';
+import { planIncludesMemory } from '@/lib/entitlements';
 
 const MEMORY_EMBEDDING_PATH = /^\/api\/v1\/(memory\/(remember|write|search)|knowledge-bases\/[^/]+\/search)$/;
+const MEMORY_PATH = /^\/api\/v1\/memory\/(remember|write|search)$/;
 const SESSION_TURN_PATH = /^\/api\/v1\/sessions\/([^/]+)\/turns$/;
 
 type AdminClient = ReturnType<typeof createAdminClient>;
@@ -53,6 +55,8 @@ type ByokParams = {
     organizationId: string;
     defaultModel: string | null;
     agentId?: string | null;
+    /** The organization's plan. A paid plan covers memory. */
+    tier?: string | null;
 };
 
 /** True only when the request names a provider the project holds an active key for. */
@@ -66,8 +70,15 @@ export async function isProvenByokRequest(params: ByokParams): Promise<boolean> 
  * (a stored agent picks the model, not the request) may only where the
  * executor settles it; everywhere else it fails closed, so an ambiguous
  * operation never quietly runs on a managed key against an empty wallet.
+ *
+ * Memory is the exception to "managed spend needs credits": a paid plan's
+ * price covers it, inside the plan's monthly allowance (lib/memory/ops-quota).
  */
 export async function mayProceedOnEmptyWallet(params: ByokParams): Promise<boolean> {
+    if (planIncludesMemory(params.tier)
+        && MEMORY_PATH.test(canonicalGatewayPath(params.req.nextUrl.pathname))) {
+        return true;
+    }
     const verdict = await byokVerdict(params);
     if (verdict === 'byok') return true;
     return verdict === 'unknown' && settlesCreditsAtExecution(params.req.nextUrl.pathname);

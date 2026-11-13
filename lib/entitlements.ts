@@ -256,6 +256,15 @@ export const MEMORY_OPS_QUOTA: Record<SubscriptionTier, MemoryOpsQuota> = {
   enterprise: { searches: Number.POSITIVE_INFINITY, writes: Number.POSITIVE_INFINITY },
 };
 
+/**
+ * A paid plan's price covers memory: every search and write inside the
+ * allowances above runs without touching the credit wallet. On Free, memory
+ * spend is charged to credits like any other managed usage.
+ */
+export function planIncludesMemory(tier: string | null | undefined): boolean {
+  return tier === 'pro' || tier === 'team' || tier === 'enterprise';
+}
+
 export function getMemoryOpsQuota(tier: SubscriptionTier): MemoryOpsQuota {
   return MEMORY_OPS_QUOTA[tier] ?? MEMORY_OPS_QUOTA.free;
 }

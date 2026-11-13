@@ -501,7 +501,11 @@ describe('validateGatewayRequest', () => {
         );
         expect(read.success).toBe(true);
 
-        const write = await validateGatewayRequest(authRequest('/api/v1/memory/remember'));
+        // Memory is part of a paid plan's price, so it needs no credits.
+        const memory = await validateGatewayRequest(authRequest('/api/v1/memory/remember'));
+        expect(memory.success).toBe(true);
+
+        const write = await validateGatewayRequest(authRequest('/api/ai/embeddings'));
         expect(write.success).toBe(false);
         if (!write.success) {
             expect(write.response.status).toBe(403);
