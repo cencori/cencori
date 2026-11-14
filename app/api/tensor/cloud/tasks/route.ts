@@ -21,6 +21,8 @@ import {
   listTasks,
   makeRoomFor,
   MAX_KEPT_TASKS,
+  projectJson,
+  projectsAmong,
   readCloudAccess,
   reconcileTasks,
   RunningTaskLimitError,
@@ -49,7 +51,7 @@ function json(body: unknown, status = 200) {
   return NextResponse.json(body, { headers: noStoreHeaders(), status });
 }
 
-/** The account's chats, most recently used first, each with the project it is in, if any. */
+/** The account's projects and chats, most recently used first. */
 export async function GET(request: NextRequest) {
   const session = await authenticateTensorBillingRequest(request);
   if (!session) return json({ error: "Your Cencori session is invalid." }, 401);
@@ -66,7 +68,13 @@ export async function GET(request: NextRequest) {
     // Whoever can start a chat gets a spare workspace made behind this response, so their next
     // chat starts without waiting for one to be built.
     if (access.tasks) waitUntil(prepareSpare(session.admin, config, session.user.id));
-    return json({ access, chats: chats.map(({ chat, task }) => chatJson(chat, task)) });
+    return json({
+      access,
+      // Projects are listed in their own right: one exists before its first chat, and after its
+      // last, so it cannot be worked out from the chats.
+      projects: projectsAmong(tasks).map(projectJson),
+      chats: chats.map(({ chat, task }) => chatJson(chat, task)),
+    });
   } catch (error) {
     console.error("[Tensor Cloud] Listing tasks failed", error);
     return json({ error: "Tensor could not load your chats." }, 503);
@@ -102,11 +110,16 @@ export async function POST(request: NextRequest) {
   const hasRef = repositoryUrl !== null && given(body.repositoryRef);
   const repositoryRef = hasRef ? normalizeRepositoryRef(body.repositoryRef) : null;
   if (hasRef && !repositoryRef) return json({ error: "That branch name is not valid." }, 400);
+  // What is created here is a project: a workspace with a name, made new or imported from a
+  // repository (which names it, unless a name is given). Chats are started in it afterwards,
+  // by the project's own chats route. A title asks for a first chat to be made along with it.
   const title = normalizeTaskTitle(body.title);
-  // Named, it is a project; an imported repository is one even unnamed, under its own name.
   const projectName =
     normalizeProjectName(body.projectName) ??
     (repositoryUrl ? repositoryUrl.replace(/^https:\/\/github\.com\//, "").replace(/\.git$/, "") : null);
+  if (!projectName) {
+    return json({ error: "Give the project a name.", code: "project_required" }, 400);
+  }
 
   try {
     const access = await readCloudAccess(session.admin, session.user.id);
@@ -149,14 +162,18 @@ export async function POST(request: NextRequest) {
             `[Tensor Cloud] Starting claimed sandbox ${claimed.machine_id} of task ${claimed.id} failed (${started.status}): ${started.error}`,
           );
         }
-        const chat = await insertChat(session.admin, {
-          id: claimed.id,
-          taskId: claimed.id,
-          userId: session.user.id,
-          title,
-        });
+        const chat = title
+          ? await insertChat(session.admin, { taskId: claimed.id, userId: session.user.id, title })
+          : null;
         waitUntil(prepareSpare(session.admin, config, session.user.id));
-        return json({ task: taskJson(claimed), chat: chatJson(chat, claimed) }, 201);
+        return json(
+          {
+            task: taskJson(claimed),
+            project: projectJson(claimed),
+            chat: chat ? chatJson(chat, claimed) : null,
+          },
+          201,
+        );
       }
     }
 
@@ -202,16 +219,19 @@ export async function POST(request: NextRequest) {
       region: created.value.region,
       status: "ready",
     });
-    // The workspace's first chat takes the task's own id.
-    const chat = await insertChat(session.admin, {
-      id: task.id,
-      taskId: task.id,
-      userId: session.user.id,
-      title,
-    });
     const ready = { ...task, status: "ready" as const };
+    const chat = title
+      ? await insertChat(session.admin, { taskId: task.id, userId: session.user.id, title })
+      : null;
     waitUntil(prepareSpare(session.admin, config, session.user.id));
-    return json({ task: taskJson(ready), chat: chatJson(chat, ready) }, 201);
+    return json(
+      {
+        task: taskJson(ready),
+        project: projectJson(ready),
+        chat: chat ? chatJson(chat, ready) : null,
+      },
+      201,
+    );
   } catch (error) {
     if (error instanceof RunningTaskLimitError) {
       return json({ error: STILL_WORKING, code: "running_limit" }, 409);

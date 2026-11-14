@@ -40,6 +40,8 @@ export type TensorCloudTask = {
   region: string | null;
   status: TensorCloudTaskStatus;
   last_connected_at: string | null;
+  /** When the project was archived; null or absent for one in use. */
+  archived_at?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -102,6 +104,33 @@ export async function reconcileTasks(
       await updateTask(admin, task.id, { status });
       return { ...task, status };
     }),
+  );
+}
+
+/**
+ * A project, as the site lists it: a workspace someone named. It exists from the moment it is
+ * created, before any chat is started in it, and keeps existing when its chats are deleted.
+ */
+export function projectJson(task: TensorCloudTask) {
+  return {
+    id: task.id,
+    name: task.project_name ?? "",
+    repositoryUrl: task.repository_url,
+    status: task.status,
+    archivedAt: task.archived_at ?? null,
+    createdAt: task.created_at,
+    updatedAt: task.updated_at,
+  };
+}
+
+/** The tasks that are projects a person can see: named, and not failed, deleted or spare. */
+export function projectsAmong(tasks: TensorCloudTask[]): TensorCloudTask[] {
+  return tasks.filter(
+    (task) =>
+      Boolean(task.project_name) &&
+      task.status !== "failed" &&
+      task.status !== "deleted" &&
+      task.status !== "spare",
   );
 }
 
@@ -239,7 +268,10 @@ export async function insertTask(
 export async function updateTask(
   admin: Admin,
   taskId: string,
-  patch: Partial<Pick<TensorCloudTask, "machine_id" | "volume_id" | "region" | "status" | "last_connected_at">>,
+  patch: Partial<Pick<
+    TensorCloudTask,
+    "machine_id" | "volume_id" | "region" | "status" | "last_connected_at" | "project_name" | "archived_at"
+  >>,
 ): Promise<void> {
   const { error } = await admin
     .from(TABLE)
@@ -395,6 +427,8 @@ export type TensorCloudChat = {
   user_id: string;
   title: string | null;
   thread_id: string | null;
+  /** When the chat was archived; null or absent for one in use. */
+  archived_at?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -406,6 +440,7 @@ export function chatJson(chat: TensorCloudChat, task: TensorCloudTask) {
     taskId: task.id,
     title: chat.title,
     threadId: chat.thread_id,
+    archivedAt: chat.archived_at ?? null,
     projectName: task.project_name,
     repositoryUrl: task.repository_url,
     status: task.status,
@@ -533,6 +568,21 @@ export async function setChatThread(admin: Admin, chatId: string, threadId: stri
   if (error) throw error;
 }
 
+/** Puts a chat away, or brings it back. Nothing in it changes; only whether it is listed. */
+export async function setChatArchived(admin: Admin, chatId: string, archived: boolean): Promise<void> {
+  const { error } = await admin
+    .from(CHATS)
+    .update({ archived_at: archived ? new Date().toISOString() : null })
+    .eq("id", chatId);
+  if (error) throw error;
+}
+
+/** Gives a chat a new name. Only what it is called changes, not when it was last used. */
+export async function setChatTitle(admin: Admin, chatId: string, title: string): Promise<void> {
+  const { error } = await admin.from(CHATS).update({ title }).eq("id", chatId);
+  if (error) throw error;
+}
+
 /** Moves a chat to the top of the list: something just happened in it. */
 export async function touchChat(admin: Admin, chatId: string): Promise<void> {
   const { error } = await admin
@@ -553,6 +603,82 @@ export async function deleteChatsOfTask(admin: Admin, taskId: string): Promise<v
   if (error) throw error;
 }
 
+/* ---------------------------------------------------------------------------
+   Deployments: the address a project is published at
+   --------------------------------------------------------------------------- */
+
+const DEPLOYMENTS = "tensor_cloud_deployments";
+
+export type TensorCloudDeployment = {
+  task_id: string;
+  user_id: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+  published_at: string | null;
+};
+
+export function deploymentJson(deployment: TensorCloudDeployment) {
+  return { name: deployment.name, publishedAt: deployment.published_at, updatedAt: deployment.updated_at };
+}
+
+export async function readDeployment(admin: Admin, taskId: string): Promise<TensorCloudDeployment | null> {
+  const { data, error } = await admin.from(DEPLOYMENTS).select("*").eq("task_id", taskId).maybeSingle();
+  if (error) throw error;
+  return (data as TensorCloudDeployment | null) ?? null;
+}
+
+/** Whether a name is free, or already this project's own. */
+export async function siteNameAvailable(admin: Admin, name: string, taskId: string): Promise<boolean> {
+  const { data, error } = await admin.from(DEPLOYMENTS).select("task_id").eq("name", name).maybeSingle();
+  if (error) throw error;
+  return !data || (data as { task_id: string }).task_id === taskId;
+}
+
+/**
+ * Gives a project a name, or changes the one it has. "taken" when another project holds it: the
+ * database's own rule (one row per name) decides, so two claims at once cannot both win.
+ */
+export async function claimSiteName(
+  admin: Admin,
+  task: Pick<TensorCloudTask, "id" | "user_id">,
+  name: string,
+): Promise<TensorCloudDeployment | "taken"> {
+  const { data, error } = await admin
+    .from(DEPLOYMENTS)
+    .upsert(
+      { task_id: task.id, user_id: task.user_id, name, updated_at: new Date().toISOString() },
+      { onConflict: "task_id" },
+    )
+    .select("*")
+    .single();
+  // 23505: a unique rule was broken, and the only one a claim can break is the name's.
+  if (error) {
+    if ((error as { code?: string }).code === "23505") return "taken";
+    throw error;
+  }
+  return data as TensorCloudDeployment;
+}
+
+/** Records that what is served under a project's name has just been replaced. */
+export async function markPublished(admin: Admin, taskId: string): Promise<TensorCloudDeployment | null> {
+  const now = new Date().toISOString();
+  const { data, error } = await admin
+    .from(DEPLOYMENTS)
+    .update({ published_at: now, updated_at: now })
+    .eq("task_id", taskId)
+    .select("*")
+    .maybeSingle();
+  if (error) throw error;
+  return (data as TensorCloudDeployment | null) ?? null;
+}
+
+/** Lets a project's name go. The copy being served is the gateway's to remove. */
+export async function deleteDeployment(admin: Admin, taskId: string): Promise<void> {
+  const { error } = await admin.from(DEPLOYMENTS).delete().eq("task_id", taskId);
+  if (error) throw error;
+}
+
 /**
  * Deletes a task: its row is marked, its credential dies with that, and its machine and volume
  * are destroyed with whatever was in them.
@@ -567,6 +693,8 @@ export async function destroyTask(
 ): Promise<void> {
   await updateTask(admin, task.id, { status: "deleted" });
   await deleteChatsOfTask(admin, task.id);
+  // Its name is let go with it, so the address is free for another project.
+  await deleteDeployment(admin, task.id);
 
   let machineGone = true;
   if (task.machine_id) {

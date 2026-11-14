@@ -391,3 +391,50 @@ describe("tensorCloudAccess", () => {
     expect(tensorCloudAccess("gold")).toEqual({ tasks: false, privateRepositories: false });
   });
 });
+
+describe("publishing", () => {
+  it("tidies a name into what an address can hold", async () => {
+    const { normalizeSiteName } = await import("@/lib/tensor-cloud");
+    expect(normalizeSiteName("Bola's Bakery!")).toBe("bola-s-bakery");
+    expect(normalizeSiteName("  --Café  Menu--  ")).toBe("cafe-menu");
+    expect(normalizeSiteName("a".repeat(60))).toHaveLength(40);
+    expect(normalizeSiteName(`${"a".repeat(39)} b`)).toBe("a".repeat(39));
+  });
+
+  it("gives out no name that is too short, empty, or kept back", async () => {
+    const { normalizeSiteName } = await import("@/lib/tensor-cloud");
+    for (const bad of ["", "ab", "!!!", "www", "API", "admin", "cencori", "Tensor", 42, null]) {
+      expect(normalizeSiteName(bad)).toBeNull();
+    }
+  });
+
+  it("signs a ticket for one name and one action, which expires", async () => {
+    const { signDeployTicket, DEPLOY_TICKET_AUDIENCE, DEPLOY_TICKET_TTL_SECONDS } = await import("@/lib/tensor-cloud");
+    const ticket = signDeployTicket(
+      { userId: "user-1", taskId: "task-1", name: "bakery", action: "publish", replaces: "old-bakery" },
+      "a-secret-that-is-long-enough-for-tests",
+      1_000,
+    );
+    const claims = JSON.parse(Buffer.from(ticket.split(".")[1]!, "base64url").toString());
+    expect(claims).toMatchObject({
+      aud: DEPLOY_TICKET_AUDIENCE,
+      sub: "user-1",
+      task: "task-1",
+      name: "bakery",
+      action: "publish",
+      replaces: "old-bakery",
+      iat: 1_000,
+      exp: 1_000 + DEPLOY_TICKET_TTL_SECONDS,
+    });
+    expect(typeof claims.jti).toBe("string");
+    // Nothing to replace: the claim is left out, not sent empty.
+    const plain = signDeployTicket({ userId: "u", taskId: "t", name: "bakery", action: "remove" }, "a-secret-that-is-long-enough-for-tests");
+    expect(JSON.parse(Buffer.from(plain.split(".")[1]!, "base64url").toString()).replaces).toBeUndefined();
+  });
+
+  it("turns the gateway's socket address into its ordinary one", async () => {
+    const { gatewayHttpUrl } = await import("@/lib/tensor-cloud");
+    expect(gatewayHttpUrl("wss://tensor-gateway.fly.dev")).toBe("https://tensor-gateway.fly.dev");
+    expect(gatewayHttpUrl("ws://localhost:8080/v1/connect")).toBe("http://localhost:8080");
+  });
+});

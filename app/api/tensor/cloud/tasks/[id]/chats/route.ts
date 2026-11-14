@@ -39,6 +39,9 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     if (!task || task.status === "failed") return json({ error: "That project does not exist." }, 404);
     // More than one conversation over the same files is what a project is for. A plain chat's
     // workspace holds that chat alone.
+    if (task.archived_at) {
+      return json({ error: "This project is archived. Unarchive it to start a chat in it.", code: "archived" }, 409);
+    }
     if (!task.project_name) {
       return json({ error: "Only a project can hold more than one chat." }, 409);
     }

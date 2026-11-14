@@ -127,6 +127,78 @@ export function signGatewayTicket(
   );
 }
 
+/* ---------------------------------------------------------------------------
+   Publishing: a project's site, at an address of its own
+   --------------------------------------------------------------------------- */
+
+export const DEPLOY_TICKET_AUDIENCE = "tensor-cloud-deploy";
+/**
+ * Long enough for the upload it is for, which follows a build. It still works only once, for one
+ * name, and only to put files there (or take them away).
+ */
+export const DEPLOY_TICKET_TTL_SECONDS = 15 * 60;
+
+/** Names nobody can publish under: they read as the service's own, or as something to trust. */
+const RESERVED_SITE_NAMES = new Set([
+  "www", "app", "api", "admin", "auth", "login", "signin", "signup", "account", "accounts", "billing", "pay", "payments",
+  "mail", "email", "smtp", "ftp", "ns", "ns1", "ns2", "dns", "cdn", "static", "assets", "status", "docs", "help", "support",
+  "blog", "dashboard", "console", "preview", "previews", "gateway", "sandbox", "internal", "root", "test", "staging", "dev",
+  "cencori", "tensor", "tensorade", "security", "abuse", "postmaster", "webmaster", "localhost",
+]);
+
+export const SITE_NAME_MIN = 3;
+export const SITE_NAME_MAX = 40;
+
+/**
+ * A name as it can stand in an address: lower-case letters, digits and single dashes, three to
+ * forty characters. "Bola's Bakery!" becomes "bola-s-bakery". Null when nothing usable is left,
+ * or the name is one that is not given out.
+ */
+export function normalizeSiteName(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const name = value
+    .normalize("NFKD")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, SITE_NAME_MAX)
+    .replace(/-+$/, "");
+  if (name.length < SITE_NAME_MIN || RESERVED_SITE_NAMES.has(name)) return null;
+  return name;
+}
+
+/**
+ * Lets one upload put a project's site at one name, or take it away. Carried in a URL to the
+ * gateway, which holds and serves the sites. `replaces` is a name the project published under
+ * before: the gateway removes that copy once the new one is in place.
+ */
+export function signDeployTicket(
+  input: { userId: string; taskId: string; name: string; action: "publish" | "remove"; replaces?: string | null },
+  secret: string,
+  now: number = Math.floor(Date.now() / 1000),
+): string {
+  return signJwt(
+    {
+      aud: DEPLOY_TICKET_AUDIENCE,
+      sub: input.userId,
+      task: input.taskId,
+      name: input.name,
+      action: input.action,
+      ...(input.replaces ? { replaces: input.replaces } : {}),
+      jti: randomBytes(18).toString("base64url"),
+      iat: now,
+      exp: now + DEPLOY_TICKET_TTL_SECONDS,
+    },
+    secret,
+  );
+}
+
+/** The gateway's address for ordinary requests, from the one browsers connect to (wss → https). */
+export function gatewayHttpUrl(gatewayUrl: string): string {
+  const url = new URL(gatewayUrl);
+  return `${url.protocol === "ws:" ? "http:" : "https:"}//${url.host}`;
+}
+
 /**
  * SHA-256 of the token a task's sandbox requires of whoever connects to it.
  *

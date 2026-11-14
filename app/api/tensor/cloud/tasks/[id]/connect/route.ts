@@ -35,6 +35,9 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
   try {
     const found = await readTask(session.admin, session.user.id, (await context.params).id);
     if (!found) return json({ error: "That chat does not exist." }, 404);
+    if (found.archived_at) {
+      return json({ error: "This project is archived. Unarchive it to continue.", code: "archived" }, 409);
+    }
     // A plan that has lapsed keeps its tasks but cannot run them.
     if (!(await readCloudAccess(session.admin, session.user.id)).tasks) {
       return json(

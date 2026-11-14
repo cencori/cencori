@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { noStoreHeaders } from "@/lib/tensor-auth";
 import { authenticateTensorBillingRequest } from "@/lib/tensor-billing";
-import { FlyMachines, readTensorCloudConfig } from "@/lib/tensor-cloud";
+import { FlyMachines, normalizeTaskTitle, readTensorCloudConfig } from "@/lib/tensor-cloud";
 import {
   deleteChatRow,
   destroyTask,
   isThreadId,
   readChat,
   readTask,
+  setChatArchived,
   setChatThread,
+  setChatTitle,
   touchChat,
 } from "@/lib/tensor-cloud-tasks";
 
@@ -17,8 +19,8 @@ function json(body: unknown, status = 200) {
 }
 
 /**
- * Notes what just happened in a chat: its runtime thread, the first time there is one, and that
- * it is the most recently used.
+ * Changes a chat: renames it, archives it or brings it back, or notes what just happened in it (its runtime
+ * thread, the first time there is one, and that it is the most recently used).
  *
  * The thread id comes from the page, which got it from the sandbox. It is only ever used to ask
  * that same account's own sandbox for a conversation, so a made-up one opens nothing.
@@ -38,7 +40,17 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ c
     const chat = await readChat(session.admin, session.user.id, (await context.params).chatId);
     if (!chat) return json({ error: "That chat does not exist." }, 404);
 
-    if (body.threadId !== undefined) {
+    if (body.title !== undefined) {
+      const title = normalizeTaskTitle(body.title);
+      if (!title) return json({ error: "A chat needs a name." }, 400);
+      await setChatTitle(session.admin, chat.id, title);
+      // The name as kept (tidied, and cut to length), so the page shows what was saved.
+      return json({ ok: true, title });
+    }
+    if (body.archived !== undefined) {
+      if (typeof body.archived !== "boolean") return json({ error: "That request is invalid." }, 400);
+      await setChatArchived(session.admin, chat.id, body.archived);
+    } else if (body.threadId !== undefined) {
       if (!isThreadId(body.threadId)) return json({ error: "That request is invalid." }, 400);
       await setChatThread(session.admin, chat.id, body.threadId);
     } else {

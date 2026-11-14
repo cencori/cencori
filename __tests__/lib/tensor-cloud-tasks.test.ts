@@ -22,6 +22,8 @@ import {
   isThreadId,
   listChats,
   makeRoomFor,
+  projectJson,
+  projectsAmong,
   setChatThread,
   type TensorCloudChat,
   reconcileTasks,
@@ -526,5 +528,42 @@ describe("spares", () => {
   it("claims nothing when there is no spare", async () => {
     const { admin } = adminWithSpare(null);
     expect(await claimSpare(admin, config(), { userId: "user-1", title: null, projectName: null })).toBeNull();
+  });
+});
+
+describe("projects", () => {
+  const task = (id: string, patch: Partial<TensorCloudTask>): TensorCloudTask => ({
+    id,
+    user_id: "user-1",
+    title: null,
+    project_name: null,
+    repository_url: null,
+    repository_ref: null,
+    machine_id: `machine-${id}`,
+    volume_id: `vol-${id}`,
+    region: "jnb",
+    status: "ready",
+    last_connected_at: null,
+    created_at: "2026-11-13T00:00:00Z",
+    updated_at: "2026-11-13T00:00:00Z",
+    ...patch,
+  });
+
+  it("are the named workspaces a person can see, whether or not they have chats", () => {
+    const listed = projectsAmong([
+      task("a", { project_name: "Bakery website" }),
+      task("b", { project_name: "Broken", status: "failed" }),
+      task("c", { project_name: null }),
+      task("d", { project_name: null, status: "spare" }),
+      task("e", { project_name: "Asleep", status: "stopped" }),
+    ]);
+    expect(listed.map((item) => item.id)).toEqual(["a", "e"]);
+  });
+
+  it("are shown by name, never by where they run", () => {
+    const shown = projectJson(task("a", { project_name: "Bakery website" }));
+    expect(shown).toMatchObject({ id: "a", name: "Bakery website", status: "ready" });
+    expect(JSON.stringify(shown)).not.toContain("machine-a");
+    expect(JSON.stringify(shown)).not.toContain("vol-a");
   });
 });
