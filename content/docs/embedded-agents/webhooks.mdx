@@ -44,18 +44,73 @@ endpoint.secret; // the signing secret. Returned once, here. Store it.
 
 `create` is the only call that returns the signing secret; `list` and `update` never show it again. To set the secret yourself, pass `secret` (16 to 256 characters). If you lose it, delete the endpoint and create a new one. Webhooks are managed with a secret key only.
 
-Inspect the delivery log with `cencori.webhooks.deliveries()` and replay any delivery with `cencori.webhooks.replay(deliveryId)`.
-
 ## Payload
+
+Every event has the same envelope. `data` depends on the event.
 
 ```json
 {
-  "event": "run.completed",
+  "event": "action.required",
   "project_id": "5b1f...",
   "timestamp": "2026-11-09T10:15:00.000Z",
-  "data": { "event_id": "evt_mh2k9x4a1b2c", "run_id": "...", "agent_id": "..." }
+  "data": {
+    "event_id": "evt_mh2k9x4a1b2c",
+    "action_id": "act_30dc90ba-...",
+    "tool": "gmail.send",
+    "tenant_id": "ten_e9d4...",
+    "run_id": null,
+    "session_id": null,
+    "risk_level": "write",
+    "expires_at": "2026-11-10T10:15:00.000Z"
+  }
 }
 ```
+
+`data.event_id` is on every event. Use it to drop duplicates.
+
+Ids in `data` are spelled the way the API returns them: `act_…`, `ten_…`, `run_…`, `ins_…`. You can compare them to an API response directly. Every endpoint also accepts an id without its prefix.
+
+### Fields in `data`
+
+| Event | Fields |
+| --- | --- |
+| `run.queued` | `run_id`, `agent_id`, `mode` |
+| `run.started`, `run.completed` | `run_id`, `agent_id` |
+| `run.failed` | `run_id`, and either `agent_id` or, when the run failed before the model ran, `error` |
+| `run.cancelled` | `run_id` |
+| `action.required` | `action_id`, `tool`, `tenant_id`, `run_id`, `session_id`, `risk_level`, and `expires_at` for actions you create |
+| `action.approved` | `action_id`, `tool`, `tenant_id`, `run_id`, `session_id`, `approved_by` |
+| `action.rejected` | `action_id`, `tool`, `tenant_id`, `run_id`, `session_id`, `rejected_by`, `reason` |
+| `action.executed` | `action_id`, `tool`, `tenant_id`, `run_id`, `session_id` |
+| `action.failed` | `action_id`, `tool`, `tenant_id`, `run_id`, `session_id`, `error` |
+| `action.expired` | `action_id`, `tool`, `tenant_id`, `run_id`, `session_id` |
+| `subagent.called`, `subagent.completed`, `subagent.failed` | `parent_run_id`, `child_run_id` |
+| `knowledge_source.queued` | `knowledge_base_id`, `source_id` |
+| `knowledge_source.ready` | `knowledge_base_id`, `source_id`, `chunks` |
+| `knowledge_source.failed` | `knowledge_base_id`, `source_id`, `error` |
+| `connection.active` | `connection_id`, `connector` |
+| `tenant.deleted` | `tenant_id` |
+| `budget.pause` | `scope` (`tenant` or `installation`), `tenant_id`, `installation_id`, `spent`, `budget` |
+
+`tenant_id`, `run_id` and `session_id` are `null` when the action isn't tied to one. A webhook carries ids, not the full object: fetch the action's arguments with `GET /v1/actions/:id`.
+
+`action.executed` follows `action.approved` when Cencori ran the tool itself. An approval with nothing for Cencori to run sends `action.approved` only.
+
+## Delivery log and replay
+
+`cencori.webhooks.deliveries()` (`GET /v1/webhook-deliveries`) lists the last 100 deliveries:
+
+| Field | Meaning |
+| --- | --- |
+| `id` | The delivery. Pass it to replay |
+| `endpoint_id` | The webhook endpoint it went to |
+| `event_id`, `event_type` | The event |
+| `status` | `delivered` or `failed` |
+| `attempt_count` | How many times Cencori tried |
+| `response_code` | Your server's last HTTP status. `null` when it never answered (timeout, connection refused) |
+| `data` | The `data` that was sent |
+
+`cencori.webhooks.replay(deliveryId)` sends the event again with its original `data`, the same `event_id`, a new `timestamp`, and `"replayed": true`. Deliveries logged before 14 November 2026 kept no data, so their replays carry only `event_id` and `replayed`.
 
 ## Verification
 
@@ -107,4 +162,4 @@ The HMAC covers the body, **not** `X-Webhook-Timestamp`. Do not treat the header
 
 ## Delivery guarantees
 
-At-least-once with exponential backoff (2s, 4s, 8s) and 24-hour retry budget. `4xx` (other than `429`) is non-retryable; `5xx`, `429`, and network errors retry. Design every handler idempotently: deliveries (and replays) can arrive more than once. Payloads carry their own `api_version` so additive changes never break your parser.
+Each event is tried up to 3 times, 2 seconds and then 4 seconds apart, with a 10-second timeout per try. `4xx` (other than `429`) is not retried; `5xx`, `429`, and network errors are. After the third failure the delivery is logged as `failed` and you can replay it. Design every handler idempotently: a delivery, and any replay of it, can arrive more than once.

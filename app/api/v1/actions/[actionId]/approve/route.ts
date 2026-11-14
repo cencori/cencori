@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabaseAdmin';
 import { validateGatewayRequest, addGatewayHeaders, handleCorsPreFlight } from '@/lib/gateway-middleware';
 import { embeddedError, dePrefixId, withPrefix } from '@/lib/embedded/http';
 import { emitEmbeddedEvent } from '@/lib/embedded/runs';
+import { actionEventData } from '@/lib/embedded/public-ids';
 import { executeGmailSend } from '@/lib/embedded/tool-executor';
 import { parseMcpHostedToolName } from '@/lib/embedded/turn-tools';
 import crypto from 'crypto';
@@ -183,7 +184,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ actionId: 
 
     if (action.expires_at && Date.parse(action.expires_at) <= Date.now() && action.status === 'pending') {
         await supabase.from('actions').update({ status: 'expired' }).eq('id', action.id);
-        await emitEmbeddedEvent(action.project_id, 'action.expired', { action_id: action.id });
+        await emitEmbeddedEvent(action.project_id, 'action.expired', actionEventData(action));
         return addGatewayHeaders(embeddedError(410, 'action_expired', 'Action expired', { requestId }), { requestId });
     }
     // Idempotent replay: already-approved/executed returns the recorded outcome (no duplicate execution).
@@ -223,18 +224,19 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ actionId: 
         }
         return addGatewayHeaders(embeddedError(409, 'concurrent_modification', 'Action was already resolved by another approver', { requestId }), { requestId });
     }
-    await emitEmbeddedEvent(action.project_id, 'action.approved', { action_id: action.id, tool: action.tool_name });
+    await emitEmbeddedEvent(action.project_id, 'action.approved', { ...actionEventData(action), approved_by: body.approved_by ?? null });
 
     try {
         const { result } = await dispatchExecution(supabase, { ...action, status: 'approved' }, validation.context.organizationId);
         const executed = (result as { executed?: boolean }).executed !== false && (result as { approved?: boolean }).approved !== true;
         await supabase.from('actions').update({ status: executed ? 'executed' : 'approved', result, resolved_at: new Date().toISOString() }).eq('id', action.id);
-        await emitEmbeddedEvent(action.project_id, executed ? 'action.executed' : 'action.approved', { action_id: action.id, tool: action.tool_name });
+        // Approved without a dispatch (nothing for Cencori to run): 'action.approved' already went out.
+        if (executed) await emitEmbeddedEvent(action.project_id, 'action.executed', actionEventData(action));
         return addGatewayHeaders(NextResponse.json({ id: withPrefix('act', action.id), status: executed ? 'executed' : 'approved', result }), { requestId });
     } catch (e) {
         const message = e instanceof Error ? e.message : 'Execution failed';
         await supabase.from('actions').update({ status: 'failed', error: message.slice(0, 1000) }).eq('id', action.id);
-        await emitEmbeddedEvent(action.project_id, 'action.failed', { action_id: action.id, error: message.slice(0, 300) });
+        await emitEmbeddedEvent(action.project_id, 'action.failed', { ...actionEventData(action), error: message.slice(0, 300) });
         return addGatewayHeaders(embeddedError(502, 'invalid_request_error', message, { requestId }), { requestId });
     }
 }

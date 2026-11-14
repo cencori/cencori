@@ -514,6 +514,7 @@ async function runModelLoop(
                         execution_key: executionKey,
                     }).select('id').single();
                     pendingApprovals.push({ action_id: (action as { id: string } | null)?.id ?? tc.id, tool: tc.function.name });
+                    if (action) scheduleEmbeddedWebhook(run.project_id, 'action.required', { action_id: (action as { id: string }).id, tool: tc.function.name, tenant_id: run.tenant_id ?? null, run_id: runId, session_id: null, risk_level: classification.risk });
                     continue;
                 }
                 const connRow = ctx.runConnector.rows.get(connSnap.id.toLowerCase());
@@ -589,6 +590,7 @@ async function runModelLoop(
                     execution_key: executionKey,
                 }).select('id').single();
                 pendingApprovals.push({ action_id: (action as { id: string } | null)?.id ?? tc.id, tool: tc.function.name });
+                if (action) scheduleEmbeddedWebhook(run.project_id, 'action.required', { action_id: (action as { id: string }).id, tool: tc.function.name, tenant_id: run.tenant_id ?? null, run_id: runId, session_id: null, risk_level: classifyTool(parsed.tool).risk });
                 continue;
             }
             const egress = await checkEgress(server.url, ctx.runNetPolicy);

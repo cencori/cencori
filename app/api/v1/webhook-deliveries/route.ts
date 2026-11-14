@@ -20,5 +20,6 @@ export async function GET(req: NextRequest) {
     if (ids.length === 0) return addGatewayHeaders(NextResponse.json({ data: [], next_cursor: null }), { requestId });
     const { data, error } = await supabase.from('webhook_deliveries').select('*').in('endpoint_id', ids).order('created_at', { ascending: false }).limit(100);
     if (error) return addGatewayHeaders(embeddedError(500, 'invalid_request_error', error.message, { requestId }), { requestId });
-    return addGatewayHeaders(NextResponse.json({ data: data ?? [], next_cursor: null }), { requestId });
+    const rows = ((data ?? []) as Array<Record<string, unknown>>).map(({ payload, ...row }) => ({ ...row, data: payload ?? null }));
+    return addGatewayHeaders(NextResponse.json({ data: rows, next_cursor: null }), { requestId });
 }

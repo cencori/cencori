@@ -1,33 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { validateGatewayRequest, addGatewayHeaders, handleCorsPreFlight } from '@/lib/gateway-middleware';
-import { embeddedError, dePrefixId, withPrefix, getIdempotencyKey } from '@/lib/embedded/http';
+import { embeddedError, dePrefixId, getIdempotencyKey } from '@/lib/embedded/http';
+import { actionEventData, serializeAction } from '@/lib/embedded/public-ids';
 import { classifyTool } from '@/lib/embedded/tool-risk';
 import { emitEmbeddedEvent } from '@/lib/embedded/runs';
 import crypto from 'crypto';
 
 export async function OPTIONS() {
     return handleCorsPreFlight();
-}
-
-function serialize(row: Record<string, unknown>) {
-    return {
-        id: withPrefix('act', row.id as string),
-        tool: row.tool_name,
-        risk_level: row.risk_level,
-        status: row.status,
-        arguments: row.sanitized_arguments ?? {},
-        approval_policy: row.approval_policy ?? {},
-        expires_at: row.expires_at ?? null,
-        approved_by: row.approved_by ?? null,
-        resolved_at: row.resolved_at ?? null,
-        result: row.result ?? null,
-        error: row.error ?? null,
-        run_id: row.run_id ?? null,
-        session_id: row.session_id ?? null,
-        created_at: row.created_at,
-        updated_at: row.updated_at,
-    };
 }
 
 // POST /v1/actions — create an approval-gated action (idempotent via Idempotency-Key → execution_key).
@@ -71,7 +52,7 @@ export async function POST(req: NextRequest) {
             if (!sameTool) {
                 return addGatewayHeaders(embeddedError(409, 'idempotency_conflict', 'Idempotency key already used for a different tool', { requestId }), { requestId });
             }
-            return addGatewayHeaders(NextResponse.json(serialize(existing as Record<string, unknown>)), { requestId });
+            return addGatewayHeaders(NextResponse.json(serializeAction(existing as Record<string, unknown>)), { requestId });
         }
     }
 
@@ -126,6 +107,10 @@ export async function POST(req: NextRequest) {
         return addGatewayHeaders(embeddedError(500, 'invalid_request_error', error?.message ?? 'Failed to create action', { requestId }), { requestId });
     }
     const row = data as Record<string, unknown>;
-    await emitEmbeddedEvent(validation.context.projectId, 'action.required', { action_id: row.id, tool: toolName, tenant_id: tenantId });
-    return addGatewayHeaders(NextResponse.json(serialize(row), { status: 201 }), { requestId });
+    await emitEmbeddedEvent(validation.context.projectId, 'action.required', {
+        ...actionEventData(row as { id: string }),
+        risk_level: row.risk_level,
+        expires_at: row.expires_at ?? null,
+    });
+    return addGatewayHeaders(NextResponse.json(serializeAction(row), { status: 201 }), { requestId });
 }

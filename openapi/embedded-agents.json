@@ -881,7 +881,8 @@
           "approval_policy": {
             "type": "object",
             "properties": {},
-            "additionalProperties": true
+            "additionalProperties": true,
+            "description": "Stored and returned. Not enforced yet: no key changes which tools need approval."
           },
           "overlay_config": {
             "type": "object",
@@ -1204,28 +1205,16 @@
             "type": "string",
             "example": "act_abc"
           },
-          "project_id": {
-            "type": "string"
-          },
-          "tenant_id": {
-            "type": "string",
-            "nullable": true
-          },
-          "run_id": {
-            "type": "string",
-            "nullable": true
-          },
-          "session_id": {
-            "type": "string",
-            "nullable": true
-          },
           "tool": {
             "type": "string"
           },
-          "arguments": {
-            "type": "object",
-            "properties": {},
-            "additionalProperties": true
+          "risk_level": {
+            "type": "string",
+            "enum": [
+              "read",
+              "write",
+              "destructive"
+            ]
           },
           "status": {
             "type": "string",
@@ -1233,11 +1222,79 @@
               "pending",
               "approved",
               "rejected",
-              "executing",
-              "completed",
+              "executed",
               "failed",
               "expired"
             ]
+          },
+          "arguments": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true
+          },
+          "approval_policy": {
+            "type": "object",
+            "description": "How Cencori runs the tool once approved.",
+            "properties": {
+              "connection_id": {
+                "type": "string"
+              },
+              "op": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "method": {
+                    "type": "string"
+                  },
+                  "path": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              },
+              "base_url": {
+                "type": "string"
+              },
+              "mcp_server_id": {
+                "type": "string"
+              },
+              "mcp_tool": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": true
+          },
+          "tenant_id": {
+            "type": "string",
+            "nullable": true,
+            "example": "ten_abc"
+          },
+          "run_id": {
+            "type": "string",
+            "nullable": true,
+            "example": "run_abc"
+          },
+          "session_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "expires_at": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "approved_by": {
+            "type": "string",
+            "nullable": true
+          },
+          "resolved_at": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
           },
           "result": {
             "type": "object",
@@ -1245,10 +1302,9 @@
             "additionalProperties": true,
             "nullable": true
           },
-          "expires_at": {
+          "error": {
             "type": "string",
-            "nullable": true,
-            "format": "date-time"
+            "nullable": true
           },
           "created_at": {
             "type": "string",
@@ -1264,6 +1320,9 @@
           "tool",
           "arguments",
           "status",
+          "tenant_id",
+          "run_id",
+          "session_id",
           "created_at"
         ]
       },
@@ -2603,37 +2662,57 @@
           "id": {
             "type": "string"
           },
-          "webhook_id": {
-            "type": "string"
+          "endpoint_id": {
+            "type": "string",
+            "description": "The webhook endpoint it went to."
           },
-          "event": {
-            "type": "string"
+          "event_id": {
+            "type": "string",
+            "example": "evt_mh2k9x4a1b2c"
+          },
+          "event_type": {
+            "type": "string",
+            "example": "action.required"
           },
           "status": {
-            "type": "string"
-          },
-          "response_status": {
-            "type": "integer"
-          },
-          "attempts": {
-            "type": "integer"
-          },
-          "next_attempt_at": {
             "type": "string",
+            "enum": [
+              "pending",
+              "delivered",
+              "failed"
+            ]
+          },
+          "attempt_count": {
+            "type": "integer"
+          },
+          "response_code": {
+            "type": "integer",
             "nullable": true,
-            "format": "date-time"
+            "description": "The endpoint's last HTTP status. Null when it never answered."
+          },
+          "data": {
+            "type": "object",
+            "nullable": true,
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The event data that was sent."
           },
           "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
             "type": "string",
             "format": "date-time"
           }
         },
         "required": [
           "id",
-          "webhook_id",
-          "event",
+          "endpoint_id",
+          "event_id",
+          "event_type",
           "status",
-          "attempts"
+          "attempt_count"
         ]
       },
       "WebhookDeliveryList": {
@@ -3028,7 +3107,8 @@
           "approval_policy": {
             "type": "object",
             "properties": {},
-            "additionalProperties": true
+            "additionalProperties": true,
+            "description": "Stored and returned. Not enforced yet: no key changes which tools need approval."
           }
         },
         "required": [
@@ -3061,7 +3141,8 @@
           "approval_policy": {
             "type": "object",
             "properties": {},
-            "additionalProperties": true
+            "additionalProperties": true,
+            "description": "Stored and returned. Not enforced yet: no key changes which tools need approval."
           },
           "overlay_config": {
             "type": "object",
@@ -3184,7 +3265,38 @@
           },
           "approval_policy": {
             "type": "object",
-            "properties": {},
+            "description": "How Cencori runs the tool once approved.",
+            "properties": {
+              "connection_id": {
+                "type": "string"
+              },
+              "op": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "method": {
+                    "type": "string"
+                  },
+                  "path": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              },
+              "base_url": {
+                "type": "string"
+              },
+              "mcp_server_id": {
+                "type": "string"
+              },
+              "mcp_tool": {
+                "type": "string"
+              }
+            },
             "additionalProperties": true
           }
         },

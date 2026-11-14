@@ -27,6 +27,69 @@ Exactly one approver wins the `pending → approved` claim; that winner dispatch
 
 On an ambiguous action, reconcile against the upstream outbox (Gmail sent folder, MCP server logs) before creating a **replacement action with a new key** — never reuse a key with a different body (that is `409 idempotency_conflict` by design).
 
-## Session approvals
+## The action object
 
-Session pauses (`turn.paused`) resolve through the session endpoints and mirror into the actions index, so one timeline covers both. Approval requires the full `tool_results` set; the resume replays tool outputs back into the model and continues the turn.
+`POST /v1/actions` and `GET /v1/actions/:id` return the same object:
+
+```json
+{
+  "id": "act_30dc90ba-...",
+  "tool": "gmail.send",
+  "risk_level": "write",
+  "status": "pending",
+  "arguments": { "to": "ada@example.com", "subject": "Your invoice" },
+  "approval_policy": { "connection_id": "con_..." },
+  "tenant_id": "ten_e9d4...",
+  "run_id": null,
+  "session_id": null,
+  "expires_at": "2026-11-10T10:15:00.000Z",
+  "approved_by": null,
+  "resolved_at": null,
+  "result": null,
+  "error": null,
+  "created_at": "2026-11-09T10:15:00.000Z",
+  "updated_at": "2026-11-09T10:15:00.000Z"
+}
+```
+
+`status` is one of `pending`, `approved`, `rejected`, `executed`, `failed`, `expired`. `tenant_id`, `run_id` and `session_id` say who the action belongs to; each is `null` when the action isn't tied to one.
+
+## `approval_policy` on an action
+
+On an action, `approval_policy` tells Cencori how to run the tool once it's approved. It does not decide whether approval is needed: every action waits for a decision.
+
+| Key | Use |
+| --- | --- |
+| `connection_id` | The connection whose credential runs the call. Required for Gmail and for connector (HTTP) tools |
+| `op` | For an imported connector operation: `{ "name", "method", "path" }` |
+| `base_url` | For a connector call, when the connection has no `base_url` of its own |
+| `mcp_server_id` | The MCP server to call |
+| `mcp_tool` | The tool name on that server, when it differs from the action's `tool` |
+
+With none of these, approving records the decision and runs nothing: you run the tool yourself. Actions that a run creates for a gated tool have these filled in already.
+
+## `approval_policy` on an installation
+
+An installation stores and returns `approval_policy`, but nothing reads it yet: no key in it changes which tools need approval. Per-tool rules (run without asking, ask first, never run) are not available today. What needs approval is decided by the tool:
+
+- MCP tools: read-only tools run without asking; anything else waits for approval. A server's `readOnlyHint` and `destructiveHint` annotations are respected.
+- Connector operations: `GET` and `HEAD` run without asking; other methods wait for approval.
+- Your own function tools in a session: the ones you mark `needsApproval: true`.
+
+## Approvals in a session
+
+A session turn does not wait in the open stream. When the model calls a tool that needs approval and the turn was sent with `pause_on_tool_calls: true`, the stream ends with `turn.paused` (`reason: "approval_required"`) and the session becomes `paused`. It stays paused for up to 24 hours at no cost.
+
+`POST /v1/sessions/:id/approve` resumes it. Send the paused `action_id` and a `tool_results` entry for every call in the pause; the reply is a new stream that continues the turn. `POST /v1/sessions/:id/reject` ends the turn instead.
+
+`POST /v1/actions/:id/approve` does not resume a session. It decides one action and, when the action is bound to a connection or MCP server, runs the tool and returns its `result`. To have Cencori run a paused tool call:
+
+1. On `turn.paused`, create an action for the call with `POST /v1/actions` (`tool`, `arguments`, `session_id`, and the binding in `approval_policy`). You receive `action.required`.
+2. When a person approves, call `POST /v1/actions/:id/approve` and take `result` from the response.
+3. Pass that result as the call's `output` in `POST /v1/sessions/:id/approve`.
+
+Without `pause_on_tool_calls`, the turn completes with the tool calls in its output and nothing pauses.
+
+Tools an agent runs itself (its webhook tools, system tools, and the apps connected on the agent) run inside the turn without an approval step.
+
+Session approvals are mirrored into the actions index after the fact, so one timeline covers both. See [Tool calls and approvals](/docs/agents-api/tool-calls) for the full pause and resume reference.

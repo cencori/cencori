@@ -1,6 +1,6 @@
 import { createAdminClient } from '@/lib/supabaseAdmin';
-import { triggerWebhooks } from '@/lib/webhooks/trigger';
-import { webhookEventPatterns } from '@/lib/webhooks/deliver';
+import { triggerWebhooks, type WebhookDeliveryResult } from '@/lib/webhooks/trigger';
+import { withPublicIds } from './public-ids';
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -16,29 +16,34 @@ export function canTransition(from: string, to: string): boolean {
     return (allowed[from] ?? []).includes(to);
 }
 
-/** Emit a signed project webhook + record per-endpoint delivery rows (M1). */
+/**
+ * Send a signed project webhook and log one delivery per endpoint: what it
+ * answered, how many attempts it took, and the data sent (so a replay can
+ * send the same event again). Ids go out as the API returns them.
+ */
 export async function emitEmbeddedEvent(projectId: string, eventType: string, data: Record<string, unknown>): Promise<void> {
     const supabase = createAdminClient();
     const eventId = `evt_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
-    let succeeded = 0;
-    let failed = 0;
+    const payload = { ...withPublicIds(data), event_id: eventId };
+    let deliveries: WebhookDeliveryResult[] = [];
     try {
-        const result = await triggerWebhooks(projectId, eventType as never, { ...data, event_id: eventId });
-        succeeded = result.succeeded;
-        failed = result.failed;
+        deliveries = (await triggerWebhooks(projectId, eventType as never, payload)).deliveries;
     } catch {
-        failed += 1;
+        return;
     }
     try {
-        const { data: endpoints } = await supabase.from('webhooks').select('id').eq('project_id', projectId).eq('is_active', true).overlaps('events', webhookEventPatterns(eventType));
-        for (const ep of (endpoints ?? []) as Array<{ id: string }>) {
-            await supabase.from('webhook_deliveries').insert({
-                endpoint_id: ep.id,
+        for (const delivery of deliveries) {
+            const row = {
+                endpoint_id: delivery.webhookId,
                 event_id: eventId,
                 event_type: eventType,
-                status: failed > 0 && succeeded === 0 ? 'failed' : 'delivered',
-                attempt_count: 1,
-            });
+                status: delivery.success ? 'delivered' : 'failed',
+                attempt_count: delivery.attempts,
+                response_code: delivery.statusCode,
+            };
+            const { error } = await supabase.from('webhook_deliveries').insert({ ...row, payload });
+            // A database without the payload column yet still gets its log row.
+            if (error) await supabase.from('webhook_deliveries').insert(row);
         }
     } catch {
         // Delivery logging must never break the run lifecycle.

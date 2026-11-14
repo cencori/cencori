@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabaseAdmin';
 import { validateGatewayRequest, addGatewayHeaders, handleCorsPreFlight } from '@/lib/gateway-middleware';
 import { embeddedError, dePrefixId, withPrefix } from '@/lib/embedded/http';
 import { emitEmbeddedEvent } from '@/lib/embedded/runs';
+import { actionEventData } from '@/lib/embedded/public-ids';
 import crypto from 'crypto';
 
 export async function OPTIONS() {
@@ -19,7 +20,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ actionId: 
     const supabase = createAdminClient();
     const { data } = await supabase.from('actions').select('*').eq('project_id', validation.context.projectId).eq('id', dePrefixId(actionId)).maybeSingle();
     if (!data) return addGatewayHeaders(embeddedError(404, 'invalid_request_error', 'Action not found', { requestId }), { requestId });
-    const action = data as { id: string; status: string; project_id: string; tool_name: string };
+    const action = data as { id: string; status: string; project_id: string; tool_name: string; tenant_id: string | null; run_id: string | null; session_id: string | null };
 
     if (action.status === 'rejected') {
         return addGatewayHeaders(NextResponse.json({ id: withPrefix('act', action.id), status: 'rejected', deduped: true }), { requestId });
@@ -42,6 +43,6 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ actionId: 
         }
         return addGatewayHeaders(embeddedError(409, 'concurrent_modification', 'Action was already resolved by another approver', { requestId }), { requestId });
     }
-    await emitEmbeddedEvent(action.project_id, 'action.rejected', { action_id: action.id, tool: action.tool_name });
+    await emitEmbeddedEvent(action.project_id, 'action.rejected', { ...actionEventData(action), rejected_by: body.rejected_by ?? null, reason: body.reason ?? null });
     return addGatewayHeaders(NextResponse.json({ id: withPrefix('act', action.id), status: 'rejected' }), { requestId });
 }

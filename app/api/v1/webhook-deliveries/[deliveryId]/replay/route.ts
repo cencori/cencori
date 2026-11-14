@@ -19,12 +19,14 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ deliveryId
     const supabase = createAdminClient();
     const { data: delivery } = await supabase.from('webhook_deliveries').select('*').eq('id', deliveryId).maybeSingle();
     if (!delivery) return addGatewayHeaders(embeddedError(404, 'invalid_request_error', 'Delivery not found', { requestId }), { requestId });
-    const d = delivery as { endpoint_id: string; event_id: string; event_type: string };
+    const d = delivery as { endpoint_id: string; event_id: string; event_type: string; payload?: Record<string, unknown> | null };
     const { data: endpoint } = await supabase.from('webhooks').select('id, name, url, secret, events, is_active, project_id').eq('id', d.endpoint_id).maybeSingle();
     if (!endpoint || (endpoint.project_id as string) !== validation.context.projectId) {
         return addGatewayHeaders(embeddedError(404, 'invalid_request_error', 'Webhook endpoint not found', { requestId }), { requestId });
     }
-    const payload = createWebhookEvent(d.event_type, validation.context.projectId, { event_id: d.event_id, replayed: true });
+    // The original data again, marked as a replay. Deliveries logged before
+    // the data was kept can only say which event they were.
+    const payload = createWebhookEvent(d.event_type, validation.context.projectId, { ...(d.payload ?? {}), event_id: d.event_id, replayed: true });
     const result = await deliverWebhook(
         endpoint as { id: string; name: string; url: string; secret: string; events: string[]; is_active: boolean },
         payload,

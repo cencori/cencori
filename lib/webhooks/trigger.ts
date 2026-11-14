@@ -10,6 +10,14 @@ interface Webhook {
     is_active: boolean;
 }
 
+export interface WebhookDeliveryResult {
+    webhookId: string;
+    success: boolean;
+    /** The endpoint's HTTP status; null when it never answered. */
+    statusCode: number | null;
+    attempts: number;
+}
+
 /**
  * Trigger webhooks for a given event in a project
  */
@@ -17,7 +25,7 @@ export async function triggerWebhooks(
     projectId: string,
     eventType: WebhookEventType,
     eventData: Record<string, unknown>
-): Promise<{ triggered: number; succeeded: number; failed: number }> {
+): Promise<{ triggered: number; succeeded: number; failed: number; deliveries: WebhookDeliveryResult[] }> {
     const supabase = createAdminClient();
 
     // Fetch active webhooks subscribed to this event, by exact name or family
@@ -30,7 +38,7 @@ export async function triggerWebhooks(
         .overlaps('events', webhookEventPatterns(eventType));
 
     if (error || !webhooks || webhooks.length === 0) {
-        return { triggered: 0, succeeded: 0, failed: 0 };
+        return { triggered: 0, succeeded: 0, failed: 0, deliveries: [] };
     }
 
     const payload = createWebhookEvent(eventType, projectId, eventData);
@@ -69,12 +77,14 @@ export async function triggerWebhooks(
         })
     );
 
-    const succeeded = results.filter(
-        r => r.status === 'fulfilled' && r.value.success
-    ).length;
-    const failed = results.length - succeeded;
+    // What each endpoint answered, for the delivery log.
+    const deliveries: WebhookDeliveryResult[] = results.map((r, index) => r.status === 'fulfilled'
+        ? { webhookId: (webhooks[index] as Webhook).id, success: r.value.success, statusCode: r.value.statusCode ?? null, attempts: r.value.attempts }
+        : { webhookId: (webhooks[index] as Webhook).id, success: false, statusCode: null, attempts: 1 });
+    const succeeded = deliveries.filter((d) => d.success).length;
+    const failed = deliveries.length - succeeded;
 
-    return { triggered: webhooks.length, succeeded, failed };
+    return { triggered: webhooks.length, succeeded, failed, deliveries };
 }
 
 /**
