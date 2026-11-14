@@ -237,9 +237,34 @@ describe('executeGatewayChat failover', () => {
                 provider: { chat: primaryChat, stream: vi.fn(), countTokens: vi.fn(), getPricing: vi.fn() },
                 router: { hasProvider: () => true, getProvider: () => ({ chat: fallbackChat, getPricing: vi.fn() }) },
             } as never,
-        })).rejects.toThrow('Credit balance exhausted');
+        })).rejects.toThrow(/^BYOK provider unavailable$/);
         expect(primaryChat).toHaveBeenCalledOnce();
         expect(fallbackChat).not.toHaveBeenCalled();
+    });
+
+    it('reports why the own-key call failed, not the empty wallet, and blames no fallback', async () => {
+        mockGetCreditsBalance.mockResolvedValue(0);
+        mockInitializeBYOKProviders.mockResolvedValue({ success: true, usesByok: false });
+        const primaryChat = vi.fn().mockRejectedValue(new Error('401 Incorrect API key provided'));
+
+        const failure = await executeGatewayChat({
+            supabase: createMockSupabaseForExecutor({ maxRetries: 1 }) as never,
+            projectId: 'proj-ex',
+            organizationId: 'org-ex',
+            tier: 'pro',
+            request: { messages: [], model: 'gpt-4o', stream: false } as UnifiedChatRequest,
+            resolved: {
+                providerName: 'openai', model: 'gpt-4o', billingMode: 'byok',
+                provider: { chat: primaryChat, stream: vi.fn(), countTokens: vi.fn(), getPricing: vi.fn() },
+                router: { hasProvider: () => true, getProvider: () => ({ chat: vi.fn(), getPricing: vi.fn() }) },
+            } as never,
+        }).catch((error: Error) => error);
+
+        expect((failure as Error).message).toBe('401 Incorrect API key provided');
+        expect((failure as Error).message).not.toContain('Credit balance exhausted');
+        // The managed fallbacks were never called, so their circuits take no failure.
+        const blamed = mockRecordFailure.mock.calls.map((call) => String(call[0]));
+        expect(blamed.every((key) => key.startsWith('openai'))).toBe(true);
     });
 
     it('makes only one charge-sensitive provider attempt without fallback', async () => {

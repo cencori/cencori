@@ -396,6 +396,10 @@ export async function executeGatewayChat(params: {
             };
         } catch (fallbackError) {
             if (params.request.signal?.aborted) throw new Error('Chat request aborted');
+            // A managed fallback this wallet can't pay for was never tried. It is
+            // not the provider failing, and not why the request failed: the
+            // caller needs the primary's error, not "credits exhausted".
+            if (fallbackError instanceof CreditExhaustedError) continue;
             const msg = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
             fallbackErrors.push(`${fallbackProviderName}: ${msg}`);
             console.warn(`[Gateway/Failover] Fallback ${fallbackProviderName} failed:`, fallbackError);
@@ -519,7 +523,13 @@ export async function* streamGatewayChat(params: {
                             model: fallbackModel,
                         });
                         const billingMode = resolveProviderBillingMode(accessMode, initialized.usesByok);
-                        await assertManagedCreditsAvailable(billingMode, params.organizationId, params.tier, params.planCovered);
+                        // A managed candidate this wallet can't pay for is skipped, not an error.
+                        try {
+                            await assertManagedCreditsAvailable(billingMode, params.organizationId, params.tier, params.planCovered);
+                        } catch (creditError) {
+                            if (creditError instanceof CreditExhaustedError) continue;
+                            throw creditError;
+                        }
                         await fallbackProvider.getPricing(fallbackModel);
                         hedgeFallbackProviderName = candidate;
                         hedgeFallbackModel = fallbackModel;
@@ -705,6 +715,8 @@ export async function* streamGatewayChat(params: {
             });
             return;
         } catch (fallbackError) {
+            // As in executeGatewayChat: an unaffordable managed fallback was never tried.
+            if (fallbackError instanceof CreditExhaustedError) continue;
             const msg = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
             fallbackErrors.push(`${fallbackProviderName}: ${msg}`);
             console.warn(`[Gateway/Failover/Stream] Fallback ${fallbackProviderName} failed:`, fallbackError);
