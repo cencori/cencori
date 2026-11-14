@@ -3,5 +3,5 @@
 # file, which only pulls the image (brimble.toml build.dockerfile). Roll back by
 # pointing this at an older tag. Edit a comment to redeploy the same image.
 # Redeploy: 2026-11-08 (db72b287 did not roll out).
-FROM ghcr.io/cencori/cencori:a0564eb25d51436557c88b30e9ac2c9cbc9414cc
+FROM ghcr.io/cencori/cencori:5096aed29f2e09acc417b005a08ccbd5d0566c86
 # redeploy 2026-11-14T14:53Z
