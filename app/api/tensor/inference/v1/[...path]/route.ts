@@ -22,6 +22,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { waitUntil } from "@vercel/functions";
 import { authenticateTensorDataRequest } from "@/lib/tensor-data";
+import { authenticateTensorInferenceRequest } from "@/lib/tensor-cloud-tasks";
 import { noStoreHeaders } from "@/lib/tensor-auth";
 import {
   countTensorHelperCall,
@@ -129,7 +130,8 @@ async function forward(req: NextRequest, path: string[]): Promise<Response> {
 
   const authStartedAt = Date.now();
   const handlerStartedAt = authStartedAt;
-  const session = await authenticateTensorDataRequest(req.headers.get("authorization"));
+  // A signed-in user, or a cloud task's sandbox acting for one (lib/tensor-cloud-tasks.ts).
+  const session = await authenticateTensorInferenceRequest(req.headers.get("authorization"));
   const authMs = Date.now() - authStartedAt;
   if (!session) {
     return json({ error: "Sign in to Tensor to continue.", code: "unauthenticated" }, 401);
