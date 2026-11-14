@@ -24,6 +24,7 @@ import {
     parseMemoryDirective,
     retrieveMemories,
 } from '@/lib/memory';
+import { planIncludesMemory, memoryPlanRequiredBody } from '@/lib/entitlements';
 
 interface SearchMemoryRequest {
     userId?: string;
@@ -60,6 +61,10 @@ export async function POST(req: NextRequest) {
     let queryForLog = '';
 
     try {
+        // Memory comes with a paid plan.
+        if (!planIncludesMemory(ctx.tier)) {
+            return respond(memoryPlanRequiredBody(ctx.projectId), 403);
+        }
         const body: SearchMemoryRequest = await req.json();
 
         const settings = await getProjectMemorySettings(ctx.supabase, ctx.projectId);

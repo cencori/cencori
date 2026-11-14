@@ -110,7 +110,7 @@ export async function POST(req: NextRequest) {
         }
 
         // An export is a read: count one search op.
-        const searchOps = await checkMemoryOpsQuota(ctx.projectId, tier, directive.scopeKey, 'search', settings);
+        const searchOps = await checkMemoryOpsQuota({ organizationId: ctx.organizationId, projectId: ctx.projectId }, tier, directive.scopeKey, 'search', settings);
         if (!searchOps.allowed) {
             return respond(buildMemoryOpsExceededBody(ctx.projectId, tier, 'search', searchOps), 429);
         }

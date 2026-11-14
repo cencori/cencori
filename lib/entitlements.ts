@@ -218,7 +218,9 @@ export function hasFeature(tier: SubscriptionTier, feature: keyof TierFeatures):
 }
 
 // ── Memory quotas ──
-// Memory is available on every tier (API opt-in); the quota is the gate.
+// Memory is a paid-plan feature (see planIncludesMemory). The Free numbers
+// below only bound what an org that stored memories before the change, or
+// after a downgrade, can still list, export and forget.
 // Metered by count of memories per project, 10KB content cap per memory.
 export const MEMORY_QUOTA: Record<SubscriptionTier, number> = {
   free: 1_000,
@@ -235,13 +237,13 @@ export function getMemoryQuota(tier: SubscriptionTier): number {
 // Stored count (MEMORY_QUOTA) caps what sits in the DB; operations cap what
 // runs on the shared managed keys. Every opted-in turn costs ~2–3 managed
 // LLM calls (extraction + reconciliation, +1 with the entity graph on) plus
-// embeddings — billed to the org's prepaid credits (memory/writeback.ts →
-// incrementUsage). Without an ops cap, one hot tenant can burn the shared
-// Groq/Cerebras/Gemini quota (MON-6). Paid allowances are sized so a fully
-// maxed project's monthly background LLM COGS stays bounded against plan
-// revenue (pro: searches ≈ $7.5, writes ≈ $15 on $29; team: ≈ $30 + $30 on
-// $99; median usage sits far below). Two dimensions: per-project monthly (protects the
-// shared keys) and per end-user daily (protects against a single hot user).
+// embeddings — covered by the plan price, not charged to credits. Without an
+// ops cap, one hot tenant can burn the shared managed quota (MON-6), and the
+// cap is the only bound on what a plan's memory costs us. The estimate for a
+// fully used monthly allowance is pro: searches ≈ $7.5, writes ≈ $15 on a $20
+// plan; team: ≈ $30 + $30 on $99; median usage sits far below. Two dimensions:
+// per-organization monthly, shared by all its projects (protects the shared
+// keys and bounds plan cost) and per end-user daily (a single hot user).
 // Both enforced in lib/memory/ops-quota.ts via the shared Redis fixed-window
 // limiter.
 export interface MemoryOpsQuota {
@@ -257,12 +259,22 @@ export const MEMORY_OPS_QUOTA: Record<SubscriptionTier, MemoryOpsQuota> = {
 };
 
 /**
- * A paid plan's price covers memory: every search and write inside the
- * allowances above runs without touching the credit wallet. On Free, memory
- * spend is charged to credits like any other managed usage.
+ * Memory comes with a paid plan and is not available on Free. The plan price
+ * covers it: every search and write inside the organization's monthly
+ * allowance runs without touching the credit wallet.
  */
 export function planIncludesMemory(tier: string | null | undefined): boolean {
   return tier === 'pro' || tier === 'team' || tier === 'enterprise';
+}
+
+/** The 403 a Free organization gets when it asks memory to recall or save. */
+export function memoryPlanRequiredBody(projectId: string) {
+  return {
+    error: 'memory_requires_plan',
+    code: 'memory_requires_plan',
+    message: 'Memory is available on the Pro and Enterprise plans. Upgrade to use it.',
+    upgradeUrl: `https://cencori.com/pricing?upgrade=memory&project=${projectId}`,
+  };
 }
 
 export function getMemoryOpsQuota(tier: SubscriptionTier): MemoryOpsQuota {

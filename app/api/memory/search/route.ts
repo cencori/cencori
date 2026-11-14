@@ -15,6 +15,7 @@ import { runGatewayOutputGuard } from '@/lib/gateway/output-guard';
 import { getPricingFromDB } from '@/lib/providers/pricing';
 import { calculateProviderTokenCost } from '@/lib/providers/base';
 import { withUsageMarkup } from '@/lib/billing/usage-markup';
+import { planIncludesMemory, memoryPlanRequiredBody } from '@/lib/entitlements';
 
 interface SearchMemoryRequest {
     namespace?: string;
@@ -37,6 +38,11 @@ export async function POST(req: NextRequest) {
         NextResponse.json(body, { status }),
         { requestId: ctx.requestId },
     );
+
+    // Memory comes with a paid plan.
+    if (!planIncludesMemory(ctx.tier)) {
+        return respond(memoryPlanRequiredBody(ctx.projectId), 403);
+    }
 
     // Kept outside the try so the failure path can still log what was asked.
     let queryForLog = '';

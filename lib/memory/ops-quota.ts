@@ -7,8 +7,11 @@
  * bills to the org's prepaid credits and runs on shared Groq/Cerebras/Gemini
  * quota, so volume — not stored rows — is the shared-key abuse vector (MON-6).
  *
- * Two dimensions, project-monthly first (protects the shared keys), then
- * per-end-user daily (a single hot user). Both ride the shared Redis
+ * Two dimensions, organization-monthly first (protects the shared keys), then
+ * per-end-user daily (a single hot user). The monthly allowance is shared by
+ * every project in the organization: a paid plan's price covers memory, and
+ * a plan allows unlimited projects, so a per-project allowance would have no
+ * ceiling. A project with a custom cap is counted on its own against that cap. Both ride the shared Redis
  * fixed-window limiter; checking IS counting (INCR on check).
  *
  * Fail-open by contract on the chat path: when Redis is unavailable the
@@ -32,7 +35,7 @@ export interface MemoryOpsStatus {
     /** ms until the denying window resets (0 when allowed). */
     resetMs: number;
     /** Which dimension denied (null when allowed). */
-    scope: 'project' | 'user' | null;
+    scope: 'organization' | 'project' | 'user' | null;
 }
 
 const MONTH_SECONDS = 30 * 24 * 60 * 60;
@@ -65,12 +68,12 @@ export interface MemoryOpsOverrides {
 
 /**
  * Check (and consume one unit of) the ops allowance for a memory operation.
- * Project-monthly is checked first so shared-key protection binds before any
- * single user is blamed. Session scope is never counted — it is Redis-only,
+ * The monthly allowance is checked first so shared-key protection binds before
+ * any single user is blamed. Session scope is never counted — it is Redis-only,
  * no managed LLM spend.
  */
 export async function checkMemoryOpsQuota(
-    projectId: string,
+    owner: { organizationId: string; projectId: string },
     tier: SubscriptionTier,
     scopeKey: string,
     op: MemoryOpsOp,
@@ -80,13 +83,14 @@ export async function checkMemoryOpsQuota(
     const custom = op === 'search' ? overrides?.maxSearchesMonthly : overrides?.maxWritesMonthly;
     // An explicit custom cap always wins — including over enterprise infinity.
     // Null/undefined/absent-nonpositive falls through to the tier default.
-    const monthlyLimit =
-        typeof custom === 'number' && Number.isFinite(custom) && custom > 0
-            ? Math.floor(custom)
-            : getMemoryOpsQuota(tier)[field];
+    const { organizationId, projectId } = owner;
+    const hasCustomCap = typeof custom === 'number' && Number.isFinite(custom) && custom > 0;
+    const monthlyLimit = hasCustomCap ? Math.floor(custom) : getMemoryOpsQuota(tier)[field];
     if (Number.isFinite(monthlyLimit)) {
         const m = await checkCustomRateLimit(
-            `memory_ops:v1:${projectId}:${op}:month`,
+            hasCustomCap
+                ? `memory_ops:v1:${projectId}:${op}:month`
+                : `memory_ops:v2:org:${organizationId}:${op}:month`,
             monthlyLimit,
             MONTH_SECONDS
         );
@@ -96,7 +100,7 @@ export async function checkMemoryOpsQuota(
                 used: monthlyLimit - m.remaining,
                 limit: monthlyLimit,
                 resetMs: Math.max(0, m.reset - Date.now()),
-                scope: 'project',
+                scope: hasCustomCap ? 'project' : 'organization',
             };
         }
     }
@@ -133,7 +137,9 @@ export function buildMemoryOpsExceededBody(
     return {
         error: {
             code: 'memory_ops_quota_exceeded',
-            message: `Project has exceeded its memory ${op} operations allowance for this period.`,
+            message: status.scope === 'organization'
+                ? `Your organization has used its memory ${op} allowance for this period.`
+                : `Project has exceeded its memory ${op} operations allowance for this period.`,
             upgradeUrl: `https://cencori.com/pricing?upgrade=memory&project=${projectId}`,
             tier,
             op,

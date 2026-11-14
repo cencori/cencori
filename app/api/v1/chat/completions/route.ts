@@ -84,6 +84,7 @@ import {
     resolveRequestedKnowledgeBases,
     startKnowledgeRetrieval,
 } from "@/lib/gateway/chat-knowledge";
+import { planIncludesMemory, memoryPlanRequiredBody } from '@/lib/entitlements';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -628,6 +629,10 @@ export async function POST(req: NextRequest) {
         let memorySettings: MemorySettings | null = null;
 
         if (body.memory !== undefined) {
+            // Memory comes with a paid plan.
+            if (!planIncludesMemory(gatewayCtx.tier)) {
+                return respondError(403, memoryPlanRequiredBody(gatewayCtx.projectId).message, "memory_requires_plan");
+            }
             memorySettings = await getProjectMemorySettings(adminClient, gatewayCtx.projectId);
             if (!memorySettings.enabled) {
                 return respondError(403, "Memory is disabled for this project.", "memory_disabled");

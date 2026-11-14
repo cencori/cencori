@@ -83,7 +83,7 @@ export async function retrieveMemories(params: {
         // Ops allowance (MON-6): every retrieval burns a managed embedding on
         // the shared key. Session scope is Redis-only and never counted.
         if (params.tier) {
-            const opsStatus = await checkMemoryOpsQuota(projectId, params.tier, directive.scopeKey, 'search', params.settings);
+            const opsStatus = await checkMemoryOpsQuota({ organizationId, projectId }, params.tier, directive.scopeKey, 'search', params.settings);
             if (!opsStatus.allowed) {
                 if (params.ops === 'throw') {
                     throw new MemoryOpsExceededError('search', opsStatus);

@@ -82,6 +82,7 @@ import {
     type MemorySettings,
     type RetrievedMemory,
 } from '@/lib/memory';
+import { planIncludesMemory, memoryPlanRequiredBody } from '@/lib/entitlements';
 
 const ROUTE = '/api/ai/chat';
 
@@ -359,6 +360,10 @@ export async function POST(req: NextRequest) {
         let memoryDirective: MemoryDirective | null = null;
         let memorySettings: MemorySettings | null = null;
         if (body.memory !== undefined) {
+            // Memory comes with a paid plan.
+            if (!planIncludesMemory(ctx.tier)) {
+                return wrap(NextResponse.json(memoryPlanRequiredBody(ctx.projectId), { status: 403 }), ctx);
+            }
             memorySettings = await getProjectMemorySettings(supabase, ctx.projectId);
             if (!memorySettings.enabled) {
                 return wrap(

@@ -34,6 +34,7 @@ import {
     redactFact,
     writeMemories,
 } from '@/lib/memory';
+import { planIncludesMemory, memoryPlanRequiredBody } from '@/lib/entitlements';
 
 /** Hard cap on items per batch — bounds the reconcile candidate fan-out. */
 const MEMORY_BATCH_MAX_ITEMS = 50;
@@ -70,6 +71,10 @@ export async function POST(req: NextRequest) {
         addGatewayHeaders(NextResponse.json(body, { status }), { requestId: ctx.requestId });
 
     try {
+        // Memory comes with a paid plan.
+        if (!planIncludesMemory(ctx.tier)) {
+            return respond(memoryPlanRequiredBody(ctx.projectId), 403);
+        }
         const body: BatchWriteRequest = await req.json();
 
         const settings = await getProjectMemorySettings(ctx.supabase, ctx.projectId);
@@ -179,7 +184,7 @@ export async function POST(req: NextRequest) {
 
         // One batch = one write op: a single embedding call + a single
         // reconciliation pass covers every item.
-        const writeOps = await checkMemoryOpsQuota(ctx.projectId, tier, directive.scopeKey, 'write', settings);
+        const writeOps = await checkMemoryOpsQuota({ organizationId: ctx.organizationId, projectId: ctx.projectId }, tier, directive.scopeKey, 'write', settings);
         if (!writeOps.allowed) {
             return respond(buildMemoryOpsExceededBody(ctx.projectId, tier, 'write', writeOps), 429);
         }
@@ -200,7 +205,7 @@ export async function POST(req: NextRequest) {
 
         if (result.opsExceeded) {
             const ops = result.opsStatus
-                ?? await checkMemoryOpsQuota(ctx.projectId, tier, directive.scopeKey, 'write');
+                ?? await checkMemoryOpsQuota({ organizationId: ctx.organizationId, projectId: ctx.projectId }, tier, directive.scopeKey, 'write');
             return respond(buildMemoryOpsExceededBody(ctx.projectId, tier, 'write', ops), 429);
         }
 

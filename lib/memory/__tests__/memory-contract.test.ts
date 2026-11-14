@@ -340,7 +340,7 @@ describe('memory contract routes', () => {
             expect(chain.eq).toHaveBeenCalledWith('project_id', ctx.projectId);
             expect(chain.eq).toHaveBeenCalledWith('scope_key', 'u');
             expect(routeMocks.checkMemoryOpsQuota).toHaveBeenCalledWith(
-                ctx.projectId,
+                { organizationId: ctx.organizationId, projectId: ctx.projectId },
                 ctx.tier,
                 'u',
                 'search',
@@ -372,6 +372,14 @@ describe('memory contract routes', () => {
 
     describe('POST /v1/memory/remember', () => {
         const exchange = { userId: 'u', user: 'I prefer dark mode.', assistant: 'Noted.' };
+
+        it('refuses a Free organization: memory comes with a paid plan', async () => {
+            routeMocks.validateGatewayRequest.mockResolvedValue({ success: true, context: { ...ctx, tier: 'free' } });
+            const res = await rememberPost(jsonRequest('http://x/remember', exchange));
+            expect(res.status).toBe(403);
+            expect((await res.json()).code).toBe('memory_requires_plan');
+            expect(routeMocks.rememberExchange).not.toHaveBeenCalled();
+        });
 
         it('returns cost/model/provider and logs the true provider', async () => {
             routeMocks.rememberExchange.mockResolvedValue({

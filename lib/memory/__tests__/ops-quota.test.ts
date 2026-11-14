@@ -47,38 +47,38 @@ describe('checkMemoryOpsQuota', () => {
         mockedCheck.mockResolvedValue(allow());
     });
 
-    it('checks the project-monthly bucket first with the monthly window', async () => {
-        const status = await checkMemoryOpsQuota('proj_1', 'free', 'user_a', 'write');
+    it('checks the organization-monthly bucket first with the monthly window', async () => {
+        const status = await checkMemoryOpsQuota({ organizationId: 'org_1', projectId: 'proj_1' }, 'free', 'user_a', 'write');
         expect(status.allowed).toBe(true);
         expect(mockedCheck).toHaveBeenCalledTimes(2);
-        expect(mockedCheck.mock.calls[0][0]).toBe('memory_ops:v1:proj_1:write:month');
+        expect(mockedCheck.mock.calls[0][0]).toBe('memory_ops:v2:org:org_1:write:month');
         expect(mockedCheck.mock.calls[0][1]).toBe(getMemoryOpsQuota('free').writes);
         expect(mockedCheck.mock.calls[0][2]).toBe(30 * 24 * 60 * 60);
         expect(mockedCheck.mock.calls[1][0]).toBe('memory_ops:v1:proj_1:user_a:write:day');
     });
 
-    it('denies on the project bucket without consulting the user bucket', async () => {
+    it('denies on the organization bucket without consulting the user bucket', async () => {
         mockedCheck.mockResolvedValueOnce(deny());
-        const status = await checkMemoryOpsQuota('proj_1', 'free', 'user_a', 'write');
-        expect(status).toMatchObject({ allowed: false, scope: 'project', limit: 1000, used: 1000 });
+        const status = await checkMemoryOpsQuota({ organizationId: 'org_1', projectId: 'proj_1' }, 'free', 'user_a', 'write');
+        expect(status).toMatchObject({ allowed: false, scope: 'organization', limit: 1000, used: 1000 });
         expect(status.resetMs).toBeGreaterThan(0);
         expect(mockedCheck).toHaveBeenCalledTimes(1);
     });
 
     it('denies on the user-daily bucket when the project allows', async () => {
         mockedCheck.mockResolvedValueOnce(allow()).mockResolvedValueOnce(deny());
-        const status = await checkMemoryOpsQuota('proj_1', 'free', 'user_a', 'search');
+        const status = await checkMemoryOpsQuota({ organizationId: 'org_1', projectId: 'proj_1' }, 'free', 'user_a', 'search');
         expect(status).toMatchObject({ allowed: false, scope: 'user', limit: 200 });
         expect(mockedCheck).toHaveBeenCalledTimes(2);
     });
 
     it('uses the search field for search ops', async () => {
-        await checkMemoryOpsQuota('proj_1', 'pro', 'user_a', 'search');
+        await checkMemoryOpsQuota({ organizationId: 'org_1', projectId: 'proj_1' }, 'pro', 'user_a', 'search');
         expect(mockedCheck.mock.calls[0][1]).toBe(getMemoryOpsQuota('pro').searches);
     });
 
     it('never touches Redis for enterprise', async () => {
-        const status = await checkMemoryOpsQuota('proj_1', 'enterprise', 'user_a', 'write');
+        const status = await checkMemoryOpsQuota({ organizationId: 'org_1', projectId: 'proj_1' }, 'enterprise', 'user_a', 'write');
         expect(status.allowed).toBe(true);
         expect(status.scope).toBeNull();
         expect(mockedCheck).not.toHaveBeenCalled();
@@ -93,16 +93,18 @@ describe('checkMemoryOpsQuota custom project caps', () => {
 
     it('an explicit custom cap wins over the tier default', async () => {
         mockedCheck.mockResolvedValueOnce(deny());
-        const status = await checkMemoryOpsQuota('proj_1', 'pro', 'user_a', 'write', {
+        const status = await checkMemoryOpsQuota({ organizationId: 'org_1', projectId: 'proj_1' }, 'pro', 'user_a', 'write', {
             maxWritesMonthly: 5000,
         });
         expect(mockedCheck.mock.calls[0][1]).toBe(5000);
+        // A custom cap is the project's own; it is not shared across the org.
+        expect(mockedCheck.mock.calls[0][0]).toBe('memory_ops:v1:proj_1:write:month');
         expect(status).toMatchObject({ allowed: false, scope: 'project', limit: 5000 });
     });
 
     it('an explicit custom cap wins even over enterprise infinity', async () => {
         mockedCheck.mockResolvedValueOnce(deny());
-        const status = await checkMemoryOpsQuota('proj_1', 'enterprise', 'user_a', 'write', {
+        const status = await checkMemoryOpsQuota({ organizationId: 'org_1', projectId: 'proj_1' }, 'enterprise', 'user_a', 'write', {
             maxWritesMonthly: 100,
         });
         expect(mockedCheck).toHaveBeenCalledTimes(1);
@@ -110,7 +112,7 @@ describe('checkMemoryOpsQuota custom project caps', () => {
     });
 
     it('null custom caps fall through to the tier default', async () => {
-        await checkMemoryOpsQuota('proj_1', 'pro', 'user_a', 'search', {
+        await checkMemoryOpsQuota({ organizationId: 'org_1', projectId: 'proj_1' }, 'pro', 'user_a', 'search', {
             maxSearchesMonthly: null,
             maxWritesMonthly: null,
         });
@@ -118,20 +120,20 @@ describe('checkMemoryOpsQuota custom project caps', () => {
     });
 
     it('non-positive custom caps fall through to the tier default', async () => {
-        await checkMemoryOpsQuota('proj_1', 'pro', 'user_a', 'write', { maxWritesMonthly: 0 });
+        await checkMemoryOpsQuota({ organizationId: 'org_1', projectId: 'proj_1' }, 'pro', 'user_a', 'write', { maxWritesMonthly: 0 });
         expect(mockedCheck.mock.calls[0][1]).toBe(getMemoryOpsQuota('pro').writes);
-        await checkMemoryOpsQuota('proj_1', 'pro', 'user_a', 'write', { maxWritesMonthly: -50 });
+        await checkMemoryOpsQuota({ organizationId: 'org_1', projectId: 'proj_1' }, 'pro', 'user_a', 'write', { maxWritesMonthly: -50 });
         // Each check consumes two calls (project-monthly, then user-daily).
         expect(mockedCheck.mock.calls[2][1]).toBe(getMemoryOpsQuota('pro').writes);
     });
 
     it('search and write customs apply to their own op only', async () => {
-        await checkMemoryOpsQuota('proj_1', 'pro', 'user_a', 'search', {
+        await checkMemoryOpsQuota({ organizationId: 'org_1', projectId: 'proj_1' }, 'pro', 'user_a', 'search', {
             maxSearchesMonthly: 111,
             maxWritesMonthly: 222,
         });
         expect(mockedCheck.mock.calls[0][1]).toBe(111);
-        await checkMemoryOpsQuota('proj_1', 'pro', 'user_a', 'write', {
+        await checkMemoryOpsQuota({ organizationId: 'org_1', projectId: 'proj_1' }, 'pro', 'user_a', 'write', {
             maxSearchesMonthly: 111,
             maxWritesMonthly: 222,
         });

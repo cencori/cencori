@@ -96,7 +96,7 @@ export async function writeMemories(params: WriteMemoriesParams): Promise<WriteM
 
     // Ops allowance (MON-6): extraction + reconciliation + embeddings all run
     // on shared managed keys. Denial here saves the LLM spend, not just rows.
-    const opsStatus = await checkMemoryOpsQuota(projectId, tier, scopeKey, 'write', params.settings);
+    const opsStatus = await checkMemoryOpsQuota({ organizationId, projectId }, tier, scopeKey, 'write', params.settings);
     if (!opsStatus.allowed) {
         console.warn(
             `[Memory] Write ops quota exceeded (scope=${opsStatus.scope}) project=${projectId} — dropping write`
@@ -380,7 +380,7 @@ export async function rememberExchange(params: {
     // Ops allowance before extraction (MON-6): a capped project must not burn
     // managed extraction calls. Session scope is Redis-only and ungated.
     if (directive.scope !== 'session') {
-        const opsStatus = await checkMemoryOpsQuota(projectId, tier, directive.scopeKey, 'write', settings);
+        const opsStatus = await checkMemoryOpsQuota({ organizationId, projectId }, tier, directive.scopeKey, 'write', settings);
         if (!opsStatus.allowed) {
             console.warn(
                 `[Memory] Write ops quota exceeded (scope=${opsStatus.scope}) project=${projectId} — dropping remember`
@@ -510,7 +510,7 @@ export async function runChatMemoryWriteback(params: {
         // Ops allowance first (MON-6): a capped project must not burn managed
         // extraction/reconciliation calls. Session scope is Redis-only, ungated.
         if (directive.scope !== 'session') {
-            const writeOps = await checkMemoryOpsQuota(gatewayCtx.projectId, tier, directive.scopeKey, 'write', settings);
+            const writeOps = await checkMemoryOpsQuota({ organizationId: gatewayCtx.organizationId, projectId: gatewayCtx.projectId }, tier, directive.scopeKey, 'write', settings);
             if (!writeOps.allowed) {
                 console.warn(
                     `[Memory] Write ops quota exceeded (scope=${writeOps.scope}) project=${gatewayCtx.projectId} request=${gatewayCtx.requestId}`

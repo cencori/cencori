@@ -29,6 +29,7 @@ import {
     parseMemoryDirective,
     rememberExchange,
 } from '@/lib/memory';
+import { planIncludesMemory, memoryPlanRequiredBody } from '@/lib/entitlements';
 
 interface RememberRequest {
     userId?: string;
@@ -60,6 +61,10 @@ export async function POST(req: NextRequest) {
     let exchangeForLog: Array<{ role: string; content: unknown }> = [];
 
     try {
+        // Memory comes with a paid plan.
+        if (!planIncludesMemory(ctx.tier)) {
+            return respond(memoryPlanRequiredBody(ctx.projectId), 403);
+        }
         const body: RememberRequest = await req.json();
 
         const settings = await getProjectMemorySettings(ctx.supabase, ctx.projectId);
@@ -110,7 +115,7 @@ export async function POST(req: NextRequest) {
                 return respond(buildQuotaExceededBody(ctx.projectId, tier, quota.used, quota.limit), 429);
             }
             // Ops allowance (MON-6): managed-LLM spend gate, distinct from rows.
-            const writeOps = await checkMemoryOpsQuota(ctx.projectId, tier, directive.scopeKey, 'write', settings);
+            const writeOps = await checkMemoryOpsQuota({ organizationId: ctx.organizationId, projectId: ctx.projectId }, tier, directive.scopeKey, 'write', settings);
             if (!writeOps.allowed) {
                 return respond(buildMemoryOpsExceededBody(ctx.projectId, tier, 'write', writeOps), 429);
             }
@@ -170,7 +175,7 @@ export async function POST(req: NextRequest) {
 
         if (result.opsExceeded) {
             const ops = result.opsStatus
-                ?? await checkMemoryOpsQuota(ctx.projectId, tier, directive.scopeKey, 'write');
+                ?? await checkMemoryOpsQuota({ organizationId: ctx.organizationId, projectId: ctx.projectId }, tier, directive.scopeKey, 'write');
             return respond(buildMemoryOpsExceededBody(ctx.projectId, tier, 'write', ops), 429);
         }
 

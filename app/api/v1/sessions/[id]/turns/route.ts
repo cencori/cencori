@@ -47,6 +47,7 @@ import {
 import { installedTurnTools } from '@/lib/embedded/turn-tools';
 import { intersectBrowserEnabled, intersectNetworkPolicy, type NetworkPolicy } from '@/lib/embedded/net-policy';
 import type { CapabilityManifest } from '@/lib/embedded/manifest';
+import { planIncludesMemory, memoryPlanRequiredBody } from '@/lib/entitlements';
 
 const normalizeGatewayModelId = (modelId: string): string => {
     const strippedModel = modelId.startsWith("cencori/")
@@ -564,6 +565,10 @@ export async function POST(
         let memorySettings: MemorySettings | null = null;
 
         if (body.memory !== undefined) {
+            // Memory comes with a paid plan.
+            if (!planIncludesMemory(activeGatewayCtx.tier)) {
+                return respondError(403, memoryPlanRequiredBody(activeGatewayCtx.projectId).message, "memory_requires_plan");
+            }
             memorySettings = await getProjectMemorySettings(adminClient, activeGatewayCtx.projectId);
             if (!memorySettings.enabled) {
                 return respondError(403, "Memory is disabled for this project.", "memory_disabled");

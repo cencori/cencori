@@ -18,7 +18,7 @@ import {
 } from '@/lib/gateway-middleware';
 import { promptPayload, textResponsePayload } from '@/lib/gateway/log-payload';
 import { runGatewayInputPipeline } from '@/lib/gateway/input-guard';
-import type { SubscriptionTier } from '@/lib/entitlements';
+import { planIncludesMemory, memoryPlanRequiredBody, type SubscriptionTier } from '@/lib/entitlements';
 import { MEMORY_CONTENT_MAX_CHARS } from '@/lib/memory';
 import { USAGE_MARKUP_PERCENT, withUsageMarkup } from '@/lib/billing/usage-markup';
 
@@ -40,6 +40,13 @@ export async function POST(req: NextRequest) {
         return validation.response;
     }
     const ctx = validation.context;
+    // Memory comes with a paid plan.
+    if (!planIncludesMemory(ctx.tier)) {
+        return addGatewayHeaders(
+            NextResponse.json(memoryPlanRequiredBody(ctx.projectId), { status: 403 }),
+            { requestId: ctx.requestId }
+        );
+    }
 
     // Kept outside the try so the failure paths can still log what was sent.
     let contentForLog = '';
