@@ -21,6 +21,7 @@ export default function MemoriesPage({ params }: PageProps) {
         <MemoryRoute
             orgSlug={orgSlug}
             projectSlug={projectSlug}
+            showOnFree
             title="Memories"
             description="Every fact stored for your end-users. Search, filter, and forget."
         >
