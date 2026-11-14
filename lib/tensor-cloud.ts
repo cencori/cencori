@@ -146,8 +146,14 @@ export function sandboxTokenSha256(sandboxTokenSecret: string, taskId: string): 
 
 export const TASK_TOKEN_PREFIX = "tct_";
 const TASK_TOKEN_AUDIENCE = "tensor-cloud-task";
-/** Past any task's life. The token dies with its task long before this; see verifyTaskToken. */
-export const TASK_TOKEN_TTL_SECONDS = 24 * 60 * 60;
+/**
+ * Ten years: in effect, for as long as the task exists. A sandbox is given its token once, when
+ * its machine is created, and a chat can be picked up again weeks later; a token that expired on
+ * the clock would leave it unable to think. What ends a token is its task: the proxy honours one
+ * only while the task's row is ready (see authenticateTensorCloudTask), and only during a turn
+ * the account has reserved.
+ */
+export const TASK_TOKEN_TTL_SECONDS = 10 * 365 * 24 * 60 * 60;
 
 export type TaskTokenClaims = { userId: string; taskId: string; expiresAt: number };
 
@@ -327,6 +333,11 @@ export function sandboxMachineRequest(
     /** Null starts the task in an empty workspace: something new, built from nothing. */
     repositoryUrl: string | null;
     repositoryRef: string | null;
+    /**
+     * False creates the machine without starting it: a spare, made ahead of time so that the
+     * chat that claims it only has to start a machine, not wait for one to be built.
+     */
+    launch?: boolean;
   },
   config: TensorCloudConfig,
   now?: number,
@@ -334,6 +345,7 @@ export function sandboxMachineRequest(
   return {
     name: `task-${input.taskId}`,
     region: config.sandboxRegion,
+    ...(input.launch === false ? { skip_launch: true } : {}),
     config: {
       image: config.sandboxImage,
       guest: SANDBOX_GUEST,

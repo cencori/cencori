@@ -12,6 +12,7 @@ import {
   sandboxTokenSha256,
   signGatewayTicket,
   signTaskToken,
+  TASK_TOKEN_TTL_SECONDS,
   tensorCloudAccess,
   verifyTaskToken,
   type TensorCloudConfig,
@@ -129,12 +130,17 @@ describe("task tokens", () => {
     expect(verifyTaskToken(token, config.taskTokenSecret, now)).toEqual({
       userId: "user-1",
       taskId,
-      expiresAt: now + 24 * 60 * 60,
+      expiresAt: now + TASK_TOKEN_TTL_SECONDS,
     });
   });
 
+  it("outlives a chat that is picked up again weeks later", () => {
+    const weeksLater = now + 60 * 24 * 60 * 60;
+    expect(verifyTaskToken(token, config.taskTokenSecret, weeksLater)).not.toBeNull();
+  });
+
   it("is refused after it expires", () => {
-    expect(verifyTaskToken(token, config.taskTokenSecret, now + 24 * 60 * 60)).toBeNull();
+    expect(verifyTaskToken(token, config.taskTokenSecret, now + TASK_TOKEN_TTL_SECONDS)).toBeNull();
   });
 
   it("is refused under another secret", () => {
@@ -290,6 +296,16 @@ describe("sandboxMachineRequest", () => {
     expect(empty.config.env).not.toHaveProperty("REPO_URL");
     expect(empty.config.env).not.toHaveProperty("REPO_REF");
     expect(empty.config.env).toHaveProperty("CENCORI_TOKEN");
+  });
+
+  it("can be created without being started, as a spare", () => {
+    const spare = sandboxMachineRequest(
+      { taskId, userId: "user-1", volumeId: "vol_test", repositoryUrl: null, repositoryRef: null, launch: false },
+      config,
+      now,
+    );
+    expect(spare).toMatchObject({ skip_launch: true });
+    expect(request).not.toHaveProperty("skip_launch");
   });
 
   it("has no public service and does not restart itself", () => {

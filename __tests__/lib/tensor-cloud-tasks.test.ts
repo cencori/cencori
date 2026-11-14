@@ -12,11 +12,18 @@ vi.mock("@/lib/tensor-data", async (original) => ({
 
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { authenticateTensorDataRequest } from "@/lib/tensor-data";
-import { signGatewayTicket, signTaskToken } from "@/lib/tensor-cloud";
+import { readTensorCloudConfig, signGatewayTicket, signTaskToken, type TensorCloudConfig } from "@/lib/tensor-cloud";
 import {
   authenticateTensorCloudTask,
   authenticateTensorInferenceRequest,
+  chatJson,
+  claimSpare,
+  ensureSpare,
+  isThreadId,
+  listChats,
   makeRoomFor,
+  setChatThread,
+  type TensorCloudChat,
   reconcileTasks,
   taskJson,
   type TensorCloudTask,
@@ -294,5 +301,230 @@ describe("makeRoomFor", () => {
     const stop = vi.fn(async () => ({ ok: false as const, status: 500, error: "busy" }));
     expect(await makeRoomFor(admin, { stop }, "user-1", [task("a", "ready")], null)).toBe(true);
     expect(written).toEqual([expect.objectContaining({ status: "stopped" })]);
+  });
+});
+
+describe("chats", () => {
+  const task = (id: string, patch: Partial<TensorCloudTask> = {}): TensorCloudTask => ({
+    id,
+    user_id: "user-1",
+    title: `title of ${id}`,
+    project_name: null,
+    repository_url: null,
+    repository_ref: null,
+    machine_id: `machine-${id}`,
+    volume_id: `vol-${id}`,
+    region: "jnb",
+    status: "ready",
+    last_connected_at: null,
+    created_at: "2026-11-13T00:00:00Z",
+    updated_at: "2026-11-13T00:00:00Z",
+    ...patch,
+  });
+  const chat = (id: string, taskId: string, updatedAt: string): TensorCloudChat => ({
+    id,
+    task_id: taskId,
+    user_id: "user-1",
+    title: `chat ${id}`,
+    thread_id: null,
+    created_at: updatedAt,
+    updated_at: updatedAt,
+  });
+
+  /** An admin client whose chats table holds `rows`; upserts are recorded and echoed back. */
+  function adminWithChats(rows: TensorCloudChat[]) {
+    const upserted: Array<Record<string, unknown>> = [];
+    const asked: { taskIds?: string[] } = {};
+    const query = {
+      select: () => query,
+      eq: () => query,
+      in: (_column: string, ids: string[]) => {
+        asked.taskIds = ids;
+        return query;
+      },
+      order: () => query,
+      limit: async () => ({ data: rows.filter((row) => asked.taskIds?.includes(row.task_id)), error: null }),
+      upsert: (row: Record<string, unknown>) => {
+        upserted.push(row);
+        return { select: () => ({ single: async () => ({ data: { thread_id: null, ...row }, error: null }) }) };
+      },
+    };
+    return { admin: { from: () => query } as never, upserted };
+  }
+
+  it("lists chats newest first, each with its task", async () => {
+    const { admin, upserted } = adminWithChats([
+      chat("c1", "a", "2026-11-13T01:00:00Z"),
+      chat("c2", "a", "2026-11-13T03:00:00Z"),
+      chat("c3", "b", "2026-11-13T02:00:00Z"),
+    ]);
+    const listed = await listChats(admin, "user-1", [task("a", { project_name: "Site" }), task("b")]);
+    expect(listed.map(({ chat: row, task: owner }) => [row.id, owner.id])).toEqual([
+      ["c2", "a"],
+      ["c3", "b"],
+      ["c1", "a"],
+    ]);
+    expect(upserted).toEqual([]);
+  });
+
+  it("gives a task with no chat its first one, under the task's own id", async () => {
+    const { admin, upserted } = adminWithChats([]);
+    const listed = await listChats(admin, "user-1", [task("a")]);
+    expect(upserted).toEqual([expect.objectContaining({ id: "a", task_id: "a", title: "title of a" })]);
+    expect(listed.map(({ chat: row }) => row.id)).toEqual(["a"]);
+  });
+
+  it("leaves out the chats of failed tasks, and makes none for them", async () => {
+    const { admin, upserted } = adminWithChats([chat("c1", "bad", "2026-11-13T01:00:00Z")]);
+    expect(await listChats(admin, "user-1", [task("bad", { status: "failed" })])).toEqual([]);
+    expect(upserted).toEqual([]);
+  });
+
+  it("shows the site the conversation and its project, never where it runs", () => {
+    const shown = chatJson(
+      { ...chat("c1", "a", "2026-11-13T01:00:00Z"), thread_id: "0195c0de-0000-7000-8000-00000000000a" },
+      task("a", { project_name: "Site" }),
+    );
+    expect(shown).toMatchObject({ id: "c1", taskId: "a", projectName: "Site", status: "ready" });
+    expect(JSON.stringify(shown)).not.toContain("machine-a");
+    expect(JSON.stringify(shown)).not.toContain("vol-a");
+    expect(shown).not.toHaveProperty("user_id");
+  });
+
+  it("records a chat's thread only while it has none", async () => {
+    const filters: unknown[][] = [];
+    const update = {
+      eq: (...args: unknown[]) => {
+        filters.push(["eq", ...args]);
+        return update;
+      },
+      is: async (...args: unknown[]) => {
+        filters.push(["is", ...args]);
+        return { error: null };
+      },
+    };
+    const admin = { from: () => ({ update: () => update }) } as never;
+    await setChatThread(admin, "c1", "0195c0de-0000-7000-8000-00000000000a");
+    expect(filters).toEqual([
+      ["eq", "id", "c1"],
+      ["is", "thread_id", null],
+    ]);
+  });
+
+  it("accepts only a UUID as a thread id", () => {
+    expect(isThreadId("0195c0de-0000-7000-8000-00000000000a")).toBe(true);
+    expect(isThreadId("../../etc/passwd")).toBe(false);
+    expect(isThreadId(42)).toBe(false);
+  });
+});
+
+describe("spares", () => {
+  const config = () => readTensorCloudConfig(secrets) as TensorCloudConfig;
+  const spare = (patch: Partial<TensorCloudTask> = {}): TensorCloudTask => ({
+    id: taskId,
+    user_id: "user-1",
+    title: null,
+    project_name: null,
+    repository_url: null,
+    repository_ref: null,
+    machine_id: "148e21dc03d789",
+    volume_id: "vol_spare",
+    image: secrets.TENSOR_CLOUD_SANDBOX_IMAGE,
+    region: "jnb",
+    status: "spare",
+    last_connected_at: null,
+    created_at: "2026-11-13T00:00:00Z",
+    updated_at: "2026-11-13T00:00:00Z",
+    ...patch,
+  });
+
+  /** An admin client whose tasks table holds at most one spare, recording what is written. */
+  function adminWithSpare(existing: TensorCloudTask | null, insertError: { code: string } | null = null) {
+    const writes: Array<{ op: string; row: Record<string, unknown> }> = [];
+    const chain = (result: unknown) => {
+      const query: Record<string, unknown> = {};
+      for (const name of ["select", "eq", "not", "neq", "in"]) query[name] = () => query;
+      query.maybeSingle = async () => result;
+      query.single = async () => result;
+      query.then = (resolve: (value: unknown) => void) => resolve({ error: null });
+      return query;
+    };
+    const admin = {
+      from: () => ({
+        select: () => chain({ data: existing, error: null }),
+        insert: (row: Record<string, unknown>) => {
+          writes.push({ op: "insert", row });
+          return chain({ data: insertError ? null : spare({ machine_id: null, volume_id: null, ...row }), error: insertError });
+        },
+        update: (row: Record<string, unknown>) => {
+          writes.push({ op: "update", row });
+          return chain({ data: existing ? { ...existing, ...row } : null, error: null });
+        },
+        delete: () => chain({ error: null }),
+      }),
+    };
+    return { admin: admin as never, writes };
+  }
+  const flyOk = () => ({
+    createVolume: vi.fn(async () => ({ ok: true as const, value: { id: "vol_new", region: "jnb" } })),
+    create: vi.fn(async () => ({ ok: true as const, value: { id: "machine-new", state: "created", region: "jnb" } })),
+    destroy: vi.fn(async () => ({ ok: true as const, value: null })),
+    destroyVolume: vi.fn(async () => ({ ok: true as const, value: null })),
+  });
+
+  it("makes a spare that is created but not started", async () => {
+    const { admin, writes } = adminWithSpare(null);
+    const fly = flyOk();
+    await ensureSpare(admin, fly, config(), "user-1");
+    expect(writes[0]).toEqual({
+      op: "insert",
+      row: { user_id: "user-1", status: "spare", image: secrets.TENSOR_CLOUD_SANDBOX_IMAGE },
+    });
+    expect(fly.create).toHaveBeenCalledWith(expect.objectContaining({ skip_launch: true }));
+    expect(writes.at(-1)).toEqual({ op: "update", row: expect.objectContaining({ machine_id: "machine-new" }) });
+  });
+
+  it("leaves a good spare alone", async () => {
+    const { admin, writes } = adminWithSpare(spare());
+    const fly = flyOk();
+    await ensureSpare(admin, fly, config(), "user-1");
+    expect(writes).toEqual([]);
+    expect(fly.create).not.toHaveBeenCalled();
+  });
+
+  it("replaces a spare made from an image that is no longer current", async () => {
+    const { admin, writes } = adminWithSpare(spare({ image: "registry.fly.io/tensor-sandbox:old" }));
+    const fly = flyOk();
+    await ensureSpare(admin, fly, config(), "user-1");
+    expect(fly.destroy).toHaveBeenCalledWith("148e21dc03d789");
+    expect(fly.destroyVolume).toHaveBeenCalledWith("vol_spare");
+    expect(writes.some((write) => write.op === "insert")).toBe(true);
+  });
+
+  it("does not make a second spare when another request is already making one", async () => {
+    const { admin } = adminWithSpare(null, { code: "23505" });
+    const fly = flyOk();
+    await ensureSpare(admin, fly, config(), "user-1");
+    expect(fly.createVolume).not.toHaveBeenCalled();
+  });
+
+  it("removes the row and the volume when the machine cannot be created", async () => {
+    const { admin, writes } = adminWithSpare(null);
+    const fly = { ...flyOk(), create: vi.fn(async () => ({ ok: false as const, status: 422, error: "no capacity" })) };
+    await ensureSpare(admin, fly, config(), "user-1");
+    expect(writes).toContainEqual({ op: "update", row: expect.objectContaining({ status: "deleted" }) });
+    expect(fly.destroyVolume).toHaveBeenCalledWith("vol_new");
+  });
+
+  it("turns the spare into the chat's workspace when one is claimed", async () => {
+    const { admin, writes } = adminWithSpare(spare());
+    const claimed = await claimSpare(admin, config(), { userId: "user-1", title: "hello", projectName: "Site" });
+    expect(claimed).toMatchObject({ id: taskId, status: "ready", title: "hello", project_name: "Site" });
+    expect(writes).toEqual([{ op: "update", row: expect.objectContaining({ status: "ready" }) }]);
+  });
+
+  it("claims nothing when there is no spare", async () => {
+    const { admin } = adminWithSpare(null);
+    expect(await claimSpare(admin, config(), { userId: "user-1", title: null, projectName: null })).toBeNull();
   });
 });

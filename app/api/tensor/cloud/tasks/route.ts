@@ -1,3 +1,4 @@
+import { waitUntil } from "@vercel/functions";
 import { NextRequest, NextResponse } from "next/server";
 import { noStoreHeaders } from "@/lib/tensor-auth";
 import { authenticateTensorBillingRequest } from "@/lib/tensor-billing";
@@ -11,7 +12,12 @@ import {
   sandboxMachineRequest,
 } from "@/lib/tensor-cloud";
 import {
+  chatJson,
+  claimSpare,
+  ensureSpare,
+  insertChat,
   insertTask,
+  listChats,
   listTasks,
   makeRoomFor,
   MAX_KEPT_TASKS,
@@ -22,6 +28,19 @@ import {
   updateTask,
 } from "@/lib/tensor-cloud-tasks";
 
+/** Runs ensureSpare where a failure is nobody's problem but the log's: it is an optimisation. */
+async function prepareSpare(
+  admin: Parameters<typeof ensureSpare>[0],
+  config: Parameters<typeof ensureSpare>[2],
+  userId: string,
+): Promise<void> {
+  try {
+    await ensureSpare(admin, new FlyMachines(config), config, userId);
+  } catch (error) {
+    console.error("[Tensor Cloud] Preparing a spare sandbox failed", error);
+  }
+}
+
 /** Said when another conversation's turn is in progress, which is the one thing not interrupted. */
 const STILL_WORKING =
   "Tensor is still working in another chat. Let it finish, then try again.";
@@ -30,7 +49,7 @@ function json(body: unknown, status = 200) {
   return NextResponse.json(body, { headers: noStoreHeaders(), status });
 }
 
-/** The account's cloud tasks, newest first. */
+/** The account's chats, most recently used first, each with the project it is in, if any. */
 export async function GET(request: NextRequest) {
   const session = await authenticateTensorBillingRequest(request);
   if (!session) return json({ error: "Your Cencori session is invalid." }, 401);
@@ -43,7 +62,11 @@ export async function GET(request: NextRequest) {
       listTasks(session.admin, session.user.id),
     ]);
     const tasks = await reconcileTasks(session.admin, new FlyMachines(config), listed);
-    return json({ access, tasks: tasks.map(taskJson) });
+    const chats = await listChats(session.admin, session.user.id, tasks);
+    // Whoever can start a chat gets a spare workspace made behind this response, so their next
+    // chat starts without waiting for one to be built.
+    if (access.tasks) waitUntil(prepareSpare(session.admin, config, session.user.id));
+    return json({ access, chats: chats.map(({ chat, task }) => chatJson(chat, task)) });
   } catch (error) {
     console.error("[Tensor Cloud] Listing tasks failed", error);
     return json({ error: "Tensor could not load your chats." }, 503);
@@ -109,6 +132,34 @@ export async function POST(request: NextRequest) {
       return json({ error: STILL_WORKING, code: "running_limit" }, 409);
     }
 
+    // A chat that starts from nothing takes the account's spare workspace when there is one:
+    // the machine already exists and only has to start. An imported repository cannot, because
+    // a machine is told what to clone when it is created.
+    if (!repositoryUrl) {
+      const claimed = await claimSpare(session.admin, config, {
+        userId: session.user.id,
+        title,
+        projectName,
+      });
+      if (claimed?.machine_id) {
+        // Not waited for: opening the chat waits for the machine, and it may already be up.
+        const started = await fly.start(claimed.machine_id);
+        if (!started.ok) {
+          console.error(
+            `[Tensor Cloud] Starting claimed sandbox ${claimed.machine_id} of task ${claimed.id} failed (${started.status}): ${started.error}`,
+          );
+        }
+        const chat = await insertChat(session.admin, {
+          id: claimed.id,
+          taskId: claimed.id,
+          userId: session.user.id,
+          title,
+        });
+        waitUntil(prepareSpare(session.admin, config, session.user.id));
+        return json({ task: taskJson(claimed), chat: chatJson(chat, claimed) }, 201);
+      }
+    }
+
     const task = await insertTask(session.admin, {
       userId: session.user.id,
       title,
@@ -151,7 +202,16 @@ export async function POST(request: NextRequest) {
       region: created.value.region,
       status: "ready",
     });
-    return json({ task: taskJson({ ...task, status: "ready" }) }, 201);
+    // The workspace's first chat takes the task's own id.
+    const chat = await insertChat(session.admin, {
+      id: task.id,
+      taskId: task.id,
+      userId: session.user.id,
+      title,
+    });
+    const ready = { ...task, status: "ready" as const };
+    waitUntil(prepareSpare(session.admin, config, session.user.id));
+    return json({ task: taskJson(ready), chat: chatJson(chat, ready) }, 201);
   } catch (error) {
     if (error instanceof RunningTaskLimitError) {
       return json({ error: STILL_WORKING, code: "running_limit" }, 409);

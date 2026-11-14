@@ -5,14 +5,26 @@ import {
   type FlyMachines,
   isTaskToken,
   readTensorCloudConfig,
+  sandboxMachineRequest,
   tensorCloudAccess,
   type TensorCloudAccess,
+  type TensorCloudConfig,
   verifyTaskToken,
 } from "@/lib/tensor-cloud";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
-export type TensorCloudTaskStatus = "creating" | "ready" | "stopped" | "failed" | "deleted";
+/**
+ * `spare` is a workspace made ahead of time and not yet anybody's chat: a volume and a machine
+ * that exists but has never been started. It is invisible everywhere a person looks.
+ */
+export type TensorCloudTaskStatus =
+  | "creating"
+  | "ready"
+  | "stopped"
+  | "failed"
+  | "deleted"
+  | "spare";
 
 export type TensorCloudTask = {
   id: string;
@@ -23,6 +35,8 @@ export type TensorCloudTask = {
   repository_ref: string | null;
   machine_id: string | null;
   volume_id: string | null;
+  /** The sandbox image the machine was created from; a spare on an old image is replaced. */
+  image?: string | null;
   region: string | null;
   status: TensorCloudTaskStatus;
   last_connected_at: string | null;
@@ -171,6 +185,7 @@ export async function listTasks(admin: Admin, userId: string): Promise<TensorClo
     .select("*")
     .eq("user_id", userId)
     .neq("status", "deleted")
+    .neq("status", "spare")
     .order("created_at", { ascending: false })
     .limit(MAX_KEPT_TASKS * 2);
   if (error) throw error;
@@ -232,6 +247,348 @@ export async function updateTask(
     .eq("id", taskId);
   if (isUniqueViolation(error)) throw new RunningTaskLimitError();
   if (error) throw error;
+}
+
+/* ---------------------------------------------------------------------------
+   Spares
+
+   Making a workspace takes many seconds: a volume, a machine, an image to unpack. Nobody should
+   watch that happen after pressing send. So each account that can use the web keeps one spare:
+   made in the background, never started, costing only its small disk. A new chat claims it and
+   starts it (about two seconds), and the next spare is made behind it.
+   --------------------------------------------------------------------------- */
+
+async function readSpare(admin: Admin, userId: string): Promise<TensorCloudTask | null> {
+  const { data, error } = await admin
+    .from(TABLE)
+    .select("*")
+    .eq("user_id", userId)
+    .eq("status", "spare")
+    .maybeSingle();
+  if (error) throw error;
+  return (data as TensorCloudTask | null) ?? null;
+}
+
+/**
+ * Makes sure the account has a usable spare. Meant to run after a response has been sent.
+ *
+ * A spare that was only half made, or was made from an image that is no longer the current one,
+ * is destroyed and replaced. Two calls at once cannot both make one: the row comes first, and the
+ * database allows an account a single spare.
+ */
+export async function ensureSpare(
+  admin: Admin,
+  fly: Pick<FlyMachines, "create" | "createVolume" | "destroy" | "destroyVolume">,
+  config: TensorCloudConfig,
+  userId: string,
+): Promise<void> {
+  const existing = await readSpare(admin, userId);
+  if (existing?.machine_id && existing.image === config.sandboxImage) return;
+  if (existing) {
+    // Mid-creation by another request, most likely: give it time before calling it abandoned.
+    if (Date.now() - new Date(existing.created_at).getTime() < 2 * 60 * 1000) return;
+    await destroyTask(admin, fly, existing);
+  }
+
+  const { data, error } = await admin
+    .from(TABLE)
+    .insert({ user_id: userId, status: "spare", image: config.sandboxImage })
+    .select("*")
+    .single();
+  if (isUniqueViolation(error)) return;
+  if (error) throw error;
+  const spare = data as TensorCloudTask;
+
+  const volume = await fly.createVolume(spare.id);
+  if (!volume.ok) {
+    console.error(`[Tensor Cloud] Creating a spare volume failed (${volume.status}): ${volume.error}`);
+    await destroyTask(admin, fly, spare);
+    return;
+  }
+  await updateTask(admin, spare.id, { volume_id: volume.value.id });
+
+  const machine = await fly.create(
+    sandboxMachineRequest(
+      {
+        taskId: spare.id,
+        userId,
+        volumeId: volume.value.id,
+        repositoryUrl: null,
+        repositoryRef: null,
+        launch: false,
+      },
+      config,
+    ),
+  );
+  if (!machine.ok) {
+    console.error(`[Tensor Cloud] Creating a spare sandbox failed (${machine.status}): ${machine.error}`);
+    await destroyTask(admin, fly, { ...spare, volume_id: volume.value.id });
+    return;
+  }
+  await updateTask(admin, spare.id, { machine_id: machine.value.id, region: machine.value.region });
+}
+
+/**
+ * Starts the account's spare, if it has one: called when someone begins to type, so that the
+ * machine is up by the time they send. An unused one stops itself when idle, like any other.
+ */
+export async function warmSpare(
+  admin: Admin,
+  fly: Pick<FlyMachines, "start">,
+  config: TensorCloudConfig,
+  userId: string,
+): Promise<boolean> {
+  const spare = await readSpare(admin, userId);
+  if (!spare?.machine_id || spare.image !== config.sandboxImage) return false;
+  const started = await fly.start(spare.machine_id);
+  return started.ok;
+}
+
+/**
+ * Turns the account's spare into a chat's workspace, or returns null when there is none to use.
+ *
+ * The update names the status it expects, so two chats started at once cannot both take the same
+ * spare: one gets the row, the other gets null and has a workspace made the slow way.
+ */
+export async function claimSpare(
+  admin: Admin,
+  config: TensorCloudConfig,
+  input: { userId: string; title: string | null; projectName: string | null },
+): Promise<TensorCloudTask | null> {
+  const now = new Date().toISOString();
+  const { data, error } = await admin
+    .from(TABLE)
+    .update({
+      status: "ready",
+      title: input.title,
+      project_name: input.projectName,
+      created_at: now,
+      updated_at: now,
+    })
+    .eq("user_id", input.userId)
+    .eq("status", "spare")
+    .eq("image", config.sandboxImage)
+    .not("machine_id", "is", null)
+    .select("*")
+    .maybeSingle();
+  if (isUniqueViolation(error)) throw new RunningTaskLimitError();
+  if (error) throw error;
+  return (data as TensorCloudTask | null) ?? null;
+}
+
+/* ---------------------------------------------------------------------------
+   Chats
+
+   A task is the workspace; a chat is one conversation in it. A plain chat is a task with a single
+   chat. A project is a task with a name, and can hold several: they share its files, and each is
+   its own thread in the agent runtime.
+   --------------------------------------------------------------------------- */
+
+const CHATS = "tensor_cloud_chats";
+
+/** How many chats one project may hold. Each is cheap, but the list has to stay usable. */
+export const MAX_CHATS_PER_TASK = 50;
+
+export type TensorCloudChat = {
+  id: string;
+  task_id: string;
+  user_id: string;
+  title: string | null;
+  thread_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** What the site is shown of a chat: the conversation, and the workspace it is in. */
+export function chatJson(chat: TensorCloudChat, task: TensorCloudTask) {
+  return {
+    id: chat.id,
+    taskId: task.id,
+    title: chat.title,
+    threadId: chat.thread_id,
+    projectName: task.project_name,
+    repositoryUrl: task.repository_url,
+    status: task.status,
+    createdAt: chat.created_at,
+    updatedAt: chat.updated_at,
+  };
+}
+
+/** The runtime's thread ids are UUIDs; anything else is not one and is never stored. */
+export function isThreadId(value: unknown): value is string {
+  return isUuid(value);
+}
+
+export async function insertChat(
+  admin: Admin,
+  input: { id?: string; taskId: string; userId: string; title: string | null },
+): Promise<TensorCloudChat> {
+  const { data, error } = await admin
+    .from(CHATS)
+    .insert({
+      ...(input.id ? { id: input.id } : {}),
+      task_id: input.taskId,
+      user_id: input.userId,
+      title: input.title,
+    })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data as TensorCloudChat;
+}
+
+/**
+ * The account's chats, newest first, each with its task; chats of failed tasks are left out.
+ *
+ * A task with no chat at all gets its first one here, under the task's own id. That is every
+ * task made before chats were rows of their own that the migration could not see, and it is what
+ * keeps the address of an existing chat working.
+ */
+export async function listChats(
+  admin: Admin,
+  userId: string,
+  tasks: TensorCloudTask[],
+): Promise<Array<{ chat: TensorCloudChat; task: TensorCloudTask }>> {
+  const live = tasks.filter(
+    (task) => task.status !== "failed" && task.status !== "deleted" && task.status !== "spare",
+  );
+  if (live.length === 0) return [];
+  const byId = new Map(live.map((task) => [task.id, task]));
+
+  const { data, error } = await admin
+    .from(CHATS)
+    .select("*")
+    .eq("user_id", userId)
+    .in("task_id", [...byId.keys()])
+    .order("updated_at", { ascending: false })
+    .limit(MAX_KEPT_TASKS * MAX_CHATS_PER_TASK);
+  if (error) throw error;
+  const chats = (data ?? []) as TensorCloudChat[];
+
+  const covered = new Set(chats.map((chat) => chat.task_id));
+  for (const task of live) {
+    if (covered.has(task.id)) continue;
+    const { data: made, error: failed } = await admin
+      .from(CHATS)
+      .upsert(
+        {
+          id: task.id,
+          task_id: task.id,
+          user_id: userId,
+          title: task.title,
+          created_at: task.created_at,
+          updated_at: task.updated_at,
+        },
+        { onConflict: "id" },
+      )
+      .select("*")
+      .single();
+    if (failed) throw failed;
+    chats.push(made as TensorCloudChat);
+  }
+
+  return chats
+    .sort((left, right) => right.updated_at.localeCompare(left.updated_at))
+    .map((chat) => ({ chat, task: byId.get(chat.task_id) as TensorCloudTask }));
+}
+
+/** One of this account's chats, or null: another account's chat is indistinguishable from none. */
+export async function readChat(
+  admin: Admin,
+  userId: string,
+  chatId: unknown,
+): Promise<TensorCloudChat | null> {
+  if (!isUuid(chatId)) return null;
+  const { data, error } = await admin
+    .from(CHATS)
+    .select("*")
+    .eq("id", chatId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as TensorCloudChat | null) ?? null;
+}
+
+export async function countChats(admin: Admin, taskId: string): Promise<number> {
+  const { count, error } = await admin
+    .from(CHATS)
+    .select("id", { count: "exact", head: true })
+    .eq("task_id", taskId);
+  if (error) throw error;
+  return count ?? 0;
+}
+
+/**
+ * Records which runtime thread a chat is, the first time it is known.
+ *
+ * Set once: the page reports it after the chat's first message creates the thread, and a chat
+ * never becomes a different conversation afterwards. A second report is ignored, not an error.
+ */
+export async function setChatThread(admin: Admin, chatId: string, threadId: string): Promise<void> {
+  const { error } = await admin
+    .from(CHATS)
+    .update({ thread_id: threadId, updated_at: new Date().toISOString() })
+    .eq("id", chatId)
+    .is("thread_id", null);
+  if (error) throw error;
+}
+
+/** Moves a chat to the top of the list: something just happened in it. */
+export async function touchChat(admin: Admin, chatId: string): Promise<void> {
+  const { error } = await admin
+    .from(CHATS)
+    .update({ updated_at: new Date().toISOString() })
+    .eq("id", chatId);
+  if (error) throw error;
+}
+
+export async function deleteChatRow(admin: Admin, chatId: string): Promise<void> {
+  const { error } = await admin.from(CHATS).delete().eq("id", chatId);
+  if (error) throw error;
+}
+
+/** Every chat of a task. Tasks are marked deleted, not removed, so their chats go explicitly. */
+export async function deleteChatsOfTask(admin: Admin, taskId: string): Promise<void> {
+  const { error } = await admin.from(CHATS).delete().eq("task_id", taskId);
+  if (error) throw error;
+}
+
+/**
+ * Deletes a task: its row is marked, its credential dies with that, and its machine and volume
+ * are destroyed with whatever was in them.
+ *
+ * The row is marked first: from that moment the sandbox's credential is refused, so even if
+ * destroying the machine fails, what is left running can no longer spend anything.
+ */
+export async function destroyTask(
+  admin: Admin,
+  fly: Pick<FlyMachines, "destroy" | "destroyVolume">,
+  task: TensorCloudTask,
+): Promise<void> {
+  await updateTask(admin, task.id, { status: "deleted" });
+  await deleteChatsOfTask(admin, task.id);
+
+  let machineGone = true;
+  if (task.machine_id) {
+    const destroyed = await fly.destroy(task.machine_id);
+    // Already gone is the outcome that was asked for.
+    if (!destroyed.ok && destroyed.status !== 404) {
+      machineGone = false;
+      console.error(
+        `[Tensor Cloud] Destroying sandbox ${task.machine_id} of task ${task.id} failed (${destroyed.status}): ${destroyed.error}`,
+      );
+    }
+  }
+  // A volume cannot be removed while a machine still holds it, and it is billed until it is.
+  // What is logged here is what a clean-up job has to pick up; there is not one yet.
+  if (task.volume_id && machineGone) {
+    const removed = await fly.destroyVolume(task.volume_id);
+    if (!removed.ok && removed.status !== 404) {
+      console.error(
+        `[Tensor Cloud] Destroying volume ${task.volume_id} of task ${task.id} failed (${removed.status}): ${removed.error}`,
+      );
+    }
+  }
 }
 
 /**
