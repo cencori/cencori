@@ -3,22 +3,28 @@ import { noStoreHeaders } from "@/lib/tensor-auth";
 import { authenticateTensorBillingRequest } from "@/lib/tensor-billing";
 import {
   FlyMachines,
+  normalizeProjectName,
   normalizeRepositoryRef,
   normalizeRepositoryUrl,
+  normalizeTaskTitle,
   readTensorCloudConfig,
   sandboxMachineRequest,
 } from "@/lib/tensor-cloud";
 import {
   insertTask,
   listTasks,
+  makeRoomFor,
   MAX_KEPT_TASKS,
-  MAX_RUNNING_TASKS,
   readCloudAccess,
   reconcileTasks,
   RunningTaskLimitError,
   taskJson,
   updateTask,
 } from "@/lib/tensor-cloud-tasks";
+
+/** Said when another conversation's turn is in progress, which is the one thing not interrupted. */
+const STILL_WORKING =
+  "Tensor is still working in another chat. Let it finish, then try again.";
 
 function json(body: unknown, status = 200) {
   return NextResponse.json(body, { headers: noStoreHeaders(), status });
@@ -29,7 +35,7 @@ export async function GET(request: NextRequest) {
   const session = await authenticateTensorBillingRequest(request);
   if (!session) return json({ error: "Your Cencori session is invalid." }, 401);
   const config = readTensorCloudConfig();
-  if (!config) return json({ error: "Cloud tasks are not available yet." }, 503);
+  if (!config) return json({ error: "Tensor on the web is not available yet." }, 503);
 
   try {
     const [access, listed] = await Promise.all([
@@ -40,7 +46,7 @@ export async function GET(request: NextRequest) {
     return json({ access, tasks: tasks.map(taskJson) });
   } catch (error) {
     console.error("[Tensor Cloud] Listing tasks failed", error);
-    return json({ error: "Tensor could not load your cloud tasks." }, 503);
+    return json({ error: "Tensor could not load your chats." }, 503);
   }
 }
 
@@ -55,7 +61,7 @@ export async function POST(request: NextRequest) {
   const session = await authenticateTensorBillingRequest(request);
   if (!session) return json({ error: "Your Cencori session is invalid." }, 401);
   const config = readTensorCloudConfig();
-  if (!config) return json({ error: "Cloud tasks are not available yet." }, 503);
+  if (!config) return json({ error: "Tensor on the web is not available yet." }, 503);
 
   let body: Record<string, unknown>;
   try {
@@ -63,19 +69,27 @@ export async function POST(request: NextRequest) {
   } catch {
     return json({ error: "That request is invalid." }, 400);
   }
-  const repositoryUrl = normalizeRepositoryUrl(body.repositoryUrl);
-  if (!repositoryUrl) {
+  // A repository is optional: without one the task starts in an empty workspace. One that is
+  // given must be valid; a typo is an error, not a silent fall back to starting from nothing.
+  const given = (value: unknown) => value !== undefined && value !== null && value !== "";
+  const repositoryUrl = given(body.repositoryUrl) ? normalizeRepositoryUrl(body.repositoryUrl) : null;
+  if (given(body.repositoryUrl) && !repositoryUrl) {
     return json({ error: "Enter a public GitHub repository, like https://github.com/owner/name." }, 400);
   }
-  const hasRef = body.repositoryRef !== undefined && body.repositoryRef !== null && body.repositoryRef !== "";
+  const hasRef = repositoryUrl !== null && given(body.repositoryRef);
   const repositoryRef = hasRef ? normalizeRepositoryRef(body.repositoryRef) : null;
   if (hasRef && !repositoryRef) return json({ error: "That branch name is not valid." }, 400);
+  const title = normalizeTaskTitle(body.title);
+  // Named, it is a project; an imported repository is one even unnamed, under its own name.
+  const projectName =
+    normalizeProjectName(body.projectName) ??
+    (repositoryUrl ? repositoryUrl.replace(/^https:\/\/github\.com\//, "").replace(/\.git$/, "") : null);
 
   try {
     const access = await readCloudAccess(session.admin, session.user.id);
     if (!access.tasks) {
       return json(
-        { error: "Cloud tasks are part of Tensor's paid plans. Choose a plan to start one.", code: "plan_required" },
+        { error: "Tensor on the web is part of Tensor's paid plans. Choose a plan to start.", code: "plan_required" },
         402,
       );
     }
@@ -85,22 +99,20 @@ export async function POST(request: NextRequest) {
       fly,
       await listTasks(session.admin, session.user.id),
     );
-    const running = existing.filter((task) => task.status === "ready" || task.status === "creating");
-    if (running.length >= MAX_RUNNING_TASKS) {
+    if (existing.length >= MAX_KEPT_TASKS) {
       return json(
-        { error: "You already have a cloud task running. Stop it before starting another.", code: "running_limit" },
+        { error: "You have reached the number of chats you can keep. Delete one to start another.", code: "kept_limit" },
         409,
       );
     }
-    if (existing.length >= MAX_KEPT_TASKS) {
-      return json(
-        { error: "You have reached the number of cloud tasks you can keep. Delete one to continue.", code: "kept_limit" },
-        409,
-      );
+    if (!(await makeRoomFor(session.admin, fly, session.user.id, existing, null))) {
+      return json({ error: STILL_WORKING, code: "running_limit" }, 409);
     }
 
     const task = await insertTask(session.admin, {
       userId: session.user.id,
+      title,
+      projectName,
       repositoryUrl,
       repositoryRef,
     });
@@ -109,7 +121,7 @@ export async function POST(request: NextRequest) {
     if (!volume.ok) {
       console.error(`[Tensor Cloud] Creating a volume failed (${volume.status}): ${volume.error}`);
       await updateTask(session.admin, task.id, { status: "failed" });
-      return json({ error: "Tensor could not start a sandbox for this task. Try again shortly." }, 503);
+      return json({ error: "Tensor could not get this chat ready. Try again shortly." }, 503);
     }
     await updateTask(session.admin, task.id, { volume_id: volume.value.id });
 
@@ -132,7 +144,7 @@ export async function POST(request: NextRequest) {
       const removed = await fly.destroyVolume(volume.value.id);
       if (removed.ok) await updateTask(session.admin, task.id, { volume_id: null });
       else console.error(`[Tensor Cloud] Volume ${volume.value.id} of failed task ${task.id} was not removed: ${removed.error}`);
-      return json({ error: "Tensor could not start a sandbox for this task. Try again shortly." }, 503);
+      return json({ error: "Tensor could not get this chat ready. Try again shortly." }, 503);
     }
     await updateTask(session.admin, task.id, {
       machine_id: created.value.id,
@@ -142,10 +154,7 @@ export async function POST(request: NextRequest) {
     return json({ task: taskJson({ ...task, status: "ready" }) }, 201);
   } catch (error) {
     if (error instanceof RunningTaskLimitError) {
-      return json(
-        { error: "You already have a cloud task running. Stop it before starting another.", code: "running_limit" },
-        409,
-      );
+      return json({ error: STILL_WORKING, code: "running_limit" }, 409);
     }
     console.error("[Tensor Cloud] Starting a task failed", error);
     return json({ error: "Tensor could not start this task." }, 503);

@@ -17,7 +17,9 @@ export type TensorCloudTaskStatus = "creating" | "ready" | "stopped" | "failed" 
 export type TensorCloudTask = {
   id: string;
   user_id: string;
-  repository_url: string;
+  title: string | null;
+  project_name: string | null;
+  repository_url: string | null;
   repository_ref: string | null;
   machine_id: string | null;
   volume_id: string | null;
@@ -89,10 +91,72 @@ export async function reconcileTasks(
   );
 }
 
+/**
+ * Whether Tensor is in the middle of a turn for this account, on any device.
+ *
+ * Every turn holds a usage reservation from before it starts until it ends, so an open one means
+ * work is in progress somewhere. It does not say where, which is why the caller treats it as
+ * "do not stop anything".
+ */
+export async function hasOpenTurn(admin: Admin, userId: string): Promise<boolean> {
+  const account = await getOrCreateTensorBillingAccount(admin, userId);
+  const { data, error } = await admin
+    .from("basecode_turn_reservations")
+    .select("id")
+    .eq("account_id", account.id)
+    .in("status", ["reserved", "running"])
+    .gt("expires_at", new Date().toISOString())
+    .limit(1);
+  if (error) throw error;
+  return (data ?? []).length > 0;
+}
+
+/**
+ * Frees the account's running slot for the task about to start or wake.
+ *
+ * People are not shown sandboxes and are not asked to manage them: opening one conversation while
+ * another's machine is still up should simply work. So the other machine is put to sleep, which
+ * loses nothing (its files and conversation are on its volume) unless Tensor is mid-turn there.
+ * That is the one case this refuses, by returning false: a turn must not be cut off because the
+ * person looked at something else.
+ *
+ * `tasks` must already be reconciled against Fly.
+ */
+export async function makeRoomFor(
+  admin: Admin,
+  fly: Pick<FlyMachines, "stop">,
+  userId: string,
+  tasks: TensorCloudTask[],
+  exceptTaskId: string | null,
+): Promise<boolean> {
+  const running = tasks.filter(
+    (task) => task.id !== exceptTaskId && (task.status === "ready" || task.status === "creating"),
+  );
+  if (running.length === 0) return true;
+  if (await hasOpenTurn(admin, userId)) return false;
+
+  for (const task of running) {
+    // Marked first, so its credential is refused from now on and the slot is free even if the
+    // machine is slow to stop; it stops itself when idle in any case.
+    await updateTask(admin, task.id, { status: "stopped" });
+    if (task.machine_id) {
+      const stopped = await fly.stop(task.machine_id);
+      if (!stopped.ok) {
+        console.error(
+          `[Tensor Cloud] Putting sandbox ${task.machine_id} of task ${task.id} to sleep failed (${stopped.status}): ${stopped.error}`,
+        );
+      }
+    }
+  }
+  return true;
+}
+
 /** What the site is shown of a task. Never the machine: the browser has no use for where it runs. */
 export function taskJson(task: TensorCloudTask) {
   return {
     id: task.id,
+    title: task.title,
+    projectName: task.project_name,
     repositoryUrl: task.repository_url,
     repositoryRef: task.repository_ref,
     status: task.status,
@@ -133,12 +197,20 @@ export async function readTask(
 
 export async function insertTask(
   admin: Admin,
-  input: { userId: string; repositoryUrl: string; repositoryRef: string | null },
+  input: {
+    userId: string;
+    title: string | null;
+    projectName: string | null;
+    repositoryUrl: string | null;
+    repositoryRef: string | null;
+  },
 ): Promise<TensorCloudTask> {
   const { data, error } = await admin
     .from(TABLE)
     .insert({
       user_id: input.userId,
+      title: input.title,
+      project_name: input.projectName,
       repository_url: input.repositoryUrl,
       repository_ref: input.repositoryRef,
     })

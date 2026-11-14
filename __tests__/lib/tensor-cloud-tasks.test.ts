@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/supabaseAdmin", () => ({ createAdminClient: vi.fn() }));
+vi.mock("@/lib/tensor-billing", () => ({
+  effectiveTensorPlan: vi.fn(() => "pro"),
+  getOrCreateTensorBillingAccount: vi.fn(async () => ({ id: "account-1" })),
+}));
 vi.mock("@/lib/tensor-data", async (original) => ({
   ...(await original<typeof import("@/lib/tensor-data")>()),
   authenticateTensorDataRequest: vi.fn(async () => null),
@@ -12,6 +16,7 @@ import { signGatewayTicket, signTaskToken } from "@/lib/tensor-cloud";
 import {
   authenticateTensorCloudTask,
   authenticateTensorInferenceRequest,
+  makeRoomFor,
   reconcileTasks,
   taskJson,
   type TensorCloudTask,
@@ -134,6 +139,8 @@ describe("taskJson", () => {
     const task: TensorCloudTask = {
       id: taskId,
       user_id: "user-1",
+      title: "Build a landing page",
+      project_name: "Bakery site",
       repository_url: "https://github.com/cencori/tensor.git",
       repository_ref: null,
       machine_id: "148e21dc03d789",
@@ -153,6 +160,8 @@ describe("reconcileTasks", () => {
   const base: TensorCloudTask = {
     id: taskId,
     user_id: "user-1",
+    title: null,
+    project_name: null,
     repository_url: "https://github.com/cencori/tensor.git",
     repository_ref: null,
     machine_id: "148e21dc03d789",
@@ -212,5 +221,78 @@ describe("reconcileTasks", () => {
     const get = vi.fn();
     await reconcileTasks(admin, { get } as never, [{ ...base, status: "stopped" }]);
     expect(get).not.toHaveBeenCalled();
+  });
+});
+
+describe("makeRoomFor", () => {
+  const task = (id: string, status: TensorCloudTask["status"]): TensorCloudTask => ({
+    id,
+    user_id: "user-1",
+    title: null,
+    project_name: null,
+    repository_url: null,
+    repository_ref: null,
+    machine_id: `machine-${id}`,
+    volume_id: `vol-${id}`,
+    region: "jnb",
+    status,
+    last_connected_at: null,
+    created_at: "2026-11-13T00:00:00Z",
+    updated_at: "2026-11-13T00:00:00Z",
+  });
+
+  /** An admin client: `openTurns` reservations are open, and every status written is recorded. */
+  function adminWithTurns(openTurns: number) {
+    const written: Array<{ status: string }> = [];
+    const reservations = {
+      select: () => reservations,
+      eq: () => reservations,
+      in: () => reservations,
+      gt: () => reservations,
+      limit: async () => ({ data: Array.from({ length: openTurns }, (_, id) => ({ id })), error: null }),
+    };
+    const admin = {
+      from: (table: string) =>
+        table === "basecode_turn_reservations"
+          ? reservations
+          : {
+              update: (patch: { status: string }) => {
+                written.push(patch);
+                return { eq: async () => ({ error: null }) };
+              },
+            },
+    };
+    return { admin: admin as never, written };
+  }
+
+  it("has nothing to do when nothing else is running", async () => {
+    const { admin, written } = adminWithTurns(1);
+    const stop = vi.fn();
+    expect(await makeRoomFor(admin, { stop }, "user-1", [task("a", "stopped"), task("b", "ready")], "b")).toBe(true);
+    expect(stop).not.toHaveBeenCalled();
+    expect(written).toEqual([]);
+  });
+
+  it("puts the other conversation's machine to sleep when it is idle", async () => {
+    const { admin, written } = adminWithTurns(0);
+    const stop = vi.fn(async () => ({ ok: true as const, value: null }));
+    expect(await makeRoomFor(admin, { stop }, "user-1", [task("a", "ready"), task("b", "stopped")], "b")).toBe(true);
+    expect(stop).toHaveBeenCalledWith("machine-a");
+    expect(written).toEqual([expect.objectContaining({ status: "stopped" })]);
+  });
+
+  it("stops nothing while a turn is in progress", async () => {
+    const { admin, written } = adminWithTurns(1);
+    const stop = vi.fn();
+    expect(await makeRoomFor(admin, { stop }, "user-1", [task("a", "ready")], null)).toBe(false);
+    expect(stop).not.toHaveBeenCalled();
+    expect(written).toEqual([]);
+  });
+
+  it("frees the slot even when the machine is slow to stop", async () => {
+    const { admin, written } = adminWithTurns(0);
+    const stop = vi.fn(async () => ({ ok: false as const, status: 500, error: "busy" }));
+    expect(await makeRoomFor(admin, { stop }, "user-1", [task("a", "ready")], null)).toBe(true);
+    expect(written).toEqual([expect.objectContaining({ status: "stopped" })]);
   });
 });

@@ -18,11 +18,11 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
   const session = await authenticateTensorBillingRequest(request);
   if (!session) return json({ error: "Your Cencori session is invalid." }, 401);
   const config = readTensorCloudConfig();
-  if (!config) return json({ error: "Cloud tasks are not available yet." }, 503);
+  if (!config) return json({ error: "Tensor on the web is not available yet." }, 503);
 
   try {
     const task = await readTask(session.admin, session.user.id, (await context.params).id);
-    if (!task) return json({ error: "That task does not exist." }, 404);
+    if (!task) return json({ error: "That chat does not exist." }, 404);
 
     await updateTask(session.admin, task.id, { status: "deleted" });
     const fly = new FlyMachines(config);
@@ -50,6 +50,6 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
     return json({ deleted: true });
   } catch (error) {
     console.error("[Tensor Cloud] Deleting a task failed", error);
-    return json({ error: "Tensor could not delete this task." }, 503);
+    return json({ error: "Tensor could not delete this chat." }, 503);
   }
 }

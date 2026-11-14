@@ -4,7 +4,9 @@ import {
   FlyMachines,
   isTaskToken,
   normalizeRepositoryRef,
+  normalizeProjectName,
   normalizeRepositoryUrl,
+  normalizeTaskTitle,
   readTensorCloudConfig,
   sandboxMachineRequest,
   sandboxTokenSha256,
@@ -226,6 +228,35 @@ describe("normalizeRepositoryRef", () => {
   );
 });
 
+describe("normalizeTaskTitle", () => {
+  it("is the message on one line", () => {
+    expect(normalizeTaskTitle("  Build me\n a   landing page ")).toBe("Build me a landing page");
+  });
+
+  it("is cut to a length that fits a list", () => {
+    const title = normalizeTaskTitle("x".repeat(200)) as string;
+    expect(title).toHaveLength(80);
+    expect(title.endsWith("…")).toBe(true);
+  });
+
+  it("is nothing when there is nothing to show", () => {
+    expect(normalizeTaskTitle("   ")).toBeNull();
+    expect(normalizeTaskTitle(42)).toBeNull();
+  });
+});
+
+describe("normalizeProjectName", () => {
+  it("tidies a name onto one line and caps its length", () => {
+    expect(normalizeProjectName("  Bakery\n  site ")).toBe("Bakery site");
+    expect(normalizeProjectName("x".repeat(100))).toHaveLength(60);
+  });
+
+  it("is nothing for an empty name or a value that is not text", () => {
+    expect(normalizeProjectName("  ")).toBeNull();
+    expect(normalizeProjectName(null)).toBeNull();
+  });
+});
+
 describe("sandboxMachineRequest", () => {
   const request = sandboxMachineRequest(
     { taskId, userId: "user-1", volumeId: "vol_test", repositoryUrl: "https://github.com/cencori/tensor.git", repositoryRef: null },
@@ -248,6 +279,17 @@ describe("sandboxMachineRequest", () => {
 
   it("mounts the task's volume where the image keeps the repository and the conversation", () => {
     expect(request.config.mounts).toEqual([{ volume: "vol_test", path: "/data" }]);
+  });
+
+  it("starts in an empty workspace when no repository is given", () => {
+    const empty = sandboxMachineRequest(
+      { taskId, userId: "user-1", volumeId: "vol_test", repositoryUrl: null, repositoryRef: "main" },
+      config,
+      now,
+    );
+    expect(empty.config.env).not.toHaveProperty("REPO_URL");
+    expect(empty.config.env).not.toHaveProperty("REPO_REF");
+    expect(empty.config.env).toHaveProperty("CENCORI_TOKEN");
   });
 
   it("has no public service and does not restart itself", () => {

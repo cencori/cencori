@@ -262,6 +262,28 @@ export function normalizeRepositoryUrl(value: unknown): string | null {
   return `https://github.com/${owner}/${name}.git`;
 }
 
+/**
+ * What a task is listed as: the start of its first message, on one line. Null when there is
+ * nothing usable, in which case the task is simply untitled.
+ */
+export function normalizeTaskTitle(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const title = value.replace(/\s+/g, " ").trim();
+  if (!title) return null;
+  return title.length > 80 ? `${title.slice(0, 79).trimEnd()}…` : title;
+}
+
+/**
+ * A project's name as its owner typed it, tidied: one line, at most 60 characters. Null when it
+ * is empty, which the caller reads as "not a project".
+ */
+export function normalizeProjectName(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const name = value.replace(/\s+/g, " ").trim();
+  if (!name) return null;
+  return name.slice(0, 60).trimEnd();
+}
+
 /** A branch or tag name safe to hand to `git clone --branch`, or null. */
 export function normalizeRepositoryRef(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -302,7 +324,8 @@ export function sandboxMachineRequest(
     taskId: string;
     userId: string;
     volumeId: string;
-    repositoryUrl: string;
+    /** Null starts the task in an empty workspace: something new, built from nothing. */
+    repositoryUrl: string | null;
     repositoryRef: string | null;
   },
   config: TensorCloudConfig,
@@ -320,8 +343,8 @@ export function sandboxMachineRequest(
       auto_destroy: false,
       mounts: [{ volume: input.volumeId, path: SANDBOX_VOLUME_PATH }],
       env: {
-        REPO_URL: input.repositoryUrl,
-        ...(input.repositoryRef ? { REPO_REF: input.repositoryRef } : {}),
+        ...(input.repositoryUrl ? { REPO_URL: input.repositoryUrl } : {}),
+        ...(input.repositoryUrl && input.repositoryRef ? { REPO_REF: input.repositoryRef } : {}),
         CENCORI_TOKEN: signTaskToken(input, config.taskTokenSecret, now),
         TENSOR_WS_TOKEN_SHA256: sandboxTokenSha256(config.sandboxTokenSecret, input.taskId),
       },
