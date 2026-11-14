@@ -443,8 +443,8 @@ export default async function MemoryPage() {
                                 One bar. Zero to 100%. <br />You know what to do.
                             </h2>
                             <p className="mt-4 text-sm text-muted-foreground leading-relaxed">
-                                Same shape as Vercel bandwidth or Supabase storage. Free tier fills
-                                fast &mdash; that&rsquo;s the upgrade signal. Reads keep working at
+                                Same shape as Vercel bandwidth or Supabase storage. Memory comes
+                                with Pro and Enterprise, inside the plan price. Reads keep working at
                                 100%; only new writes block, with a clean{' '}
                                 <span className="font-mono text-foreground/90">429 memory_quota_exceeded</span>{' '}
                                 and an upgrade URL in the error payload.
@@ -467,24 +467,24 @@ export default async function MemoryPage() {
                                             Free · Developer
                                         </div>
                                         <h3 className="font-heading text-xl font-semibold text-foreground">
-                                            Start free
+                                            Build first
                                         </h3>
                                         <p className="text-xs text-muted-foreground leading-relaxed">
-                                            The starter tank. Enough to prototype a real product
-                                            and hit the demo bar.
+                                            Memory isn&rsquo;t part of the Free plan. Build and test
+                                            your product on Free, then add memory when you move to Pro.
                                         </p>
                                         <ul className="space-y-2 pt-2">
                                             <li className="flex items-center gap-2 text-xs text-muted-foreground">
                                                 <Check className="h-3.5 w-3.5 text-foreground shrink-0" />
-                                                <span>1,000 memories per project</span>
+                                                <span>100+ models, pay as you go</span>
                                             </li>
                                             <li className="flex items-center gap-2 text-xs text-muted-foreground">
                                                 <Check className="h-3.5 w-3.5 text-foreground shrink-0" />
-                                                <span>session + user scope</span>
+                                                <span>1 agent · 5 knowledge bases</span>
                                             </li>
                                             <li className="flex items-center gap-2 text-xs text-muted-foreground">
                                                 <Check className="h-3.5 w-3.5 text-foreground shrink-0" />
-                                                <span>30 / 90-day retention</span>
+                                                <span>Memory from Pro</span>
                                             </li>
                                         </ul>
                                     </div>
@@ -511,7 +511,7 @@ export default async function MemoryPage() {
                                         <ul className="space-y-2 pt-2">
                                             <li className="flex items-center gap-2 text-xs text-muted-foreground">
                                                 <Check className="h-3.5 w-3.5 text-foreground shrink-0" />
-                                                <span>100,000 memories per project</span>
+                                                <span>50,000 memories per project</span>
                                             </li>
                                             <li className="flex items-center gap-2 text-xs text-muted-foreground">
                                                 <Check className="h-3.5 w-3.5 text-foreground shrink-0" />
@@ -585,8 +585,8 @@ export default async function MemoryPage() {
                                 Give your users a product that remembers.
                             </h2>
                             <p className="mt-4 text-sm text-muted-foreground leading-relaxed">
-                                Two calls and any model, or one flag on the gateway. Start free &mdash;
-                                the usage bar tells you when it&rsquo;s time to upgrade.
+                                Two calls and any model, or one flag on the gateway. Included
+                                with Pro &mdash; no credits needed for memory.
                             </p>
                             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
                                 <Link href={SIGNUP_URL}>
@@ -604,7 +604,7 @@ export default async function MemoryPage() {
                                 </Link>
                             </div>
                             <p className="mt-6 font-mono text-[10px] tracking-wider text-muted-foreground">
-                                Free to start · No credit card · memory@cencori.com for enterprise
+                                Included with Pro · memory@cencori.com for enterprise
                             </p>
                         </div>
                     </div>

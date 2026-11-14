@@ -50,7 +50,6 @@ const tiers: Array<{
             "Bring your own provider keys",
             "1 agent",
             "5 knowledge bases",
-            "1,000 memories per project",
             "1 project",
             "Just you (no team members)",
             "Community support",
@@ -159,19 +158,19 @@ const matrixSections: Array<{
     {
         title: "Memory",
         icon: BrainIcon,
-        description: "Long-term memory for agents and apps.",
+        description: "Long-term memory for agents and apps. Included in the plan price, no credits needed.",
         rows: [
             {
                 feature: "Memories per project",
-                values: { free: "1,000", pro: "50,000", enterprise: "Unlimited" },
+                values: { free: false, pro: "50,000", enterprise: "Unlimited" },
             },
             {
-                feature: "Memory lookups per month",
-                values: { free: "2,000", pro: "50,000", enterprise: "Unlimited" },
+                feature: "Memory lookups per month, across your projects",
+                values: { free: false, pro: "50,000", enterprise: "Unlimited" },
             },
             {
-                feature: "Memory saves per month",
-                values: { free: "1,000", pro: "5,000", enterprise: "Unlimited" },
+                feature: "Memory saves per month, across your projects",
+                values: { free: false, pro: "5,000", enterprise: "Unlimited" },
             },
         ],
     },
