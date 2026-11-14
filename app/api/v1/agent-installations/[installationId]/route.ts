@@ -82,6 +82,11 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ installat
     }
     const patch: Record<string, unknown> = {};
     if (body.overlay_config && typeof body.overlay_config === 'object') patch.overlay_config = body.overlay_config;
+    if (body.approval_policy !== undefined) {
+        const { validateApprovalPolicy } = await import('@/lib/embedded/approval-policy');
+        const checked = validateApprovalPolicy(body.approval_policy);
+        if (!checked.ok) return addGatewayHeaders(embeddedError(400, 'invalid_approval_policy', checked.message, { requestId }), { requestId });
+    }
     if (body.approval_policy && typeof body.approval_policy === 'object') patch.approval_policy = body.approval_policy;
     if (body.budget && typeof body.budget === 'object') patch.budget = body.budget;
     if (body.status === 'active' || body.status === 'disabled') patch.status = body.status;

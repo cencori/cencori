@@ -880,9 +880,36 @@
           },
           "approval_policy": {
             "type": "object",
-            "properties": {},
+            "description": "Per-tool approval rules. auto: runs without asking. required: a person approves each call. deny: the agent is never offered the tool. A tool name ending in * matches by prefix; the most specific match wins, then default.",
+            "properties": {
+              "default": {
+                "type": "string",
+                "enum": [
+                  "auto",
+                  "required",
+                  "deny"
+                ]
+              },
+              "tools": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "enum": [
+                    "auto",
+                    "required",
+                    "deny"
+                  ]
+                }
+              }
+            },
             "additionalProperties": true,
-            "description": "Stored and returned. Not enforced yet: no key changes which tools need approval."
+            "example": {
+              "default": "required",
+              "tools": {
+                "search_contacts": "auto",
+                "delete_contact": "deny"
+              }
+            }
           },
           "overlay_config": {
             "type": "object",
@@ -3106,9 +3133,36 @@
           },
           "approval_policy": {
             "type": "object",
-            "properties": {},
+            "description": "Per-tool approval rules. auto: runs without asking. required: a person approves each call. deny: the agent is never offered the tool. A tool name ending in * matches by prefix; the most specific match wins, then default.",
+            "properties": {
+              "default": {
+                "type": "string",
+                "enum": [
+                  "auto",
+                  "required",
+                  "deny"
+                ]
+              },
+              "tools": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "enum": [
+                    "auto",
+                    "required",
+                    "deny"
+                  ]
+                }
+              }
+            },
             "additionalProperties": true,
-            "description": "Stored and returned. Not enforced yet: no key changes which tools need approval."
+            "example": {
+              "default": "required",
+              "tools": {
+                "search_contacts": "auto",
+                "delete_contact": "deny"
+              }
+            }
           }
         },
         "required": [
@@ -3140,9 +3194,36 @@
           },
           "approval_policy": {
             "type": "object",
-            "properties": {},
+            "description": "Per-tool approval rules. auto: runs without asking. required: a person approves each call. deny: the agent is never offered the tool. A tool name ending in * matches by prefix; the most specific match wins, then default.",
+            "properties": {
+              "default": {
+                "type": "string",
+                "enum": [
+                  "auto",
+                  "required",
+                  "deny"
+                ]
+              },
+              "tools": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "enum": [
+                    "auto",
+                    "required",
+                    "deny"
+                  ]
+                }
+              }
+            },
             "additionalProperties": true,
-            "description": "Stored and returned. Not enforced yet: no key changes which tools need approval."
+            "example": {
+              "default": "required",
+              "tools": {
+                "search_contacts": "auto",
+                "delete_contact": "deny"
+              }
+            }
           },
           "overlay_config": {
             "type": "object",

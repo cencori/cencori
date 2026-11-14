@@ -10,6 +10,7 @@
  * and grants cascade) so partial installs never linger.
  */
 
+import { validateApprovalPolicy } from './approval-policy';
 import { checksumConfig } from './agents';
 import { validateInstallationGrants } from './installation-grants';
 import { dePrefixId } from './http';
@@ -42,6 +43,8 @@ const fail = (status: number, code: string, message: string): MarketplaceInstall
 export async function installMarketplaceVersion(supabase: Admin, input: MarketplaceInstallInput): Promise<MarketplaceInstallResult> {
     const kbIds = input.knowledgeBaseIds ?? [];
     const connIds = input.connectionIds ?? [];
+    const policyCheck = validateApprovalPolicy(input.approvalPolicy);
+    if (!policyCheck.ok) return fail(400, 'invalid_approval_policy', policyCheck.message);
     if (!Array.isArray(kbIds) || kbIds.some((k) => typeof k !== 'string')) {
         return fail(400, 'invalid_request_error', 'knowledge_base_ids must be an array of strings');
     }

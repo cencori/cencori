@@ -127,6 +127,7 @@ type PreparedRun = {
     runAgentTools: { toolset: import('@/lib/embedded/agent-tools').AgentToolset; agentName?: string };
     runConnector: RunnerConnectorContext;
     runNetPolicy: import('@/lib/embedded/net-policy').NetworkPolicy;
+    ruleFor: (name: string) => import('@/lib/embedded/approval-policy').ApprovalRule | null;
     systemParts: string[];
     baseMessages: UnifiedMessage[];
     preGatewayMs: number;
@@ -354,6 +355,12 @@ async function prepareRunExecution(args: {
     runAgentTools.toolset.warm(run.project_id);
     const { resolveActionNetworkPolicy } = await import('@/lib/embedded/net-policy');
     const runNetPolicy = await resolveActionNetworkPolicy(supabase as never, { project_id: run.project_id, run_id: runId, approval_policy: {} });
+    // The installation's per-tool rules: run without asking, ask first, never.
+    const { readApprovalPolicy, ruleForTool } = await import('@/lib/embedded/approval-policy');
+    const installationPolicy = run.installation_id
+        ? readApprovalPolicy(((await supabase.from('agent_installations').select('approval_policy').eq('project_id', run.project_id).eq('id', run.installation_id).maybeSingle()).data as { approval_policy?: unknown } | null)?.approval_policy)
+        : readApprovalPolicy(null);
+    const ruleFor = (name: string) => ruleForTool(installationPolicy, name);
 
     const baseMessages: UnifiedMessage[] = [
         ...(systemParts.length > 0 ? [{ role: 'system' as const, content: systemParts.join('\n\n') }] : []),
@@ -365,7 +372,7 @@ async function prepareRunExecution(args: {
             config, model, reasoningEffort, pinnedConnectionId,
             input, inputText, responseFormat, wantsJson,
             citations, skillsFailed: (skills as { failed?: boolean }).failed === true, runSkillsBlock, runSkillIds,
-            runManifest, runSnapshots, runMcpTools, runAgentTools, runNetPolicy,
+            runManifest, runSnapshots, runMcpTools, runAgentTools, runNetPolicy, ruleFor,
             runConnector: { tools: runConnectorTools, snapshots: runConnectorSnapshots, rows: runConnectorRows, configs: runConnectorConfigs },
             systemParts, baseMessages,
             preGatewayMs: Date.now() - executorStartedAt,
@@ -383,6 +390,7 @@ type LoopContext = {
     runSnapshots: Map<string, import('@/lib/embedded/mcp').McpServerSnapshot>;
     runConnector: RunnerConnectorContext;
     runNetPolicy: import('@/lib/embedded/net-policy').NetworkPolicy;
+    ruleFor: (name: string) => import('@/lib/embedded/approval-policy').ApprovalRule | null;
     organizationId: string;
     abortController: AbortController;
     throwIfCancelled: () => Promise<void>;
@@ -460,7 +468,17 @@ async function runModelLoop(
 
         let progressed = false;
         for (const tc of calls) {
-            // The version's own tools (webhook and system) run directly, no approval step.
+            const rule = ctx.ruleFor(tc.function.name);
+            if (rule === 'deny') {
+                loopMessages = [...loopMessages, { role: 'tool' as const, content: `Tool '${tc.function.name}' is not allowed on this installation.`, toolCallId: tc.id }];
+                continue;
+            }
+            // The version's own tools (webhook and system) run directly. A run
+            // can't wait for a person, so one that needs approval doesn't run here.
+            if (ctx.runAgentTools.toolset.has(tc.function.name) && rule === 'required') {
+                loopMessages = [...loopMessages, { role: 'tool' as const, content: `Tool '${tc.function.name}' needs a person's approval, which a run cannot wait for. It was not run.`, toolCallId: tc.id }];
+                continue;
+            }
             if (ctx.runAgentTools.toolset.has(tc.function.name)) {
                 const outcome = await ctx.runAgentTools.toolset.run(
                     { id: tc.id, name: tc.function.name, args: tc.function.arguments || '{}' },
@@ -497,7 +515,7 @@ async function runModelLoop(
                     progressed = true;
                     continue;
                 }
-                if (classification.approval !== 'auto') {
+                if (rule ? rule === 'required' : classification.approval !== 'auto') {
                     const executionKey = `run_${runId}_i${iteration}_${tc.id}`.slice(0, 64);
                     const { data: action } = await supabase.from('actions').insert({
                         project_id: run.project_id,
@@ -564,8 +582,8 @@ async function runModelLoop(
                 loopMessages = [...loopMessages, { role: 'tool' as const, content: `Unknown tool '${tc.function.name}': not granted by this agent version`, toolCallId: tc.id }];
                 continue;
             }
-            const needsApproval = (ctx.runMcpTools.find((t) => (t as { function: { name: string } }).function.name === tc.function.name) as { needsApproval?: boolean } | undefined)?.needsApproval === true
-                || classifyTool(parsed.tool).approval !== 'auto';
+            const needsApproval = rule ? rule === 'required' : ((ctx.runMcpTools.find((t) => (t as { function: { name: string } }).function.name === tc.function.name) as { needsApproval?: boolean } | undefined)?.needsApproval === true
+                || classifyTool(parsed.tool).approval !== 'auto');
             let args: Record<string, unknown> = {};
             try {
                 args = JSON.parse(tc.function.arguments || '{}') as Record<string, unknown>;
@@ -912,6 +930,7 @@ async function executeRun(runId: string): Promise<void> {
                 supabase, run, runId,
                 baseMessages: prep.baseMessages,
                 runMcpTools: prep.runMcpTools,
+                ruleFor: prep.ruleFor,
                 runAgentTools: prep.runAgentTools,
                 runSnapshots: prep.runSnapshots,
                 runConnector: prep.runConnector,
@@ -1078,6 +1097,7 @@ async function executeRunStream(runId: string, emit: StreamEmit): Promise<void> 
                 supabase, run, runId,
                 baseMessages: prep.baseMessages,
                 runMcpTools: prep.runMcpTools,
+                ruleFor: prep.ruleFor,
                 runAgentTools: prep.runAgentTools,
                 runSnapshots: prep.runSnapshots,
                 runConnector: prep.runConnector,

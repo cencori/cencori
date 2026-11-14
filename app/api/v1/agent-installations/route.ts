@@ -87,6 +87,11 @@ export async function POST(req: NextRequest) {
     } catch {
         return addGatewayHeaders(embeddedError(400, 'invalid_request_error', 'Invalid JSON body', { requestId }), { requestId });
     }
+    {
+        const { validateApprovalPolicy } = await import('@/lib/embedded/approval-policy');
+        const checked = validateApprovalPolicy(body.approval_policy);
+        if (!checked.ok) return addGatewayHeaders(embeddedError(400, 'invalid_approval_policy', checked.message, { requestId }), { requestId });
+    }
     if (!body.tenant_id || !body.agent_id) {
         return addGatewayHeaders(embeddedError(400, 'invalid_request_error', 'tenant_id and agent_id are required', { requestId }), { requestId });
     }

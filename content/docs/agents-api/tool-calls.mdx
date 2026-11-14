@@ -9,7 +9,7 @@ order: 3
 
 | Kind | Who runs it | The turn |
 | --- | --- | --- |
-| Built-in (web search, `render_ui`) and an installed agent's tools | Cencori | Continues on its own |
+| Built-in (web search, `render_ui`) and an installed agent's tools | Cencori | Continues on its own, unless the installation requires approval for the tool |
 | Your function tools, with `pause_on_tool_calls: true` | You | Pauses until you send results |
 | Your function tools, without it | Nobody | Ends with the calls in its output |
 
@@ -31,7 +31,7 @@ data: {
 - `tool_results_required`: run the tools and send the results.
 - `approval_required`: at least one call is to a tool marked `needsApproval`. A person should decide first. The request is recorded in the governance ledger.
 
-Every call in `actions` needs a result to resume, including the ones that didn't need approval.
+Every call in `actions` needs a result to resume, including the ones that didn't need approval. The exception is a call marked `"runs_on": "cencori"`: an installed agent's own tool, held by the installation's [approval rules](/docs/embedded-agents/actions-approvals#per-tool-rules-on-an-installation). Approve the pause and Cencori runs it; send a result for it only to decline that call.
 
 ## Resume
 

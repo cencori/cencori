@@ -29,7 +29,7 @@ export interface SessionEventPayloadMap {
      * 'tool_results_required' = only the caller's own tools were called, run them and resume.
      * Pauses recorded before 2026-11 always say 'approval_required' and carry no needs_approval.
      */
-    'turn.paused': { reason: 'approval_required' | 'tool_results_required' | (string & {}); action_id: string; tool: string; arguments: Record<string, unknown>; actions?: Array<{ action_id: string; tool: string; arguments: string; needs_approval?: boolean }> };
+    'turn.paused': { reason: 'approval_required' | 'tool_results_required' | (string & {}); action_id: string; tool: string; arguments: Record<string, unknown>; actions?: Array<{ action_id: string; tool: string; arguments: string; needs_approval?: boolean; runs_on?: 'cencori' | 'client' }> };
     'turn.resumed': { action_id: string; resolution: 'approved' | 'rejected' };
     'turn.completed': { turn_number: number; output?: unknown; usage?: { input_tokens: number; output_tokens: number; total_tokens: number }; knowledge_citations?: Array<{ chunk_id: string; source_id: string; ord?: number | null; score: number }> };
     'turn.failed': { turn_number: number; output: { error: string }; usage: { input_tokens: number; output_tokens: number; total_tokens: number } };

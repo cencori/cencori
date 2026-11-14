@@ -393,7 +393,10 @@ function makeStream(params: {
                 });
                 // Tools the engine runs itself: the installed agent's, and render_ui.
                 const isRenderUi = (name: string) => Boolean(widgets) && name === RENDER_UI_TOOL_NAME;
-                const runsOnServer = (name: string) => isRenderUi(name) || Boolean(agentTools?.toolset.has(name));
+                // One of the agent's own tools that a person has to approve first: it
+                // doesn't run in the round; the turn pauses, and it runs on approval.
+                const awaitsApproval = (name: string) => Boolean(agentTools?.toolset.has(name)) && needsApprovalToolNames.has(name);
+                const runsOnServer = (name: string) => isRenderUi(name) || (Boolean(agentTools?.toolset.has(name)) && !awaitsApproval(name));
                 /** Widgets shown this turn, summarised so later turns know about them. */
                 const shownWidgets: string[] = [];
                 const renderWidget = async (call: { id: string; name: string }, args: string) => {
@@ -638,6 +641,40 @@ function makeStream(params: {
                                 serverResults.push({ action_id: tc.id, tool: tc.name, arguments: tc.args, output: await renderWidget(tc, tc.args) });
                             }
                             if (serverResults.length > 0) callValues = callValues.filter((t) => !isRenderUi(t.name));
+                            // A call waiting for approval pauses the turn whether or not the
+                            // caller asked for pauses. The agent's other tools called beside it
+                            // run now, so the pause holds only what someone has to act on.
+                            const pausesForApproval = callValues.some((t) => awaitsApproval(t.name));
+                            const pausesForCaller = pauseOnToolCalls && callValues.some((t) => !runsOnServer(t.name));
+                            if (pausesForApproval || pausesForCaller) {
+                                const ranHere = new Set<string>();
+                                for (const tc of callValues.filter((t) => runsOnServer(t.name))) {
+                                    let parsedArgs: Record<string, unknown> = {};
+                                    try { parsedArgs = JSON.parse(tc.args || '{}'); } catch { /* sent as-is below */ }
+                                    await el('tool_call.started', { tool: tc.name, arguments: parsedArgs, action_id: tc.id });
+                                    let output: string;
+                                    try {
+                                        const outcome = await agentTools!.toolset.run({ id: tc.id, name: tc.name, args: tc.args }, {
+                                            organizationId: gatewayCtx.organizationId,
+                                            projectId: gatewayCtx.projectId,
+                                            agentId: agentTools!.agentId,
+                                            agentName: agentTools!.agentName,
+                                            surface: 'conversation',
+                                            conversationId: sessionId,
+                                            transcript: conversation.map((m) => ({ role: m.role, content: m.content ?? '' })),
+                                        });
+                                        if (outcome.endsConversation) conversationEnded = true;
+                                        output = outcome.output;
+                                        await el('tool_call.completed', { tool: tc.name, output: { ok: outcome.ok, status: outcome.status ?? null, result: outcome.output }, action_id: tc.id });
+                                    } catch (e) {
+                                        output = `Tool '${tc.name}' failed: ${(e instanceof Error ? e.message : 'unknown error').slice(0, 500)}`;
+                                        await el('tool_call.completed', { tool: tc.name, output: { ok: false, status: null, result: output }, action_id: tc.id });
+                                    }
+                                    serverResults.push({ action_id: tc.id, tool: tc.name, arguments: tc.args, output });
+                                    ranHere.add(tc.id);
+                                }
+                                if (ranHere.size > 0) callValues = callValues.filter((t) => !ranHere.has(t.id));
+                            }
                             // Messages from this turn's earlier tool rounds, and the last round's
                             // own text, so a resume rebuilds exactly what the model saw.
                             const roundMessages = conversation.slice(messages.length).map(storedMessage);
@@ -661,7 +698,7 @@ function makeStream(params: {
                             // needsApproval tool (approval_required), or the caller just runs
                             // its own tools (tool_results_required). Only the first is a human
                             // approval, so only it reaches the governance ledger.
-                            if (pauseOnToolCalls && callValues.length > 0) {
+                            if (callValues.length > 0 && (pauseOnToolCalls || pausesForApproval)) {
                                 const approvalCalls = callValues.filter(tc => needsApprovalToolNames.has(tc.name));
                                 const needsHuman = approvalCalls.length > 0;
                                 await terminal('turn.paused', {
@@ -674,6 +711,8 @@ function makeStream(params: {
                                         tool: tc.name,
                                         arguments: tc.args,
                                         needs_approval: needsApprovalToolNames.has(tc.name),
+                                        // 'cencori': approve and Cencori runs it. 'client': you run it and send the result.
+                                        runs_on: awaitsApproval(tc.name) ? 'cencori' : 'client',
                                     })),
                                     ...(serverResults.length > 0 ? { server_results: serverResults } : {}),
                                     ...(roundMessages.length > 0 ? { round_messages: roundMessages, round_text: roundText } : {}),
@@ -944,6 +983,8 @@ export type ResumeTurnParams = {
     tokenMap?: Map<string, string>;
     /** Continue under another agent configuration (a handoff); see session-resume-override. */
     override?: ResumeOverride;
+    /** The installed agent's own tools, so the resumed turn can keep running them. */
+    agentTools?: TurnExecuteParams['agentTools'];
 };
 
 export async function resumeSessionTurn(params: ResumeTurnParams): Promise<TurnExecuteResult> {
@@ -953,6 +994,7 @@ export async function resumeSessionTurn(params: ResumeTurnParams): Promise<TurnE
         inputText: resumedInputText, inputSecurity: resumedInputSecurity,
         tokenMap: resumedTokenMap,
         override,
+        agentTools,
     } = params;
 
     try {
@@ -1156,6 +1198,8 @@ export async function resumeSessionTurn(params: ResumeTurnParams): Promise<TurnE
             tier, logSuccess, incrementUsage, recordEndUserUsage,
             resumed: { fromTurn: turnNumber, toolResultIds: toolResults.map(r => r.action_id), originalInputText: inputText },
             widgets,
+            // A handoff leaves the installed agent behind, and its tools with it.
+            agentTools: override?.tools ? undefined : agentTools,
             // The turn's metadata carries over; a handoff's names the new agent.
             turnMetadata: {
                 ...((sp.metadata && typeof sp.metadata === 'object' ? sp.metadata : {}) as Record<string, string>),

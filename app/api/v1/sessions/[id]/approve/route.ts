@@ -1,3 +1,4 @@
+import { loadSessionAgentTools } from '@/lib/embedded/session-toolset';
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { extractGatewayCallerIdentity, logApiGatewayRequest } from "@/lib/api-gateway-logs";
@@ -77,13 +78,16 @@ export async function POST(
         } catch {
             return respondError(400, 'Request body must be valid JSON', 'invalid_json');
         }
-        const { action_id, tool_results } = body;
+        const { action_id } = body;
 
         if (typeof action_id !== 'string' || !action_id.trim()) {
             return respondError(400, "Missing action_id", "missing_action_id");
         }
 
-        if (!Array.isArray(tool_results) || tool_results.length === 0) {
+        // Results may be left out for calls Cencori runs itself on approval
+        // (checked against the pause below).
+        const tool_results = body.tool_results === undefined || body.tool_results === null ? [] : body.tool_results;
+        if (!Array.isArray(tool_results)) {
             return respondError(
                 400,
                 "tool_results are required to resume an approved tool call",
@@ -166,8 +170,24 @@ export async function POST(
                 return respondError(400, `tool_result action_id "${tr.action_id}" does not match any paused tool call`, "invalid_tool_result_action_id");
             }
         }
+        // Calls Cencori runs itself once approved (the installed agent's own
+        // tools under a "required" rule). A result sent for one of them stands
+        // in for running it, which is how a single call is declined.
+        const runsOnCencori = Array.isArray(pausedPayload.actions)
+            ? (pausedPayload.actions as Array<{ action_id?: unknown; tool?: unknown; arguments?: unknown; runs_on?: unknown }>)
+                .filter((action) => action.runs_on === 'cencori' && typeof action.action_id === 'string' && typeof action.tool === 'string')
+                .map((action) => ({
+                    id: action.action_id as string,
+                    name: action.tool as string,
+                    args: typeof action.arguments === 'string' ? action.arguments : JSON.stringify(action.arguments ?? {}),
+                }))
+            : [];
+        const cencoriIds = new Set(runsOnCencori.map((action) => action.id));
         const suppliedIds = new Set(validatedToolResults.map((result) => result.action_id));
-        const missingResult = pausedActions.find((id) => !suppliedIds.has(id));
+        const missingResult = pausedActions.find((id) => !suppliedIds.has(id) && !cencoriIds.has(id));
+        if (missingResult && validatedToolResults.length === 0) {
+            return respondError(400, "tool_results are required to resume an approved tool call", "missing_tool_results");
+        }
         if (missingResult) {
             return respondError(
                 400,
@@ -289,13 +309,44 @@ export async function POST(
             })();
         }
 
+        // The pause is ours now (one approver wins), so the approved calls run
+        // exactly once, here. Their outputs join the caller's results.
+        const toRun = runsOnCencori.filter((action) => !suppliedIds.has(action.id));
+        const sessionScope = session as { installation_id?: string | null; agent_id?: string | null };
+        const agentTools = sessionScope.installation_id
+            ? await loadSessionAgentTools(adminClient, gatewayCtx.projectId, sessionScope).catch(() => null)
+            : null;
+        const approvedResults: Array<{ action_id: string; output: string }> = [];
+        for (const action of toRun) {
+            let output: string;
+            if (!agentTools || !agentTools.toolset.has(action.name)) {
+                output = `Tool '${action.name}' was approved but is no longer available on this agent.`;
+            } else {
+                try {
+                    const outcome = await agentTools.toolset.run({ id: action.id, name: action.name, args: action.args }, {
+                        organizationId: gatewayCtx.organizationId,
+                        projectId: gatewayCtx.projectId,
+                        agentId: agentTools.agentId,
+                        surface: 'conversation',
+                        conversationId: sessionId,
+                        transcript: [],
+                    });
+                    output = outcome.output;
+                } catch (e) {
+                    output = `Tool '${action.name}' failed: ${(e instanceof Error ? e.message : 'unknown error').slice(0, 500)}`;
+                }
+            }
+            approvedResults.push({ action_id: action.id, output });
+        }
+
         // Resume the turn and return its SSE stream.
         const execResult = await resumeSessionTurn({
                 supabase: adminClient as SupabaseAdmin,
                 gatewayCtx,
                 sessionId,
                 turnNumber: session.last_turn_number,
-                toolResults: guardedToolResults,
+                toolResults: [...guardedToolResults, ...approvedResults],
+                agentTools: agentTools ?? undefined,
                 tier: (gatewayCtx.tier || "free") as SubscriptionTier,
                 inputText: toolInputPipeline.inputText,
                 inputSecurity: toolInputPipeline.inputSecurity,

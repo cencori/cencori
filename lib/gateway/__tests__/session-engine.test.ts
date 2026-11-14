@@ -211,6 +211,74 @@ describe('executeSessionTurn', () => {
         expect(incrementUsage).toHaveBeenCalledTimes(1);
     });
 
+    it('holds an agent tool that needs approval: the turn pauses and the tool does not run', async () => {
+        mockStreamGatewayChat.mockImplementation(makeStreamChunks([
+            { toolCalls: [{ id: 'call_1', function: { name: 'book_meeting', arguments: '{"time":"3pm"}' } }], usage: { promptTokens: 40, completionTokens: 5, totalTokens: 45 }, actualModel: 'gpt-4o', actualProvider: 'openai' },
+            { finishReason: 'tool_calls', actualModel: 'gpt-4o', actualProvider: 'openai' },
+        ]) as never);
+
+        const { supabase, gatewayCtx, logSuccess, incrementUsage } = makeGateways();
+        const webhook = { name: 'book_meeting', description: 'Book a meeting', method: 'POST' as const, url: 'https://example.com/book', headers: [], parameters: [{ name: 'time', type: 'string' as const, description: '', required: true }] };
+        const { applyApprovalPolicy, readApprovalPolicy } = await import('@/lib/embedded/approval-policy');
+        const tools = applyApprovalPolicy(webhookToolsModule.webhookToolDefinitions([webhook]) as never[], readApprovalPolicy({ tools: { book_meeting: 'required' } }));
+        const result = await executeSessionTurn({
+            supabase: supabase as never,
+            gatewayCtx: gatewayCtx as never,
+            sessionId: 'sid_1',
+            turnNumber: 1,
+            model: 'gpt-4o',
+            tools: tools as never,
+            agentTools: { toolset: agentToolset({ webhook_tools: [webhook] }), agentId: 'agent_1' },
+            inputMessages: [{ role: 'user', content: 'Book me at 3pm' }],
+            inputText: 'Book me at 3pm',
+            // The caller did not ask for pauses: the installation's rule is what pauses.
+            pauseOnToolCalls: false,
+            endUserId: null,
+            tier: 'free' as never,
+            logSuccess,
+            incrementUsage,
+        });
+        const allData = await (result as { ok: true; response: NextResponse }).response.text();
+
+        expect(mockExecuteWebhookTool).not.toHaveBeenCalled();
+        expect(mockStreamGatewayChat).toHaveBeenCalledTimes(1);
+        const paused = JSON.parse(/event: turn\.paused\ndata: (.+)/.exec(allData)![1]);
+        expect(paused.reason).toBe('approval_required');
+        expect(paused.actions).toEqual([{ action_id: 'call_1', tool: 'book_meeting', arguments: '{"time":"3pm"}', needs_approval: true, runs_on: 'cencori' }]);
+        expect(allData).not.toContain('event: turn.completed');
+    });
+
+    it('runs the agent\'s other tools at the pause, so only the held call waits', async () => {
+        mockStreamGatewayChat.mockImplementation(makeStreamChunks([
+            { toolCalls: [
+                { id: 'call_1', function: { name: 'check_slots', arguments: '{}' } },
+                { id: 'call_2', function: { name: 'book_meeting', arguments: '{"time":"3pm"}' } },
+            ], usage: { promptTokens: 40, completionTokens: 5, totalTokens: 45 }, actualModel: 'gpt-4o', actualProvider: 'openai' },
+            { finishReason: 'tool_calls', actualModel: 'gpt-4o', actualProvider: 'openai' },
+        ]) as never);
+        mockExecuteWebhookTool.mockResolvedValue({ ok: true, status: 200, output: '{"free":["3pm"]}' });
+
+        const { supabase, gatewayCtx, logSuccess, incrementUsage } = makeGateways();
+        const hook = (name: string) => ({ name, description: name, method: 'POST' as const, url: `https://example.com/${name}`, headers: [], parameters: [] });
+        const webhooks = [hook('check_slots'), hook('book_meeting')];
+        const { applyApprovalPolicy, readApprovalPolicy } = await import('@/lib/embedded/approval-policy');
+        const tools = applyApprovalPolicy(webhookToolsModule.webhookToolDefinitions(webhooks) as never[], readApprovalPolicy({ tools: { book_meeting: 'required' } }));
+        const result = await executeSessionTurn({
+            supabase: supabase as never, gatewayCtx: gatewayCtx as never, sessionId: 'sid_1', turnNumber: 1, model: 'gpt-4o',
+            tools: tools as never,
+            agentTools: { toolset: agentToolset({ webhook_tools: webhooks }), agentId: 'agent_1' },
+            inputMessages: [{ role: 'user', content: 'Book me at 3pm' }], inputText: 'Book me at 3pm',
+            pauseOnToolCalls: false, endUserId: null, tier: 'free' as never, logSuccess, incrementUsage,
+        });
+        const allData = await (result as { ok: true; response: NextResponse }).response.text();
+
+        expect(mockExecuteWebhookTool).toHaveBeenCalledTimes(1);
+        expect(mockExecuteWebhookTool.mock.calls[0][0]).toMatchObject({ name: 'check_slots' });
+        const paused = JSON.parse(/event: turn\.paused\ndata: (.+)/.exec(allData)![1]);
+        expect(paused.actions.map((a: { tool: string }) => a.tool)).toEqual(['book_meeting']);
+        expect(paused.server_results).toEqual([{ action_id: 'call_1', tool: 'check_slots', arguments: '{}', output: '{"free":["3pm"]}' }]);
+    });
+
     it('closes the session when the agent ends the conversation', async () => {
         const rounds = [
             [

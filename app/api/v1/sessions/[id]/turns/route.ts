@@ -344,12 +344,14 @@ export async function POST(
         let installedToolset: import('@/lib/embedded/agent-tools').AgentToolset | null = null;
         let effectiveNetworkPolicy: NetworkPolicy | undefined;
         let effectiveBrowserEnabled = false;
+        // The installation's per-tool rules: run without asking, ask first, never.
+        let installationApprovalPolicy: unknown = null;
         {
             const installationId = (session as { installation_id?: string | null }).installation_id;
             if (installationId) {
                 const { data: ins } = await adminClient
                     .from('agent_installations')
-                    .select('agent_id, agent_version_id, status, overlay_config')
+                    .select('agent_id, agent_version_id, status, overlay_config, approval_policy')
                     .eq('project_id', (gatewayCtx as GatewayContext).projectId)
                     .eq('id', installationId)
                     .maybeSingle();
@@ -357,6 +359,7 @@ export async function POST(
                 if (!ins || ins.status !== 'active' || !versionId) {
                     return respondError(403, 'Agent installation is not active', 'installation_inactive');
                 }
+                installationApprovalPolicy = (ins as { approval_policy?: unknown }).approval_policy ?? null;
                 // Pause is an agent-level flag: a paused agent admits no turns
                 // even through an otherwise active installation. The pause check, the
                 // published version and the business's payment options are independent,
@@ -777,6 +780,17 @@ export async function POST(
                     tools.length = 0;
                     tools.push(...filtered);
                 }
+            }
+        }
+
+        // The installation's approval rules, over what survived the allowlist:
+        // denied tools are not offered, "required" ones wait for a person.
+        if (installedManifest && installationApprovalPolicy) {
+            const { applyApprovalPolicy, readApprovalPolicy } = await import('@/lib/embedded/approval-policy');
+            const ruled = applyApprovalPolicy(tools as Array<{ type?: string; function?: { name?: string }; needsApproval?: boolean }>, readApprovalPolicy(installationApprovalPolicy));
+            if (ruled !== tools) {
+                tools.length = 0;
+                tools.push(...(ruled as typeof tools));
             }
         }
 

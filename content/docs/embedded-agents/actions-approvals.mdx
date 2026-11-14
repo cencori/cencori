@@ -68,28 +68,78 @@ On an action, `approval_policy` tells Cencori how to run the tool once it's appr
 
 With none of these, approving records the decision and runs nothing: you run the tool yourself. Actions that a run creates for a gated tool have these filled in already.
 
-## `approval_policy` on an installation
+## Per-tool rules on an installation
 
-An installation stores and returns `approval_policy`, but nothing reads it yet: no key in it changes which tools need approval. Per-tool rules (run without asking, ask first, never run) are not available today. What needs approval is decided by the tool:
+Set `approval_policy` when you create an installation (or `PATCH` it later) to decide, tool by tool, what the agent may do for that tenant:
 
+```json
+{
+  "approval_policy": {
+    "default": "required",
+    "tools": {
+      "search_contacts": "auto",
+      "gmail_*": "required",
+      "delete_contact": "deny"
+    }
+  }
+}
+```
+
+| Rule | Effect |
+| --- | --- |
+| `auto` | The tool runs without asking |
+| `required` | A person approves each call before it runs |
+| `deny` | The agent is never offered the tool |
+
+- `tools` maps a tool name to a rule. A name ending in `*` matches every tool that starts with it. The most specific match wins: exact name, then the longest prefix, then `default`.
+- `default` applies to every tool no entry matches, including the agent's system tools (such as ending the conversation). Leave it out to keep Cencori's own choice for those tools.
+- Tool names are the ones you see in `tool_call.started` and `turn.paused`. An MCP or connector tool can be named by its own name (`send_email`) or by the full name the model sees (`mcp__9f8e7d6c__send_email`).
+- Any other value is refused with `400 invalid_approval_policy`.
+
+Without a rule, the tool's kind decides:
+
+- The agent's own tools (webhook tools, system tools, apps connected on the agent) run without asking.
 - MCP tools: read-only tools run without asking; anything else waits for approval. A server's `readOnlyHint` and `destructiveHint` annotations are respected.
 - Connector operations: `GET` and `HEAD` run without asking; other methods wait for approval.
-- Your own function tools in a session: the ones you mark `needsApproval: true`.
+
+Rules apply from the next turn or run. A turn that is already paused keeps the rules it started with.
 
 ## Approvals in a session
 
-A session turn does not wait in the open stream. When the model calls a tool that needs approval and the turn was sent with `pause_on_tool_calls: true`, the stream ends with `turn.paused` (`reason: "approval_required"`) and the session becomes `paused`. It stays paused for up to 24 hours at no cost.
+A session turn does not wait in the open stream. When the model calls a tool that needs approval, the stream ends with `turn.paused` (`reason: "approval_required"`) and the session becomes `paused`. It stays paused for up to 24 hours at no cost.
 
-`POST /v1/sessions/:id/approve` resumes it. Send the paused `action_id` and a `tool_results` entry for every call in the pause; the reply is a new stream that continues the turn. `POST /v1/sessions/:id/reject` ends the turn instead.
+```
+event: turn.paused
+data: {
+  "reason": "approval_required",
+  "action_id": "call_1",
+  "actions": [
+    { "action_id": "call_1", "tool": "gmail_send_email", "arguments": "{\"to\":\"ada@example.com\"}", "needs_approval": true, "runs_on": "cencori" }
+  ]
+}
+```
 
-`POST /v1/actions/:id/approve` does not resume a session. It decides one action and, when the action is bound to a connection or MCP server, runs the tool and returns its `result`. To have Cencori run a paused tool call:
+Each action says who runs it:
+
+- `"runs_on": "cencori"`: one of the agent's own tools, held by a `required` rule. Approve and Cencori runs it. This pause happens whether or not the turn set `pause_on_tool_calls`.
+- `"runs_on": "client"`: your function tool, or an MCP or connector tool. You send its result. These pause only when the turn was sent with `pause_on_tool_calls: true`; without it the turn completes with the calls in its output.
+
+`POST /v1/sessions/:id/approve` with the pause's `action_id` resumes the turn; the reply is a new stream that continues it.
+
+- For `cencori` actions, send nothing: Cencori runs the tool and gives the model its result. `tool_results` can be left out when every action runs on Cencori.
+- To decline one `cencori` action and let the rest go ahead, send a `tool_results` entry for it (`"The user declined to send this email."`). The tool does not run and the model is told what you wrote.
+- For `client` actions, send a `tool_results` entry each, as before.
+
+`POST /v1/sessions/:id/reject` declines the whole pause and ends the turn.
+
+`POST /v1/actions/:id/approve` does not resume a session. It decides one action and, when the action is bound to a connection or MCP server, runs the tool and returns its `result`. To have Cencori run a paused MCP or connector call (`runs_on: "client"`):
 
 1. On `turn.paused`, create an action for the call with `POST /v1/actions` (`tool`, `arguments`, `session_id`, and the binding in `approval_policy`). You receive `action.required`.
 2. When a person approves, call `POST /v1/actions/:id/approve` and take `result` from the response.
 3. Pass that result as the call's `output` in `POST /v1/sessions/:id/approve`.
 
-Without `pause_on_tool_calls`, the turn completes with the tool calls in its output and nothing pauses.
+## Approvals in a run
 
-Tools an agent runs itself (its webhook tools, system tools, and the apps connected on the agent) run inside the turn without an approval step.
+A run cannot wait for a person. An MCP or connector call that needs approval becomes a pending action (you receive `action.required`) and the run fails with `approval_required`; approve the action to run the tool. One of the agent's own tools under a `required` rule is not run, and the model is told why. Denied tools are refused in both cases.
 
 Session approvals are mirrored into the actions index after the fact, so one timeline covers both. See [Tool calls and approvals](/docs/agents-api/tool-calls) for the full pause and resume reference.
