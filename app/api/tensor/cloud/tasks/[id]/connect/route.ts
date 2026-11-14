@@ -55,7 +55,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
 
     if (task.status === "stopped") {
       const all = await reconcileTasks(session.admin, fly, await listTasks(session.admin, session.user.id));
-      if (!(await makeRoomFor(session.admin, fly, session.user.id, all, task.id))) {
+      if (!(await makeRoomFor(session.admin, fly, all, task.id))) {
         return json({ error: STILL_WORKING, code: "running_limit" }, 409);
       }
       // The running slot is taken in the database before the machine is started, so two tasks

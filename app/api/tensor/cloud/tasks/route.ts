@@ -141,7 +141,7 @@ export async function POST(request: NextRequest) {
         409,
       );
     }
-    if (!(await makeRoomFor(session.admin, fly, session.user.id, existing, null))) {
+    if (!(await makeRoomFor(session.admin, fly, existing, null))) {
       return json({ error: STILL_WORKING, code: "running_limit" }, 409);
     }
 

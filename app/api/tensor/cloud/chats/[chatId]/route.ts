@@ -6,6 +6,7 @@ import {
   deleteChatRow,
   destroyTask,
   isThreadId,
+  noteTurnEnded,
   readChat,
   readTask,
   setChatArchived,
@@ -19,7 +20,7 @@ function json(body: unknown, status = 200) {
 }
 
 /**
- * Changes a chat: renames it, archives it or brings it back, or notes what just happened in it (its runtime
+ * Changes a chat: renames it, archives it or brings it back, records that its turn ended, or notes what just happened in it (its runtime
  * thread, the first time there is one, and that it is the most recently used).
  *
  * The thread id comes from the page, which got it from the sandbox. It is only ever used to ask
@@ -46,6 +47,12 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ c
       await setChatTitle(session.admin, chat.id, title);
       // The name as kept (tidied, and cut to length), so the page shows what was saved.
       return json({ ok: true, title });
+    }
+    // A page saw the turn it was watching end: the project is no longer working (isMidTurn), and
+    // may be put to sleep when another is opened.
+    if (body.turnEnded === true) {
+      await noteTurnEnded(session.admin, chat.task_id);
+      return json({ ok: true });
     }
     if (body.archived !== undefined) {
       if (typeof body.archived !== "boolean") return json({ error: "That request is invalid." }, 400);

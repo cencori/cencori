@@ -42,6 +42,10 @@ export type TensorCloudTask = {
   last_connected_at: string | null;
   /** When the project was archived; null or absent for one in use. */
   archived_at?: string | null;
+  /** When the project's machine last made a model call (see isMidTurn). */
+  last_model_call_at?: string | null;
+  /** When a page last saw a turn end in the project. */
+  turn_ended_at?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -135,23 +139,46 @@ export function projectsAmong(tasks: TensorCloudTask[]): TensorCloudTask[] {
 }
 
 /**
- * Whether Tensor is in the middle of a turn for this account, on any device.
- *
- * Every turn holds a usage reservation from before it starts until it ends, so an open one means
- * work is in progress somewhere. It does not say where, which is why the caller treats it as
- * "do not stop anything".
+ * How long after a project's last model call it is still taken to be working, when nothing has
+ * said the turn ended. A turn is model calls with the agent's own work between them (a command, a
+ * build), so the gap has to cover the longest of those; it is the same quarter hour after which a
+ * machine with nothing happening stops itself.
  */
-export async function hasOpenTurn(admin: Admin, userId: string): Promise<boolean> {
-  const account = await getOrCreateTensorBillingAccount(admin, userId);
-  const { data, error } = await admin
-    .from("basecode_turn_reservations")
-    .select("id")
-    .eq("account_id", account.id)
-    .in("status", ["reserved", "running"])
-    .gt("expires_at", new Date().toISOString())
-    .limit(1);
+export const WORKING_WINDOW_MS = 15 * 60_000;
+
+/**
+ * Whether Tensor is in the middle of a turn in this project.
+ *
+ * The project's machine is the only thing that makes model calls with its token, and a turn is
+ * model calls from start to finish, so: it called recently, and no page has seen the turn end
+ * since. Read from the project itself, not from the account's usage reservation: that says a turn
+ * is open somewhere on the account but not where, and other things close it (another device
+ * releasing stale reservations, a page settling a turn it only thinks has ended), which is how a
+ * turn came to be cut off.
+ *
+ * It errs towards "working": a turn whose end nobody saw (the tab was closed) keeps its project
+ * for the rest of the window. That delays opening another project; the other mistake loses work.
+ */
+export function isMidTurn(
+  task: Pick<TensorCloudTask, "last_model_call_at" | "turn_ended_at">,
+  now: number = Date.now(),
+): boolean {
+  const called = task.last_model_call_at ? Date.parse(task.last_model_call_at) : Number.NaN;
+  if (!Number.isFinite(called) || now - called > WORKING_WINDOW_MS) return false;
+  const ended = task.turn_ended_at ? Date.parse(task.turn_ended_at) : Number.NaN;
+  return !(Number.isFinite(ended) && ended >= called);
+}
+
+/** Notes that a project's machine has just asked for a model call. */
+export async function noteModelCall(admin: Admin, taskId: string): Promise<void> {
+  const { error } = await admin.from(TABLE).update({ last_model_call_at: new Date().toISOString() }).eq("id", taskId);
   if (error) throw error;
-  return (data ?? []).length > 0;
+}
+
+/** Notes that a turn in a project has been seen to end. */
+export async function noteTurnEnded(admin: Admin, taskId: string): Promise<void> {
+  const { error } = await admin.from(TABLE).update({ turn_ended_at: new Date().toISOString() }).eq("id", taskId);
+  if (error) throw error;
 }
 
 /**
@@ -159,16 +186,15 @@ export async function hasOpenTurn(admin: Admin, userId: string): Promise<boolean
  *
  * People are not shown sandboxes and are not asked to manage them: opening one conversation while
  * another's machine is still up should simply work. So the other machine is put to sleep, which
- * loses nothing (its files and conversation are on its volume) unless Tensor is mid-turn there.
- * That is the one case this refuses, by returning false: a turn must not be cut off because the
- * person looked at something else.
+ * loses nothing (its files and conversation are on its volume) unless Tensor is mid-turn there
+ * (isMidTurn). That is the one case this refuses, by returning false: a turn must not be cut off
+ * because the person looked at something else.
  *
  * `tasks` must already be reconciled against Fly.
  */
 export async function makeRoomFor(
   admin: Admin,
   fly: Pick<FlyMachines, "stop">,
-  userId: string,
   tasks: TensorCloudTask[],
   exceptTaskId: string | null,
 ): Promise<boolean> {
@@ -176,7 +202,8 @@ export async function makeRoomFor(
     (task) => task.id !== exceptTaskId && (task.status === "ready" || task.status === "creating"),
   );
   if (running.length === 0) return true;
-  if (await hasOpenTurn(admin, userId)) return false;
+  // Asked of the very machines that would be stopped.
+  if (running.some((task) => isMidTurn(task))) return false;
 
   for (const task of running) {
     // Marked first, so its credential is refused from now on and the slot is free even if the
@@ -767,5 +794,11 @@ export async function authenticateTensorInferenceRequest(
 
   const admin = createAdminClient();
   const task = await authenticateTensorCloudTask(admin, authorization);
-  return task ? { admin, user: { id: task.userId } } : null;
+  if (!task) return null;
+  // What says the project is working (isMidTurn). Not waited for: a model call is not held up,
+  // or failed, over a note about itself.
+  void noteModelCall(admin, task.taskId).catch((error) => {
+    console.error(`[Tensor Cloud] Noting a model call of task ${task.taskId} failed`, error);
+  });
+  return { admin, user: { id: task.userId } };
 }

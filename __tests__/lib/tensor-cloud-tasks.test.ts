@@ -21,6 +21,7 @@ import {
   ensureSpare,
   isThreadId,
   listChats,
+  isMidTurn,
   makeRoomFor,
   projectJson,
   projectsAmong,
@@ -44,6 +45,8 @@ const secrets = {
 /** An admin client whose one table holds the given row. */
 function adminWith(row: { user_id: string; status: string } | null) {
   const lookups: string[] = [];
+  /** What was written, and to which task. */
+  const updates: Array<{ id: string; patch: Record<string, unknown> }> = [];
   const admin = {
     from: () => ({
       select: () => ({
@@ -52,9 +55,15 @@ function adminWith(row: { user_id: string; status: string } | null) {
           return { maybeSingle: async () => ({ data: row, error: null }) };
         },
       }),
+      update: (patch: Record<string, unknown>) => ({
+        eq: async (_column: string, id: string) => {
+          updates.push({ id, patch });
+          return { error: null };
+        },
+      }),
     }),
   };
-  return { admin: admin as never, lookups };
+  return { admin: admin as never, lookups, updates };
 }
 
 const bearer = (userId = "user-1") =>
@@ -128,6 +137,23 @@ describe("authenticateTensorInferenceRequest", () => {
     const session = await authenticateTensorInferenceRequest(bearer());
     expect(session?.user).toEqual({ id: "user-1" });
     expect(authenticateTensorDataRequest).not.toHaveBeenCalled();
+  });
+
+  it("notes the model call against the project that made it, which is what says it is working", async () => {
+    const { admin, updates } = adminWith({ user_id: "user-1", status: "ready" });
+    vi.mocked(createAdminClient).mockReturnValue(admin);
+    await authenticateTensorInferenceRequest(bearer());
+    await vi.waitFor(() => expect(updates).toHaveLength(1));
+    expect(updates[0]?.id).toBe(taskId);
+    expect(isMidTurn({ last_model_call_at: updates[0]?.patch.last_model_call_at as string, turn_ended_at: null })).toBe(true);
+  });
+
+  it("notes nothing for a token that is refused", async () => {
+    const { admin, updates } = adminWith({ user_id: "user-1", status: "stopped" });
+    vi.mocked(createAdminClient).mockReturnValue(admin);
+    await authenticateTensorInferenceRequest(bearer());
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(updates).toEqual([]);
   });
 
   it("never falls back to the session check for a refused task token", async () => {
@@ -233,8 +259,34 @@ describe("reconcileTasks", () => {
   });
 });
 
+describe("isMidTurn", () => {
+  const NOW = Date.parse("2026-11-14T17:13:30Z");
+  const at = (minutesAgo: number) => new Date(NOW - minutesAgo * 60_000).toISOString();
+
+  it("is working after a recent model call that no one has seen end", () => {
+    expect(isMidTurn({ last_model_call_at: at(4), turn_ended_at: null }, NOW)).toBe(true);
+    // The turn before it ended; this call is a new one.
+    expect(isMidTurn({ last_model_call_at: at(1), turn_ended_at: at(9) }, NOW)).toBe(true);
+  });
+
+  it("is not working once the turn has been seen to end", () => {
+    expect(isMidTurn({ last_model_call_at: at(4), turn_ended_at: at(3) }, NOW)).toBe(false);
+    expect(isMidTurn({ last_model_call_at: at(4), turn_ended_at: at(4) }, NOW)).toBe(false);
+  });
+
+  it("is not working when it has never called, or not for a long while", () => {
+    expect(isMidTurn({ last_model_call_at: null, turn_ended_at: null }, NOW)).toBe(false);
+    expect(isMidTurn({}, NOW)).toBe(false);
+    // A turn whose end nobody saw holds its project for the window, and no longer.
+    expect(isMidTurn({ last_model_call_at: at(14), turn_ended_at: null }, NOW)).toBe(true);
+    expect(isMidTurn({ last_model_call_at: at(16), turn_ended_at: null }, NOW)).toBe(false);
+    expect(isMidTurn({ last_model_call_at: "not a date", turn_ended_at: null }, NOW)).toBe(false);
+  });
+});
+
 describe("makeRoomFor", () => {
-  const task = (id: string, status: TensorCloudTask["status"]): TensorCloudTask => ({
+  const recently = () => new Date(Date.now() - 60_000).toISOString();
+  const task = (id: string, status: TensorCloudTask["status"], working = false): TensorCloudTask => ({
     id,
     user_id: "user-1",
     title: null,
@@ -246,62 +298,62 @@ describe("makeRoomFor", () => {
     region: "jnb",
     status,
     last_connected_at: null,
+    last_model_call_at: working ? recently() : null,
+    turn_ended_at: null,
     created_at: "2026-11-13T00:00:00Z",
     updated_at: "2026-11-13T00:00:00Z",
   });
 
-  /** An admin client: `openTurns` reservations are open, and every status written is recorded. */
-  function adminWithTurns(openTurns: number) {
+  /** An admin client that records every status written. It is asked nothing else. */
+  function recordingAdmin() {
     const written: Array<{ status: string }> = [];
-    const reservations = {
-      select: () => reservations,
-      eq: () => reservations,
-      in: () => reservations,
-      gt: () => reservations,
-      limit: async () => ({ data: Array.from({ length: openTurns }, (_, id) => ({ id })), error: null }),
-    };
     const admin = {
-      from: (table: string) =>
-        table === "basecode_turn_reservations"
-          ? reservations
-          : {
-              update: (patch: { status: string }) => {
-                written.push(patch);
-                return { eq: async () => ({ error: null }) };
-              },
-            },
+      from: () => ({
+        update: (patch: { status: string }) => {
+          written.push(patch);
+          return { eq: async () => ({ error: null }) };
+        },
+      }),
     };
     return { admin: admin as never, written };
   }
 
   it("has nothing to do when nothing else is running", async () => {
-    const { admin, written } = adminWithTurns(1);
+    const { admin, written } = recordingAdmin();
     const stop = vi.fn();
-    expect(await makeRoomFor(admin, { stop }, "user-1", [task("a", "stopped"), task("b", "ready")], "b")).toBe(true);
+    expect(await makeRoomFor(admin, { stop }, [task("a", "stopped"), task("b", "ready", true)], "b")).toBe(true);
     expect(stop).not.toHaveBeenCalled();
     expect(written).toEqual([]);
   });
 
-  it("puts the other conversation's machine to sleep when it is idle", async () => {
-    const { admin, written } = adminWithTurns(0);
+  it("puts the other project's machine to sleep when it is idle", async () => {
+    const { admin, written } = recordingAdmin();
     const stop = vi.fn(async () => ({ ok: true as const, value: null }));
-    expect(await makeRoomFor(admin, { stop }, "user-1", [task("a", "ready"), task("b", "stopped")], "b")).toBe(true);
+    expect(await makeRoomFor(admin, { stop }, [task("a", "ready"), task("b", "stopped")], "b")).toBe(true);
     expect(stop).toHaveBeenCalledWith("machine-a");
     expect(written).toEqual([expect.objectContaining({ status: "stopped" })]);
   });
 
-  it("stops nothing while a turn is in progress", async () => {
-    const { admin, written } = adminWithTurns(1);
+  it("stops nothing while Tensor is mid-turn in the project that would be stopped", async () => {
+    const { admin, written } = recordingAdmin();
     const stop = vi.fn();
-    expect(await makeRoomFor(admin, { stop }, "user-1", [task("a", "ready")], null)).toBe(false);
+    expect(await makeRoomFor(admin, { stop }, [task("a", "ready", true)], null)).toBe(false);
     expect(stop).not.toHaveBeenCalled();
     expect(written).toEqual([]);
   });
 
+  it("is not held up by a turn that has been seen to end", async () => {
+    const { admin } = recordingAdmin();
+    const stop = vi.fn(async () => ({ ok: true as const, value: null }));
+    const done = { ...task("a", "ready", true), turn_ended_at: new Date().toISOString() };
+    expect(await makeRoomFor(admin, { stop }, [done], null)).toBe(true);
+    expect(stop).toHaveBeenCalledWith("machine-a");
+  });
+
   it("frees the slot even when the machine is slow to stop", async () => {
-    const { admin, written } = adminWithTurns(0);
+    const { admin, written } = recordingAdmin();
     const stop = vi.fn(async () => ({ ok: false as const, status: 500, error: "busy" }));
-    expect(await makeRoomFor(admin, { stop }, "user-1", [task("a", "ready")], null)).toBe(true);
+    expect(await makeRoomFor(admin, { stop }, [task("a", "ready")], null)).toBe(true);
     expect(written).toEqual([expect.objectContaining({ status: "stopped" })]);
   });
 });
