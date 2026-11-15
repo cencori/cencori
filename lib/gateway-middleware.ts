@@ -23,7 +23,7 @@ import { getCachedApiKeyConfig, getCachedTensorAccess, setCachedApiKeyConfig } f
 import { processUsageQueue } from '@/lib/queue';
 import { recordGatewayGovernanceDecision } from '@/lib/governance/record-decision';
 import { isFullySponsoredApiKey } from '@/lib/gateway/model-access';
-import { isMeteredGatewayRequest, mayProceedOnEmptyWallet } from '@/lib/gateway/credit-policy';
+import { describeManagedCall, isMeteredGatewayRequest, mayProceedOnEmptyWallet } from '@/lib/gateway/credit-policy';
 import type { GatewayPerformanceTracker } from '@/lib/gateway/performance';
 import {
     isProjectIngressAllowed,
@@ -804,16 +804,22 @@ export async function validateGatewayRequest(
                 environment: keyData.environment ?? undefined,
             })
         );
+        // Someone with their own key gets this when the gateway found no key for
+        // the provider their model runs on. Say which, or it reads as a billing bug.
+        const managedCall = await describeManagedCall({ req, defaultModel: project.default_model });
         return {
             success: false,
             response: addGatewayHeaders(
                 NextResponse.json(
                     {
                         error: 'Credit balance exhausted',
-                        message: 'Your organization has run out of credits. Top up to continue.',
+                        message: managedCall
+                            ? `Your organization has run out of credits. ${managedCall.model} runs on ${managedCall.provider}, and this project has no active ${managedCall.provider} key of its own, so the call would use Cencori's. Add your ${managedCall.provider} key to this project, or top up to continue.`
+                            : 'Your organization has run out of credits. Top up to continue.',
                         code: 'credit_balance_exhausted',
                         balance: 0,
                         top_up_url: '/billing',
+                        ...(managedCall ? { model: managedCall.model, provider: managedCall.provider } : {}),
                     },
                     { status: 403 }
                 ),

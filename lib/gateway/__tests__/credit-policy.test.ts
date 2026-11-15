@@ -6,7 +6,7 @@ vi.mock('@/lib/providers/custom-provider-routing', () => ({
     resolveCustomProviderForProject: vi.fn().mockResolvedValue(null),
 }));
 
-import { isMeteredGatewayRequest, isProvenByokRequest, mayProceedOnEmptyWallet } from '@/lib/gateway/credit-policy';
+import { describeManagedCall, isMeteredGatewayRequest, isProvenByokRequest, mayProceedOnEmptyWallet } from '@/lib/gateway/credit-policy';
 import { canonicalGatewayPath } from '@/lib/gateway/canonical-path';
 
 type Fake = {
@@ -126,6 +126,20 @@ describe('gateway credit policy', () => {
             .toBe(false);
         expect(await isProvenByokRequest({ ...base, req: turn(), supabase: fakeDb({ consoleKey: true, session: null }) as never }))
             .toBe(false);
+    });
+
+    it('names the model and the provider whose key was missing, for the refusal', async () => {
+        const chat = (body: unknown) => new NextRequest('http://localhost/v1/chat/completions', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+        });
+        expect(await describeManagedCall({ req: chat({ model: 'gpt-4.1-mini', messages: [] }), defaultModel: null }))
+            .toEqual({ model: 'gpt-4.1-mini', provider: 'openai' });
+        // No model in the request: the project's default is what would run.
+        expect(await describeManagedCall({ req: chat({ messages: [] }), defaultModel: 'claude-sonnet-4-5' }))
+            .toEqual({ model: 'claude-sonnet-4-5', provider: 'anthropic' });
+        // Nothing to place: the plain message stands.
+        expect(await describeManagedCall({ req: chat({ messages: [] }), defaultModel: null })).toBeNull();
+        expect(await describeManagedCall({ req: chat({ model: 'no-such-model-x' }), defaultModel: null })).toBeNull();
     });
 
     it('reads a public /v1 path as the endpoint it is served from', () => {

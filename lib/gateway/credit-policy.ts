@@ -197,3 +197,27 @@ async function byokVerdict(params: ByokParams): Promise<'byok' | 'managed' | 'un
         return 'managed';
     }
 }
+
+/**
+ * Why a chat call on an empty wallet was judged to need credits, for the
+ * refusal: the model it asked for and the provider that model runs on. A
+ * caller who added their own key needs to know the gateway looked for a key
+ * for *this* provider on *this* project and found none. Null when the request
+ * names no model that can be placed.
+ */
+export async function describeManagedCall(params: Pick<ByokParams, 'req' | 'defaultModel'>): Promise<{ model: string; provider: string } | null> {
+    const pathname = canonicalGatewayPath(params.req.nextUrl.pathname);
+    const isChat = pathname === '/api/ai/chat' || pathname === '/api/ai/completions'
+        || pathname === '/api/v1/chat/completions' || pathname === '/api/v1/responses';
+    if (!isChat) return null;
+    try {
+        const body: unknown = await params.req.clone().json();
+        const explicit = body && typeof body === 'object' && typeof (body as { model?: unknown }).model === 'string'
+            ? (body as { model: string }).model.trim() : '';
+        const model = explicit || params.defaultModel || '';
+        if (!model || isAutoRouterModel(model)) return null;
+        return { model, provider: new ProviderRouter().detectProvider(model) };
+    } catch {
+        return null;
+    }
+}
