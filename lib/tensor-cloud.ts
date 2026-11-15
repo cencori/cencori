@@ -219,7 +219,8 @@ export function signDeployTicket(
       ...(input.action === "publish" && input.machineId ? { kind: "app", machine: input.machineId } : {}),
       ...(input.action === "env" && input.machineId ? { kind: "app", machine: input.machineId } : {}),
       ...(input.action === "plan" && input.paused ? { paused: true } : {}),
-      ...(((input.action === "publish" && input.machineId) || (input.action === "plan" && !input.paused)) && input.limits
+      // A site of files carries them too: what it sends counts against the account's data.
+      ...((input.action === "publish" || (input.action === "plan" && !input.paused)) && input.limits
         ? {
             limits: {
               monthlyBytes: input.limits.monthlyBytes,
@@ -525,7 +526,10 @@ export type TensorCloudAccess = {
 export type SiteAllowance = {
   /** The size of its disk, which holds its code and its live data. */
   volumeGb: number;
-  /** What it may send to visitors in a calendar month. */
+  /**
+   * What the account's sites and apps may send to visitors in a calendar month, between them.
+   * Sites cost nothing to keep, but what they send is billed like an app's, so they share it.
+   */
   monthlyBytes: number;
   /** How long its machine may run in a calendar month. It only runs while it is being visited. */
   monthlyAwakeSeconds: number;
@@ -539,30 +543,32 @@ const GB = 1024 ** 3;
 const HOUR = 3600;
 
 /**
- * A static site costs nothing to keep. An app with a server is a machine, a disk and the data it
- * sends, all billed to Cencori for as long as it stays published. So every plan's allowance is
- * sized from what it can cost at its most, and an app that outgrows it needs a larger plan.
+ * A static site costs nothing to keep, but what it sends is billed. An app with a server is a
+ * machine, a disk and the data it sends, all billed to Cencori for as long as it stays published.
+ * So every plan's allowance is sized from what it can cost at its most, and an app that outgrows
+ * it needs a larger plan. Data is the account's: its sites and its apps share one monthly amount.
  *
  * The three smaller plans are each held under a dollar a month at the very most, with every
  * allowance used up. Worked from Fly's prices in Johannesburg, taken as: disk $0.15 per GB, the
  * stopped machine's image about $0.10, the smallest machine about $0.0044 an hour while it runs
  * (about $3.20 a month if it never slept), data sent $0.12 per GB.
  *
- *   starter  1 app   1 GB disk   50 h   1 GB sent    0.25 + 0.22 + 0.12 = $0.59
- *   builder  1 app   1 GB disk   80 h   2 GB sent    0.25 + 0.35 + 0.24 = $0.84
- *   pro      1 app   1 GB disk  100 h   2.5 GB sent  0.25 + 0.44 + 0.30 = $0.99
- *   max      3 apps  2 GB disk  200 h   5 GB sent    3 x (0.40 + 0.88 + 0.60) = $5.64
- *   ultra    5 apps  2 GB disk  always  10 GB sent   5 x (0.40 + 3.20 + 1.20) = $24.00
+ *   starter  1 app   1 GB disk   50 h each   1 GB sent     0.25 + 0.22 + 0.12 = $0.59
+ *   builder  1 app   1 GB disk   80 h each   2 GB sent     0.25 + 0.35 + 0.24 = $0.84
+ *   pro      1 app   1 GB disk  100 h each   2.5 GB sent   0.25 + 0.44 + 0.30 = $0.99
+ *   max      3 apps  2 GB disk  200 h each   15 GB sent    3 x (0.40 + 0.88) + 1.80 = $5.64
+ *   ultra    5 apps  2 GB disk  always on    50 GB sent    5 x (0.40 + 3.20) + 6.00 = $24.00
  *
- * If Fly's prices or the region change, these are the numbers to work out again.
+ * The rule, and the working, are the Tensor repo's cloud/PRICING.md. If Fly's prices or the
+ * region change, these are the numbers to work out again.
  */
 const SITE_ALLOWANCES: Record<string, { apps: number; site: SiteAllowance }> = {
   starter: { apps: 1, site: { volumeGb: 1, monthlyBytes: 1 * GB, monthlyAwakeSeconds: 50 * HOUR, uploadBytes: 40 * MB, appBytes: 150 * MB } },
   builder: { apps: 1, site: { volumeGb: 1, monthlyBytes: 2 * GB, monthlyAwakeSeconds: 80 * HOUR, uploadBytes: 60 * MB, appBytes: 250 * MB } },
   pro: { apps: 1, site: { volumeGb: 1, monthlyBytes: 2.5 * GB, monthlyAwakeSeconds: 100 * HOUR, uploadBytes: 80 * MB, appBytes: 300 * MB } },
-  max: { apps: 3, site: { volumeGb: 2, monthlyBytes: 5 * GB, monthlyAwakeSeconds: 200 * HOUR, uploadBytes: 150 * MB, appBytes: 600 * MB } },
-  ultra: { apps: 5, site: { volumeGb: 2, monthlyBytes: 10 * GB, monthlyAwakeSeconds: 744 * HOUR, uploadBytes: 150 * MB, appBytes: 600 * MB } },
-  enterprise: { apps: 5, site: { volumeGb: 2, monthlyBytes: 10 * GB, monthlyAwakeSeconds: 744 * HOUR, uploadBytes: 150 * MB, appBytes: 600 * MB } },
+  max: { apps: 3, site: { volumeGb: 2, monthlyBytes: 15 * GB, monthlyAwakeSeconds: 200 * HOUR, uploadBytes: 150 * MB, appBytes: 600 * MB } },
+  ultra: { apps: 5, site: { volumeGb: 2, monthlyBytes: 50 * GB, monthlyAwakeSeconds: 744 * HOUR, uploadBytes: 150 * MB, appBytes: 600 * MB } },
+  enterprise: { apps: 5, site: { volumeGb: 2, monthlyBytes: 50 * GB, monthlyAwakeSeconds: 744 * HOUR, uploadBytes: 150 * MB, appBytes: 600 * MB } },
 };
 
 const PRIVATE_REPOSITORY_PLANS = new Set(["pro", "max", "ultra", "enterprise"]);

@@ -4,9 +4,10 @@ import { createAdminClient } from "@/lib/supabaseAdmin";
 import { readTensorCloudConfig } from "@/lib/tensor-cloud";
 import { accountsWithApps, applyPlanToApps } from "@/lib/tensor-cloud-tasks";
 
-// Once a day, every published Tensor app is brought in line with its owner's plan as it is now:
-// new allowances when the plan changed, paused when it lapsed or no longer includes the app,
-// served again when it does. Nothing is deleted: a paused app keeps its data.
+// Once a day, everything published from Tensor is brought in line with its owner's plan as it is
+// now: new allowances when the plan changed, paused when it lapsed or no longer includes it,
+// served again when it does. An app paused for 30 days is deleted, with its data, after a warning
+// by email a week before (lib/tensor-cloud-tasks.ts, applyPlanToApps).
 
 async function run(request: NextRequest) {
   const off = cronDisabled();
@@ -20,13 +21,15 @@ async function run(request: NextRequest) {
   if (!config) return NextResponse.json({ skipped: "Tensor cloud is not set up here." });
 
   const admin = createAdminClient();
-  const totals = { accounts: 0, applied: 0, paused: 0, failed: 0 };
+  const totals = { accounts: 0, applied: 0, paused: 0, warned: 0, deleted: 0, failed: 0 };
   for (const userId of await accountsWithApps(admin)) {
     try {
       const done = await applyPlanToApps(admin, config, userId);
       totals.accounts += 1;
       totals.applied += done.applied;
       totals.paused += done.paused;
+      totals.warned += done.warned;
+      totals.deleted += done.deleted;
       totals.failed += done.failed;
     } catch (error) {
       totals.failed += 1;

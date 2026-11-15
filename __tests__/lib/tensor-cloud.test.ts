@@ -404,8 +404,9 @@ describe("tensorCloudAccess", () => {
     // hour, data by the gigabyte.
     const most = (plan: string) => {
       const { backendApps, site } = tensorCloudAccess(plan);
-      const each = site!.volumeGb * 0.15 + 0.1 + (site!.monthlyAwakeSeconds / 3600) * 0.0044 + (site!.monthlyBytes / 1024 ** 3) * 0.12;
-      return backendApps * each;
+      // Each app's disk, image and running time; then what the account sends, sites and apps together.
+      const each = site!.volumeGb * 0.15 + 0.1 + (site!.monthlyAwakeSeconds / 3600) * 0.0044;
+      return backendApps * each + (site!.monthlyBytes / 1024 ** 3) * 0.12;
     };
     for (const plan of ["starter", "builder", "pro"]) expect(most(plan)).toBeLessThanOrEqual(1);
     expect(most("starter")).toBeLessThan(most("builder"));
@@ -527,7 +528,11 @@ describe("published apps", () => {
     const limits = { volumeGb: 1, monthlyBytes: 1, monthlyAwakeSeconds: 2, uploadBytes: 3, appBytes: 4 };
     const limited = claimsOf(signDeployTicket({ userId: "u", taskId: "t", name: "shop", action: "publish", machineId: "148e21dc03d789", limits }, secret));
     expect(limited.limits).toEqual({ monthlyBytes: 1, monthlyAwakeSeconds: 2, uploadBytes: 3, appBytes: 4 });
-    expect(claimsOf(signDeployTicket({ userId: "u", taskId: "t", name: "shop", action: "publish", limits }, secret)).limits).toBeUndefined();
+    // A site of files carries them too, for what it may send, and names no machine.
+    const site = claimsOf(signDeployTicket({ userId: "u", taskId: "t", name: "shop", action: "publish", limits }, secret));
+    expect(site.limits).toEqual({ monthlyBytes: 1, monthlyAwakeSeconds: 2, uploadBytes: 3, appBytes: 4 });
+    expect(site.machine).toBeUndefined();
+    expect(site.kind).toBeUndefined();
     // Handing an app its variables names its machine too; nothing else is in the ticket.
     const env = claimsOf(signDeployTicket({ userId: "u", taskId: "t", name: "shop", action: "env", machineId: "148e21dc03d789" }, secret));
     expect(env).toMatchObject({ action: "env", kind: "app", machine: "148e21dc03d789" });

@@ -654,6 +654,9 @@ export type TensorCloudDeployment = {
   /** The machine a published app runs on, and its disk. Null for a project that has none. */
   machine_id: string | null;
   volume_id: string | null;
+  /** When the owner's plan stopped including this app, and when they were warned it will go. */
+  paused_at?: string | null;
+  pause_warned_at?: string | null;
 };
 
 export function deploymentJson(deployment: TensorCloudDeployment) {
@@ -662,6 +665,9 @@ export function deploymentJson(deployment: TensorCloudDeployment) {
     kind: deployment.kind ?? "static",
     publishedAt: deployment.published_at,
     updatedAt: deployment.updated_at,
+    // A paused app: since when, and when it will be deleted if nothing changes.
+    pausedAt: deployment.paused_at ?? null,
+    deletesAt: deployment.kind === "app" && deployment.paused_at ? pauseDeletesAt(deployment.paused_at) : null,
   };
 }
 
@@ -875,39 +881,160 @@ export async function applySitePlan(
   }
 }
 
-/** Applies one account's plan to every app it has published. */
-export async function applyPlanToApps(admin: Admin, config: TensorCloudConfig, userId: string): Promise<{ applied: number; paused: number; failed: number }> {
-  const access = await readCloudAccess(admin, userId);
-  const included = await includedApps(admin, userId, access.site ? access.backendApps : 0);
+/** How long a published app may stay paused before it is deleted, and when its owner is warned. */
+export const PAUSE_DELETE_DAYS = 30;
+export const PAUSE_WARN_DAYS = 23;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** When a paused app will be deleted, if nothing changes. */
+export function pauseDeletesAt(pausedAt: string): string {
+  return new Date(new Date(pausedAt).getTime() + PAUSE_DELETE_DAYS * DAY_MS).toISOString();
+}
+
+type PublishedRow = Pick<TensorCloudDeployment, "task_id" | "user_id" | "name" | "kind" | "machine_id" | "volume_id" | "paused_at" | "pause_warned_at">;
+
+/** Everything an account has published: sites of files and apps. */
+async function publishedOf(admin: Admin, userId: string): Promise<PublishedRow[]> {
   const { data, error } = await admin
     .from(DEPLOYMENTS)
-    .select("task_id, user_id, name")
+    .select("task_id, user_id, name, kind, machine_id, volume_id, paused_at, pause_warned_at")
     .eq("user_id", userId)
-    .eq("kind", "app")
-    .not("machine_id", "is", null)
     .not("published_at", "is", null);
   if (error) throw error;
-  const totals = { applied: 0, paused: 0, failed: 0 };
-  for (const deployment of (data ?? []) as Pick<TensorCloudDeployment, "task_id" | "user_id" | "name">[]) {
-    const keep = included.has(deployment.task_id) ? access.site : null;
-    const result = await applySitePlan(config, deployment, keep);
-    if (!result.ok) {
+  return (data ?? []) as PublishedRow[];
+}
+
+/** What a plan allows one published thing now: its allowance, or null when it is to be paused. */
+export async function planFor(
+  admin: Admin,
+  userId: string,
+  deployment: Pick<TensorCloudDeployment, "task_id" | "kind" | "machine_id">,
+  access?: TensorCloudAccess,
+): Promise<TensorCloudAccess["site"] | null> {
+  const plan = access ?? (await readCloudAccess(admin, userId));
+  if (!plan.tasks || !plan.site) return null;
+  // A site of files is included by any plan that publishes. An app, only if it is one of the
+  // ones the plan has room for: those published first.
+  if (deployment.kind !== "app" || !deployment.machine_id) return plan.site;
+  return (await includedApps(admin, userId, plan.backendApps)).has(deployment.task_id) ? plan.site : null;
+}
+
+/** Notes where a published app is in being paused: begun, warned, or over (it is served again). */
+async function notePause(admin: Admin, taskId: string, change: { paused_at?: string | null; pause_warned_at?: string | null }): Promise<void> {
+  const { error } = await admin.from(DEPLOYMENTS).update(change).eq("task_id", taskId);
+  if (error) throw error;
+}
+
+/**
+ * Takes a published app down for good: its machine, its disk and its data, its name, and what
+ * the gateway held of it. For an app paused past its grace period. True when it is all gone.
+ */
+export async function deleteSite(admin: Admin, config: TensorCloudConfig, deployment: PublishedRow, fetcher: typeof fetch = fetch): Promise<boolean> {
+  const { sitesFly } = await import("@/lib/tensor-cloud");
+  if ((deployment.machine_id || deployment.volume_id) && !(await destroySiteMachine(admin, sitesFly(config), deployment))) return false;
+  const ticket = signDeployTicket({ userId: deployment.user_id, taskId: deployment.task_id, name: deployment.name, action: "remove" }, config.ticketSecret);
+  await fetcher(`${gatewayHttpUrl(config.gatewayUrl)}/v1/sites?ticket=${encodeURIComponent(ticket)}`, {
+    method: "DELETE",
+    signal: AbortSignal.timeout(20_000),
+  }).catch(() => null);
+  await deleteDeployment(admin, deployment.task_id);
+  return true;
+}
+
+/** Tells an account's owner, by email, that a paused app is about to be deleted. Best effort. */
+async function warnOfDeletion(deployment: PublishedRow, domain: string): Promise<boolean> {
+  const [{ adminUsers }, { sendEmail }, { tensorSiteDeletionEmail }, unsubscribe, { getBaseUrl }] = await Promise.all([
+    import("@/lib/auth/admin-users"),
+    import("@/lib/email/sendbyte"),
+    import("@/lib/email/tensor-site-deletion"),
+    import("@/lib/user-unsubscribe"),
+    import("@/lib/newsletter"),
+  ]);
+  const user = (await adminUsers.getUserById(deployment.user_id)).data.user;
+  if (!user?.email || !deployment.paused_at) return false;
+  const fullName = (user.user_metadata as { full_name?: unknown } | null)?.full_name;
+  const baseUrl = getBaseUrl();
+  const email = tensorSiteDeletionEmail({
+    firstName: typeof fullName === "string" ? fullName.split(/\s+/)[0] || null : null,
+    address: `${deployment.name}.${domain}`,
+    when: new Date(pauseDeletesAt(deployment.paused_at)).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }),
+    preferencesUrl: "https://tensorade.app/settings",
+    unsubscribeUrl: unsubscribe.buildUserUnsubscribeUrl(baseUrl, deployment.user_id, unsubscribe.generateUserUnsubscribeToken(deployment.user_id)),
+  });
+  return sendEmail({ to: [user.email], subject: email.subject, html: email.html });
+}
+
+/**
+ * Applies one account's plan to everything it has published, and carries paused apps through
+ * their grace period: noted when paused, warned a week before, deleted after 30 days, and the
+ * clock stopped if the plan includes them again. Sites of files are paused but never deleted:
+ * they cost nothing to keep.
+ */
+export async function applyPlanToApps(
+  admin: Admin,
+  config: TensorCloudConfig,
+  userId: string,
+  now: number = Date.now(),
+): Promise<{ applied: number; paused: number; warned: number; deleted: number; failed: number }> {
+  const access = await readCloudAccess(admin, userId);
+  const included = await includedApps(admin, userId, access.tasks && access.site ? access.backendApps : 0);
+  const totals = { applied: 0, paused: 0, warned: 0, deleted: 0, failed: 0 };
+  let domain: string | null = null;
+  for (const deployment of await publishedOf(admin, userId)) {
+    const isApp = deployment.kind === "app" && Boolean(deployment.machine_id);
+    const keep = access.tasks && access.site && (!isApp || included.has(deployment.task_id)) ? access.site : null;
+    try {
+      if (isApp && !keep && deployment.paused_at && now - new Date(deployment.paused_at).getTime() >= PAUSE_DELETE_DAYS * DAY_MS) {
+        if (await deleteSite(admin, config, deployment)) totals.deleted += 1;
+        else totals.failed += 1;
+        continue;
+      }
+      const result = await applySitePlan(config, deployment, keep);
+      if (!result.ok) {
+        totals.failed += 1;
+        console.error(`[Tensor Cloud] Applying the plan to what task ${deployment.task_id} published failed: ${result.error}`);
+        continue;
+      }
+      if (!result.usage.paused) {
+        totals.applied += 1;
+        if (deployment.paused_at || deployment.pause_warned_at) await notePause(admin, deployment.task_id, { paused_at: null, pause_warned_at: null });
+        continue;
+      }
+      totals.paused += 1;
+      if (!isApp) continue;
+      if (!deployment.paused_at) {
+        await notePause(admin, deployment.task_id, { paused_at: new Date(now).toISOString() });
+        continue;
+      }
+      if (!deployment.pause_warned_at && now - new Date(deployment.paused_at).getTime() >= PAUSE_WARN_DAYS * DAY_MS) {
+        domain ??= await sitesDomainOf(config);
+        // Recorded only once it went: a warning that could not be sent is tried again tomorrow.
+        if (await warnOfDeletion(deployment, domain)) {
+          await notePause(admin, deployment.task_id, { pause_warned_at: new Date(now).toISOString() });
+          totals.warned += 1;
+        }
+      }
+    } catch (error) {
       totals.failed += 1;
-      console.error(`[Tensor Cloud] Applying the plan to the app of task ${deployment.task_id} failed: ${result.error}`);
-    } else if (result.usage.paused) totals.paused += 1;
-    else totals.applied += 1;
+      console.error(`[Tensor Cloud] Carrying what task ${deployment.task_id} published through its plan failed`, error);
+    }
   }
   return totals;
 }
 
-/** Every account that has an app published, for the daily pass that keeps them in line with plans. */
+/** The domain sites are served under, as the gateway says. */
+async function sitesDomainOf(config: TensorCloudConfig): Promise<string> {
+  try {
+    const answer = await fetch(`${gatewayHttpUrl(config.gatewayUrl)}/v1/sites`, { signal: AbortSignal.timeout(15_000) });
+    return ((await answer.json()) as { domain?: string }).domain || "cencori.app";
+  } catch {
+    return "cencori.app";
+  }
+}
+
+/** Every account that has something published, for the daily pass that keeps them in line with plans. */
 export async function accountsWithApps(admin: Admin): Promise<string[]> {
-  const { data, error } = await admin
-    .from(DEPLOYMENTS)
-    .select("user_id")
-    .eq("kind", "app")
-    .not("machine_id", "is", null)
-    .not("published_at", "is", null);
+  const { data, error } = await admin.from(DEPLOYMENTS).select("user_id").not("published_at", "is", null);
   if (error) throw error;
   return [...new Set(((data ?? []) as { user_id: string }[]).map((row) => row.user_id))];
 }

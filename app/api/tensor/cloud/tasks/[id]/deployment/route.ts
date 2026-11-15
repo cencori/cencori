@@ -19,7 +19,7 @@ import {
   applySitePlan,
   ensureSiteMachine,
   giveSiteVariables,
-  includedApps,
+  planFor,
   markPublished,
   readCloudAccess,
   readDeployment,
@@ -87,11 +87,22 @@ export async function GET(request: NextRequest, context: Context) {
     // A published app: its plan as it is now is applied (looking is one of the times it is), and
     // what it has used this month is said.
     let usage: SiteUsage | null = null;
-    if (deployment?.kind === "app" && deployment.machine_id && deployment.published_at) {
-      const included = await includedApps(session.admin, session.user.id, access.site ? access.backendApps : 0);
-      const applied = await applySitePlan(config, deployment, included.has(task.id) ? access.site : null);
-      if (applied.ok) usage = applied.usage;
-      else console.error(`[Tensor Cloud] Applying the plan to the app of task ${task.id} failed: ${applied.error}`);
+    if (deployment?.published_at) {
+      const applied = await applySitePlan(config, deployment, await planFor(session.admin, session.user.id, deployment, access));
+      if (applied.ok) {
+        usage = applied.usage;
+        // Served again: the grace period, if one had begun, is over.
+        if (!usage.paused && deployment.paused_at) {
+          await session.admin.from("tensor_cloud_deployments").update({ paused_at: null, pause_warned_at: null }).eq("task_id", task.id);
+          deployment.paused_at = null;
+        }
+        // Paused just now: an app's grace period begins (a site of files has none).
+        if (usage.paused && !deployment.paused_at && deployment.kind === "app") {
+          const now = new Date().toISOString();
+          await session.admin.from("tensor_cloud_deployments").update({ paused_at: now }).eq("task_id", task.id);
+          deployment.paused_at = now;
+        }
+      } else console.error(`[Tensor Cloud] Applying the plan to what task ${task.id} published failed: ${applied.error}`);
     }
     return json({
       usage,
@@ -193,7 +204,8 @@ export async function POST(request: NextRequest, context: Context) {
         // The copy under the old name goes once the new one is up, and only if there was one.
         replaces: before && before.name !== name && before.published_at ? before.name : null,
         machineId,
-        limits: asApp ? access.site : null,
+        // A site of files carries them too: what it sends counts against the account's data.
+        limits: access.site,
       },
       config.ticketSecret,
     );
