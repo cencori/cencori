@@ -80,6 +80,23 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # Brimble's registry stalls an upload at 850 MiB of a layer and sometimes
+      # corrupts it (deploy/app/Dockerfile). Say so here if a layer grows back.
+      - name: Check layer sizes
+        continue-on-error: true
+        env:
+          IMAGE: ${{ steps.meta.outputs.image }}
+        run: |
+          raw=$(docker buildx imagetools inspect "$IMAGE" --raw)
+          digest=$(echo "$raw" | jq -r 'if .manifests then ([.manifests[] | select(.platform.os != "unknown")][0].digest) else empty end')
+          if [ -n "$digest" ]; then raw=$(docker buildx imagetools inspect "${IMAGE%%:*}@${digest}" --raw); fi
+          echo "$raw" | jq -r '.layers[] | "\(.size / 1048576 | floor) MiB  \(.digest[7:19])"'
+          largest=$(echo "$raw" | jq '[.layers[].size] | max / 1048576 | floor')
+          echo "Largest layer: ${largest} MiB"
+          if [ "$largest" -ge 750 ]; then
+            echo "::warning::An image layer is ${largest} MiB. Brimble's registry stalls at 850 MiB; split it in deploy/app/Dockerfile."
+          fi
+
   release:
     needs: build
     if: vars.BRIMBLE_IMAGE_DEPLOY == 'true'

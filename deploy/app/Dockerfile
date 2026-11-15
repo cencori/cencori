@@ -37,6 +37,18 @@ RUN --mount=type=secret,id=buildenv,required=true \
 
 RUN npm prune --omit=dev --ignore-scripts && rm -rf .next/cache
 
+# Set the big directories aside so the runtime stage can copy each as a layer
+# of its own. As one layer the app was 1.16GB, and Brimble's registry stalls
+# every upload at 850 MiB of a layer; when the stall ran long the upload came
+# out corrupt and the deploy failed ("unexpected commit digest", 2026-11-14,
+# twice). No layer may come near that size. node_modules is the largest, so it
+# goes as two: scoped packages (@scope/...) and the rest.
+RUN mkdir -p .cache .next /layers/modules-scoped \
+    && mv node_modules/@* /layers/modules-scoped/ \
+    && mv node_modules /layers/modules \
+    && mv .next /layers/next \
+    && mv .cache /layers/cache
+
 
 FROM node:22-bookworm-slim AS runtime
 WORKDIR /app
@@ -55,7 +67,16 @@ ENV NODE_ENV=production \
     PUPPETEER_CACHE_DIR=/app/.cache/puppeteer \
     PORT=3000
 
+# Five layers, none near 850 MiB (see the build stage). The two node_modules
+# copies merge into one directory; least-changing first.
+COPY --from=build /layers/modules /app/node_modules
+COPY --from=build /layers/modules-scoped /app/node_modules
+COPY --from=build /layers/cache /app/.cache
+COPY --from=build /layers/next /app/.next
 COPY --from=build /app /app
+# Fail the build here, not the deploy, if the pieces didn't come back together.
+RUN test -x node_modules/.bin/next && test -f .next/BUILD_ID && test -f scripts/brimble-apply-sql.mjs \
+    && node -e "require.resolve('next'); require.resolve('@next/env'); require.resolve('pg')"
 
 EXPOSE 3000
 # The project's pre-start command (node scripts/brimble-apply-sql.mjs) runs in
