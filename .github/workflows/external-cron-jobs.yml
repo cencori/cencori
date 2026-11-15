@@ -28,6 +28,7 @@ on:
           - knowledge-refresh
           - finops-push
           - costgraph-marketplace
+          - tensor-sites
 
 permissions:
   contents: read
@@ -527,6 +528,56 @@ jobs:
             echo "### CostGraph Marketplace Sync"
             echo
             echo "- URL: \`$BASE_URL/api/cron/costgraph-marketplace\`"
+            echo "- Triggered at: \`$(date -u +"%Y-%m-%dT%H:%M:%SZ")\`"
+            echo
+            echo '```json'
+            cat "$RESPONSE_FILE"
+            echo
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  tensor-sites:
+    name: Keep published Tensor apps in line with their plans
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: >
+      (github.event_name == 'workflow_dispatch' &&
+      (github.event.inputs.target == 'all' || github.event.inputs.target == 'tensor-sites')) ||
+      (github.event_name == 'schedule' && github.event.schedule == '41 5 * * *')
+    env:
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      CENCORI_CRON_BASE_URL: ${{ vars.CENCORI_CRON_BASE_URL }}
+    steps:
+      - name: Validate configuration
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "Missing required GitHub secret: CRON_SECRET" >&2
+            exit 1
+          fi
+
+      - name: Invoke Tensor sites cron
+        run: |
+          BASE_URL="${CENCORI_CRON_BASE_URL:-https://cencori.com}"
+          BASE_URL="${BASE_URL%/}"
+          RESPONSE_FILE="$(mktemp)"
+
+          curl --fail-with-body --silent --show-error \
+            --max-time 600 \
+            --retry 2 \
+            --retry-delay 10 \
+            --request POST \
+            --header "Authorization: Bearer $CRON_SECRET" \
+            --header "Content-Type: application/json" \
+            "$BASE_URL/api/cron/tensor-sites" \
+            --output "$RESPONSE_FILE"
+
+          echo "Triggered $BASE_URL/api/cron/tensor-sites"
+          cat "$RESPONSE_FILE"
+
+          {
+            echo "### Tensor Sites"
+            echo
+            echo "- URL: \`$BASE_URL/api/cron/tensor-sites\`"
             echo "- Triggered at: \`$(date -u +"%Y-%m-%dT%H:%M:%SZ")\`"
             echo
             echo '```json'

@@ -192,13 +192,18 @@ export function signDeployTicket(
     userId: string;
     taskId: string;
     name: string;
-    /** "env": hand a published app's machine the project's environment variables. */
-    action: "publish" | "remove" | "env";
+    /**
+     * "env": hand a published app's machine the project's environment variables. "plan": bring a
+     * published app in line with its owner's plan as it is now (its limits, or `paused`).
+     */
+    action: "publish" | "remove" | "env" | "plan";
     replaces?: string | null;
     /** An app is published to its own machine, which the ticket names; a static site has none. */
     machineId?: string | null;
     /** What the owner's plan allows that app, for the gateway to hold it to. */
     limits?: Pick<SiteAllowance, "monthlyBytes" | "monthlyAwakeSeconds" | "uploadBytes" | "appBytes"> | null;
+    /** "plan": the owner's plan does not include this app at the moment. */
+    paused?: boolean;
   },
   secret: string,
   now: number = Math.floor(Date.now() / 1000),
@@ -213,7 +218,8 @@ export function signDeployTicket(
       ...(input.replaces ? { replaces: input.replaces } : {}),
       ...(input.action === "publish" && input.machineId ? { kind: "app", machine: input.machineId } : {}),
       ...(input.action === "env" && input.machineId ? { kind: "app", machine: input.machineId } : {}),
-      ...(input.action === "publish" && input.machineId && input.limits
+      ...(input.action === "plan" && input.paused ? { paused: true } : {}),
+      ...(((input.action === "publish" && input.machineId) || (input.action === "plan" && !input.paused)) && input.limits
         ? {
             limits: {
               monthlyBytes: input.limits.monthlyBytes,

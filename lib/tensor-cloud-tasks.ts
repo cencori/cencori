@@ -816,6 +816,102 @@ export async function giveSiteVariables(
   }
 }
 
+/** What a published app has used this month, against what its plan allows, as the gateway counts it. */
+export type SiteUsage = {
+  month: string;
+  bytes: number;
+  awakeSeconds: number;
+  limits: { monthlyBytes: number; monthlyAwakeSeconds: number; uploadBytes: number; appBytes: number };
+  paused: boolean;
+};
+
+/**
+ * Which of an account's published apps its plan includes now: the ones published first, as many
+ * as the plan allows. The rest are paused until the plan includes them again.
+ */
+export async function includedApps(admin: Admin, userId: string, allowed: number): Promise<Set<string>> {
+  const { data, error } = await admin
+    .from(DEPLOYMENTS)
+    .select("task_id")
+    .eq("user_id", userId)
+    .eq("kind", "app")
+    .not("machine_id", "is", null)
+    .not("published_at", "is", null)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return new Set(((data ?? []) as { task_id: string }[]).slice(0, Math.max(0, allowed)).map((row) => row.task_id));
+}
+
+/**
+ * Brings a published app in line with its owner's plan as it is now, through the gateway: its
+ * allowances, or paused when the plan does not include it. Says what it has used this month.
+ */
+export async function applySitePlan(
+  config: TensorCloudConfig,
+  deployment: Pick<TensorCloudDeployment, "task_id" | "user_id" | "name">,
+  allowance: TensorCloudAccess["site"] | null,
+  fetcher: typeof fetch = fetch,
+): Promise<{ ok: true; usage: SiteUsage } | { ok: false; error: string }> {
+  const ticket = signDeployTicket(
+    {
+      userId: deployment.user_id,
+      taskId: deployment.task_id,
+      name: deployment.name,
+      action: "plan",
+      ...(allowance ? { limits: allowance } : { paused: true }),
+    },
+    config.ticketSecret,
+  );
+  try {
+    const response = await fetcher(`${gatewayHttpUrl(config.gatewayUrl)}/v1/sites/plan?ticket=${encodeURIComponent(ticket)}`, {
+      method: "POST",
+      signal: AbortSignal.timeout(20_000),
+    });
+    const said = (await response.json().catch(() => ({}))) as { usage?: SiteUsage; error?: unknown };
+    if (response.ok && said.usage) return { ok: true, usage: said.usage };
+    return { ok: false, error: typeof said.error === "string" ? said.error : `The gateway answered ${response.status}.` };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "The gateway could not be reached." };
+  }
+}
+
+/** Applies one account's plan to every app it has published. */
+export async function applyPlanToApps(admin: Admin, config: TensorCloudConfig, userId: string): Promise<{ applied: number; paused: number; failed: number }> {
+  const access = await readCloudAccess(admin, userId);
+  const included = await includedApps(admin, userId, access.site ? access.backendApps : 0);
+  const { data, error } = await admin
+    .from(DEPLOYMENTS)
+    .select("task_id, user_id, name")
+    .eq("user_id", userId)
+    .eq("kind", "app")
+    .not("machine_id", "is", null)
+    .not("published_at", "is", null);
+  if (error) throw error;
+  const totals = { applied: 0, paused: 0, failed: 0 };
+  for (const deployment of (data ?? []) as Pick<TensorCloudDeployment, "task_id" | "user_id" | "name">[]) {
+    const keep = included.has(deployment.task_id) ? access.site : null;
+    const result = await applySitePlan(config, deployment, keep);
+    if (!result.ok) {
+      totals.failed += 1;
+      console.error(`[Tensor Cloud] Applying the plan to the app of task ${deployment.task_id} failed: ${result.error}`);
+    } else if (result.usage.paused) totals.paused += 1;
+    else totals.applied += 1;
+  }
+  return totals;
+}
+
+/** Every account that has an app published, for the daily pass that keeps them in line with plans. */
+export async function accountsWithApps(admin: Admin): Promise<string[]> {
+  const { data, error } = await admin
+    .from(DEPLOYMENTS)
+    .select("user_id")
+    .eq("kind", "app")
+    .not("machine_id", "is", null)
+    .not("published_at", "is", null);
+  if (error) throw error;
+  return [...new Set(((data ?? []) as { user_id: string }[]).map((row) => row.user_id))];
+}
+
 /**
  * Destroys a published app's machine and its disk, with the app's live data. True when nothing
  * of it is left on Fly; what could not be removed is logged, and stays on record to try again.

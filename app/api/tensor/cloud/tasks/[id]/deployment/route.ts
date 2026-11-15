@@ -16,14 +16,17 @@ import {
   deleteDeployment,
   deploymentJson,
   destroySiteMachine,
+  applySitePlan,
   ensureSiteMachine,
   giveSiteVariables,
+  includedApps,
   markPublished,
   readCloudAccess,
   readDeployment,
   readTask,
   readVariables,
   siteNameAvailable,
+  type SiteUsage,
   type TensorCloudTask,
 } from "@/lib/tensor-cloud-tasks";
 
@@ -81,7 +84,17 @@ export async function GET(request: NextRequest, context: Context) {
     const { session, config, task } = opened;
     const deployment = await readDeployment(session.admin, task.id);
     const access = await readCloudAccess(session.admin, session.user.id);
+    // A published app: its plan as it is now is applied (looking is one of the times it is), and
+    // what it has used this month is said.
+    let usage: SiteUsage | null = null;
+    if (deployment?.kind === "app" && deployment.machine_id && deployment.published_at) {
+      const included = await includedApps(session.admin, session.user.id, access.site ? access.backendApps : 0);
+      const applied = await applySitePlan(config, deployment, included.has(task.id) ? access.site : null);
+      if (applied.ok) usage = applied.usage;
+      else console.error(`[Tensor Cloud] Applying the plan to the app of task ${task.id} failed: ${applied.error}`);
+    }
     return json({
+      usage,
       // What the owner's plan allows a published app with a server of its own.
       allowance: { backendApps: access.backendApps, site: access.site },
       deployment: deployment ? deploymentJson(deployment) : null,

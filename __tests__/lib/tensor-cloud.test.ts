@@ -532,6 +532,13 @@ describe("published apps", () => {
     const env = claimsOf(signDeployTicket({ userId: "u", taskId: "t", name: "shop", action: "env", machineId: "148e21dc03d789" }, secret));
     expect(env).toMatchObject({ action: "env", kind: "app", machine: "148e21dc03d789" });
     expect(env.limits).toBeUndefined();
+    // A plan as it is now: its allowances, or paused, and never both.
+    const allowed = claimsOf(signDeployTicket({ userId: "u", taskId: "t", name: "shop", action: "plan", limits }, secret));
+    expect(allowed.limits).toEqual({ monthlyBytes: 1, monthlyAwakeSeconds: 2, uploadBytes: 3, appBytes: 4 });
+    expect(allowed.paused).toBeUndefined();
+    const paused = claimsOf(signDeployTicket({ userId: "u", taskId: "t", name: "shop", action: "plan", paused: true, limits }, secret));
+    expect(paused.paused).toBe(true);
+    expect(paused.limits).toBeUndefined();
     const removal = claimsOf(signDeployTicket({ userId: "u", taskId: "t", name: "shop", action: "remove", machineId: "148e21dc03d789" }, secret));
     expect(removal.machine).toBeUndefined();
   });
