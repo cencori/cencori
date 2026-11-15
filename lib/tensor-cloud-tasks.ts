@@ -885,6 +885,14 @@ export async function destroyTask(
   await deleteVariables(admin, task.id).catch((error) => {
     console.error(`[Tensor Cloud] Deleting the variables of task ${task.id} failed`, error);
   });
+  // The repository it pushed to is forgotten the same way, and for the same reason.
+  await admin
+    .from("tensor_cloud_git")
+    .delete()
+    .eq("task_id", task.id)
+    .then(({ error }) => {
+      if (error) console.error(`[Tensor Cloud] Disconnecting the repository of task ${task.id} failed`, error);
+    });
   // Its published app, if it has one, stops being billed with it. A row whose machine could not
   // be destroyed is kept, so what is still running is still on record.
   const deployment = sites ? await readDeployment(admin, task.id) : null;

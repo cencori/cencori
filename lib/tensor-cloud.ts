@@ -337,6 +337,98 @@ export function openVariables(sealed: string, secret: string, taskId: string): T
 }
 
 /* ---------------------------------------------------------------------------
+   GitHub: signing in, and the tokens that come of it
+   --------------------------------------------------------------------------- */
+
+/** The places Tensor on the web is served from: the only ones a sign-in may return to. */
+const TENSOR_SITE_ORIGINS = ["https://tensorade.app", "https://www.tensorade.app"];
+const TENSOR_DEV_ORIGINS = ["http://127.0.0.1:3000", "http://localhost:3000"];
+
+/** A site origin that a GitHub sign-in may return to, or null. Local ones only outside production. */
+export function tensorSiteOrigin(value: unknown, production: boolean = process.env.NODE_ENV === "production"): string | null {
+  if (typeof value !== "string") return null;
+  const origin = value.trim().replace(/\/+$/, "");
+  if (TENSOR_SITE_ORIGINS.includes(origin)) return origin;
+  return !production && TENSOR_DEV_ORIGINS.includes(origin) ? origin : null;
+}
+
+/** A path on the site to return to: one that begins with a single slash, and nothing else. */
+export function tensorSitePath(value: unknown): string {
+  if (typeof value !== "string" || value.length > 300) return "/chat";
+  return /^\/(?!\/)[A-Za-z0-9\-._~!$&'()*+,;=:@%/?]*$/.test(value) ? value : "/chat";
+}
+
+const GITHUB_STATE_AUDIENCE = "tensor-cloud-github";
+/** Long enough to sign in to GitHub and choose repositories; short enough to be of no use later. */
+export const GITHUB_STATE_TTL_SECONDS = 20 * 60;
+
+export type GithubState = { userId: string; site: string; path: string };
+
+/**
+ * What goes to GitHub with a person who is signing in, and comes back with them: who they are
+ * here and where to return them. Signed, so that what comes back is what was sent; the page
+ * they return to still checks that it is the same person, signed in, in the same browser.
+ */
+export function signGithubState(input: GithubState, secret: string, now: number = Math.floor(Date.now() / 1000)): string {
+  return signJwt(
+    { aud: GITHUB_STATE_AUDIENCE, sub: input.userId, site: input.site, path: input.path, iat: now, exp: now + GITHUB_STATE_TTL_SECONDS },
+    secret,
+  );
+}
+
+export function verifyGithubState(token: unknown, secret: string, now: number = Math.floor(Date.now() / 1000)): GithubState | null {
+  if (typeof token !== "string" || token.length > 2048) return null;
+  const claims = verifyJwt(token, secret);
+  if (!claims || claims.aud !== GITHUB_STATE_AUDIENCE) return null;
+  const { sub, site, path, exp } = claims;
+  if (typeof sub !== "string" || !sub || typeof exp !== "number" || exp <= now) return null;
+  const origin = tensorSiteOrigin(site);
+  if (!origin) return null;
+  return { userId: sub, site: origin, path: tensorSitePath(path) };
+}
+
+/** A person's tokens for GitHub, as GitHub gave them. Times are seconds since 1970. */
+export type GithubTokens = {
+  accessToken: string;
+  /** When the access token stops working. Null for one that does not expire. */
+  accessExpiresAt: number | null;
+  refreshToken: string | null;
+  refreshExpiresAt: number | null;
+};
+
+function githubKey(secret: string, userId: string): Buffer {
+  return Buffer.from(hkdfSync("sha256", secret, userId, "tensor-cloud-github", 32));
+}
+
+/** Seals a person's GitHub tokens for the database, as sealVariables does a project's variables. */
+export function sealGithubTokens(tokens: GithubTokens, secret: string, userId: string): string {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", githubKey(secret, userId), iv);
+  const sealed = Buffer.concat([cipher.update(JSON.stringify(tokens), "utf8"), cipher.final()]);
+  return ["v1", iv.toString("base64url"), cipher.getAuthTag().toString("base64url"), sealed.toString("base64url")].join(":");
+}
+
+export function openGithubTokens(sealed: string, secret: string, userId: string): GithubTokens | null {
+  const [version, iv, tag, data] = sealed.split(":");
+  if (version !== "v1" || !iv || !tag || !data) return null;
+  try {
+    const decipher = createDecipheriv("aes-256-gcm", githubKey(secret, userId), Buffer.from(iv, "base64url"));
+    decipher.setAuthTag(Buffer.from(tag, "base64url"));
+    const value = JSON.parse(Buffer.concat([decipher.update(Buffer.from(data, "base64url")), decipher.final()]).toString("utf8"));
+    if (typeof value?.accessToken !== "string" || !value.accessToken) return null;
+    const time = (one: unknown) => (typeof one === "number" && Number.isFinite(one) ? one : null);
+    return {
+      accessToken: value.accessToken,
+      accessExpiresAt: time(value.accessExpiresAt),
+      refreshToken: typeof value.refreshToken === "string" && value.refreshToken ? value.refreshToken : null,
+      refreshExpiresAt: time(value.refreshExpiresAt),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/* ---------------------------------------------------------------------------
    Task tokens
    --------------------------------------------------------------------------- */
 

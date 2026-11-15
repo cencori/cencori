@@ -4,6 +4,7 @@ import { createServerClient } from '@/lib/supabaseServer';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { getInstallationOctokit, appId } from '@/lib/github';
 import { parseGithubInstallState } from '@/lib/github-install-state';
+import { finishTensorGithubSignIn, tensorGithubState } from '@/lib/tensor-cloud-github-callback';
 
 function sanitizeRedirectPath(path: string | undefined, fallbackPath: string): string {
   if (!path) {
@@ -18,6 +19,12 @@ function sanitizeRedirectPath(path: string | undefined, fallbackPath: string): s
 }
 
 export async function GET(req: NextRequest) {
+  // A person who set out from Tensor to install the app comes back here too: GitHub returns an
+  // installation to the first address on the app's list, whichever one the sign-in named. Their
+  // state is Tensor's own, and what follows is Tensor's to do.
+  const tensorState = tensorGithubState(req);
+  if (tensorState) return finishTensorGithubSignIn(req, tensorState, null);
+
   const supabase = await createServerClient();
 
   const { searchParams } = new URL(req.url);
