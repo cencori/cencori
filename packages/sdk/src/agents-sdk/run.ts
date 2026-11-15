@@ -473,6 +473,14 @@ async function* runLoop<Ctx>(
         const handoffsByName = new Map<string, Agent<any>>(agent.handoffs.map((a) => [Agent.handoffToolName(a), a]));
         const interruptions: ToolApprovalItem[] = [];
         for (const action of pending.actions) {
+            // A tool Cencori runs (an app connected to the agent) that someone has
+            // to approve first: there is no local tool for it, only the decision.
+            if (action.runs_on === 'cencori') {
+                if (!resumedState?.decision(action.action_id)) {
+                    interruptions.push({ type: 'tool_approval', callId: action.action_id, toolName: action.tool, arguments: action.arguments, agentName: agent.name });
+                }
+                continue;
+            }
             const t = toolsByName.get(action.tool);
             if (!t || resumedState?.decision(action.action_id)) continue;
             let needs = action.needs_approval === true || t.needsApproval === true;
@@ -496,7 +504,8 @@ async function* runLoop<Ctx>(
         if (turnsUsed >= maxTurns) throw new MaxTurnsExceededError(maxTurns, sessionId);
 
         let handoffTo: Agent<any> | undefined;
-        const results = await Promise.all(pending.actions.map(async (action) => {
+        type ActionResult = { action: PausedAction; output: string; ranOnCencori?: boolean };
+        const results: ActionResult[] = await Promise.all(pending.actions.map(async (action): Promise<ActionResult> => {
             const target = handoffsByName.get(action.tool);
             if (target) {
                 if (handoffTo && handoffTo !== target) {
@@ -509,13 +518,15 @@ async function* runLoop<Ctx>(
             if (decision && !decision.approved) {
                 return { action, output: `The user rejected this call${decision.message ? `: ${decision.message}` : '.'} Don't retry it.` };
             }
+            // Approved, and Cencori's to run: sending no result is the approval.
+            if (action.runs_on === 'cencori') return { action, output: '', ranOnCencori: true };
             const t = toolsByName.get(action.tool);
             if (!t) return { action, output: `Error: there is no tool named ${action.tool}.` };
             return { action, output: await t.invoke(runContext, action.arguments, action.action_id) };
         }));
         for (const result of results) {
             const { action } = result;
-            if (handoffsByName.has(action.tool)) continue;
+            if (handoffsByName.has(action.tool) || result.ranOnCencori) continue;
             // A tool that returned { widget } shows it; the model gets the rest of
             // its result and a note that the user can see the widget.
             const shown = toolWidget(result.output);
@@ -549,7 +560,7 @@ async function* runLoop<Ctx>(
         response = await transport.resume(
             sessionId,
             pending.actionId,
-            results.map(({ action, output }) => ({ action_id: action.action_id, output })),
+            results.filter((r) => !r.ranOnCencori).map(({ action, output }) => ({ action_id: action.action_id, output })),
             next,
         );
         pending = undefined;

@@ -24,6 +24,11 @@ export interface PausedAction {
     tool: string;
     arguments: string;
     needs_approval?: boolean;
+    /**
+     * 'cencori': a tool Cencori runs itself, held for approval. Approve and it
+     * runs there; no result is sent for it. Otherwise the tool runs here.
+     */
+    runs_on?: 'cencori' | 'client';
 }
 
 export interface TurnBody {

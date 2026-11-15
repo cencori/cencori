@@ -32,14 +32,14 @@ const completed = (text: string): Sse => [
     ['turn.completed', { turn_number: 1, output: { output: [] }, usage: { input_tokens: 10, output_tokens: 5, total_tokens: 15 } }],
 ];
 
-const paused = (actions: Array<{ id: string; tool: string; args: unknown; approval?: boolean }>): Sse => [
+const paused = (actions: Array<{ id: string; tool: string; args: unknown; approval?: boolean; runsOn?: 'cencori' }>): Sse => [
     ['turn.started', { turn_number: 1 }],
     ...actions.map((a): [string, Record<string, unknown>] => ['tool_call.started', { tool: a.tool, arguments: a.args, action_id: a.id }]),
     ['turn.paused', {
         reason: actions.some((a) => a.approval) ? 'approval_required' : 'tool_results_required',
         action_id: actions[0].id,
         tool: actions[0].tool,
-        actions: actions.map((a) => ({ action_id: a.id, tool: a.tool, arguments: JSON.stringify(a.args), needs_approval: a.approval ?? false })),
+        actions: actions.map((a) => ({ action_id: a.id, tool: a.tool, arguments: JSON.stringify(a.args), needs_approval: a.approval ?? false, ...(a.runsOn ? { runs_on: a.runsOn } : {}) })),
     }],
 ];
 
@@ -193,6 +193,50 @@ describe('run', () => {
         });
         expect(result.lastAgent).toBe(billing);
         expect(result.newItems).toContainEqual({ type: 'handoff', from: 'Triage', to: 'Billing' });
+    });
+
+    it('raises a tool Cencori runs as an interruption, and approves it by sending no result', async () => {
+        const agent = new Agent({ name: 'Assistant', model: 'gpt-4o', tools: [getOrder] });
+        const cencori = fakeCencori([
+            paused([
+                { id: 'm1', tool: 'gmail_send_email', args: { to: 'ada@example.com' }, approval: true, runsOn: 'cencori' },
+                { id: 'g1', tool: 'get_order', args: { id: '1042' } },
+            ]),
+            completed('Sent.'),
+        ]);
+
+        const first = await run(agent, 'Email Ada about 1042', cencori.options);
+        expect(first.interruptions).toEqual([{ type: 'tool_approval', callId: 'm1', toolName: 'gmail_send_email', arguments: '{"to":"ada@example.com"}', agentName: 'Assistant' }]);
+        expect(cencori.requests).toHaveLength(1);
+
+        const state = RunState.fromJSON(JSON.stringify(first.state));
+        state.approve(first.interruptions[0]);
+        const second = await run(agent, state, cencori.options);
+
+        expect(second.finalOutput).toBe('Sent.');
+        // Nothing for m1: Cencori runs it. The local tool's result still goes back.
+        expect(cencori.requests[1].body).toEqual({
+            action_id: 'm1',
+            tool_results: [{ action_id: 'g1', output: '{"id":"1042","status":"shipped"}' }],
+        });
+    });
+
+    it('declines a tool Cencori runs by sending the rejection as its result', async () => {
+        const agent = new Agent({ name: 'Assistant', model: 'gpt-4o' });
+        const cencori = fakeCencori([
+            paused([{ id: 'm1', tool: 'gmail_send_email', args: { to: 'ada@example.com' }, approval: true, runsOn: 'cencori' }]),
+            completed('Okay, not sent.'),
+        ]);
+
+        const first = await run(agent, 'Email Ada', cencori.options);
+        first.state!.reject(first.interruptions[0], { message: 'wrong address' });
+        const second = await run(agent, first.state!, cencori.options);
+
+        expect(second.finalOutput).toBe('Okay, not sent.');
+        const sent = cencori.requests[1].body.tool_results as Array<{ action_id: string; output: string }>;
+        expect(sent).toHaveLength(1);
+        expect(sent[0].action_id).toBe('m1');
+        expect(sent[0].output).toContain('wrong address');
     });
 
     it('stops for approval, and resumes from a serialized state', async () => {

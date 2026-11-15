@@ -43,6 +43,7 @@ result.finalOutput; // "Done: I've refunded $40 for order 1042."
 
 - `RunState` is plain JSON: keep it in your database, a queue, anywhere.
 - Cencori holds a paused session for 24 hours.
+- Tools Cencori runs itself, such as an app connected to a stored agent, can need approval too: set a `required` rule on the installation ([per-tool rules](/docs/embedded-agents/actions-approvals#per-tool-rules-on-an-installation)). They arrive as the same `interruptions`. `state.approve(...)` lets Cencori run the tool; `state.reject(...)` tells the model it was declined. Needs `cencori` 1.16.1 or later.
 - A rejected call isn't run; the model is told it was rejected (with your message) and continues.
 - With `needsApproval: true`, the request and the decision are recorded in your project's governance ledger.
 
