@@ -4,12 +4,15 @@ import { effectiveTensorPlan, getOrCreateTensorBillingAccount } from "@/lib/tens
 import {
   type FlyMachines,
   isTaskToken,
+  openVariables,
   readTensorCloudConfig,
   sandboxMachineRequest,
+  sealVariables,
   siteMachineRequest,
   tensorCloudAccess,
   type TensorCloudAccess,
   type TensorCloudConfig,
+  type TensorCloudVariable,
   verifyTaskToken,
 } from "@/lib/tensor-cloud";
 
@@ -818,6 +821,49 @@ export async function deleteDeployment(admin: Admin, taskId: string): Promise<vo
   if (error) throw error;
 }
 
+/* ---------------------------------------------------------------------------
+   A project's environment variables
+   --------------------------------------------------------------------------- */
+
+const VARIABLES = "tensor_cloud_variables";
+
+/** A project's variables, in the order they were saved. None is an empty list. */
+export async function readVariables(admin: Admin, config: TensorCloudConfig, taskId: string): Promise<TensorCloudVariable[]> {
+  const { data, error } = await admin.from(VARIABLES).select("sealed").eq("task_id", taskId).maybeSingle();
+  if (error) throw error;
+  if (!data) return [];
+  const opened = openVariables((data as { sealed: string }).sealed, config.taskTokenSecret, taskId);
+  // A row that cannot be opened is not an empty set: saying so would let the next save wipe it.
+  if (!opened) throw new Error(`The variables of task ${taskId} could not be opened.`);
+  return opened;
+}
+
+/** Replaces a project's variables with a set that normalizeVariables has passed. */
+export async function writeVariables(
+  admin: Admin,
+  config: TensorCloudConfig,
+  task: Pick<TensorCloudTask, "id" | "user_id">,
+  variables: TensorCloudVariable[],
+): Promise<void> {
+  const { error } = await admin.from(VARIABLES).upsert(
+    {
+      task_id: task.id,
+      user_id: task.user_id,
+      sealed: sealVariables(variables, config.taskTokenSecret, task.id),
+      count: variables.length,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "task_id" },
+  );
+  if (error) throw error;
+}
+
+/** Forgets a project's variables. */
+export async function deleteVariables(admin: Admin, taskId: string): Promise<void> {
+  const { error } = await admin.from(VARIABLES).delete().eq("task_id", taskId);
+  if (error) throw error;
+}
+
 /**
  * Deletes a task: its row is marked, its credential dies with that, and its machine and volume
  * are destroyed with whatever was in them.
@@ -834,6 +880,11 @@ export async function destroyTask(
 ): Promise<void> {
   await updateTask(admin, task.id, { status: "deleted" });
   await deleteChatsOfTask(admin, task.id);
+  // The task's row is kept, marked, so its secrets have to be removed by name. A database that
+  // does not have the table yet (a deploy that is part way) is not a reason to keep the task.
+  await deleteVariables(admin, task.id).catch((error) => {
+    console.error(`[Tensor Cloud] Deleting the variables of task ${task.id} failed`, error);
+  });
   // Its published app, if it has one, stops being billed with it. A row whose machine could not
   // be destroyed is kept, so what is still running is still on record.
   const deployment = sites ? await readDeployment(admin, task.id) : null;

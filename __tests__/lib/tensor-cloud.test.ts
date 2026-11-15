@@ -418,6 +418,66 @@ describe("tensorCloudAccess", () => {
   });
 });
 
+describe("a project's variables", () => {
+  const secret = config.taskTokenSecret;
+  const set = [
+    { name: "DATABASE_URL", value: "postgres://user:p@ss w0rd@db.example.com:5432/app?sslmode=require" },
+    { name: "_private", value: "" },
+    { name: "KEY_FILE", value: "-----BEGIN KEY-----\nline two\n-----END KEY-----\n" },
+  ];
+
+  it("keeps a set exactly as it was given, in its order", async () => {
+    const { normalizeVariables } = await import("@/lib/tensor-cloud");
+    expect(normalizeVariables(set)).toEqual({ ok: true, variables: set });
+    expect(normalizeVariables([])).toEqual({ ok: true, variables: [] });
+  });
+
+  it("refuses what an environment cannot hold, and what is not the project's to set", async () => {
+    const { normalizeVariables, MAX_VARIABLES, MAX_VARIABLE_VALUE } = await import("@/lib/tensor-cloud");
+    const bad: unknown[] = [
+      "DATABASE_URL=x",
+      [{ name: "1ST", value: "x" }],
+      [{ name: "HAS SPACE", value: "x" }],
+      [{ name: "A-B", value: "x" }],
+      [{ name: "", value: "x" }],
+      [{ name: "A", value: 1 }],
+      [{ name: "A" }],
+      [{ name: "A", value: "x" }, { name: "A", value: "y" }],
+      [{ name: "A", value: "x".repeat(MAX_VARIABLE_VALUE + 1) }],
+      [{ name: "A", value: "nul\0inside" }],
+      [{ name: "PORT", value: "1" }],
+      [{ name: "Path", value: "/tmp" }],
+      [{ name: "NODE_OPTIONS", value: "--require /tmp/x.js" }],
+      [{ name: "DATA_DIR", value: "/" }],
+      [{ name: "SITE_TOKEN_SHA256", value: "0" }],
+      [{ name: "TENSOR_HOME", value: "/" }],
+      Array.from({ length: MAX_VARIABLES + 1 }, (_, index) => ({ name: `V${index}`, value: "" })),
+    ];
+    for (const input of bad) expect(normalizeVariables(input).ok, JSON.stringify(input).slice(0, 60)).toBe(false);
+  });
+
+  it("seals a set so that only the same secret and the same project open it", async () => {
+    const { sealVariables, openVariables } = await import("@/lib/tensor-cloud");
+    const sealed = sealVariables(set, secret, taskId);
+    expect(openVariables(sealed, secret, taskId)).toEqual(set);
+    // Nothing of it can be read as it lies in the database.
+    expect(sealed).not.toContain("DATABASE_URL");
+    expect(sealed).not.toContain("postgres");
+    expect(Buffer.from(sealed.split(":")[3]!, "base64url").toString("latin1")).not.toContain("DATABASE_URL");
+    // Sealed twice, it is not the same text twice.
+    expect(sealVariables(set, secret, taskId)).not.toBe(sealed);
+
+    expect(openVariables(sealed, secret, "0195c0de-0000-7000-8000-000000000002")).toBeNull();
+    expect(openVariables(sealed, `${secret}x`, taskId)).toBeNull();
+    const [version, iv, tag, data] = sealed.split(":");
+    const changed = Buffer.from(data!, "base64url");
+    changed[0] = changed[0]! ^ 1;
+    expect(openVariables([version, iv, tag, changed.toString("base64url")].join(":"), secret, taskId)).toBeNull();
+    expect(openVariables("", secret, taskId)).toBeNull();
+    expect(openVariables("v2:a:b:c", secret, taskId)).toBeNull();
+  });
+});
+
 describe("published apps", () => {
   it("gives an app's machine a token of its own, which is not its sandbox's", async () => {
     const { siteTokenSha256 } = await import("@/lib/tensor-cloud");

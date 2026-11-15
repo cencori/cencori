@@ -1,4 +1,4 @@
-import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash, createHmac, hkdfSync, randomBytes, timingSafeEqual } from "node:crypto";
 
 /**
  * Tensor in the cloud: a task that runs in a sandbox instead of on the user's own machine.
@@ -255,6 +255,85 @@ export function sandboxTokenSha256(sandboxTokenSecret: string, taskId: string): 
 export function siteTokenSha256(sandboxTokenSecret: string, taskId: string): string {
   const token = createHmac("sha256", sandboxTokenSecret).update(`site:${taskId}`).digest("base64url");
   return createHash("sha256").update(token).digest("hex");
+}
+
+/* ---------------------------------------------------------------------------
+   A project's environment variables
+   --------------------------------------------------------------------------- */
+
+export type TensorCloudVariable = { name: string; value: string };
+
+export const MAX_VARIABLES = 100;
+export const MAX_VARIABLE_NAME = 128;
+/** One value: long enough for a certificate or a service account's key file. */
+export const MAX_VARIABLE_VALUE = 16 * 1024;
+
+/** A name an environment can hold: letters, digits and underscores, not starting with a digit. */
+const VARIABLE_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+/**
+ * Names that are not a project's to set. The machines its app and its preview run on give these
+ * their meaning, and an app that could change them could be told to load other code or look for
+ * its data somewhere else.
+ */
+const RESERVED_VARIABLES = new Set(["PORT", "HOST", "HOME", "PATH", "DATA_DIR", "NODE_OPTIONS", "LD_PRELOAD", "LD_LIBRARY_PATH"]);
+
+/**
+ * A set of variables as it may be saved, or the reason it may not be. Order is kept. Nothing is
+ * tidied: a value is a secret, and one that is quietly changed is one that no longer works.
+ */
+export function normalizeVariables(input: unknown): { ok: true; variables: TensorCloudVariable[] } | { ok: false; error: string } {
+  if (!Array.isArray(input)) return { ok: false, error: "That is not a list of variables." };
+  if (input.length > MAX_VARIABLES) return { ok: false, error: `A project can have ${MAX_VARIABLES} variables at most.` };
+  const seen = new Set<string>();
+  const variables: TensorCloudVariable[] = [];
+  for (const item of input) {
+    const name = (item as { name?: unknown } | null)?.name;
+    const value = (item as { value?: unknown } | null)?.value;
+    if (typeof name !== "string" || typeof value !== "string") return { ok: false, error: "Every variable needs a name and a value." };
+    if (!VARIABLE_NAME.test(name) || name.length > MAX_VARIABLE_NAME) {
+      return { ok: false, error: `"${name.slice(0, 40)}" is not a name a variable can have: use letters, digits and underscores, not starting with a digit.` };
+    }
+    if (RESERVED_VARIABLES.has(name.toUpperCase()) || /^(TENSOR|SITE)_/i.test(name)) {
+      return { ok: false, error: `${name} is set by Tensor and cannot be changed.` };
+    }
+    if (seen.has(name)) return { ok: false, error: `${name} is there twice.` };
+    if (value.length > MAX_VARIABLE_VALUE || value.includes("\0")) return { ok: false, error: `The value of ${name} is too long.` };
+    seen.add(name);
+    variables.push({ name, value });
+  }
+  return { ok: true, variables };
+}
+
+/** The key one project's variables are sealed with. Never stored: derived when it is needed. */
+function variablesKey(secret: string, taskId: string): Buffer {
+  return Buffer.from(hkdfSync("sha256", secret, taskId, "tensor-cloud-variables", 32));
+}
+
+/**
+ * Seals a project's variables for the database: AES-256-GCM, under a key derived from a secret
+ * only this app holds and from the project's id, so one project's row cannot be opened as
+ * another's and the table by itself gives nothing away.
+ */
+export function sealVariables(variables: TensorCloudVariable[], secret: string, taskId: string): string {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", variablesKey(secret, taskId), iv);
+  const sealed = Buffer.concat([cipher.update(JSON.stringify(variables), "utf8"), cipher.final()]);
+  return ["v1", iv.toString("base64url"), cipher.getAuthTag().toString("base64url"), sealed.toString("base64url")].join(":");
+}
+
+/** Opens what sealVariables made, or null when it is not that, or was changed, or is another project's. */
+export function openVariables(sealed: string, secret: string, taskId: string): TensorCloudVariable[] | null {
+  const [version, iv, tag, data] = sealed.split(":");
+  if (version !== "v1" || !iv || !tag || !data) return null;
+  try {
+    const decipher = createDecipheriv("aes-256-gcm", variablesKey(secret, taskId), Buffer.from(iv, "base64url"));
+    decipher.setAuthTag(Buffer.from(tag, "base64url"));
+    const text = Buffer.concat([decipher.update(Buffer.from(data, "base64url")), decipher.final()]).toString("utf8");
+    const opened = normalizeVariables(JSON.parse(text));
+    return opened.ok ? opened.variables : null;
+  } catch {
+    return null;
+  }
 }
 
 /* ---------------------------------------------------------------------------
