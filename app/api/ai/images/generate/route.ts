@@ -16,6 +16,7 @@ import { runGatewayOutputGuard } from '@/lib/gateway/output-guard';
 import { deTokenize } from '@/lib/safety/custom-data-rules';
 import type { SubscriptionTier } from '@/lib/entitlements';
 import { createAdminClient } from '@/lib/supabaseAdmin';
+import { mapOpenAIQuality, openAIImageParams } from '@/lib/images/openai-params';
 import { withUsageMarkup } from '@/lib/billing/usage-markup';
 
 // Supported image generation providers
@@ -48,8 +49,7 @@ const IMAGE_MODELS = {
     'gpt-image-2': { provider: 'openai' as const, apiModel: 'gpt-image-2', description: 'State-of-the-art image generation model' },
     'gpt-image-1.5': { provider: 'openai' as const, apiModel: 'gpt-image-1.5', description: 'Best text rendering, top ELO rating' },
     'gpt-image-1': { provider: 'openai' as const, apiModel: 'gpt-image-1', description: 'ChatGPT image generation' },
-    'dall-e-3': { provider: 'openai' as const, apiModel: 'dall-e-3', description: 'High quality, creative' },
-    'dall-e-2': { provider: 'openai' as const, apiModel: 'dall-e-2', description: 'Fast, cost-effective' },
+    'gpt-image-1-mini': { provider: 'openai' as const, apiModel: 'gpt-image-1-mini', description: 'Fast, cost-effective' },
     'gemini-3-pro-image': { provider: 'google' as const, apiModel: 'gemini-2.0-flash-preview-image-generation', description: 'High photorealism, fast' },
     'nano-banana-pro': { provider: 'google' as const, apiModel: 'gemini-2.0-flash-preview-image-generation', description: 'Alias for Gemini 3 Pro Image' },
     'gemini-3.1-flash-image': { provider: 'google' as const, apiModel: 'gemini-3.1-flash-image-generation', description: 'Nano Banana 2 — reasoning-guided, up to 4K' },
@@ -73,12 +73,11 @@ function normalizeModelName(model: string): { normalized: string; apiModel: stri
         const config = IMAGE_MODELS[modelLower as SupportedModel];
         return { normalized: modelLower, apiModel: config.apiModel };
     }
-    if (modelLower === 'dalle-3' || modelLower === 'dalle3') return { normalized: 'dall-e-3', apiModel: 'dall-e-3' };
-    if (modelLower === 'dalle-2' || modelLower === 'dalle2') return { normalized: 'dall-e-2', apiModel: 'dall-e-2' };
     if (modelLower.includes('gpt') && modelLower.includes('image') && (modelLower.includes('2.0') || modelLower.endsWith('-2') || modelLower.includes('image-2'))) {
         return { normalized: 'gpt-image-2', apiModel: 'gpt-image-2' };
     }
     if (modelLower.includes('gpt') && modelLower.includes('image') && modelLower.includes('1.5')) return { normalized: 'gpt-image-1.5', apiModel: 'gpt-image-1.5' };
+    if (modelLower.includes('gpt') && modelLower.includes('image') && modelLower.includes('mini')) return { normalized: 'gpt-image-1-mini', apiModel: 'gpt-image-1-mini' };
     if (modelLower.includes('gpt') && modelLower.includes('image')) return { normalized: 'gpt-image-1', apiModel: 'gpt-image-1' };
     if (modelLower.includes('gemini') && modelLower.includes('image')) return { normalized: 'gemini-3-pro-image', apiModel: 'gemini-2.0-flash-preview-image-generation' };
     if (modelLower.includes('nano-banana-2') || modelLower.includes('nano banana 2')) return { normalized: 'nano-banana-2', apiModel: 'gemini-3.1-flash-image-generation' };
@@ -87,25 +86,13 @@ function normalizeModelName(model: string): { normalized: string; apiModel: stri
     return { normalized: model, apiModel: model };
 }
 
-function mapOpenAIQuality(quality?: ImageGenerationRequest['quality']): 'low' | 'medium' | 'high' | undefined {
-    if (!quality) return undefined;
-    if (quality === 'standard') return 'medium';
-    if (quality === 'hd') return 'high';
-    return quality;
+/** OpenAI removed DALL·E 2 and 3 from its API on 12 May 2026. */
+function isRetiredImageModel(model: string): boolean {
+    return /^dall-?e/i.test(model.trim());
 }
 
 async function generateWithOpenAI(client: OpenAI, request: ImageGenerationRequest, apiModel: string): Promise<ImageGenerationResponse> {
-    const isGptImage = apiModel.startsWith('gpt-image');
-    const openaiQuality = mapOpenAIQuality(request.quality);
-    const response = await client.images.generate({
-        model: apiModel,
-        prompt: request.prompt,
-        n: isGptImage ? 1 : (request.n ?? 1),
-        size: request.size || '1024x1024',
-        quality: isGptImage ? openaiQuality : request.quality,
-        style: isGptImage ? undefined : request.style,
-        response_format: isGptImage ? 'b64_json' : (request.responseFormat || 'url'),
-    });
+    const response = await client.images.generate(openAIImageParams(request, apiModel) as never) as { data?: Array<{ url?: string; b64_json?: string; revised_prompt?: string }> };
     return {
         images: (response.data ?? []).map(item => ({
             url: item.url,
@@ -258,8 +245,8 @@ export async function POST(req: NextRequest) {
                         projectId: ctx.projectId,
                         task: 'image',
                         verify: async (provider, candidate) => {
-                            // n>1 is only served by dall-e-2 through this endpoint.
-                            if (requestedCount > 1 && candidate !== 'dall-e-2') {
+                            // One image per request through this endpoint.
+                            if (requestedCount > 1) {
                                 throw new Error(`${candidate} does not support n>1`);
                             }
                             const qualityForCandidate = candidate.startsWith('gpt-image')
@@ -297,7 +284,16 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        const { normalized: model, apiModel } = normalizeModelName(requestedModelResolved || 'dall-e-3');
+        if (typeof requestedModelResolved === 'string' && isRetiredImageModel(requestedModelResolved)) {
+            return addGatewayHeaders(
+                NextResponse.json({
+                    error: 'model_retired',
+                    message: `${requestedModelResolved} was removed from OpenAI's API on 12 May 2026. Use gpt-image-1-mini, gpt-image-1, gpt-image-1.5 or gpt-image-2.`,
+                }, { status: 400 }),
+                { requestId: ctx.requestId }
+            );
+        }
+        const { normalized: model, apiModel } = normalizeModelName(requestedModelResolved || 'gpt-image-1');
         if (!(model in IMAGE_MODELS)) {
             return addGatewayHeaders(
                 NextResponse.json({ error: 'unsupported_model', message: `Unsupported image model: ${model}` }, { status: 400 }),
@@ -310,7 +306,7 @@ export async function POST(req: NextRequest) {
             ? (mapOpenAIQuality(body.quality) || 'medium')
             : (body.quality || 'standard');
         const requestedImageCount = body.n ?? 1;
-        if (requestedImageCount > 1 && apiModel !== 'dall-e-2') {
+        if (requestedImageCount > 1) {
             return addGatewayHeaders(
                 NextResponse.json({ error: 'unsupported_n', message: `${model} only supports n=1 through this endpoint.` }, { status: 400 }),
                 { requestId: ctx.requestId }

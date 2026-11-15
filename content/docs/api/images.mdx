@@ -9,12 +9,14 @@ order: 4
 
 | Provider | Model | Description |
 |----------|-------|-------------|
+| OpenAI | `gpt-image-2` | State-of-the-art image generation |
 | OpenAI | `gpt-image-1.5` | Best text rendering, top ELO rating |
 | OpenAI | `gpt-image-1` | ChatGPT image generation |
-| OpenAI | `dall-e-3` | High quality, creative |
-| OpenAI | `dall-e-2` | Fast, cost-effective |
+| OpenAI | `gpt-image-1-mini` | Fast, cost-effective |
 | Google | `gemini-3-pro-image` | High photorealism, fast |
 | Google | `imagen-3` | Google Imagen 3, high quality |
+
+OpenAI removed `dall-e-3` and `dall-e-2` from its API on 12 May 2026. A request for either returns `400 model_retired`.
 
 ## Usage
 
@@ -22,12 +24,12 @@ order: 4
 ```typescript
 const response = await cencori.ai.generateImage({
   prompt: "A futuristic city at sunset with flying cars",
-  model: "dall-e-3",
+  model: "gpt-image-1",
   size: "1024x1024",
-  quality: "hd"
+  quality: "high"
 });
 
-console.log(response.images[0].url);
+console.log(response.images[0].b64_json);
 ```
 
 ### API Request
@@ -36,7 +38,7 @@ POST https://api.cencori.com/v1/images/generations
 Headers: { "CENCORI_API_KEY": "csk_..." }
 Body: {
   "prompt": "A futuristic city at sunset",
-  "model": "dall-e-3",
+  "model": "gpt-image-1",
   "size": "1024x1024"
 }
 ```
@@ -46,11 +48,12 @@ Body: {
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `prompt` | string | Yes | Text description of the image |
-| `model` | string | No | Image model (default: `dall-e-3`) |
-| `size` | string | No | `1024x1024`, `1792x1024`, `1024x1792` |
-| `n` | number | No | Number of images (1-4) |
-| `quality` | string | No | `standard` or `hd` |
-| `style` | string | No | `vivid` or `natural` (DALL-E 3) |
+| `model` | string | No | Image model (default: `gpt-image-1`) |
+| `size` | string | No | `1024x1024`, `1536x1024`, `1024x1536`. Google models: `1024x1024` only |
+| `n` | number | No | `1`. One image per request |
+| `quality` | string | No | `low`, `medium` (default) or `high`. `standard` and `hd` are read as `medium` and `high` |
+
+OpenAI's image models always return the image as base64 in `b64_json`; there is no hosted URL.
 
 ## Response
 
@@ -58,15 +61,14 @@ Body: {
 {
   "images": [
     {
-      "url": "https://...",
-      "revisedPrompt": "A futuristic cityscape..."
+      "b64_json": "iVBORw0KGgo..."
     }
   ],
-  "model": "dall-e-3",
+  "model": "gpt-image-1",
   "provider": "openai"
 }
 ```
 
 ## Auto-router (`auto` / `cencori-auto`)
 
-Pass `model: 'auto'` to resolve a quality-ordered BYOK image model for the project (`gpt-image-1` → `dall-e-3` → `dall-e-2` → Google), verified against image pricing for the requested size/quality. `n > 1` only matches `dall-e-2`; Google-incompatible options match OpenAI only. BYOK-only: no usable key returns `402 byok_required`, and it never falls back to managed keys. Details: [BYOK auto-router](/docs/platform/byok#auto-router).
+Pass `model: 'auto'` to resolve a quality-ordered BYOK image model for the project (`gpt-image-1` → `gpt-image-1-mini` → Google), verified against image pricing for the requested size/quality. Google-incompatible options match OpenAI only. BYOK-only: no usable key returns `402 byok_required`, and it never falls back to managed keys. Details: [BYOK auto-router](/docs/platform/byok#auto-router).

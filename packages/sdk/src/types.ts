@@ -296,9 +296,9 @@ export interface ImageGenerationRequest {
     prompt: string;
     /** 
      * Model to use. Supported models:
-     * - OpenAI: 'gpt-image-1.5', 'dall-e-3', 'dall-e-2'
+     * - OpenAI: 'gpt-image-2', 'gpt-image-1.5', 'gpt-image-1', 'gpt-image-1-mini'
      * - Google: 'gemini-3-pro-image', 'imagen-3'
-     * Default: 'dall-e-3'
+     * Default: 'gpt-image-1'
      */
     model?: string;
     /** Number of images to generate (default: 1) */

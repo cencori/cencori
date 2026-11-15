@@ -521,6 +521,23 @@ export async function runV1ResponsesExecution(
         // Custom tools (Codex's apply_patch) become function tools every provider can call.
         const { tools: requestTools, customToolNames } = translateCustomTools(body.tools);
         const { functionTools, builtInTools } = extractTools(requestTools as ResponsesTool[] | undefined);
+        // Tools this endpoint can't run are refused by name. Dropping one
+        // quietly left the model without the tool the caller asked for, and a
+        // tool_choice naming it then failed for no visible reason.
+        if (builtInTools.some((tool) => (tool as { type?: string }).type === 'image_generation')) {
+            return {
+                ok: false,
+                status: 400,
+                body: {
+                    error: {
+                        message: "The image_generation tool isn't available on /v1/responses. Generate images with POST /v1/images/generations.",
+                        type: 'invalid_request_error',
+                        code: 'unsupported_tool',
+                    },
+                    status: 'failed',
+                },
+            };
+        }
         params.performance?.step('provider');
         params.performance?.markPreflightComplete();
 

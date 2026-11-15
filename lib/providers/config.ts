@@ -121,6 +121,7 @@ export const SUPPORTED_PROVIDERS: AIProviderConfig[] = [
             { id: 'gpt-image-2', name: 'GPT Image 2', type: ['image'], contextWindow: 0, description: 'State-of-the-art image generation model', addedAt: '2026-04-21' },
             { id: 'gpt-image-1.5', name: 'GPT Image 1.5', type: ['image'], contextWindow: 0, description: 'Best text rendering', addedAt: '2026-06-01' },
             { id: 'gpt-image-1', name: 'GPT Image 1', type: ['image'], contextWindow: 0, description: 'ChatGPT image generation model', addedAt: '2025-04-23' },
+            { id: 'gpt-image-1-mini', name: 'GPT Image 1 Mini', type: ['image'], contextWindow: 0, description: 'Fast, cost-effective image generation', addedAt: '2025-10-06' },
         ],
     },
     {

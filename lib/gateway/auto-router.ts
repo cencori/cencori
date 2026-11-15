@@ -230,8 +230,7 @@ const EMBED_CANDIDATES: AutoCandidate[] = [
 
 const IMAGE_CANDIDATES: AutoCandidate[] = [
     { provider: 'openai', model: 'gpt-image-1' },
-    { provider: 'openai', model: 'dall-e-3' },
-    { provider: 'openai', model: 'dall-e-2' },
+    { provider: 'openai', model: 'gpt-image-1-mini' },
     { provider: 'google', model: 'gemini-3-pro-image' },
     { provider: 'google', model: 'imagen-3' },
 ];

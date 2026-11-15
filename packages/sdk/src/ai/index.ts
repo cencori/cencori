@@ -531,7 +531,7 @@ export class AINamespace {
      * @example
      * const response = await cencori.ai.generateImage({
      *   prompt: 'A futuristic city at sunset',
-     *   model: 'dall-e-3',
+     *   model: 'gpt-image-1',
      *   size: '1024x1024'
      * });
      * console.log(response.images[0].url);
@@ -546,7 +546,7 @@ export class AINamespace {
             },
             body: JSON.stringify({
                 prompt: request.prompt,
-                model: request.model ?? 'dall-e-3',
+                model: request.model ?? 'gpt-image-1',
                 n: request.n,
                 size: request.size,
                 quality: request.quality,

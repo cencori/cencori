@@ -1169,8 +1169,8 @@ Cencori credits, works at a zero credit balance. No usable key returns
 - Embeddings (`POST /v1/embeddings`): cheapest priced BYOK model first
   (`text-embedding-3-small` → `text-embedding-3-large` → Google → Cohere).
 - Images (`POST /v1/images/generations`): quality-ordered
-  (`gpt-image-1` → `dall-e-3` → `dall-e-2` → Google). `n > 1` only matches
-  `dall-e-2`.
+  (`gpt-image-1` → `gpt-image-1-mini` → Google). One image per request.
+  DALL·E 2 and 3 are retired (`400 model_retired`).
 - Speech (`POST /v1/audio/speech`): latency-ordered (`tts-1` →
   `tts-1-hd` → Deepgram → Cartesia → Spitch → ElevenLabs). A voice that does
   not belong to the resolved model falls back to that model's default voice.
