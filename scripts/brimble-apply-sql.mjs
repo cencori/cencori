@@ -73,6 +73,38 @@ try {
             console.log(`[brimble-apply-sql] applied ${file}`);
         } catch (error) {
             await client.query("rollback");
+            // 55P03: the file waited its 10s for a table lock someone else holds.
+            // Say who, so the deploy log names the blocker instead of only failing.
+            // No query text: it can hold data.
+            if (error.code === "55P03") {
+                try {
+                    const { rows } = await client.query(`
+                        select a.pid, a.usename, a.application_name, a.client_addr::text as client_addr, a.state,
+                               round(extract(epoch from now() - a.xact_start)) as xact_seconds,
+                               round(extract(epoch from now() - a.state_change)) as state_seconds,
+                               string_agg(distinct c.relname || ':' || l.mode, ', ') as table_locks
+                        from pg_locks l
+                        join pg_class c on c.oid = l.relation and c.relkind = 'r'
+                        join pg_namespace n on n.oid = c.relnamespace and n.nspname = 'public'
+                        join pg_stat_activity a on a.pid = l.pid
+                        where l.granted and a.pid <> pg_backend_pid() and a.xact_start is not null
+                        group by a.pid, a.usename, a.application_name, a.client_addr, a.state, a.xact_start, a.state_change
+                        order by a.xact_start
+                        limit 20
+                    `);
+                    console.log(`[brimble-apply-sql] ${file} timed out waiting for a lock; sessions holding table locks: ${rows.length}`);
+                    for (const row of rows) console.log(`[brimble-apply-sql] lock holder ${JSON.stringify(row)}`);
+                } catch {
+                    // The report is a courtesy; the failure below is what matters.
+                }
+            }
+            // Files before this one are committed. PostgREST must hear about
+            // them even though the deploy fails, or a function they added
+            // stays "not found" on the build that is still serving.
+            if (ran > 0) {
+                await client.query("notify pgrst, 'reload schema'").catch(() => {});
+                console.log("[brimble-apply-sql] asked PostgREST to reload its schema (earlier files were applied)");
+            }
             throw new Error(`${file}: ${error.message}`);
         }
     }
