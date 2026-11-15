@@ -8,11 +8,15 @@ import {
   signDeployTicket,
   SITE_NAME_MAX,
   SITE_NAME_MIN,
+  sitesFly,
 } from "@/lib/tensor-cloud";
 import {
   claimSiteName,
+  countSiteMachines,
   deleteDeployment,
   deploymentJson,
+  destroySiteMachine,
+  ensureSiteMachine,
   markPublished,
   readCloudAccess,
   readDeployment,
@@ -31,6 +35,11 @@ import {
 //   POST    hold a name (or change it) and get a ticket to upload with
 //   PATCH   the upload went through: what is served is now this
 //   DELETE  stop publishing: the name is let go, and a ticket to remove the copy is returned
+//
+// A project is published as one of two things, and says which ("kind"). A static site is files.
+// An app has a server of its own, so it is given a machine and a disk to run on, which cost money
+// for as long as it stays published: a plan includes a number of them, and the machine is
+// destroyed, with the app's live data, when the project is unpublished.
 
 function json(body: unknown, status = 200) {
   return NextResponse.json(body, { headers: noStoreHeaders(), status });
@@ -87,7 +96,8 @@ export async function POST(request: NextRequest, context: Context) {
       return json({ error: "This project is archived. Unarchive it to publish.", code: "archived" }, 409);
     }
     // Publishing is part of building on the web: a plan that has lapsed cannot publish.
-    if (!(await readCloudAccess(session.admin, session.user.id)).tasks) {
+    const access = await readCloudAccess(session.admin, session.user.id);
+    if (!access.tasks) {
       return json(
         { error: "Publishing is part of Tensor's paid plans. Choose a plan to continue.", code: "plan_required" },
         402,
@@ -104,10 +114,47 @@ export async function POST(request: NextRequest, context: Context) {
     // What was typed is what is claimed, or nothing is: a name is not quietly changed into another.
     if (!name || name !== String(body.name).trim().toLowerCase()) return json({ error: BAD_NAME, code: "bad_name" }, 400);
 
+    const asApp = body.kind === "app";
     const before = await readDeployment(session.admin, task.id);
+    if (asApp) {
+      if (!config.sitesImage) {
+        return json(
+          { error: "Projects that run a server of their own cannot be published yet.", code: "apps_unavailable" },
+          503,
+        );
+      }
+      if (access.backendApps === 0 || !access.site) {
+        return json(
+          { error: "This project runs a server of its own, which your plan does not include publishing.", code: "plan_required" },
+          402,
+        );
+      }
+      // A project that already has its machine is updating, which is always allowed.
+      if (!before?.machine_id && (await countSiteMachines(session.admin, session.user.id, task.id)) >= access.backendApps) {
+        const apps = access.backendApps === 1 ? "one published app" : `${access.backendApps} published apps`;
+        return json(
+          {
+            error: `Your plan includes ${apps} with a server of its own. Unpublish one, or choose a larger plan.`,
+            code: "app_limit",
+          },
+          409,
+        );
+      }
+    }
+
     const claimed = await claimSiteName(session.admin, task, name);
     if (claimed === "taken") {
       return json({ error: "That name is taken. Try another.", code: "name_taken" }, 409);
+    }
+
+    let machineId: string | null = null;
+    if (asApp) {
+      const machine = await ensureSiteMachine(session.admin, sitesFly(config), config, claimed, access.site?.volumeGb ?? 1);
+      if (!machine.ok) {
+        console.error(`[Tensor Cloud] Making a site machine for task ${task.id} failed: ${machine.error}`);
+        return json({ error: "Tensor could not set up somewhere for this app to run. Try again shortly." }, 503);
+      }
+      machineId = machine.machineId;
     }
 
     const ticket = signDeployTicket(
@@ -118,6 +165,8 @@ export async function POST(request: NextRequest, context: Context) {
         action: "publish",
         // The copy under the old name goes once the new one is up, and only if there was one.
         replaces: before && before.name !== name && before.published_at ? before.name : null,
+        machineId,
+        limits: asApp ? access.site : null,
       },
       config.ticketSecret,
     );
@@ -135,9 +184,15 @@ export async function PATCH(request: NextRequest, context: Context) {
   try {
     const opened = await open(request, context);
     if ("refused" in opened) return opened.refused;
-    const { session, task } = opened;
-    const deployment = await markPublished(session.admin, task.id);
+    const { session, config, task } = opened;
+    const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+    const kind = body.kind === "app" ? "app" : "static";
+    const deployment = await markPublished(session.admin, task.id, kind);
     if (!deployment) return json({ error: "This project has no site to mark as published." }, 404);
+    // It was an app and is now files: the machine it ran on has nothing left to do.
+    if (kind === "static" && (deployment.machine_id || deployment.volume_id)) {
+      await destroySiteMachine(session.admin, sitesFly(config), deployment);
+    }
     return json({ deployment: deploymentJson(deployment) });
   } catch (error) {
     console.error("[Tensor Cloud] Marking a deployment published failed", error);
@@ -152,6 +207,11 @@ export async function DELETE(request: NextRequest, context: Context) {
     const { session, config, task } = opened;
     const deployment = await readDeployment(session.admin, task.id);
     if (!deployment) return json({ removed: true, remove: null });
+    // An app's machine and disk go first. If they cannot be destroyed the project stays
+    // published: letting the name go would leave a machine running that nothing remembers.
+    if ((deployment.machine_id || deployment.volume_id) && !(await destroySiteMachine(session.admin, sitesFly(config), deployment))) {
+      return json({ error: "Tensor could not take this app down. Try again shortly." }, 503);
+    }
     await deleteDeployment(session.admin, task.id);
     const ticket = signDeployTicket(
       { userId: session.user.id, taskId: task.id, name: deployment.name, action: "remove" },

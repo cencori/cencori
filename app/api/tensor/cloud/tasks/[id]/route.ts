@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { noStoreHeaders } from "@/lib/tensor-auth";
 import { authenticateTensorBillingRequest } from "@/lib/tensor-billing";
-import { FlyMachines, normalizeProjectName, readTensorCloudConfig } from "@/lib/tensor-cloud";
+import { FlyMachines, normalizeProjectName, readTensorCloudConfig, sitesFly } from "@/lib/tensor-cloud";
 import { destroyTask, projectJson, readTask, updateTask } from "@/lib/tensor-cloud-tasks";
 
 function json(body: unknown, status = 200) {
@@ -77,7 +77,7 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
   try {
     const task = await readTask(session.admin, session.user.id, (await context.params).id);
     if (!task) return json({ error: "That project does not exist." }, 404);
-    await destroyTask(session.admin, new FlyMachines(config), task);
+    await destroyTask(session.admin, new FlyMachines(config), task, sitesFly(config));
     return json({ deleted: true });
   } catch (error) {
     console.error("[Tensor Cloud] Deleting a task failed", error);

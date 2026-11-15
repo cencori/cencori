@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { noStoreHeaders } from "@/lib/tensor-auth";
 import { authenticateTensorBillingRequest } from "@/lib/tensor-billing";
-import { FlyMachines, normalizeTaskTitle, readTensorCloudConfig } from "@/lib/tensor-cloud";
+import { FlyMachines, normalizeTaskTitle, readTensorCloudConfig, sitesFly } from "@/lib/tensor-cloud";
 import {
   deleteChatRow,
   destroyTask,
@@ -89,7 +89,7 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
     const task = await readTask(session.admin, session.user.id, chat.task_id);
 
     if (task && !task.project_name) {
-      await destroyTask(session.admin, new FlyMachines(config), task);
+      await destroyTask(session.admin, new FlyMachines(config), task, sitesFly(config));
       return json({ deleted: true, workspace: true });
     }
     await deleteChatRow(session.admin, chat.id);

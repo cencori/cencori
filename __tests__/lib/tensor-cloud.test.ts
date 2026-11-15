@@ -375,20 +375,101 @@ describe("FlyMachines", () => {
 
 describe("tensorCloudAccess", () => {
   it("gives the trial no cloud tasks", () => {
-    expect(tensorCloudAccess("free")).toEqual({ tasks: false, privateRepositories: false });
+    expect(tensorCloudAccess("free")).toEqual({ tasks: false, privateRepositories: false, backendApps: 0, site: null });
   });
 
   it("gives every paid plan cloud tasks, and private repositories from Pro", () => {
-    expect(tensorCloudAccess("starter")).toEqual({ tasks: true, privateRepositories: false });
-    expect(tensorCloudAccess("builder")).toEqual({ tasks: true, privateRepositories: false });
+    expect(tensorCloudAccess("starter")).toMatchObject({ tasks: true, privateRepositories: false });
+    expect(tensorCloudAccess("builder")).toMatchObject({ tasks: true, privateRepositories: false });
     for (const plan of ["pro", "max", "ultra", "enterprise"]) {
-      expect(tensorCloudAccess(plan)).toEqual({ tasks: true, privateRepositories: true });
+      expect(tensorCloudAccess(plan)).toMatchObject({ tasks: true, privateRepositories: true });
     }
   });
 
+  it("includes one published app with a server on the smaller plans, and more above them", () => {
+    expect(["starter", "builder", "pro", "max", "ultra"].map((plan) => tensorCloudAccess(plan).backendApps)).toEqual([1, 1, 1, 3, 5]);
+  });
+
+  it("gives each larger plan at least what the one below it has", () => {
+    const plans = ["starter", "builder", "pro", "max", "ultra"].map((plan) => tensorCloudAccess(plan).site!);
+    for (let index = 1; index < plans.length; index++) {
+      for (const key of ["volumeGb", "monthlyBytes", "monthlyAwakeSeconds", "uploadBytes", "appBytes"] as const) {
+        expect(plans[index]![key]).toBeGreaterThanOrEqual(plans[index - 1]![key]);
+      }
+    }
+  });
+
+  it("keeps the most a smaller plan's app can cost under a dollar a month", () => {
+    // Fly in Johannesburg, as taken in lib/tensor-cloud.ts: disk and image, the machine by the
+    // hour, data by the gigabyte.
+    const most = (plan: string) => {
+      const { backendApps, site } = tensorCloudAccess(plan);
+      const each = site!.volumeGb * 0.15 + 0.1 + (site!.monthlyAwakeSeconds / 3600) * 0.0044 + (site!.monthlyBytes / 1024 ** 3) * 0.12;
+      return backendApps * each;
+    };
+    for (const plan of ["starter", "builder", "pro"]) expect(most(plan)).toBeLessThanOrEqual(1);
+    expect(most("starter")).toBeLessThan(most("builder"));
+    expect(most("builder")).toBeLessThan(most("pro"));
+  });
+
   it("gives an unknown plan nothing", () => {
-    expect(tensorCloudAccess("")).toEqual({ tasks: false, privateRepositories: false });
-    expect(tensorCloudAccess("gold")).toEqual({ tasks: false, privateRepositories: false });
+    expect(tensorCloudAccess("")).toEqual({ tasks: false, privateRepositories: false, backendApps: 0, site: null });
+    expect(tensorCloudAccess("gold")).toEqual({ tasks: false, privateRepositories: false, backendApps: 0, site: null });
+  });
+});
+
+describe("published apps", () => {
+  it("gives an app's machine a token of its own, which is not its sandbox's", async () => {
+    const { siteTokenSha256 } = await import("@/lib/tensor-cloud");
+    const token = createHmac("sha256", config.sandboxTokenSecret).update(`site:${taskId}`).digest("base64url");
+    expect(siteTokenSha256(config.sandboxTokenSecret, taskId)).toBe(createHash("sha256").update(token).digest("hex"));
+    expect(siteTokenSha256(config.sandboxTokenSecret, taskId)).not.toBe(sandboxTokenSha256(config.sandboxTokenSecret, taskId));
+  });
+
+  it("asks Fly for the smallest machine, with its disk, no address of its own, and no restart", async () => {
+    const { siteMachineRequest, siteTokenSha256 } = await import("@/lib/tensor-cloud");
+    const withImage = { ...config, sitesImage: "registry.fly.io/tensor-sites:test" };
+    const request = siteMachineRequest({ taskId, userId: "user-1", volumeId: "vol_1" }, withImage);
+    expect(request.config).toMatchObject({
+      image: "registry.fly.io/tensor-sites:test",
+      guest: { cpu_kind: "shared", cpus: 1, memory_mb: 256 },
+      restart: { policy: "no" },
+      mounts: [{ volume: "vol_1", path: "/data" }],
+      env: { SITE_TOKEN_SHA256: siteTokenSha256(config.sandboxTokenSecret, taskId) },
+    });
+    expect(request.config).not.toHaveProperty("services");
+    // Nothing that could spend money or open a sandbox is handed to code a stranger wrote.
+    expect(JSON.stringify(request.config.env)).not.toMatch(/CENCORI|TENSOR_WS/);
+  });
+
+  it("talks to the sites app with its own client, and leaves the sandbox one where it was", async () => {
+    const { sitesFly } = await import("@/lib/tensor-cloud");
+    const asked: string[] = [];
+    const fetcher = (async (url: string | URL | Request) => {
+      asked.push(String(url));
+      return new Response(JSON.stringify({ id: "148e21dc03d789", state: "started", region: "jnb" }));
+    }) as typeof fetch;
+    await sitesFly(config, fetcher).get("148e21dc03d789");
+    await new FlyMachines(config, fetcher).get("148e21dc03d789");
+    expect(asked[0]).toContain("/apps/tensor-sites/machines/");
+    expect(asked[1]).toContain("/apps/tensor-sandbox/machines/");
+  });
+
+  it("names the machine in a ticket to publish an app, and only then", async () => {
+    const { signDeployTicket } = await import("@/lib/tensor-cloud");
+    const secret = "a-secret-that-is-long-enough-for-tests";
+    const app = claimsOf(signDeployTicket({ userId: "u", taskId: "t", name: "shop", action: "publish", machineId: "148e21dc03d789" }, secret));
+    expect(app).toMatchObject({ kind: "app", machine: "148e21dc03d789" });
+    const files = claimsOf(signDeployTicket({ userId: "u", taskId: "t", name: "shop", action: "publish" }, secret));
+    expect(files.kind).toBeUndefined();
+    expect(files.machine).toBeUndefined();
+    // The plan's allowances travel with it, for the gateway to hold the app to.
+    const limits = { volumeGb: 1, monthlyBytes: 1, monthlyAwakeSeconds: 2, uploadBytes: 3, appBytes: 4 };
+    const limited = claimsOf(signDeployTicket({ userId: "u", taskId: "t", name: "shop", action: "publish", machineId: "148e21dc03d789", limits }, secret));
+    expect(limited.limits).toEqual({ monthlyBytes: 1, monthlyAwakeSeconds: 2, uploadBytes: 3, appBytes: 4 });
+    expect(claimsOf(signDeployTicket({ userId: "u", taskId: "t", name: "shop", action: "publish", limits }, secret)).limits).toBeUndefined();
+    const removal = claimsOf(signDeployTicket({ userId: "u", taskId: "t", name: "shop", action: "remove", machineId: "148e21dc03d789" }, secret));
+    expect(removal.machine).toBeUndefined();
   });
 });
 

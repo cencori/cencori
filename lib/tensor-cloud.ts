@@ -33,6 +33,17 @@ export type TensorCloudConfig = {
   sandboxTokenSecret: string;
   /** Signs the credential a sandbox makes model calls with. Known only to this app. */
   taskTokenSecret: string;
+  /** The Fly app that holds published apps' machines, one per project published with a server. */
+  sitesApp: string;
+  /**
+   * The image such a machine boots, e.g. registry.fly.io/tensor-sites:<label>. Empty until that
+   * is rolled out: static sites publish as before, and a project with a server is told it cannot
+   * be published yet.
+   */
+  sitesImage: string;
+  sitesRegion: string;
+  /** A token for the sites app, when the sandbox app's own does not reach it. */
+  sitesFlyApiToken: string;
 };
 
 /** Null when cloud tasks are not set up here, which is every environment until it is rolled out. */
@@ -49,6 +60,10 @@ export function readTensorCloudConfig(
     ticketSecret: read("TENSOR_CLOUD_TICKET_SECRET"),
     sandboxTokenSecret: read("TENSOR_CLOUD_SANDBOX_TOKEN_SECRET"),
     taskTokenSecret: read("TENSOR_CLOUD_TASK_TOKEN_SECRET"),
+    sitesApp: read("TENSOR_CLOUD_SITES_APP") || "tensor-sites",
+    sitesImage: read("TENSOR_CLOUD_SITES_IMAGE"),
+    sitesRegion: read("TENSOR_CLOUD_SITES_REGION") || read("TENSOR_CLOUD_SANDBOX_REGION") || "jnb",
+    sitesFlyApiToken: read("TENSOR_CLOUD_SITES_FLY_API_TOKEN") || read("TENSOR_CLOUD_FLY_API_TOKEN"),
   };
   const secrets = [config.ticketSecret, config.sandboxTokenSecret, config.taskTokenSecret];
   if (!config.flyApiToken || !config.sandboxImage || !/^wss:\/\//.test(config.gatewayUrl)) {
@@ -173,7 +188,17 @@ export function normalizeSiteName(value: unknown): string | null {
  * before: the gateway removes that copy once the new one is in place.
  */
 export function signDeployTicket(
-  input: { userId: string; taskId: string; name: string; action: "publish" | "remove"; replaces?: string | null },
+  input: {
+    userId: string;
+    taskId: string;
+    name: string;
+    action: "publish" | "remove";
+    replaces?: string | null;
+    /** An app is published to its own machine, which the ticket names; a static site has none. */
+    machineId?: string | null;
+    /** What the owner's plan allows that app, for the gateway to hold it to. */
+    limits?: Pick<SiteAllowance, "monthlyBytes" | "monthlyAwakeSeconds" | "uploadBytes" | "appBytes"> | null;
+  },
   secret: string,
   now: number = Math.floor(Date.now() / 1000),
 ): string {
@@ -185,6 +210,17 @@ export function signDeployTicket(
       name: input.name,
       action: input.action,
       ...(input.replaces ? { replaces: input.replaces } : {}),
+      ...(input.action === "publish" && input.machineId ? { kind: "app", machine: input.machineId } : {}),
+      ...(input.action === "publish" && input.machineId && input.limits
+        ? {
+            limits: {
+              monthlyBytes: input.limits.monthlyBytes,
+              monthlyAwakeSeconds: input.limits.monthlyAwakeSeconds,
+              uploadBytes: input.limits.uploadBytes,
+              appBytes: input.limits.appBytes,
+            },
+          }
+        : {}),
       jti: randomBytes(18).toString("base64url"),
       iat: now,
       exp: now + DEPLOY_TICKET_TTL_SECONDS,
@@ -209,6 +245,15 @@ export function sandboxTokenSha256(sandboxTokenSecret: string, taskId: string): 
   const token = createHmac("sha256", sandboxTokenSecret)
     .update(`sandbox:${taskId}`)
     .digest("base64url");
+  return createHash("sha256").update(token).digest("hex");
+}
+
+/**
+ * SHA-256 of the token a published app's machine requires of whoever calls it. The same scheme
+ * as a sandbox's, under a different label, so that neither token opens the other.
+ */
+export function siteTokenSha256(sandboxTokenSecret: string, taskId: string): string {
+  const token = createHmac("sha256", sandboxTokenSecret).update(`site:${taskId}`).digest("base64url");
   return createHash("sha256").update(token).digest("hex");
 }
 
@@ -291,6 +336,54 @@ export type TensorCloudAccess = {
   tasks: boolean;
   /** May run them against private repositories. */
   privateRepositories: boolean;
+  /** How many published apps with a server of their own the account may have live at once. */
+  backendApps: number;
+  /** What each of those apps may use. Null when the plan includes none. */
+  site: SiteAllowance | null;
+};
+
+/** What one published app may use in a month, and how large it may be. */
+export type SiteAllowance = {
+  /** The size of its disk, which holds its code and its live data. */
+  volumeGb: number;
+  /** What it may send to visitors in a calendar month. */
+  monthlyBytes: number;
+  /** How long its machine may run in a calendar month. It only runs while it is being visited. */
+  monthlyAwakeSeconds: number;
+  /** The app as sent (packed), and as it unpacks. */
+  uploadBytes: number;
+  appBytes: number;
+};
+
+const MB = 1024 ** 2;
+const GB = 1024 ** 3;
+const HOUR = 3600;
+
+/**
+ * A static site costs nothing to keep. An app with a server is a machine, a disk and the data it
+ * sends, all billed to Cencori for as long as it stays published. So every plan's allowance is
+ * sized from what it can cost at its most, and an app that outgrows it needs a larger plan.
+ *
+ * The three smaller plans are each held under a dollar a month at the very most, with every
+ * allowance used up. Worked from Fly's prices in Johannesburg, taken as: disk $0.15 per GB, the
+ * stopped machine's image about $0.10, the smallest machine about $0.0044 an hour while it runs
+ * (about $3.20 a month if it never slept), data sent $0.12 per GB.
+ *
+ *   starter  1 app   1 GB disk   50 h   1 GB sent    0.25 + 0.22 + 0.12 = $0.59
+ *   builder  1 app   1 GB disk   80 h   2 GB sent    0.25 + 0.35 + 0.24 = $0.84
+ *   pro      1 app   1 GB disk  100 h   2.5 GB sent  0.25 + 0.44 + 0.30 = $0.99
+ *   max      3 apps  2 GB disk  200 h   5 GB sent    3 x (0.40 + 0.88 + 0.60) = $5.64
+ *   ultra    5 apps  2 GB disk  always  10 GB sent   5 x (0.40 + 3.20 + 1.20) = $24.00
+ *
+ * If Fly's prices or the region change, these are the numbers to work out again.
+ */
+const SITE_ALLOWANCES: Record<string, { apps: number; site: SiteAllowance }> = {
+  starter: { apps: 1, site: { volumeGb: 1, monthlyBytes: 1 * GB, monthlyAwakeSeconds: 50 * HOUR, uploadBytes: 40 * MB, appBytes: 150 * MB } },
+  builder: { apps: 1, site: { volumeGb: 1, monthlyBytes: 2 * GB, monthlyAwakeSeconds: 80 * HOUR, uploadBytes: 60 * MB, appBytes: 250 * MB } },
+  pro: { apps: 1, site: { volumeGb: 1, monthlyBytes: 2.5 * GB, monthlyAwakeSeconds: 100 * HOUR, uploadBytes: 80 * MB, appBytes: 300 * MB } },
+  max: { apps: 3, site: { volumeGb: 2, monthlyBytes: 5 * GB, monthlyAwakeSeconds: 200 * HOUR, uploadBytes: 150 * MB, appBytes: 600 * MB } },
+  ultra: { apps: 5, site: { volumeGb: 2, monthlyBytes: 10 * GB, monthlyAwakeSeconds: 744 * HOUR, uploadBytes: 150 * MB, appBytes: 600 * MB } },
+  enterprise: { apps: 5, site: { volumeGb: 2, monthlyBytes: 10 * GB, monthlyAwakeSeconds: 744 * HOUR, uploadBytes: 150 * MB, appBytes: 600 * MB } },
 };
 
 const PRIVATE_REPOSITORY_PLANS = new Set(["pro", "max", "ultra", "enterprise"]);
@@ -307,7 +400,12 @@ const PRIVATE_REPOSITORY_PLANS = new Set(["pro", "max", "ultra", "enterprise"]);
  */
 export function tensorCloudAccess(planCode: string): TensorCloudAccess {
   const paid = ["starter", "builder", "pro", "max", "ultra", "enterprise"].includes(planCode);
-  return { tasks: paid, privateRepositories: paid && PRIVATE_REPOSITORY_PLANS.has(planCode) };
+  return {
+    tasks: paid,
+    privateRepositories: paid && PRIVATE_REPOSITORY_PLANS.has(planCode),
+    backendApps: paid ? (SITE_ALLOWANCES[planCode]?.apps ?? 0) : 0,
+    site: paid ? (SITE_ALLOWANCES[planCode]?.site ?? null) : null,
+  };
 }
 
 /* ---------------------------------------------------------------------------
@@ -439,6 +537,40 @@ export function sandboxMachineRequest(
   };
 }
 
+/**
+ * What a published app runs on: the smallest machine there is. It sleeps when nobody is visiting
+ * (it stops itself, and the gateway starts it), so most of what it costs is its disk.
+ */
+export const SITE_GUEST = { cpu_kind: "shared", cpus: 1, memory_mb: 256 } as const;
+
+export function siteVolumeName(taskId: string): string {
+  return `site_${taskId.replace(/-/g, "").slice(0, 24)}`;
+}
+
+/** The body of Fly's "create machine" call for one project's published app. */
+export function siteMachineRequest(
+  input: { taskId: string; userId: string; volumeId: string },
+  config: TensorCloudConfig,
+) {
+  return {
+    name: `site-${input.taskId}`,
+    region: config.sitesRegion,
+    config: {
+      image: config.sitesImage,
+      guest: SITE_GUEST,
+      // Memory to fall back on: an app's start can need more than it does once it is running.
+      init: { swap_size_mb: 512 },
+      // It exits when it has been idle, and that is meant to stop it. The gateway starts it.
+      restart: { policy: "no" },
+      auto_destroy: false,
+      mounts: [{ volume: input.volumeId, path: "/data" }],
+      env: { SITE_TOKEN_SHA256: siteTokenSha256(config.sandboxTokenSecret, input.taskId) },
+      // No `services`: an app has no public address of its own. The gateway is the way in.
+      metadata: { tensor_task: input.taskId, tensor_user: input.userId, tensor_site: "1" },
+    },
+  };
+}
+
 export type FlyMachine = { id: string; state: string; region: string };
 export type FlyVolume = { id: string; region: string };
 
@@ -446,25 +578,33 @@ export type FlyResult<T> = { ok: true; value: T } | { ok: false; status: number;
 
 const FLY_API = "https://api.machines.dev/v1";
 
-/** Fly's Machines API, for the sandbox app only. */
+/** Fly's Machines API, for one app: the sandboxes' unless said otherwise (see sitesFly). */
 export class FlyMachines {
   readonly #config: TensorCloudConfig;
   readonly #fetch: typeof fetch;
+  readonly #app: string;
+  readonly #token: string;
 
-  constructor(config: TensorCloudConfig, fetcher: typeof fetch = fetch) {
+  constructor(
+    config: TensorCloudConfig,
+    fetcher: typeof fetch = fetch,
+    target: { app: string; token: string } = { app: config.sandboxApp, token: config.flyApiToken },
+  ) {
     this.#config = config;
     this.#fetch = fetcher;
+    this.#app = target.app;
+    this.#token = target.token;
   }
 
   async #call<T>(method: string, path: string, body?: unknown): Promise<FlyResult<T>> {
     let response: Response;
     try {
       response = await this.#fetch(
-        `${FLY_API}/apps/${encodeURIComponent(this.#config.sandboxApp)}${path}`,
+        `${FLY_API}/apps/${encodeURIComponent(this.#app)}${path}`,
         {
           method,
           headers: {
-            authorization: `Bearer ${this.#config.flyApiToken}`,
+            authorization: `Bearer ${this.#token}`,
             ...(body === undefined ? {} : { "content-type": "application/json" }),
           },
           body: body === undefined ? undefined : JSON.stringify(body),
@@ -491,12 +631,23 @@ export class FlyMachines {
     });
   }
 
+  /** The disk of a published app: its code, its dependencies and its live data. */
+  createSiteVolume(taskId: string, sizeGb: number): Promise<FlyResult<FlyVolume>> {
+    return this.#call<FlyVolume>("POST", "/volumes", {
+      name: siteVolumeName(taskId),
+      region: this.#config.sitesRegion,
+      size_gb: sizeGb,
+    });
+  }
+
   /** Everything the task held goes with it. The volume must no longer be attached to a machine. */
   destroyVolume(volumeId: string): Promise<FlyResult<unknown>> {
     return this.#call("DELETE", `/volumes/${encodeURIComponent(volumeId)}`);
   }
 
-  create(request: ReturnType<typeof sandboxMachineRequest>): Promise<FlyResult<FlyMachine>> {
+  create(
+    request: ReturnType<typeof sandboxMachineRequest> | ReturnType<typeof siteMachineRequest>,
+  ): Promise<FlyResult<FlyMachine>> {
     return this.#call<FlyMachine>("POST", "/machines", request);
   }
 
@@ -524,4 +675,9 @@ export class FlyMachines {
   destroy(machineId: string): Promise<FlyResult<unknown>> {
     return this.#call("DELETE", `/machines/${encodeURIComponent(machineId)}?force=true`);
   }
+}
+
+/** Fly's Machines API for the app that holds published apps' machines. */
+export function sitesFly(config: TensorCloudConfig, fetcher: typeof fetch = fetch): FlyMachines {
+  return new FlyMachines(config, fetcher, { app: config.sitesApp, token: config.sitesFlyApiToken });
 }

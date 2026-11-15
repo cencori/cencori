@@ -6,6 +6,7 @@ import {
   isTaskToken,
   readTensorCloudConfig,
   sandboxMachineRequest,
+  siteMachineRequest,
   tensorCloudAccess,
   type TensorCloudAccess,
   type TensorCloudConfig,
@@ -643,10 +644,20 @@ export type TensorCloudDeployment = {
   created_at: string;
   updated_at: string;
   published_at: string | null;
+  /** What is being served under the name: files the gateway keeps, or a program on a machine. */
+  kind: "static" | "app";
+  /** The machine a published app runs on, and its disk. Null for a project that has none. */
+  machine_id: string | null;
+  volume_id: string | null;
 };
 
 export function deploymentJson(deployment: TensorCloudDeployment) {
-  return { name: deployment.name, publishedAt: deployment.published_at, updatedAt: deployment.updated_at };
+  return {
+    name: deployment.name,
+    kind: deployment.kind ?? "static",
+    publishedAt: deployment.published_at,
+    updatedAt: deployment.updated_at,
+  };
 }
 
 export async function readDeployment(admin: Admin, taskId: string): Promise<TensorCloudDeployment | null> {
@@ -687,17 +698,118 @@ export async function claimSiteName(
   return data as TensorCloudDeployment;
 }
 
-/** Records that what is served under a project's name has just been replaced. */
-export async function markPublished(admin: Admin, taskId: string): Promise<TensorCloudDeployment | null> {
+/** Records that what is served under a project's name has just been replaced, and as what. */
+export async function markPublished(
+  admin: Admin,
+  taskId: string,
+  kind: "static" | "app" = "static",
+): Promise<TensorCloudDeployment | null> {
   const now = new Date().toISOString();
   const { data, error } = await admin
     .from(DEPLOYMENTS)
-    .update({ published_at: now, updated_at: now })
+    .update({ published_at: now, updated_at: now, kind })
     .eq("task_id", taskId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
   return (data as TensorCloudDeployment | null) ?? null;
+}
+
+/** How many machines for published apps an account holds, not counting one project's own. */
+export async function countSiteMachines(admin: Admin, userId: string, exceptTaskId: string): Promise<number> {
+  const { count, error } = await admin
+    .from(DEPLOYMENTS)
+    .select("task_id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .not("machine_id", "is", null)
+    .neq("task_id", exceptTaskId);
+  if (error) throw error;
+  return count ?? 0;
+}
+
+type SitesFly = Pick<FlyMachines, "create" | "createSiteVolume" | "destroy" | "destroyVolume" | "get">;
+
+/**
+ * The machine a project's app is published to, made the first time it is needed. A machine that
+ * is on record but that Fly no longer has (it was removed by hand, or its host was lost) is made
+ * again on the disk it had, so the app's data survives it.
+ */
+export async function ensureSiteMachine(
+  admin: Admin,
+  fly: SitesFly,
+  config: TensorCloudConfig,
+  deployment: TensorCloudDeployment,
+  /** The size of disk the owner's plan gives an app. Only used when the disk is first made. */
+  volumeGb: number,
+): Promise<{ ok: true; machineId: string } | { ok: false; error: string }> {
+  if (deployment.machine_id) {
+    const found = await fly.get(deployment.machine_id);
+    if (found.ok) return { ok: true, machineId: deployment.machine_id };
+    // Anything but "there is no such machine" is Fly being unreachable: not a reason to make another.
+    if (found.status !== 404) return { ok: false, error: found.error };
+  }
+
+  let volumeId = deployment.volume_id;
+  if (!volumeId) {
+    const volume = await fly.createSiteVolume(deployment.task_id, volumeGb);
+    if (!volume.ok) return { ok: false, error: volume.error };
+    volumeId = volume.value.id;
+    // Written down at once: a disk that is paid for must never be one nobody remembers.
+    const { error } = await admin.from(DEPLOYMENTS).update({ volume_id: volumeId }).eq("task_id", deployment.task_id);
+    if (error) throw error;
+  }
+  const machine = await fly.create(
+    siteMachineRequest({ taskId: deployment.task_id, userId: deployment.user_id, volumeId }, config),
+  );
+  if (!machine.ok) return { ok: false, error: machine.error };
+  const { error } = await admin
+    .from(DEPLOYMENTS)
+    .update({ machine_id: machine.value.id, updated_at: new Date().toISOString() })
+    .eq("task_id", deployment.task_id);
+  if (error) throw error;
+  return { ok: true, machineId: machine.value.id };
+}
+
+/**
+ * Destroys a published app's machine and its disk, with the app's live data. True when nothing
+ * of it is left on Fly; what could not be removed is logged, and stays on record to try again.
+ */
+export async function destroySiteMachine(
+  admin: Admin,
+  fly: Pick<FlyMachines, "destroy" | "destroyVolume">,
+  deployment: Pick<TensorCloudDeployment, "task_id" | "machine_id" | "volume_id">,
+): Promise<boolean> {
+  let gone = true;
+  if (deployment.machine_id) {
+    const destroyed = await fly.destroy(deployment.machine_id);
+    if (!destroyed.ok && destroyed.status !== 404) {
+      gone = false;
+      console.error(
+        `[Tensor Cloud] Destroying site machine ${deployment.machine_id} of task ${deployment.task_id} failed (${destroyed.status}): ${destroyed.error}`,
+      );
+    }
+  }
+  if (deployment.volume_id && gone) {
+    // A volume is not free to remove the instant its machine is destroyed; one more try covers it.
+    let removed = await fly.destroyVolume(deployment.volume_id);
+    if (!removed.ok && removed.status !== 404) {
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+      removed = await fly.destroyVolume(deployment.volume_id);
+    }
+    if (!removed.ok && removed.status !== 404) {
+      gone = false;
+      console.error(
+        `[Tensor Cloud] Destroying site volume ${deployment.volume_id} of task ${deployment.task_id} failed (${removed.status}): ${removed.error}`,
+      );
+    }
+  }
+  if (gone) {
+    await admin
+      .from(DEPLOYMENTS)
+      .update({ machine_id: null, volume_id: null })
+      .eq("task_id", deployment.task_id);
+  }
+  return gone;
 }
 
 /** Lets a project's name go. The copy being served is the gateway's to remove. */
@@ -717,11 +829,20 @@ export async function destroyTask(
   admin: Admin,
   fly: Pick<FlyMachines, "destroy" | "destroyVolume">,
   task: TensorCloudTask,
+  /** Fly for the sites app: a project published as an app has a machine there too. */
+  sites?: Pick<FlyMachines, "destroy" | "destroyVolume">,
 ): Promise<void> {
   await updateTask(admin, task.id, { status: "deleted" });
   await deleteChatsOfTask(admin, task.id);
+  // Its published app, if it has one, stops being billed with it. A row whose machine could not
+  // be destroyed is kept, so what is still running is still on record.
+  const deployment = sites ? await readDeployment(admin, task.id) : null;
+  const siteGone =
+    !deployment || !sites || (!deployment.machine_id && !deployment.volume_id)
+      ? true
+      : await destroySiteMachine(admin, sites, deployment);
   // Its name is let go with it, so the address is free for another project.
-  await deleteDeployment(admin, task.id);
+  if (siteGone) await deleteDeployment(admin, task.id);
 
   let machineGone = true;
   if (task.machine_id) {
