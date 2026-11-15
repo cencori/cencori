@@ -373,8 +373,13 @@ export async function POST(req: NextRequest) {
     try {
         // Body parsing is independent of authentication and project checks;
         // overlap it with remote validation instead of adding another serial
-        // phase to preflight.
-        const bodyPromise = req.json() as Promise<ChatRequestBody>;
+        // phase to preflight. Read a clone: validation reads the body too (the
+        // empty-wallet check needs the model to tell whose key will run), and a
+        // request whose body is already being read can't be read or cloned
+        // again. Reading `req` itself here made that check fail closed, so every
+        // call on a customer's own key with no credits got 403
+        // credit_balance_exhausted (2026-11-15).
+        const bodyPromise = req.clone().json() as Promise<ChatRequestBody>;
         const authHeader = req.headers.get("Authorization");
         const providedApiKey = extractCencoriApiKeyFromHeaders(req.headers);
 
