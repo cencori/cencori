@@ -20,13 +20,6 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Loading03Icon } from "@hugeicons/core-free-icons";
 import { Logo } from "@/components/logo";
 
-// Who the organization is for: a business running agents (naira plans per
-// conversation) or a developer building with the API (credits, today's plans).
-const TRACKS = [
-  { id: "business", name: "My business", description: "Agents that answer customers on WhatsApp and your website." },
-  { id: "developer", name: "With the API", description: "Build AI into your own product with our SDKs." },
-] as const;
-
 const PLANS = [
   {
     id: "free",
@@ -63,17 +56,15 @@ function OnboardingContent() {
   const [fullName, setFullName] = useState("");
   const [orgName, setOrgName] = useState("");
   const [plan, setPlan] = useState<"free" | "pro">("free");
-  const [track, setTrack] = useState<"business" | "developer" | null>(null);
+  // Who the organization is for. Everyone is a developer (credits, the plans
+  // below) unless they signed up from business.cencori.com, which starts a
+  // free trial and hands over to Studio instead.
+  const [track, setTrack] = useState<"business" | "developer">("developer");
   const [heard, setHeard] = useState<HeardAboutSource | null>(null);
   const [heardDetail, setHeardDetail] = useState("");
-  // Signed up from business.cencori.com (or developers.): the choice is already made.
-  const [trackFromSignup, setTrackFromSignup] = useState(false);
   useEffect(() => {
     const fromSignup = readSignupTrack() ?? (searchParams.get("for") === "business" || searchParams.get("for") === "developer" ? searchParams.get("for") as "business" | "developer" : null);
-    if (fromSignup) {
-      setTrack(fromSignup);
-      setTrackFromSignup(true);
-    }
+    if (fromSignup) setTrack(fromSignup);
   }, [searchParams]);
   const [loading, setLoading] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
@@ -198,57 +189,46 @@ function OnboardingContent() {
           return null;
         }
 
+        // Paid onboarding starts as Free (the column defaults) and is upgraded
+        // only after payment is confirmed. The browser can't write plan or
+        // billing columns at all (database/brimble/0300_lock_down_billing.sql).
+        //
+        // A slug taken by someone else's organization can't be seen from here
+        // (row security hides other people's organizations), so the insert is
+        // what finds out: on a clash, try the next suffix.
         const baseSlug = slugify(organizationName) || "org";
-        let newSlug = baseSlug;
-        let slugExists = true;
+        const candidates = [
+          baseSlug,
+          ...Array.from({ length: 9 }, (_, i) => `${baseSlug}-${i + 1}`),
+          `${baseSlug}-${Math.random().toString(36).slice(2, 6)}`,
+        ].filter((candidate) => !isReservedSlug(candidate));
 
-        for (let i = 0; i < 10; i++) {
-          // Skip reserved slugs that collide with application routes.
-          if (isReservedSlug(newSlug)) {
-            newSlug = `${baseSlug}-${i + 1}`;
-            continue;
-          }
-
-          const { data, error: slugError } = await supabase
+        let orgData: ProvisionedOrganization | null = null;
+        for (const candidate of candidates) {
+          const { data, error } = await supabase
             .from("organizations")
-            .select("slug")
-            .eq("slug", newSlug)
-            .maybeSingle();
+            .insert({
+              name: organizationName,
+              slug: candidate,
+              owner_id: user.id,
+            })
+            .select("id, slug, name")
+            .single();
 
-          if (slugError) {
-            console.error("Error checking organization slug:", slugError.message);
-            toast.error("Could not prepare your organization. Please try again.");
-            return null;
-          }
-
-          if (!data) {
-            slugExists = false;
+          if (data) {
+            orgData = data;
             break;
           }
-          newSlug = `${baseSlug}-${i + 1}`;
+          // 23505: the slug is taken. Anything else is a real failure.
+          if (error?.code !== "23505") {
+            console.error("Error creating organization:", error?.message);
+            toast.error("Failed to create organization.");
+            return null;
+          }
         }
 
-        if (slugExists) {
-          toast.error("Could not generate a unique slug. Try again.");
-          return null;
-        }
-
-        // Paid onboarding starts as Free (the column defaults) and is upgraded
-        // only after Stripe confirms payment. The browser can't write plan or
-        // billing columns at all (database/brimble/0300_lock_down_billing.sql).
-        const { data: orgData, error } = await supabase
-          .from("organizations")
-          .insert({
-            name: organizationName,
-            slug: newSlug,
-            owner_id: user.id,
-          })
-          .select("id, slug, name")
-          .single();
-
-        if (error || !orgData) {
-          console.error("Error creating organization:", error?.message);
-          toast.error("Failed to create organization.");
+        if (!orgData) {
+          toast.error("That organization name is taken. Try a different one.");
           return null;
         }
 
@@ -295,10 +275,6 @@ function OnboardingContent() {
   };
 
   const handleSubmit = async () => {
-    if (!track) {
-      toast.error("Choose what you're building.");
-      return;
-    }
     if (!heard) {
       toast.error("Tell us how you heard about Cencori.");
       return;
@@ -402,34 +378,8 @@ function OnboardingContent() {
             />
           </div>
 
-          {!trackFromSignup && (
-          <div>
-            <label className="block text-sm font-medium text-zinc-300 mb-3">
-              What are you building for?
-            </label>
-            <div className="grid grid-cols-2 gap-3">
-              {TRACKS.map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => setTrack(t.id)}
-                  disabled={loading}
-                  aria-pressed={track === t.id}
-                  className={`rounded-lg border p-4 text-left transition-colors ${
-                    track === t.id
-                      ? "border-blue-500/45 bg-zinc-900"
-                      : "border-white/[0.06] bg-zinc-900/50 hover:border-white/10 hover:bg-zinc-900/80"
-                  } disabled:cursor-wait disabled:opacity-60`}
-                >
-                  <span className="text-sm font-medium text-white">{t.name}</span>
-                  <p className="text-xs text-zinc-500 mt-0.5">{t.description}</p>
-                </button>
-              ))}
-            </div>
-          </div>
-          )}
           {track === "business" && (
-            <p className="-mt-3 text-xs text-zinc-500">Free for 14 days or 50 conversations. No card needed.</p>
+            <p className="text-xs text-zinc-500">Free for 14 days or 50 conversations. No card needed.</p>
           )}
 
           <div>
