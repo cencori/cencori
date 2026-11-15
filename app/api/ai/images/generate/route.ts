@@ -63,7 +63,7 @@ function getProviderForModel(model: string): ImageProvider {
     const modelLower = model.toLowerCase().replace(/\s+/g, '-');
     if (modelLower in IMAGE_MODELS) return IMAGE_MODELS[modelLower as SupportedModel].provider;
     if (modelLower.includes('gemini') || modelLower.includes('imagen') || modelLower.includes('nano-banana')) return 'google';
-    if (modelLower.includes('dall-e') || modelLower.includes('dalle') || modelLower.includes('gpt-image')) return 'openai';
+    if (modelLower.includes('gpt-image')) return 'openai';
     return 'openai';
 }
 

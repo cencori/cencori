@@ -400,16 +400,16 @@ const response = await cencori.ai.generateImage({
   prompt: 'A futuristic city at sunset with flying cars',
   model: 'gpt-image-1.5',  // Best text rendering, top ELO rating
   size: '1024x1024',
-  quality: 'hd'
+  quality: 'high'
 });
 
-console.log(response.images[0].url); // https://...
+console.log(response.images[0].b64_json); // base64 image data
 ```
 
 **Supported Models:**
 | Provider | Models | Description |
 |----------|--------|-------------|
-| **OpenAI** | `gpt-image-1.5`, `gpt-image-1`, `dall-e-3`, `dall-e-2` | Text rendering, creative |
+| **OpenAI** | `gpt-image-2`, `gpt-image-1.5`, `gpt-image-1`, `gpt-image-1-mini` | Text rendering, creative |
 | **Google** | `gemini-3-pro-image`, `imagen-3` | High photorealism |
 
 ## Framework Integrations

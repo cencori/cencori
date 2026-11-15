@@ -325,7 +325,7 @@ class AIModule:
     def generate_image(
         self,
         prompt: str,
-        model: str = "dall-e-3",
+        model: str = "gpt-image-1",
         n: Optional[int] = None,
         size: Optional[str] = None,
         quality: Optional[str] = None,
@@ -677,7 +677,7 @@ class AIModule:
     async def async_generate_image(
         self,
         prompt: str,
-        model: str = "dall-e-3",
+        model: str = "gpt-image-1",
         n: Optional[int] = None,
         size: Optional[str] = None,
         quality: Optional[str] = None,

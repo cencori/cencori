@@ -305,9 +305,9 @@ export interface ImageGenerationRequest {
     n?: number;
     /** Image size (availability varies by model) */
     size?: '256x256' | '512x512' | '1024x1024' | '1024x1792' | '1792x1024' | '1536x1024' | '1024x1536';
-    /** Image quality (DALL-E 3 / GPT Image only) */
-    quality?: 'standard' | 'hd';
-    /** Image style (DALL-E 3 only) */
+    /** Image quality. 'standard' and 'hd' are read as 'medium' and 'high'. */
+    quality?: 'low' | 'medium' | 'high' | 'standard' | 'hd';
+    /** Not used by the current OpenAI image models. */
     style?: 'vivid' | 'natural';
     /** Response format */
     responseFormat?: 'url' | 'b64_json';

@@ -56,10 +56,10 @@ const response = await cencori.ai.generateImage({
   prompt: 'A futuristic city at sunset',
   model: 'gpt-image-1.5',
   size: '1024x1024',
-  quality: 'hd',
+  quality: 'high',
 });
 
-console.log(response.images[0].url);
+console.log(response.images[0].b64_json); // base64 image data
 ```
 
 ## Embeddings

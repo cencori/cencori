@@ -188,7 +188,7 @@ class ImageGenerationRequest:
     """Request for image generation."""
 
     prompt: str
-    model: str = "dall-e-3"
+    model: str = "gpt-image-1"
     n: Optional[int] = None
     size: Optional[str] = None
     quality: Optional[str] = None

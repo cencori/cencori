@@ -265,17 +265,17 @@ Generate images from text prompts across providers:
 ```typescript
 const response = await cencori.ai.generateImage({
   prompt: "A futuristic city at sunset",
-  model: "gpt-image-1.5",  // or "dall-e-3", "gemini-3-pro-image"
+  model: "gpt-image-1.5",  // or "gpt-image-1-mini", "gemini-3-pro-image"
   size: "1024x1024",
 });
 
-console.log(response.images[0].url);
+console.log(response.images[0].b64_json);
 ```
 
 **Supported Models:**
 | Provider | Models |
 |----------|--------|
-| **OpenAI** | GPT Image 1.5, GPT Image 1, DALL-E 3, DALL-E 2 |
+| **OpenAI** | GPT Image 2, GPT Image 1.5, GPT Image 1, GPT Image 1 Mini |
 | **Google** | Gemini 3 Pro Image, Imagen 3 |
 
 ### **Real-Time Streaming**
@@ -428,7 +428,7 @@ AI design tools, coding assistants, chatbots, content generators?
 |----------|-------------|-----------|
 | `/api/ai/chat` | Chat completions (streaming) | OpenAI, Anthropic, Google, xAI, Mistral, DeepSeek |
 | `/api/ai/embeddings` | Vector embeddings | OpenAI, Google, Cohere |
-| `/api/ai/images/generate` | Image generation | OpenAI (GPT Image 1.5, DALL-E), Google (Imagen) |
+| `/api/ai/images/generate` | Image generation | OpenAI (GPT Image), Google (Imagen) |
 | `/api/ai/audio/transcriptions` | Speech-to-text | OpenAI (Whisper) |
 | `/api/ai/audio/speech` | Text-to-speech | OpenAI (TTS-1, TTS-1-HD) |
 | `/api/ai/moderation` | Content moderation | OpenAI |

@@ -63,10 +63,9 @@ export function getModelDisplayPrice(
     if (
         primaryType === 'image' ||
         id.includes('image') ||
-        id.includes('dall-e') ||
         id.includes('imagen')
     ) {
-        if (id.includes('dall-e-3') || id.includes('image-2')) {
+        if (id.includes('image-2')) {
             return perImage(0.04);
         }
         return perImage(0.02);
