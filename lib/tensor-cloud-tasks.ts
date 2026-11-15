@@ -6,8 +6,10 @@ import {
   isTaskToken,
   openVariables,
   readTensorCloudConfig,
+  gatewayHttpUrl,
   sandboxMachineRequest,
   sealVariables,
+  signDeployTicket,
   siteMachineRequest,
   tensorCloudAccess,
   type TensorCloudAccess,
@@ -730,7 +732,7 @@ export async function countSiteMachines(admin: Admin, userId: string, exceptTask
   return count ?? 0;
 }
 
-type SitesFly = Pick<FlyMachines, "create" | "createSiteVolume" | "destroy" | "destroyVolume" | "get">;
+type SitesFly = Pick<FlyMachines, "create" | "createSiteVolume" | "destroy" | "destroyVolume" | "get" | "update">;
 
 /**
  * The machine a project's app is published to, made the first time it is needed. A machine that
@@ -747,7 +749,18 @@ export async function ensureSiteMachine(
 ): Promise<{ ok: true; machineId: string } | { ok: false; error: string }> {
   if (deployment.machine_id) {
     const found = await fly.get(deployment.machine_id);
-    if (found.ok) return { ok: true, machineId: deployment.machine_id };
+    if (found.ok) {
+      // A machine made from an older image is moved to the current one, on the same disk: what
+      // runs an app (cloud/site) changes, and an app published before must keep up with it.
+      if (deployment.volume_id && found.value.config?.image && found.value.config.image !== config.sitesImage) {
+        const moved = await fly.update(
+          deployment.machine_id,
+          siteMachineRequest({ taskId: deployment.task_id, userId: deployment.user_id, volumeId: deployment.volume_id }, config),
+        );
+        if (!moved.ok) return { ok: false, error: moved.error };
+      }
+      return { ok: true, machineId: deployment.machine_id };
+    }
     // Anything but "there is no such machine" is Fly being unreachable: not a reason to make another.
     if (found.status !== 404) return { ok: false, error: found.error };
   }
@@ -771,6 +784,36 @@ export async function ensureSiteMachine(
     .eq("task_id", deployment.task_id);
   if (error) throw error;
   return { ok: true, machineId: machine.value.id };
+}
+
+/**
+ * Hands a published app's machine the project's environment variables, through the gateway,
+ * which wakes it if it is asleep. The app is restarted with them. True when the machine took them.
+ */
+export async function giveSiteVariables(
+  config: TensorCloudConfig,
+  deployment: Pick<TensorCloudDeployment, "task_id" | "user_id" | "name">,
+  machineId: string,
+  variables: TensorCloudVariable[],
+  fetcher: typeof fetch = fetch,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const ticket = signDeployTicket(
+    { userId: deployment.user_id, taskId: deployment.task_id, name: deployment.name, action: "env", machineId },
+    config.ticketSecret,
+  );
+  try {
+    const response = await fetcher(`${gatewayHttpUrl(config.gatewayUrl)}/v1/sites/env?ticket=${encodeURIComponent(ticket)}`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ variables }),
+      signal: AbortSignal.timeout(60_000),
+    });
+    if (response.ok) return { ok: true };
+    const said = (await response.json().catch(() => ({}))) as { error?: unknown };
+    return { ok: false, error: typeof said.error === "string" ? said.error : `The gateway answered ${response.status}.` };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "The gateway could not be reached." };
+  }
 }
 
 /**

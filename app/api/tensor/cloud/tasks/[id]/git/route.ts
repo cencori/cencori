@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { noStoreHeaders } from "@/lib/tensor-auth";
-import { authenticateTensorBillingRequest } from "@/lib/tensor-billing";
+import { authenticateProjectRequest } from "@/lib/tensor-cloud-project-auth";
 import { readTensorCloudConfig } from "@/lib/tensor-cloud";
 import {
   connectionJson,
@@ -41,12 +41,14 @@ type Context = { params: Promise<{ id: string }> };
 
 /** The project the request is about, or the answer to give instead. */
 async function open(request: NextRequest, context: Context) {
-  const session = await authenticateTensorBillingRequest(request);
+  const id = (await context.params).id;
+  const session = await authenticateProjectRequest(request, id, ["GET", "POST", "PATCH"]);
+  if (session === "forbidden") return { refused: json({ error: "Tensor cannot do that for you. Ask the project's owner to do it in the project's settings." }, 403) } as const;
   if (!session) return { refused: json({ error: "Your Cencori session is invalid." }, 401) } as const;
   const config = readTensorCloudConfig();
   const app = readGithubApp();
   if (!config || !app) return { refused: json({ error: "GitHub is not available yet." }, 503) } as const;
-  const task = await readTask(session.admin, session.user.id, (await context.params).id);
+  const task = await readTask(session.admin, session.user.id, id);
   if (!task || !task.project_name) return { refused: json({ error: "That project does not exist." }, 404) } as const;
   return { session, config, app, task } as const;
 }

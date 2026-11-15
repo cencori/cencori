@@ -528,6 +528,10 @@ describe("published apps", () => {
     const limited = claimsOf(signDeployTicket({ userId: "u", taskId: "t", name: "shop", action: "publish", machineId: "148e21dc03d789", limits }, secret));
     expect(limited.limits).toEqual({ monthlyBytes: 1, monthlyAwakeSeconds: 2, uploadBytes: 3, appBytes: 4 });
     expect(claimsOf(signDeployTicket({ userId: "u", taskId: "t", name: "shop", action: "publish", limits }, secret)).limits).toBeUndefined();
+    // Handing an app its variables names its machine too; nothing else is in the ticket.
+    const env = claimsOf(signDeployTicket({ userId: "u", taskId: "t", name: "shop", action: "env", machineId: "148e21dc03d789" }, secret));
+    expect(env).toMatchObject({ action: "env", kind: "app", machine: "148e21dc03d789" });
+    expect(env.limits).toBeUndefined();
     const removal = claimsOf(signDeployTicket({ userId: "u", taskId: "t", name: "shop", action: "remove", machineId: "148e21dc03d789" }, secret));
     expect(removal.machine).toBeUndefined();
   });

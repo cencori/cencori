@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { noStoreHeaders } from "@/lib/tensor-auth";
-import { authenticateTensorBillingRequest } from "@/lib/tensor-billing";
+import { authenticateProjectRequest } from "@/lib/tensor-cloud-project-auth";
 import { normalizeVariables, readTensorCloudConfig } from "@/lib/tensor-cloud";
-import { readTask, readVariables, writeVariables } from "@/lib/tensor-cloud-tasks";
+import { giveSiteVariables, readDeployment, readTask, readVariables, writeVariables } from "@/lib/tensor-cloud-tasks";
 
 // A project's environment variables: the names and values its app reads from its environment.
 //
@@ -20,11 +20,13 @@ type Context = { params: Promise<{ id: string }> };
 
 /** The project the request is about, or the answer to give instead. */
 async function open(request: NextRequest, context: Context) {
-  const session = await authenticateTensorBillingRequest(request);
+  const id = (await context.params).id;
+  const session = await authenticateProjectRequest(request, id, ["GET", "PUT"]);
+  if (session === "forbidden") return { refused: json({ error: "Tensor cannot do that for you. Ask the project's owner to do it in the project's settings." }, 403) } as const;
   if (!session) return { refused: json({ error: "Your Cencori session is invalid." }, 401) } as const;
   const config = readTensorCloudConfig();
   if (!config) return { refused: json({ error: "Tensor on the web is not available yet." }, 503) } as const;
-  const task = await readTask(session.admin, session.user.id, (await context.params).id);
+  const task = await readTask(session.admin, session.user.id, id);
   if (!task || !task.project_name) return { refused: json({ error: "That project does not exist." }, 404) } as const;
   return { session, config, task } as const;
 }
@@ -57,7 +59,17 @@ export async function PUT(request: NextRequest, context: Context) {
     if (!checked.ok) return json({ error: checked.error, code: "bad_variables" }, 400);
 
     await writeVariables(session.admin, config, task, checked.variables);
-    return json({ variables: checked.variables });
+
+    // A project published as an app gets them at once, and is restarted with them. When that
+    // cannot be done now, they are saved all the same and given the next time it is published.
+    const deployment = await readDeployment(session.admin, task.id);
+    let app: "updated" | "failed" | null = null;
+    if (deployment?.kind === "app" && deployment.machine_id && deployment.published_at) {
+      const given = await giveSiteVariables(config, deployment, deployment.machine_id, checked.variables);
+      app = given.ok ? "updated" : "failed";
+      if (!given.ok) console.error(`[Tensor Cloud] Giving variables to the app of task ${task.id} failed: ${given.error}`);
+    }
+    return json({ variables: checked.variables, app });
   } catch (error) {
     console.error("[Tensor Cloud] Saving variables failed", error);
     return json({ error: "Tensor could not save this project's variables. Try again shortly." }, 503);

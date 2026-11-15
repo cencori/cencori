@@ -192,7 +192,8 @@ export function signDeployTicket(
     userId: string;
     taskId: string;
     name: string;
-    action: "publish" | "remove";
+    /** "env": hand a published app's machine the project's environment variables. */
+    action: "publish" | "remove" | "env";
     replaces?: string | null;
     /** An app is published to its own machine, which the ticket names; a static site has none. */
     machineId?: string | null;
@@ -211,6 +212,7 @@ export function signDeployTicket(
       action: input.action,
       ...(input.replaces ? { replaces: input.replaces } : {}),
       ...(input.action === "publish" && input.machineId ? { kind: "app", machine: input.machineId } : {}),
+      ...(input.action === "env" && input.machineId ? { kind: "app", machine: input.machineId } : {}),
       ...(input.action === "publish" && input.machineId && input.limits
         ? {
             limits: {
@@ -742,7 +744,7 @@ export function siteMachineRequest(
   };
 }
 
-export type FlyMachine = { id: string; state: string; region: string };
+export type FlyMachine = { id: string; state: string; region: string; config?: { image?: string } };
 export type FlyVolume = { id: string; region: string };
 
 export type FlyResult<T> = { ok: true; value: T } | { ok: false; status: number; error: string };
@@ -824,6 +826,11 @@ export class FlyMachines {
 
   get(machineId: string): Promise<FlyResult<FlyMachine>> {
     return this.#call<FlyMachine>("GET", `/machines/${encodeURIComponent(machineId)}`);
+  }
+
+  /** Replaces a machine's configuration (its image, say), keeping its disk. It restarts with it. */
+  update(machineId: string, request: { config: unknown }): Promise<FlyResult<FlyMachine>> {
+    return this.#call<FlyMachine>("POST", `/machines/${encodeURIComponent(machineId)}`, { config: request.config });
   }
 
   start(machineId: string): Promise<FlyResult<unknown>> {

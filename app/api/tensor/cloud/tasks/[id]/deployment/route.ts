@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { noStoreHeaders } from "@/lib/tensor-auth";
-import { authenticateTensorBillingRequest } from "@/lib/tensor-billing";
+import { authenticateProjectRequest } from "@/lib/tensor-cloud-project-auth";
 import {
   gatewayHttpUrl,
   normalizeSiteName,
@@ -17,10 +17,12 @@ import {
   deploymentJson,
   destroySiteMachine,
   ensureSiteMachine,
+  giveSiteVariables,
   markPublished,
   readCloudAccess,
   readDeployment,
   readTask,
+  readVariables,
   siteNameAvailable,
   type TensorCloudTask,
 } from "@/lib/tensor-cloud-tasks";
@@ -51,11 +53,13 @@ type Context = { params: Promise<{ id: string }> };
 
 /** The project the request is about, or the answer to give instead. */
 async function open(request: NextRequest, context: Context) {
-  const session = await authenticateTensorBillingRequest(request);
+  const id = (await context.params).id;
+  const session = await authenticateProjectRequest(request, id, ["GET", "POST", "PATCH"]);
+  if (session === "forbidden") return { refused: json({ error: "Tensor cannot do that for you. Ask the project's owner to do it in the project's settings." }, 403) } as const;
   if (!session) return { refused: json({ error: "Your Cencori session is invalid." }, 401) } as const;
   const config = readTensorCloudConfig();
   if (!config) return { refused: json({ error: "Tensor on the web is not available yet." }, 503) } as const;
-  const task = await readTask(session.admin, session.user.id, (await context.params).id);
+  const task = await readTask(session.admin, session.user.id, id);
   if (!task || !task.project_name) return { refused: json({ error: "That project does not exist." }, 404) } as const;
   return { session, config, task } as const;
 }
@@ -76,7 +80,10 @@ export async function GET(request: NextRequest, context: Context) {
     if ("refused" in opened) return opened.refused;
     const { session, config, task } = opened;
     const deployment = await readDeployment(session.admin, task.id);
+    const access = await readCloudAccess(session.admin, session.user.id);
     return json({
+      // What the owner's plan allows a published app with a server of its own.
+      allowance: { backendApps: access.backendApps, site: access.site },
       deployment: deployment ? deploymentJson(deployment) : null,
       suggestedName: deployment ? null : await suggestName(session.admin, task),
       gateway: gatewayHttpUrl(config.gatewayUrl),
@@ -155,6 +162,13 @@ export async function POST(request: NextRequest, context: Context) {
         return json({ error: "Tensor could not set up somewhere for this app to run. Try again shortly." }, 503);
       }
       machineId = machine.machineId;
+      // The app is started as soon as it arrives, so it has its variables before then: an app
+      // that needs a database address would otherwise fail its first start.
+      const given = await giveSiteVariables(config, claimed, machineId, await readVariables(session.admin, config, task.id));
+      if (!given.ok) {
+        console.error(`[Tensor Cloud] Giving variables to the site machine of task ${task.id} failed: ${given.error}`);
+        return json({ error: "Tensor could not give the app its environment variables. Try again shortly." }, 503);
+      }
     }
 
     const ticket = signDeployTicket(
