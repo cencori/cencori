@@ -11,11 +11,15 @@ import {
 import { createServerClient } from "@/lib/supabaseServer";
 import { useAnotherCencoriAccount } from "./actions";
 import { ContinueToTensor } from "./continue-to-tensor";
+import { StartProvider } from "./start-provider";
+import { isBetterAuthEnabled } from "@/lib/auth/flags";
 
 type TensorSignInPageProps = {
   searchParams: Promise<{
     code_challenge?: string;
     error?: string;
+    /** "google": an app asked to go straight to Google (the phone app's Continue with Google). */
+    provider?: string;
     redirect_uri?: string;
     state?: string;
   }>;
@@ -39,6 +43,9 @@ export default async function TensorSignInPage({ searchParams }: TensorSignInPag
   const { data } = await getAuthUser(supabase);
   if (!data.user) {
     const returnTo = tensorSignInPath(challenge, state, redirectUri);
+    if (params.provider === "google" && isBetterAuthEnabled()) {
+      return <StartProvider provider="google" callbackURL={returnTo} />;
+    }
     redirect(`/login?redirect=${encodeURIComponent(returnTo)}`);
   }
 
