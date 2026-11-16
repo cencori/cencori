@@ -56,7 +56,7 @@ describe('Embedded Agents public contracts', () => {
             ({ path, method }) => `${method.toUpperCase()} ${normalizePath(path)}`,
         );
 
-        expect(documented).toHaveLength(131);
+        expect(documented).toHaveLength(132);
         expect(documented.filter((operation) => !handlers.includes(operation))).toEqual([]);
     });
 

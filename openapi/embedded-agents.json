@@ -1495,6 +1495,21 @@
           },
           "state": {
             "type": "string"
+          },
+          "redirect_uri": {
+            "type": "string",
+            "format": "uri",
+            "description": "The redirect URI this attempt uses. Register exactly this value on your OAuth app."
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "expires_in": {
+            "type": "integer",
+            "description": "Seconds the state stays valid."
           }
         },
         "required": [
@@ -3725,13 +3740,15 @@
         "properties": {
           "redirect_uri": {
             "type": "string",
-            "format": "uri"
+            "format": "uri",
+            "description": "Receive the code yourself: the provider redirects here, and you finish with POST /v1/connections/{connectionId}/exchange. Omit it to let Cencori receive the code."
           },
           "scopes": {
             "type": "array",
             "items": {
               "type": "string"
-            }
+            },
+            "description": "Scopes to request. Replaces the connector's defaults (Gmail defaults to gmail.send only)."
           },
           "discovery_url": {
             "type": "string",
@@ -3744,7 +3761,12 @@
           },
           "client_id": {
             "type": "string",
-            "description": "Bring-your-own OAuth app id when the connector has no platform-registered client; pairs with client_secret."
+            "description": "Your own OAuth app's client id; pairs with client_secret. Register the `redirect_uri` from the response on that app."
+          },
+          "return_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "Where Cencori sends the browser after it has saved the connection, with `status=connected|error` and `connection_id` added to the query. https only (http allowed on localhost). Cannot be combined with redirect_uri."
           }
         },
         "additionalProperties": false
@@ -4153,6 +4175,50 @@
           "imported",
           "base_url",
           "operations"
+        ]
+      },
+      "ExchangeConnectionRequest": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "state"
+        ],
+        "additionalProperties": false
+      },
+      "ConnectionExchange": {
+        "type": "object",
+        "properties": {
+          "connected": {
+            "type": "boolean"
+          },
+          "connection_id": {
+            "type": "string"
+          },
+          "connector": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "connected",
+          "connection_id",
+          "status"
         ]
       }
     },
@@ -5843,7 +5909,8 @@
             }
           }
         ],
-        "security": []
+        "security": [],
+        "description": "Cencori's redirect URI. Saves the connection, then redirects the browser to the `return_url` given at authorize (`status=connected|error`, `connection_id`), or returns JSON when none was given."
       }
     },
     "/v1/connections/{connectionId}": {
@@ -5973,6 +6040,49 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/AuthorizeConnectionRequest"
+              }
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ConnectionId"
+        }
+      ]
+    },
+    "/v1/connections/{connectionId}/exchange": {
+      "post": {
+        "summary": "Finish OAuth with a code your own redirect_uri received",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectionExchange"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "description": "Requires a secret project key (`secret_key_required` otherwise). Pass the `code` and `state` query parameters your redirect URI received; Cencori exchanges the code and stores the tokens on the connection.",
+        "operationId": "postConnectionsByConnectionIdExchange",
+        "tags": [
+          "Connections"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExchangeConnectionRequest"
               }
             }
           }

@@ -1,5 +1,5 @@
 import type { createAdminClient } from '@/lib/supabaseAdmin';
-import { getValidAccessToken, gmailClientConfig, oauthClientConfig } from './oauth';
+import { getValidAccessToken, connectionOauthConfig } from './oauth';
 import { safeOutboundFetch } from '@/lib/security/outbound-url';
 import { decryptApiKey } from '@/lib/encryption';
 
@@ -23,7 +23,7 @@ export interface GmailSendInput {
 export async function executeGmailSend(
     supabase: Admin,
     opts: {
-        connection: { id: string; encrypted_access_ref: string | null; encrypted_refresh_ref: string | null; expires_at: string | null; connector_slug?: string };
+        connection: { id: string; encrypted_access_ref: string | null; encrypted_refresh_ref: string | null; expires_at: string | null; connector_slug?: string; metadata?: unknown };
         organizationId: string;
         connectorConfig: Record<string, unknown>;
         input: GmailSendInput;
@@ -33,8 +33,12 @@ export async function executeGmailSend(
     if (!opts.input.to || !opts.input.subject) {
         throw new Error('to and subject are required');
     }
-    const { clientId, clientSecret, tokenUrl } = gmailClientConfig(opts.connectorConfig);
-    const accessToken = await getValidAccessToken(supabase, opts.connection, { organizationId: opts.organizationId, tokenUrl, clientId, clientSecret });
+    // The connection's own OAuth app (if it was authorized with one) refreshes its tokens.
+    const client = connectionOauthConfig('gmail', opts.connectorConfig, opts.connection.metadata, opts.organizationId);
+    if (!client.clientId || !client.clientSecret) {
+        throw new Error('Gmail OAuth client is not configured for this connection — authorize it again with client_id/client_secret');
+    }
+    const accessToken = await getValidAccessToken(supabase, opts.connection, { organizationId: opts.organizationId, ...client });
 
     const res = await safeOutboundFetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
         method: 'POST',
@@ -72,7 +76,7 @@ export type ConnectorHttpResult = { status: number; body: unknown };
 export async function executeConnectorHttp(
     supabase: Admin,
     opts: {
-        connection: { id: string; connector_slug?: string; encrypted_access_ref: string | null; encrypted_refresh_ref: string | null; expires_at: string | null };
+        connection: { id: string; connector_slug?: string; encrypted_access_ref: string | null; encrypted_refresh_ref: string | null; expires_at: string | null; metadata?: unknown };
         organizationId: string;
         connectorConfig: Record<string, unknown>;
         input: ConnectorHttpInput;
@@ -87,7 +91,7 @@ export async function executeConnectorHttp(
         throw new Error(`Method ${method} is not supported`);
     }
     const secret = opts.connection.expires_at
-        ? await getValidAccessToken(supabase, opts.connection, { organizationId: opts.organizationId, ...oauthClientConfig(opts.connection.connector_slug || 'generic-http', opts.connectorConfig) })
+        ? await getValidAccessToken(supabase, opts.connection, { organizationId: opts.organizationId, ...connectionOauthConfig(opts.connection.connector_slug || 'generic-http', opts.connectorConfig, opts.connection.metadata, opts.organizationId) })
         : decryptApiKey(opts.connection.encrypted_access_ref ?? '', opts.organizationId);
 
     const url = new URL(`${(opts.connectorConfig.base_url as string).replace(/\/+$/, '')}/${opts.input.path.replace(/^\/+/, '')}`);

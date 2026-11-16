@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { validateGatewayRequest, addGatewayHeaders, handleCorsPreFlight } from '@/lib/gateway-middleware';
 import { embeddedError } from '@/lib/embedded/http';
+import { withLiveManagedAuth } from '@/lib/embedded/oauth';
 import crypto from 'crypto';
 
 export async function OPTIONS() {
@@ -17,5 +18,5 @@ export async function GET(req: NextRequest) {
     const supabase = createAdminClient();
     const { data, error } = await supabase.from('connectors').select('slug, name, auth_type, default_scopes, mcp_transport, risk_defaults, status, managed_auth').eq('status', 'active').order('slug');
     if (error) return addGatewayHeaders(embeddedError(500, 'invalid_request_error', error.message, { requestId }), { requestId });
-    return addGatewayHeaders(NextResponse.json({ data: data ?? [], next_cursor: null }), { requestId });
+    return addGatewayHeaders(NextResponse.json({ data: (data ?? []).map((row) => withLiveManagedAuth(row)), next_cursor: null }), { requestId });
 }

@@ -21,7 +21,9 @@ async function dispatchExecution(
     const connectionId = (policy.connection_id as string | undefined) ?? (action.sanitized_arguments._connection_id as string | undefined);
     const tool = action.tool_name.toLowerCase();
 
-    if (tool === 'gmail.send' || tool === 'gmail/send' || (tool.includes('gmail') && connectionId)) {
+    // An imported operation (policy.op) is dispatched as itself even when its name mentions gmail.
+    const isImportedOp = Boolean(policy.op);
+    if (!isImportedOp && (tool === 'gmail.send' || tool === 'gmail/send' || (tool.includes('gmail') && connectionId))) {
         if (!connectionId) throw new Error('No connection bound to this Gmail action');
         const { data: conn } = await supabase.from('tool_connections').select('*').eq('project_id', action.project_id).eq('id', dePrefixId(connectionId)).maybeSingle();
         if (!conn) throw new Error('Bound connection not found in this project');
@@ -49,7 +51,7 @@ async function dispatchExecution(
     // egress policy applies to the base host first.
     const genericConnId = (policy.connection_id as string | undefined) ?? (action.sanitized_arguments._connection_id as string | undefined);
     const opSpec = policy.op as { name: string; method?: string; path?: string } | undefined;
-    if (genericConnId && !tool.includes('gmail') && !mcpServerId && !hosted) {
+    if (genericConnId && (isImportedOp || !tool.includes('gmail')) && !mcpServerId && !hosted) {
         const { data: gConn } = await supabase.from('tool_connections').select('*').eq('project_id', action.project_id).eq('id', dePrefixId(genericConnId)).maybeSingle();
         if (gConn && (((gConn as { connector_slug?: string }).connector_slug === 'generic-http') || opSpec)) {
             const g = gConn as { connector_slug?: string; metadata?: Record<string, unknown> };

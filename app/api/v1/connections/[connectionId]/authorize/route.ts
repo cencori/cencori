@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { validateGatewayRequest, addGatewayHeaders, handleCorsPreFlight } from '@/lib/gateway-middleware';
 import { embeddedError, dePrefixId } from '@/lib/embedded/http';
-import { createAuthorizationUrl, oauthClientConfig, resolveOauthEndpoints } from '@/lib/embedded/oauth';
+import { createAuthorizationUrl, isAllowedReturnUrl, oauthClientConfig, resolveOauthEndpoints } from '@/lib/embedded/oauth';
 import { encryptApiKey } from '@/lib/encryption';
 import crypto from 'crypto';
 
@@ -26,11 +26,20 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ connection
         return addGatewayHeaders(embeddedError(400, 'invalid_request_error', `Connector ${slug} does not use OAuth`, { requestId }), { requestId });
     }
 
-    let body: { redirect_uri?: string; scopes?: string[]; client_id?: string; client_secret?: string; discovery_url?: string } = {};
+    let body: { redirect_uri?: string; return_url?: string; scopes?: string[]; client_id?: string; client_secret?: string; discovery_url?: string } = {};
     try {
         body = await req.json().catch(() => ({}));
     } catch {
         body = {};
+    }
+    if (body.return_url !== undefined && !isAllowedReturnUrl(body.return_url)) {
+        return addGatewayHeaders(embeddedError(400, 'invalid_request_error', 'return_url must be an https URL (http is allowed on localhost)', { requestId }), { requestId });
+    }
+    if (body.return_url && body.redirect_uri) {
+        return addGatewayHeaders(embeddedError(400, 'invalid_request_error', 'Pass return_url (Cencori receives the code, then sends the browser to you) or redirect_uri (you receive the code and call /exchange), not both', { requestId }), { requestId });
+    }
+    if (body.scopes !== undefined && (!Array.isArray(body.scopes) || body.scopes.some((s) => typeof s !== 'string' || !s))) {
+        return addGatewayHeaders(embeddedError(400, 'invalid_request_error', 'scopes must be an array of scope strings', { requestId }), { requestId });
     }
     const redirectUri = body.redirect_uri || `${process.env.NEXT_PUBLIC_APP_URL || 'https://cencori.com'}/api/v1/connections/oauth/callback`;
     const connectorConfig = (connector.oauth_config ?? {}) as Record<string, unknown>;
@@ -39,11 +48,12 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ connection
         const creds = oauthClientConfig(slug, connectorConfig, { client_id: body.client_id, client_secret: body.client_secret });
         if (!creds.clientId) {
             const connectorManaged = (connector?.managed_auth as boolean | null) === true;
+            // A setup gap the caller can act on, not a server fault.
             return addGatewayHeaders(embeddedError(
-                500,
-                'invalid_request_error',
+                400,
+                'oauth_client_not_configured',
                 connectorManaged
-                    ? `Platform-managed credentials for ${slug} are not configured yet — retry later or pass client_id/client_secret`
+                    ? `Cencori's own OAuth app for ${slug} is not available yet — pass the client_id and client_secret of your OAuth app`
                     : 'OAuth client is not configured — pass client_id/client_secret for a BYO connector (env fallback: CENCORI_OAUTH_' + slug.toUpperCase().replace(/-/g, '_') + '_*)',
                 { requestId },
             ), { requestId });
@@ -71,9 +81,12 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ connection
             connectorSlug: slug,
             redirectUri,
             scopes: body.scopes ?? ((connector.default_scopes ?? []) as string[]),
-            metadata,
+            // return_url belongs to this attempt only, not to the connection.
+            metadata: body.return_url ? { ...metadata, return_url: body.return_url } : metadata,
         }, { oauth_config: { auth_url: endpoints.auth_url, token_url: endpoints.token_url }, default_scopes: ((connector.default_scopes ?? []) as string[]) }, creds.clientId);
-        return addGatewayHeaders(NextResponse.json({ authorize_url: url, state, expires_in: 900 }), { requestId });
+        // `redirect_uri` is the exact value to register on the OAuth app.
+        const scopes = (body.scopes?.length ? body.scopes : ((connector.default_scopes ?? []) as string[]));
+        return addGatewayHeaders(NextResponse.json({ authorize_url: url, state, redirect_uri: redirectUri, scopes, expires_in: 900 }), { requestId });
     } catch (e) {
         return addGatewayHeaders(embeddedError(500, 'invalid_request_error', e instanceof Error ? e.message : 'Failed to create authorization URL', { requestId }), { requestId });
     }

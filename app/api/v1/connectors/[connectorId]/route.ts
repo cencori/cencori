@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { validateGatewayRequest, addGatewayHeaders, handleCorsPreFlight } from '@/lib/gateway-middleware';
 import { embeddedError } from '@/lib/embedded/http';
+import { withLiveManagedAuth } from '@/lib/embedded/oauth';
 import crypto from 'crypto';
 
 export async function OPTIONS() {
@@ -19,5 +20,5 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ connectorId
     const { data } = await supabase.from('connectors').select('slug, name, auth_type, default_scopes, mcp_transport, risk_defaults, status, managed_auth').eq('slug', connectorId).maybeSingle();
     const row = data ?? (await supabase.from('connectors').select('slug, name, auth_type, default_scopes, mcp_transport, risk_defaults, status, managed_auth').eq('id', connectorId).maybeSingle()).data;
     if (!row) return addGatewayHeaders(embeddedError(404, 'invalid_request_error', 'Connector not found', { requestId }), { requestId });
-    return addGatewayHeaders(NextResponse.json(row), { requestId });
+    return addGatewayHeaders(NextResponse.json(withLiveManagedAuth(row)), { requestId });
 }

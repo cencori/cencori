@@ -242,7 +242,127 @@ export async function resolveOauthEndpoints(opts: {
     };
 }
 
-export function gmailClientConfig(connectorConfig: Record<string, unknown>): { clientId: string; clientSecret: string; tokenUrl: string } {    const { clientId, clientSecret, tokenUrl } = oauthClientConfig('gmail', connectorConfig);
+/**
+ * `managed_auth` as customers should read it: the catalog flags the connector
+ * AND this deployment actually holds a client for it. The flag alone promised
+ * a Gmail app that was never configured (2026-11-15).
+ */
+export function withLiveManagedAuth<T extends { slug?: unknown; managed_auth?: unknown }>(connector: T): T {
+    if (connector.managed_auth !== true || typeof connector.slug !== 'string') return connector;
+    const { clientId, clientSecret } = oauthClientConfig(connector.slug, {});
+    return { ...connector, managed_auth: Boolean(clientId && clientSecret) };
+}
+
+type StoredOauthClient = { token_url?: string; token_auth?: TokenEndpointAuth; client_id?: string; client_secret_ref?: string };
+
+/**
+ * Client credentials for an existing connection. A connection authorized with
+ * the customer's own OAuth app keeps that app on `metadata.oauth`; its tokens
+ * can only be refreshed with the same app, so it wins over the platform client.
+ */
+export function connectionOauthConfig(
+    slug: string,
+    connectorConfig: Record<string, unknown>,
+    connectionMetadata: unknown,
+    organizationId: string,
+): { clientId: string; clientSecret: string; tokenUrl: string; tokenAuth: TokenEndpointAuth } {
+    const stored = ((connectionMetadata ?? {}) as { oauth?: StoredOauthClient }).oauth ?? null;
+    const cfg = oauthClientConfig(slug, connectorConfig, {
+        client_id: stored?.client_id,
+        client_secret: stored?.client_secret_ref ? decryptApiKey(stored.client_secret_ref, organizationId) : undefined,
+        token_url: stored?.token_url,
+    });
+    return { ...cfg, tokenAuth: stored?.token_auth ?? cfg.tokenAuth };
+}
+
+/** Where the browser may be sent after consent: https, or http on localhost for development. */
+export function isAllowedReturnUrl(value: unknown): value is string {
+    if (typeof value !== 'string' || value.length > 2000) return false;
+    try {
+        const url = new URL(value);
+        if (url.username || url.password) return false;
+        if (url.protocol === 'https:') return true;
+        return url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+    } catch {
+        return false;
+    }
+}
+
+export function returnUrlWith(returnUrl: string, params: Record<string, string>): string {
+    const url = new URL(returnUrl);
+    for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
+    return url.toString();
+}
+
+export type OauthCompletion =
+    | { ok: true; projectId: string; connectionId: string; connector: string; scopes: string[]; returnUrl: string | null }
+    | { ok: false; status: number; code: string; message: string; connectionId: string | null; returnUrl: string | null };
+
+/**
+ * Finish an authorization: verify the state, exchange the code and store the
+ * tokens on the connection. Shared by the browser callback (Cencori's redirect
+ * URI) and POST /v1/connections/:id/exchange (the customer's own redirect URI).
+ * `expect` pins the state to the caller's project and connection.
+ */
+export async function completeOauthAuthorization(
+    supabase: Admin,
+    input: { state: string; code: string; expect?: { projectId: string; connectionId: string } },
+): Promise<OauthCompletion> {
+    const fail = (status: number, code: string, message: string, connectionId: string | null = null, returnUrl: string | null = null): OauthCompletion =>
+        ({ ok: false, status, code, message, connectionId, returnUrl });
+
+    const { data: row } = await supabase.from('oauth_states').select('*').eq('state', input.state).maybeSingle();
+    if (!row) return fail(400, 'invalid_request_error', 'Unknown or expired OAuth state');
+    const oauth = row as { project_id: string; connection_id: string; connector_slug: string; code_verifier: string | null; redirect_uri: string; scopes: string[]; metadata?: Record<string, unknown>; expires_at: string };
+    if (input.expect && (input.expect.projectId !== oauth.project_id || input.expect.connectionId !== oauth.connection_id)) {
+        return fail(400, 'invalid_request_error', 'This state was issued for a different connection');
+    }
+    const stateMeta = ((oauth.metadata ?? {}) as StoredOauthClient & { return_url?: string });
+    const returnUrl = isAllowedReturnUrl(stateMeta.return_url) ? stateMeta.return_url : null;
+    if (Date.parse(oauth.expires_at) <= Date.now()) {
+        await supabase.from('oauth_states').delete().eq('state', input.state);
+        return fail(410, 'invalid_request_error', 'OAuth state expired — call authorize again', oauth.connection_id, returnUrl);
+    }
+    const [raw, sig] = input.state.split('.');
+    if (!raw || signOAuthState(`${oauth.project_id}:${oauth.connection_id}:${raw}`) !== sig) {
+        return fail(400, 'invalid_request_error', 'Invalid OAuth state signature', oauth.connection_id, returnUrl);
+    }
+
+    const { data: project } = await supabase.from('projects').select('organization_id').eq('id', oauth.project_id).maybeSingle();
+    const organizationId = (project?.organization_id as string) ?? '';
+    const { data: connector } = await supabase.from('connectors').select('oauth_config').eq('slug', oauth.connector_slug).maybeSingle();
+    // Endpoints and (own-app) client credentials resolved at authorize time
+    // ride in the state metadata; the secret is an org-scoped encrypted ref.
+    const creds = organizationId
+        ? connectionOauthConfig(oauth.connector_slug, ((connector?.oauth_config ?? {}) as Record<string, unknown>), { oauth: stateMeta }, organizationId)
+        : null;
+    if (!creds || !creds.clientId || !creds.clientSecret) {
+        return fail(500, 'oauth_client_not_configured', 'OAuth client is not configured', oauth.connection_id, returnUrl);
+    }
+
+    try {
+        const tokens = await exchangeCodeForTokens({ tokenUrl: creds.tokenUrl, clientId: creds.clientId, clientSecret: creds.clientSecret, code: input.code, redirectUri: oauth.redirect_uri, codeVerifier: oauth.code_verifier, tokenAuth: creds.tokenAuth });
+        const scopes = tokens.scope ? tokens.scope.split(' ') : oauth.scopes;
+        await supabase.from('tool_connections').update({
+            encrypted_access_ref: encryptApiKey(tokens.access_token, organizationId),
+            encrypted_refresh_ref: tokens.refresh_token ? encryptApiKey(tokens.refresh_token, organizationId) : undefined,
+            key_hint: 'oauth',
+            scopes,
+            status: 'active',
+            expires_at: new Date(Date.now() + (tokens.expires_in ?? 3600) * 1000).toISOString(),
+            last_error: null,
+        }).eq('id', oauth.connection_id);
+        await supabase.from('oauth_states').delete().eq('state', input.state);
+        return { ok: true, projectId: oauth.project_id, connectionId: oauth.connection_id, connector: oauth.connector_slug, scopes, returnUrl };
+    } catch (e) {
+        const message = e instanceof Error ? e.message : 'Token exchange failed';
+        await supabase.from('tool_connections').update({ status: 'error', last_error: message.slice(0, 500) }).eq('id', oauth.connection_id);
+        return fail(502, 'oauth_failed', message, oauth.connection_id, returnUrl);
+    }
+}
+
+export function gmailClientConfig(connectorConfig: Record<string, unknown>): { clientId: string; clientSecret: string; tokenUrl: string } {
+    const { clientId, clientSecret, tokenUrl } = oauthClientConfig('gmail', connectorConfig);
     if (!clientId || !clientSecret) {
         throw new Error('Gmail OAuth client is not configured (CENCORI_OAUTH_GMAIL_CLIENT_ID/SECRET)');
     }

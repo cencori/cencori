@@ -525,8 +525,29 @@ export class ConnectionsNamespace {
     remove(connectionId: string): Promise<unknown> {
         return request(this.config, 'DELETE', `/v1/connections/${connectionId}`);
     }
-    authorize(connectionId: string, params: { redirect_uri?: string; scopes?: string[] }): Promise<{ authorize_url: string; state: string }> {
+    /**
+     * Start OAuth consent. Send the person to `authorize_url`.
+     *
+     * - `scopes` replaces the connector's defaults (Gmail defaults to `gmail.send` only).
+     * - `client_id` / `client_secret`: your own OAuth app. Register the returned
+     *   `redirect_uri` on it.
+     * - `return_url`: where Cencori sends the browser once the connection is saved
+     *   (`?status=connected&connection_id=con_...`).
+     * - `redirect_uri`: receive the code yourself instead, then call `exchange`.
+     */
+    authorize(connectionId: string, params: {
+        scopes?: string[];
+        client_id?: string;
+        client_secret?: string;
+        return_url?: string;
+        redirect_uri?: string;
+        discovery_url?: string;
+    } = {}): Promise<{ authorize_url: string; state: string; redirect_uri: string; scopes: string[]; expires_in: number }> {
         return request(this.config, 'POST', `/v1/connections/${connectionId}/authorize`, params);
+    }
+    /** Hand back the `code` and `state` your own `redirect_uri` received, to save the connection. */
+    exchange(connectionId: string, params: { code: string; state: string }): Promise<{ connected: true; connection_id: string; connector: string; status: 'active'; scopes: string[] }> {
+        return request(this.config, 'POST', `/v1/connections/${connectionId}/exchange`, params);
     }
     test(connectionId: string): Promise<unknown> {
         return request(this.config, 'POST', `/v1/connections/${connectionId}/test`, {});

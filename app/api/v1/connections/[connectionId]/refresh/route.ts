@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { validateGatewayRequest, addGatewayHeaders, handleCorsPreFlight } from '@/lib/gateway-middleware';
 import { embeddedError, dePrefixId, withPrefix } from '@/lib/embedded/http';
-import { refreshAccessToken, oauthClientConfig } from '@/lib/embedded/oauth';
+import { refreshAccessToken, connectionOauthConfig } from '@/lib/embedded/oauth';
 import { encryptApiKey, decryptApiKey } from '@/lib/encryption';
 import crypto from 'crypto';
 
@@ -33,14 +33,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ connection
         return addGatewayHeaders(embeddedError(409, 'invalid_request_error', 'No refresh token stored for this connection', { requestId }), { requestId });
     }
     const { data: connector } = await supabase.from('connectors').select('oauth_config').eq('slug', c.connector_slug).maybeSingle();
-    const connMeta = ((conn.metadata ?? {}) as { oauth?: { token_url?: string; token_auth?: 'form' | 'basic'; client_id?: string; client_secret_ref?: string } }).oauth ?? null;
-    const clientSecretOverride = connMeta?.client_secret_ref ? decryptApiKey(connMeta.client_secret_ref, validation.context.organizationId) : undefined;
-    const cfg = oauthClientConfig(c.connector_slug, ((connector?.oauth_config ?? {}) as Record<string, unknown>), {
-        client_id: connMeta?.client_id,
-        client_secret: clientSecretOverride,
-        token_url: connMeta?.token_url,
-    });
-    const tokenAuth = connMeta?.token_auth ?? cfg.tokenAuth;
+    const cfg = connectionOauthConfig(c.connector_slug, ((connector?.oauth_config ?? {}) as Record<string, unknown>), conn.metadata, validation.context.organizationId);
+    const tokenAuth = cfg.tokenAuth;
     try {
         const refreshed = await refreshAccessToken({
             tokenUrl: cfg.tokenUrl,
