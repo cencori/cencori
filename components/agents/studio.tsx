@@ -130,7 +130,7 @@ export function agentStatus(agent: Agent) {
 
 export function statusTone(status: string) {
     const normalized = status.toLowerCase();
-    if (normalized === "published" || normalized === "completed" || normalized === "active") {
+    if (normalized === "published" || normalized === "completed" || normalized === "active" || normalized === "installed") {
         return { text: "text-emerald-600 dark:text-emerald-400", dot: "bg-emerald-500", bg: "bg-emerald-500/10" };
     }
     if (normalized === "draft" || normalized === "running" || normalized === "queued") {
