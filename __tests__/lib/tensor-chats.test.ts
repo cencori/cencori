@@ -31,8 +31,13 @@ describe("plain chats", () => {
   });
 
   it("tells Tensor the person's projects and that building happens in one", () => {
-    const text = plainChatInstructions([{ name: "Bakery", published: true }], new Date("2026-11-16T00:00:00Z"));
-    expect(text).toContain("- Bakery (published)");
+    const text = plainChatInstructions(
+      [{ name: "Bakery", address: "bakery.cencori.app", updatedAt: "2026-11-14T10:00:00Z", recentChats: ["Add a menu", "Fix checkout"] }],
+      new Date("2026-11-16T00:00:00Z"),
+    );
+    expect(text).toContain('- Bakery; live at bakery.cencori.app; last worked on 2026-11-14; recent chats: "Add a menu", "Fix checkout"');
+    // Work that belongs in a project already there is offered there, as a Continue card.
+    expect(text).toContain("```tensor-continue");
     expect(text).toContain("plain chat");
     expect(text).toContain("2026-11-16");
     expect(plainChatInstructions([], new Date())).toContain("None yet.");

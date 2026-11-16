@@ -275,28 +275,46 @@ async function upstreamFailure(response: Response | null): Promise<{ code: strin
   return { code, error: "Tensor could not answer just now. Try again." };
 }
 
-/** The account's projects, by name, for Tensor to know what the person is already building. */
+/** The account's projects, for Tensor to know what the person is already building and where. */
 async function readProjects(
   admin: Parameters<typeof readPlainMessages>[0],
   userId: string,
 ): Promise<ProjectSummary[]> {
-  const [{ data: tasks }, { data: deployments }] = await Promise.all([
+  const [{ data: tasks }, { data: deployments }, { data: chats }] = await Promise.all([
     admin
       .from("tensor_cloud_tasks")
-      .select("id, project_name")
+      .select("id, project_name, updated_at")
       .eq("user_id", userId)
       .not("project_name", "is", null)
       .is("archived_at", null)
       .not("status", "in", "(deleted,failed,spare)")
       .order("updated_at", { ascending: false })
       .limit(30),
-    admin.from("tensor_cloud_deployments").select("task_id, published_at").eq("user_id", userId),
+    admin.from("tensor_cloud_deployments").select("task_id, name, published_at").eq("user_id", userId),
+    admin
+      .from("tensor_cloud_chats")
+      .select("task_id, title")
+      .eq("user_id", userId)
+      .is("archived_at", null)
+      .not("title", "is", null)
+      .order("updated_at", { ascending: false })
+      .limit(200),
   ]);
-  const published = new Set(
-    (deployments ?? []).filter((row) => row.published_at).map((row) => row.task_id as string),
+  const addresses = new Map(
+    (deployments ?? [])
+      .filter((row) => row.published_at)
+      .map((row) => [row.task_id as string, `${row.name as string}.cencori.app`]),
   );
+  const recent = new Map<string, string[]>();
+  for (const chat of chats ?? []) {
+    const titles = recent.get(chat.task_id as string) ?? [];
+    if (titles.length < 3) titles.push(String(chat.title).slice(0, 80));
+    recent.set(chat.task_id as string, titles);
+  }
   return (tasks ?? []).map((task) => ({
     name: String(task.project_name),
-    published: published.has(task.id as string),
+    address: addresses.get(task.id as string) ?? null,
+    updatedAt: String(task.updated_at),
+    recentChats: recent.get(task.id as string) ?? [],
   }));
 }

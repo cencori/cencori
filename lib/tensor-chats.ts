@@ -167,7 +167,26 @@ export function titleFromMessage(text: string): string {
   return `${line.slice(0, 57).trimEnd()}…`;
 }
 
-export type ProjectSummary = { name: string; published: boolean };
+export type ProjectSummary = {
+  name: string;
+  /** Its live address, when it is published. */
+  address: string | null;
+  /** When it was last worked on. */
+  updatedAt: string;
+  /** Its newest chats' names: roughly what is being built in it. */
+  recentChats: string[];
+};
+
+/** One project as Tensor is told about it: one line, newest work first. */
+export function describeProject(project: ProjectSummary): string {
+  const parts = [`- ${project.name}`];
+  if (project.address) parts.push(`live at ${project.address}`);
+  parts.push(`last worked on ${project.updatedAt.slice(0, 10)}`);
+  if (project.recentChats.length) {
+    parts.push(`recent chats: ${project.recentChats.map((title) => `"${title}"`).join(", ")}`);
+  }
+  return parts.join("; ");
+}
 
 /**
  * What Tensor is told about itself in a plain chat. It is a conversation, not a build: there is no
@@ -176,7 +195,7 @@ export type ProjectSummary = { name: string; published: boolean };
  */
 export function plainChatInstructions(projects: ProjectSummary[], today: Date): string {
   const list = projects.length
-    ? projects.map((project) => `- ${project.name}${project.published ? " (published)" : ""}`).join("\n")
+    ? projects.map(describeProject).join("\n")
     : "None yet.";
   return [
     "You are Tensor, made by Cencori. You build software for people, and you are also good company for thinking: answering questions, explaining, writing, planning, and brainstorming ideas.",
@@ -192,9 +211,17 @@ export function plainChatInstructions(projects: ProjectSummary[], today: Date): 
     "```",
     "",
     "`name` is a short project name (one to four words). `brief` is the first message the project will start with, written to Tensor as the builder: what to build, for whom, the features and decisions agreed in this conversation, and the style. Make it complete enough that nothing has to be explained again, in at most 250 words.",
-    "The person sees the block as a card with a Create project button. Nothing is created until they press it, so say so plainly (\"Press Create project when you are ready\"); never claim the project exists. If an idea already fits one of their projects, suggest continuing there instead.",
+    "The person sees the block as a card with a Create project button. Nothing is created until they press it, so say so plainly (\"Press Create project when you are ready\"); never claim the project exists.",
     "",
-    "Their projects:",
+    "Their projects are listed below, with what has been happening in each. When what they want to build belongs in one of them (a feature for it, a fix, a change), say which, and offer to take it there rather than starting a new project. When they agree, or ask you to, end your answer with exactly one block like this, and nothing after it:",
+    "",
+    "```tensor-continue",
+    '{"project": "Bakery Orders", "brief": "Add an order form to the menu page: ..."}',
+    "```",
+    "",
+    "`project` is the project's name exactly as listed. `brief` is the message that project's chat will start with, written to Tensor as the builder, with what was agreed here. The person sees it as a card with a Continue button that opens the project with the brief ready to send; nothing happens until they send it. Never use this block for a project that is not listed.",
+    "",
+    "Their projects, most recently worked on first:",
     list,
     "",
     "Write in plain, warm, direct language. Use Markdown where it helps (lists, headings for long answers, code blocks with a language). Keep answers as short as the question allows.",
