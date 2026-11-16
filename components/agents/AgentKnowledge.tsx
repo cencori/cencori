@@ -22,6 +22,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "@/components/ui/toast";
 import { useAgentWorkspace } from "@/components/agents/AgentWorkspace";
+import { StatusBadge } from "@/components/agents/studio";
 import { cn } from "@/lib/utils";
 import { KnowledgeSkeleton } from "@/components/agents/AgentSkeletons";
 
@@ -62,22 +63,12 @@ function kindOf(source: Source) {
     return { label: "Text file", icon: File02Icon };
 }
 
+const SOURCE_LABELS: Record<string, string> = { ready: "Ready", failed: "Failed", stale: "Held for review", queued: "Queued" };
+
 function SourceStatus({ source }: { source: Source }) {
-    const tone = source.status === "ready"
-        ? { label: "Ready", text: "text-emerald-600 dark:text-emerald-400", dot: "bg-emerald-500" }
-        : source.status === "failed"
-            ? { label: "Failed", text: "text-destructive", dot: "bg-destructive" }
-            : source.status === "stale"
-                ? { label: "Held for review", text: "text-amber-600 dark:text-amber-400", dot: "bg-amber-500" }
-                : source.status === "queued"
-                    ? { label: "Queued", text: "text-muted-foreground", dot: "bg-muted-foreground" }
-                    : { label: "Processing", text: "text-amber-600 dark:text-amber-400", dot: "bg-amber-500" };
-    return (
-        <span className={cn("inline-flex items-center gap-1.5 text-xs", tone.text)} title={source.error ?? undefined}>
-            <span className={cn("h-1.5 w-1.5 rounded-full", tone.dot)} />
-            {tone.label}
-        </span>
-    );
+    // Anything not listed is still being read.
+    const known = source.status in SOURCE_LABELS;
+    return <StatusBadge status={known ? (source.status === "queued" ? "waiting" : source.status) : "processing"} label={known ? SOURCE_LABELS[source.status] : "Processing"} title={source.error ?? undefined} />;
 }
 
 /** The agent's documents: what it knows for every customer, live as soon as they're added. */
