@@ -1318,14 +1318,22 @@ export async function incrementUsage(context: GatewayContext, costUsd?: number):
 
         if (context.tensorUserId) {
             const costMicrousd = Math.max(0, Math.ceil((costUsd ?? 0) * 1_000_000));
-            const { data: recorded, error: tensorUsageError } = await context.supabase.rpc(
-                'basecode_record_gateway_usage',
-                {
-                    p_user_id: context.tensorUserId,
-                    p_gateway_request_id: context.requestId,
-                    p_cost_microusd: costMicrousd,
-                }
-            );
+            // The month's ceiling only holds if every call's cost reaches it, so a failed write is
+            // tried again. Safe to repeat: a request is recorded once, by its id.
+            let recorded: unknown = null;
+            let tensorUsageError: unknown = null;
+            for (let attempt = 0; attempt < 3; attempt += 1) {
+                if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, attempt * 500));
+                ({ data: recorded, error: tensorUsageError } = await context.supabase.rpc(
+                    'basecode_record_gateway_usage',
+                    {
+                        p_user_id: context.tensorUserId,
+                        p_gateway_request_id: context.requestId,
+                        p_cost_microusd: costMicrousd,
+                    }
+                ));
+                if (!tensorUsageError) break;
+            }
             if (tensorUsageError || recorded !== true) {
                 console.error(
                     `[Gateway] Failed to record Tensor usage for request ${context.requestId}:`,
