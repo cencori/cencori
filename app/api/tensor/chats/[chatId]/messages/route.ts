@@ -15,13 +15,34 @@ import {
   updatePlainChat,
   type ProjectSummary,
 } from "@/lib/tensor-chats";
+import { readStream, searchQuery, type ChatMessage, type ToolCall } from "@/lib/tensor-chats-stream";
 import { authenticateTensorDataRequest } from "@/lib/tensor-data";
 import { gatewayEntitlementFrom } from "@/lib/tensor-entitlement";
+import { liveWebSearch, takeWebSearchSlot } from "@/lib/web/live-search";
+import { WEB_PRICES_USD } from "@/lib/web/pricing";
 
 /** The model a plain chat answers with: the one the web's project chats use, open to every plan. */
 const CHAT_MODEL = "maximo-atlas-1.5";
 /** How long one answer may go on. */
 const ANSWER_MAX_TOKENS = 4096;
+/** Searches one message may make, and results each brings back. */
+const MAX_SEARCHES = 3;
+const SEARCH_RESULTS = 6;
+
+/** The one tool a plain chat has: searching the live web. */
+const WEB_SEARCH_TOOL = {
+  type: "function",
+  function: {
+    name: "web_search",
+    description:
+      "Search the live web. Use it for anything current (news, prices, releases, events, people's current roles), for facts you are not sure of, and when asked to look something up. Returns titles, links and snippets.",
+    parameters: {
+      type: "object",
+      properties: { query: { type: "string", description: "What to search for, as you would type it into a search engine." } },
+      required: ["query"],
+    },
+  },
+} as const;
 
 export const maxDuration = 300;
 
@@ -113,26 +134,32 @@ export async function POST(request: NextRequest, context: Context) {
   }
 
   const upstreamAbort = new AbortController();
-  const upstream = await inference(
-    new NextRequest(`${new URL(request.url).origin}/api/tensor/inference/v1/chat/completions`, {
-      method: "POST",
-      headers: { authorization, "content-type": "application/json" },
-      body: JSON.stringify({
-        model: CHAT_MODEL,
-        stream: true,
-        max_tokens: ANSWER_MAX_TOKENS,
-        messages: [
-          { role: "system", content: plainChatInstructions(projects, new Date()) },
-          ...contextMessages([...history, saved]),
-        ],
+  const origin = new URL(request.url).origin;
+  /** One model call: the conversation so far, with the search tool while searches remain. */
+  const callModel = (messages: ChatMessage[], withSearch: boolean) =>
+    inference(
+      new NextRequest(`${origin}/api/tensor/inference/v1/chat/completions`, {
+        method: "POST",
+        headers: { authorization, "content-type": "application/json" },
+        body: JSON.stringify({
+          model: CHAT_MODEL,
+          stream: true,
+          max_tokens: ANSWER_MAX_TOKENS,
+          messages,
+          ...(withSearch ? { tools: [WEB_SEARCH_TOOL], tool_choice: "auto" } : {}),
+        }),
+        signal: upstreamAbort.signal,
       }),
-      signal: upstreamAbort.signal,
-    }),
-    { params: Promise.resolve({ path: ["chat", "completions"] }) },
-  ).catch((error: unknown) => {
-    console.error("[Tensor Chats] The model call failed", error);
-    return null;
-  });
+      { params: Promise.resolve({ path: ["chat", "completions"] }) },
+    ).catch((error: unknown) => {
+      console.error("[Tensor Chats] The model call failed", error);
+      return null;
+    });
+
+  const conversation: ChatMessage[] = [
+    { role: "system", content: plainChatInstructions(projects, new Date()) },
+    ...contextMessages([...history, saved]),
+  ];
 
   const encoder = new TextEncoder();
   const line = (value: unknown) => encoder.encode(`${JSON.stringify(value)}\n`);
@@ -158,22 +185,55 @@ export async function POST(request: NextRequest, context: Context) {
       let status: "complete" | "stopped" | "failed" = "complete";
       let failure: { code: string; error: string } | null = null;
 
-      if (!upstream || !upstream.ok || !upstream.body) {
-        status = "failed";
-        failure = await upstreamFailure(upstream);
-      } else {
-        try {
-          for await (const delta of readDeltas(upstream.body, upstreamAbort.signal)) {
-            answer += delta;
-            send({ type: "delta", text: delta });
-          }
-        } catch (error) {
-          if (upstreamAbort.signal.aborted) status = "stopped";
-          else {
-            console.error("[Tensor Chats] The answer broke off", error);
+      // Answer, or search and then answer: each round is one model call. A round that asks for
+      // searches has them run, and their results go into the next.
+      let searches = 0;
+      try {
+        for (let round = 0; round <= MAX_SEARCHES; round += 1) {
+          const upstream = await callModel(conversation, searches < MAX_SEARCHES);
+          if (!upstream || !upstream.ok || !upstream.body) {
             status = "failed";
-            failure = { code: "answer_interrupted", error: "The answer was cut short. Try again." };
+            failure = await upstreamFailure(upstream);
+            break;
           }
+          const calls: ToolCall[] = [];
+          let said = "";
+          for await (const event of readStream(upstream.body, upstreamAbort.signal)) {
+            if (event.kind === "text") {
+              said += event.text;
+              answer += event.text;
+              send({ type: "delta", text: event.text });
+            } else {
+              calls.push(event.call);
+            }
+          }
+          if (calls.length === 0) break;
+
+          conversation.push({ role: "assistant", content: said || null, tool_calls: calls });
+          for (const call of calls) {
+            const query = searchQuery(call);
+            let result: unknown;
+            if (!query) result = { error: "A search needs a query." };
+            else if (searches >= MAX_SEARCHES) result = { error: "No more searches for this message. Answer from what you have." };
+            else {
+              searches += 1;
+              send({ type: "search", query });
+              result = await searchTheWeb(admin, user.id, turnKey, searches, query);
+            }
+            conversation.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify(result) });
+          }
+          // Words said before a search run on into the answer that follows it.
+          if (said && !said.endsWith("\n")) {
+            answer += "\n\n";
+            send({ type: "delta", text: "\n\n" });
+          }
+        }
+      } catch (error) {
+        if (upstreamAbort.signal.aborted) status = "stopped";
+        else {
+          console.error("[Tensor Chats] The answer broke off", error);
+          status = "failed";
+          failure = { code: "answer_interrupted", error: "The answer was cut short. Try again." };
         }
       }
       request.signal.removeEventListener("abort", onAbort);
@@ -220,43 +280,42 @@ export async function POST(request: NextRequest, context: Context) {
   });
 }
 
-/** The text of a streamed chat completion, piece by piece. */
-async function* readDeltas(body: ReadableStream<Uint8Array>, signal: AbortSignal): AsyncGenerator<string> {
-  const reader = body.getReader();
-  // Stopping cancels the stream itself, so the model stops generating, not only the reading.
-  const stop = () => void reader.cancel().catch(() => {});
-  signal.addEventListener("abort", stop);
-  const decoder = new TextDecoder();
-  let buffer = "";
+/**
+ * One search of the live web, for Tensor to read. Billed like a model call, against the account's
+ * month: Cencori Web's price per search, recorded on this turn. A search that fails costs nothing,
+ * and an account searching faster than its per-minute allowance is told to wait.
+ */
+async function searchTheWeb(
+  admin: Parameters<typeof readPlainMessages>[0],
+  userId: string,
+  turnKey: string,
+  number: number,
+  query: string,
+): Promise<unknown> {
+  const slot = await takeWebSearchSlot(`tensor-chat:${userId}`, "free").catch(() => ({ allowed: true }));
+  if (!slot.allowed) return { error: "Too many searches this minute. Answer from what you know, and say so." };
+  let results: Awaited<ReturnType<typeof liveWebSearch>>;
   try {
-    while (true) {
-      const { value, done } = await reader.read();
-      if (signal.aborted) throw new Error("stopped");
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      let end = buffer.indexOf("\n");
-      while (end !== -1) {
-        const raw = buffer.slice(0, end).trim();
-        buffer = buffer.slice(end + 1);
-        end = buffer.indexOf("\n");
-        if (!raw.startsWith("data:")) continue;
-        const data = raw.slice(5).trim();
-        if (!data || data === "[DONE]") continue;
-        let parsed: { choices?: { delta?: { content?: unknown } }[]; error?: { message?: unknown } };
-        try {
-          parsed = JSON.parse(data);
-        } catch {
-          continue;
-        }
-        if (parsed.error) throw new Error(String(parsed.error.message ?? "upstream_error"));
-        const content = parsed.choices?.[0]?.delta?.content;
-        if (typeof content === "string" && content) yield content;
-      }
-    }
-  } finally {
-    signal.removeEventListener("abort", stop);
-    reader.releaseLock();
+    results = await liveWebSearch(query, { limit: SEARCH_RESULTS });
+  } catch (error) {
+    console.error("[Tensor Chats] A web search failed", error);
+    return { error: "The search did not work. Answer from what you know, and say so." };
   }
+  const { error } = await admin.rpc("basecode_record_gateway_usage", {
+    p_user_id: userId,
+    p_gateway_request_id: `${turnKey}:search:${number}`,
+    p_cost_microusd: Math.round(WEB_PRICES_USD["web/search"] * 1_000_000),
+  });
+  if (error) console.error("[Tensor Chats] Recording a web search failed", error);
+  return {
+    query,
+    results: results.map((result) => ({
+      title: result.title,
+      url: result.canonicalUrl || result.url,
+      snippet: result.snippet,
+      published: result.publishedAt,
+    })),
+  };
 }
 
 /** What to tell the person when the model call itself was refused. */

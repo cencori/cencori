@@ -38,6 +38,9 @@ describe("plain chats", () => {
     expect(text).toContain('- Bakery; live at bakery.cencori.app; last worked on 2026-11-14; recent chats: "Add a menu", "Fix checkout"');
     // Work that belongs in a project already there is offered there, as a Continue card.
     expect(text).toContain("```tensor-continue");
+    // It can search, and is told to cite what it used.
+    expect(text).toContain("web_search");
+    expect(text).toContain("[title](url)");
     expect(text).toContain("plain chat");
     expect(text).toContain("2026-11-16");
     expect(plainChatInstructions([], new Date())).toContain("None yet.");
