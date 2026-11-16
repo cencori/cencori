@@ -131,15 +131,15 @@ export function agentStatus(agent: Agent) {
 export function statusTone(status: string) {
     const normalized = status.toLowerCase();
     if (normalized === "published" || normalized === "completed" || normalized === "active") {
-        return { text: "text-emerald-600 dark:text-emerald-400", dot: "bg-emerald-500" };
+        return { text: "text-emerald-600 dark:text-emerald-400", dot: "bg-emerald-500", bg: "bg-emerald-500/10" };
     }
     if (normalized === "draft" || normalized === "running" || normalized === "queued") {
-        return { text: "text-amber-600 dark:text-amber-400", dot: "bg-amber-500" };
+        return { text: "text-amber-600 dark:text-amber-400", dot: "bg-amber-500", bg: "bg-amber-500/10" };
     }
     if (normalized === "failed" || normalized === "cancelled") {
-        return { text: "text-destructive", dot: "bg-destructive" };
+        return { text: "text-destructive", dot: "bg-destructive", bg: "bg-destructive/10" };
     }
-    return { text: "text-muted-foreground", dot: "bg-muted-foreground" };
+    return { text: "text-muted-foreground", dot: "bg-muted-foreground", bg: "bg-muted" };
 }
 
 export function Status({ status }: { status: string }) {
@@ -147,6 +147,16 @@ export function Status({ status }: { status: string }) {
     return (
         <span className={`inline-flex items-center gap-1.5 text-xs capitalize ${tone.text}`}>
             <span className={`h-1.5 w-1.5 rounded-full ${tone.dot}`} />
+            {status.replaceAll("_", " ")}
+        </span>
+    );
+}
+
+/** A status as the soft tinted badge used beside agent names. */
+export function StatusBadge({ status }: { status: string }) {
+    const tone = statusTone(status);
+    return (
+        <span className={`inline-block shrink-0 whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-medium capitalize ${tone.text} ${tone.bg}`}>
             {status.replaceAll("_", " ")}
         </span>
     );
