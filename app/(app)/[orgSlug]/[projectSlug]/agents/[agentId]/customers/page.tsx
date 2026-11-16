@@ -1,10 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import { Plus } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAgentWorkspace } from "@/components/agents/AgentWorkspace";
@@ -13,27 +11,15 @@ import { cn } from "@/lib/utils";
 
 const HEAD_CLASS = "h-8 text-[10px] font-medium uppercase tracking-wider text-muted-foreground";
 
-/** Which customers have this agent, and installing it for more. */
+/** Which customers have this agent, and installing it for more. Customers are created by use (widget, WhatsApp) or through the API, not here. */
 export default function AgentCustomersPage() {
     const { agent, data, canManage, busy, act } = useAgentWorkspace();
-    const [name, setName] = useState("");
-    const [externalId, setExternalId] = useState("");
     const installs = new Map(data.installations.filter((item) => item.agent_id === agent.id).map((item) => [item.tenant_id, item] as const));
     const published = !!agent.stable_version_id;
 
     const install = async (tenantId: string, tenantName: string) => {
         const result = await act("install_agent", { agent_id: agent.id, tenant_id: tenantId });
         if (result) toast.success("Agent installed", { description: `${agent.name} is now available to ${tenantName}.` });
-    };
-
-    const addCustomer = async (event: React.FormEvent) => {
-        event.preventDefault();
-        const result = await act("create_tenant", { name, external_id: externalId });
-        if (result) {
-            setName("");
-            setExternalId("");
-            toast.success("Customer added", { description: "You can now install this agent for them." });
-        }
     };
 
     return (
@@ -49,7 +35,7 @@ export default function AgentCustomersPage() {
 
             <div className="overflow-hidden rounded-lg border border-border/40 bg-muted/30">
                 {data.tenants.length === 0 ? (
-                    <p className="px-5 py-12 text-center text-xs text-muted-foreground">No customers yet. Add one below to give them access.</p>
+                    <p className="px-5 py-12 text-center text-xs text-muted-foreground">No customers yet. They appear here once someone uses this agent, or when you create one through the API.</p>
                 ) : (
                     <div className="overflow-x-auto">
                         <Table>
@@ -87,21 +73,6 @@ export default function AgentCustomersPage() {
                     </div>
                 )}
             </div>
-
-            {canManage && (
-                <form onSubmit={addCustomer} className="mt-6 rounded-lg border border-border/40 bg-muted/30 p-5">
-                    <h2 className="text-sm font-medium">Add a customer</h2>
-                    <p className="mt-0.5 text-xs text-muted-foreground">Use the same customer ID your application uses.</p>
-                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                        <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Customer name, e.g. Northstar Health" className="h-9 text-sm shadow-none" />
-                        <Input value={externalId} onChange={(event) => setExternalId(event.target.value)} placeholder="Customer ID, e.g. northstar-health" className="h-9 font-mono text-sm shadow-none" />
-                    </div>
-                    <Button type="submit" size="sm" className="mt-4 h-7 gap-1 text-xs" disabled={!name.trim() || !externalId.trim() || !!busy}>
-                        {busy === "create_tenant" ? <Spinner className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
-                        Add customer
-                    </Button>
-                </form>
-            )}
         </div>
     );
 }
