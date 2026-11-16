@@ -1,10 +1,12 @@
 /**
- * Photos for what Tensor builds, from Pexels (https://www.pexels.com/api/documentation/).
+ * Photos for what Tensor builds, from Pexels (https://www.pexels.com/api/documentation/) when
+ * Cencori has a Pexels key, otherwise from Pixabay (https://pixabay.com/api/docs/).
  *
- * Tensor's agent asks here, on Cencori, so the Pexels key stays on Cencori and never lands in a
- * sandbox or someone's project. Pexels photos are free to use and to download, credit not
- * required, so the agent saves the photo it chooses into the project rather than linking to
- * Pexels: a published site keeps its images whatever happens to Pexels.
+ * Tensor's agent asks here, on Cencori, so the key stays on Cencori and never lands in a sandbox
+ * or someone's project. Both libraries' photos are free to use and to download, credit not
+ * required, so the agent saves the photo it chooses into the project rather than linking to it:
+ * a published site keeps its images whatever happens to the library. (Pixabay asks for exactly
+ * that: no permanent hotlinking.)
  */
 
 export type ImageOrientation = "landscape" | "portrait" | "square";
@@ -91,4 +93,79 @@ export async function searchPexels(input: ImageSearchInput, apiKey: string): Pro
   if (!response.ok) throw new ImageSearchUnavailable(`Pexels answered ${response.status}.`);
   const json = (await response.json().catch(() => null)) as { photos?: unknown[] } | null;
   return (json?.photos ?? []).map(imageFromPexels).filter((photo): photo is ImageResult => photo !== null);
+}
+
+/** Pixabay's photo, as Tensor hands it on; null for anything missing what a photo needs. */
+export function imageFromPixabay(hit: unknown): ImageResult | null {
+  if (!hit || typeof hit !== "object") return null;
+  const record = hit as Record<string, unknown>;
+  const large = text(record.largeImageURL);
+  const web = text(record.webformatURL);
+  if (!large || typeof record.id !== "number") return null;
+  const user = text(record.user);
+  const userId = typeof record.user_id === "number" ? record.user_id : null;
+  const tags = text(record.tags)
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+  return {
+    id: String(record.id),
+    // Pixabay describes a photo only by its tags.
+    description: tags.length ? `Tagged: ${tags.join(", ")}` : "",
+    width: typeof record.imageWidth === "number" ? record.imageWidth : 0,
+    height: typeof record.imageHeight === "number" ? record.imageHeight : 0,
+    color: null,
+    photographer: user,
+    photographerUrl: user && userId !== null ? `https://pixabay.com/users/${user}-${userId}/` : "",
+    pageUrl: text(record.pageURL),
+    // webformat is 640px on its long side, large 1280px: what Pixabay gives without full access.
+    src: { small: text(record.previewURL) || web || large, medium: web || large, large, large2x: large, original: large },
+  };
+}
+
+/** Whether a photo's shape fits the orientation asked for. Pixabay has no "square" of its own. */
+function fits(image: ImageResult, orientation?: ImageOrientation): boolean {
+  if (orientation !== "square") return true;
+  if (!image.width || !image.height) return false;
+  const ratio = image.width / image.height;
+  return ratio > 0.8 && ratio < 1.25;
+}
+
+export async function searchPixabay(input: ImageSearchInput, apiKey: string): Promise<ImageResult[]> {
+  const square = input.orientation === "square";
+  const params = new URLSearchParams({
+    key: apiKey,
+    q: input.query,
+    image_type: "photo",
+    safesearch: "true",
+    // Pixabay returns at least 3; a square search takes more and keeps the square ones.
+    per_page: String(Math.max(3, square ? 40 : input.count)),
+    page: String(input.page),
+  });
+  if (input.orientation === "landscape") params.set("orientation", "horizontal");
+  if (input.orientation === "portrait") params.set("orientation", "vertical");
+  const response = await fetch(`https://pixabay.com/api/?${params}`, {
+    headers: { Accept: "application/json" },
+    signal: AbortSignal.timeout(10_000),
+    cache: "no-store",
+  }).catch(() => null);
+  if (!response) throw new ImageSearchUnavailable("Pixabay didn't answer.");
+  if (response.status === 429) throw new ImageSearchUnavailable("Pixabay's limit is used up.");
+  if (!response.ok) throw new ImageSearchUnavailable(`Pixabay answered ${response.status}.`);
+  const json = (await response.json().catch(() => null)) as { hits?: unknown[] } | null;
+  return (json?.hits ?? [])
+    .map(imageFromPixabay)
+    .filter((photo): photo is ImageResult => photo !== null && fits(photo, input.orientation))
+    .slice(0, input.count);
+}
+
+export type ImageLibrary = { name: "Pexels" | "Pixabay"; search: (input: ImageSearchInput) => Promise<ImageResult[]> };
+
+/** The photo library Cencori has a key for, Pexels first; null with neither. */
+export function imageLibrary(env: Record<string, string | undefined> = process.env): ImageLibrary | null {
+  const pexels = env.PEXELS_API_KEY?.trim();
+  if (pexels) return { name: "Pexels", search: (input) => searchPexels(input, pexels) };
+  const pixabay = env.PIXABAY_API_KEY?.trim();
+  if (pixabay) return { name: "Pixabay", search: (input) => searchPixabay(input, pixabay) };
+  return null;
 }
