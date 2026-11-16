@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 20;
 const STATUSES = ["completed", "failed", "running", "queued", "requires_action", "cancelled", "expired"];
 
 /** Every run of this agent, newest first, a page at a time. */
