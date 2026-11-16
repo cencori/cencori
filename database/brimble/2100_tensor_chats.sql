@@ -6,8 +6,11 @@
 --
 -- And a turn of it is billed by what it costs, not as a task. A task is a whole piece of work in
 -- a sandbox; a chat message is one model call. Counting each message as a task would spend
--- Starter's week in nine messages. So a reservation now has a kind: a chat turn checks and spends
--- the plan's cost ceiling for the month (the trial's included) and leaves the task count alone.
+-- Starter's week in nine messages. So a reservation can now be a chat turn
+-- (basecode_chat_reservations): it checks and spends the plan's cost ceiling for the month (the
+-- trial's included) and leaves the task count alone.
+--
+-- Nothing here alters an existing table, so it never waits behind a backup.
 --
 -- Applied once by scripts/brimble-apply-sql.mjs before a deploy starts. The live build does not
 -- read the new tables, and calls basecode_reserve_turn with three named arguments, which the new
@@ -55,22 +58,22 @@ comment on table public.tensor_chats is
 comment on table public.tensor_chat_messages is
   'The messages of plain Tensor chats, in order.';
 
--- ── A reservation's kind ─────────────────────────────────────────────────
-alter table public.basecode_turn_reservations
-  add column if not exists kind text not null default 'task';
+-- ── Which reservations are chat turns ──────────────────────────────────
+-- Kept beside basecode_turn_reservations rather than as a column of it. Adding a column needs an
+-- exclusive lock on that table, which waits behind the database's backups (pg_dump holds a share
+-- lock on every table for as long as it runs) and failed two deploys on 2026-11-16. A new table
+-- needs no lock on anything a backup holds.
+create table if not exists public.basecode_chat_reservations (
+  reservation_id uuid primary key,
+  created_at timestamptz not null default now()
+);
 
-do $$
-begin
-  if not exists (
-    select 1 from pg_constraint where conname = 'basecode_turn_reservations_kind_check'
-  ) then
-    alter table public.basecode_turn_reservations
-      add constraint basecode_turn_reservations_kind_check check (kind in ('task', 'chat'));
-  end if;
-end $$;
+alter table public.basecode_chat_reservations enable row level security;
+revoke all on table public.basecode_chat_reservations from anon, authenticated;
+grant all on table public.basecode_chat_reservations to service_role;
 
-comment on column public.basecode_turn_reservations.kind is
-  'task: a piece of work, counted against the period''s tasks. chat: one message of a plain chat, billed only by its cost against the month''s ceiling.';
+comment on table public.basecode_chat_reservations is
+  'Turn reservations that are one message of a plain chat: billed only by cost against the month''s ceiling, never counted as a task.';
 
 -- ── Reserving a turn ─────────────────────────────────────────────────────
 -- As in 0900, with p_kind. A chat turn skips the task count (neither checked nor spent) and is
@@ -180,7 +183,7 @@ begin
 
   insert into public.basecode_turn_reservations(
     account_id, usage_period_id, client_turn_key, model,
-    reserved_microusd, cost_cap_microusd, expires_at, kind
+    reserved_microusd, cost_cap_microusd, expires_at
   ) values (
     v_account.id, v_period.id, p_client_turn_key,
     nullif(left(coalesce(p_model, ''), 160), ''),
@@ -189,9 +192,12 @@ begin
       when v_chat then least(v_chat_cap, coalesce(v_plan.task_cost_cap_microusd, v_chat_cap))
       else v_plan.task_cost_cap_microusd
     end,
-    now() + case when v_chat then interval '10 minutes' else interval '2 hours' end,
-    case when v_chat then 'chat' else 'task' end
+    now() + case when v_chat then interval '10 minutes' else interval '2 hours' end
   ) returning * into v_reservation;
+
+  if v_chat then
+    insert into public.basecode_chat_reservations(reservation_id) values (v_reservation.id);
+  end if;
 
   insert into public.basecode_usage_events(
     account_id, usage_period_id, reservation_id, kind, request_delta, cost_delta_microusd
@@ -250,7 +256,9 @@ begin
   if not found then return false; end if;
   if v_reservation.status in ('completed', 'released', 'expired') then return true; end if;
 
-  if v_reservation.gateway_calls = 0 and v_reservation.kind = 'task' then
+  if v_reservation.gateway_calls = 0 and not exists (
+    select 1 from public.basecode_chat_reservations where reservation_id = v_reservation.id
+  ) then
     update public.basecode_usage_periods
     set requests_used = greatest(requests_used - 1, 0)
     where id = v_reservation.usage_period_id;
