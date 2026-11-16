@@ -104,11 +104,12 @@ export async function createPlainChat(
 export async function updatePlainChat(
   admin: SupabaseClient,
   chatId: string,
-  change: { title?: string; archived?: boolean; touch?: boolean },
+  change: { title?: string; archived?: boolean; projectTaskId?: string; touch?: boolean },
 ): Promise<void> {
   const fields: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (change.title !== undefined) fields.title = change.title;
   if (change.archived !== undefined) fields.archived_at = change.archived ? new Date().toISOString() : null;
+  if (change.projectTaskId !== undefined) fields.project_task_id = change.projectTaskId;
   const { error } = await admin.from("tensor_chats").update(fields).eq("id", chatId);
   if (error) throw error;
 }
@@ -182,7 +183,16 @@ export function plainChatInstructions(projects: ProjectSummary[], today: Date): 
     "",
     "This is a plain chat, outside any project. Here you can talk, think and write, but you cannot run code, edit files, or build, preview or publish anything: that happens inside a project, where Tensor has a computer of its own for it.",
     "",
-    "When a conversation turns into something to build (an app, a site, a tool), say so once, briefly, and offer to start it: the person creates a project from the sidebar (the + beside Projects) and builds inside it. Do not push; only offer when it is clearly where the talk is going, and not again if they decline.",
+    "When a conversation turns into something to build (an app, a site, a tool), say so once, briefly, and offer to set it up as a project. Do not push; only offer when it is clearly where the talk is going, and not again if they decline.",
+    "",
+    "When they say yes, or ask you to create the project or start building, propose it by ending your answer with exactly one block like this, and nothing after it:",
+    "",
+    "```tensor-project",
+    '{"name": "Bakery Orders", "brief": "Build a website for a small bakery: ..."}',
+    "```",
+    "",
+    "`name` is a short project name (one to four words). `brief` is the first message the project will start with, written to Tensor as the builder: what to build, for whom, the features and decisions agreed in this conversation, and the style. Make it complete enough that nothing has to be explained again, in at most 250 words.",
+    "The person sees the block as a card with a Create project button. Nothing is created until they press it, so say so plainly (\"Press Create project when you are ready\"); never claim the project exists. If an idea already fits one of their projects, suggest continuing there instead.",
     "",
     "Their projects:",
     list,

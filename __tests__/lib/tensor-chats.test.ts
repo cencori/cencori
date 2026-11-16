@@ -36,6 +36,9 @@ describe("plain chats", () => {
     expect(text).toContain("plain chat");
     expect(text).toContain("2026-11-16");
     expect(plainChatInstructions([], new Date())).toContain("None yet.");
+    // How a project is proposed: a block the page turns into a Create project card.
+    expect(text).toContain("```tensor-project");
+    expect(text).toContain("never claim the project exists");
   });
 
   it("only accepts real ids", () => {
