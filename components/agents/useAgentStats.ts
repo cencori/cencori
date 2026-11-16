@@ -44,6 +44,10 @@ export interface AgentRun {
     created_at: string;
     /** An API run, or one conversation turn (widget, share link, Sessions API). */
     kind?: "api" | "conversation";
+    /** What the customer asked, and what the agent answered. Null when the project doesn't keep prompts. */
+    prompt?: string | null;
+    reply?: string | null;
+    model?: string | null;
 }
 
 /** A page of one agent's runs, newest first. */

@@ -33,3 +33,52 @@ export function turnAsRun(row: ConversationTurnRow, agentId: string) {
         kind: 'conversation' as const,
     };
 }
+
+/** How much of a prompt or reply the runs list carries per row. */
+export const RUN_TEXT_LIMIT = 4_000;
+
+function clip(text: string): string {
+    return text.length > RUN_TEXT_LIMIT ? `${text.slice(0, RUN_TEXT_LIMIT)}…` : text;
+}
+
+function asText(value: unknown): string | null {
+    if (value == null) return null;
+    if (typeof value === 'string') return value.trim() ? clip(value) : null;
+    try {
+        const json = JSON.stringify(value);
+        return json && json !== '{}' && json !== '[]' ? clip(json) : null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * What the customer asked and what the agent answered, from a logged turn
+ * (ai_requests payloads, already masked by the project's data rules). The
+ * prompt is the last user message; earlier messages are the conversation so far.
+ */
+export function turnText(row: { request_payload?: unknown; response_payload?: unknown }): { prompt: string | null; reply: string | null } {
+    const messages = (row.request_payload as { messages?: unknown } | null)?.messages;
+    let prompt: string | null = null;
+    if (Array.isArray(messages)) {
+        for (let i = messages.length - 1; i >= 0; i -= 1) {
+            const message = messages[i] as { role?: unknown; content?: unknown } | null;
+            if (message?.role === 'user') {
+                prompt = asText(message.content);
+                break;
+            }
+        }
+    }
+    return { prompt, reply: asText((row.response_payload as { content?: unknown } | null)?.content) };
+}
+
+/** The same for an API run: its stored input and output. */
+export function runText(row: { input_ref?: unknown; output_ref?: unknown }): { prompt: string | null; reply: string | null } {
+    const stored = row.input_ref as Record<string, unknown> | null;
+    // Newer runs wrap the input in an envelope ({ input, response_format, mode }).
+    const input = stored && typeof stored === 'object' && !Array.isArray(stored) && 'input' in stored ? stored.input : stored;
+    const text = input && typeof input === 'object' && !Array.isArray(input)
+        ? ((input as Record<string, unknown>).text ?? (input as Record<string, unknown>).prompt ?? (input as Record<string, unknown>).message ?? input)
+        : input;
+    return { prompt: asText(text), reply: asText((row.output_ref as { output?: unknown } | null)?.output) };
+}
