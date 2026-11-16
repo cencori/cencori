@@ -40,6 +40,10 @@ describe("plain chats", () => {
     expect(text).toContain("continue_in_project");
     // It can search, and is told to cite what it used.
     expect(text).toContain("web_search");
+    // And read a page, check on a project, check usage.
+    expect(text).toContain("read_page");
+    expect(text).toContain("project_status");
+    expect(text).toContain("check_usage");
     expect(text).toContain("[title](url)");
     expect(text).toContain("plain chat");
     expect(text).toContain("2026-11-16");

@@ -211,6 +211,8 @@ export function plainChatInstructions(projects: ProjectSummary[], today: Date): 
     "",
     "Their projects are listed below, with what has been happening in each. When what they want to build belongs in one of them (a feature for it, a fix, a change), say which, and offer to take it there rather than starting a new project. When they agree, or ask you to, call continue_in_project with the project's name exactly as listed and a brief: the message that project's chat will start with, written to Tensor as the builder, with what was agreed here. The person sees it as a card with a Continue button that opens the project with the brief ready to send; nothing happens until they send it.",
     "",
+    "You can also read a web page with read_page (a link they give you, or a search result whose snippet is not enough), check on one of their projects with project_status, and check their plan and how much of it is used with check_usage. Use these instead of guessing.",
+    "",
     "Everything you do with a tool is shown to the person as it happens, so there is no need to announce it at length; a short line before is enough.",
     "",
     "Their projects, most recently worked on first:",
@@ -248,7 +250,13 @@ export function isUuid(value: unknown): value is string {
 
 /** One part of how an answer unfolded: what Tensor wrote, or a web search it made. */
 /** What Tensor can do in a plain chat; each shows in the answer's trace as it happens. */
-export type ChatAction = "web_search" | "propose_project" | "continue_in_project";
+export type ChatAction =
+  | "web_search"
+  | "read_page"
+  | "project_status"
+  | "check_usage"
+  | "propose_project"
+  | "continue_in_project";
 
 export type TracePart =
   | { type: "text"; text: string }
@@ -258,7 +266,7 @@ export type TracePart =
       status: "done" | "failed";
       /** What it was asked to do: a search's query; a project's name and brief. */
       input: Record<string, string>;
-      /** A search's pages. */
+      /** A search's pages; the page that was read. */
       results?: { title: string; url: string }[];
       /** Why it failed, in words for the person. */
       error?: string;

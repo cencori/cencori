@@ -21,6 +21,9 @@ import {
 import { readStream, searchQuery, type ChatMessage, type ToolCall } from "@/lib/tensor-chats-stream";
 import { authenticateTensorDataRequest } from "@/lib/tensor-data";
 import { gatewayEntitlementFrom } from "@/lib/tensor-entitlement";
+import { getTensorBillingSnapshot } from "@/lib/tensor-billing";
+import { fetchWebResource } from "@/lib/web/fetch";
+import { extractWebDocument } from "@/lib/web/html";
 import { liveWebSearch, takeWebSearchSlot } from "@/lib/web/live-search";
 import { WEB_PRICES_USD } from "@/lib/web/pricing";
 
@@ -82,7 +85,46 @@ const TOOLS = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "read_page",
+      description:
+        "Read a web page: its title and text. Use it to read a link the person gives you, or a search result whose snippet is not enough.",
+      parameters: {
+        type: "object",
+        properties: { url: { type: "string", description: "The page's full address, starting with https://." } },
+        required: ["url"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "project_status",
+      description:
+        "Check on one of the person's projects: whether it is published and where, when it was last worked on, and its latest chats.",
+      parameters: {
+        type: "object",
+        properties: { project: { type: "string", description: "The project's name, exactly as listed." } },
+        required: ["project"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "check_usage",
+      description:
+        "Check the person's Tensor plan and how much of its allowance is used: the plan, the share used, tasks used, and when it resets or ends.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
 ] as const;
+
+/** Pages one message may read, and how much of each Tensor is given. */
+const MAX_READS = 3;
+const PAGE_TEXT_MAX = 12_000;
 
 export const maxDuration = 300;
 
@@ -241,6 +283,7 @@ export async function POST(request: NextRequest, context: Context) {
       // next. The last round has no tools, so it can only answer.
       let searches = 0;
       let proposed = false;
+      let reads = 0;
       try {
         for (let round = 0; round < MAX_ROUNDS; round += 1) {
           const upstream = await callModel(conversation, round < MAX_ROUNDS - 1);
@@ -283,6 +326,36 @@ export async function POST(request: NextRequest, context: Context) {
                   ? { type: "action", ...action, status: "done", results: found.map((item) => ({ title: item.title, url: item.url })) }
                   : { type: "action", ...action, status: "failed", error: "The search did not work." };
               }
+            } else if (action.name === "read_page") {
+              if (reads >= MAX_READS) {
+                step = { type: "action", ...action, status: "failed", error: "No more pages for this message." };
+                result = { error: "No more pages for this message. Answer from what you have." };
+              } else {
+                reads += 1;
+                const page = await readPage(admin, user.id, turnKey, reads, action.input.url);
+                result = page;
+                step = "content" in page
+                  ? { type: "action", ...action, status: "done", results: [{ title: page.title, url: page.url }] }
+                  : { type: "action", ...action, status: "failed", error: "The page could not be read." };
+              }
+            } else if (action.name === "project_status") {
+              const project = projects.find((item) => sameName(item.name, action.input.project));
+              step = project
+                ? { type: "action", ...action, status: "done" }
+                : { type: "action", ...action, status: "failed", error: "No project by that name." };
+              result = project
+                ? {
+                    name: project.name,
+                    published: Boolean(project.address),
+                    address: project.address ? `https://${project.address}` : null,
+                    lastWorkedOn: project.updatedAt,
+                    latestChats: project.recentChats,
+                  }
+                : { error: `There is no project named "${action.input.project}".` };
+            } else if (action.name === "check_usage") {
+              const usage = await readUsage(admin, user.id);
+              step = usage ? { type: "action", ...action, status: "done" } : { type: "action", ...action, status: "failed", error: "Usage could not be read." };
+              result = usage ?? { error: "Usage could not be read just now." };
             } else if (proposed) {
               step = { type: "action", ...action, status: "failed", error: "Only one proposal per answer." };
               result = { error: "You already proposed something in this answer." };
@@ -412,6 +485,55 @@ async function upstreamFailure(response: Response | null): Promise<{ code: strin
   return { code, error: "Tensor could not answer just now. Try again." };
 }
 
+/**
+ * One web page, read for Tensor: its title and text, cut to a length it can use. Billed like a
+ * search, at Cencori Web's price for a fetch; a page that cannot be read costs nothing.
+ */
+async function readPage(
+  admin: Parameters<typeof readPlainMessages>[0],
+  userId: string,
+  turnKey: string,
+  number: number,
+  url: string,
+): Promise<{ title: string; url: string; content: string } | { error: string }> {
+  let document: ReturnType<typeof extractWebDocument>;
+  try {
+    const resource = await fetchWebResource(url, { timeoutMs: 15_000, maxBytes: 2 * 1024 * 1024 });
+    document = extractWebDocument(resource);
+  } catch (error) {
+    console.error("[Tensor Chats] Reading a page failed", error);
+    return { error: "That page could not be read (it may block readers, need a sign-in, or not be a web page). Say so." };
+  }
+  const { error } = await admin.rpc("basecode_record_gateway_usage", {
+    p_user_id: userId,
+    p_gateway_request_id: `${turnKey}:read:${number}`,
+    p_cost_microusd: Math.round(WEB_PRICES_USD["web/fetch"] * 1_000_000),
+  });
+  if (error) console.error("[Tensor Chats] Recording a page read failed", error);
+  const content = document.content.length > PAGE_TEXT_MAX ? `${document.content.slice(0, PAGE_TEXT_MAX)}\n\n[The rest of the page is not shown.]` : document.content;
+  return { title: document.title || document.canonicalUrl, url: document.canonicalUrl || url, content };
+}
+
+/** The person's plan and how much of it is used, as the usage card reads it. */
+async function readUsage(admin: Parameters<typeof readPlainMessages>[0], userId: string) {
+  try {
+    const snapshot = await getTensorBillingSnapshot(admin, userId);
+    return {
+      plan: snapshot.plan.name,
+      onTrial: snapshot.plan.tier === "trial",
+      percentageUsed: snapshot.usage.percentageUsed,
+      tasksUsed: snapshot.usage.tasksUsed ?? null,
+      tasksLimit: snapshot.usage.tasksLimit ?? null,
+      resetsAt: snapshot.usage.resetsAt ?? null,
+      planEndsAt: snapshot.plan.endsAt ?? null,
+      renews: snapshot.plan.renews,
+    };
+  } catch (error) {
+    console.error("[Tensor Chats] Reading usage failed", error);
+    return null;
+  }
+}
+
 /** A tool call as one of the chat's actions, with what it was asked, or null when it is not one. */
 function readAction(call: ToolCall): { name: ChatAction; input: Record<string, string> } | null {
   let args: Record<string, unknown>;
@@ -430,6 +552,15 @@ function readAction(call: ToolCall): { name: ChatAction; input: Record<string, s
     const brief = text("brief", 4000);
     return name && brief ? { name: "propose_project", input: { name, brief } } : null;
   }
+  if (call.function.name === "read_page") {
+    const url = text("url", 2000);
+    return /^https?:\/\//i.test(url) ? { name: "read_page", input: { url } } : null;
+  }
+  if (call.function.name === "project_status") {
+    const project = text("project", 100);
+    return project ? { name: "project_status", input: { project } } : null;
+  }
+  if (call.function.name === "check_usage") return { name: "check_usage", input: {} };
   if (call.function.name === "continue_in_project") {
     const project = text("project", 100);
     const brief = text("brief", 4000);
