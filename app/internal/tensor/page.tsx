@@ -10,6 +10,7 @@ import {
 } from '@/components/dashboard/project-overview/ProjectOverviewDashboard';
 import { BarBreakdownChart } from '@/components/dashboard/project-overview/ModelBreakdown';
 import { StatCard } from '@/internal/analytics/components/StatCard';
+import { TensorAccounts } from '@/components/internal/tensor-accounts';
 import {
     Select,
     SelectContent,
@@ -295,6 +296,8 @@ export default function InternalTensorPage() {
                         { label: 'Ending within 7 days', value: count(now?.ending_soon), color: '#f59e0b', hint: `not set to renew · ${count(now?.paid_used_up)} paid at their limit` },
                     ]}
                 />
+
+                <TensorAccounts />
 
                 <div className="grid gap-4 lg:grid-cols-2">
                     <MetricCard config={signupsConfig} data={chartData} loading={loading} hasData={Number(now?.accounts ?? 0) > 0} reduceMotion={reduceMotion} />
