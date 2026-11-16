@@ -209,16 +209,19 @@ async function forward(req: NextRequest, path: string[]): Promise<Response> {
       reset_at?: string;
     } | null;
     if (!entitlement?.allowed) {
+      const taskCapped = entitlement?.reason === "task_cost_limit";
       return json(
         {
           // A task that has reached its own ceiling is a different thing to tell someone than a
-          // plan that is used up: the first is over, the second needs a new pass.
-          error:
-            entitlement?.reason === "task_cost_limit"
-              ? "This task has reached the size limit for your plan. Start a new task to continue."
-              : "Tensor usage limit reached",
+          // plan that is used up: the first is over and the next message starts another, the
+          // second waits for the allowance to come back. The agent runtime ends the turn on either
+          // and shows this text, adding when the allowance resets if a reset_at is given; a task's
+          // own ceiling has no reset, so none is given for it.
+          error: taskCapped
+            ? "This task reached its limit on your plan, so Tensor stopped here. Send another message to carry on as a new task"
+            : "Usage exhausted: you have used your plan's allowance for now",
           code: entitlement?.reason ?? "usage_limited",
-          reset_at: entitlement?.reset_at ?? null,
+          reset_at: taskCapped ? null : (entitlement?.reset_at ?? null),
         },
         entitlement?.reason === "concurrency_limit" ? 409 : 429,
       );
