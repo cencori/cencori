@@ -10,6 +10,8 @@ import {
   plainMessageJson,
   readPlainChat,
   readPlainMessages,
+  readTraces,
+  type TracePart,
   updatePlainChat,
 } from "@/lib/tensor-chats";
 
@@ -26,8 +28,15 @@ export async function GET(request: NextRequest, context: Context) {
   try {
     const chat = await readPlainChat(session.admin, session.user.id, (await context.params).chatId);
     if (!chat) return json({ error: "That chat does not exist." }, 404);
-    const messages = await readPlainMessages(session.admin, chat.id);
-    return json({ chat: plainChatJson(chat), messages: messages.map(plainMessageJson) });
+    const [messages, traces] = await Promise.all([
+      readPlainMessages(session.admin, chat.id),
+      // Traces are extra: a chat still opens when they cannot be read.
+      readTraces(session.admin, chat.id).catch(() => new Map<string, TracePart[]>()),
+    ]);
+    return json({
+      chat: plainChatJson(chat),
+      messages: messages.map((message) => ({ ...plainMessageJson(message), parts: traces.get(message.id) ?? null })),
+    });
   } catch (error) {
     console.error("[Tensor Chats] Reading a chat failed", error);
     return json({ error: "Tensor could not load this chat." }, 503);

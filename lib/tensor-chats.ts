@@ -206,22 +206,12 @@ export function plainChatInstructions(projects: ProjectSummary[], today: Date): 
     "",
     "When a conversation turns into something to build (an app, a site, a tool), say so once, briefly, and offer to set it up as a project. Do not push; only offer when it is clearly where the talk is going, and not again if they decline.",
     "",
-    "When they say yes, or ask you to create the project or start building, propose it by ending your answer with exactly one block like this, and nothing after it:",
+    "When they say yes, or ask you to create the project or start building, call propose_project with a short name (one to four words) and a brief: the first message the project will start with, written to Tensor as the builder, covering what to build, for whom, the features and decisions agreed in this conversation, and the style, complete enough that nothing has to be explained again, in at most 250 words.",
+    "The person sees the proposal as a card with a Create project button. Nothing is created until they press it, so say so plainly (\"Press Create project when you are ready\"); never claim the project exists.",
     "",
-    "```tensor-project",
-    '{"name": "Bakery Orders", "brief": "Build a website for a small bakery: ..."}',
-    "```",
+    "Their projects are listed below, with what has been happening in each. When what they want to build belongs in one of them (a feature for it, a fix, a change), say which, and offer to take it there rather than starting a new project. When they agree, or ask you to, call continue_in_project with the project's name exactly as listed and a brief: the message that project's chat will start with, written to Tensor as the builder, with what was agreed here. The person sees it as a card with a Continue button that opens the project with the brief ready to send; nothing happens until they send it.",
     "",
-    "`name` is a short project name (one to four words). `brief` is the first message the project will start with, written to Tensor as the builder: what to build, for whom, the features and decisions agreed in this conversation, and the style. Make it complete enough that nothing has to be explained again, in at most 250 words.",
-    "The person sees the block as a card with a Create project button. Nothing is created until they press it, so say so plainly (\"Press Create project when you are ready\"); never claim the project exists.",
-    "",
-    "Their projects are listed below, with what has been happening in each. When what they want to build belongs in one of them (a feature for it, a fix, a change), say which, and offer to take it there rather than starting a new project. When they agree, or ask you to, end your answer with exactly one block like this, and nothing after it:",
-    "",
-    "```tensor-continue",
-    '{"project": "Bakery Orders", "brief": "Add an order form to the menu page: ..."}',
-    "```",
-    "",
-    "`project` is the project's name exactly as listed. `brief` is the message that project's chat will start with, written to Tensor as the builder, with what was agreed here. The person sees it as a card with a Continue button that opens the project with the brief ready to send; nothing happens until they send it. Never use this block for a project that is not listed.",
+    "Everything you do with a tool is shown to the person as it happens, so there is no need to announce it at length; a short line before is enough.",
     "",
     "Their projects, most recently worked on first:",
     list,
@@ -254,4 +244,41 @@ export function isUuid(value: unknown): value is string {
     typeof value === "string" &&
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
   );
+}
+
+/** One part of how an answer unfolded: what Tensor wrote, or a web search it made. */
+/** What Tensor can do in a plain chat; each shows in the answer's trace as it happens. */
+export type ChatAction = "web_search" | "propose_project" | "continue_in_project";
+
+export type TracePart =
+  | { type: "text"; text: string }
+  | {
+      type: "action";
+      name: ChatAction;
+      status: "done" | "failed";
+      /** What it was asked to do: a search's query; a project's name and brief. */
+      input: Record<string, string>;
+      /** A search's pages. */
+      results?: { title: string; url: string }[];
+      /** Why it failed, in words for the person. */
+      error?: string;
+    };
+
+/** The traces of a chat's answers, by answer. */
+export async function readTraces(admin: SupabaseClient, chatId: string): Promise<Map<string, TracePart[]>> {
+  const { data, error } = await admin.from("tensor_chat_traces").select("message_id, parts").eq("chat_id", chatId);
+  if (error) throw error;
+  return new Map((data ?? []).map((row) => [row.message_id as string, row.parts as TracePart[]]));
+}
+
+/** Keeps how an answer unfolded. Only an answer that did something has anything worth keeping. */
+export async function saveTrace(
+  admin: SupabaseClient,
+  input: { messageId: string; chatId: string; parts: TracePart[] },
+): Promise<void> {
+  if (!input.parts.some((part) => part.type === "action")) return;
+  const { error } = await admin
+    .from("tensor_chat_traces")
+    .insert({ message_id: input.messageId, chat_id: input.chatId, parts: input.parts });
+  if (error) throw error;
 }

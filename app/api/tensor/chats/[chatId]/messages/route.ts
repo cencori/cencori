@@ -11,7 +11,10 @@ import {
   plainMessageJson,
   readPlainChat,
   readPlainMessages,
+  saveTrace,
   titleFromMessage,
+  type ChatAction,
+  type TracePart,
   updatePlainChat,
   type ProjectSummary,
 } from "@/lib/tensor-chats";
@@ -29,20 +32,57 @@ const ANSWER_MAX_TOKENS = 4096;
 const MAX_SEARCHES = 3;
 const SEARCH_RESULTS = 6;
 
-/** The one tool a plain chat has: searching the live web. */
-const WEB_SEARCH_TOOL = {
-  type: "function",
-  function: {
-    name: "web_search",
-    description:
-      "Search the live web. Use it for anything current (news, prices, releases, events, people's current roles), for facts you are not sure of, and when asked to look something up. Returns titles, links and snippets.",
-    parameters: {
-      type: "object",
-      properties: { query: { type: "string", description: "What to search for, as you would type it into a search engine." } },
-      required: ["query"],
+/** Rounds of answering, then acting, that one message may take. */
+const MAX_ROUNDS = 5;
+
+/** What Tensor can do in a plain chat. Each shows in the answer's trace as it happens. */
+const TOOLS = [
+  {
+    type: "function",
+    function: {
+      name: "web_search",
+      description:
+        "Search the live web. Use it for anything current (news, prices, releases, events, people's current roles), for facts you are not sure of, and when asked to look something up. Returns titles, links and snippets.",
+      parameters: {
+        type: "object",
+        properties: { query: { type: "string", description: "What to search for, as you would type it into a search engine." } },
+        required: ["query"],
+      },
     },
   },
-} as const;
+  {
+    type: "function",
+    function: {
+      name: "propose_project",
+      description:
+        "Propose a new project to build what was agreed. The person sees a card with a Create project button; nothing is created until they press it. Use only when they want to build it.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "A short project name, one to four words." },
+          brief: { type: "string", description: "The project's first message, written to Tensor as the builder. At most 250 words." },
+        },
+        required: ["name", "brief"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "continue_in_project",
+      description:
+        "Take the work to one of the person's projects. They see a card that opens that project with the brief ready to send; nothing happens until they send it.",
+      parameters: {
+        type: "object",
+        properties: {
+          project: { type: "string", description: "The project's name, exactly as listed." },
+          brief: { type: "string", description: "The message that project's chat will start with, written to Tensor as the builder." },
+        },
+        required: ["project", "brief"],
+      },
+    },
+  },
+] as const;
 
 export const maxDuration = 300;
 
@@ -136,7 +176,7 @@ export async function POST(request: NextRequest, context: Context) {
   const upstreamAbort = new AbortController();
   const origin = new URL(request.url).origin;
   /** One model call: the conversation so far, with the search tool while searches remain. */
-  const callModel = (messages: ChatMessage[], withSearch: boolean) =>
+  const callModel = (messages: ChatMessage[], withTools: boolean) =>
     inference(
       new NextRequest(`${origin}/api/tensor/inference/v1/chat/completions`, {
         method: "POST",
@@ -146,7 +186,7 @@ export async function POST(request: NextRequest, context: Context) {
           stream: true,
           max_tokens: ANSWER_MAX_TOKENS,
           messages,
-          ...(withSearch ? { tools: [WEB_SEARCH_TOOL], tool_choice: "auto" } : {}),
+          ...(withTools ? { tools: TOOLS, tool_choice: "auto" } : {}),
         }),
         signal: upstreamAbort.signal,
       }),
@@ -182,15 +222,28 @@ export async function POST(request: NextRequest, context: Context) {
       send({ type: "message", message: plainMessageJson(saved) });
 
       let answer = "";
+      /** How the answer unfolds: its text, and each search between, in order. */
+      const parts: TracePart[] = [];
+      const write = (text: string) => {
+        answer += text;
+        const last = parts.at(-1);
+        if (last?.type === "text") last.text += text;
+        else parts.push({ type: "text", text });
+        send({ type: "delta", text });
+      };
       let status: "complete" | "stopped" | "failed" = "complete";
       let failure: { code: string; error: string } | null = null;
 
       // Answer, or search and then answer: each round is one model call. A round that asks for
       // searches has them run, and their results go into the next.
+      // Answer, or act and then answer: each round is one model call. A round that asks for
+      // actions has them done, shown in the trace as they happen, and their results go into the
+      // next. The last round has no tools, so it can only answer.
       let searches = 0;
+      let proposed = false;
       try {
-        for (let round = 0; round <= MAX_SEARCHES; round += 1) {
-          const upstream = await callModel(conversation, searches < MAX_SEARCHES);
+        for (let round = 0; round < MAX_ROUNDS; round += 1) {
+          const upstream = await callModel(conversation, round < MAX_ROUNDS - 1);
           if (!upstream || !upstream.ok || !upstream.body) {
             status = "failed";
             failure = await upstreamFailure(upstream);
@@ -201,8 +254,7 @@ export async function POST(request: NextRequest, context: Context) {
           for await (const event of readStream(upstream.body, upstreamAbort.signal)) {
             if (event.kind === "text") {
               said += event.text;
-              answer += event.text;
-              send({ type: "delta", text: event.text });
+              write(event.text);
             } else {
               calls.push(event.call);
             }
@@ -211,22 +263,43 @@ export async function POST(request: NextRequest, context: Context) {
 
           conversation.push({ role: "assistant", content: said || null, tool_calls: calls });
           for (const call of calls) {
-            const query = searchQuery(call);
-            let result: unknown;
-            if (!query) result = { error: "A search needs a query." };
-            else if (searches >= MAX_SEARCHES) result = { error: "No more searches for this message. Answer from what you have." };
-            else {
-              searches += 1;
-              send({ type: "search", query });
-              result = await searchTheWeb(admin, user.id, turnKey, searches, query);
+            const action = readAction(call);
+            if (!action) {
+              conversation.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify({ error: "That is not something you can do here." }) });
+              continue;
             }
+            send({ type: "action", name: action.name, input: action.input });
+            let step: TracePart;
+            let result: unknown;
+            if (action.name === "web_search") {
+              if (searches >= MAX_SEARCHES) {
+                step = { type: "action", ...action, status: "failed", error: "No more searches for this message." };
+                result = { error: "No more searches for this message. Answer from what you have." };
+              } else {
+                searches += 1;
+                result = await searchTheWeb(admin, user.id, turnKey, searches, action.input.query);
+                const found = (result as { results?: { title: string; url: string }[] }).results;
+                step = found
+                  ? { type: "action", ...action, status: "done", results: found.map((item) => ({ title: item.title, url: item.url })) }
+                  : { type: "action", ...action, status: "failed", error: "The search did not work." };
+              }
+            } else if (proposed) {
+              step = { type: "action", ...action, status: "failed", error: "Only one proposal per answer." };
+              result = { error: "You already proposed something in this answer." };
+            } else if (action.name === "continue_in_project" && !projects.some((project) => sameName(project.name, action.input.project))) {
+              step = { type: "action", ...action, status: "failed", error: "No project by that name." };
+              result = { error: `There is no project named "${action.input.project}". Use one of the names listed, or propose a new project.` };
+            } else {
+              proposed = true;
+              step = { type: "action", ...action, status: "done" };
+              result = { shown: "The person now sees a card for this. Tell them briefly to press it when ready." };
+            }
+            parts.push(step);
+            send({ type: "action_done", ...stepEvent(step) });
             conversation.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify(result) });
           }
-          // Words said before a search run on into the answer that follows it.
-          if (said && !said.endsWith("\n")) {
-            answer += "\n\n";
-            send({ type: "delta", text: "\n\n" });
-          }
+          // Words said before an action run on into the answer that follows it.
+          if (said && !said.endsWith("\n")) write("\n\n");
         }
       } catch (error) {
         if (upstreamAbort.signal.aborted) status = "stopped";
@@ -248,8 +321,13 @@ export async function POST(request: NextRequest, context: Context) {
             status,
             model: CHAT_MODEL,
           });
-          if (status === "failed" && failure) send({ type: "error", ...failure, message: plainMessageJson(message) });
-          else send({ type: "done", message: plainMessageJson(message) });
+          // The trace is extra: an answer is kept and shown even when how it unfolded is not.
+          await saveTrace(admin, { messageId: message.id, chatId: chat.id, parts }).catch((error: unknown) =>
+            console.error("[Tensor Chats] Saving a trace failed", error),
+          );
+          const shown = { ...plainMessageJson(message), parts: parts.some((part) => part.type === "action") ? parts : null };
+          if (status === "failed" && failure) send({ type: "error", ...failure, message: shown });
+          else send({ type: "done", message: shown });
         } else if (failure) {
           send({ type: "error", ...failure });
         }
@@ -332,6 +410,42 @@ async function upstreamFailure(response: Response | null): Promise<{ code: strin
     return { code, error: "You have used this month's allowance." };
   }
   return { code, error: "Tensor could not answer just now. Try again." };
+}
+
+/** A tool call as one of the chat's actions, with what it was asked, or null when it is not one. */
+function readAction(call: ToolCall): { name: ChatAction; input: Record<string, string> } | null {
+  let args: Record<string, unknown>;
+  try {
+    args = JSON.parse(call.function.arguments || "{}") as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+  const text = (key: string, max: number) => (typeof args[key] === "string" ? (args[key] as string).trim().slice(0, max) : "");
+  if (call.function.name === "web_search") {
+    const query = searchQuery(call);
+    return query ? { name: "web_search", input: { query } } : null;
+  }
+  if (call.function.name === "propose_project") {
+    const name = text("name", 100);
+    const brief = text("brief", 4000);
+    return name && brief ? { name: "propose_project", input: { name, brief } } : null;
+  }
+  if (call.function.name === "continue_in_project") {
+    const project = text("project", 100);
+    const brief = text("brief", 4000);
+    return project && brief ? { name: "continue_in_project", input: { project, brief } } : null;
+  }
+  return null;
+}
+
+function sameName(a: string, b: string): boolean {
+  return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
+/** A finished step as the page is told it: everything but its type. */
+function stepEvent(step: TracePart) {
+  if (step.type !== "action") return {};
+  return { name: step.name, status: step.status, input: step.input, results: step.results ?? [], error: step.error ?? null };
 }
 
 /** The account's projects, for Tensor to know what the person is already building and where. */
