@@ -829,7 +829,55 @@ export type SiteUsage = {
   awakeSeconds: number;
   limits: { monthlyBytes: number; monthlyAwakeSeconds: number; uploadBytes: number; appBytes: number };
   paused: boolean;
+  /** Pages browsers asked for this month: the site's visits. Absent from an older gateway. */
+  visits?: number;
 };
+
+export type SiteVisibility = "public" | "password";
+
+/** Who may see a project's site: as last set, anyone when it never was. */
+export async function readSiteVisibility(admin: Admin, taskId: string): Promise<SiteVisibility> {
+  const { data, error } = await admin.from("tensor_cloud_site_access").select("mode").eq("task_id", taskId).maybeSingle();
+  if (error) throw error;
+  return data?.mode === "password" ? "password" : "public";
+}
+
+/**
+ * Makes a project's site public, or protects it with a password. The gateway is told first (it
+ * keeps the password, hashed); the choice is kept here once it has taken it. The ticket names the
+ * site's address when it has one; the gateway keeps the setting by project, so it holds from
+ * before the first publish and through a change of address.
+ */
+export async function setSiteVisibility(
+  admin: Admin,
+  config: TensorCloudConfig,
+  task: { id: string; user_id: string },
+  name: string,
+  mode: SiteVisibility,
+  password: string | null,
+  fetcher: typeof fetch = fetch,
+): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
+  const ticket = signDeployTicket({ userId: task.user_id, taskId: task.id, name, action: "access" }, config.ticketSecret);
+  try {
+    const response = await fetcher(`${gatewayHttpUrl(config.gatewayUrl)}/v1/sites/access?ticket=${encodeURIComponent(ticket)}`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(mode === "password" ? { mode, password } : { mode }),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!response.ok) {
+      const said = (await response.json().catch(() => ({}))) as { error?: unknown };
+      return { ok: false, status: response.status === 400 ? 400 : 503, error: typeof said.error === "string" ? said.error : "The setting could not be saved." };
+    }
+  } catch {
+    return { ok: false, status: 503, error: "Publishing could not be reached. Try again." };
+  }
+  const { error } = await admin
+    .from("tensor_cloud_site_access")
+    .upsert({ task_id: task.id, user_id: task.user_id, mode, updated_at: new Date().toISOString() }, { onConflict: "task_id" });
+  if (error) throw error;
+  return { ok: true };
+}
 
 /**
  * Which of an account's published apps its plan includes now: the ones published first, as many

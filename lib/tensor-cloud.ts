@@ -194,9 +194,10 @@ export function signDeployTicket(
     name: string;
     /**
      * "env": hand a published app's machine the project's environment variables. "plan": bring a
-     * published app in line with its owner's plan as it is now (its limits, or `paused`).
+     * published app in line with its owner's plan as it is now (its limits, or `paused`). "access":
+     * who may see the project's site, anyone or whoever has its password.
      */
-    action: "publish" | "remove" | "env" | "plan";
+    action: "publish" | "remove" | "env" | "plan" | "access";
     replaces?: string | null;
     /** An app is published to its own machine, which the ticket names; a static site has none. */
     machineId?: string | null;

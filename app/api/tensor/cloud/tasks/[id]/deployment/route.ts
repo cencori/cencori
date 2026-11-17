@@ -13,6 +13,7 @@ import {
 import {
   claimSiteName,
   countSiteMachines,
+  readSiteVisibility,
   releaseUnpublishedSiteMachines,
   deleteDeployment,
   deploymentJson,
@@ -110,6 +111,8 @@ export async function GET(request: NextRequest, context: Context) {
       // What the owner's plan allows a published app with a server of its own.
       allowance: { backendApps: access.backendApps, site: access.site },
       deployment: deployment ? deploymentJson(deployment) : null,
+      // Who may see it: anyone with its address, or whoever has its password.
+      visibility: await readSiteVisibility(session.admin, task.id),
       suggestedName: deployment ? null : await suggestName(session.admin, task),
       gateway: gatewayHttpUrl(config.gatewayUrl),
     });
