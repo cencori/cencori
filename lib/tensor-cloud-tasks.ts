@@ -1081,6 +1081,39 @@ export async function destroySiteMachine(
   return gone;
 }
 
+/** How long a first publish may still be under way: building, then sending the app. */
+const PUBLISH_IN_PROGRESS_MS = 20 * 60_000;
+
+/**
+ * Lets go of app machines that were set up for a first publish that never finished (it was
+ * interrupted, or the page gave up waiting), in this account's other projects. Such a machine has
+ * nothing published on it, so nothing is lost, but it held one of the plan's app places: the plan
+ * said "Unpublish one" when nothing was published. One more recent than a publish can take is left
+ * alone, as it may still be on its way.
+ */
+export async function releaseUnpublishedSiteMachines(
+  admin: Admin,
+  fly: Pick<FlyMachines, "destroy" | "destroyVolume">,
+  userId: string,
+  exceptTaskId: string,
+): Promise<number> {
+  const before = new Date(Date.now() - PUBLISH_IN_PROGRESS_MS).toISOString();
+  const { data, error } = await admin
+    .from(DEPLOYMENTS)
+    .select("task_id, machine_id, volume_id")
+    .eq("user_id", userId)
+    .is("published_at", null)
+    .not("machine_id", "is", null)
+    .neq("task_id", exceptTaskId)
+    .lt("updated_at", before);
+  if (error) throw error;
+  let released = 0;
+  for (const deployment of (data ?? []) as Pick<TensorCloudDeployment, "task_id" | "machine_id" | "volume_id">[]) {
+    if (await destroySiteMachine(admin, fly, deployment)) released += 1;
+  }
+  return released;
+}
+
 /** Lets a project's name go. The copy being served is the gateway's to remove. */
 export async function deleteDeployment(admin: Admin, taskId: string): Promise<void> {
   const { error } = await admin.from(DEPLOYMENTS).delete().eq("task_id", taskId);

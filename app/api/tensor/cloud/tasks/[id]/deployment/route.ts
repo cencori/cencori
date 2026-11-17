@@ -13,6 +13,7 @@ import {
 import {
   claimSiteName,
   countSiteMachines,
+  releaseUnpublishedSiteMachines,
   deleteDeployment,
   deploymentJson,
   destroySiteMachine,
@@ -160,7 +161,13 @@ export async function POST(request: NextRequest, context: Context) {
           402,
         );
       }
-      // A project that already has its machine is updating, which is always allowed.
+      // A project that already has its machine is updating, which is always allowed. A place held
+      // by another project's first publish that never finished is given back first.
+      if (!before?.machine_id) {
+        await releaseUnpublishedSiteMachines(session.admin, sitesFly(config), session.user.id, task.id).catch((error) => {
+          console.error("[Tensor Cloud] Releasing unpublished app machines failed", error);
+        });
+      }
       if (!before?.machine_id && (await countSiteMachines(session.admin, session.user.id, task.id)) >= access.backendApps) {
         const apps = access.backendApps === 1 ? "one published app" : `${access.backendApps} published apps`;
         return json(
