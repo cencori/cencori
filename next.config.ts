@@ -16,6 +16,9 @@ const portableRewrites = onVercel
       .map(({ source, destination }) => ({ source, destination }));
 const portableRedirects = onVercel ? [] : vercelConfig.redirects;
 
+// admin.cencori.com and admin.localhost (lib/admin/routing.ts), with or without a port.
+const adminHost = { type: "host" as const, value: "admin\\.(?:cencori\\.com|localhost)(?::\\d+)?" };
+
 const nextConfig: NextConfig = {
   // Exercise local subdomains with the same host-based routing as production.
   allowedDevOrigins: ["console.localhost", "pitch.localhost", "studio.localhost", "**.sslip.io", "172-20-10-5.sslip.io", "studio.172-20-10-5.sslip.io"],
@@ -117,14 +120,18 @@ const nextConfig: NextConfig = {
       ...portableRedirects,
       // Tensor has a site of its own. The page that was here is gone; someone returning from a
       // checkout started in the desktop app (billing/checkout/route.ts) lands on its billing page.
+      // Not on the admin host: admin.cencori.com/tensor is the internal panel's Tensor page
+      // (proxy.ts rewrites it to /internal/tensor), and these run before the proxy does.
       {
         source: "/tensor",
         has: [{ type: "query", key: "billing_return" }],
+        missing: [adminHost],
         destination: "https://www.tensorade.app/billing",
         permanent: false,
       },
       {
         source: "/tensor",
+        missing: [adminHost],
         destination: "https://www.tensorade.app",
         permanent: true,
       },
