@@ -14,6 +14,7 @@ export const metadata: Metadata = {
   title: { absolute: "Tensor | Agentic Development Environment" },
   description:
     "Cencori's advanced self-improving development environment for engineers. It helps you build, brainstorm, and iterate like a colleague, friend, and employee — for everyone, everywhere.",
+  alternates: { canonical: "https://cencori.com/tensor" },
   openGraph: {
     title: "Tensor | Agentic Development Environment",
     description:

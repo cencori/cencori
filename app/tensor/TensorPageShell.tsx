@@ -128,16 +128,25 @@ export function TensorPageShell() {
               <h1 className="font-inter max-w-3xl text-balance text-3xl font-normal leading-[1.15] tracking-tight text-white sm:text-4xl">
                 The Agentic Development Environment for the Ambitious
               </h1>
-              <a
-                href="#waitlist"
-                onClick={(e) => {
-                  e.preventDefault();
-                  openChat();
-                }}
-                className="font-inter mt-7 inline-flex min-h-[2.2rem] items-center rounded-full bg-[#f3f3ef] px-4 text-[0.92rem] font-medium tracking-[-0.005em] text-[#050505] transition-colors hover:bg-[#e4e4de]"
-              >
-                Join waitlist
-              </a>
+              <div className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-3">
+                <a
+                  href="#waitlist"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    openChat();
+                  }}
+                  className="font-inter inline-flex min-h-[2.2rem] items-center rounded-full bg-[#f3f3ef] px-4 text-[0.92rem] font-medium tracking-[-0.005em] text-[#050505] transition-colors hover:bg-[#e4e4de]"
+                >
+                  Join waitlist
+                </a>
+                {/* Tensor's own site, where it is downloaded and used on the web. */}
+                <a
+                  href="https://www.tensorade.app"
+                  className="font-inter text-[0.92rem] font-medium tracking-[-0.005em] text-white/70 underline-offset-4 transition-colors hover:text-white hover:underline"
+                >
+                  Visit tensorade.app
+                </a>
+              </div>
             </section>
             <section className="mx-auto hidden w-full max-w-5xl px-5 md:block md:px-8">
               <TensorMock />
@@ -177,6 +186,12 @@ export function TensorPageShell() {
               </svg>
             </a>
           </div>
+          <a
+            href="https://www.tensorade.app"
+            className="text-xs text-white/50 transition-colors hover:text-white"
+          >
+            Tensor ADE at tensorade.app
+          </a>
           <span className="text-xs text-white/40">© 2026 Cencori, Inc.</span>
         </div>
       </main>
