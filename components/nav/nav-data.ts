@@ -14,13 +14,6 @@ export const navigationMenus = [
             description:
               "AI-native software engineering environment built on Cencori infrastructure.",
           },
-          {
-            href: "/arcie",
-            label: "Arcie",
-            tagline: "Agent framework",
-            description:
-              "Cencori's first-party framework for building agents and autonomous AI systems.",
-          },
         ],
       },
       {
@@ -84,7 +77,6 @@ export const navigationMenus = [
               { label: "Human Approval", href: "/agents/human-approval" },
               { label: "Traces", href: "/agents/traces" },
             ],
-            link: { href: "/arcie", label: "Build with Arcie" },
           },
         ],
       },
