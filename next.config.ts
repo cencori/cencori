@@ -72,6 +72,9 @@ const nextConfig: NextConfig = {
     "puppeteer", "tiktoken", "pdf-parse", "mammoth", "stripe", "resend", "@octokit/rest", "@octokit/app",
   ],
   experimental: {
+    // Coding agents working here are told when the installed Next.js has a
+    // published security advisory, and to upgrade.
+    agentUpgrade: "security",
     // Static generation forks one worker per CPU Node sees; in a container
     // that can be the host's cores, not the 2 we get, and each worker holds
     // its own copy of the app.
