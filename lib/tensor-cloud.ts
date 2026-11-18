@@ -397,6 +397,71 @@ export function verifyGithubState(token: unknown, secret: string, now: number = 
   return { userId: sub, site: origin, path: tensorSitePath(path) };
 }
 
+const SUPABASE_STATE_AUDIENCE = "tensor-supabase";
+const SUPABASE_STATE_TTL_SECONDS = 20 * 60;
+
+export type SupabaseState = { userId: string; site: string; path: string; nonce: string };
+
+/**
+ * What goes to Supabase with a person connecting their account, and comes back with them: who
+ * they are here, where to return them, and a nonce the PKCE verifier is worked out from (here,
+ * from the secret: it never leaves this server). Signed, as GitHub's is.
+ */
+export function signSupabaseState(
+  input: Omit<SupabaseState, "nonce">,
+  secret: string,
+  now: number = Math.floor(Date.now() / 1000),
+): { state: string; nonce: string } {
+  const nonce = randomBytes(18).toString("base64url");
+  const state = signJwt(
+    { aud: SUPABASE_STATE_AUDIENCE, sub: input.userId, site: input.site, path: input.path, jti: nonce, iat: now, exp: now + SUPABASE_STATE_TTL_SECONDS },
+    secret,
+  );
+  return { state, nonce };
+}
+
+export function verifySupabaseState(token: unknown, secret: string, now: number = Math.floor(Date.now() / 1000)): SupabaseState | null {
+  if (typeof token !== "string" || token.length > 2048) return null;
+  const claims = verifyJwt(token, secret);
+  if (!claims || claims.aud !== SUPABASE_STATE_AUDIENCE) return null;
+  const { sub, site, path, jti, exp } = claims;
+  if (typeof sub !== "string" || !sub || typeof jti !== "string" || !jti || typeof exp !== "number" || exp <= now) return null;
+  const origin = tensorSiteOrigin(site);
+  if (!origin) return null;
+  return { userId: sub, site: origin, path: tensorSitePath(path), nonce: jti };
+}
+
+/** The PKCE verifier for a sign-in, from its nonce: the same each time, and known only here. */
+export function supabaseCodeVerifier(nonce: string, secret: string): string {
+  return createHmac("sha256", secret).update(`tensor-supabase-pkce:${nonce}`).digest("base64url");
+}
+
+export function supabaseCodeChallenge(verifier: string): string {
+  return createHash("sha256").update(verifier).digest("base64url");
+}
+
+/** Seals something of a person's for the database (their Supabase tokens), keyed to them. */
+export function sealForUser(value: unknown, secret: string, userId: string, purpose: string): string {
+  const key = Buffer.from(hkdfSync("sha256", secret, userId, purpose, 32));
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", key, iv);
+  const sealed = Buffer.concat([cipher.update(JSON.stringify(value), "utf8"), cipher.final()]);
+  return ["v1", iv.toString("base64url"), cipher.getAuthTag().toString("base64url"), sealed.toString("base64url")].join(":");
+}
+
+export function openForUser(sealed: string, secret: string, userId: string, purpose: string): unknown {
+  const [version, iv, tag, data] = sealed.split(":");
+  if (version !== "v1" || !iv || !tag || !data) return null;
+  try {
+    const key = Buffer.from(hkdfSync("sha256", secret, userId, purpose, 32));
+    const decipher = createDecipheriv("aes-256-gcm", key, Buffer.from(iv, "base64url"));
+    decipher.setAuthTag(Buffer.from(tag, "base64url"));
+    return JSON.parse(Buffer.concat([decipher.update(Buffer.from(data, "base64url")), decipher.final()]).toString("utf8"));
+  } catch {
+    return null;
+  }
+}
+
 /** A person's tokens for GitHub, as GitHub gave them. Times are seconds since 1970. */
 export type GithubTokens = {
   accessToken: string;
