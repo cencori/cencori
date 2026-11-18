@@ -41,15 +41,47 @@ async function verifiedCharge(chargeId: string) {
   return { charge, amountMinor, currency };
 }
 
+/**
+ * Which checkout of ours a paid charge is for. Bachs does not always copy the reference onto the
+ * charge (naira charges arrived without one), so it is also found through the checkout id we put
+ * in the metadata, or Bachs's own checkout id, both saved on our checkout row. The amount is
+ * still checked against that row's plan before anything is granted.
+ */
+export async function checkoutReference(
+  admin: Admin,
+  charge: { reference?: string | null; checkout_id?: string | null; metadata?: Record<string, string> | null },
+  data: Pick<BachsCollectionData, "reference" | "checkout_id" | "metadata">,
+): Promise<string | null> {
+  if (charge.reference) return charge.reference;
+  if (data.reference) return data.reference;
+  const ours = charge.metadata?.checkout_id ?? data.metadata?.checkout_id;
+  if (ours) {
+    const { data: row } = await admin.from("basecode_checkout_sessions").select("reference").eq("id", ours).maybeSingle();
+    if (row?.reference) return row.reference as string;
+  }
+  const theirs = charge.checkout_id ?? data.checkout_id;
+  if (theirs) {
+    const { data: row } = await admin
+      .from("basecode_checkout_sessions")
+      .select("reference")
+      .eq("provider", "bachs")
+      .eq("provider_checkout_id", theirs)
+      .maybeSingle();
+    if (row?.reference) return row.reference as string;
+  }
+  return null;
+}
+
 /** One month bought without a catalog product: the checkout row says which plan it is. */
 export async function handleTensorPassCharge(data: BachsCollectionData, admin: Admin): Promise<void> {
   if (!data.charge_id) throw new Error("Bachs Tensor collection is missing a charge ID");
   const { charge, amountMinor, currency } = await verifiedCharge(data.charge_id);
-  if (!charge.reference) throw new Error("Bachs Tensor charge has no reference");
+  const reference = await checkoutReference(admin, charge, data);
+  if (!reference) throw new Error("Bachs Tensor charge has no reference");
   await applyVerifiedTensorPayment(admin, {
     provider: "bachs",
     providerTransactionId: charge.charge_id,
-    reference: charge.reference,
+    reference,
     amountMinor,
     currency,
     paymentMethod: charge.payment_method,
