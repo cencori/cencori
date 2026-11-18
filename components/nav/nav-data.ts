@@ -8,7 +8,7 @@ export const navigationMenus = [
         label: "Explore products",
         items: [
           {
-            href: "/tensor",
+            href: "https://www.tensorade.app",
             label: "Tensor",
             tagline: "AI software engineering",
             description:

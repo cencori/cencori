@@ -583,7 +583,7 @@ export function CencoriFuturePage({
               <article className={styles.pinCard} data-card="">
                 <Link
                   className={styles.pinPoster}
-                  href="/tensor"
+                  href="https://www.tensorade.app"
                   aria-label="Explore Tensor"
                 >
                   <Image

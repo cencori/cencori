@@ -21,7 +21,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const ORDER: RenewalReminder[] = ["ends_3", "ends_1", "ended"];
 /** A month that ended longer ago than this is past reminding. */
 const ENDED_REMIND_DAYS = 2;
-const PLANS_URL = "https://cencori.com/tensor#plans";
+const PLANS_URL = "https://www.tensorade.app/pricing";
 
 /** The reminder a month ending at `endsAt` has reached, if any. */
 export function renewalReminderDue(endsAt: string | null, now = Date.now()): RenewalReminder | null {

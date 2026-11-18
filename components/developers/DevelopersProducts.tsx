@@ -55,7 +55,7 @@ const PRODUCTS = [
       "Fast, reliable compute on any frontier model with autoscaling and regional pinning.",
   },
   {
-    href: "/tensor",
+    href: "https://www.tensorade.app",
     icon: Zap,
     image: "/bc.png",
     light: true,
@@ -125,7 +125,7 @@ export function DevelopersProducts() {
                         : ""
                   }`}
                 >
-                  {product.href === "/tensor" ? (
+                  {product.name === "Tensor" ? (
                     <>
                       <Image
                         alt={product.name}

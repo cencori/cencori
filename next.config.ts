@@ -115,6 +115,19 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       ...portableRedirects,
+      // Tensor has a site of its own. The page that was here is gone; someone returning from a
+      // checkout started in the desktop app (billing/checkout/route.ts) lands on its billing page.
+      {
+        source: "/tensor",
+        has: [{ type: "query", key: "billing_return" }],
+        destination: "https://www.tensorade.app/billing",
+        permanent: false,
+      },
+      {
+        source: "/tensor",
+        destination: "https://www.tensorade.app",
+        permanent: true,
+      },
       {
         source: "/blog/computing-infrastructure-global-ai-runs-on",
         destination: "/thesis",

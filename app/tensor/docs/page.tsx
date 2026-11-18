@@ -22,7 +22,7 @@ export default function TensorDocsPage() {
     <div className="marketing-theme min-h-screen bg-background text-foreground">
       <SiteNav solid />
       <main className="mx-auto max-w-6xl px-5 pb-24 pt-28 md:px-8">
-        <Link href="/tensor" className="text-sm text-muted-foreground hover:text-foreground">← Tensor</Link>
+        <Link href="https://www.tensorade.app" className="text-sm text-muted-foreground hover:text-foreground">← Tensor</Link>
         <header className="mb-12 mt-6 max-w-3xl">
           <p className="mb-3 text-sm font-medium text-muted-foreground">Documentation</p>
           <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">Make Tensor your workspace.</h1>
@@ -39,7 +39,7 @@ export default function TensorDocsPage() {
             <section id="get-started" aria-labelledby="get-started-title">
               <h2 id="get-started-title">Get started</h2>
               <ol>
-                <li>Get Tensor from the <Link className="underline underline-offset-4" href="/tensor#waitlist">waitlist</Link> and open the desktop app.</li>
+                <li><Link className="underline underline-offset-4" href="https://www.tensorade.app/download">Download Tensor</Link> and open the desktop app.</li>
                 <li>Sign in with your Cencori account. When the browser prompts you to return to Tensor, continue into the app.</li>
                 <li>Choose a project folder, or start a new task by describing what you want to build.</li>
                 <li>Choose a model in the composer, send your request, and follow the task’s progress. Review file changes in the review panel and respond to any approval requests.</li>

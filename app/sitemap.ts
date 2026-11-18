@@ -19,7 +19,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
 
     // Product pages - these target specific keywords
     const productPages = [
-        { url: `${baseUrl}/tensor`, priority: 0.8, changeFrequency: 'weekly' as const },
         { url: `${baseUrl}/tensor/docs`, priority: 0.8, changeFrequency: 'weekly' as const },
         { url: `${baseUrl}/ai`, priority: 0.9, changeFrequency: 'weekly' as const },
         { url: `${baseUrl}/audit`, priority: 0.8, changeFrequency: 'weekly' as const },

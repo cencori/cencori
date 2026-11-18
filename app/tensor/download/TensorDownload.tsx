@@ -114,7 +114,7 @@ export function TensorDownload() {
     <div className="marketing-theme dark relative isolate min-h-screen bg-black text-white [color-scheme:dark]">
       <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col px-5 pb-10 pt-20 md:px-8 md:pt-28">
         <Link
-          href="/tensor"
+          href="https://www.tensorade.app"
           className="font-inter mb-10 flex w-fit items-center gap-2 text-sm font-bold uppercase tracking-[0.2em] text-white"
         >
           <img src="/tensor/base.png" alt="" aria-hidden="true" className="h-3 w-auto" />
