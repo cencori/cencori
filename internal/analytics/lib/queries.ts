@@ -1,5 +1,6 @@
 // Platform Analytics Database Queries
 import { createAdminClient } from '@/lib/supabaseAdmin';
+import { adminUsers } from '@/lib/auth/admin-users';
 import { heardAboutLabel, readHeardAbout } from '@/lib/heard-about';
 import { fetchAllRows } from '@/lib/supabase-paginate';
 import type { TimePeriod, AIGatewayMetrics, SecurityMetrics, OrganizationsMetrics, ProjectsMetrics, ApiKeysMetrics, UsersMetrics, ScanMetrics, CaptureMetrics } from './types';
@@ -457,7 +458,6 @@ export async function getApiKeysMetrics(period: TimePeriod): Promise<ApiKeysMetr
 }
 
 export async function getUsersMetrics(period: TimePeriod): Promise<UsersMetrics> {
-    const supabase = createAdminClient();
     const startDate = getStartDate(period);
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -470,7 +470,10 @@ export async function getUsersMetrics(period: TimePeriod): Promise<UsersMetrics>
         const perPage = 200;
 
         while (true) {
-            const { data, error } = await supabase.auth.admin.listUsers({ page, perPage });
+            // Through adminUsers: sign-in lives in Better Auth on Brimble, and asking the
+            // Supabase auth API there fails, which showed every user count as 0.
+            const { data, error } = await adminUsers.listUsers({ page, perPage })
+                .catch((cause: unknown) => ({ data: null, error: cause }));
             if (error) {
                 console.error('[Analytics] Error fetching users page:', error);
                 return null;
@@ -500,7 +503,13 @@ export async function getUsersMetrics(period: TimePeriod): Promise<UsersMetrics>
 
     const total = realUsers.length;
     // Active users scoped to the selected time period (fix: was hardcoded to 30 days)
-    const active = realUsers.filter((u) => u.last_sign_in_at && new Date(u.last_sign_in_at) >= startDate).length;
+    const activeIds = await adminUsers.activeUserIdsSince(startDate).catch((error) => {
+        console.error('[Analytics] Error fetching active sessions:', error);
+        return null;
+    });
+    const active = activeIds
+        ? realUsers.filter((u) => activeIds.has(u.id)).length
+        : realUsers.filter((u) => u.last_sign_in_at && new Date(u.last_sign_in_at) >= startDate).length;
     const newToday = realUsers.filter((u) => new Date(u.created_at) >= today).length;
     const newThisWeek = realUsers.filter((u) => new Date(u.created_at) >= thisWeek).length;
     const newThisMonth = realUsers.filter((u) => new Date(u.created_at) >= thisMonth).length;

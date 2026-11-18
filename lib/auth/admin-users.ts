@@ -53,6 +53,30 @@ export const adminUsers = {
         };
     },
 
+    /**
+     * Ids of users with a session used since `since`. Sessions are extended
+     * while in use (at most daily), so this is "signed in and active", the
+     * Better Auth stand-in for Supabase's last_sign_in_at. Null on Supabase.
+     */
+    async activeUserIdsSince(since: Date): Promise<Set<string> | null> {
+        if (!isBetterAuthEnabled()) return null;
+        const ctx = await betterAuthContext();
+        const ids = new Set<string>();
+        const pageSize = 1000;
+        for (let offset = 0; ; offset += pageSize) {
+            const sessions = await ctx.adapter.findMany<{ userId: string }>({
+                model: "session",
+                where: [{ field: "updatedAt", operator: "gte", value: since }],
+                limit: pageSize,
+                offset,
+                sortBy: { field: "updatedAt", direction: "desc" },
+            });
+            for (const session of sessions) ids.add(session.userId);
+            if (sessions.length < pageSize) break;
+        }
+        return ids;
+    },
+
     /** Users whose email or name contains `query` (case-insensitive), newest first. */
     async searchUsers(query: string, limit = 8): Promise<Result<{ users: User[] }>> {
         const q = query.trim();
