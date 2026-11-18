@@ -17,9 +17,9 @@ export type TensorPlanCode =
   | "ultra"
   | "enterprise";
 /**
- * The plans that are for sale. On Starter, Builder and Pro Tensor picks the model and the
- * allowance is tasks a week; on Max and Ultra the customer picks any model and the allowance is
- * what those models cost.
+ * The plans that are for sale. On Starter, Builder and Pro Tensor picks the model; on Max and
+ * Ultra the customer picks any model. Every one of them is measured the same way: what the
+ * models cost, against a share of the month's ceiling that refills each week.
  */
 export type TensorPaidPlanCode = "starter" | "builder" | "pro" | "max" | "ultra";
 /** What a customer pays in: naira is what Nigeria is shown, dollars everyone else. */
@@ -67,11 +67,11 @@ export type TensorPlanRow = {
   price_ngn_minor: number | null;
   price_usd_minor: number | null;
   billing_period_days: number;
-  /** Tasks in a week of a pass; for the trial, tasks a month. Null is unlimited. */
+  /** No longer a limit: usage is measured in cost alone (database/brimble/2900). */
   task_limit: number | null;
   /** Provider cost one task may reach. */
   task_cost_cap_microusd: number | null;
-  /** Provider cost the whole pass may reach, kept below what the pass nets. */
+  /** Provider cost a month may reach, kept below what it nets. Each week gets its share. */
   pass_budget_microusd: number | null;
   model_policy: "auto" | "open_weight" | "frontier" | "custom";
   max_concurrent_turns: number;
@@ -261,28 +261,33 @@ export function legacyTensorPlanCode(
   return "free";
 }
 
-/** The period an account's tasks count against, as `basecode_allowance_period` reports it. */
+/** The period an account's usage counts against, as `basecode_allowance_period` reports it. */
 export function readAllowancePeriod(value: unknown): {
   startsAt: string;
   endsAt: string | null;
-  taskLimit: number | null;
   passEndsAt: string | null;
-  passCostUsedMicrousd: number;
+  /** What the period may cost, or null when the plan has no ceiling. */
+  budgetMicrousd: number | null;
+  /** What the period has cost, less anything a reset forgave. */
+  costUsedMicrousd: number;
   /** The models the account may use, which a pass bought before the ladder can differ on. */
   modelPolicy: TensorPlanRow["model_policy"] | null;
 } | null {
   if (typeof value !== "object" || value === null) return null;
   const row = value as Record<string, unknown>;
   if (typeof row.starts_at !== "string") return null;
-  const limit = row.task_limit === null || row.task_limit === undefined ? null : Number(row.task_limit);
-  const cost = Number(row.pass_cost_used_microusd ?? 0);
+  // Postgres returns a bigint as a string once it is large.
+  const budget =
+    row.budget_microusd === null || row.budget_microusd === undefined
+      ? null
+      : Number(row.budget_microusd);
+  const cost = Number(row.cost_used_microusd ?? 0);
   return {
     startsAt: row.starts_at,
     endsAt: typeof row.ends_at === "string" ? row.ends_at : null,
-    taskLimit: limit !== null && Number.isFinite(limit) ? limit : null,
     passEndsAt: typeof row.pass_ends_at === "string" ? row.pass_ends_at : null,
-    // Postgres returns a bigint sum as a string once it is large.
-    passCostUsedMicrousd: Number.isFinite(cost) ? cost : 0,
+    budgetMicrousd: budget !== null && Number.isFinite(budget) ? budget : null,
+    costUsedMicrousd: Number.isFinite(cost) ? cost : 0,
     modelPolicy:
       row.model_policy === "auto" ||
       row.model_policy === "open_weight" ||
@@ -333,34 +338,19 @@ export async function getTensorBillingSnapshot(admin: Admin, userId: string) {
   const plan = await getTensorPlan(admin, planCode);
   const onTrial = planCode === "free";
 
-  // Which period the account is in is the database's to say: a week of the pass, counted from the
-  // moment it started, or the trial's month counted from the account's creation. The reservation
-  // reads the same function, so the meter and the limit cannot disagree on where a week starts.
+  // Which period the account is in, what it may cost and what it has cost are the database's to
+  // say: a week of the paid month, counted from the moment it started, or the trial's month. The
+  // reservation reads the same function, so the meter and the limit cannot disagree.
   const { data: allowanceRow, error: allowanceError } = await admin
     .rpc("basecode_allowance_period", { p_account_id: account.id })
     .single();
   const allowance = readAllowancePeriod(allowanceRow);
   if (allowanceError || !allowance) throw new Error("Could not load the Tensor allowance period.");
 
-  const { data: period, error } = await admin
-    .from("basecode_usage_periods")
-    .select("ends_at, requests_used, cost_used_microusd")
-    .eq("account_id", account.id)
-    .eq("plan_code", planCode)
-    .eq("starts_at", allowance.startsAt)
-    .maybeSingle();
-  if (error) throw new Error("Could not load Tensor usage.");
-
-  const tasksUsed = Number(period?.requests_used ?? 0);
-  const tasksLimit = allowance.taskLimit;
-  // The pass also has a cost ceiling, counted across all its weeks. It is not shown as a figure,
-  // but a pass that has reached it is used up until it ends, and the percentage and the reset date
-  // have to say so or the app would offer tasks it cannot start.
-  const costPercentage = percentageOf(allowance.passCostUsedMicrousd, plan.pass_budget_microusd);
-  const percentageUsed = Math.max(percentageOf(tasksUsed, tasksLimit), costPercentage);
-  // A plan with no task count is all cost ceiling: nothing comes back until the month turns.
-  const resetsAt =
-    costPercentage >= 100 || tasksLimit === null ? allowance.passEndsAt : allowance.endsAt;
+  // One meter: the period's cost against its share of the month's ceiling. Tasks are not counted
+  // against anything, so no task figures are reported.
+  const percentageUsed = percentageOf(allowance.costUsedMicrousd, allowance.budgetMicrousd);
+  const resetsAt = allowance.endsAt;
   const modelPolicy = allowance.modelPolicy ?? plan.model_policy;
 
   // The card subscription, when there is one. A naira month has none, and says when it ends.
@@ -374,7 +364,7 @@ export async function getTensorBillingSnapshot(admin: Admin, userId: string) {
   }
   const subscription = readTensorSubscription(subscriptionRow);
   // Token spend across every device on this account. Deliberately separate from the meter above:
-  // the plan is counted in tasks and provider cost, never in tokens. Left off entirely when the
+  // the plan is counted in provider cost, never in tokens. Left off entirely when the
   // account has no rows yet, because absent has to read as unknown rather than as zero.
   const { data: tokenTotals, error: tokenError } = await admin.rpc("basecode_account_token_usage", {
     p_user_id: userId,
@@ -394,7 +384,7 @@ export async function getTensorBillingSnapshot(admin: Admin, userId: string) {
       // none it is the day the plan stops unless it is paid for again.
       endsAt: onTrial ? null : account.entitlement_ends_at,
       renews: Boolean(subscription && subscription.status === "active" && !subscription.cancelAtPeriodEnd),
-      // When the allowance resets: the pass's next week, or the trial's next month. The name is the
+      // When the allowance resets: the plan's next week, or the trial's next month. The name is the
       // one released builds read.
       renewsAt: resetsAt,
       // Both currencies, because nothing here knows which one a given account pays in -- checkout
@@ -413,8 +403,6 @@ export async function getTensorBillingSnapshot(admin: Admin, userId: string) {
     usage: {
       percentageUsed,
       resetsAt,
-      tasksUsed,
-      tasksLimit,
       ...(tokens ? { tokens } : {}),
     },
   };

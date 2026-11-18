@@ -16,9 +16,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/components/ui/toast';
 
-// Tensor accounts on the internal Tensor page: find one, clear the tasks counted in its week,
+// Tensor accounts on the internal Tensor page: find one, clear the usage counted in its week,
 // clear everyone's, or put a plan on it (database/brimble/2400_tensor_admin_resets.sql).
-// A reset clears task counts only. Plan dates and the month's cost ceiling stay as they are.
+// Usage is what the models cost, against the week's share of the plan's monthly ceiling
+// (database/brimble/2900_tensor_usage_is_cost.sql). A reset forgives the week's cost; plan dates stay.
 
 interface Account {
     user_id: string;
@@ -26,8 +27,10 @@ interface Account {
     username: string | null;
     plan: string;
     plan_ends_at: string | null;
-    tasks_used: number;
-    tasks_limit: number | null;
+    /** What the week has cost, in millionths of a dollar, less anything a reset forgave. */
+    cost_used_microusd: number;
+    /** What the week may cost; null is no ceiling. */
+    budget_microusd: number | null;
     week_ends_at: string | null;
 }
 
@@ -37,7 +40,11 @@ interface LogEntry {
     admin: string;
     action: 'reset_week' | 'reset_week_all' | 'set_plan';
     email: string | null;
-    detail: { plan?: string; from?: string; scope?: string; accounts?: number; tasks_cleared?: number };
+    detail: { plan?: string; from?: string; scope?: string; accounts?: number;
+        /** Resets from when the week was counted in tasks. */
+        tasks_cleared?: number;
+        cost_cleared_microusd?: number;
+    };
 }
 
 interface AccountsResponse {
@@ -87,18 +94,31 @@ function people(count: number): string {
     return `${count.toLocaleString('en-US')} ${count === 1 ? 'account' : 'accounts'}`;
 }
 
-function tasks(count: number): string {
-    return `${count.toLocaleString('en-US')} ${count === 1 ? 'task' : 'tasks'}`;
+function dollars(microusd: number): string {
+    return `$${(microusd / 1_000_000).toFixed(2)}`;
+}
+
+/** How much of the week is gone, as the app shows it. */
+function percent(account: Account): number | null {
+    if (!account.budget_microusd || account.budget_microusd <= 0) return null;
+    return Math.max(0, Math.min(100, Math.round((account.cost_used_microusd / account.budget_microusd) * 100)));
+}
+
+/** What a reset cleared: a cost now, a task count on entries from before usage was cost. */
+function cleared(detail: LogEntry['detail']): string {
+    if (typeof detail.cost_cleared_microusd === 'number') return `${dollars(detail.cost_cleared_microusd)} cleared`;
+    const count = detail.tasks_cleared ?? 0;
+    return `${count.toLocaleString('en-US')} ${count === 1 ? 'task' : 'tasks'} cleared`;
 }
 
 function describe(entry: LogEntry, plans: AccountsResponse['plans']): string {
     if (entry.action === 'reset_week_all') {
         const who = entry.detail.scope === 'all' ? 'everyone' : 'paid plans';
-        return `Reset the week for ${who}: ${people(entry.detail.accounts ?? 0)}, ${tasks(entry.detail.tasks_cleared ?? 0)} cleared`;
+        return `Reset the week for ${who}: ${people(entry.detail.accounts ?? 0)}, ${cleared(entry.detail)}`;
     }
     const account = entry.email ?? 'a deleted account';
     if (entry.action === 'reset_week') {
-        return `Reset the week for ${account}: ${tasks(entry.detail.tasks_cleared ?? 0)} cleared`;
+        return `Reset the week for ${account}: ${cleared(entry.detail)}`;
     }
     return `Put ${account} on ${planName(entry.detail.plan ?? '', plans)}`;
 }
@@ -147,8 +167,8 @@ export function TensorAccounts() {
     const resetOne = useMutation({
         mutationFn: (account: Account) => post({ action: 'reset_week', userId: account.user_id }),
         onSuccess: (result, account) => {
-            const cleared = Number(result.tasks_cleared ?? 0);
-            toast.success(cleared > 0 ? `Week reset for ${account.email}` : `${account.email} had nothing to clear`);
+            const forgiven = Number(result.cost_cleared_microusd ?? 0);
+            toast.success(forgiven > 0 ? `Week reset for ${account.email}` : `${account.email} had nothing to clear`);
             refresh();
         },
         onError: (failure) => toast.error(message(failure)),
@@ -191,7 +211,7 @@ export function TensorAccounts() {
                 <div className="min-w-0">
                     <p className="text-sm font-medium tracking-[-0.01em] text-foreground">Accounts</p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                        A reset clears the tasks counted this week. Plan dates and the month’s cost ceiling stay.
+                        Usage is what the models cost, against the week’s share of the plan. A reset clears the week; plan dates stay.
                     </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -241,7 +261,7 @@ export function TensorAccounts() {
                     >
                         <span>Account</span>
                         <span>Plan</span>
-                        <span>Tasks used</span>
+                        <span>Used this week</span>
                         <span />
                     </li>
                     {accounts.map((account) => (
@@ -263,10 +283,10 @@ export function TensorAccounts() {
                             </div>
                             <div className="flex flex-wrap gap-x-1.5 sm:block">
                                 <p className="font-mono tabular-nums">
-                                    {account.tasks_limit === null
-                                        ? `${account.tasks_used.toLocaleString('en-US')}`
-                                        : `${account.tasks_used.toLocaleString('en-US')} of ${account.tasks_limit.toLocaleString('en-US')}`}
-                                    <span className="font-sans sm:hidden"> tasks used</span>
+                                    {percent(account) === null
+                                        ? dollars(account.cost_used_microusd)
+                                        : `${percent(account)}% · ${dollars(account.cost_used_microusd)} of ${dollars(account.budget_microusd ?? 0)}`}
+                                    <span className="font-sans sm:hidden"> used</span>
                                 </p>
                                 {account.week_ends_at && (
                                     <p className="text-muted-foreground">resets {day(account.week_ends_at)}</p>
@@ -298,7 +318,7 @@ export function TensorAccounts() {
                                     size="sm"
                                     variant="outline"
                                     className="h-9 flex-1 sm:h-8 sm:flex-none"
-                                    disabled={busy || account.tasks_used === 0}
+                                    disabled={busy || account.cost_used_microusd <= 0}
                                     onClick={() => resetOne.mutate(account)}
                                     aria-label={`Reset the week for ${account.email}`}
                                 >
@@ -336,7 +356,7 @@ export function TensorAccounts() {
                             <AlertDialogDescription>
                                 {affected === 0
                                     ? 'Nobody has used a task this week, so there is nothing to clear.'
-                                    : `${people(affected)} ${affected === 1 ? 'has' : 'have'} used tasks this week and will start again from zero. Plan dates and cost ceilings don’t change. This can’t be undone.`}
+                                    : `${people(affected)} ${affected === 1 ? 'has' : 'have'} used some of this week and will start it again from zero. Plan dates don’t change. This can’t be undone.`}
                             </AlertDialogDescription>
                         </AlertDialogHeader>
                     )}

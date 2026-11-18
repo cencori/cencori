@@ -14,8 +14,8 @@ const listing = {
             username: 'ada_l',
             plan: 'starter',
             plan_ends_at: '2026-12-16T00:00:00Z',
-            tasks_used: 9,
-            tasks_limit: 9,
+            cost_used_microusd: 233333,
+            budget_microusd: 233333,
             week_ends_at: '2026-11-23T00:00:00Z',
         },
         {
@@ -24,8 +24,8 @@ const listing = {
             username: null,
             plan: 'free',
             plan_ends_at: null,
-            tasks_used: 0,
-            tasks_limit: 5,
+            cost_used_microusd: 0,
+            budget_microusd: 250000,
             week_ends_at: null,
         },
     ],
@@ -38,7 +38,7 @@ const listing = {
             admin: 'boss@example.com',
             action: 'reset_week_all',
             email: null,
-            detail: { scope: 'paid', accounts: 2, tasks_cleared: 11 },
+            detail: { scope: 'paid', accounts: 2, cost_cleared_microusd: 1100000 },
         },
     ],
 };
@@ -95,7 +95,7 @@ describe('TensorAccounts', () => {
     beforeEach(() => {
         fetchMock.mockImplementation(async (_url: string, init?: RequestInit) => ({
             ok: true,
-            json: async () => (init?.method === 'POST' ? { accounts: 3, tasks_cleared: 9 } : listing),
+            json: async () => (init?.method === 'POST' ? { accounts: 3, cost_cleared_microusd: 233333 } : listing),
         }));
         vi.stubGlobal('fetch', fetchMock);
     });
@@ -113,8 +113,8 @@ describe('TensorAccounts', () => {
         const text = document.body.textContent ?? '';
         expect(text).toContain('ada@example.com');
         expect(text).toContain('@ada_l');
-        expect(text).toContain('9 of 9');
-        expect(text).toContain('Reset the week for paid plans: 2 accounts, 11 tasks cleared');
+        expect(text).toContain('100% · $0.23 of $0.23');
+        expect(text).toContain('Reset the week for paid plans: 2 accounts, $1.10 cleared');
         // Nothing used means nothing to reset.
         expect(button('Reset the week for idle@example.com')[0]?.disabled).toBe(true);
         expect(button('Reset the week for ada@example.com')[0]?.disabled).toBe(false);
@@ -131,7 +131,7 @@ describe('TensorAccounts', () => {
     it('asks before resetting everyone, naming how many accounts it touches', async () => {
         await mount();
         await click(button('Reset the week')[0]);
-        expect(document.body.textContent).toContain('3 accounts have used tasks this week');
+        expect(document.body.textContent).toContain('3 accounts have used some of this week');
         expect(posted()).toEqual([]);
 
         await click(button('Reset the week').at(-1));

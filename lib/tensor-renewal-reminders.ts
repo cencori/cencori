@@ -52,7 +52,7 @@ export function renewalReminderText(
     case "ended":
       return {
         title: `Your Tensor ${planName} plan has ended`,
-        body: "You are back on the trial's five tasks a month. Choose a plan to pick up where you left off.",
+        body: "You are back on the trial. Choose a plan to pick up where you left off.",
       };
   }
 }

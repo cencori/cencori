@@ -14,13 +14,14 @@ type BillingSnapshot = {
     renews?: boolean;
   };
   subscription?: { status: string; cancelAtPeriodEnd: boolean } | null;
-  usage: { tasksUsed?: number; tasksLimit?: number | null; percentageUsed?: number };
+  usage: { percentageUsed?: number };
 };
 
 /**
- * The ladder. On the first three Tensor picks the model and the allowance is tasks a week; on the
- * last two the customer picks any model and the allowance is usage, which a frontier model spends
- * faster than a small one. Prices are the naira price and the dollar price of the same plan.
+ * The ladder. On the first three Tensor picks the model; on the last two the customer picks any
+ * model. Every plan's allowance is usage, measured by what the models cost and refilled each week,
+ * so the multiples below are the plans' cost ceilings against Starter's (database/brimble/0900).
+ * Prices are the naira price and the dollar price of the same plan.
  */
 const packs: Array<{
   code: PackCode;
@@ -36,7 +37,7 @@ const packs: Array<{
     ngn: "₦2,000",
     usd: "$2",
     description: "For trying Tensor on real work.",
-    features: ["9 tasks every week", "Tensor picks the model", "Every task runs until it's done"],
+    features: ["Usage that refills every week", "Tensor picks the model", "Every task runs until it's done"],
   },
   {
     code: "builder",
@@ -44,7 +45,7 @@ const packs: Array<{
     ngn: "₦5,000",
     usd: "$5",
     description: "For building most days.",
-    features: ["27 tasks every week", "3x Starter", "Tensor picks the model"],
+    features: ["2.5x the usage of Starter", "Refills every week", "Tensor picks the model"],
   },
   {
     code: "pro",
@@ -52,7 +53,7 @@ const packs: Array<{
     ngn: "₦15,000",
     usd: "$15",
     description: "For shipping every day.",
-    features: ["81 tasks every week", "9x Starter", "Tensor picks the model"],
+    features: ["7.5x the usage of Starter", "Refills every week", "Tensor picks the model"],
   },
   {
     code: "max",
@@ -60,7 +61,7 @@ const packs: Array<{
     ngn: "₦30,000",
     usd: "$20",
     description: "Choose any model, frontier included.",
-    features: ["Pick your own model", "A month of usage, shown as a meter", "Small models stretch it further"],
+    features: ["Pick your own model", "Usage that refills every week", "Small models stretch it further"],
   },
   {
     code: "ultra",
@@ -92,7 +93,7 @@ function defaultCurrency(): Currency {
 
 /** Where the signed-in account stands, said in one line. */
 function describeStanding(snapshot: BillingSnapshot): string | null {
-  const { tasksLimit, tasksUsed, percentageUsed } = snapshot.usage;
+  const { percentageUsed } = snapshot.usage;
   const day = (value: string | null | undefined): string | null => {
     const date = value ? new Date(value) : null;
     return date && !Number.isNaN(date.getTime())
@@ -100,16 +101,11 @@ function describeStanding(snapshot: BillingSnapshot): string | null {
       : null;
   };
   if (snapshot.plan.tier === "trial") {
-    if (typeof tasksUsed !== "number" || typeof tasksLimit !== "number") return null;
-    return `Trial · ${Math.max(0, tasksLimit - tasksUsed)} of ${tasksLimit} tasks left`;
+    return typeof percentageUsed === "number" ? `Trial · ${percentageUsed}% used` : null;
   }
-  // Plans counted in tasks refill every week; plans counted in usage say how much is gone.
+  // Every plan is one meter: this week's usage, which refills when the week turns.
   const allowance =
-    typeof tasksUsed === "number" && typeof tasksLimit === "number"
-      ? `${Math.max(0, tasksLimit - tasksUsed)} of ${tasksLimit} tasks left this week`
-      : typeof percentageUsed === "number"
-        ? `${percentageUsed}% of this month's usage used`
-        : null;
+    typeof percentageUsed === "number" ? `${percentageUsed}% of this week's usage used` : null;
   const end = day(snapshot.plan.endsAt);
   const term = end ? (snapshot.plan.renews ? `renews ${end}` : `ends ${end}`) : null;
   return [snapshot.plan.name, allowance, term].filter(Boolean).join(" · ");

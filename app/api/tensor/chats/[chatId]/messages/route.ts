@@ -522,8 +522,6 @@ async function readUsage(admin: Parameters<typeof readPlainMessages>[0], userId:
       plan: snapshot.plan.name,
       onTrial: snapshot.plan.tier === "trial",
       percentageUsed: snapshot.usage.percentageUsed,
-      tasksUsed: snapshot.usage.tasksUsed ?? null,
-      tasksLimit: snapshot.usage.tasksLimit ?? null,
       resetsAt: snapshot.usage.resetsAt ?? null,
       planEndsAt: snapshot.plan.endsAt ?? null,
       renews: snapshot.plan.renews,

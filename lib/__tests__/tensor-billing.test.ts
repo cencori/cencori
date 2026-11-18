@@ -186,35 +186,37 @@ describe("Tensor billing contracts", () => {
     ).toBe("https://cencori-feature.vercel.app");
   });
 
-  /** The usage screen trusts this row for where the week starts, so a malformed one is refused. */
+  /** The usage screen trusts this row for the week and what it may cost, so a malformed one is refused. */
   it("reads the allowance period the database reports, and refuses one without a start", () => {
     expect(
       readAllowancePeriod({
         plan_code: "starter",
         starts_at: "2026-11-10T00:00:00+00:00",
         ends_at: "2026-11-17T00:00:00+00:00",
-        task_limit: 9,
+        task_limit: null,
         pass_ends_at: "2026-12-10T00:00:00+00:00",
-        // A bigint sum arrives as a string.
         pass_cost_used_microusd: "540000",
+        // A bigint arrives as a string.
+        budget_microusd: "233333",
+        cost_used_microusd: "120000",
       }),
     ).toEqual({
       startsAt: "2026-11-10T00:00:00+00:00",
       endsAt: "2026-11-17T00:00:00+00:00",
-      taskLimit: 9,
       passEndsAt: "2026-12-10T00:00:00+00:00",
-      passCostUsedMicrousd: 540000,
+      budgetMicrousd: 233333,
+      costUsedMicrousd: 120000,
       modelPolicy: null,
     });
-    // Enterprise has no task limit and no end.
+    // Enterprise has no ceiling and no end.
     expect(
-      readAllowancePeriod({ starts_at: "2026-11-10T00:00:00+00:00", ends_at: null, task_limit: null }),
+      readAllowancePeriod({ starts_at: "2026-11-10T00:00:00+00:00", ends_at: null, budget_microusd: null }),
     ).toEqual({
       startsAt: "2026-11-10T00:00:00+00:00",
       endsAt: null,
-      taskLimit: null,
       passEndsAt: null,
-      passCostUsedMicrousd: 0,
+      budgetMicrousd: null,
+      costUsedMicrousd: 0,
       modelPolicy: null,
     });
     expect(readAllowancePeriod(null)).toBeNull();
