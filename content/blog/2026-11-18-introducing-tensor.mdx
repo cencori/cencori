@@ -44,16 +44,9 @@ All four agents solved all 28 tasks and passed all 73 checks. Where they differe
 
 ![Tasks solved against tokens spent for Tensor, Codex, OpenCode and Claude Code. Tensor solves all 28 tasks with 1.45 million tokens.](/newsroom/images/tensor-tokens-chart.png?v=2)
 
-| Agent | Model | Tasks solved | Tokens used | Tokens per task |
-| --- | --- | --- | --- | --- |
-| Tensor | GPT-6 Astra | 28 of 28 | 1.45M | 51.9k |
-| Codex | CLI default, medium effort | 28 of 28 | 2.19M | 78.2k |
-| OpenCode | Big Pickle | 28 of 28 | 2.91M | 103.8k |
-| Claude Code | Claude Opus 5.5 | 28 of 28 | 3.27M | 117.0k |
-
 Tensor finished the suite on 1.45 million tokens. Codex used 1.5 times as many, OpenCode 2 times and Claude Code 2.3 times. Because Tensor usage is measured by what the models cost to run, an agent that spends fewer tokens on a task leaves more of your plan for the next one.
 
-A few things to know when reading these numbers. Each agent ran as installed, with the model shown, so the models differ and this compares products, not models. Tokens are input plus output, cached input included, as each agent reports them. Every task was run once, on 18 November 2026. The tasks are small Node.js projects, which is why every agent solved all of them. They measure how efficiently an agent works, not the limit of what it can do.
+A few things to know when reading these numbers. Each agent ran as installed, so the models differ and this compares products, not models: Tensor ran GPT-6 Astra, Claude Code ran Claude Opus 5.5, Codex ran its default model at medium effort, and OpenCode ran Big Pickle. Tokens are input plus output, cached input included, as each agent reports them. Every task was run once, on 18 November 2026. The tasks are small Node.js projects, which is why every agent solved all of them. They measure how efficiently an agent works, not the limit of what it can do.
 
 ## Bring your setup with you
 
