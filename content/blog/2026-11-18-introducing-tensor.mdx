@@ -36,6 +36,25 @@ There are three ways to choose what runs a task:
 - **Pick one yourself.** On Max and Ultra you can choose any model, frontier models included.
 - **Bring your own key.** Connect your preferred provider with your own API key.
 
+## The same work on fewer tokens
+
+Before launch we ran Tensor against Claude Code, Codex and OpenCode on the same 28 coding tasks: bug fixes, changes across several files, new features, refactors and configuration work. Each agent started every task from a fresh copy of the same repository with the same prompt, and its work was scored by checks it never saw.
+
+All four agents solved all 28 tasks and passed all 73 checks. Where they differed was in how much model usage it took to get there.
+
+![Tasks solved against tokens spent for Tensor, Codex, OpenCode and Claude Code. Tensor solves all 28 tasks with 1.45 million tokens.](/newsroom/images/tensor-tokens-chart.png)
+
+| Agent | Model | Tasks solved | Tokens used | Tokens per task |
+| --- | --- | --- | --- | --- |
+| Tensor | GPT-6 Astra | 28 of 28 | 1.45M | 51.9k |
+| Codex | CLI default, medium effort | 28 of 28 | 2.19M | 78.2k |
+| OpenCode | Big Pickle | 28 of 28 | 2.91M | 103.8k |
+| Claude Code | Claude Opus 5.5 | 28 of 28 | 3.27M | 117.0k |
+
+Tensor finished the suite on 1.45 million tokens. Codex used 1.5 times as many, OpenCode 2 times and Claude Code 2.3 times. Because Tensor usage is measured by what the models cost to run, an agent that spends fewer tokens on a task leaves more of your plan for the next one.
+
+A few things to know when reading these numbers. Each agent ran as installed, with the model shown, so the models differ and this compares products, not models. Tokens are input plus output, cached input included, as each agent reports them. Every task was run once, on 18 November 2026. The tasks are small Node.js projects, which is why every agent solved all of them. They measure how efficiently an agent works, not the limit of what it can do.
+
 ## Bring your setup with you
 
 If you already work with an agent, you don't start over. Tensor imports an existing Claude Code or Codex setup and can keep the imported configuration in sync.
