@@ -3,6 +3,7 @@ import type { User } from "@supabase/supabase-js";
 import type { NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { createServerClient } from "@/lib/supabaseServer";
+import { canRefill, refillPriceMinor } from "@/lib/tensor-refills";
 
 /**
  * What an account is on. `free` is the trial: there is no free plan, but every account starts
@@ -350,6 +351,10 @@ export async function getTensorBillingSnapshot(admin: Admin, userId: string) {
   // One meter: the period's cost against its share of the month's ceiling. Tasks are not counted
   // against anything, so no task figures are reported.
   const percentageUsed = percentageOf(allowance.costUsedMicrousd, allowance.budgetMicrousd);
+  // Offered once the week is used up, at its price in both currencies (lib/tensor-refills.ts).
+  const refill = canRefill(planCode, allowance)
+    ? { ngnMinor: refillPriceMinor(plan, "NGN"), usdMinor: refillPriceMinor(plan, "USD") }
+    : null;
   const resetsAt = allowance.endsAt;
   const modelPolicy = allowance.modelPolicy ?? plan.model_policy;
 
@@ -400,6 +405,7 @@ export async function getTensorBillingSnapshot(admin: Admin, userId: string) {
             },
     },
     subscription,
+    refill,
     usage: {
       percentageUsed,
       resetsAt,

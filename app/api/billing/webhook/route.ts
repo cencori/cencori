@@ -24,6 +24,7 @@ import {
 } from '@/lib/tensor-billing';
 import {
   handleTensorPassCharge,
+  handleTensorRefillCharge,
   handleTensorSubscriptionCharge,
   handleTensorSubscriptionInvoice,
   handleTensorSubscriptionLifecycle,
@@ -199,6 +200,12 @@ async function handleCollectionSucceeded(
   // One month of a Tensor plan, at a price rather than a product: product-less too.
   if (data.metadata?.purchase_type === 'tensor_pass') {
     await handleTensorPassCharge(data, supabase);
+    return;
+  }
+
+  // A refill of a Tensor plan's week: product-less too.
+  if (data.metadata?.purchase_type === 'tensor_refill') {
+    await handleTensorRefillCharge(data, supabase);
     return;
   }
 

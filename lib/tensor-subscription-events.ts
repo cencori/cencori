@@ -24,6 +24,7 @@ import {
   oneMonthAfter,
   type TensorCurrency,
 } from "@/lib/tensor-billing";
+import { applyRefillPayment } from "@/lib/tensor-refills";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -39,6 +40,13 @@ async function verifiedCharge(chargeId: string) {
     throw new Error("Bachs Tensor charge did not verify");
   }
   return { charge, amountMinor, currency };
+}
+
+/** A refill of the week's allowance, paid once (lib/tensor-refills.ts). */
+export async function handleTensorRefillCharge(data: BachsCollectionData, admin: Admin): Promise<void> {
+  if (!data.charge_id) throw new Error("Bachs Tensor refill is missing a charge ID");
+  const { charge, amountMinor, currency } = await verifiedCharge(data.charge_id);
+  await applyRefillPayment(admin, { charge, amountMinor, currency }, data);
 }
 
 /**
