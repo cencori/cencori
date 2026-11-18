@@ -273,7 +273,7 @@ export async function executeGatewayChat(params: {
     // so one retired model cannot speak for everything else the provider serves.
     const primaryCircuit = circuitKey(providerName, model);
     if (failoverAllowed && (await isCircuitOpen(primaryCircuit, cbConfig))) {
-        lastError = new Error(`Provider ${providerName} circuit is open for ${model}`);
+        lastError = new Error('Cencori circuit is open');
     } else {
         const maxRetries = params.singleProviderAttempt ? 1 : failoverAllowed ? settings.maxRetries : 1;
         for (let attempt = 0; attempt < maxRetries; attempt++) {
@@ -635,7 +635,7 @@ export async function* streamGatewayChat(params: {
         }
         await recordFailure(primaryCircuit, cbConfig);
     } else {
-        lastError = new Error(`Provider ${providerName} circuit is open`);
+        lastError = new Error('Cencori circuit is open');
     }
 
     if (params.singleProviderAttempt || !failoverAllowed || !settings.enableFallback || !lastError) {
