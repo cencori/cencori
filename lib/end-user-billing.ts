@@ -7,6 +7,7 @@
  */
 
 import { createAdminClient } from "@/lib/supabaseAdmin";
+import type { UsageTask } from "./queue";
 
 // ──────────────────────────────────────────────
 // Types
@@ -154,22 +155,20 @@ export async function checkEndUserQuota(
  * Never throws, never blocks the response.
  */
 export function recordEndUserUsage(record: UsageRecord): void {
-  try {
-    const { enqueueUsageRecord } = require('./queue');
-    
-    const task = {
-      ...record,
-      timestamp: Date.now(),
-      environment: record.environment === "test" ? "test" : "production",
-    };
+  const task = {
+    ...record,
+    timestamp: Date.now(),
+    environment: record.environment === "test" ? "test" : "production",
+  };
 
-    // Enqueue for background processing (persistent & crash-proof)
-    enqueueUsageRecord(task).catch((err: any) => {
+  // Enqueue for background processing (persistent & crash-proof). A dynamic import, not
+  // require(): the production bundle dropped enqueueUsageRecord from a required module
+  // ("b is not a function"), and every gateway call's end-user usage was lost.
+  import('./queue')
+    .then(({ enqueueUsageRecord }) => enqueueUsageRecord(task as UsageTask))
+    .catch((err: unknown) => {
       console.error("[EndUserBilling] Failed to enqueue usage:", err);
     });
-  } catch (err) {
-    console.error("[EndUserBilling] Unexpected error enqueuing usage:", err);
-  }
 }
 
 /**
