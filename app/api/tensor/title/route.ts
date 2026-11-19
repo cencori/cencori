@@ -5,9 +5,10 @@ import { noStoreHeaders } from "@/lib/tensor-auth";
 import { authenticateTensorBillingRequest } from "@/lib/tensor-billing";
 
 // Names a Tensor chat from its opening exchange, as Copilot names its own (app/api/agent/title):
-// a small, fast, non-reasoning model through the Cencori gateway, on Cencori's own key, so it is
-// not counted against the person's plan.
-const TITLE_MODEL = "gemini-2.5-flash-lite";
+// a fast model through the Cencori gateway, on Cencori's own key, so it is not counted against the
+// person's plan. DeepSeek V4 Flash may think before it answers, so it is given room to (a budget
+// of a few words would be spent thinking and return nothing), and any thinking is dropped.
+const TITLE_MODEL = "deepseek-v4-flash";
 const GATEWAY_BASE_URL = process.env.CENCORI_GATEWAY_URL || "https://api.cencori.com/v1";
 
 const SYSTEM_PROMPT =
@@ -43,10 +44,15 @@ export async function POST(request: NextRequest) {
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: transcript },
       ],
-      max_tokens: 24,
+      max_tokens: 600,
       temperature: 0.2,
     });
-    const title = (completion.choices[0]?.message?.content ?? "").replace(/^["'\s]+|["'.\s]+$/g, "").slice(0, 60);
+    const title = (completion.choices[0]?.message?.content ?? "")
+      .replace(/<think>[\s\S]*?<\/think>/g, "")
+      .trim()
+      .split("\n")[0]
+      .replace(/^["'\s]+|["'.\s]+$/g, "")
+      .slice(0, 60);
     if (!title) return json({ error: "Empty title" }, 502);
     return json({ title });
   } catch (error) {
