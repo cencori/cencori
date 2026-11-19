@@ -206,6 +206,8 @@ export function plainChatInstructions(projects: ProjectSummary[], today: Date): 
     "",
     "When a conversation turns into something to build (an app, a site, a tool), say so once, briefly, and offer to set it up as a project. Do not push; only offer when it is clearly where the talk is going, and not again if they decline.",
     "",
+    "Your earlier answers may begin with a line in square brackets saying what you did in them (a project you proposed, a search you made). Tensor adds that line so you remember: the cards it names are on screen under those answers. Never write such a line yourself.",
+    "",
     "When they say yes, or ask you to create the project or start building, call propose_project with a short name (one to four words) and a brief: the first message the project will start with, written to Tensor as the builder, covering what to build, for whom, the features and decisions agreed in this conversation, and the style, complete enough that nothing has to be explained again, in at most 250 words.",
     "The person sees the proposal as a card with a Create project button. Nothing is created until they press it, so say so plainly (\"Press Create project when you are ready\"); never claim the project exists.",
     "",
@@ -271,6 +273,37 @@ export type TracePart =
       /** Why it failed, in words for the person. */
       error?: string;
     };
+
+/**
+ * What an answer did, in a line the model reads with it next time. The conversation sent to the
+ * model is the answers' text alone, and its actions were kept apart (the trace), so on the next
+ * turn it had no idea it had proposed a project: it would say "there's no proposal card yet" under
+ * the card it had just made. `created` is whether the person has since made the chat's project.
+ */
+export function actionNote(parts: TracePart[] | undefined, created: boolean): string | null {
+  const done = (parts ?? []).filter((part): part is Extract<TracePart, { type: "action" }> => part.type === "action" && part.status === "done");
+  if (!done.length) return null;
+  const said = done.map((action) => {
+    switch (action.name) {
+      case "propose_project":
+        return `proposed the project "${action.input.name ?? "a project"}" (a card with a Create project button was shown under your answer${created ? "; the person has since created it" : ""})`;
+      case "continue_in_project":
+        return `offered to continue in the project "${action.input.project ?? "a project"}" (a card with a button to go there was shown)`;
+      case "web_search":
+        return `searched the web for "${action.input.query ?? ""}"`;
+      case "read_page":
+        return `read ${action.input.url ?? "a page"}`;
+      case "project_status":
+        return "checked the person's projects";
+      case "check_usage":
+        return "checked the person's usage";
+      default:
+        return null;
+    }
+  });
+  const list = said.filter(Boolean);
+  return list.length ? `[In this answer you ${list.join("; ")}.]` : null;
+}
 
 /** The traces of a chat's answers, by answer. */
 export async function readTraces(admin: SupabaseClient, chatId: string): Promise<Map<string, TracePart[]>> {

@@ -5,12 +5,14 @@ import { invalidateTensorAccess, setCachedTensorAccess } from "@/lib/config-cach
 import { noStoreHeaders } from "@/lib/tensor-auth";
 import {
   PLAIN_CHAT_MESSAGE_MAX,
+  actionNote,
   addPlainMessage,
   contextMessages,
   plainChatInstructions,
   plainMessageJson,
   readPlainChat,
   readPlainMessages,
+  readTraces,
   saveTrace,
   titleFromMessage,
   type ChatAction,
@@ -206,7 +208,19 @@ export async function POST(request: NextRequest, context: Context) {
   let saved: Awaited<ReturnType<typeof addPlainMessage>>;
   let projects: ProjectSummary[];
   try {
-    [history, projects] = await Promise.all([readPlainMessages(admin, chat.id), readProjects(admin, user.id)]);
+    let traces: Map<string, TracePart[]>;
+    [history, projects, traces] = await Promise.all([
+      readPlainMessages(admin, chat.id),
+      readProjects(admin, user.id),
+      // Best effort: without them the model still has the conversation's words.
+      readTraces(admin, chat.id).catch(() => new Map<string, TracePart[]>()),
+    ]);
+    // Each answer goes back with a note of what it did (a proposal shown, a search made), so the
+    // model knows the cards under its answers are there.
+    history = history.map((message) => {
+      const note = message.role === "assistant" ? actionNote(traces.get(message.id), Boolean(chat.project_task_id)) : null;
+      return note ? { ...message, content: `${note}\n\n${message.content ?? ""}` } : message;
+    });
     saved = await addPlainMessage(admin, { chatId: chat.id, userId: user.id, role: "user", content: text });
     await updatePlainChat(admin, chat.id, history.length === 0 && !chat.title ? { title: titleFromMessage(text) } : { touch: true });
   } catch (error) {
