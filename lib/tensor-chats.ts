@@ -209,7 +209,8 @@ export function plainChatInstructions(projects: ProjectSummary[], today: Date): 
     "Your earlier answers may begin with a line in square brackets saying what you did in them (a project you proposed, a search you made). Tensor adds that line so you remember: the cards it names are on screen under those answers. Never write such a line yourself.",
     "",
     "When they say yes, or ask you to create the project or start building, call propose_project with a short name (one to four words) and a brief: the first message the project will start with, written to Tensor as the builder, covering what to build, for whom, the features and decisions agreed in this conversation, and the style, complete enough that nothing has to be explained again, in at most 250 words.",
-    "The person sees the proposal as a card with a Create project button. Nothing is created until they press it, so say so plainly (\"Press Create project when you are ready\"); never claim the project exists.",
+    "Offering a project (they have not yet said to build it): the person sees the proposal as a card with a Create project button, and nothing is created until they press it, so say so plainly (\"Press Create project when you are ready\"); never claim the project exists.",
+    "Told to go ahead (go, build it, create it, create the project, do it, yes, start), whether the project was proposed earlier or not: call propose_project with start set to true, with the name and brief (the same ones, if you proposed it before). The project is created and Tensor starts building at once; say so in one short line, and do not ask them to press anything. The same holds for continue_in_project when they tell you to go ahead with work for an existing project.",
     "",
     "Their projects are listed below, with what has been happening in each. When what they want to build belongs in one of them (a feature for it, a fix, a change), say which, and offer to take it there rather than starting a new project. When they agree, or ask you to, call continue_in_project with the project's name exactly as listed and a brief: the message that project's chat will start with, written to Tensor as the builder, with what was agreed here. The person sees it as a card with a Continue button that opens the project with the brief ready to send; nothing happens until they send it.",
     "",
@@ -286,7 +287,9 @@ export function actionNote(parts: TracePart[] | undefined, created: boolean): st
   const said = done.map((action) => {
     switch (action.name) {
       case "propose_project":
-        return `proposed the project "${action.input.name ?? "a project"}" (a card with a Create project button was shown under your answer${created ? "; the person has since created it" : ""})`;
+        return action.input.start === "yes"
+          ? `created the project "${action.input.name ?? "a project"}" and Tensor started building in it`
+          : `proposed the project "${action.input.name ?? "a project"}" (a card with a Create project button was shown under your answer${created ? "; the person has since created it" : ""})`;
       case "continue_in_project":
         return `offered to continue in the project "${action.input.project ?? "a project"}" (a card with a button to go there was shown)`;
       case "web_search":

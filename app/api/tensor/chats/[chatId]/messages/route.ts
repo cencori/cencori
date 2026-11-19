@@ -60,12 +60,13 @@ const TOOLS = [
     function: {
       name: "propose_project",
       description:
-        "Propose a new project to build what was agreed. The person sees a card with a Create project button; nothing is created until they press it. Use only when they want to build it.",
+        "Propose a new project to build what was agreed. The person sees a card with a Create project button. With start set, the project is created at once and Tensor starts building in it: use that when they have told you to go ahead (go, build it, create it, do it, yes), including after you proposed it earlier (send the same name and brief again). Use only when they want to build it.",
       parameters: {
         type: "object",
         properties: {
           name: { type: "string", description: "A short project name, one to four words." },
           brief: { type: "string", description: "The project's first message, written to Tensor as the builder. At most 250 words." },
+          start: { type: "boolean", description: "True when the person has told you to build it now: the project is created and building starts without them pressing anything." },
         },
         required: ["name", "brief"],
       },
@@ -76,12 +77,13 @@ const TOOLS = [
     function: {
       name: "continue_in_project",
       description:
-        "Take the work to one of the person's projects. They see a card that opens that project with the brief ready to send; nothing happens until they send it.",
+        "Take the work to one of the person's projects. They see a card that opens that project with the brief ready to send. With start set, the project opens at once and Tensor starts on the brief: use that when they have told you to go ahead.",
       parameters: {
         type: "object",
         properties: {
           project: { type: "string", description: "The project's name, exactly as listed." },
           brief: { type: "string", description: "The message that project's chat will start with, written to Tensor as the builder." },
+          start: { type: "boolean", description: "True when the person has told you to go ahead now: the work starts without them pressing anything." },
         },
         required: ["project", "brief"],
       },
@@ -379,7 +381,10 @@ export async function POST(request: NextRequest, context: Context) {
             } else {
               proposed = true;
               step = { type: "action", ...action, status: "done" };
-              result = { shown: "The person now sees a card for this. Tell them briefly to press it when ready." };
+              result =
+                action.input.start === "yes"
+                  ? { started: "The project is being created now and Tensor starts building in it straight away. Say so in one short line; do not ask them to press anything." }
+                  : { shown: "The person now sees a card for this. Tell them briefly to press it when ready." };
             }
             parts.push(step);
             send({ type: "action_done", ...stepEvent(step) });
@@ -562,7 +567,7 @@ function readAction(call: ToolCall): { name: ChatAction; input: Record<string, s
   if (call.function.name === "propose_project") {
     const name = text("name", 100);
     const brief = text("brief", 4000);
-    return name && brief ? { name: "propose_project", input: { name, brief } } : null;
+    return name && brief ? { name: "propose_project", input: { name, brief, ...(args.start === true ? { start: "yes" } : {}) } } : null;
   }
   if (call.function.name === "read_page") {
     const url = text("url", 2000);
@@ -576,7 +581,7 @@ function readAction(call: ToolCall): { name: ChatAction; input: Record<string, s
   if (call.function.name === "continue_in_project") {
     const project = text("project", 100);
     const brief = text("brief", 4000);
-    return project && brief ? { name: "continue_in_project", input: { project, brief } } : null;
+    return project && brief ? { name: "continue_in_project", input: { project, brief, ...(args.start === true ? { start: "yes" } : {}) } } : null;
   }
   return null;
 }
