@@ -1,10 +1,10 @@
--- Refills: usage bought on top of a paid plan (2026-11-19).
+-- Credits: usage topped up on a paid plan (2026-11-19).
 --
 -- Any amount, within limits, at a fixed rate per plan: half as much again as the plan itself
--- charges for the same usage (lib/tensor-refills.ts), so every refill earns above what it lets
--- through. What is bought lasts until the paid month ends. It is spent only once a week's own
--- share is gone: each week's ceiling is its share plus whatever of the month's refills earlier
--- weeks have not already spent past theirs.
+-- charges for the same usage (lib/tensor-refills.ts), so every top-up earns above what it lets
+-- through. Credits never expire. They are spent only once a period's own share is gone: each
+-- period's ceiling is its share plus the balance, which is every top-up less what earlier periods
+-- spent past their own shares.
 
 create table if not exists public.tensor_refills (
   id uuid primary key default gen_random_uuid(),
@@ -85,8 +85,51 @@ do $$ begin
   end if;
 end $$;
 
+-- What is left of an account's top-ups as a period starts: every paid one, less what the periods
+-- before it spent past their own share of their plan (a week's share of the month, or the
+-- trial's whole month). Periods from before the first top-up are not counted against it.
+create or replace function public.tensor_credit_balance(p_account_id uuid, p_before timestamptz)
+returns bigint
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  with bought as (
+    select coalesce(sum(credit_microusd), 0)::bigint as total, min(paid_at) as first_paid
+    from public.tensor_refills
+    where account_id = p_account_id and status = 'paid'
+  ),
+  spent as (
+    select coalesce(sum(greatest(
+      greatest(p.cost_used_microusd - p.cost_reset_microusd, 0)
+        - round(coalesce(pl.pass_budget_microusd, 0) * extract(epoch from (p.ends_at - p.starts_at))
+                / (86400.0 * greatest(pl.billing_period_days, 1)))::bigint,
+      0
+    )), 0)::bigint as total
+    from public.basecode_usage_periods p
+    join public.basecode_plans pl on pl.code = p.plan_code
+    cross join bought b
+    where p.account_id = p_account_id
+      and b.first_paid is not null
+      and p.ends_at > b.first_paid
+      and p.starts_at < p_before
+  )
+  select greatest((select total from bought) - (select total from spent), 0)::bigint;
+$$;
+
+revoke all on function public.tensor_credit_balance(uuid, timestamptz) from public;
+do $$ begin
+  if exists (select 1 from pg_roles where rolname = 'anon') then
+    revoke all on function public.tensor_credit_balance(uuid, timestamptz) from anon, authenticated;
+  end if;
+  if exists (select 1 from pg_roles where rolname = 'service_role') then
+    grant execute on function public.tensor_credit_balance(uuid, timestamptz) to service_role;
+  end if;
+end $$;
+
 -- ── The allowance an account is in ───────────────────────────────────────
--- As in 2900, with the month's refills added to the week (above).
+-- As in 2900, with the credit balance added to the period (above).
 create or replace function public.basecode_allowance_period(
   p_account_id uuid,
   p_at timestamptz default now()
@@ -122,8 +165,6 @@ declare
   v_weeks integer;
   v_last_week integer;
   v_starts_at timestamptz;
-  v_credit bigint;
-  v_overage bigint;
 begin
   select * into v_account from public.basecode_billing_accounts where id = p_account_id;
   if not found then
@@ -214,33 +255,13 @@ begin
           v_plan.pass_budget_microusd * extract(epoch from (ends_at - starts_at)) / v_month_seconds
         )::bigint;
       end if;
-      -- Refills (3100): what was bought in this paid month, less what the weeks before this one
-      -- spent past their own share, is added to this week's. So bought usage lasts until the
-      -- month ends, used only once a week's own share is gone.
-      if budget_microusd is not null then
-        v_starts_at := starts_at;
-        select coalesce(sum(r.credit_microusd), 0)::bigint into v_credit
-        from public.tensor_refills r
-        where r.account_id = v_account.id
-          and r.status = 'paid'
-          and r.paid_at >= v_month_starts_at
-          and (pass_ends_at is null or r.paid_at < pass_ends_at);
-        if v_credit > 0 then
-          select coalesce(sum(greatest(
-            greatest(p.cost_used_microusd - p.cost_reset_microusd, 0)
-              - round(v_plan.pass_budget_microusd * extract(epoch from (p.ends_at - p.starts_at)) / v_month_seconds)::bigint,
-            0
-          )), 0)::bigint
-          into v_overage
-          from public.basecode_usage_periods p
-          where p.account_id = v_account.id
-            and p.plan_code = v_plan.code
-            and p.starts_at >= v_month_starts_at
-            and p.starts_at < v_starts_at;
-          budget_microusd := budget_microusd + greatest(v_credit - v_overage, 0);
-        end if;
-      end if;
     end if;
+  end if;
+
+  -- Credits (3100): what is left of every top-up, added to this period's allowance, so it is
+  -- spent once the period's own share is gone. They never expire.
+  if budget_microusd is not null then
+    budget_microusd := budget_microusd + public.tensor_credit_balance(v_account.id, starts_at);
   end if;
 
   select coalesce(sum(p.cost_used_microusd), 0)::bigint into pass_cost_used_microusd

@@ -3,7 +3,7 @@ import type { User } from "@supabase/supabase-js";
 import type { NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { createServerClient } from "@/lib/supabaseServer";
-import { refillOffer } from "@/lib/tensor-refills";
+import { creditValueMinor, refillOffer } from "@/lib/tensor-refills";
 
 /**
  * What an account is on. `free` is the trial: there is no free plan, but every account starts
@@ -354,6 +354,20 @@ export async function getTensorBillingSnapshot(admin: Admin, userId: string) {
   // A paid plan can buy more usage at any time: what a week of it costs, and the limits, in both
   // currencies (lib/tensor-refills.ts). The trial cannot.
   const refill = onTrial ? null : refillOffer(plan);
+  // What is left of the account's top-ups: the balance as this period began, less what this
+  // period has spent past its own share. Shown in money at the plan's top-up rate.
+  const { data: balanceRow, error: balanceError } = await admin.rpc("tensor_credit_balance", {
+    p_account_id: account.id,
+    p_before: allowance.startsAt,
+  });
+  if (balanceError) console.error("[Tensor Billing] Credit balance failed", balanceError);
+  const atStart = Number(balanceRow ?? 0) || 0;
+  const share = (allowance.budgetMicrousd ?? 0) - atStart;
+  const creditMicrousd = Math.max(atStart - Math.max(allowance.costUsedMicrousd - share, 0), 0);
+  const credits =
+    creditMicrousd > 0
+      ? { ngnMinor: creditValueMinor(plan, creditMicrousd, "NGN"), usdMinor: creditValueMinor(plan, creditMicrousd, "USD") }
+      : null;
   const resetsAt = allowance.endsAt;
   const modelPolicy = allowance.modelPolicy ?? plan.model_policy;
 
@@ -405,6 +419,7 @@ export async function getTensorBillingSnapshot(admin: Admin, userId: string) {
     },
     subscription,
     refill,
+    credits,
     usage: {
       percentageUsed,
       resetsAt,

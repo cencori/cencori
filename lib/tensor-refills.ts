@@ -1,7 +1,7 @@
 /**
- * Refills: usage bought on top of a paid plan, in any amount within limits. See
- * database/brimble/3100_tensor_refills.sql for how it is spent (after each week's own share,
- * until the paid month ends).
+ * Credits: usage topped up on a paid plan, in any amount within limits. See
+ * database/brimble/3100_tensor_refills.sql for how it is spent: after each period's own share,
+ * and never expiring.
  *
  * The rate is the plan's own, made dearer by REFILL_PREMIUM: a plan sells its month's model
  * ceiling for its price, so a refill sells the same usage for half as much again. Every naira of
@@ -28,6 +28,14 @@ export function refillCreditMicrousd(plan: PlanForRefill, amountMinor: number, c
   const month = tensorPlanPriceMinor(plan, currency);
   if (!month || amountMinor <= 0) return null;
   return Math.floor((amountMinor * plan.pass_budget_microusd) / (month * REFILL_PREMIUM));
+}
+
+/** What a credit balance is worth at the plan's top-up rate, in minor units: what it would cost to buy again. */
+export function creditValueMinor(plan: PlanForRefill, microusd: number, currency: Currency): number | null {
+  if (!plan.pass_budget_microusd || plan.pass_budget_microusd <= 0) return null;
+  const month = tensorPlanPriceMinor(plan, currency);
+  if (!month) return null;
+  return Math.floor((microusd * month * REFILL_PREMIUM) / plan.pass_budget_microusd);
 }
 
 /** What a week of the plan's usage costs as a refill, rounded up: the unit the page suggests amounts in. */
