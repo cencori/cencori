@@ -5,25 +5,28 @@ import {
   effectiveTensorPlan,
   getOrCreateTensorBillingAccount,
   getTensorPlan,
-  readAllowancePeriod,
   tensorCheckoutReturnUrl,
 } from "@/lib/tensor-billing";
-import { canRefill, refillPriceMinor, refillReference } from "@/lib/tensor-refills";
+import { refillAmountAllowed, refillCreditMicrousd, refillReference } from "@/lib/tensor-refills";
 import { createCheckoutSession } from "@/lib/bachsClient";
 import { noStoreHeaders } from "@/lib/tensor-auth";
 
 /**
- * A Bachs checkout for a refill of this week's allowance: offered only to a paid plan whose week
- * is used up, at the refill's price for that plan (lib/tensor-refills.ts). The payment is applied
- * by the webhook (purchase_type "tensor_refill").
+ * A Bachs checkout for a refill: an amount of the customer's choosing, within limits, on a paid
+ * plan, at that plan's refill rate (lib/tensor-refills.ts). The payment is applied by the webhook
+ * (purchase_type "tensor_refill"), which works the usage out again from what was paid.
  */
 export async function POST(request: NextRequest) {
   const session = await authenticateTensorBillingRequest(request);
   if (!session || !session.user.email) {
     return NextResponse.json({ error: "Your Cencori session is invalid." }, { headers: noStoreHeaders(), status: 401 });
   }
-  const body = (await request.json().catch(() => null)) as { currency?: unknown; return_url?: unknown } | null;
+  const body = (await request.json().catch(() => null)) as { currency?: unknown; return_url?: unknown; amount_minor?: unknown } | null;
   const currency = body?.currency === "USD" ? "USD" : "NGN";
+  const amountMinor = body?.amount_minor;
+  if (!refillAmountAllowed(amountMinor, currency)) {
+    return NextResponse.json({ error: "Choose an amount within the limits shown." }, { headers: noStoreHeaders(), status: 400 });
+  }
   const returnUrl = tensorCheckoutReturnUrl(body?.return_url);
   if (!returnUrl) {
     return NextResponse.json({ error: "Open the refill from Tensor's billing page." }, { headers: noStoreHeaders(), status: 400 });
@@ -33,19 +36,13 @@ export async function POST(request: NextRequest) {
   try {
     const account = await getOrCreateTensorBillingAccount(session.admin, session.user.id);
     const plan = await getTensorPlan(session.admin, effectiveTensorPlan(account));
-    const { data: allowanceRow, error: allowanceError } = await session.admin
-      .rpc("basecode_allowance_period", { p_account_id: account.id })
-      .single();
-    const allowance = readAllowancePeriod(allowanceRow);
-    if (allowanceError || !allowance) throw new Error("Could not load the Tensor allowance period.");
-    if (!canRefill(plan.code, allowance)) {
+    const credit = refillCreditMicrousd(plan, amountMinor, currency);
+    if (!credit) {
       return NextResponse.json(
-        { error: plan.code === "free" ? "Refills come with a plan. Choose one to keep going." : "This week still has usage left." },
+        { error: "Refills come with a paid plan. Choose one to keep going." },
         { headers: noStoreHeaders(), status: 409 },
       );
     }
-    const price = refillPriceMinor(plan, currency);
-    if (!price) throw new Error("The plan has no refill price in this currency.");
 
     const reference = refillReference(refillId);
     const { error: insertError } = await session.admin.from("tensor_refills").insert({
@@ -53,8 +50,9 @@ export async function POST(request: NextRequest) {
       account_id: account.id,
       plan_code: plan.code,
       reference,
-      expected_amount_minor: price,
+      expected_amount_minor: amountMinor,
       currency,
+      credit_microusd: credit,
       expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
     });
     if (insertError) throw new Error("Could not create the refill record.");
@@ -65,7 +63,7 @@ export async function POST(request: NextRequest) {
       cancel_url: `${returnUrl}?billing_cancelled=1`,
       reference,
       expires_in_minutes: 30,
-      pricing: { currency, price_type: "fixed", amount: (price / 100).toFixed(2) },
+      pricing: { currency, price_type: "fixed", amount: (amountMinor / 100).toFixed(2) },
       billing_currency: currency,
       customer: { email: session.user.email, name },
       metadata: {
@@ -83,7 +81,7 @@ export async function POST(request: NextRequest) {
     if (updateError) throw new Error("Could not save the provider checkout.");
 
     return NextResponse.json(
-      { refillId, checkoutUrl: checkout.checkout_url, priceMinor: price, currency },
+      { refillId, checkoutUrl: checkout.checkout_url, amountMinor, currency },
       { headers: noStoreHeaders() },
     );
   } catch (error) {

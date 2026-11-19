@@ -1,13 +1,10 @@
--- Refills: a paid plan that has used its week can buy the week again (2026-11-18).
+-- Refills: usage bought on top of a paid plan (2026-11-19).
 --
--- A refill is paid for once, through Bachs, and gives back the whole of the week's allowance:
--- what the week has cost so far is forgiven (cost_reset_microusd, as an admin reset is), so the
--- account starts the week's share of the ceiling over. What it cost stays on the period for the
--- books, and the refill row says how much it forgave and which period.
---
--- It is priced above the plan's own weekly share (lib/tensor-refills.ts), so it always earns
--- more than the model calls it lets through, and buying it often costs more than the next plan.
--- A refill lasts the week it was bought in; nothing is carried on.
+-- Any amount, within limits, at a fixed rate per plan: half as much again as the plan itself
+-- charges for the same usage (lib/tensor-refills.ts), so every refill earns above what it lets
+-- through. What is bought lasts until the paid month ends. It is spent only once a week's own
+-- share is gone: each week's ceiling is its share plus whatever of the month's refills earlier
+-- weeks have not already spent past theirs.
 
 create table if not exists public.tensor_refills (
   id uuid primary key default gen_random_uuid(),
@@ -21,9 +18,8 @@ create table if not exists public.tensor_refills (
   expected_amount_minor bigint not null check (expected_amount_minor > 0),
   currency text not null check (currency in ('NGN', 'USD')),
   status text not null default 'pending' check (status in ('pending', 'paid', 'failed', 'expired')),
-  -- Once paid: the week it refilled, and how much of that week's cost it forgave.
-  usage_period_id uuid references public.basecode_usage_periods(id) on delete set null,
-  forgiven_microusd bigint check (forgiven_microusd is null or forgiven_microusd >= 0),
+  -- The usage it buys, at the plan's refill rate, set again from what was actually paid.
+  credit_microusd bigint not null check (credit_microusd > 0),
   paid_amount_minor bigint,
   paid_currency text check (paid_currency is null or paid_currency in ('NGN', 'USD')),
   expires_at timestamptz not null,
@@ -37,14 +33,15 @@ alter table public.tensor_refills enable row level security;
 revoke all on table public.tensor_refills from anon, authenticated;
 grant all on table public.tensor_refills to service_role;
 
--- Applies a verified payment to its refill, once. The amount has been checked against the
--- refill's price by the caller (lib/tensor-refills.ts); this makes the grant and the record one
--- step, and a second delivery of the same payment a no-op.
+-- Applies a verified payment to its refill, once. The amount and the usage it buys have been
+-- worked out from the payment by the caller (lib/tensor-refills.ts); a second delivery of the
+-- same payment is a no-op.
 create or replace function public.tensor_apply_refill(
   p_refill_id uuid,
   p_transaction_id text,
   p_amount_minor bigint,
-  p_currency text
+  p_currency text,
+  p_credit_microusd bigint
 )
 returns jsonb
 language plpgsql
@@ -53,10 +50,10 @@ set search_path = public
 as $$
 declare
   v_refill public.tensor_refills%rowtype;
-  v_allowance record;
-  v_period public.basecode_usage_periods%rowtype;
-  v_forgiven bigint;
 begin
+  if p_credit_microusd is null or p_credit_microusd <= 0 then
+    raise exception 'tensor_refill_credit';
+  end if;
   select * into v_refill from public.tensor_refills where id = p_refill_id for update;
   if not found then
     raise exception 'tensor_refill_missing';
@@ -65,53 +62,213 @@ begin
     return jsonb_build_object('applied', false, 'already', true, 'refill_id', v_refill.id);
   end if;
 
-  -- The week the account is in now, made if no turn has made it yet (as basecode_reserve_turn does).
-  select * into v_allowance from public.basecode_allowance_period(v_refill.account_id);
-  insert into public.basecode_usage_periods(
-    account_id, plan_code, starts_at, ends_at, request_limit, budget_microusd
-  ) values (
-    v_refill.account_id, v_allowance.plan_code, v_allowance.starts_at, v_allowance.ends_at,
-    null, v_allowance.budget_microusd
-  )
-  on conflict (account_id, plan_code, starts_at) do update set
-    budget_microusd = excluded.budget_microusd,
-    ends_at = excluded.ends_at,
-    updated_at = now()
-  returning * into v_period;
-
-  select * into v_period from public.basecode_usage_periods where id = v_period.id for update;
-  v_forgiven := greatest(v_period.cost_used_microusd - v_period.cost_reset_microusd, 0);
-
-  update public.basecode_usage_periods
-  set cost_reset_microusd = cost_reset_microusd + v_forgiven,
-      updated_at = now()
-  where id = v_period.id;
-
   update public.tensor_refills
   set status = 'paid',
       paid_at = now(),
       provider_transaction_id = p_transaction_id,
       paid_amount_minor = p_amount_minor,
       paid_currency = p_currency,
-      usage_period_id = v_period.id,
-      forgiven_microusd = v_forgiven
+      credit_microusd = p_credit_microusd
   where id = v_refill.id;
 
-  return jsonb_build_object(
-    'applied', true,
-    'refill_id', v_refill.id,
-    'usage_period_id', v_period.id,
-    'forgiven_microusd', v_forgiven
-  );
+  return jsonb_build_object('applied', true, 'refill_id', v_refill.id, 'credit_microusd', p_credit_microusd);
 end;
 $$;
 
-revoke all on function public.tensor_apply_refill(uuid, text, bigint, text) from public;
+revoke all on function public.tensor_apply_refill(uuid, text, bigint, text, bigint) from public;
 do $$ begin
   if exists (select 1 from pg_roles where rolname = 'anon') then
-    revoke all on function public.tensor_apply_refill(uuid, text, bigint, text) from anon, authenticated;
+    revoke all on function public.tensor_apply_refill(uuid, text, bigint, text, bigint) from anon, authenticated;
   end if;
   if exists (select 1 from pg_roles where rolname = 'service_role') then
-    grant execute on function public.tensor_apply_refill(uuid, text, bigint, text) to service_role;
+    grant execute on function public.tensor_apply_refill(uuid, text, bigint, text, bigint) to service_role;
+  end if;
+end $$;
+
+-- ── The allowance an account is in ───────────────────────────────────────
+-- As in 2900, with the month's refills added to the week (above).
+create or replace function public.basecode_allowance_period(
+  p_account_id uuid,
+  p_at timestamptz default now()
+)
+returns table (
+  plan_code text,
+  starts_at timestamptz,
+  ends_at timestamptz,
+  -- Always null. Kept so callers written against the task count read "no limit".
+  task_limit integer,
+  pass_ends_at timestamptz,
+  pass_cost_used_microusd bigint,
+  model_policy text,
+  -- What this period may cost, and what it has, less anything a reset forgave.
+  budget_microusd bigint,
+  cost_used_microusd bigint
+)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  v_account public.basecode_billing_accounts%rowtype;
+  v_plan public.basecode_plans%rowtype;
+  v_legacy public.basecode_usage_periods%rowtype;
+  v_paid_from timestamptz;
+  v_paid_until timestamptz;
+  v_month_starts_at timestamptz;
+  v_month_seconds numeric;
+  v_months integer;
+  v_month integer;
+  v_weeks integer;
+  v_last_week integer;
+  v_starts_at timestamptz;
+  v_credit bigint;
+  v_overage bigint;
+begin
+  select * into v_account from public.basecode_billing_accounts where id = p_account_id;
+  if not found then
+    raise exception 'basecode_account_missing';
+  end if;
+
+  select * into v_plan
+  from public.basecode_plans
+  where code = public.basecode_effective_plan(v_account) and enabled;
+  if not found then
+    raise exception 'basecode_plan_unavailable';
+  end if;
+
+  plan_code := v_plan.code;
+  task_limit := null;
+  model_policy := v_plan.model_policy;
+  budget_microusd := v_plan.pass_budget_microusd;
+
+  if v_plan.code = 'free' then
+    -- The trial's month is one period, with the whole of its ceiling.
+    select t.starts_at, t.ends_at into starts_at, ends_at
+    from public.basecode_trial_period(v_account.created_at, p_at) t;
+    v_month_starts_at := starts_at;
+    pass_ends_at := ends_at;
+  else
+    if v_account.model_policy_override is not null
+      and (v_account.model_policy_override_until is null or p_at < v_account.model_policy_override_until) then
+      model_policy := v_account.model_policy_override;
+    end if;
+    v_paid_from := coalesce(v_account.entitlement_starts_at, v_account.created_at);
+    v_paid_until := v_account.entitlement_ends_at;
+
+    -- The paid month this moment falls in. What is paid for is a whole number of
+    -- months, counted from the first; anything left over belongs to the last one, so
+    -- a 31-day month is one month and not a month and a day.
+    v_months := case
+      when v_paid_until is null then 1
+      else greatest(
+        1,
+        floor(extract(epoch from (v_paid_until - v_paid_from)) / (86400.0 * v_plan.billing_period_days))::integer
+      )
+    end;
+    v_month := least(
+      v_months - 1,
+      greatest(
+        0,
+        floor(extract(epoch from (p_at - v_paid_from)) / (86400.0 * v_plan.billing_period_days))::integer
+      )
+    );
+    v_month_starts_at := v_paid_from + make_interval(days => v_plan.billing_period_days * v_month);
+    pass_ends_at := case
+      when v_month = v_months - 1 then v_paid_until
+      else v_month_starts_at + make_interval(days => v_plan.billing_period_days)
+    end;
+
+    -- A pass bought before weeks existed has one period as long as the pass.
+    select * into v_legacy
+    from public.basecode_usage_periods p
+    where p.account_id = v_account.id
+      and p.plan_code = v_plan.code
+      and p.starts_at = v_paid_from
+      and p.ends_at > v_paid_from + interval '13 days';
+
+    if found and v_month = 0 then
+      starts_at := v_paid_from;
+      ends_at := pass_ends_at;
+    else
+      v_month_seconds := extract(epoch from (
+        coalesce(pass_ends_at, v_month_starts_at + make_interval(days => v_plan.billing_period_days))
+        - v_month_starts_at
+      ));
+      v_weeks := greatest(
+        0,
+        floor(extract(epoch from (p_at - v_month_starts_at)) / 604800)::integer
+      );
+      -- The last whole week takes the days left over after it.
+      v_last_week := greatest(1, floor(v_month_seconds / 604800)::integer) - 1;
+      if pass_ends_at is not null and v_weeks >= v_last_week then
+        v_weeks := v_last_week;
+        starts_at := v_month_starts_at + make_interval(days => 7 * v_weeks);
+        ends_at := pass_ends_at;
+      else
+        starts_at := v_month_starts_at + make_interval(days => 7 * v_weeks);
+        ends_at := starts_at + interval '7 days';
+      end if;
+      if v_plan.pass_budget_microusd is not null and v_month_seconds > 0 then
+        budget_microusd := round(
+          v_plan.pass_budget_microusd * extract(epoch from (ends_at - starts_at)) / v_month_seconds
+        )::bigint;
+      end if;
+      -- Refills (3100): what was bought in this paid month, less what the weeks before this one
+      -- spent past their own share, is added to this week's. So bought usage lasts until the
+      -- month ends, used only once a week's own share is gone.
+      if budget_microusd is not null then
+        v_starts_at := starts_at;
+        select coalesce(sum(r.credit_microusd), 0)::bigint into v_credit
+        from public.tensor_refills r
+        where r.account_id = v_account.id
+          and r.status = 'paid'
+          and r.paid_at >= v_month_starts_at
+          and (pass_ends_at is null or r.paid_at < pass_ends_at);
+        if v_credit > 0 then
+          select coalesce(sum(greatest(
+            greatest(p.cost_used_microusd - p.cost_reset_microusd, 0)
+              - round(v_plan.pass_budget_microusd * extract(epoch from (p.ends_at - p.starts_at)) / v_month_seconds)::bigint,
+            0
+          )), 0)::bigint
+          into v_overage
+          from public.basecode_usage_periods p
+          where p.account_id = v_account.id
+            and p.plan_code = v_plan.code
+            and p.starts_at >= v_month_starts_at
+            and p.starts_at < v_starts_at;
+          budget_microusd := budget_microusd + greatest(v_credit - v_overage, 0);
+        end if;
+      end if;
+    end if;
+  end if;
+
+  select coalesce(sum(p.cost_used_microusd), 0)::bigint into pass_cost_used_microusd
+  from public.basecode_usage_periods p
+  where p.account_id = v_account.id
+    and p.plan_code = v_plan.code
+    and p.starts_at >= v_month_starts_at
+    and (pass_ends_at is null or p.starts_at < pass_ends_at);
+
+  -- Under its own name: a bare starts_at below would be read as the column.
+  v_starts_at := starts_at;
+  select coalesce(max(greatest(p.cost_used_microusd - p.cost_reset_microusd, 0)), 0)::bigint
+  into cost_used_microusd
+  from public.basecode_usage_periods p
+  where p.account_id = v_account.id
+    and p.plan_code = v_plan.code
+    and p.starts_at = v_starts_at;
+
+  return next;
+end;
+$$;
+
+revoke all on function public.basecode_allowance_period(uuid, timestamptz) from public;
+do $$ begin
+  if exists (select 1 from pg_roles where rolname = 'anon') then
+    revoke all on function public.basecode_allowance_period(uuid, timestamptz) from anon, authenticated;
+  end if;
+  if exists (select 1 from pg_roles where rolname = 'service_role') then
+    grant execute on function public.basecode_allowance_period(uuid, timestamptz) to service_role;
   end if;
 end $$;
