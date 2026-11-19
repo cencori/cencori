@@ -37,6 +37,11 @@ const ANSWER_MAX_TOKENS = 4096;
 const MAX_SEARCHES = 3;
 const SEARCH_RESULTS = 6;
 
+/** Images with one message: how many, and how large each may be as a data URL (about 5 MB). */
+const MAX_IMAGES = 4;
+const MAX_IMAGE_CHARS = 7_000_000;
+const IMAGE_DATA_URL = /^data:image\/(png|jpe?g|gif|webp);base64,[A-Za-z0-9+/=]+$/;
+
 /** Rounds of answering, then acting, that one message may take. */
 const MAX_ROUNDS = 5;
 
@@ -155,12 +160,21 @@ export async function POST(request: NextRequest, context: Context) {
   if (!session || !authorization) return json({ error: "Your Cencori session is invalid." }, 401);
 
   let text = "";
+  /** Pictures sent with the message (pasted or dropped), as data URLs: seen by the model this turn. */
+  let images: string[] = [];
   try {
-    const body = (await request.json()) as { content?: unknown };
+    const body = (await request.json()) as { content?: unknown; images?: unknown };
     text = typeof body.content === "string" ? body.content.trim() : "";
+    images = Array.isArray(body.images)
+      ? body.images.filter((image): image is string => typeof image === "string" && IMAGE_DATA_URL.test(image))
+      : [];
   } catch {
     return json({ error: "That request is invalid." }, 400);
   }
+  if (images.length > MAX_IMAGES) return json({ error: `Send at most ${MAX_IMAGES} images with a message.` }, 413);
+  if (images.some((image) => image.length > MAX_IMAGE_CHARS)) return json({ error: "One of the images is too large. Keep each under 5 MB." }, 413);
+  // A picture alone is a message too.
+  if (!text && images.length) text = images.length === 1 ? "(Sent an image.)" : `(Sent ${images.length} images.)`;
   if (!text) return json({ error: "Write a message first." }, 400);
   if (text.length > PLAIN_CHAT_MESSAGE_MAX) {
     return json({ error: "That message is too long to send." }, 413);
@@ -258,6 +272,12 @@ export async function POST(request: NextRequest, context: Context) {
     { role: "system", content: plainChatInstructions(projects, new Date()) },
     ...contextMessages([...history, saved]),
   ];
+  // This message's pictures go to the model with it (Maximo Atlas reads images). Earlier ones are
+  // not kept: the conversation remembers what was said about them.
+  const last = conversation.at(-1);
+  if (images.length && last?.role === "user" && typeof last.content === "string") {
+    last.content = [{ type: "text", text: last.content }, ...images.map((url) => ({ type: "image_url" as const, image_url: { url } }))];
+  }
 
   const encoder = new TextEncoder();
   const line = (value: unknown) => encoder.encode(`${JSON.stringify(value)}\n`);
