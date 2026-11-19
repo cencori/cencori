@@ -186,6 +186,48 @@ export async function pushableRepository(token: string, repositoryId: number, fe
   return repository(found.value);
 }
 
+/** A repository name GitHub accepts: letters, numbers, hyphens, underscores and periods. */
+export function repositoryName(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const name = value.trim().replace(/\s+/g, "-").replace(/[^A-Za-z0-9._-]/g, "").slice(0, 100);
+  return name && name !== "." && name !== ".." ? name : null;
+}
+
+/**
+ * Makes a new, empty repository on the person's own GitHub account, with their token, as v0 does
+ * from a project's settings. Needs the Cencori app to have Administration (write) on repositories;
+ * without it GitHub answers 403, said as such so it can be fixed in the app's settings.
+ */
+export async function createUserRepository(
+  token: string,
+  name: string,
+  isPrivate: boolean,
+  fetcher: typeof fetch = fetch,
+): Promise<
+  | { ok: true; repository: GithubRepository }
+  | { ok: false; reason: "exists" | "not_allowed" | "failed" }
+> {
+  try {
+    const response = await fetcher(`${API}/user/repos`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${token}`,
+        accept: "application/vnd.github+json",
+        "content-type": "application/json",
+        "x-github-api-version": "2022-11-28",
+      },
+      body: JSON.stringify({ name, private: isPrivate, auto_init: false }),
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (response.status === 422) return { ok: false, reason: "exists" };
+    if (response.status === 403 || response.status === 404) return { ok: false, reason: "not_allowed" };
+    if (!response.ok) return { ok: false, reason: "failed" };
+    return { ok: true, repository: repository((await response.json()) as RawRepository) };
+  } catch {
+    return { ok: false, reason: "failed" };
+  }
+}
+
 /* ---------------------------------------------------------------------------
    The person's account
    --------------------------------------------------------------------------- */
