@@ -155,8 +155,37 @@ describe("a branch to push to", () => {
 
 describe("the GitHub App's sign-in credentials", () => {
   it("are read when they are both there", () => {
-    expect(readGithubApp({ GITHUB_APP_CLIENT_ID: "Iv1", GITHUB_APP_CLIENT_SECRET: "s" })).toEqual({ clientId: "Iv1", clientSecret: "s", slug: "cencori" });
+    expect(readGithubApp({ GITHUB_APP_CLIENT_ID: "Iv1", GITHUB_APP_CLIENT_SECRET: "s" })).toEqual({ clientId: "Iv1", clientSecret: "s", slug: "cencori", own: null });
     expect(readGithubApp({ GITHUB_APP_CLIENT_ID: "Iv1" })).toBeNull();
     expect(readGithubApp({})).toBeNull();
+  });
+
+  it("are Tensor's own app's once all of its settings are there", () => {
+    const own = {
+      TENSOR_GITHUB_APP_ID: "123",
+      TENSOR_GITHUB_APP_CLIENT_ID: "Iv2",
+      TENSOR_GITHUB_APP_CLIENT_SECRET: "t",
+      TENSOR_GITHUB_APP_PRIVATE_KEY: "-----BEGIN KEY-----\\nabc\\n-----END KEY-----",
+      TENSOR_GITHUB_APP_SLUG: "tensor",
+    };
+    expect(readGithubApp({ ...own, GITHUB_APP_CLIENT_ID: "Iv1", GITHUB_APP_CLIENT_SECRET: "s" })).toEqual({
+      clientId: "Iv2",
+      clientSecret: "t",
+      slug: "tensor",
+      own: { appId: "123", privateKey: "-----BEGIN KEY-----\nabc\n-----END KEY-----" },
+    });
+    // Half set up: Cencori's app, as before.
+    expect(readGithubApp({ ...own, TENSOR_GITHUB_APP_SLUG: "", GITHUB_APP_CLIENT_ID: "Iv1", GITHUB_APP_CLIENT_SECRET: "s" })?.clientId).toBe("Iv1");
+  });
+});
+
+describe("sealed GitHub tokens", () => {
+  it("keep the app they were issued to", () => {
+    const sealed = sealGithubTokens(
+      { accessToken: "ghu_1", accessExpiresAt: null, refreshToken: null, refreshExpiresAt: null, clientId: "Iv2" },
+      secret,
+      userId,
+    );
+    expect(openGithubTokens(sealed, secret, userId)?.clientId).toBe("Iv2");
   });
 });

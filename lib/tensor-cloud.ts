@@ -469,6 +469,8 @@ export type GithubTokens = {
   accessExpiresAt: number | null;
   refreshToken: string | null;
   refreshExpiresAt: number | null;
+  /** The app the tokens were issued to. Absent on ones from before Tensor had an app of its own. */
+  clientId?: string;
 };
 
 function githubKey(secret: string, userId: string): Buffer {
@@ -497,6 +499,7 @@ export function openGithubTokens(sealed: string, secret: string, userId: string)
       accessExpiresAt: time(value.accessExpiresAt),
       refreshToken: typeof value.refreshToken === "string" && value.refreshToken ? value.refreshToken : null,
       refreshExpiresAt: time(value.refreshExpiresAt),
+      ...(typeof value.clientId === "string" && value.clientId ? { clientId: value.clientId } : {}),
     };
   } catch {
     return null;

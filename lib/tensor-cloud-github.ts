@@ -26,14 +26,41 @@ const ACCOUNTS = "tensor_cloud_github_accounts";
 const CONNECTIONS = "tensor_cloud_git";
 const API = "https://api.github.com";
 
-export type GithubApp = { clientId: string; clientSecret: string; slug: string };
+export type GithubApp = {
+  clientId: string;
+  clientSecret: string;
+  slug: string;
+  /** Tensor's own app, which pushes as itself: its id and private key. Null on Cencori's. */
+  own: { appId: string; privateKey: string } | null;
+};
 
-/** The app's sign-in credentials, or null where it is not set up. */
+/**
+ * The app Tensor signs people in with and pushes through, or null where none is set up.
+ *
+ * Tensor has a GitHub App of its own (TENSOR_GITHUB_APP_*), so what it does on GitHub is
+ * Tensor's and not Cencori's. Until all of its settings are in place, Cencori's app (GITHUB_APP_*)
+ * is used as before.
+ */
 export function readGithubApp(env: Record<string, string | undefined> = process.env): GithubApp | null {
+  const own = {
+    appId: env.TENSOR_GITHUB_APP_ID?.trim() || "",
+    clientId: env.TENSOR_GITHUB_APP_CLIENT_ID?.trim() || "",
+    clientSecret: env.TENSOR_GITHUB_APP_CLIENT_SECRET?.trim() || "",
+    privateKey: (env.TENSOR_GITHUB_APP_PRIVATE_KEY ?? "").replace(/\\n/g, "\n").trim(),
+    slug: env.TENSOR_GITHUB_APP_SLUG?.trim() || "",
+  };
+  if (own.appId && own.clientId && own.clientSecret && own.privateKey && own.slug) {
+    return {
+      clientId: own.clientId,
+      clientSecret: own.clientSecret,
+      slug: own.slug,
+      own: { appId: own.appId, privateKey: own.privateKey },
+    };
+  }
   const clientId = env.GITHUB_APP_CLIENT_ID?.trim() || "";
   const clientSecret = env.GITHUB_APP_CLIENT_SECRET?.trim() || "";
   if (!clientId || !clientSecret) return null;
-  return { clientId, clientSecret, slug: env.NEXT_PUBLIC_GITHUB_APP_SLUG?.trim() || "cencori" };
+  return { clientId, clientSecret, slug: env.NEXT_PUBLIC_GITHUB_APP_SLUG?.trim() || "cencori", own: null };
 }
 
 export type GithubRepository = {
@@ -97,7 +124,8 @@ async function askForTokens(app: GithubApp, body: Record<string, string>, fetche
       signal: AbortSignal.timeout(20_000),
     });
     if (!response.ok) return null;
-    return tokensFrom((await response.json()) as TokenAnswer, Math.floor(Date.now() / 1000));
+    const tokens = tokensFrom((await response.json()) as TokenAnswer, Math.floor(Date.now() / 1000));
+    return tokens ? { ...tokens, clientId: app.clientId } : null;
   } catch {
     return null;
   }
@@ -112,10 +140,19 @@ export function exchangeGithubCode(app: GithubApp, code: string, redirectUri: st
    Asking GitHub, as the person
    --------------------------------------------------------------------------- */
 
-async function github<T>(token: string, path: string, fetcher: typeof fetch): Promise<{ ok: true; value: T } | { ok: false; status: number }> {
+async function github<T>(
+  token: string,
+  path: string,
+  fetcher: typeof fetch,
+  signedIn = true,
+): Promise<{ ok: true; value: T } | { ok: false; status: number }> {
   try {
     const response = await fetcher(`${API}${path}`, {
-      headers: { authorization: `Bearer ${token}`, accept: "application/vnd.github+json", "x-github-api-version": "2022-11-28" },
+      headers: {
+        ...(signedIn ? { authorization: `Bearer ${token}` } : {}),
+        accept: "application/vnd.github+json",
+        "x-github-api-version": "2022-11-28",
+      },
       signal: AbortSignal.timeout(20_000),
     });
     if (!response.ok) return { ok: false, status: response.status };
@@ -281,6 +318,9 @@ export async function readGithubAccount(
   const account = { login: row.github_login, githubUserId: Number(row.github_user_id) };
   const tokens = openGithubTokens(row.sealed, config.taskTokenSecret, userId);
   if (!tokens) return { ...account, token: null };
+  // A sign-in through another app (Cencori's, from before Tensor had its own) reaches only that
+  // app's installations, and its refresh token is that app's: the person signs in again.
+  if ((tokens.clientId ?? process.env.GITHUB_APP_CLIENT_ID?.trim()) !== app.clientId) return { ...account, token: null };
 
   const now = Math.floor(Date.now() / 1000);
   // A minute's margin: a token about to run out is of no use to a request about to be made.
@@ -367,10 +407,12 @@ export function normalizeBranch(value: unknown): string | null {
  * app's, for the installation that covers the repository, cut down to that repository and to
  * its contents. Made only after the person's own access has just been checked.
  */
-export async function mintPushToken(repo: GithubRepository): Promise<{ token: string; expiresAt: string } | null> {
+export async function mintPushToken(
+  repo: GithubRepository,
+  githubApp: GithubApp,
+): Promise<{ token: string; expiresAt: string } | null> {
   try {
-    // Loaded when it is needed: the module refuses to load where the app is not set up.
-    const { app } = await import("@/lib/github");
+    const app = githubApp.own ? await tensorOctokitApp(githubApp.own) : (await import("@/lib/github")).app;
     const [owner, name] = repo.fullName.split("/") as [string, string];
     const installation = await app.octokit.request("GET /repos/{owner}/{repo}/installation", { owner, repo: name });
     const made = await app.octokit.request("POST /app/installations/{installation_id}/access_tokens", {
@@ -383,4 +425,41 @@ export async function mintPushToken(repo: GithubRepository): Promise<{ token: st
     console.error(`[Tensor Cloud] Making a push token for ${repo.fullName} failed`, error);
     return null;
   }
+}
+
+/** Tensor's own app, as the app (not as a person): what mints its installations' tokens. */
+let ownApp: { key: string; app: Promise<import("@octokit/app").App> } | null = null;
+
+function tensorOctokitApp(own: { appId: string; privateKey: string }) {
+  const key = `${own.appId}:${own.privateKey.length}`;
+  if (ownApp?.key !== key) {
+    ownApp = {
+      key,
+      app: Promise.all([import("@octokit/app"), import("@octokit/rest")]).then(
+        ([{ App }, { Octokit }]) => new App({ appId: own.appId, privateKey: own.privateKey, Octokit }),
+      ),
+    };
+  }
+  return ownApp.app;
+}
+
+/** Who Tensor is in a commit: the app's bot account on GitHub, looked up once. */
+const bots = new Map<string, Promise<{ name: string; email: string } | null>>();
+
+export function tensorCommitter(app: GithubApp, fetcher: typeof fetch = fetch): Promise<{ name: string; email: string } | null> {
+  // Only Tensor's own app is Tensor. Cencori's bot is not named on a commit Tensor made.
+  if (!app.own) return Promise.resolve(null);
+  const login = `${app.slug}[bot]`;
+  let known = bots.get(login);
+  if (!known) {
+    known = github<{ id: number }>("", `/users/${encodeURIComponent(login)}`, fetcher, false).then((answer) =>
+      answer.ok && typeof answer.value.id === "number" ? { name: login, email: `${answer.value.id}+${login}@users.noreply.github.com` } : null,
+    );
+    // A failed lookup is asked again next time.
+    void known.then((bot) => {
+      if (!bot) bots.delete(login);
+    });
+    bots.set(login, known);
+  }
+  return known;
 }
