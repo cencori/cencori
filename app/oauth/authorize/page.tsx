@@ -107,7 +107,7 @@ export default async function AuthorizePage({ searchParams }: AuthorizePageProps
           ) : (
             <div
               aria-hidden="true"
-              className="grid h-11 w-11 place-items-center rounded-lg bg-foreground text-base font-semibold text-background"
+              className="grid h-11 w-11 place-items-center rounded-lg border border-border/40 bg-white text-base font-semibold text-black"
             >
               {app.name.slice(0, 1).toUpperCase()}
             </div>
@@ -115,8 +115,10 @@ export default async function AuthorizePage({ searchParams }: AuthorizePageProps
           <span aria-hidden="true" className="text-muted-foreground">
             ⇄
           </span>
-          <div className="grid h-11 w-11 place-items-center rounded-lg border border-border/40 bg-background">
-            <Logo variant="mark" className="h-5" />
+          {/* Both tiles are white in either theme, so the two logos sit as a pair. */}
+          <div className="grid h-11 w-11 place-items-center rounded-lg border border-border/40 bg-white">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img alt="Cencori" className="h-5 w-auto" src="/black.png" />
           </div>
         </div>
 
