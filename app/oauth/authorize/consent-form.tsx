@@ -28,6 +28,14 @@ export function ConsentForm(props: ConsentFormProps) {
   const [organizationId, setOrganizationId] = useState(choosable.length === 1 ? choosable[0].id : "");
   const [pending, setPending] = useState<"allow" | "deny" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [detailed, setDetailed] = useState(false);
+  // One row for each level, as "Projects, API keys": what can be changed first, then what can only be read.
+  const levels = (["write", "read"] as const)
+    .map((level) => ({
+      level,
+      labels: props.permissions.filter((permission) => permission.level === level).map((permission) => permission.label),
+    }))
+    .filter((group) => group.labels.length > 0);
 
   async function decide(decision: "allow" | "deny") {
     if (props.preview) {
@@ -97,24 +105,43 @@ export function ConsentForm(props: ConsentFormProps) {
         {props.appName} will be able to do the following in the organization you choose, and nothing else.
       </p>
       <ul className="mt-3 divide-y divide-border rounded-lg border border-border">
-        {props.permissions.map((permission) => (
-          <li className="px-3 py-2.5" key={permission.resource}>
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-sm font-medium">{permission.label}</span>
-              <span
-                className={
-                  permission.level === "write"
-                    ? "rounded-full border border-amber-500/40 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-amber-700 dark:text-amber-300"
-                    : "rounded-full border border-border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground"
-                }
-              >
-                {permission.level === "write" ? "Read + write" : "Read"}
-              </span>
-            </div>
-            <p className="mt-1 text-xs leading-5 text-muted-foreground">{permission.description}</p>
+        {levels.map((group) => (
+          <li className="flex items-center justify-between gap-3 px-3 py-2.5" key={group.level}>
+            <span className="text-sm font-medium">{group.labels.join(", ")}</span>
+            <span
+              className={
+                group.level === "write"
+                  ? "shrink-0 rounded-full border border-amber-500/40 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-amber-700 dark:text-amber-300"
+                  : "shrink-0 rounded-full border border-border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground"
+              }
+            >
+              {group.level === "write" ? "Read + write" : "Read"}
+            </span>
           </li>
         ))}
       </ul>
+
+      <button
+        aria-expanded={detailed}
+        className="mx-auto mt-3 flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+        onClick={() => setDetailed((open) => !open)}
+        type="button"
+      >
+        {detailed ? "Hide detailed permissions" : "Show detailed permissions"}
+        <span aria-hidden="true" className={detailed ? "rotate-180 transition-transform" : "transition-transform"}>
+          ⌄
+        </span>
+      </button>
+      {detailed ? (
+        <ul className="mt-3 space-y-2.5">
+          {props.permissions.map((permission) => (
+            <li key={permission.resource}>
+              <p className="text-xs font-medium">{permission.label}</p>
+              <p className="text-xs leading-5 text-muted-foreground">{permission.description}</p>
+            </li>
+          ))}
+        </ul>
+      ) : null}
 
       {error ? (
         <p className="mt-4 text-sm text-destructive" role="alert">
