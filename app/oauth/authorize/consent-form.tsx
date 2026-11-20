@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -128,9 +129,10 @@ export function ConsentForm(props: ConsentFormProps) {
         type="button"
       >
         {detailed ? "Hide detailed permissions" : "Show detailed permissions"}
-        <span aria-hidden="true" className={detailed ? "rotate-180 transition-transform" : "transition-transform"}>
-          ⌄
-        </span>
+        <ChevronDown
+          aria-hidden="true"
+          className={detailed ? "size-3.5 rotate-180 transition-transform" : "size-3.5 transition-transform"}
+        />
       </button>
       {detailed ? (
         <ul className="mt-3 space-y-2.5">
