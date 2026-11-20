@@ -275,6 +275,26 @@ export function connectionOauthConfig(
     return { ...cfg, tokenAuth: stored?.token_auth ?? cfg.tokenAuth };
 }
 
+/**
+ * Scopes a request may not ask for through Cencori's own Google app: anything beyond the
+ * connector's defaults. Google approves an app scope by scope, and one unapproved scope puts
+ * its "Google hasn't verified this app" warning in front of the customer's user (2026-11-20:
+ * a request added gmail.modify, which no Gmail tool of ours uses). Someone who needs more
+ * passes their own OAuth app, which this does not limit.
+ */
+export function scopesBeyondPlatformGoogleApp(authUrl: string, requested: readonly string[], defaults: readonly string[]): string[] {
+    let host = '';
+    try {
+        host = new URL(authUrl).hostname;
+    } catch {
+        return [];
+    }
+    if (host !== 'accounts.google.com') return [];
+    // Signing in is not a permission over anyone's data and needs no approval.
+    const always = new Set(['openid', 'email', 'profile']);
+    return requested.filter((scope) => !defaults.includes(scope) && !always.has(scope));
+}
+
 /** Where the browser may be sent after consent: https, or http on localhost for development. */
 export function isAllowedReturnUrl(value: unknown): value is string {
     if (typeof value !== 'string' || value.length > 2000) return false;

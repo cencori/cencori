@@ -52,7 +52,9 @@ Agents see hosted tools named `conn__<connection>__<operation>` — the same pat
 
 A connection to an OAuth connector (Gmail, Slack, Notion, and the rest of `GET /v1/connectors`) starts as `pending` and becomes `active` once the account owner consents.
 
-Use your own OAuth app: pass its `client_id` and `client_secret` at `authorize`. Cencori's own Gmail app is not available yet, so `authorize` without them returns `400 oauth_client_not_configured`.
+For Gmail you can call `authorize` with no `client_id`: the consent screen is Cencori's, and it asks for permission to send mail (`gmail.send`) and nothing else. Asking for any other Google scope that way returns `400 scope_not_available`.
+
+To ask for more, or to show your own name on the consent screen, pass the `client_id` and `client_secret` of your own OAuth app, as below. A connector Cencori has no app for returns `400 oauth_client_not_configured` without them.
 
 ```bash
 # 1. Create the connection

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabaseAdmin';
 import { validateGatewayRequest, addGatewayHeaders, handleCorsPreFlight } from '@/lib/gateway-middleware';
 import { embeddedError, dePrefixId } from '@/lib/embedded/http';
-import { createAuthorizationUrl, isAllowedReturnUrl, oauthClientConfig, resolveOauthEndpoints } from '@/lib/embedded/oauth';
+import { createAuthorizationUrl, isAllowedReturnUrl, oauthClientConfig, resolveOauthEndpoints, scopesBeyondPlatformGoogleApp } from '@/lib/embedded/oauth';
 import { encryptApiKey } from '@/lib/encryption';
 import crypto from 'crypto';
 
@@ -57,6 +57,18 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ connection
                     : 'OAuth client is not configured — pass client_id/client_secret for a BYO connector (env fallback: CENCORI_OAUTH_' + slug.toUpperCase().replace(/-/g, '_') + '_*)',
                 { requestId },
             ), { requestId });
+        }
+
+        if (!body.client_id) {
+            const refused = scopesBeyondPlatformGoogleApp(endpoints.auth_url, body.scopes ?? [], (connector.default_scopes ?? []) as string[]);
+            if (refused.length > 0) {
+                return addGatewayHeaders(embeddedError(
+                    400,
+                    'scope_not_available',
+                    `Cencori's own Google app cannot ask for ${refused.join(', ')}. Leave scopes out to use this connector's defaults, or pass the client_id and client_secret of your own Google OAuth app to ask for more.`,
+                    { requestId },
+                ), { requestId });
+            }
         }
 
         // BYO / discovered provider context rides with the state (secret as an
