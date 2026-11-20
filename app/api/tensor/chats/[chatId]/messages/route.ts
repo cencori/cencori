@@ -32,6 +32,11 @@ import { WEB_PRICES_USD } from "@/lib/web/pricing";
 
 /** The model a plain chat answers with: the one the web's project chats use, open to every plan. */
 const CHAT_MODEL = "maximo-atlas-1.5";
+/**
+ * What the web's model picker may choose instead (its Auto is CHAT_MODEL). The plan's model rules
+ * are applied by the inference route, as for every call; this only keeps unknown names out.
+ */
+const PICKABLE_MODELS = new Set(["deepseek-v4-pro", "glm-5.3-flash", "gpt-6-astra", "claude-opus-5-5"]);
 
 /** How long one answer may go on. */
 const ANSWER_MAX_TOKENS = 4096;
@@ -163,9 +168,12 @@ export async function POST(request: NextRequest, context: Context) {
   let text = "";
   /** Pictures sent with the message (pasted or dropped), as data URLs: seen by the model this turn. */
   let images: string[] = [];
+  /** The model that answers: the one picked, or the chat's own. */
+  let model = CHAT_MODEL;
   try {
-    const body = (await request.json()) as { content?: unknown; images?: unknown };
+    const body = (await request.json()) as { content?: unknown; images?: unknown; model?: unknown };
     text = typeof body.content === "string" ? body.content.trim() : "";
+    if (typeof body.model === "string" && PICKABLE_MODELS.has(body.model)) model = body.model;
     images = Array.isArray(body.images)
       ? body.images.filter((image): image is string => typeof image === "string" && IMAGE_DATA_URL.test(image))
       : [];
@@ -190,7 +198,7 @@ export async function POST(request: NextRequest, context: Context) {
   const { data: reservation, error: reserveError } = await admin.rpc("basecode_reserve_turn", {
     p_user_id: user.id,
     p_client_turn_key: turnKey,
-    p_model: CHAT_MODEL,
+    p_model: model,
     p_kind: "chat",
   });
   if (reserveError) {
@@ -255,7 +263,7 @@ export async function POST(request: NextRequest, context: Context) {
         method: "POST",
         headers: { authorization, "content-type": "application/json" },
         body: JSON.stringify({
-          model: CHAT_MODEL,
+          model,
           stream: true,
           max_tokens: ANSWER_MAX_TOKENS,
           messages,
@@ -434,7 +442,7 @@ export async function POST(request: NextRequest, context: Context) {
             role: "assistant",
             content: answer,
             status,
-            model: CHAT_MODEL,
+            model,
           });
           // The trace is extra: an answer is kept and shown even when how it unfolded is not.
           await saveTrace(admin, { messageId: message.id, chatId: chat.id, parts }).catch((error: unknown) =>
