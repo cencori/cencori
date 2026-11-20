@@ -142,6 +142,22 @@
             "destination": "/api/v1/webhook-deliveries/:path*"
         },
         {
+            "source": "/v1/organization",
+            "destination": "/api/v1/organization"
+        },
+        {
+            "source": "/v1/organization/:path*",
+            "destination": "/api/v1/organization/:path*"
+        },
+        {
+            "source": "/v1/projects",
+            "destination": "/api/v1/projects"
+        },
+        {
+            "source": "/v1/projects/:path*",
+            "destination": "/api/v1/projects/:path*"
+        },
+        {
             "source": "/v1/usage",
             "destination": "/api/v1/usage"
         },

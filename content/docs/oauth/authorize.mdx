@@ -1,0 +1,89 @@
+---
+title: "Authorize a user"
+description: "Send a person to Cencori's approval screen and handle the redirect back."
+section: "OAuth"
+order: 3
+---
+
+To ask for access, send the person's browser to `https://cencori.com/oauth/authorize`.
+
+## 1. Create a PKCE verifier and a state
+
+Before redirecting, create two random values and keep them in the person's session on your server:
+
+- a **code verifier**: 43 to 128 characters from `A-Z a-z 0-9 - . _ ~`
+- a **state**: any random string, up to 512 characters
+
+The **code challenge** is the SHA-256 of the verifier, base64url-encoded without padding.
+
+```ts
+import { createHash, randomBytes } from "node:crypto";
+
+const codeVerifier = randomBytes(32).toString("base64url");
+const codeChallenge = createHash("sha256").update(codeVerifier).digest("base64url");
+const state = randomBytes(16).toString("base64url");
+// Save codeVerifier and state in the user's session.
+```
+
+## 2. Redirect to Cencori
+
+```ts
+const url = new URL("https://cencori.com/oauth/authorize");
+url.searchParams.set("response_type", "code");
+url.searchParams.set("client_id", process.env.CENCORI_CLIENT_ID);
+url.searchParams.set("redirect_uri", "https://app.example.com/oauth/callback");
+url.searchParams.set("scope", "organization:read projects:write api_keys:write");
+url.searchParams.set("state", state);
+url.searchParams.set("code_challenge", codeChallenge);
+url.searchParams.set("code_challenge_method", "S256");
+// Redirect the browser to url.toString()
+```
+
+| Parameter | Required | Meaning |
+| :--- | :--- | :--- |
+| `response_type` | Yes | Always `code`. |
+| `client_id` | Yes | Your app's client ID. |
+| `redirect_uri` | Yes | One of your registered addresses, exactly. |
+| `scope` | Yes | [Permissions](/docs/oauth/permissions), separated by spaces. Each must be one your app registered. |
+| `code_challenge` | Yes | The PKCE challenge. |
+| `code_challenge_method` | No | `S256`, which is also the default and the only method. |
+| `state` | Recommended | Returned to you unchanged. Check it to make sure the answer belongs to the request you started. |
+
+## 3. The person decides
+
+If the person is not signed in to Cencori, they sign in first and come back to the approval screen. The screen shows your app's name, whether it is verified, each permission you asked for, and the address they will be sent to.
+
+They choose **one organization**. Only organizations they own or administer are offered. If you ask for `api_keys:write`, only organizations they **own** can be chosen, because creating API keys is the owner's right in Cencori.
+
+Approving the same app again for the same organization replaces the permissions it had.
+
+## 4. Handle the redirect
+
+Cencori sends the browser to your `redirect_uri`.
+
+**Approved:**
+
+```
+https://app.example.com/oauth/callback?code=…&state=…
+```
+
+**Declined or failed:**
+
+```
+https://app.example.com/oauth/callback?error=access_denied&error_description=…&state=…
+```
+
+In your callback:
+
+1. Check that `state` equals the value in the session. If it does not, stop.
+2. If there is an `error`, show the person what happened. Do not retry automatically.
+3. Otherwise [exchange the `code`](/docs/oauth/tokens) for tokens. The code works once and expires after 5 minutes.
+
+| `error` | Meaning |
+| :--- | :--- |
+| `access_denied` | The person clicked Cancel. |
+| `invalid_scope` | `scope` is missing, names a permission that does not exist, or asks for one your app did not register. |
+| `invalid_request` | The PKCE challenge is missing or malformed, or `state` is not printable text. |
+| `unsupported_response_type` | `response_type` is not `code`. |
+
+If the `client_id` is unknown or the `redirect_uri` is not registered, Cencori shows an error page and does not redirect. An address it cannot trust is never sent anything.

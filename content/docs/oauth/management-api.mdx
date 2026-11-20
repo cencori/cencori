@@ -1,0 +1,252 @@
+---
+title: "Management API"
+description: "The endpoints an OAuth access token can call: organization, projects, API keys and usage."
+section: "OAuth"
+order: 6
+---
+
+Base URL: `https://api.cencori.com/v1`
+
+Every request carries the access token:
+
+```bash
+-H "Authorization: Bearer $ACCESS_TOKEN"
+```
+
+The token decides the organization. There is no organization ID in any path.
+
+| Endpoint | Permission |
+| :--- | :--- |
+| [`GET /organization`](#get-the-organization) | `organization:read` |
+| [`GET /organization/usage`](#get-usage) | `usage:read` |
+| [`GET /projects`](#list-projects) | `projects:read` |
+| [`POST /projects`](#create-a-project) | `projects:write` |
+| [`GET /projects/{id}`](#get-a-project) | `projects:read` |
+| [`PATCH /projects/{id}`](#update-a-project) | `projects:write` |
+| [`GET /projects/{id}/api-keys`](#list-api-keys) | `api_keys:read` |
+| [`POST /projects/{id}/api-keys`](#create-an-api-key) | `api_keys:write` |
+| [`DELETE /projects/{id}/api-keys/{key_id}`](#revoke-an-api-key) | `api_keys:write` |
+
+Each authorization can make 120 requests a minute.
+
+## Get the organization
+
+```bash
+curl https://api.cencori.com/v1/organization \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+```
+
+```json
+{
+  "id": "0b6f…",
+  "object": "organization",
+  "name": "Acme",
+  "slug": "acme",
+  "plan": "pro",
+  "member_count": 4,
+  "created_at": "2026-03-02T10:14:00Z"
+}
+```
+
+## Get usage
+
+```bash
+curl "https://api.cencori.com/v1/organization/usage?range=30d" \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+```
+
+| Query | Default | Meaning |
+| :--- | :--- | :--- |
+| `range` | `7d` | `1h`, `24h`, `7d`, `30d` or `90d`. |
+| `project_id` | All projects | Usage for one project. |
+
+How far back you can read follows the organization's plan: 7 days on Free, 30 on Pro, 90 on Enterprise. A longer `range` is shortened to the plan's limit, and the response says which range was used.
+
+```json
+{
+  "object": "usage",
+  "range": "30d",
+  "project_id": null,
+  "requests": 18422,
+  "successful_requests": 18310,
+  "input_tokens": 9120044,
+  "output_tokens": 2204190,
+  "total_tokens": 11324234,
+  "cost_usd": 41.87,
+  "average_latency_ms": 912,
+  "by_model": { "gpt-5.6": 12010, "claude-sonnet-5": 6412 },
+  "by_provider": { "openai": 12010, "anthropic": 6412 }
+}
+```
+
+`by_model` and `by_provider` count requests. For daily records by project, model and customer, use the [usage export](/docs/platform/usage-export).
+
+## List projects
+
+```bash
+curl https://api.cencori.com/v1/projects \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+```
+
+```json
+{
+  "object": "list",
+  "data": [
+    {
+      "id": "5d1c…",
+      "object": "project",
+      "name": "Storefront",
+      "slug": "storefront",
+      "description": null,
+      "region": "af-south-1",
+      "status": "active",
+      "created_at": "2026-11-19T09:30:00Z"
+    }
+  ]
+}
+```
+
+Projects are returned oldest first.
+
+## Create a project
+
+```bash
+curl https://api.cencori.com/v1/projects \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Storefront", "description": "Created by Acme Deploy"}'
+```
+
+| Field | Required | Meaning |
+| :--- | :--- | :--- |
+| `name` | Yes | 1 to 60 characters. |
+| `description` | No | Up to 200 characters. |
+
+Returns `201` with the project. The slug is made from the name; if it is taken in the organization, a number is added (`storefront-2`).
+
+The organization's plan applies. The Free plan includes one project, so a second create returns `402` with the code `project_limit_reached`. Tell the user their organization needs Pro; your app cannot upgrade it.
+
+## Get a project
+
+```bash
+curl https://api.cencori.com/v1/projects/$PROJECT_ID \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+```
+
+Returns the project, or `404` with `project_not_found`. A project in another organization is also `404`.
+
+## Update a project
+
+```bash
+curl -X PATCH https://api.cencori.com/v1/projects/$PROJECT_ID \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Storefront (production)"}'
+```
+
+Send `name`, `description` or both. `description: null` clears it. The slug does not change when the name does.
+
+## List API keys
+
+```bash
+curl https://api.cencori.com/v1/projects/$PROJECT_ID/api-keys \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+```
+
+```json
+{
+  "object": "list",
+  "data": [
+    {
+      "id": "a41e…",
+      "object": "api_key",
+      "name": "Acme Deploy",
+      "key_prefix": "csk_9f2c...",
+      "environment": "production",
+      "type": "secret",
+      "allowed_domains": null,
+      "created_at": "2026-11-19T09:31:00Z",
+      "last_used_at": null
+    }
+  ]
+}
+```
+
+Revoked keys are not listed. A key's value is never returned here.
+
+## Create an API key
+
+```bash
+curl https://api.cencori.com/v1/projects/$PROJECT_ID/api-keys \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Acme Deploy"}'
+```
+
+| Field | Default | Meaning |
+| :--- | :--- | :--- |
+| `name` | Required | 1 to 80 characters. Name it after your product so the owner knows what to revoke. |
+| `environment` | `production` | `production` or `test`. |
+| `type` | `secret` | `secret` for servers, `publishable` for browsers. |
+| `allowed_domains` | | Required for a publishable key: 1 to 20 domains it may be used from. |
+
+Returns `201` with the key object plus `key`, the key's value:
+
+```json
+{
+  "id": "a41e…",
+  "object": "api_key",
+  "name": "Acme Deploy",
+  "key_prefix": "csk_9f2c...",
+  "environment": "production",
+  "type": "secret",
+  "allowed_domains": null,
+  "created_at": "2026-11-19T09:31:00Z",
+  "last_used_at": null,
+  "key": "csk_9f2c…"
+}
+```
+
+`key` is returned **once**. Cencori stores only a hash and cannot show it again. Store it where the user's app will read it, then use it with the [AI API](/docs/api/authentication).
+
+A project can have 50 active keys.
+
+## Revoke an API key
+
+```bash
+curl -X DELETE https://api.cencori.com/v1/projects/$PROJECT_ID/api-keys/$KEY_ID \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+```
+
+```json
+{ "id": "a41e…", "object": "api_key", "revoked": true }
+```
+
+The key stops working at once and cannot be restored.
+
+## Errors
+
+Errors use the same envelope as the rest of the Cencori API:
+
+```json
+{
+  "error": {
+    "type": "permission_error",
+    "code": "insufficient_scope",
+    "message": "This token does not have the projects:write permission.",
+    "request_id": "req_1a2b3c4d"
+  }
+}
+```
+
+| Status | `code` | Meaning |
+| :--- | :--- | :--- |
+| 400 | `invalid_request_error` | A field is missing or invalid. `param` names it. |
+| 401 | `invalid_token` | No token, or it is invalid, expired or revoked. [Refresh](/docs/oauth/tokens#refresh) and retry once. |
+| 402 | `project_limit_reached`, `pro_required` | The organization's plan does not allow this. |
+| 403 | `insufficient_scope` | The token lacks the permission this endpoint needs. |
+| 404 | `project_not_found`, `api_key_not_found` | Nothing with this ID in the organization. |
+| 409 | `api_key_limit_reached` | The project has 50 active keys. |
+| 429 | `rate_limit_exceeded` | More than 120 requests in a minute. |
+
+Everything your app creates, changes or revokes is recorded in the organization's audit log under your app's name.

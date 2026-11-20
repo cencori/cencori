@@ -1,0 +1,50 @@
+---
+title: "Create an OAuth app"
+description: "Register your app with Cencori to get a client ID and secret."
+section: "OAuth"
+order: 2
+---
+
+An OAuth app is your product's identity on Cencori. People see its name when they are asked to approve access.
+
+## Register the app
+
+1. Open **Organization settings → OAuth apps**. You need to be an owner or admin of the organization.
+2. Click **New app** and fill in:
+
+| Field | Notes |
+| :--- | :--- |
+| **Name** | Shown as "Authorize *Name*". Up to 60 characters. It cannot contain "Cencori". |
+| **Description** | Optional. One line under the title on the approval screen. Up to 200 characters. |
+| **Website** | Optional. Must be `https://`. |
+| **Redirect addresses** | Where Cencori sends people after they decide. 1 to 10. |
+| **Permissions** | The most your app can ever ask for. See [Permissions](/docs/oauth/permissions). |
+
+3. Click **Create app**. Cencori shows the **client ID** (`coa_…`) and **client secret** (`cos_…`).
+
+The secret is shown once. Store it on your server, in the same place as your other credentials. Never ship it in a browser bundle, a mobile app or a public repository.
+
+## Redirect addresses
+
+A redirect address must be:
+
+- `https://`, on any host and path, or
+- `http://` on `localhost`, `127.0.0.1` or `[::1]`, for development.
+
+It cannot contain a wildcard, a `#` fragment or a username and password. A query string is allowed.
+
+Cencori compares the `redirect_uri` in a request with your list as text. `https://app.example.com/callback` and `https://app.example.com/callback/` are different addresses. Register each one you use, including the port for localhost.
+
+## Verified apps
+
+A new app is unverified. Its approval screen tells the person that Cencori has not verified who runs it. To have your app verified, email [support@cencori.com](mailto:support@cencori.com) with the client ID and your company details.
+
+## Change or remove an app
+
+In **Organization settings → OAuth apps**:
+
+- **Edit** changes the name, description, website, redirect addresses and permissions. Removing a permission also removes it from everyone who already approved the app.
+- **New secret** replaces the client secret. The old secret stops working at once, so your app cannot get or refresh tokens until you deploy the new one. Tokens already issued keep working.
+- **Delete** removes the app. Everyone who approved it loses the connection and its tokens stop working at once. This cannot be undone.
+
+An organization can register up to 25 apps.

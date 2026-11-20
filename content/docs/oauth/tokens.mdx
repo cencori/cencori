@@ -1,0 +1,103 @@
+---
+title: "Exchange and refresh tokens"
+description: "Trade the authorization code for an access token, keep it fresh, and revoke it."
+section: "OAuth"
+order: 4
+---
+
+Token requests go from **your server** to `https://cencori.com/api/oauth/token`. Never make them from a browser: they carry your client secret.
+
+Send your client ID and secret either as HTTP Basic authentication or as `client_id` and `client_secret` in the body. The body can be form-encoded (the standard) or JSON.
+
+## Exchange the code
+
+```bash
+curl https://cencori.com/api/oauth/token \
+  -u "$CENCORI_CLIENT_ID:$CENCORI_CLIENT_SECRET" \
+  -d grant_type=authorization_code \
+  -d code="$CODE" \
+  -d redirect_uri="https://app.example.com/oauth/callback" \
+  -d code_verifier="$CODE_VERIFIER"
+```
+
+| Field | Meaning |
+| :--- | :--- |
+| `grant_type` | `authorization_code` |
+| `code` | The `code` from the redirect. |
+| `redirect_uri` | The same address you sent to the authorize endpoint. |
+| `code_verifier` | The PKCE verifier you saved before redirecting. |
+
+```json
+{
+  "access_token": "cat_…",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "refresh_token": "crt_…",
+  "scope": "organization:read projects:write api_keys:write"
+}
+```
+
+Store both tokens encrypted, against the user in your own database.
+
+A code can be exchanged once. A second attempt fails with `invalid_grant`, as does a code older than 5 minutes, a `redirect_uri` that differs, or a verifier that does not match the challenge. A failed attempt also spends the code: start the authorization again.
+
+## Refresh
+
+An access token lasts **1 hour**. Get a new one with the refresh token:
+
+```bash
+curl https://cencori.com/api/oauth/token \
+  -u "$CENCORI_CLIENT_ID:$CENCORI_CLIENT_SECRET" \
+  -d grant_type=refresh_token \
+  -d refresh_token="$REFRESH_TOKEN"
+```
+
+The response has the same shape and contains a **new refresh token**. Save it and discard the old one: the old refresh token and the old access token both stop working as soon as the request succeeds.
+
+> **Using a refresh token a second time revokes the whole authorization.** Cencori cannot tell a retry from a stolen token, so it ends the connection and the person has to approve your app again. Refresh from one place at a time, and save the new token before you use it.
+
+A refresh token expires 90 days after it was issued. An app that refreshes at least that often stays connected indefinitely.
+
+## Use the access token
+
+```bash
+curl https://api.cencori.com/v1/organization \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+```
+
+See the [management API](/docs/oauth/management-api).
+
+## Revoke
+
+When a user disconnects Cencori in your product, hand the token back:
+
+```bash
+curl https://cencori.com/api/oauth/revoke \
+  -u "$CENCORI_CLIENT_ID:$CENCORI_CLIENT_SECRET" \
+  -d token="$REFRESH_TOKEN"
+```
+
+Either token works, and either ends the whole authorization. The response is `200` with an empty body whether or not the token existed.
+
+## When access ends
+
+A token stops working, and refreshing fails with `invalid_grant`, when:
+
+- the person or another owner or admin removes your app in **Organization settings → OAuth apps**
+- the person who approved it leaves the organization or loses the role that let them approve
+- you remove from your app every permission the person granted, or delete the app
+- a refresh token is used twice
+
+API calls then return `401` with the code `invalid_token`. Ask the person to connect again.
+
+## Errors
+
+Token errors are JSON with `error` and `error_description`.
+
+| Status | `error` | Meaning |
+| :--- | :--- | :--- |
+| 400 | `invalid_request` | A required field is missing or malformed. |
+| 400 | `invalid_grant` | The code or refresh token is invalid, expired or already used. |
+| 400 | `unsupported_grant_type` | `grant_type` is not `authorization_code` or `refresh_token`. |
+| 401 | `invalid_client` | The client ID or secret is wrong. |
+| 429 | `invalid_request` | Too many requests from this address. Wait for `Retry-After` seconds. |

@@ -1,0 +1,47 @@
+---
+title: "Permissions"
+description: "The scopes a Cencori OAuth app can ask for, and exactly what each allows."
+section: "OAuth"
+order: 5
+---
+
+A permission (a scope) names one kind of thing and a level: `projects:read`, `projects:write`. Write includes read, so `projects:write` is enough to list projects.
+
+A token can only act on the **one organization** the person chose, and only on the things its permissions name.
+
+| Scope | Allows | Who can grant it |
+| :--- | :--- | :--- |
+| `organization:read` | Read the organization's name, slug, plan and number of members. | Owner or admin |
+| `projects:read` | List the organization's projects and read one. | Owner or admin |
+| `projects:write` | Create a project and change a project's name or description. Includes `projects:read`. | Owner or admin |
+| `api_keys:read` | List a project's API keys: name, prefix, type and when each was last used. Never the key's value. | Owner or admin |
+| `api_keys:write` | Create and revoke API keys. Includes `api_keys:read`. | **Owner only** |
+| `usage:read` | Read requests, tokens and cost for the organization or one project. | Owner or admin |
+
+## What `api_keys:write` means
+
+A project API key can call models, and those calls are billed to the organization. An app with `api_keys:write` can therefore create something that spends the organization's money. This is why only an owner can grant it, and why the approval screen says so.
+
+Ask for it only if your product needs to call models on the user's behalf, or to hand a key to something it deploys for them.
+
+## What no permission allows
+
+OAuth tokens cannot:
+
+- call models or any other part of the AI API
+- delete a project
+- read the value of an existing API key
+- change members, roles, billing, plans or organization settings
+- see any organization other than the one chosen
+
+## Ask for less
+
+Request the smallest set that does the job. A person is more likely to approve a short list, and a leaked token can do less.
+
+Your app registers the most it can ever ask for. Each authorization request can ask for all of it or a subset:
+
+```
+scope=organization:read projects:read
+```
+
+A request for a permission your app did not register fails with `invalid_scope`.

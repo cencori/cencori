@@ -1,0 +1,48 @@
+---
+title: "Cencori OAuth"
+description: "Let your product ask a Cencori user for access to their organization, then set up projects and API keys for them through the management API."
+section: "OAuth"
+order: 1
+---
+
+Cencori OAuth lets your product act on a Cencori organization with its owner's permission. The person clicks a button in your product, sees exactly what you are asking for, chooses an organization and approves. Your server receives a token limited to that organization and those permissions.
+
+Use it when your product sets Cencori up for its users: a deployment platform that creates a Cencori project for each app, a FinOps tool that reads usage, or an app builder that issues a project key for what it builds.
+
+## OAuth or an API key?
+
+| | Project API key (`csk_…`) | OAuth access token (`cat_…`) |
+| :--- | :--- | :--- |
+| **Belongs to** | One project | One organization, as granted by one person |
+| **Used for** | Calling models and the rest of the AI API | The [management API](/docs/oauth/management-api): projects, API keys, usage |
+| **Who creates it** | The organization's owner, in the dashboard | Cencori, after the person approves your app |
+| **Lifetime** | Until revoked | 1 hour, renewed with a refresh token |
+
+An access token cannot call models. To call models for a user, use `api_keys:write` to create a project key and call the AI API with that.
+
+## How it works
+
+Cencori OAuth is the OAuth 2.1 authorization code flow with PKCE.
+
+1. **[Create an OAuth app](/docs/oauth/create-an-app)** in your organization's settings. You get a client ID and a client secret.
+2. **[Send the person to Cencori](/docs/oauth/authorize)** with your client ID, the permissions you want and a PKCE challenge.
+3. The person signs in, chooses an organization and approves. Cencori sends them back to your redirect address with a `code`.
+4. **[Exchange the code](/docs/oauth/tokens)** on your server for an access token and a refresh token.
+5. **[Call the management API](/docs/oauth/management-api)** with the access token.
+
+## Endpoints
+
+| | Address |
+| :--- | :--- |
+| Authorize (browser) | `https://cencori.com/oauth/authorize` |
+| Token | `https://cencori.com/api/oauth/token` |
+| Revoke | `https://cencori.com/api/oauth/revoke` |
+| Management API | `https://api.cencori.com/v1` |
+| Discovery (RFC 8414) | `https://cencori.com/.well-known/oauth-authorization-server` |
+
+## What Cencori requires
+
+- **PKCE with S256** on every authorization request. There is no plain method and no way to skip it.
+- **A client secret** on every token request. The flow is for apps with a server; there is no implicit flow and no secret-less client.
+- **Exact redirect addresses.** The `redirect_uri` you send must be one you registered, character for character.
+- **Rotating refresh tokens.** Each refresh returns a new refresh token and ends the old one.

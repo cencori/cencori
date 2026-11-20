@@ -352,7 +352,7 @@ function OrganizationLayoutShell({
         ? "general"
         : organizationSettingsArea === "teams" || organizationSettingsArea === "billing" || organizationSettingsArea === "usage" || organizationSettingsArea === "audit-log"
         ? organizationSettingsArea
-        : searchParams.get("section") === "advanced" ? "advanced" : "general";
+        : searchParams.get("section") === "advanced" ? "advanced" : searchParams.get("section") === "oauth-apps" ? "oauth-apps" : "general";
     const requestedProjectSettingsTab = searchParams.get("tab");
     // Local tab switches (sidebar → settings page event + replaceState) don't
     // touch useSearchParams, so the highlight tracks a local override until
@@ -532,6 +532,7 @@ function OrganizationLayoutShell({
     const organizationSettingsItems = [
         { section: "general", href: consoleMode ? "/organization/settings" : `${orgBase}/~/settings`, label: "General" },
         { section: "advanced", href: consoleMode ? "/organization/settings?section=advanced" : `${orgBase}/~/settings?section=advanced`, label: "Advanced" },
+        { section: "oauth-apps", href: consoleMode ? "/organization/settings?section=oauth-apps" : `${orgBase}/~/settings?section=oauth-apps`, label: "OAuth apps" },
         { section: "teams", href: consoleMode ? "/teams" : `${orgBase}/~/teams`, label: "Teams" },
         { section: "billing", href: consoleMode ? "/billing" : `${orgBase}/~/billing`, label: "Billing" },
         { section: "usage", href: consoleMode ? "/usage" : `${orgBase}/~/usage`, label: "Usage" },

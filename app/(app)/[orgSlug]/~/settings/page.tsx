@@ -27,6 +27,7 @@ import { deleteOrganization, updateOrgName, updateOrgSlug } from './actions';
 import { SsoSettings } from './SsoSettings';
 import { AuditInfrastructureSettings } from './AuditInfrastructureSettings';
 import { UsageExportSettings } from './UsageExportSettings';
+import { OAuthAppsSettings } from './OAuthAppsSettings';
 import type { SubscriptionTier } from '@/lib/entitlements';
 import { useOrganizationProject } from '@/lib/contexts/OrganizationProjectContext';
 
@@ -44,7 +45,8 @@ interface OrgRow {
 export default function OrgSettingsPage({ params }: PageProps) {
     const { orgSlug } = use(params);
     const searchParams = useSearchParams();
-    const activeSection = searchParams.get('section') === 'advanced' ? 'advanced' : 'general';
+    const sectionParam = searchParams.get('section');
+    const activeSection = sectionParam === 'advanced' || sectionParam === 'oauth-apps' ? sectionParam : 'general';
     const { organizations } = useOrganizationProject();
     const cachedOrganization = useMemo<OrgRow | undefined>(() => {
         const organization = organizations.find((item) => item.slug === orgSlug);
@@ -98,17 +100,19 @@ export default function OrgSettingsPage({ params }: PageProps) {
             <header className="pb-8">
                 <div>
                     <h1 className="text-2xl font-semibold tracking-[-0.03em]">
-                        {activeSection === 'advanced' ? 'Advanced settings' : 'General settings'}
+                        {activeSection === 'advanced' ? 'Advanced settings' : activeSection === 'oauth-apps' ? 'OAuth apps' : 'General settings'}
                     </h1>
                     <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
                         {activeSection === 'advanced'
                             ? `Low-level organization controls for ${org?.name ?? "this organization"}. Changes here can affect every project and workload.`
+                            : activeSection === 'oauth-apps'
+                            ? `Apps ${org?.name ?? "this organization"} built on Cencori OAuth, and apps that have access to it.`
                             : `Identity settings for every project and workload operated by ${org?.name ?? "this organization"}.`}
                     </p>
                 </div>
             </header>
 
-            <nav className="mb-6 grid grid-cols-2 gap-1 rounded-lg border border-border/35 bg-muted/20 p-1 lg:hidden" aria-label="Organization settings">
+            <nav className="mb-6 grid grid-cols-3 gap-1 rounded-lg border border-border/35 bg-muted/20 p-1 lg:hidden" aria-label="Organization settings">
                 <Link
                     href={`/${orgSlug}/~/settings`}
                     className={`rounded-md px-3 py-2 text-center text-xs font-medium transition-colors ${activeSection === 'general' ? 'bg-muted/80 text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
@@ -120,6 +124,12 @@ export default function OrgSettingsPage({ params }: PageProps) {
                     className={`rounded-md px-3 py-2 text-center text-xs font-medium transition-colors ${activeSection === 'advanced' ? 'bg-muted/80 text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
                 >
                     Advanced
+                </Link>
+                <Link
+                    href={`/${orgSlug}/~/settings?section=oauth-apps`}
+                    className={`rounded-md px-3 py-2 text-center text-xs font-medium transition-colors ${activeSection === 'oauth-apps' ? 'bg-muted/80 text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                >
+                    OAuth apps
                 </Link>
             </nav>
 
@@ -151,6 +161,15 @@ export default function OrgSettingsPage({ params }: PageProps) {
                         <SettingsPanel>
                             <OrgIdCard org={org} />
                         </SettingsPanel>
+                    </SettingsSection>
+                </div>
+            ) : activeSection === 'oauth-apps' ? (
+                <div className="border-t border-border/35">
+                    <SettingsSection
+                        title="OAuth apps"
+                        description="Let other products ask for access to a Cencori organization, and see which apps can reach this one."
+                    >
+                        <OAuthAppsSettings orgSlug={orgSlug} />
                     </SettingsSection>
                 </div>
             ) : (

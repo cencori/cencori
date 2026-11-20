@@ -18,6 +18,9 @@ export const RESERVED_ORG_SLUGS: ReadonlySet<string> = new Set([
     // Public API prefix (/v1/* rewrites to /api/v1/*)
     "v1",
     "auth",
+    // Cencori OAuth: the consent screen (/oauth/authorize) and its discovery document.
+    "oauth",
+    ".well-known",
     // Public API paths (vercel.json rewrites /v1/* to /api/v1/*). Unreserved,
     // the proxy read `v1` as an org slug and 308'd every SDK call made with
     // the default https://cencori.com base URL to the console.

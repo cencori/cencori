@@ -1,0 +1,11 @@
+{
+  "title": "OAuth",
+  "pages": [
+    "index",
+    "create-an-app",
+    "authorize",
+    "tokens",
+    "permissions",
+    "management-api"
+  ]
+}
