@@ -133,6 +133,7 @@ export async function POST(request: NextRequest, context: Context) {
     if (!repo) return json(NO_ACCESS, 403);
 
     const [made, tensor] = await Promise.all([mintPushToken(repo, app), tensorCommitter(app)]);
+    const person = { name: account.login, email: `${account.githubUserId}+${account.login}@users.noreply.github.com` };
     if (!made) return json({ error: "Tensor could not get permission to push from GitHub. Try again shortly." }, 503);
     return json({
       // The repository's name as it is now: it may have been renamed since it was connected.
@@ -140,9 +141,11 @@ export async function POST(request: NextRequest, context: Context) {
       branch: connection.branch,
       token: made.token,
       expiresAt: made.expiresAt,
-      author: { name: account.login, email: `${account.githubUserId}+${account.login}@users.noreply.github.com` },
-      // Named in the commit beside the person, so GitHub shows Tensor took part. Absent on Cencori's app.
-      coAuthor: tensor,
+      // Tensor's commits are Tensor's: its app's bot is the author (so it is among the repository's
+      // contributors, as v0's is), and the person is named beside it as co-author. On Cencori's app
+      // there is no Tensor bot, and the person is the author as before.
+      author: tensor ?? person,
+      coAuthor: tensor ? person : null,
     });
   } catch (error) {
     console.error("[Tensor Cloud] Preparing a push failed", error);
