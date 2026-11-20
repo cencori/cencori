@@ -7,8 +7,7 @@
 -- Nothing secret is stored as it was issued: client secrets, codes and tokens are kept as their
 -- SHA-256 only. Applied once by scripts/brimble-apply-sql.mjs before a deploy starts.
 
--- An app an organization registered. `verified` is set by Cencori staff, by hand, for apps whose
--- owner we know; the consent screen warns about every other app.
+-- An app an organization registered.
 create table if not exists public.oauth_apps (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references public.organizations(id) on delete cascade,
@@ -20,7 +19,6 @@ create table if not exists public.oauth_apps (
   client_secret_last_four text not null,
   redirect_uris text[] not null check (cardinality(redirect_uris) between 1 and 10),
   scopes text[] not null check (cardinality(scopes) >= 1),
-  verified boolean not null default false,
   created_by uuid not null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

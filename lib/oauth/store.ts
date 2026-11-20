@@ -32,13 +32,12 @@ export type OAuthApp = {
   client_secret_last_four: string;
   redirect_uris: string[];
   scopes: string[];
-  verified: boolean;
   created_at: string;
   updated_at: string;
 };
 
 const APP_COLUMNS =
-  "id, organization_id, name, description, website_url, client_id, client_secret_last_four, redirect_uris, scopes, verified, created_at, updated_at";
+  "id, organization_id, name, description, website_url, client_id, client_secret_last_four, redirect_uris, scopes, created_at, updated_at";
 
 /** An organization may register this many apps. Enough for real use, few enough to read. */
 export const MAX_APPS_PER_ORGANIZATION = 25;
@@ -509,7 +508,6 @@ export type GrantSummary = {
   id: string;
   app_name: string;
   app_website_url: string | null;
-  app_verified: boolean;
   user_id: string;
   scopes: string[];
   created_at: string;
@@ -520,12 +518,12 @@ export type GrantSummary = {
 export async function listGrants(db: SupabaseClient, organizationId: string): Promise<GrantSummary[]> {
   const { data, error } = await db
     .from("oauth_grants")
-    .select("id, user_id, scopes, created_at, last_used_at, oauth_apps!inner(name, website_url, verified)")
+    .select("id, user_id, scopes, created_at, last_used_at, oauth_apps!inner(name, website_url)")
     .eq("organization_id", organizationId)
     .is("revoked_at", null)
     .order("created_at", { ascending: false });
   if (error) throw new Error(`Could not list authorized apps: ${error.message}`);
-  type AppJoin = { name: string; website_url: string | null; verified: boolean };
+  type AppJoin = { name: string; website_url: string | null };
   type Row = { id: string; user_id: string; scopes: string[]; created_at: string; last_used_at: string | null; oauth_apps: AppJoin | AppJoin[] };
   return ((data ?? []) as unknown as Row[]).map((row) => {
     const app = Array.isArray(row.oauth_apps) ? row.oauth_apps[0] : row.oauth_apps;
@@ -533,7 +531,6 @@ export async function listGrants(db: SupabaseClient, organizationId: string): Pr
       id: row.id,
       app_name: app?.name ?? "OAuth app",
       app_website_url: app?.website_url ?? null,
-      app_verified: app?.verified ?? false,
       user_id: row.user_id,
       scopes: row.scopes,
       created_at: row.created_at,

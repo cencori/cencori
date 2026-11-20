@@ -212,9 +212,6 @@ export function OAuthAppsSettings({ orgSlug }: { orgSlug: string }) {
                                 <div className="min-w-0">
                                     <p className="flex items-center gap-1.5 truncate text-[13px] font-medium">
                                         {app.name}
-                                        {app.verified ? (
-                                            <ShieldCheck className="size-3.5 text-emerald-600 dark:text-emerald-400" aria-label="Verified by Cencori" />
-                                        ) : null}
                                     </p>
                                     <p className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">
                                         {app.client_id} · secret ending {app.client_secret_last_four}
@@ -256,7 +253,6 @@ export function OAuthAppsSettings({ orgSlug }: { orgSlug: string }) {
                                 <div className="min-w-0">
                                     <p className="truncate text-[13px] font-medium">
                                         {grant.app_name}
-                                        {grant.app_verified ? "" : " (unverified)"}
                                     </p>
                                     <p className="mt-0.5 text-[11px] leading-5 text-muted-foreground">
                                         {describeScopes(grant.scopes)

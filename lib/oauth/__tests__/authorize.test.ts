@@ -27,7 +27,6 @@ const app = {
   client_id: CLIENT_ID,
   redirect_uris: [REDIRECT],
   scopes: ["organization:read", "projects:read", "projects:write"],
-  verified: false,
 };
 
 const good: AuthorizeParams = {

@@ -30,7 +30,6 @@ const PREVIEW_REQUEST: AuthorizeRequest = {
     client_secret_last_four: "0000",
     redirect_uris: ["https://acme.example/oauth/callback"],
     scopes: ["organization:read", "projects:write", "api_keys:write", "usage:read"],
-    verified: false,
     created_at: "",
     updated_at: "",
   },
@@ -125,15 +124,6 @@ export default async function AuthorizePage({ searchParams }: AuthorizePageProps
           needsOwner={scopes.includes("api_keys:write")}
           preview={preview}
         />
-
-        {app.verified ? null : (
-          <p
-            className="mt-6 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs leading-5 text-amber-700 dark:text-amber-300"
-            role="note"
-          >
-            Cencori has not verified who runs this app. Only continue if you trust it.
-          </p>
-        )}
       </section>
     </main>
   );
