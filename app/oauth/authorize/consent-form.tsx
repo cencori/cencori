@@ -30,6 +30,8 @@ export function ConsentForm(props: ConsentFormProps) {
   const [pending, setPending] = useState<"allow" | "deny" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [detailed, setDetailed] = useState(false);
+  // Which of the detailed permissions are opened to show what they allow.
+  const [opened, setOpened] = useState<string[]>([]);
   // One row for each level, as "Projects, API keys": what can be changed first, then what can only be read.
   const levels = (["write", "read"] as const)
     .map((level) => ({
@@ -135,13 +137,37 @@ export function ConsentForm(props: ConsentFormProps) {
         />
       </button>
       {detailed ? (
-        <ul className="mt-3 space-y-2.5">
-          {props.permissions.map((permission) => (
-            <li key={permission.resource}>
-              <p className="text-xs font-medium">{permission.label}</p>
-              <p className="text-xs leading-5 text-muted-foreground">{permission.description}</p>
-            </li>
-          ))}
+        <ul className="mt-3 divide-y divide-border rounded-lg border border-border">
+          {props.permissions.map((permission) => {
+            const open = opened.includes(permission.resource);
+            return (
+              <li key={permission.resource}>
+                <button
+                  aria-expanded={open}
+                  className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left text-sm font-medium"
+                  onClick={() =>
+                    setOpened((current) =>
+                      open ? current.filter((item) => item !== permission.resource) : [...current, permission.resource],
+                    )
+                  }
+                  type="button"
+                >
+                  {permission.label}
+                  <ChevronDown
+                    aria-hidden="true"
+                    className={
+                      open
+                        ? "size-3.5 shrink-0 rotate-180 text-muted-foreground transition-transform"
+                        : "size-3.5 shrink-0 text-muted-foreground transition-transform"
+                    }
+                  />
+                </button>
+                {open ? (
+                  <p className="px-3 pb-2.5 text-xs leading-5 text-muted-foreground">{permission.description}</p>
+                ) : null}
+              </li>
+            );
+          })}
         </ul>
       ) : null}
 
