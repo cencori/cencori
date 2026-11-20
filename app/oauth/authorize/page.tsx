@@ -13,6 +13,7 @@ import {
 import { describeScopes, formatScopes } from "@/lib/oauth/protocol";
 import { grantableOrganizations, roleMayGrant } from "@/lib/oauth/store";
 import { ConsentForm } from "./consent-form";
+import { FollowSystemTheme } from "./follow-system-theme";
 
 export const metadata: Metadata = {
   title: "Authorize an app",
@@ -91,6 +92,7 @@ export default async function AuthorizePage({ searchParams }: AuthorizePageProps
 
   return (
     <main className="grid min-h-dvh place-items-center bg-background px-5 py-10 text-foreground">
+      <FollowSystemTheme />
       <section className="w-full max-w-sm">
         <div className="flex items-center justify-center gap-3">
           <div
@@ -132,6 +134,7 @@ export default async function AuthorizePage({ searchParams }: AuthorizePageProps
 function Stopped({ message }: { message: string }) {
   return (
     <main className="grid min-h-dvh place-items-center bg-background px-5 text-foreground">
+      <FollowSystemTheme />
       <section className="w-full max-w-sm text-center">
         <div className="mb-6 flex justify-center">
           <Logo variant="mark" className="h-7" />
