@@ -3,6 +3,7 @@ import { getAuthUser } from "@/lib/auth/get-auth-user";
 
 import { createServerClient } from "@/lib/supabaseServer";
 import { createAdminClient } from "@/lib/supabaseAdmin";
+import { checkInternalAccess } from '@/lib/internal-access';
 import { adjustCredits } from "@/lib/credits";
 import { revalidatePath } from "next/cache";
 import { listBachsTopups, toInvoiceSummary } from "@/lib/billing/bachs-invoices";
@@ -115,6 +116,12 @@ async function getAuthorizedOrgOperatorContext(orgSlug: string): Promise<Operato
 
     if (userError || !user) {
         return { error: 'Unauthorized' };
+    }
+
+    // Cencori staff only. These controls add credit without a payment and freeze billing; being
+    // the organization's owner or admin is not enough, or every customer could credit themselves.
+    if (!(await checkInternalAccess(user.id, user.email))) {
+        return { error: 'Forbidden' };
     }
 
     const { data: org, error: orgError } = await supabase
