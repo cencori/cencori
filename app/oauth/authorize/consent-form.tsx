@@ -112,8 +112,8 @@ export function ConsentForm(props: ConsentFormProps) {
             <span
               className={
                 group.level === "write"
-                  ? "shrink-0 rounded-full border border-amber-500/40 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-amber-700 dark:text-amber-300"
-                  : "shrink-0 rounded-full border border-border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground"
+                  ? "shrink-0 rounded border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-1 text-[10px] font-medium uppercase leading-none tracking-wider text-emerald-600 dark:text-emerald-400"
+                  : "shrink-0 rounded border border-border px-1.5 py-1 text-[10px] font-medium uppercase leading-none tracking-wider text-muted-foreground"
               }
             >
               {group.level === "write" ? "Read + write" : "Read"}
