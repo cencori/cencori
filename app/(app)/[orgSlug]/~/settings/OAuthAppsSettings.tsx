@@ -209,13 +209,23 @@ export function OAuthAppsSettings({ orgSlug }: { orgSlug: string }) {
                     ) : (
                         data.apps.map((app) => (
                             <div key={app.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
-                                <div className="min-w-0">
-                                    <p className="flex items-center gap-1.5 truncate text-[13px] font-medium">
+                                <div className="flex min-w-0 items-center gap-3">
+                                    {app.logo_url ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img alt="" src={app.logo_url} className="size-8 shrink-0 rounded-md border border-border/40 bg-white object-contain p-1" />
+                                    ) : (
+                                        <div aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-md bg-foreground text-xs font-semibold text-background">
+                                            {app.name.slice(0, 1).toUpperCase()}
+                                        </div>
+                                    )}
+                                    <div className="min-w-0">
+                                    <p className="truncate text-[13px] font-medium">
                                         {app.name}
                                     </p>
                                     <p className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">
                                         {app.client_id} · secret ending {app.client_secret_last_four}
                                     </p>
+                                    </div>
                                 </div>
                                 <div className="flex items-center gap-1">
                                     <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => openForm(app)}>
@@ -321,6 +331,9 @@ export function OAuthAppsSettings({ orgSlug }: { orgSlug: string }) {
                                 onChange={(event) => setForm({ ...form, websiteUrl: event.target.value })}
                                 className="h-8 text-xs"
                             />
+                            <p className="text-[11px] leading-5 text-muted-foreground">
+                                Your app&apos;s logo is taken from this site&apos;s icon. Without a website, people see the first letter of the name.
+                            </p>
                         </div>
                         <div className="space-y-1.5">
                             <Label htmlFor="oauth-app-redirects" className="text-xs">Redirect addresses</Label>

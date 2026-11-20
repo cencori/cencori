@@ -28,6 +28,7 @@ export type OAuthApp = {
   name: string;
   description: string | null;
   website_url: string | null;
+  logo_url: string | null;
   client_id: string;
   client_secret_last_four: string;
   redirect_uris: string[];
@@ -37,7 +38,7 @@ export type OAuthApp = {
 };
 
 const APP_COLUMNS =
-  "id, organization_id, name, description, website_url, client_id, client_secret_last_four, redirect_uris, scopes, created_at, updated_at";
+  "id, organization_id, name, description, website_url, logo_url, client_id, client_secret_last_four, redirect_uris, scopes, created_at, updated_at";
 
 /** An organization may register this many apps. Enough for real use, few enough to read. */
 export const MAX_APPS_PER_ORGANIZATION = 25;
@@ -188,6 +189,12 @@ export async function deleteApp(
     .maybeSingle();
   if (error) throw new Error(`Could not delete the OAuth app: ${error.message}`);
   return (data as OAuthApp | null) ?? null;
+}
+
+/** Records where an app's logo is kept, or that it has none. */
+export async function setAppLogo(db: SupabaseClient, appId: string, logoUrl: string | null): Promise<void> {
+  const { error } = await db.from("oauth_apps").update({ logo_url: logoUrl }).eq("id", appId);
+  if (error) throw new Error(`Could not save the app's logo: ${error.message}`);
 }
 
 /** Whether this is the app's secret. */
@@ -508,6 +515,7 @@ export type GrantSummary = {
   id: string;
   app_name: string;
   app_website_url: string | null;
+  app_logo_url: string | null;
   user_id: string;
   scopes: string[];
   created_at: string;
@@ -518,12 +526,12 @@ export type GrantSummary = {
 export async function listGrants(db: SupabaseClient, organizationId: string): Promise<GrantSummary[]> {
   const { data, error } = await db
     .from("oauth_grants")
-    .select("id, user_id, scopes, created_at, last_used_at, oauth_apps!inner(name, website_url)")
+    .select("id, user_id, scopes, created_at, last_used_at, oauth_apps!inner(name, website_url, logo_url)")
     .eq("organization_id", organizationId)
     .is("revoked_at", null)
     .order("created_at", { ascending: false });
   if (error) throw new Error(`Could not list authorized apps: ${error.message}`);
-  type AppJoin = { name: string; website_url: string | null };
+  type AppJoin = { name: string; website_url: string | null; logo_url: string | null };
   type Row = { id: string; user_id: string; scopes: string[]; created_at: string; last_used_at: string | null; oauth_apps: AppJoin | AppJoin[] };
   return ((data ?? []) as unknown as Row[]).map((row) => {
     const app = Array.isArray(row.oauth_apps) ? row.oauth_apps[0] : row.oauth_apps;
@@ -531,6 +539,7 @@ export async function listGrants(db: SupabaseClient, organizationId: string): Pr
       id: row.id,
       app_name: app?.name ?? "OAuth app",
       app_website_url: app?.website_url ?? null,
+      app_logo_url: app?.logo_url ?? null,
       user_id: row.user_id,
       scopes: row.scopes,
       created_at: row.created_at,

@@ -24,17 +24,18 @@ const PREVIEW_REQUEST: AuthorizeRequest = {
   app: {
     id: "preview",
     organization_id: "preview",
-    name: "Acme Deploy",
-    description: "Sets up Cencori for the apps you deploy on Acme.",
-    website_url: "https://acme.example",
+    name: "Tensor",
+    description: "Sets up Cencori for the apps you build in Tensor.",
+    website_url: "https://www.tensorade.app",
+    logo_url: "/tensor/baseb.png",
     client_id: "coa_000000000000000000000000",
     client_secret_last_four: "0000",
-    redirect_uris: ["https://acme.example/oauth/callback"],
+    redirect_uris: ["https://cencori.com/api/tensor/integrations/cencori/callback"],
     scopes: ["organization:read", "projects:write", "api_keys:write", "usage:read"],
     created_at: "",
     updated_at: "",
   },
-  redirectUri: "https://acme.example/oauth/callback",
+  redirectUri: "https://cencori.com/api/tensor/integrations/cencori/callback",
   scopes: ["organization:read", "projects:write", "api_keys:write", "usage:read"],
   state: undefined,
   codeChallenge: "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
@@ -95,12 +96,22 @@ export default async function AuthorizePage({ searchParams }: AuthorizePageProps
       <FollowSystemTheme />
       <section className="w-full max-w-sm">
         <div className="flex items-center justify-center gap-3">
-          <div
-            aria-hidden="true"
-            className="grid h-11 w-11 place-items-center rounded-lg bg-foreground text-base font-semibold text-background"
-          >
-            {app.name.slice(0, 1).toUpperCase()}
-          </div>
+          {app.logo_url ? (
+            // The app's own logo, served from our file storage (lib/oauth/logo.ts).
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              alt=""
+              className="h-11 w-11 rounded-lg border border-border/40 bg-white object-contain p-1.5"
+              src={app.logo_url}
+            />
+          ) : (
+            <div
+              aria-hidden="true"
+              className="grid h-11 w-11 place-items-center rounded-lg bg-foreground text-base font-semibold text-background"
+            >
+              {app.name.slice(0, 1).toUpperCase()}
+            </div>
+          )}
           <span aria-hidden="true" className="text-muted-foreground">
             ⇄
           </span>

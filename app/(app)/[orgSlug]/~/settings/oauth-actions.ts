@@ -10,6 +10,7 @@ import { createAdminClient } from '@/lib/supabaseAdmin';
 import { requireOrgOwnerOrAdmin } from '@/lib/org-admin-access';
 import { writeAuditLog } from '@/lib/audit-log';
 import { adminUsers } from '@/lib/auth/admin-users';
+import { refreshAppLogo, removeAppLogo } from '@/lib/oauth/logo';
 import { MAX_REDIRECT_URIS, isOAuthScope, isRegistrableRedirectUri, type OAuthScope } from '@/lib/oauth/protocol';
 import {
     MAX_APPS_PER_ORGANIZATION,
@@ -117,6 +118,8 @@ export async function createOAuthApp(
             return { ok: false, error: `An organization can register up to ${MAX_APPS_PER_ORGANIZATION} OAuth apps.` };
         }
         const created = await createApp(admin, { ...checked.input, organizationId: auth.orgId, createdBy: auth.userId });
+        // The logo is the website's icon, copied once. No website, or no usable icon, means no logo.
+        created.app.logo_url = await refreshAppLogo(admin, created.app);
         writeAuditLog({
             organizationId: auth.orgId,
             category: 'integration',
@@ -140,8 +143,14 @@ export async function updateOAuthApp(orgSlug: string, appId: string, form: OAuth
     const auth = await requireOrgOwnerOrAdmin(orgSlug);
     if (!auth.ok) return { ok: false, error: auth.error };
     try {
-        const app = await updateApp(createAdminClient(), { ...checked.input, organizationId: auth.orgId, appId });
+        const admin = createAdminClient();
+        const before = (await listApps(admin, auth.orgId)).find((existing) => existing.id === appId);
+        const app = await updateApp(admin, { ...checked.input, organizationId: auth.orgId, appId });
         if (!app) return { ok: false, error: 'This OAuth app no longer exists.' };
+        // Fetched again when the website changes, or when there was no logo to begin with.
+        if (before?.website_url !== app.website_url || !app.logo_url) {
+            app.logo_url = await refreshAppLogo(admin, app);
+        }
         writeAuditLog({
             organizationId: auth.orgId,
             category: 'integration',
@@ -190,6 +199,7 @@ export async function deleteOAuthApp(orgSlug: string, appId: string): Promise<Ac
     try {
         const app = await deleteApp(createAdminClient(), { organizationId: auth.orgId, appId });
         if (!app) return { ok: false, error: 'This OAuth app no longer exists.' };
+        await removeAppLogo(app.id);
         writeAuditLog({
             organizationId: auth.orgId,
             category: 'integration',

@@ -14,6 +14,8 @@ create table if not exists public.oauth_apps (
   name text not null check (char_length(name) between 1 and 60),
   description text check (description is null or char_length(description) <= 200),
   website_url text check (website_url is null or char_length(website_url) <= 300),
+  -- The app's logo: a copy of its website's icon, kept in our own file storage (lib/oauth/logo.ts).
+  logo_url text,
   client_id text not null unique,
   client_secret_hash text not null,
   client_secret_last_four text not null,
