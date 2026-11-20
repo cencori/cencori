@@ -17,6 +17,8 @@ type ConsentFormProps = {
   state: string | undefined;
   /** The request includes creating API keys, which only an organization's owner can give. */
   needsOwner: boolean;
+  /** A made-up app shown in development to look at the design. The buttons do nothing. */
+  preview?: boolean;
 };
 
 type Answer = { redirect_url?: string; login_url?: string; error?: string };
@@ -28,6 +30,10 @@ export function ConsentForm(props: ConsentFormProps) {
   const [error, setError] = useState<string | null>(null);
 
   async function decide(decision: "allow" | "deny") {
+    if (props.preview) {
+      setError("This is a preview with a made-up app. Nothing was authorized.");
+      return;
+    }
     setError(null);
     setPending(decision);
     try {
