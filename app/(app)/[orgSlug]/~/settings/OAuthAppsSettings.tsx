@@ -289,7 +289,7 @@ export function OAuthAppsSettings({ orgSlug }: { orgSlug: string }) {
                     <DialogHeader>
                         <DialogTitle className="text-sm">{editing === "new" ? "New OAuth app" : "Edit OAuth app"}</DialogTitle>
                         <DialogDescription className="text-xs leading-5">
-                            People see the name, description and website on the screen where they decide whether to authorize your app.
+                            People see the name on the screen where they decide whether to authorize your app.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4">

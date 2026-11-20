@@ -112,9 +112,6 @@ export default async function AuthorizePage({ searchParams }: AuthorizePageProps
         <p className="mt-1 text-center text-sm leading-6 text-muted-foreground">
           This app wants to access your Cencori account.
         </p>
-        {app.description ? (
-          <p className="mt-3 text-center text-sm leading-6 text-muted-foreground">{app.description}</p>
-        ) : null}
 
         <ConsentForm
           appName={app.name}
