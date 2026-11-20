@@ -104,7 +104,7 @@ export default async function AuthorizePage({ searchParams }: AuthorizePageProps
           <span aria-hidden="true" className="text-muted-foreground">
             ⇄
           </span>
-          <div className="grid h-11 w-11 place-items-center rounded-lg border border-border bg-background">
+          <div className="grid h-11 w-11 place-items-center rounded-lg border border-border/40 bg-background">
             <Logo variant="mark" className="h-5" />
           </div>
         </div>

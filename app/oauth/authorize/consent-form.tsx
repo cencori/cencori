@@ -82,7 +82,7 @@ export function ConsentForm(props: ConsentFormProps) {
         Organization
       </Label>
       {choosable.length === 0 ? (
-        <p className="mt-2 rounded-lg border border-border px-3 py-2 text-sm leading-6 text-muted-foreground">
+        <p className="mt-2 rounded-lg border border-border/40 px-3 py-2 text-sm leading-6 text-muted-foreground">
           {props.needsOwner
             ? "This app asks to create API keys, which only an organization's owner can allow. You don't own an organization on this account."
             : "You need to be an owner or admin of an organization to give an app access to it."}
@@ -107,7 +107,7 @@ export function ConsentForm(props: ConsentFormProps) {
       <p className="mt-1 text-xs leading-5 text-muted-foreground">
         {props.appName} will be able to do the following in the organization you choose, and nothing else.
       </p>
-      <ul className="mt-3 divide-y divide-border rounded-lg border border-border">
+      <ul className="mt-3 divide-y divide-border/40 rounded-lg border border-border/40">
         {levels.map((group) => (
           <li className="flex items-center justify-between gap-3 px-3 py-2.5" key={group.level}>
             <span className="text-sm font-medium">{group.labels.join(", ")}</span>
@@ -115,7 +115,7 @@ export function ConsentForm(props: ConsentFormProps) {
               className={
                 group.level === "write"
                   ? "shrink-0 rounded border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-1 text-[10px] font-medium uppercase leading-none tracking-wider text-emerald-600 dark:text-emerald-400"
-                  : "shrink-0 rounded border border-border px-1.5 py-1 text-[10px] font-medium uppercase leading-none tracking-wider text-muted-foreground"
+                  : "shrink-0 rounded border border-border/60 px-1.5 py-1 text-[10px] font-medium uppercase leading-none tracking-wider text-muted-foreground"
               }
             >
               {group.level === "write" ? "Read + write" : "Read"}
@@ -137,7 +137,7 @@ export function ConsentForm(props: ConsentFormProps) {
         />
       </button>
       {detailed ? (
-        <ul className="mt-2 divide-y divide-border">
+        <ul className="mt-2 divide-y divide-border/40">
           {props.permissions.map((permission) => {
             const open = opened.includes(permission.resource);
             return (
