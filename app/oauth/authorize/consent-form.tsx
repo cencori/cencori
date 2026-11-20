@@ -151,23 +151,27 @@ export function ConsentForm(props: ConsentFormProps) {
         </p>
       ) : null}
 
-      <Button
-        className="mt-5 w-full"
-        disabled={pending !== null || !organizationId}
-        onClick={() => decide("allow")}
-        type="button"
-      >
-        {pending === "allow" ? "Authorizing…" : `Authorize ${props.appName}`}
-      </Button>
-      <Button
-        className="mt-2 w-full"
-        disabled={pending !== null}
-        onClick={() => decide("deny")}
-        type="button"
-        variant="ghost"
-      >
-        Cancel
-      </Button>
+      <div className="mt-5 flex items-center justify-between gap-2">
+        <Button
+          className="h-8 px-3 text-xs"
+          disabled={pending !== null}
+          onClick={() => decide("deny")}
+          size="sm"
+          type="button"
+          variant="outline"
+        >
+          Cancel
+        </Button>
+        <Button
+          className="h-8 px-3 text-xs"
+          disabled={pending !== null || !organizationId}
+          onClick={() => decide("allow")}
+          size="sm"
+          type="button"
+        >
+          {pending === "allow" ? "Authorizing…" : `Authorize ${props.appName}`}
+        </Button>
+      </div>
     </div>
   );
 }
