@@ -291,14 +291,14 @@ export function OAuthAppsSettings({ orgSlug }: { orgSlug: string }) {
 
             {/* Create or edit */}
             <Dialog open={editing !== null} onOpenChange={(open) => (open ? null : setEditing(null))}>
-                <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
+                <DialogContent className="max-h-[90dvh] grid-cols-[minmax(0,1fr)] overflow-y-auto sm:max-w-lg">
                     <DialogHeader>
                         <DialogTitle className="text-sm">{editing === "new" ? "New OAuth app" : "Edit OAuth app"}</DialogTitle>
                         <DialogDescription className="text-xs leading-5">
                             People see the name on the screen where they decide whether to authorize your app.
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-4">
+                    <div className="min-w-0 space-y-4">
                         <div className="space-y-1.5">
                             <Label htmlFor="oauth-app-name" className="text-xs">Name</Label>
                             <Input
@@ -343,7 +343,7 @@ export function OAuthAppsSettings({ orgSlug }: { orgSlug: string }) {
                                 rows={3}
                                 placeholder={"https://acme.example/oauth/callback\nhttp://localhost:3000/oauth/callback"}
                                 onChange={(event) => setRedirectText(event.target.value)}
-                                className="font-mono text-xs"
+                                className="[field-sizing:fixed] min-w-0 resize-y break-all font-mono text-xs"
                             />
                             <p className="text-[11px] leading-5 text-muted-foreground">
                                 One on each line. Must be https://, or http:// on localhost. Cencori only sends people back to an address listed here, matched exactly.
@@ -389,7 +389,7 @@ export function OAuthAppsSettings({ orgSlug }: { orgSlug: string }) {
 
             {/* The secret, once */}
             <Dialog open={secret !== null} onOpenChange={(open) => (open ? null : setSecret(null))}>
-                <DialogContent className="sm:max-w-md">
+                <DialogContent className="grid-cols-[minmax(0,1fr)] sm:max-w-md">
                     <DialogHeader>
                         <DialogTitle className="text-sm">Copy the client secret for {secret?.app.name}</DialogTitle>
                         <DialogDescription className="text-xs leading-5">
