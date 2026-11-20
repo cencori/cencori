@@ -95,6 +95,7 @@ export default function InternalRevenuePage() {
     const [period, setPeriod] = useState<Period>('30d');
     const reduceMotion = useReducedMotion();
     const queryClient = useQueryClient();
+    const [issuing, setIssuing] = useState(false);
 
     const { data, isLoading, isError, error, refetch } = useQuery<RevenueResponse>({
         queryKey: ['internal-revenue', period],
@@ -223,6 +224,14 @@ export default function InternalRevenuePage() {
                     >
                         {sync.isPending ? 'Syncing with Bachs…' : 'Sync from Bachs'}
                     </button>
+                    <button
+                        type="button"
+                        onClick={() => setIssuing((open) => !open)}
+                        aria-expanded={issuing}
+                        className="h-8 rounded-md border border-border/45 bg-muted/20 px-3 text-[11px] font-medium hover:bg-muted/50"
+                    >
+                        Issue credits
+                    </button>
                     <Select value={period} onValueChange={(value) => setPeriod(value as Period)}>
                         <SelectTrigger
                             aria-label="Select revenue period"
@@ -240,6 +249,8 @@ export default function InternalRevenuePage() {
                     </Select>
                 </div>
             </div>
+
+            {issuing && <IssueCredits />}
 
             {sync.isSuccess && (
                 <div className="mb-4 rounded-md border border-emerald-500/20 bg-emerald-500/[0.04] px-4 py-3 text-[11px] text-emerald-700 dark:text-emerald-400">
@@ -295,5 +306,104 @@ export default function InternalRevenuePage() {
                 </div>
             </div>
         </section>
+    );
+}
+
+interface IssuedCredits {
+    organization: { name: string; slug: string };
+    email: string;
+    amount: number;
+    balance_before: number;
+    balance_after: number;
+}
+
+/** Credits Cencori gives an organization. The account must belong to the organization named. */
+function IssueCredits() {
+    const [email, setEmail] = useState('');
+    const [organization, setOrganization] = useState('');
+    const [amount, setAmount] = useState('');
+    const [note, setNote] = useState('');
+
+    const issue = useMutation<IssuedCredits, Error>({
+        mutationFn: async () => {
+            const response = await fetch('/api/internal/billing/issue-credits', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, organization, amount: Number(amount), note }),
+            });
+            const body = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(body?.error ?? 'The credits could not be added.');
+            return body as IssuedCredits;
+        },
+        onSuccess: () => setAmount(''),
+    });
+
+    const field = 'h-8 rounded-md border border-border/45 bg-background px-3 text-[11px] outline-none focus:border-foreground/40';
+    const ready = email.trim() && organization.trim() && Number(amount) > 0;
+
+    return (
+        <form
+            className="mb-4 rounded-md border border-border/45 bg-muted/10 px-4 py-3"
+            onSubmit={(event) => {
+                event.preventDefault();
+                if (ready && !issue.isPending) issue.mutate();
+            }}
+        >
+            <div className="flex flex-wrap items-center gap-2">
+                <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    placeholder="Account email"
+                    aria-label="Account email"
+                    className={`${field} w-full sm:w-56`}
+                />
+                <input
+                    required
+                    value={organization}
+                    onChange={(event) => setOrganization(event.target.value)}
+                    placeholder="Organization slug or name"
+                    aria-label="Organization slug or name"
+                    className={`${field} w-full sm:w-48`}
+                />
+                <input
+                    type="number"
+                    required
+                    min="0.01"
+                    max="1000"
+                    step="0.01"
+                    value={amount}
+                    onChange={(event) => setAmount(event.target.value)}
+                    placeholder="Amount (USD)"
+                    aria-label="Amount in US dollars"
+                    className={`${field} w-full sm:w-32`}
+                />
+                <input
+                    value={note}
+                    onChange={(event) => setNote(event.target.value)}
+                    placeholder="Note (optional)"
+                    aria-label="Note"
+                    maxLength={200}
+                    className={`${field} w-full sm:min-w-40 sm:flex-1`}
+                />
+                <button
+                    type="submit"
+                    disabled={!ready || issue.isPending}
+                    className="h-8 rounded-md bg-foreground px-3 text-[11px] font-medium text-background disabled:opacity-50"
+                >
+                    {issue.isPending ? 'Issuing…' : 'Issue'}
+                </button>
+            </div>
+            {issue.isSuccess && (
+                <p className="mt-2 text-[11px] text-emerald-700 dark:text-emerald-400">
+                    Issued {usd(issue.data.amount)} to {issue.data.organization.name} ({issue.data.organization.slug}).
+                    Balance {usd(issue.data.balance_before)} → {usd(issue.data.balance_after)}.
+                </p>
+            )}
+            {issue.isError && (
+                <p className="mt-2 text-[11px] text-red-600 dark:text-red-400">{issue.error.message}</p>
+            )}
+        </form>
     );
 }
