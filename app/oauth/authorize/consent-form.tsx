@@ -137,14 +137,14 @@ export function ConsentForm(props: ConsentFormProps) {
         />
       </button>
       {detailed ? (
-        <ul className="mt-3 divide-y divide-border rounded-lg border border-border">
+        <ul className="mt-2 divide-y divide-border">
           {props.permissions.map((permission) => {
             const open = opened.includes(permission.resource);
             return (
               <li key={permission.resource}>
                 <button
                   aria-expanded={open}
-                  className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left text-sm font-medium"
+                  className="flex w-full items-center justify-between gap-3 py-2.5 text-left text-sm font-medium"
                   onClick={() =>
                     setOpened((current) =>
                       open ? current.filter((item) => item !== permission.resource) : [...current, permission.resource],
@@ -163,7 +163,7 @@ export function ConsentForm(props: ConsentFormProps) {
                   />
                 </button>
                 {open ? (
-                  <p className="px-3 pb-2.5 text-xs leading-5 text-muted-foreground">{permission.description}</p>
+                  <p className="pb-2.5 text-xs leading-5 text-muted-foreground">{permission.description}</p>
                 ) : null}
               </li>
             );
