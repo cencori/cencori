@@ -15,7 +15,11 @@ ENV NODE_ENV=production \
     BRIMBLE_BUILD=1 \
     NEXT_TELEMETRY_DISABLED=1 \
     # Keep puppeteer's Chromium inside /app so it ships to the runtime stage.
-    PUPPETEER_CACHE_DIR=/app/.cache/puppeteer
+    PUPPETEER_CACHE_DIR=/app/.cache/puppeteer \
+    # onnxruntime-node (under @huggingface/transformers) downloads a CUDA build on Linux at
+    # install, and that file is gone from its release (404), which fails npm ci. Nothing here
+    # has a GPU; the CPU runtime ships inside the package.
+    ONNXRUNTIME_NODE_INSTALL_CUDA=skip
 
 COPY package.json package-lock.json .npmrc ./
 RUN npm ci --include=dev --no-audit --no-fund

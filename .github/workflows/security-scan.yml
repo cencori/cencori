@@ -25,6 +25,9 @@ jobs:
           cache: 'npm'
       
       - name: Install dependencies
+        # onnxruntime-node's CUDA download 404s and fails the install; nothing here needs a GPU.
+        env:
+          ONNXRUNTIME_NODE_INSTALL_CUDA: skip
         run: npm ci
       
       - name: Run npm audit
