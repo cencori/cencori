@@ -137,14 +137,6 @@ export default async function AuthorizePage({ searchParams }: AuthorizePageProps
           needsOwner={scopes.includes("api_keys:write")}
           preview={preview}
         />
-
-        <div className="mt-5 border-t border-border pt-4 text-center text-xs leading-5 text-muted-foreground">
-          <p>Authorizing will send you to</p>
-          <p className="break-all text-foreground">{redirectUri}</p>
-          <p className="mt-3">
-            Signed in as <span className="text-foreground">{user.email}</span>
-          </p>
-        </div>
       </section>
     </main>
   );
