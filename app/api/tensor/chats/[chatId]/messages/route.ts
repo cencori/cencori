@@ -22,6 +22,7 @@ import {
 } from "@/lib/tensor-chats";
 import { readStream, searchQuery, type ChatMessage, type ToolCall } from "@/lib/tensor-chats-stream";
 import { authenticateTensorDataRequest } from "@/lib/tensor-data";
+import { describeImage, IMAGE_DATA_URL, imageNotes } from "@/lib/tensor-vision";
 import { gatewayEntitlementFrom } from "@/lib/tensor-entitlement";
 import { getTensorBillingSnapshot } from "@/lib/tensor-billing";
 import { fetchWebResource } from "@/lib/web/fetch";
@@ -31,10 +32,7 @@ import { WEB_PRICES_USD } from "@/lib/web/pricing";
 
 /** The model a plain chat answers with: the one the web's project chats use, open to every plan. */
 const CHAT_MODEL = "maximo-atlas-1.5";
-/** What looks at a message's pictures, as Tensor's desktop app does (apps/desktop/src/main/visionHost.ts). */
-const VISION_MODEL = "deepseek-v4-flash-vision-exp";
-const VISION_PROMPT =
-  "Describe this image concisely for an assistant answering the person who sent it: what is shown, any text in it, UI, errors, and relevant details.";
+
 /** How long one answer may go on. */
 const ANSWER_MAX_TOKENS = 4096;
 /** Searches one message may make, and results each brings back. */
@@ -44,7 +42,6 @@ const SEARCH_RESULTS = 6;
 /** Images with one message: how many, and how large each may be as a data URL (about 5 MB). */
 const MAX_IMAGES = 4;
 const MAX_IMAGE_CHARS = 7_000_000;
-const IMAGE_DATA_URL = /^data:image\/(png|jpe?g|gif|webp);base64,[A-Za-z0-9+/=]+$/;
 
 /** Rounds of answering, then acting, that one message may take. */
 const MAX_ROUNDS = 5;
@@ -272,32 +269,6 @@ export async function POST(request: NextRequest, context: Context) {
       return null;
     });
 
-  /** One picture, described by the vision model through Tensor's own inference, on this turn. */
-  const describeImage = async (url: string): Promise<string | null> => {
-    try {
-      const answer = await inference(
-        new NextRequest(`${origin}/api/tensor/inference/v1/chat/completions`, {
-          method: "POST",
-          headers: { authorization, "content-type": "application/json" },
-          body: JSON.stringify({
-            model: VISION_MODEL,
-            max_tokens: 700,
-            messages: [{ role: "user", content: [{ type: "text", text: VISION_PROMPT }, { type: "image_url", image_url: { url } }] }],
-          }),
-          signal: AbortSignal.timeout(45_000),
-        }),
-        { params: Promise.resolve({ path: ["chat", "completions"] }) },
-      );
-      if (!answer.ok) return null;
-      const body = (await answer.json().catch(() => null)) as { choices?: { message?: { content?: string } }[] } | null;
-      const text = body?.choices?.[0]?.message?.content?.trim();
-      return text && text.length > 10 ? text.slice(0, 4000) : null;
-    } catch (error) {
-      console.error("[Tensor Chats] Looking at an image failed", error);
-      return null;
-    }
-  };
-
   const conversation: ChatMessage[] = [
     { role: "system", content: plainChatInstructions(projects, new Date()) },
     ...contextMessages([...history, saved]),
@@ -307,13 +278,8 @@ export async function POST(request: NextRequest, context: Context) {
   // it. A picture that could not be looked at is said so, rather than guessed at.
   const last = conversation.at(-1);
   if (images.length && last?.role === "user" && typeof last.content === "string") {
-    const seen = await Promise.all(images.map((url) => describeImage(url)));
-    const notes = seen.map((description, index) =>
-      description
-        ? `[Image ${index + 1} they attached, as described by a vision model: ${description}]`
-        : `[Image ${index + 1} they attached could not be looked at. Say so; do not guess what it shows.]`,
-    );
-    last.content = `${last.content}\n\n${notes.join("\n\n")}`;
+    const seen = await Promise.all(images.map((url) => describeImage(authorization, origin, url)));
+    last.content = `${last.content}\n\n${imageNotes(seen)}`;
   }
 
   const encoder = new TextEncoder();
