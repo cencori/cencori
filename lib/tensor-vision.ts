@@ -1,8 +1,11 @@
 import { NextRequest } from "next/server";
 import { POST as inference } from "@/app/api/tensor/inference/v1/[...path]/route";
 
-/** What looks at pictures for Tensor, as its desktop app does (apps/desktop/src/main/visionHost.ts). */
-export const VISION_MODEL = "deepseek-v4-flash-vision-exp";
+/**
+ * What looks at pictures for Tensor. B.AI's deepseek-v4-flash-vision-exp, used before, was retired
+ * (lib/vision/analyze.ts) and every description failed; Atlas 1.5 reads images, as Copilot's does.
+ */
+export const VISION_MODEL = "maximo-atlas-1.5";
 const VISION_PROMPT =
   "Describe this image concisely for an assistant helping the person who sent it: what is shown, any text in it, UI, errors, and relevant details.";
 

@@ -11,7 +11,10 @@
 
 import { measureResponsesContent } from '@/lib/gateway/responses-content';
 
-export const MAX_INPUT_ITEMS = 2000;
+// The count is a sanity bound, not the budget: a long coding task (every tool call is two items)
+// passed 2000 well inside its model's context, and the agent compacts by tokens, not by items, so
+// a cap that low ended tasks that had room left. The byte caps below bound the payload.
+export const MAX_INPUT_ITEMS = 20000;
 const MAX_TOTAL_TEXT_BYTES = 8 * 1024 * 1024;
 const MAX_INLINE_FILES = 20;
 const MAX_INLINE_FILE_BYTES = 512 * 1024;
