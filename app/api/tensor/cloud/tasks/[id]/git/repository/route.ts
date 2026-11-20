@@ -5,6 +5,7 @@ import { readTensorCloudConfig } from "@/lib/tensor-cloud";
 import {
   connectionJson,
   createUserRepository,
+  listInstalledOwners,
   pushableRepository,
   readGithubAccount,
   readGithubApp,
@@ -13,8 +14,9 @@ import {
 } from "@/lib/tensor-cloud-github";
 import { readCloudAccess, readTask } from "@/lib/tensor-cloud-tasks";
 
-// POST { name }: make a new repository on the person's GitHub account and connect this project
-// to it, in one step (v0's "Create Repository"). Private on plans that include private
+// POST { name, owner? }: make a new repository on one of the accounts the app is installed on (the
+// person's own, or an organization's) and connect this project to it, in one step (v0's "Create
+// Repository"). Private on plans that include private
 // repositories, public otherwise.
 
 function json(body: unknown, status = 200) {
@@ -35,7 +37,7 @@ export async function POST(request: NextRequest, context: Context) {
     const task = await readTask(session.admin, session.user.id, id);
     if (!task || !task.project_name) return json({ error: "That project does not exist." }, 404);
 
-    const body = (await request.json().catch(() => null)) as { name?: unknown } | null;
+    const body = (await request.json().catch(() => null)) as { name?: unknown; owner?: unknown } | null;
     const name = repositoryName(body?.name);
     if (!name) return json({ error: "Use letters, numbers, hyphens, underscores and periods." }, 400);
 
@@ -46,12 +48,32 @@ export async function POST(request: NextRequest, context: Context) {
     const account = await readGithubAccount(session.admin, config, app, session.user.id);
     if (!account?.token) return json({ error: "Sign in with GitHub again to continue.", code: "github_signin" }, 401);
 
-    const made = await createUserRepository(account.token, name, access.privateRepositories);
+    // Where it goes: an account the app is installed on, which this person can reach. GitHub asks
+    // the same of the request; asking first gives a plain answer instead of a refusal.
+    const owners = await listInstalledOwners(account.token);
+    const wanted = typeof body?.owner === "string" && body.owner.trim() ? body.owner.trim() : account.login;
+    const owner = owners?.find((one) => one.login.toLowerCase() === wanted.toLowerCase());
+    if (owners && !owner) {
+      return json(
+        {
+          error: `Tensor's GitHub app is not installed on ${wanted}. Install it there, then try again.`,
+          code: "github_not_installed",
+        },
+        403,
+      );
+    }
+    const made = await createUserRepository(
+      account.token,
+      name,
+      access.privateRepositories,
+      fetch,
+      owner?.organization ? owner.login : null,
+    );
     if (!made.ok) {
-      if (made.reason === "exists") return json({ error: `You already have a repository called ${name}. Choose another name.` }, 409);
+      if (made.reason === "exists") return json({ error: `${owner?.login ?? account.login} already has a repository called ${name}. Choose another name.` }, 409);
       if (made.reason === "not_allowed") {
         return json(
-          { error: "Tensor is not allowed to create repositories on your GitHub yet. Create one on GitHub and choose it here, or try again after the Cencori app's permissions are updated.", code: "github_cannot_create" },
+          { error: `GitHub did not let Tensor create the repository. Install Tensor's GitHub app (github.com/apps/${app.slug}) on your account with access to all repositories, then try again, or create one on GitHub and choose it here.`, code: "github_cannot_create" },
           403,
         );
       }

@@ -193,6 +193,31 @@ const MAX_LISTED = 500;
  * Every repository this person can push to through the app: the ones the app is installed on,
  * narrowed by GitHub to those the person can reach, narrowed here to those they may push to.
  */
+/** An account (a person's or an organization's) the app is installed on, as its installer sees it. */
+export type GithubOwner = { login: string; organization: boolean; allRepositories: boolean };
+
+/**
+ * The accounts the app is installed on that this person can reach: their own, and organizations
+ * that installed it. A repository can be made in one of these. Null when GitHub could not be asked.
+ */
+export async function listInstalledOwners(token: string, fetcher: typeof fetch = fetch): Promise<GithubOwner[] | null> {
+  const answer = await github<{
+    installations?: { account?: { login?: unknown; type?: unknown } | null; repository_selection?: unknown }[];
+  }>(token, "/user/installations?per_page=100", fetcher);
+  if (!answer.ok) return null;
+  const owners: GithubOwner[] = [];
+  for (const installation of answer.value.installations ?? []) {
+    const login = installation.account?.login;
+    if (typeof login !== "string" || !login) continue;
+    owners.push({
+      login,
+      organization: installation.account?.type === "Organization",
+      allRepositories: installation.repository_selection === "all",
+    });
+  }
+  return owners;
+}
+
 export async function listPushableRepositories(token: string, fetcher: typeof fetch = fetch): Promise<GithubRepository[] | null> {
   const installations = await github<{ installations: { id: number }[] }>(token, "/user/installations?per_page=100", fetcher);
   if (!installations.ok) return null;
@@ -240,12 +265,15 @@ export async function createUserRepository(
   name: string,
   isPrivate: boolean,
   fetcher: typeof fetch = fetch,
+  /** An organization to make it in; the person's own account when absent. */
+  organization: string | null = null,
 ): Promise<
   | { ok: true; repository: GithubRepository }
   | { ok: false; reason: "exists" | "not_allowed" | "failed" }
 > {
   try {
-    const response = await fetcher(`${API}/user/repos`, {
+    const path = organization ? `/orgs/${encodeURIComponent(organization)}/repos` : "/user/repos";
+    const response = await fetcher(`${API}${path}`, {
       method: "POST",
       headers: {
         authorization: `Bearer ${token}`,
@@ -257,7 +285,12 @@ export async function createUserRepository(
       signal: AbortSignal.timeout(20_000),
     });
     if (response.status === 422) return { ok: false, reason: "exists" };
-    if (response.status === 403 || response.status === 404) return { ok: false, reason: "not_allowed" };
+    if (response.status === 403 || response.status === 404) {
+      // GitHub says why (the app's permission, its installation's reach, the account's own rules).
+      const said = await response.text().catch(() => "");
+      console.error(`[Tensor Cloud] GitHub refused to create ${name}: ${response.status} ${said.slice(0, 300)}`);
+      return { ok: false, reason: "not_allowed" };
+    }
     if (!response.ok) return { ok: false, reason: "failed" };
     return { ok: true, repository: repository((await response.json()) as RawRepository) };
   } catch {

@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { noStoreHeaders } from "@/lib/tensor-auth";
 import { authenticateTensorBillingRequest } from "@/lib/tensor-billing";
 import { readTensorCloudConfig, signGithubState, tensorSiteOrigin, tensorSitePath } from "@/lib/tensor-cloud";
-import { forgetGithubAccount, listPushableRepositories, readGithubAccount, readGithubApp } from "@/lib/tensor-cloud-github";
+import { forgetGithubAccount, listInstalledOwners,
+  listPushableRepositories, readGithubAccount, readGithubApp } from "@/lib/tensor-cloud-github";
 import { TENSOR_GITHUB_CALLBACK_URL } from "@/lib/tensor-cloud-github-callback";
 
 // A person's GitHub, for Tensor in the cloud.
@@ -38,10 +39,14 @@ export async function GET(request: NextRequest) {
     install.searchParams.set("state", state);
 
     const account = await readGithubAccount(session.admin, config, app, session.user.id);
-    const repositories = account?.token ? await listPushableRepositories(account.token) : null;
+    const [repositories, owners] = account?.token
+      ? await Promise.all([listPushableRepositories(account.token), listInstalledOwners(account.token)])
+      : [null, null];
     return json({
       account: account ? { login: account.login, expired: !account.token } : null,
       repositories,
+      // Where a new repository can go: the accounts the app is installed on.
+      owners,
       authorizeUrl: authorize.toString(),
       installUrl: install.toString(),
     });
