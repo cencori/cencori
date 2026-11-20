@@ -9,7 +9,8 @@ import {
   tensorSitePath,
   verifyGithubState,
 } from "@/lib/tensor-cloud";
-import { listPushableRepositories, normalizeBranch, pushableRepository, readGithubApp } from "@/lib/tensor-cloud-github";
+import { createPrivateKey, generateKeyPairSync } from "node:crypto";
+import { listPushableRepositories, normalizeBranch, pemFrom, pushableRepository, readGithubApp } from "@/lib/tensor-cloud-github";
 
 const secret = "task-secret-task-secret-task-secret-task";
 const userId = "0195c0de-0000-7000-8000-00000000000a";
@@ -172,7 +173,7 @@ describe("the GitHub App's sign-in credentials", () => {
       clientId: "Iv2",
       clientSecret: "t",
       slug: "tensor",
-      own: { appId: "123", privateKey: "-----BEGIN KEY-----\nabc\n-----END KEY-----" },
+      own: { appId: "123", privateKey: "-----BEGIN KEY-----\nabc\n-----END KEY-----\n" },
     });
     // Half set up: Cencori's app, as before.
     expect(readGithubApp({ ...own, TENSOR_GITHUB_APP_SLUG: "", GITHUB_APP_CLIENT_ID: "Iv1", GITHUB_APP_CLIENT_SECRET: "s" })?.clientId).toBe("Iv1");
@@ -187,5 +188,19 @@ describe("sealed GitHub tokens", () => {
       userId,
     );
     expect(openGithubTokens(sealed, secret, userId)?.clientId).toBe("Iv2");
+  });
+});
+
+describe("the app's private key", () => {
+  it("is read however a settings form passed it on", () => {
+    const pem = generateKeyPairSync("rsa", { modulusLength: 2048 }).privateKey.export({ type: "pkcs1", format: "pem" }).toString();
+    const forms = [
+      pem,
+      pem.replace(/\n/g, "\\n"),
+      pem.replace(/\n/g, " "),
+      pem.replace(/\n/g, ""),
+      Buffer.from(pem).toString("base64"),
+    ];
+    for (const form of forms) expect(() => createPrivateKey(pemFrom(form))).not.toThrow();
   });
 });

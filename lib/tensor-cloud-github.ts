@@ -35,6 +35,24 @@ export type GithubApp = {
 };
 
 /**
+ * A private key as GitHub gives it (PEM), however it came through a settings form: with its line
+ * breaks, as literal "\\n", flattened to spaces or one long line, or base64 of the whole file.
+ * Node reads only the first; the rest fail with "DECODER routines::unsupported".
+ */
+export function pemFrom(raw: string): string {
+  let text = raw.trim().replace(/\\n/g, "\n");
+  if (text && !text.includes("-----BEGIN")) {
+    const decoded = Buffer.from(text.replace(/\s+/g, ""), "base64").toString("utf8");
+    if (decoded.includes("-----BEGIN")) text = decoded.trim();
+  }
+  const match = /-----BEGIN ([A-Z ]+)-----([\s\S]*?)-----END \1-----/.exec(text);
+  if (!match) return text;
+  const body = match[2].replace(/\s+/g, "");
+  const lines = body.match(/.{1,64}/g) ?? [];
+  return [`-----BEGIN ${match[1]}-----`, ...lines, `-----END ${match[1]}-----`].join("\n") + "\n";
+}
+
+/**
  * The app Tensor signs people in with and pushes through, or null where none is set up.
  *
  * Tensor has a GitHub App of its own (TENSOR_GITHUB_APP_*), so what it does on GitHub is
@@ -46,7 +64,7 @@ export function readGithubApp(env: Record<string, string | undefined> = process.
     appId: env.TENSOR_GITHUB_APP_ID?.trim() || "",
     clientId: env.TENSOR_GITHUB_APP_CLIENT_ID?.trim() || "",
     clientSecret: env.TENSOR_GITHUB_APP_CLIENT_SECRET?.trim() || "",
-    privateKey: (env.TENSOR_GITHUB_APP_PRIVATE_KEY ?? "").replace(/\\n/g, "\n").trim(),
+    privateKey: pemFrom(env.TENSOR_GITHUB_APP_PRIVATE_KEY ?? ""),
     slug: env.TENSOR_GITHUB_APP_SLUG?.trim() || "",
   };
   if (own.appId && own.clientId && own.clientSecret && own.privateKey && own.slug) {
