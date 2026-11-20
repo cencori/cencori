@@ -92,7 +92,7 @@ export default async function AuthorizePage({ searchParams }: AuthorizePageProps
 
   return (
     <main className="grid min-h-dvh place-items-center bg-background px-5 py-10 text-foreground">
-      <section className="w-full max-w-sm rounded-xl border border-border bg-card p-6">
+      <section className="w-full max-w-sm">
         <div className="flex items-center justify-center gap-3">
           <div
             aria-hidden="true"
