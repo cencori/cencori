@@ -12,7 +12,7 @@ import {
     logGatewayRequest,
 } from '@/lib/gateway-middleware';
 import { parseVisionRequest, VisionValidationError, type VisionAnalyzeRequest } from '@/lib/vision/analyze';
-import { executeGuardedVision, visionRequestPayload } from '@/lib/vision/guarded';
+import { executeGuardedVision, providerKeyRefusal, visionRequestPayload } from '@/lib/vision/guarded';
 import { ProviderError } from '@/lib/providers/errors';
 import { mapProviderErrorToHttpResponse } from '@/lib/gateway-reliability';
 
@@ -46,6 +46,9 @@ export async function POST(req: NextRequest) {
             { requestId: ctx.requestId }
         );
     } catch (error) {
+        const refusal = await providerKeyRefusal(error, ctx, 'vision/describe', requestForLog ? visionRequestPayload(requestForLog) : undefined);
+        if (refusal) return refusal;
+
         if (error instanceof VisionValidationError) {
             await logGatewayRequest(ctx, {
                 endpoint: 'vision/describe',

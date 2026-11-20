@@ -10,7 +10,7 @@ import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { NextRequest } from 'next/server';
-import { decryptApiKey } from '@/lib/encryption';
+import { resolveProviderKey } from '@/lib/providers/byok-store';
 import { getCreditsBalance } from '@/lib/credits';
 import { getGoogleApiKey } from '@/lib/providers/google-env';
 import {
@@ -235,29 +235,100 @@ export function listVisionModels() {
 
 // ── Provider key resolution ─────────────────────────────────────
 
-async function getProviderKey(ctx: GatewayContext, provider: VisionProvider): Promise<{ key: string; usesByok: boolean } | null> {
-    const { data: providerKey } = await ctx.supabase
-        .from('provider_keys')
-        .select('encrypted_key, is_active')
-        .eq('project_id', ctx.projectId)
-        .eq('provider', provider)
-        .eq('is_active', true)
-        .maybeSingle();
+export type ProviderCallKey = { key: string; usesByok: boolean };
 
-    if (providerKey?.encrypted_key) {
-        return { key: decryptApiKey(providerKey.encrypted_key, ctx.organizationId), usesByok: true };
+/**
+ * A call that has no key it may run on. `credit_balance_exhausted`: Cencori has a key for
+ * the provider but the organization's wallet is empty and the project has no key of its own.
+ * `provider_not_configured`: nobody has a key for it.
+ */
+export class ProviderKeyError extends Error {
+    readonly code: 'credit_balance_exhausted' | 'provider_not_configured';
+    readonly provider: string;
+    readonly status: number;
+    constructor(code: ProviderKeyError['code'], provider: string, model?: string) {
+        const subject = model ? `${model} runs on ${provider}` : `This call runs on ${provider}`;
+        super(code === 'credit_balance_exhausted'
+            ? `Your organization has run out of credits. ${subject}, and this project has no active ${provider} key of its own, so the call would use Cencori's. Add your ${provider} key to this project, name a model from a provider you have connected, or top up to continue.`
+            : `No ${provider} API key configured for this project. Add one in project settings.`);
+        this.name = 'ProviderKeyError';
+        this.code = code;
+        this.provider = provider;
+        this.status = code === 'credit_balance_exhausted' ? 403 : 400;
     }
+}
+
+/**
+ * The project's own key for a provider: one saved in the console, else one added through the
+ * API. The same lookup the empty-wallet check runs (lib/gateway/credit-policy.ts), so a call
+ * that check lets through finds the key it was let through on.
+ */
+async function getOwnProviderKey(ctx: GatewayContext, provider: string): Promise<ProviderCallKey | null> {
+    const own = await resolveProviderKey(ctx.supabase, {
+        projectId: ctx.projectId,
+        organizationId: ctx.organizationId,
+        provider,
+    });
+    return own ? { key: own.apiKey, usesByok: true } : null;
+}
+
+type KeyLookup = { key: ProviderCallKey } | { key: null; reason: ProviderKeyError['code'] };
+
+/**
+ * The key a call to this provider runs on: the project's own, else Cencori's. Cencori's is
+ * only handed out while the organization has credits to pay for the call.
+ */
+async function lookUpProviderKey(ctx: GatewayContext, provider: VisionProvider): Promise<KeyLookup> {
+    const own = await getOwnProviderKey(ctx, provider);
+    if (own) return { key: own };
+    // Managed keys for OpenAI-compatible providers are named in one place
+    // (providers-setup), including historical aliases like MAXIMOAI_API_KEY.
     const managedKey = provider === 'openai' ? process.env.OPENAI_API_KEY
         : provider === 'anthropic' ? process.env.ANTHROPIC_API_KEY
         : provider === 'google' ? getGoogleApiKey()
         : getManagedOpenAICompatibleKey(provider);
-    if (managedKey && ctx.tier !== 'enterprise' && !ctx.fullySponsoredKey
+    if (!managedKey) return { key: null, reason: 'provider_not_configured' };
+    if (ctx.tier !== 'enterprise' && !ctx.fullySponsoredKey
         && await getCreditsBalance(ctx.organizationId) <= 0) {
-        return null;
+        return { key: null, reason: 'credit_balance_exhausted' };
     }
-    // Managed keys for OpenAI-compatible providers are named in one place
-    // (providers-setup), including historical aliases like MAXIMOAI_API_KEY.
-    return managedKey ? { key: managedKey, usesByok: false } : null;
+    return { key: { key: managedKey, usesByok: false } };
+}
+
+async function getProviderKey(ctx: GatewayContext, provider: VisionProvider): Promise<ProviderCallKey | null> {
+    return (await lookUpProviderKey(ctx, provider)).key;
+}
+
+/** As above, for callers outside vision that need one provider's key or a refusal to return. */
+export async function requireProviderKey(ctx: GatewayContext, provider: VisionProvider, model?: string): Promise<ProviderCallKey> {
+    const found = await lookUpProviderKey(ctx, provider);
+    if (!found.key) throw new ProviderKeyError(found.reason, provider, model);
+    return found.key;
+}
+
+/**
+ * What a request that names no model runs on when the usual default cannot be used: the
+ * project's own key, on that provider's everyday vision model. Someone who connected only a
+ * Google key and has no credits gets their image read by Gemini, not a refusal about OpenAI.
+ */
+const OWN_KEY_DEFAULTS = ['gemini-2.5-flash', 'claude-3-5-haiku-latest'];
+
+/** The model a request runs on and the key for it. Throws ProviderKeyError when there is none. */
+export async function resolveModelAndKey(
+    ctx: GatewayContext,
+    requested: string | undefined,
+): Promise<{ model: ModelInfo & { key: string }; providerKey: ProviderCallKey }> {
+    const model = resolveModel(requested);
+    const found = await lookUpProviderKey(ctx, model.provider);
+    if (found.key) return { model, providerKey: found.key };
+    if (!requested) {
+        for (const id of OWN_KEY_DEFAULTS) {
+            const candidate = resolveModel(id);
+            const own = await getOwnProviderKey(ctx, candidate.provider);
+            if (own) return { model: candidate, providerKey: own };
+        }
+    }
+    throw new ProviderKeyError(found.reason, model.provider, model.key);
 }
 
 // ── Image normalization ─────────────────────────────────────────
@@ -663,13 +734,11 @@ export async function* streamVision(
     ctx: GatewayContext,
     request: VisionAnalyzeRequest
 ): AsyncGenerator<VisionStreamChunk> {
-    let model = resolveModel(request.model);
+    const resolved = await resolveModelAndKey(ctx, request.model);
+    let model = resolved.model;
     const originalModel = model;
     let usedFallback = false;
-    const initialKey = await getProviderKey(ctx, model.provider);
-    if (!initialKey) {
-        throw new Error(`No ${model.provider} API key configured for this project. Add one in project settings.`);
-    }
+    const initialKey = resolved.providerKey;
     let usesByok = initialKey.usesByok;
 
     const imgs = await normalizeImages(resolveImageList(request));
@@ -827,11 +896,9 @@ export async function analyzeVision(
     ctx: GatewayContext,
     request: VisionAnalyzeRequest
 ): Promise<VisionAnalyzeResult> {
-    let model = resolveModel(request.model);
-    const initialKey = await getProviderKey(ctx, model.provider);
-    if (!initialKey) {
-        throw new Error(`No ${model.provider} API key configured for this project. Add one in project settings.`);
-    }
+    const resolved = await resolveModelAndKey(ctx, request.model);
+    let model = resolved.model;
+    const initialKey = resolved.providerKey;
     let usesByok = initialKey.usesByok;
 
     const imgs = await normalizeImages(resolveImageList(request));

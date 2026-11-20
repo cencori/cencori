@@ -90,13 +90,32 @@ describe('gateway credit policy', () => {
             supabase: providerKeyClient(true) as never,
         };
         const vision = new NextRequest('http://localhost/api/ai/vision', {
-            method: 'POST', body: JSON.stringify({ image: { url: 'https://example.com/image.png' } }),
+            method: 'POST', body: JSON.stringify({ model: 'gpt-4o-mini', image: { url: 'https://example.com/image.png' } }),
         });
         expect(await isProvenByokRequest({ ...base, req: vision })).toBe(true);
         const image = new NextRequest('http://localhost/api/ai/images/generate', {
             method: 'POST', body: JSON.stringify({ model: 'nano-banana-pro', prompt: 'A cat' }),
         });
         expect(await isProvenByokRequest({ ...base, req: image })).toBe(true);
+    });
+
+    it('leaves image and document reading to the code that picks the key', async () => {
+        const base = { projectId: 'project-1', organizationId: 'org-1', defaultModel: null };
+        const noKey = () => fakeDb({}) as never;
+        const post = (path: string, body: unknown) => new NextRequest(`http://localhost${path}`, { method: 'POST', body: JSON.stringify(body) });
+        const image = { url: 'https://example.com/receipt.png' };
+
+        // No model named: the project's Google or Anthropic key may serve it, which only the vision code knows.
+        expect(await mayProceedOnEmptyWallet({ ...base, req: post('/v1/vision/ocr', { image }), supabase: noKey() })).toBe(true);
+        // An uploaded file is a form, not JSON.
+        const form = new FormData();
+        form.set('file', new File([new Uint8Array([1, 2, 3])], 'receipt.png', { type: 'image/png' }));
+        const upload = new NextRequest('http://localhost/api/ai/vision/ocr', { method: 'POST', body: form });
+        expect(await mayProceedOnEmptyWallet({ ...base, req: upload, supabase: noKey() })).toBe(true);
+        // A PDF with its text in it costs nothing to read.
+        expect(await mayProceedOnEmptyWallet({ ...base, req: post('/v1/documents/extract', { url: 'https://example.com/a.pdf' }), supabase: noKey() })).toBe(true);
+        // A model the project has no key for is still refused before anything runs.
+        expect(await mayProceedOnEmptyWallet({ ...base, req: post('/v1/vision/ocr', { model: 'gpt-4o', image }), supabase: noKey() })).toBe(false);
     });
 
     it('counts a key added through the API, not only one saved in the console', async () => {

@@ -36,16 +36,29 @@ export function isMeteredGatewayRequest(method: string, requestPath: string): bo
  * wallet again against the key it actually resolved (and against every
  * fallback it tries). A request here that can't be judged up front is safe to
  * let through: a managed call on an empty wallet is still refused there.
+ *
+ * Vision and documents settle the same way in lib/vision/analyze.ts: Cencori's
+ * key is only handed out while the wallet has credits.
  */
 export function settlesCreditsAtExecution(requestPath: string): boolean {
     const pathname = canonicalGatewayPath(requestPath);
     return pathname === '/api/ai/chat'
+        || isVisionPath(pathname)
+        || isDocumentsPath(pathname)
         || pathname === '/api/ai/completions'
         || pathname === '/api/v1/chat/completions'
         || pathname === '/api/v1/responses'
         || /^\/api\/v1\/sessions\/[^/]+\/(turns|approve)$/.test(pathname)
         || /^\/api\/v1\/agents\/[^/]+\/runs$/.test(pathname)
         || /^\/api\/v1\/agents\/[^/]+\/versions\/[^/]+\/test$/.test(pathname);
+}
+
+function isVisionPath(pathname: string): boolean {
+    return pathname === '/api/ai/vision' || pathname.startsWith('/api/ai/vision/');
+}
+
+function isDocumentsPath(pathname: string): boolean {
+    return pathname.startsWith('/api/ai/documents/');
 }
 
 type ByokParams = {
@@ -101,6 +114,9 @@ async function byokVerdict(params: ByokParams): Promise<'byok' | 'managed' | 'un
             return 'managed';
         }
     }
+    // Reading a document can cost nothing (a PDF with its text in it), or run on a key the
+    // request doesn't name. Only the code that does the work knows; it settles there.
+    if (isDocumentsPath(pathname)) return 'unknown';
     const supported = Boolean(sessionId)
         || pathname === '/api/ai/chat'
         || pathname === '/api/ai/completions'
@@ -113,6 +129,13 @@ async function byokVerdict(params: ByokParams): Promise<'byok' | 'managed' | 'un
     if (!supported || params.agentId) return 'unknown';
     // A request that names no model it could be judged by proves nothing.
     const unreadable = 'managed' as const;
+
+    // An uploaded image arrives as a form, not JSON. That is a way of sending the picture, not
+    // proof the call is managed: leave it to the vision code, which reads the form anyway.
+    if (isVisionPath(pathname)
+        && (params.req.headers.get('content-type') ?? '').includes('multipart/form-data')) {
+        return 'unknown';
+    }
 
     let body: Record<string, unknown>;
     try {
@@ -142,6 +165,9 @@ async function byokVerdict(params: ByokParams): Promise<'byok' | 'managed' | 'un
 
     const explicitModel = typeof body.model === 'string' && body.model.trim()
         ? body.model.trim() : null;
+    // A vision call that names no model runs on whichever of the project's own keys can read
+    // an image when the default can't be used (resolveModelAndKey), so it isn't judged here.
+    if (!explicitModel && isVisionPath(pathname)) return 'unknown';
     const defaultModel = pathname === '/api/ai/embeddings'
         ? 'text-embedding-3-small'
         : pathname === '/api/ai/audio/speech'

@@ -7,6 +7,7 @@
  * pointing the caller at /api/ai/vision.
  */
 
+import { providerKeyRefusal } from '@/lib/vision/guarded';
 import { NextRequest, NextResponse } from 'next/server';
 import {
     validateGatewayRequest,
@@ -122,6 +123,9 @@ export async function POST(req: NextRequest) {
 
         return addGatewayHeaders(NextResponse.json(result), { requestId: ctx.requestId });
     } catch (error) {
+        const refusal = await providerKeyRefusal(error, ctx, 'documents/extract', promptPayload(documentForLog));
+        if (refusal) return refusal;
+
         if (error instanceof DocumentValidationError) {
             await logGatewayRequest(ctx, {
                 endpoint: 'documents/extract',

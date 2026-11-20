@@ -7,7 +7,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
-import { decryptApiKey } from '@/lib/encryption';
+import { requireProviderKey } from '@/lib/vision/analyze';
+import { providerKeyRefusal } from '@/lib/vision/guarded';
 import {
     validateGatewayRequest,
     addGatewayHeaders,
@@ -99,6 +100,9 @@ export async function POST(req: NextRequest) {
             }
             opts.prompt = promptGuard.messages[0]?.content ?? opts.prompt;
         }
+        // Before the document is read: the answer is written by OpenAI, on the project's own
+        // key or on Cencori's while there are credits. Without either there is nothing to do.
+        const openai = await requireProviderKey(ctx, 'openai', QUERY_MODEL);
         const extracted = await extractDocument(ctx, input, opts);
 
         const providerInput = `Document:\n\n${extracted.text}\n\n---\n\nQuestion: ${question}`;
@@ -125,24 +129,8 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        const { data: providerKey } = await ctx.supabase
-            .from('provider_keys')
-            .select('encrypted_key, is_active')
-            .eq('project_id', ctx.projectId)
-            .eq('provider', 'openai')
-            .eq('is_active', true)
-            .maybeSingle();
-        const openaiKey = providerKey?.encrypted_key
-            ? decryptApiKey(providerKey.encrypted_key, ctx.organizationId)
-            : process.env.OPENAI_API_KEY;
-        if (!openaiKey) {
-            return addGatewayHeaders(
-                NextResponse.json({ error: 'provider_not_configured', message: 'No OpenAI API key configured for this project' }, { status: 400 }),
-                { requestId: ctx.requestId }
-            );
-        }
 
-        const client = new OpenAI({ apiKey: openaiKey, timeout: 55_000, maxRetries: 0 });
+        const client = new OpenAI({ apiKey: openai.key, timeout: 55_000, maxRetries: 0 });
         const queryResp = await client.chat.completions.create({
             model: QUERY_MODEL,
             temperature: 0,
@@ -167,7 +155,7 @@ export async function POST(req: NextRequest) {
             completionTokens,
             pricing
         );
-        const charge = providerKey?.encrypted_key ? 0 : withUsageMarkup(providerCost);
+        const charge = openai.usesByok ? 0 : withUsageMarkup(providerCost);
 
         const totalProviderCost = providerCost + (extracted.cost?.providerCostUsd ?? 0);
         const totalCharge = charge + (extracted.cost?.cencoriChargeUsd ?? 0);
@@ -231,6 +219,9 @@ export async function POST(req: NextRequest) {
             { requestId: ctx.requestId }
         );
     } catch (error) {
+        const refusal = await providerKeyRefusal(error, ctx, 'documents/query', promptPayload(`${documentForLog}\n\nQuestion: ${questionForLog}`));
+        if (refusal) return refusal;
+
         if (error instanceof DocumentValidationError) {
             await logGatewayRequest(ctx, {
                 endpoint: 'documents/query',

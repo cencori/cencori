@@ -5,7 +5,7 @@ import { runGatewayInputPipeline } from '@/lib/gateway/input-guard';
 import { runGatewayOutputGuard } from '@/lib/gateway/output-guard';
 import { deTokenize } from '@/lib/safety/custom-data-rules';
 import type { SubscriptionTier } from '@/lib/entitlements';
-import { analyzeVision, type VisionAnalyzeRequest, type VisionAnalyzeResult } from './analyze';
+import { analyzeVision, ProviderKeyError, type VisionAnalyzeRequest, type VisionAnalyzeResult } from './analyze';
 import { redactBinaryRef, textResponsePayload, toLoggedText } from '@/lib/gateway/log-payload';
 
 /**
@@ -141,4 +141,39 @@ export async function executeGuardedVision(params: {
     const finalAnalysis = deTokenize(result.analysis, inputPipeline.tokenMap ?? new Map());
 
     return { ok: true, result: { ...result, analysis: finalAnalysis } };
+}
+
+/**
+ * The response for a call that had no key to run on, or null for any other failure. Written
+ * to the request log as blocked, so an organization out of credits sees why in its console.
+ */
+export async function providerKeyRefusal(
+    error: unknown,
+    ctx: GatewayContext,
+    endpoint: string,
+    requestPayload?: Parameters<typeof logGatewayRequest>[1]['requestPayload'],
+): Promise<NextResponse | null> {
+    if (!(error instanceof ProviderKeyError)) return null;
+    await logGatewayRequest(ctx, {
+        endpoint,
+        model: 'unknown',
+        provider: error.provider,
+        status: 'blocked',
+        errorMessage: error.message,
+        requestPayload,
+    });
+    const outOfCredits = error.code === 'credit_balance_exhausted';
+    return addGatewayHeaders(
+        NextResponse.json(
+            {
+                error: outOfCredits ? 'Credit balance exhausted' : error.code,
+                message: error.message,
+                code: error.code,
+                provider: error.provider,
+                ...(outOfCredits ? { balance: 0, top_up_url: '/billing' } : {}),
+            },
+            { status: error.status }
+        ),
+        { requestId: ctx.requestId }
+    );
 }
