@@ -56,7 +56,7 @@ jobs:
           BRIMBLE_API_KEY: ${{ secrets.BRIMBLE_API_KEY }}
         run: node scripts/ci/brimble-build-env.mjs "$BRIMBLE_PROJECT_ID" > "$RUNNER_TEMP/build.env"
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
       - uses: docker/login-action@v3
         with:
