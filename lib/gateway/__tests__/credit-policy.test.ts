@@ -6,7 +6,7 @@ vi.mock('@/lib/providers/custom-provider-routing', () => ({
     resolveCustomProviderForProject: vi.fn().mockResolvedValue(null),
 }));
 
-import { describeManagedCall, isMeteredGatewayRequest, isProvenByokRequest, mayProceedOnEmptyWallet } from '@/lib/gateway/credit-policy';
+import { clientTokenCallNeedsCredits, describeManagedCall, isMeteredGatewayRequest, isProvenByokRequest, mayProceedOnEmptyWallet } from '@/lib/gateway/credit-policy';
 import { canonicalGatewayPath } from '@/lib/gateway/canonical-path';
 
 type Fake = {
@@ -17,6 +17,7 @@ type Fake = {
     session?: { agent_id: string | null; installation_id: string | null } | null;
     /** The embedding space the project's memory is pinned to. */
     memoryPin?: 'openai' | 'google';
+    organization?: { subscription_tier: string; credits_balance: number };
 };
 
 /** Answers each table the policy reads; filters are accepted and ignored. */
@@ -24,6 +25,8 @@ function fakeDb(fake: Fake) {
     const rows = (table: string): unknown => {
         if (table === 'provider_keys') return fake.consoleKey ? { encrypted_key: 'encrypted', is_active: true } : null;
         if (table === 'sessions') return fake.session ?? null;
+        if (table === 'organizations') return fake.organization ?? null;
+        if (table === 'projects') return { default_model: null };
         if (table === 'project_memory_settings') return fake.memoryPin ? { embedding_provider: fake.memoryPin } : null;
         if (table === 'provider_connections') {
             return fake.connection
@@ -225,5 +228,22 @@ describe('gateway credit policy', () => {
         // The plan covers memory, not model usage or knowledge-base search.
         expect(await mayProceedOnEmptyWallet({ ...base, tier: 'pro', req: post('/v1/embeddings'), supabase: noKey() })).toBe(false);
         expect(await mayProceedOnEmptyWallet({ ...base, tier: 'pro', req: post('/v1/knowledge-bases/kb1/search'), supabase: noKey() })).toBe(false);
+    });
+
+    it('refuses a client-token turn on an empty wallet only when the reply would not run on the project\'s own key', async () => {
+        const turn = () => new NextRequest('http://localhost/api/v1/sessions/s1/turns', {
+            method: 'POST',
+            body: JSON.stringify({ model: 'gpt-4o', input: 'hi' }),
+        });
+        const base = { projectId: 'project-1', organizationId: 'org-1' };
+        const plain = { agent_id: null, installation_id: null };
+        const empty = { subscription_tier: 'pro', credits_balance: 0 };
+        const call = (fake: Fake) => clientTokenCallNeedsCredits({ ...base, req: turn(), supabase: fakeDb(fake) as never });
+        expect(await call({ organization: empty, session: plain })).toBe(true);
+        expect(await call({ organization: empty, session: plain, consoleKey: true })).toBe(false);
+        // A stored agent picks the model; the executor refuses it there if it runs on Cencori's key.
+        expect(await call({ organization: empty, session: { agent_id: 'a1', installation_id: null } })).toBe(false);
+        expect(await call({ organization: { subscription_tier: 'pro', credits_balance: 5 }, session: plain })).toBe(false);
+        expect(await call({ organization: { subscription_tier: 'enterprise', credits_balance: 0 }, session: plain })).toBe(false);
     });
 });

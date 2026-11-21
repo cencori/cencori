@@ -189,9 +189,9 @@ export async function authClientTokenAction(
             return { ok: false, status: 402, message: 'This business’s plan isn’t active', code: 'plan_inactive' };
         }
         if (plan.accountType !== 'business') {
-            const { data: org } = await admin.from('organizations').select('subscription_tier, credits_balance').eq('id', organizationId).maybeSingle();
-            const { isCreditBalanceExhausted } = await import('@/lib/credits');
-            if (org && org.subscription_tier !== 'enterprise' && isCreditBalanceExhausted(Number(org.credits_balance ?? 0))) {
+            // A reply that runs on the project's own key needs no credits (credit-policy).
+            const { clientTokenCallNeedsCredits } = await import('@/lib/gateway/credit-policy');
+            if (await clientTokenCallNeedsCredits({ req, supabase: admin, projectId: verified.claims.project_id, organizationId })) {
                 return { ok: false, status: 402, message: 'Credit balance exhausted: add credits to keep this agent replying', code: 'insufficient_credits' };
             }
         }

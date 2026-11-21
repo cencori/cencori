@@ -7,6 +7,7 @@ import { resolveProviderKeyRow } from '@/lib/providers/byok-store';
 import { canonicalGatewayPath } from '@/lib/gateway/canonical-path';
 import { memoryEmbedsOnOwnKey } from '@/lib/memory/embeddings';
 import { planIncludesMemory } from '@/lib/entitlements';
+import { isCreditBalanceExhausted } from '@/lib/credits';
 
 const MEMORY_EMBEDDING_PATH = /^\/api\/v1\/(memory\/(remember|write|search)|knowledge-bases\/[^/]+\/search)$/;
 const MEMORY_PATH = /^\/api\/v1\/memory\/(remember|write|search)$/;
@@ -95,6 +96,41 @@ export async function mayProceedOnEmptyWallet(params: ByokParams): Promise<boole
     const verdict = await byokVerdict(params);
     if (verdict === 'byok') return true;
     return verdict === 'unknown' && settlesCreditsAtExecution(params.req.nextUrl.pathname);
+}
+
+/**
+ * The empty-wallet rule for a call made with a browser's client token, which never passes the
+ * API-key preflight. True when the call must be refused: the wallet is empty and the call is
+ * not one that may go ahead without credits. It used to be refused on the balance alone, so
+ * an embedded agent running on the project's own key stopped replying at zero credits.
+ */
+export async function clientTokenCallNeedsCredits(params: {
+    req: NextRequest;
+    supabase: AdminClient;
+    projectId: string;
+    organizationId: string;
+}): Promise<boolean> {
+    const { data: org } = await params.supabase
+        .from('organizations')
+        .select('subscription_tier, credits_balance')
+        .eq('id', params.organizationId)
+        .maybeSingle();
+    if (!org || org.subscription_tier === 'enterprise') return false;
+    if (!isCreditBalanceExhausted(Number(org.credits_balance ?? 0))) return false;
+    const { data: project } = await params.supabase
+        .from('projects')
+        .select('default_model')
+        .eq('id', params.projectId)
+        .maybeSingle();
+    return !await mayProceedOnEmptyWallet({
+        req: params.req,
+        supabase: params.supabase,
+        projectId: params.projectId,
+        organizationId: params.organizationId,
+        defaultModel: (project?.default_model as string | null | undefined) ?? null,
+        agentId: null,
+        tier: (org.subscription_tier as string | null) ?? null,
+    });
 }
 
 /**
