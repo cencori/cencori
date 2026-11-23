@@ -43,7 +43,9 @@ Agents with tools, handoffs or widgets need a model that supports tool calling. 
 
 ## Auto
 
-`model: 'auto'` routes each call to a model on your own provider keys, by task. Your provider bills the model the call went to, at that model's price, and Cencori adds no charge, so `auto` has no price of its own in `GET /v1/models`. `result.steps` says which model answered each call.
+`model: 'auto'` routes each call to a model on your own provider keys, by task. Your provider bills the model the call went to, at that model's price, and Cencori adds no charge, so `auto` has no price of its own in `GET /v1/models`; its row carries a `pricing_note` saying so. `result.steps` says which model answered each call.
+
+GPT-5.6 and GPT-6 take function tools together with a reasoning effort only on OpenAI's Responses API. Cencori sends those calls there for you; nothing changes in your code or in what you get back.
 
 ## Models that are going away
 

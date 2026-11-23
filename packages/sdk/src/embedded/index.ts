@@ -207,6 +207,8 @@ export interface UnifiedModel {
     retires_at?: string | null;
     /** What the vendor says to use instead. */
     replaced_by?: string | null;
+    /** How a row with no price of its own is charged, e.g. `auto`; null otherwise. */
+    pricing_note?: string | null;
 }
 
 export class ModelsNamespace {

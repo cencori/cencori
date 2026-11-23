@@ -78,6 +78,12 @@ describe('GPT-6 function tools go through the Responses API', () => {
         expect(needsOpenAIResponsesApi({ model: 'gpt-6-luna', tools, reasoningEffort: 'none' })).toBe(false);
         expect(needsOpenAIResponsesApi({ model: 'gpt-6-luna' })).toBe(false);
         expect(needsOpenAIResponsesApi({ model: 'gpt-5.6-luna', tools })).toBe(false);
+        // GPT-5.6 is refused on Chat Completions only once an effort is sent with tools.
+        expect(needsOpenAIResponsesApi({ model: 'gpt-5.6-luna', tools, reasoningEffort: 'low' })).toBe(true);
+        expect(needsOpenAIResponsesApi({ model: 'gpt-5.6-sol-2026-07-09', tools, reasoningEffort: 'high' })).toBe(true);
+        expect(needsOpenAIResponsesApi({ model: 'gpt-5.6-luna', tools, reasoningEffort: 'none' })).toBe(false);
+        expect(needsOpenAIResponsesApi({ model: 'gpt-5.6-luna', reasoningEffort: 'low' })).toBe(false);
+        expect(needsOpenAIResponsesApi({ model: 'gpt-5.5', tools, reasoningEffort: 'low' })).toBe(false);
     });
 
     it('maps a tool-call round trip into Responses input items', () => {

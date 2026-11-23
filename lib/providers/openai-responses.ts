@@ -20,13 +20,18 @@ import type {
 import type { StreamChunk, ToolCall, UnifiedChatRequest, UnifiedMessage } from './base';
 
 /**
- * True when this request has to use the Responses API: a GPT-6 model with
- * function tools and reasoning left on (anything but an explicit 'none').
+ * True when this request has to use the Responses API: function tools together
+ * with reasoning, on a family where Chat Completions refuses that pair.
+ *
+ * GPT-6 reasons unless told 'none', so any tool call there qualifies. GPT-5.6
+ * is refused only when an effort is sent ("Function tools with reasoning_effort
+ * are not supported for gpt-5.6-luna in /v1/chat/completions"), so it moves
+ * only when the caller set one.
  */
 export function needsOpenAIResponsesApi(request: Pick<UnifiedChatRequest, 'model' | 'tools' | 'reasoningEffort'>): boolean {
-    return /^gpt-6(?:[.-]|$)/.test(request.model)
-        && (request.tools?.length ?? 0) > 0
-        && request.reasoningEffort !== 'none';
+    if ((request.tools?.length ?? 0) === 0 || request.reasoningEffort === 'none') return false;
+    if (/^gpt-6(?:[.-]|$)/.test(request.model)) return true;
+    return /^gpt-5\.6(?:-|$)/.test(request.model) && Boolean(request.reasoningEffort);
 }
 
 export function toResponsesInput(messages: UnifiedMessage[]): ResponseInputItem[] {

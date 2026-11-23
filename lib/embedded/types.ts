@@ -49,6 +49,8 @@ export interface UnifiedModelRow {
     managed_access: boolean;
     pricing_status: PricingStatus;
     pricing?: { input_per_million: number; output_per_million: number; currency: 'USD' } | null;
+    /** Says how a row with no price of its own is charged, e.g. the auto router. */
+    pricing_note?: string | null;
     /** The day the vendor stops serving the model (YYYY-MM-DD), when it has announced one. */
     retires_at?: string | null;
     /** What the vendor says to use instead of a model with a retires_at. */

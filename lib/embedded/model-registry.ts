@@ -321,6 +321,7 @@ export async function buildUnifiedModelRegistry(
                 managed_access: false,
                 pricing_status: 'unknown',
                 pricing: null,
+                pricing_note: 'Priced as the model each call is routed to, billed by your provider. The model and cost are in each response and in the steps of an agent run.',
                 description:
                     'Auto-routes by task across your BYOK keys: chat (code / reasoning / fast / vision), embeddings, image generation, and text-to-speech. Requires at least one active provider key. Your provider bills the model each call was routed to, at that model\'s price; Cencori adds no charge. The model used is in each response and in a session turn\'s trace.',
             });
