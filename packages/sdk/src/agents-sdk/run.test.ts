@@ -40,6 +40,7 @@ const paused = (actions: Array<{ id: string; tool: string; args: unknown; approv
         action_id: actions[0].id,
         tool: actions[0].tool,
         actions: actions.map((a) => ({ action_id: a.id, tool: a.tool, arguments: JSON.stringify(a.args), needs_approval: a.approval ?? false, ...(a.runsOn ? { runs_on: a.runsOn } : {}) })),
+        usage: { input_tokens: 100, output_tokens: 20, total_tokens: 120 },
     }],
 ];
 
@@ -121,6 +122,8 @@ describe('run', () => {
         const result = await run(agent, 'Orders 1042 and 1043?', cencori.options);
 
         expect(result.finalOutput).toBe('Both shipped.');
+        // Every round counts, not only the one that answered.
+        expect(result.usage).toEqual({ inputTokens: 210, outputTokens: 45, totalTokens: 255 });
         const turn = cencori.requests[0].body.turn;
         expect(turn.tools).toEqual([{
             type: 'function',

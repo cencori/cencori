@@ -254,7 +254,7 @@ function completedText(streamed: string, data: Record<string, unknown>): string 
 type TurnOutcome =
     | { kind: 'with_human' }
     | { kind: 'completed'; text: string; usage: unknown }
-    | { kind: 'paused'; pause: PendingPause };
+    | { kind: 'paused'; pause: PendingPause; usage: unknown };
 
 /** Read one turn's stream: emit deltas and tool calls, end on pause or completion. */
 async function* consumeTurn(response: Response, agentName: string, sessionId: string, items: RunItem[]): AsyncGenerator<RunStreamEvent, TurnOutcome> {
@@ -301,7 +301,7 @@ async function* consumeTurn(response: Response, agentName: string, sessionId: st
                 const actions = Array.isArray(data.actions)
                     ? (data.actions as PausedAction[])
                     : [{ action_id: String(data.action_id), tool: String(data.tool), arguments: JSON.stringify((data.arguments as Record<string, unknown>)?.[String(data.tool)] ?? {}) }];
-                return { kind: 'paused', pause: { actionId: String(data.action_id), actions, text } };
+                return { kind: 'paused', pause: { actionId: String(data.action_id), actions, text }, usage: data.usage };
             }
             case 'turn.completed':
                 return { kind: 'completed', text: completedText(text, data), usage: data.usage };
@@ -458,6 +458,8 @@ async function* runLoop<Ctx>(
                 }
                 return { finalOutput, sessionId, lastAgent: agent, interruptions: [], state: undefined, newItems: items, usage, withHuman: false };
             }
+            // The round that asked for tools used tokens too: tool definitions are read on every round.
+            usage = addUsage(usage, outcome.usage);
             pending = outcome.pause;
             if (outcome.pause.text) items.push({ type: 'message', agentName: agent.name, text: outcome.pause.text });
             for (const action of outcome.pause.actions) {

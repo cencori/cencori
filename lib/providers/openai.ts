@@ -52,8 +52,16 @@ export function openAIReasoningEffort(request: Pick<UnifiedChatRequest, 'model' 
     // elsewhere risks a 400, so non-reasoning models silently omit it.
     if (!request.reasoningEffort) return undefined;
     const reasoningModel = /^(?:gpt-[56](?:[.-]|$)|o[1-9](?:[.-]|$))/.test(request.model);
+    if (!reasoningModel) return undefined;
+    // The first GPT-5 models and the o-series cannot turn reasoning off: OpenAI answers
+    // 400 "does not support 'none'". Give them the lowest setting they take, so one
+    // setting works on every model.
+    if (request.reasoningEffort === 'none') {
+        if (/^gpt-5(?:-(?:mini|nano|pro|codex|chat))?(?:-\d{4}|-latest|$)/.test(request.model)) return 'minimal' as OpenAI.ReasoningEffort;
+        if (/^o[1-9](?:[.-]|$)/.test(request.model)) return 'low' as OpenAI.ReasoningEffort;
+    }
     // The SDK types predate the max effort used by newer reasoning models.
-    return reasoningModel ? request.reasoningEffort as OpenAI.ReasoningEffort : undefined;
+    return request.reasoningEffort as OpenAI.ReasoningEffort;
 }
 
 /**
@@ -286,6 +294,10 @@ export class OpenAIProvider extends AIProvider {
             // Track tool calls across chunks (they stream incrementally)
             const toolCallsInProgress: Map<number, { id: string; name: string; arguments: string }> = new Map();
 
+            // The finish chunk, held until the usage chunk that follows it. Callers stop
+            // reading at the finish, so yielding it first meant the usage was never seen
+            // and tokens were estimated from message text, leaving out tool definitions.
+            let terminal: StreamChunk | undefined;
             for await (const chunk of stream) {
                 // Usage arrives on a final chunk of its own, after the content
                 // is done, with an empty choices array.
@@ -342,7 +354,7 @@ export class OpenAIProvider extends AIProvider {
                     }));
                 }
 
-                yield {
+                const out: StreamChunk = {
                     delta,
                     finishReason: finishReason === 'tool_calls' ? 'tool_calls'
                         : finishReason === 'stop' || finishReason === 'length' || finishReason === 'content_filter'
@@ -352,7 +364,18 @@ export class OpenAIProvider extends AIProvider {
                     ...(liveToolCalls.length > 0 ? { toolCallDeltas: liveToolCalls } : {}),
                     ...(usage ? { usage } : {}),
                 };
+                if (terminal) {
+                    // What follows the finish is the usage chunk: fold it in.
+                    if (usage) terminal = { ...terminal, usage };
+                    continue;
+                }
+                if (out.finishReason && !usage) {
+                    terminal = out;
+                    continue;
+                }
+                yield out;
             }
+            if (terminal) yield terminal;
         } catch (error) {
             throw normalizeProviderError(this.providerName, error);
         }

@@ -21,6 +21,14 @@ vi.mock('openai', () => ({
             completions: {
                 create: async (params: Record<string, unknown>) => {
                     chatCalls.push(params);
+                    // A stream as OpenAI sends it: text, the finish, then usage on its own.
+                    if (params.stream) {
+                        return (async function* () {
+                            yield { choices: [{ delta: { content: 'ok' }, finish_reason: null }] };
+                            yield { choices: [{ delta: {}, finish_reason: 'stop' }] };
+                            yield { choices: [], usage: { prompt_tokens: 17000, completion_tokens: 5, total_tokens: 17005 } };
+                        })();
+                    }
                     return {
                         model: params.model,
                         choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
@@ -132,5 +140,31 @@ describe('GPT-6 function tools go through the Responses API', () => {
         await provider.chat({ messages: [{ role: 'user', content: 'hi' }], model: 'gpt-6-luna', tools, reasoningEffort: 'none' });
         expect(responsesCalls).toHaveLength(0);
         expect(chatCalls[0].reasoning_effort).toBe('none');
+    });
+
+    it('delivers the usage with the finish on a Chat Completions stream', async () => {
+        reset();
+        const provider = new OpenAIProvider('sk-test');
+        const chunks = [];
+        for await (const chunk of provider.stream({ messages: [{ role: 'user', content: 'hi' }], model: 'gpt-5.6-luna', tools })) {
+            chunks.push(chunk);
+            // The gateway stops reading here, so the usage has to be on this chunk.
+            if (chunk.finishReason) break;
+        }
+        expect(chunks[chunks.length - 1].usage).toMatchObject({ promptTokens: 17000, completionTokens: 5 });
+    });
+
+    it("gives a model that cannot turn reasoning off its lowest setting for 'none'", async () => {
+        const provider = new OpenAIProvider('sk-test');
+        const sent = async (model: string) => {
+            reset();
+            await provider.chat({ messages: [{ role: 'user', content: 'hi' }], model, reasoningEffort: 'none' });
+            return chatCalls[0].reasoning_effort;
+        };
+        expect(await sent('gpt-5-nano')).toBe('minimal');
+        expect(await sent('gpt-5-mini-2025-08-07')).toBe('minimal');
+        expect(await sent('o3')).toBe('low');
+        expect(await sent('gpt-5.6-luna')).toBe('none');
+        expect(await sent('gpt-4o')).toBeUndefined();
     });
 });
