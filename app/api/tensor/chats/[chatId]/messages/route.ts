@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
+import { waitUntil } from "@vercel/functions";
 import { POST as inference } from "@/app/api/tensor/inference/v1/[...path]/route";
 import { invalidateTensorAccess, setCachedTensorAccess } from "@/lib/config-cache";
 import { noStoreHeaders } from "@/lib/tensor-auth";
@@ -22,6 +23,7 @@ import {
 } from "@/lib/tensor-chats";
 import { readStream, searchQuery, type ChatMessage, type ToolCall } from "@/lib/tensor-chats-stream";
 import { authenticateTensorDataRequest } from "@/lib/tensor-data";
+import { learnFromTurn, promptContext, readChat, recordTurn, rememberFact, searchChats } from "@/lib/tensor-memory";
 import { describeImage, IMAGE_DATA_URL, imageNotes } from "@/lib/tensor-vision";
 import { gatewayEntitlementFrom } from "@/lib/tensor-entitlement";
 import { getTensorBillingSnapshot } from "@/lib/tensor-billing";
@@ -123,6 +125,44 @@ const TOOLS = [
         type: "object",
         properties: { project: { type: "string", description: "The project's name, exactly as listed." } },
         required: ["project"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "remember",
+      description:
+        "Save one lasting fact about the person to Tensor's memory, so every later chat knows it: their name, work, preferences, a decision. Use it when they ask you to remember something, or when you learn something about them worth keeping. One self-contained sentence; never a secret.",
+      parameters: {
+        type: "object",
+        properties: { fact: { type: "string", description: "The fact, as one sentence that makes sense on its own." } },
+        required: ["fact"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "search_chats",
+      description:
+        "Search all of the person's earlier chats with Tensor, plain chats and project chats alike, for what was said about something. Returns the chats that match, newest first, each with its id and the part that matched.",
+      parameters: {
+        type: "object",
+        properties: { query: { type: "string", description: "The words to look for, as they might have been said." } },
+        required: ["query"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "read_chat",
+      description: "Read one of the person's earlier chats, turn by turn, by the id search_chats gave.",
+      parameters: {
+        type: "object",
+        properties: { chat_id: { type: "string", description: "The chat's id." } },
+        required: ["chat_id"],
       },
     },
   },
@@ -277,8 +317,19 @@ export async function POST(request: NextRequest, context: Context) {
       return null;
     });
 
+  // What Tensor remembers about the person, for this message; and on a chat's first message, their
+  // other chats about the same thing. Memory that cannot be read says nothing.
+  const memory = await promptContext(admin, {
+    userId: user.id,
+    taskId: null,
+    prompt: text,
+    first: history.length === 0,
+    known: [],
+    place: { kind: "plain", chatId: chat.id },
+  }).catch(() => ({ context: "", ids: [] as string[] }));
+
   const conversation: ChatMessage[] = [
-    { role: "system", content: plainChatInstructions(projects, new Date()) },
+    { role: "system", content: plainChatInstructions(projects, new Date(), memory.context) },
     ...contextMessages([...history, saved]),
   ];
   // This message's pictures are looked at by the vision model first, as the desktop app does, and
@@ -399,6 +450,18 @@ export async function POST(request: NextRequest, context: Context) {
                     latestChats: project.recentChats,
                   }
                 : { error: `There is no project named "${action.input.project}".` };
+            } else if (action.name === "remember") {
+              const saved = await rememberFact(admin, { userId: user.id, taskId: null, about: "you", content: action.input.fact });
+              step = saved.ok ? { type: "action", ...action, status: "done" } : { type: "action", ...action, status: "failed", error: saved.error };
+              result = saved.ok ? { saved: true } : { error: saved.error };
+            } else if (action.name === "search_chats") {
+              const chats = await searchChats(admin, { userId: user.id, query: action.input.query, limit: 6, exclude: { kind: "plain", chatId: chat.id } });
+              step = { type: "action", ...action, status: "done" };
+              result = chats.length ? { chats } : { chats: [], note: "No earlier chat matched. Try other words, or ask them." };
+            } else if (action.name === "read_chat") {
+              const found = await readChat(admin, { userId: user.id, chatId: action.input.chat_id });
+              step = found ? { type: "action", ...action, status: "done" } : { type: "action", ...action, status: "failed", error: "No such chat." };
+              result = found ?? { error: "No chat of theirs has that id." };
             } else if (action.name === "check_usage") {
               const usage = await readUsage(admin, user.id);
               step = usage ? { type: "action", ...action, status: "done" } : { type: "action", ...action, status: "failed", error: "Usage could not be read." };
@@ -448,6 +511,15 @@ export async function POST(request: NextRequest, context: Context) {
           await saveTrace(admin, { messageId: message.id, chatId: chat.id, parts }).catch((error: unknown) =>
             console.error("[Tensor Chats] Saving a trace failed", error),
           );
+          // Kept for other chats to find, and read for anything worth remembering, after the answer.
+          if (status === "complete" && answer.trim()) {
+            const turn = { userId: user.id, place: { kind: "plain" as const, chatId: chat.id }, turnKey: `plain:${saved.id}`, prompt: text, answer };
+            waitUntil(
+              recordTurn(admin, turn).then((kept) =>
+                kept ? learnFromTurn(admin, { userId: user.id, taskId: null, prompt: text, answer, source: "plain-chat" }) : undefined,
+              ),
+            );
+          }
           const shown = { ...plainMessageJson(message), parts: parts.some((part) => part.type === "action") ? parts : null };
           if (status === "failed" && failure) send({ type: "error", ...failure, message: shown });
           else send({ type: "done", message: shown });
@@ -609,6 +681,18 @@ function readAction(call: ToolCall): { name: ChatAction; input: Record<string, s
     return project ? { name: "project_status", input: { project } } : null;
   }
   if (call.function.name === "check_usage") return { name: "check_usage", input: {} };
+  if (call.function.name === "remember") {
+    const fact = text("fact", 600);
+    return fact ? { name: "remember", input: { fact } } : null;
+  }
+  if (call.function.name === "search_chats") {
+    const query = text("query", 300);
+    return query ? { name: "search_chats", input: { query } } : null;
+  }
+  if (call.function.name === "read_chat") {
+    const chatId = text("chat_id", 64);
+    return chatId ? { name: "read_chat", input: { chat_id: chatId } } : null;
+  }
   if (call.function.name === "continue_in_project") {
     const project = text("project", 100);
     const brief = text("brief", 4000);

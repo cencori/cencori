@@ -3,6 +3,7 @@ import { authenticateTensorDataRequest, isUuid } from "@/lib/tensor-data";
 import { effectiveTensorPlan, getOrCreateTensorBillingAccount } from "@/lib/tensor-billing";
 import {
   type FlyMachines,
+  type FlyResult,
   isTaskToken,
   openVariables,
   readTensorCloudConfig,
@@ -1283,6 +1284,27 @@ export async function destroyTask(
  * Returns undefined when the bearer is not a task token at all, so the caller falls through to
  * the ordinary session check.
  */
+/**
+ * Starts a stopped sandbox, first moving it to the current image when it was made from an older
+ * one: the same disk and the same settings, only what runs the task is new (memory, for one, came
+ * with an image), so a project made before keeps up. A move that fails starts it as it was.
+ */
+export async function startSandbox(
+  fly: Pick<FlyMachines, "get" | "update" | "start">,
+  image: string,
+  machineId: string,
+): Promise<FlyResult<unknown>> {
+  const found = await fly.get(machineId);
+  const current = found.ok ? (found.value as { config?: Record<string, unknown> }).config : undefined;
+  if (current && typeof current.image === "string" && current.image !== image) {
+    const moved = await fly.update(machineId, { config: { ...current, image }, skipLaunch: true });
+    if (!moved.ok) {
+      console.error(`[Tensor Cloud] Moving sandbox ${machineId} to ${image} failed (${moved.status}): ${moved.error}`);
+    }
+  }
+  return fly.start(machineId);
+}
+
 export async function authenticateTensorCloudTask(
   admin: Admin,
   authorization: string | null,

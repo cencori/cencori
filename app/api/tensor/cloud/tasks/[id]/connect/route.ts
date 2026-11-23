@@ -9,6 +9,7 @@ import {
   readTask,
   reconcileTasks,
   RunningTaskLimitError,
+  startSandbox,
   updateTask,
 } from "@/lib/tensor-cloud-tasks";
 
@@ -61,7 +62,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
       // The running slot is taken in the database before the machine is started, so two tasks
       // opened at once cannot both start: the second fails here, before it costs anything.
       await updateTask(session.admin, task.id, { status: "ready" });
-      const started = await fly.start(task.machine_id);
+      const started = await startSandbox(fly, config.sandboxImage, task.machine_id);
       if (!started.ok) {
         console.error(
           `[Tensor Cloud] Starting sandbox ${task.machine_id} of task ${task.id} failed (${started.status}): ${started.error}`,

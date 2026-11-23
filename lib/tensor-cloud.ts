@@ -909,9 +909,15 @@ export class FlyMachines {
     return this.#call<FlyMachine>("GET", `/machines/${encodeURIComponent(machineId)}`);
   }
 
-  /** Replaces a machine's configuration (its image, say), keeping its disk. It restarts with it. */
-  update(machineId: string, request: { config: unknown }): Promise<FlyResult<FlyMachine>> {
-    return this.#call<FlyMachine>("POST", `/machines/${encodeURIComponent(machineId)}`, { config: request.config });
+  /**
+   * Replaces a machine's configuration (its image, say), keeping its disk. It restarts with it,
+   * unless `skipLaunch` leaves it stopped.
+   */
+  update(machineId: string, request: { config: unknown; skipLaunch?: boolean }): Promise<FlyResult<FlyMachine>> {
+    return this.#call<FlyMachine>("POST", `/machines/${encodeURIComponent(machineId)}`, {
+      config: request.config,
+      ...(request.skipLaunch ? { skip_launch: true } : {}),
+    });
   }
 
   start(machineId: string): Promise<FlyResult<unknown>> {

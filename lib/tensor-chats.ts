@@ -193,7 +193,7 @@ export function describeProject(project: ProjectSummary): string {
  * computer here to run anything on, so building happens in a project, and it says so when the talk
  * turns that way.
  */
-export function plainChatInstructions(projects: ProjectSummary[], today: Date): string {
+export function plainChatInstructions(projects: ProjectSummary[], today: Date, memory = ""): string {
   const list = projects.length
     ? projects.map(describeProject).join("\n")
     : "None yet.";
@@ -216,6 +216,8 @@ export function plainChatInstructions(projects: ProjectSummary[], today: Date): 
     "",
     "You can also read a web page with read_page (a link they give you, or a search result whose snippet is not enough), check on one of their projects with project_status, and check their plan and how much of it is used with check_usage. Use these instead of guessing.",
     "",
+    "You have memory across chats. Tensor remembers on its own what matters from each conversation; what it remembers about this person comes below, when there is any. When they say \"remember…\", or you learn something lasting about them that should not be lost (their name, work, preferences, decisions), save it with remember. When they refer to an earlier conversation (\"like we discussed\", \"the other chat\", \"what did we decide about…\"), in a plain chat or in one of their projects, look with search_chats and then read_chat before asking them to repeat it.",
+    "",
     "Everything you do with a tool is shown to the person as it happens, so there is no need to announce it at length; a short line before is enough.",
     "",
     "Their projects, most recently worked on first:",
@@ -223,6 +225,7 @@ export function plainChatInstructions(projects: ProjectSummary[], today: Date): 
     "",
     "Write in plain, warm, direct language. Use Markdown where it helps (lists, headings for long answers, code blocks with a language). Keep answers as short as the question allows.",
     `Today is ${today.toISOString().slice(0, 10)}.`,
+    ...(memory ? ["", memory] : []),
   ].join("\n");
 }
 
@@ -259,7 +262,10 @@ export type ChatAction =
   | "project_status"
   | "check_usage"
   | "propose_project"
-  | "continue_in_project";
+  | "continue_in_project"
+  | "remember"
+  | "search_chats"
+  | "read_chat";
 
 export type TracePart =
   | { type: "text"; text: string }
@@ -300,6 +306,12 @@ export function actionNote(parts: TracePart[] | undefined, created: boolean): st
         return "checked the person's projects";
       case "check_usage":
         return "checked the person's usage";
+      case "remember":
+        return `saved to memory: "${action.input.fact ?? ""}"`;
+      case "search_chats":
+        return `searched their earlier chats for "${action.input.query ?? ""}"`;
+      case "read_chat":
+        return "read one of their earlier chats";
       default:
         return null;
     }
