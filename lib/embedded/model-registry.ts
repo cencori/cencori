@@ -2,6 +2,7 @@ import type { createAdminClient } from '@/lib/supabaseAdmin';
 import { SUPPORTED_PROVIDERS } from '@/lib/providers/config';
 import { publicProviderLabel } from '@/lib/providers/branding';
 import { hasStaticPricing } from '@/lib/providers/pricing';
+import { modelRetirement } from '@/lib/providers/retirements';
 import { resolveApiKeyModelAccess } from '@/lib/gateway/model-access';
 import { getManagedProviderNames } from '@/lib/gateway/providers-setup';
 import { getManagedJudgmentProviderNames } from '@/lib/judgment/registry';
@@ -226,6 +227,8 @@ export async function buildUnifiedModelRegistry(
                 managed_access: managedAvailable,
                 pricing_status: price ? 'priced' : hasStaticPricing(ownedBy, model.id) ? 'priced' : 'unpriced',
                 pricing: price ? { input_per_million: price.inputPerM, output_per_million: price.outputPerM, currency: 'USD' } : null,
+                retires_at: modelRetirement(model.id)?.date ?? null,
+                replaced_by: modelRetirement(model.id)?.replacedBy ?? null,
                 description: model.description,
             });
         }
@@ -319,7 +322,7 @@ export async function buildUnifiedModelRegistry(
                 pricing_status: 'unknown',
                 pricing: null,
                 description:
-                    'Auto-routes by task across your BYOK keys: chat (code / reasoning / fast / vision), embeddings, image generation, and text-to-speech. Requires at least one active provider key.',
+                    'Auto-routes by task across your BYOK keys: chat (code / reasoning / fast / vision), embeddings, image generation, and text-to-speech. Requires at least one active provider key. Your provider bills the model each call was routed to, at that model\'s price; Cencori adds no charge. The model used is in each response and in a session turn\'s trace.',
             });
         }
     }

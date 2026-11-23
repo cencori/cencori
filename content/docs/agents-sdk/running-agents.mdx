@@ -19,6 +19,7 @@ const result = await run(support, 'Where is order 1042?');
 | --- | --- |
 | `context` | Your value for tools, guardrails and instructions. Never sent to Cencori |
 | `sessionId` | Continue an earlier conversation |
+| `onToolEnd` | A function called after each tool call finishes, with `{ toolName, callId, arguments, output, agentName }` and the run context. Awaited before the result goes back to the model |
 | `stream` | Get events as they happen |
 | `maxTurns` | Most model calls the run may make (each tool round is one). Default 10 |
 | `user` | Your end user's id: per-user quotas, billing and memory |
@@ -38,7 +39,8 @@ const result = await run(support, 'Where is order 1042?');
 | `interruptions` | Tool calls waiting for approval |
 | `withHuman` | `true` when a person is handling the conversation, so the message was saved for them ([Human handoff](/docs/agents-sdk/human-handoff)) |
 | `state` | A `RunState` to resume after deciding on them |
-| `usage` | Input, output and total tokens across the run |
+| `usage` | Input, output and total tokens across the run, every tool round included |
+| `steps` | One entry per model call: `model` and `provider` that answered (with `model: 'auto'`, the model it was routed to), `usedFallback`, `usage`, `costUsd` (what Cencori charged; 0 on your own key) and `providerCostUsd` |
 
 ## Streaming
 

@@ -49,6 +49,10 @@ export interface UnifiedModelRow {
     managed_access: boolean;
     pricing_status: PricingStatus;
     pricing?: { input_per_million: number; output_per_million: number; currency: 'USD' } | null;
+    /** The day the vendor stops serving the model (YYYY-MM-DD), when it has announced one. */
+    retires_at?: string | null;
+    /** What the vendor says to use instead of a model with a retires_at. */
+    replaced_by?: string | null;
     description?: string;
 }
 

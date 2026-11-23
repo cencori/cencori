@@ -29,7 +29,7 @@ function sseResponse(events: Sse, headers: Record<string, string> = {}): Respons
 const completed = (text: string): Sse => [
     ['turn.started', { turn_number: 1 }],
     ['output_text.delta', { delta: text }],
-    ['turn.completed', { turn_number: 1, output: { output: [] }, usage: { input_tokens: 10, output_tokens: 5, total_tokens: 15 } }],
+    ['turn.completed', { turn_number: 1, output: { output: [] }, usage: { input_tokens: 10, output_tokens: 5, total_tokens: 15 }, trace: { model: 'gpt-5.6-luna', provider: 'openai', used_fallback: false, cost_usd: 0, provider_cost_usd: 0.002 } }],
 ];
 
 const paused = (actions: Array<{ id: string; tool: string; args: unknown; approval?: boolean; runsOn?: 'cencori' }>): Sse => [
@@ -124,6 +124,9 @@ describe('run', () => {
         expect(result.finalOutput).toBe('Both shipped.');
         // Every round counts, not only the one that answered.
         expect(result.usage).toEqual({ inputTokens: 210, outputTokens: 45, totalTokens: 255 });
+        // One step per model call, with the model that answered it.
+        expect(result.steps).toHaveLength(3);
+        expect(result.steps[2]).toMatchObject({ agentName: 'Support', model: 'gpt-5.6-luna', provider: 'openai', providerCostUsd: 0.002, usage: { inputTokens: 10 } });
         const turn = cencori.requests[0].body.turn;
         expect(turn.tools).toEqual([{
             type: 'function',
@@ -137,8 +140,36 @@ describe('run', () => {
             path: '/v1/sessions/ses_1/approve',
             body: { action_id: 'call_1', tool_results: [{ action_id: 'call_1', output: '{"id":"1042","status":"shipped"}' }] },
         });
+
         expect(cencori.requests[2].body).toEqual({ action_id: 'call_2', tool_results: [{ action_id: 'call_2', output: '{"id":"1043","status":"shipped"}' }] });
         expect(result.newItems.map((i) => i.type)).toEqual(['tool_call', 'tool_output', 'tool_call', 'tool_output', 'message']);
+    });
+
+    it('reports each finished tool call to onToolEnd and to output guardrails', async () => {
+        const cencori = fakeCencori([
+            paused([{ id: 'call_1', tool: 'get_order', args: { id: '1042' } }]),
+            completed('Shipped.'),
+        ]);
+        const seenByGuardrail: string[] = [];
+        const agent = new Agent({
+            name: 'Support',
+            model: 'gpt-4o',
+            tools: [getOrder],
+            outputGuardrails: [{
+                name: 'sees-tools',
+                execute: ({ toolResults }) => {
+                    seenByGuardrail.push(...toolResults.map((r) => `${r.toolName}:${r.callId}`));
+                    return { tripwireTriggered: false };
+                },
+            }],
+        });
+        const ended: Array<{ toolName: string; arguments: string; output: string }> = [];
+        await run(agent, 'Order 1042?', { ...cencori.options, onToolEnd: (r) => { ended.push(r); } });
+
+        expect(ended).toHaveLength(1);
+        expect(ended[0]).toMatchObject({ toolName: 'get_order', callId: 'call_1', arguments: '{"id":"1042"}', agentName: 'Support' });
+        expect(ended[0].output.length).toBeGreaterThan(0);
+        expect(seenByGuardrail).toEqual(['get_order:call_1']);
     });
 
     it('tells the model about bad arguments and tool errors instead of failing the run', async () => {

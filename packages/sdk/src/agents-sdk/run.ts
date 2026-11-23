@@ -2,7 +2,7 @@ import { isWidgetResult, validateWidget, type WidgetNode } from '../widgets/spec
 import { inputText, type AgentInput } from './input';
 import { HUMAN_HANDOFF_TOOL } from './human';
 import { partialRenderUiWidget } from '../widgets/partial';
-import { Agent } from './agent';
+import { Agent, type ToolResult } from './agent';
 import type { RunContext } from './context';
 import { AgentsError, CencoriRunError, GuardrailTripwireTriggered, MaxTurnsExceededError } from './errors';
 import { toJsonSchema, validate } from './schema';
@@ -24,6 +24,11 @@ export interface RunOptions<Ctx = unknown> extends TransportOptions {
     user?: string;
     /** Extra metadata on the session (strings). */
     metadata?: Record<string, string>;
+    /**
+     * Called after each tool call finishes, before its result goes back to the model: your
+     * tools, MCP servers' tools and rejected calls alike. Awaited; an error it throws stops the run.
+     */
+    onToolEnd?: (result: ToolResult, runContext: RunContext<Ctx>) => void | Promise<void>;
 }
 
 /** A tool call waiting for a human. Approve or reject it on result.state, then run again. */
@@ -47,6 +52,21 @@ export interface Usage {
     inputTokens: number;
     outputTokens: number;
     totalTokens: number;
+}
+
+/** One model call in a run: which model answered it and what it cost. */
+export interface RunStep {
+    agentName: string;
+    /** The model that answered. With model: 'auto', the one it was routed to. */
+    model: string | undefined;
+    provider: string | undefined;
+    /** True when the model you asked for failed and another answered. */
+    usedFallback: boolean;
+    usage: Usage;
+    /** What Cencori charged, in USD. 0 on your own provider key. */
+    costUsd: number;
+    /** What the provider's price list says the call cost, in USD. */
+    providerCostUsd: number;
 }
 
 export type RunStreamEvent =
@@ -153,6 +173,8 @@ export interface RunResult<Output = string> {
     /** Messages, tool calls and handoffs in this run, in order. */
     newItems: RunItem[];
     usage: Usage;
+    /** Each model call this run() made, in order. A run resumed from a RunState lists the calls made since. */
+    steps: RunStep[];
     /**
      * A person is handling this conversation (the agent handed it over with
      * humanHandoff, or someone stepped in): the message was kept for them and
@@ -225,6 +247,19 @@ function wireTools(agent: Agent<any>, resolved: FunctionTool<any>[] = agent.tool
     return tools;
 }
 
+function stepOf(agentName: string, usage: unknown, trace: unknown): RunStep {
+    const t = (trace ?? {}) as { model?: unknown; provider?: unknown; used_fallback?: unknown; cost_usd?: unknown; provider_cost_usd?: unknown };
+    return {
+        agentName,
+        model: typeof t.model === 'string' ? t.model : undefined,
+        provider: typeof t.provider === 'string' ? t.provider : undefined,
+        usedFallback: t.used_fallback === true,
+        usage: addUsage({ inputTokens: 0, outputTokens: 0, totalTokens: 0 }, usage),
+        costUsd: Number(t.cost_usd) || 0,
+        providerCostUsd: Number(t.provider_cost_usd) || 0,
+    };
+}
+
 function addUsage(total: Usage, usage: unknown): Usage {
     const u = (usage ?? {}) as { input_tokens?: number; output_tokens?: number; total_tokens?: number };
     return {
@@ -253,8 +288,8 @@ function completedText(streamed: string, data: Record<string, unknown>): string 
 
 type TurnOutcome =
     | { kind: 'with_human' }
-    | { kind: 'completed'; text: string; usage: unknown }
-    | { kind: 'paused'; pause: PendingPause; usage: unknown };
+    | { kind: 'completed'; text: string; usage: unknown; trace: unknown }
+    | { kind: 'paused'; pause: PendingPause; usage: unknown; trace: unknown };
 
 /** Read one turn's stream: emit deltas and tool calls, end on pause or completion. */
 async function* consumeTurn(response: Response, agentName: string, sessionId: string, items: RunItem[]): AsyncGenerator<RunStreamEvent, TurnOutcome> {
@@ -301,10 +336,10 @@ async function* consumeTurn(response: Response, agentName: string, sessionId: st
                 const actions = Array.isArray(data.actions)
                     ? (data.actions as PausedAction[])
                     : [{ action_id: String(data.action_id), tool: String(data.tool), arguments: JSON.stringify((data.arguments as Record<string, unknown>)?.[String(data.tool)] ?? {}) }];
-                return { kind: 'paused', pause: { actionId: String(data.action_id), actions, text }, usage: data.usage };
+                return { kind: 'paused', pause: { actionId: String(data.action_id), actions, text }, usage: data.usage, trace: data.trace };
             }
             case 'turn.completed':
-                return { kind: 'completed', text: completedText(text, data), usage: data.usage };
+                return { kind: 'completed', text: completedText(text, data), usage: data.usage, trace: data.trace };
             case 'owner.handling':
                 return { kind: 'with_human' };
             case 'turn.failed': {
@@ -331,6 +366,8 @@ async function* runLoop<Ctx>(
     const agents = collectAgents(startAgent);
     const maxTurns = options.maxTurns ?? DEFAULT_MAX_TURNS;
     const items: RunItem[] = [];
+    const steps: RunStep[] = [];
+    const toolResults: ToolResult[] = [];
 
     const contextFor = (agent: Agent<any>, sessionId: string): RunContext<Ctx> => {
         const ctx: RunContext<Ctx> & { __runOptions?: RunOptions<Ctx> } = {
@@ -436,10 +473,11 @@ async function* runLoop<Ctx>(
             if (outcome.kind === 'with_human') {
                 // A person is handling it: the message was kept for them.
                 yield { type: 'with_human' };
-                return { finalOutput: undefined, sessionId, lastAgent: agent, interruptions: [], state: undefined, newItems: items, usage, withHuman: true };
+                return { finalOutput: undefined, sessionId, lastAgent: agent, interruptions: [], state: undefined, newItems: items, usage, steps, withHuman: true };
             }
             if (outcome.kind === 'completed') {
                 usage = addUsage(usage, outcome.usage);
+                steps.push(stepOf(agent.name, outcome.usage, outcome.trace));
                 let finalOutput: unknown = outcome.text;
                 if (agent.outputType) {
                     let parsed: unknown;
@@ -453,13 +491,14 @@ async function* runLoop<Ctx>(
                 items.push({ type: 'message', agentName: agent.name, text: outcome.text });
                 const runContext = contextFor(agent, sessionId);
                 for (const guardrail of agent.outputGuardrails) {
-                    const verdict = await guardrail.execute({ output: finalOutput, agent, runContext });
+                    const verdict = await guardrail.execute({ output: finalOutput, agent, runContext, toolResults });
                     if (verdict.tripwireTriggered) throw new GuardrailTripwireTriggered('output', guardrail.name, verdict.outputInfo);
                 }
-                return { finalOutput, sessionId, lastAgent: agent, interruptions: [], state: undefined, newItems: items, usage, withHuman: false };
+                return { finalOutput, sessionId, lastAgent: agent, interruptions: [], state: undefined, newItems: items, usage, steps, withHuman: false };
             }
             // The round that asked for tools used tokens too: tool definitions are read on every round.
             usage = addUsage(usage, outcome.usage);
+            steps.push(stepOf(agent.name, outcome.usage, outcome.trace));
             pending = outcome.pause;
             if (outcome.pause.text) items.push({ type: 'message', agentName: agent.name, text: outcome.pause.text });
             for (const action of outcome.pause.actions) {
@@ -500,7 +539,7 @@ async function* runLoop<Ctx>(
         if (interruptions.length > 0) {
             const state = new RunState({ sessionId, agentName: agent.name, turnsUsed, usage, pending });
             yield { type: 'interruption', interruptions };
-            return { finalOutput: undefined, sessionId, lastAgent: agent, interruptions, state, newItems: items, usage, withHuman: false };
+            return { finalOutput: undefined, sessionId, lastAgent: agent, interruptions, state, newItems: items, usage, steps, withHuman: false };
         }
 
         if (turnsUsed >= maxTurns) throw new MaxTurnsExceededError(maxTurns, sessionId);
@@ -538,6 +577,9 @@ async function* runLoop<Ctx>(
                 yield { type: 'widget', callId: action.action_id, widgetId: shown.widgetId, widget: shown.widget, agentName: agent.name };
             }
             const output = result.output;
+            const finished: ToolResult = { callId: action.action_id, toolName: action.tool, arguments: action.arguments, output, agentName: agent.name };
+            toolResults.push(finished);
+            if (options.onToolEnd) await options.onToolEnd(finished, runContext);
             items.push({ type: 'tool_output', agentName: agent.name, callId: action.action_id, toolName: action.tool, output });
             yield { type: 'tool_output', callId: action.action_id, toolName: action.tool, output, agentName: agent.name };
             if (action.tool === HUMAN_HANDOFF_TOOL && !output.startsWith('Error')) {

@@ -6,11 +6,11 @@
  * the catalog.
  */
 export { Agent, DEFAULT_MODEL } from './agent';
-export type { AgentOptions, InputGuardrail, OutputGuardrail, GuardrailResult, ModelSettings } from './agent';
+export type { AgentOptions, InputGuardrail, OutputGuardrail, GuardrailResult, ModelSettings, ToolResult } from './agent';
 export { tool } from './tool';
 export type { FunctionTool, ToolOptions, NeedsApproval } from './tool';
 export { run, RunState } from './run';
-export type { RunOptions, RunResult, StreamedRunResult, RunStreamEvent, RunItem, ToolApprovalItem, Usage } from './run';
+export type { RunOptions, RunResult, StreamedRunResult, RunStreamEvent, RunItem, RunStep, ToolApprovalItem, Usage } from './run';
 export type { RunContext } from './context';
 export { AgentsError, CencoriRunError, GuardrailTripwireTriggered, MaxTurnsExceededError } from './errors';
 export { SchemaValidationError } from './schema';

@@ -86,6 +86,21 @@ const onTopic = {
 };
 ```
 
+An output guardrail also gets `toolResults`: what each tool returned in this run, in order (your tools and MCP servers' tools). Use it to tell the user's own data from something the answer must not say:
+
+```ts
+const noInternalNames = {
+    name: 'no_internal_names',
+    execute: ({ output, toolResults }) => {
+        const fromTools = toolResults.map((r) => r.output).join('\n');
+        const leaked = INTERNAL_NAMES.filter((n) => String(output).includes(n) && !fromTools.includes(n));
+        return { tripwireTriggered: leaked.length > 0, outputInfo: { leaked } };
+    },
+};
+```
+
+Each entry has `toolName`, `callId`, `arguments` (JSON text), `output` and `agentName`. To see each call as it finishes, pass `onToolEnd` to `run()` ([Running agents](/docs/agents-sdk/running-agents)).
+
 A tripped guardrail throws `GuardrailTripwireTriggered` with `kind` (`'input'` or `'output'`), the guardrail's name and your `outputInfo`.
 
 ## Gateway protection still applies

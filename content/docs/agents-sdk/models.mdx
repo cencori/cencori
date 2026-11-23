@@ -35,11 +35,24 @@ new Agent({
 | --- | --- |
 | `temperature` | Lower is steadier, higher more varied |
 | `maxTokens` | Cap on each reply |
-| `reasoningEffort` | How long a reasoning model thinks first. Lower is faster |
+| `reasoningEffort` | How long a reasoning model thinks first. Lower is faster. `'none'` turns thinking off; a model that cannot turn it off gets its lowest setting |
 
 ## Tools need a model that calls tools
 
 Agents with tools, handoffs or widgets need a model that supports tool calling. Check `capabilities.tools` in `GET /v1/models`.
+
+## Auto
+
+`model: 'auto'` routes each call to a model on your own provider keys, by task. Your provider bills the model the call went to, at that model's price, and Cencori adds no charge, so `auto` has no price of its own in `GET /v1/models`. `result.steps` says which model answered each call.
+
+## Models that are going away
+
+`GET /v1/models` gives each model a `retires_at`: the day its vendor has said it will stop serving it (`YYYY-MM-DD`), or `null` when none is announced. `replaced_by` is what the vendor says to use instead.
+
+```ts
+const { data } = await cencori.models.list();
+const soon = data.filter((m) => m.retires_at && Date.parse(m.retires_at) < Date.now() + 60 * 86_400_000);
+```
 
 ## Your own keys
 

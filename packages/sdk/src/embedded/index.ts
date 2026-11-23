@@ -203,6 +203,10 @@ export interface UnifiedModel {
     status: string;
     available: boolean;
     unavailable_reason: string | null;
+    /** The day the vendor stops serving the model (YYYY-MM-DD); null when none is announced. */
+    retires_at?: string | null;
+    /** What the vendor says to use instead. */
+    replaced_by?: string | null;
 }
 
 export class ModelsNamespace {

@@ -16,8 +16,27 @@ export interface InputGuardrail<Ctx = unknown> {
 /** Checks the final answer before the run returns it. */
 export interface OutputGuardrail<Ctx = unknown> {
     name: string;
-    execute: (args: { output: unknown; agent: Agent<Ctx, any>; runContext: RunContext<Ctx> }) =>
-        GuardrailResult | Promise<GuardrailResult>;
+    execute: (args: {
+        output: unknown;
+        agent: Agent<Ctx, any>;
+        runContext: RunContext<Ctx>;
+        /**
+         * What each tool returned in this run, in order (your tools and MCP servers'). Use it to
+         * tell the user's own data, which a tool fetched, from something the answer must not say.
+         */
+        toolResults: ToolResult[];
+    }) => GuardrailResult | Promise<GuardrailResult>;
+}
+
+/** One finished tool call: what the model asked for and what the tool gave back. */
+export interface ToolResult {
+    callId: string;
+    toolName: string;
+    /** The model's arguments, as JSON text. */
+    arguments: string;
+    /** What the model was given back. */
+    output: string;
+    agentName: string;
 }
 
 export interface GuardrailResult {

@@ -215,6 +215,9 @@ export async function GET(req: NextRequest) {
                 managed_access: m.managed_access,
                 pricing_status: m.pricing_status,
                 pricing: m.pricing ?? undefined,
+                // The vendor's announced shutdown day, or null when it has announced none.
+                retires_at: m.retires_at ?? null,
+                replaced_by: m.replaced_by ?? null,
             })),
             total,
             distinct_model_ids: distinctModelIds,
