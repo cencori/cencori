@@ -4,7 +4,7 @@
  * Read from the vendors' own deprecation pages on 2026-11-23:
  *   OpenAI     https://developers.openai.com/api/docs/deprecations
  *   Anthropic  https://platform.claude.com/docs/en/about-claude/model-deprecations
- *   Google     https://ai.google.dev/gemini-api/docs/deprecations
+ *   Google     https://aistudio.google.com/docs/deprecations (where ai.google.dev/gemini-api/docs/deprecations redirects)
  *
  * Only a date the page states for the exact model ID is here. A model with no entry has no
  * announced date; that is not a promise it will stay. Google calls its dates the earliest
@@ -14,7 +14,7 @@
 export interface ModelRetirement {
     /** The day the vendor stops serving it (YYYY-MM-DD). */
     date: string;
-    /** What the vendor says to use instead. */
+    /** What the vendor says to use instead. Not always a model in Cencori's catalog. */
     replacedBy?: string;
 }
 
@@ -28,7 +28,7 @@ export const MODEL_RETIREMENTS: Record<string, ModelRetirement> = {
     'gpt-image-1-mini': { date: '2026-12-01' },
     'gpt-image-1.5': { date: '2026-12-01' },
     'gpt-5': { date: '2026-12-11', replacedBy: 'gpt-6.1-sol' },
-    'gpt-5-mini': { date: '2026-12-11' },
+    'gpt-5-mini': { date: '2026-12-11', replacedBy: 'gpt-6.1-terra' },
     'gpt-5-nano': { date: '2026-12-11', replacedBy: 'gpt-6-luna' },
     'gpt-5-pro': { date: '2026-12-11', replacedBy: 'gpt-6.1-sol' },
     'o3': { date: '2026-12-11', replacedBy: 'gpt-6.1-sol' },
@@ -37,8 +37,8 @@ export const MODEL_RETIREMENTS: Record<string, ModelRetirement> = {
     // Anthropic
     'claude-sonnet-4-5': { date: '2026-11-30', replacedBy: 'claude-sonnet-5-5' },
     // Google
-    'gemini-2.5-pro': { date: '2026-12-01' },
-    'gemini-2.5-flash': { date: '2026-12-01' },
+    'gemini-2.5-pro': { date: '2026-12-01', replacedBy: 'gemini-3.8-flash' },
+    'gemini-2.5-flash': { date: '2026-12-01', replacedBy: 'gemini-3.5-flash-lite' },
 };
 
 export function modelRetirement(modelId: string): ModelRetirement | null {

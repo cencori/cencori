@@ -55,9 +55,10 @@ export function openAIReasoningEffort(request: Pick<UnifiedChatRequest, 'model' 
     if (!reasoningModel) return undefined;
     // The first GPT-5 models and the o-series cannot turn reasoning off: OpenAI answers
     // 400 "does not support 'none'". Give them the lowest setting they take, so one
-    // setting works on every model.
+    // setting works on every model. Only the models known to take 'minimal' or 'low' are
+    // mapped; any other is sent what was asked for.
     if (request.reasoningEffort === 'none') {
-        if (/^gpt-5(?:-(?:mini|nano|pro|codex|chat))?(?:-\d{4}|-latest|$)/.test(request.model)) return 'minimal' as OpenAI.ReasoningEffort;
+        if (/^gpt-5(?:-(?:mini|nano))?(?:-\d{4}|$)/.test(request.model)) return 'minimal' as OpenAI.ReasoningEffort;
         if (/^o[1-9](?:[.-]|$)/.test(request.model)) return 'low' as OpenAI.ReasoningEffort;
     }
     // The SDK types predate the max effort used by newer reasoning models.

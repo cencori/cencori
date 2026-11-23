@@ -25,8 +25,10 @@ export interface RunOptions<Ctx = unknown> extends TransportOptions {
     /** Extra metadata on the session (strings). */
     metadata?: Record<string, string>;
     /**
-     * Called after each tool call finishes, before its result goes back to the model: your
-     * tools, MCP servers' tools and rejected calls alike. Awaited; an error it throws stops the run.
+     * Called once for each finished tool call, before its result goes back to the model: your
+     * tools, MCP servers' tools and rejected calls alike. Calls the model made together run
+     * together, and this is then called for each in order. Not called for handoffs or for
+     * tools Cencori runs. Awaited; an error it throws stops the run.
      */
     onToolEnd?: (result: ToolResult, runContext: RunContext<Ctx>) => void | Promise<void>;
 }

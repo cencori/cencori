@@ -19,7 +19,7 @@ const result = await run(support, 'Where is order 1042?');
 | --- | --- |
 | `context` | Your value for tools, guardrails and instructions. Never sent to Cencori |
 | `sessionId` | Continue an earlier conversation |
-| `onToolEnd` | A function called after each tool call finishes, with `{ toolName, callId, arguments, output, agentName }` and the run context. Awaited before the result goes back to the model |
+| `onToolEnd` | A function called once for each finished tool call, with `{ toolName, callId, arguments, output, agentName }` and the run context. Awaited before the results go back to the model. Not called for handoffs or for tools Cencori runs |
 | `stream` | Get events as they happen |
 | `maxTurns` | Most model calls the run may make (each tool round is one). Default 10 |
 | `user` | Your end user's id: per-user quotas, billing and memory |
