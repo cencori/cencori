@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { anyOf, projectScopeKey, snippetOf, sortFacts } from "@/lib/tensor-memory";
+import { anyOf, parseNoteReply, projectScopeKey, snippetOf, sortFacts } from "@/lib/tensor-memory";
 
 describe("Tensor memory", () => {
   it("sorts tagged facts into the person's and the project's", () => {
@@ -81,5 +81,15 @@ describe("Waking a sandbox", () => {
     const current = fly("registry.fly.io/tensor-sandbox:new");
     await startSandbox(current, "registry.fly.io/tensor-sandbox:new", "m1");
     expect(current.calls).toEqual([["get", "m1"], ["start", "m1"]]);
+  });
+});
+
+describe("parseNoteReply", () => {
+  it("reads the reply, the facts to save and the ids to forget, inside a code fence too", () => {
+    const raw = '```json\n{"reply":"Updated.","remember":["Cencori was founded in November 2025."," "],"forget":["mem_1"]}\n```';
+    expect(parseNoteReply(raw)).toEqual({ reply: "Updated.", remember: ["Cencori was founded in November 2025."], forget: ["mem_1"] });
+  });
+  it("gives nothing for a reply that is not JSON", () => {
+    expect(parseNoteReply("Sure, done!")).toBeNull();
   });
 });

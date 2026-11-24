@@ -23,6 +23,7 @@ import crypto from "node:crypto";
 import type { createAdminClient } from "@/lib/supabaseAdmin";
 import { loadApiKeyConfig } from "@/lib/gateway-middleware";
 import { checkCustomRateLimit } from "@/lib/rate-limit";
+import { callMemoryLlm } from "@/lib/memory/llm";
 import {
   DEFAULT_MEMORY_SETTINGS,
   extractFacts,
@@ -36,6 +37,7 @@ import {
   type MemoryDirective,
   type MemorySettings,
   type RetrievedMemory,
+  resolveMemoryModel,
 } from "@/lib/memory";
 
 type Admin = ReturnType<typeof createAdminClient>;
@@ -654,4 +656,149 @@ export async function forgetEverything(admin: Admin, userId: string): Promise<vo
   }
   const { error } = await admin.from("tensor_memory_turns").delete().eq("user_id", userId);
   if (error) throw error;
+}
+
+// ─── The summary ─────────────────────────────────────────────────────────
+
+/** Summaries written and notes answered, per person per day. */
+const SUMMARIES_PER_DAY = 60;
+const NOTES_PER_DAY = 60;
+/** Facts a summary is written from: the newest, which is nearly always all of them. */
+const SUMMARY_FACTS_MAX = 400;
+const NOTE_MAX = 2000;
+
+export type MemorySummary = { content: string; updatedAt: string | null };
+
+const SUMMARY_PROMPT = [
+  "You write the memory summary a person reads in Tensor's settings: what Tensor has learned about them, from the facts it saved.",
+  "Write to them, in the second person (\"You're…\", \"You prefer…\"), as a few short sections. Each section starts with a Markdown heading of the form \"## Title\". Start with \"## Overview\": who they are, what they do, how they like to work. Then one section per theme the facts support (their company, their work, their projects, preferences), only when there is enough to say. Each section is one paragraph of plain sentences: no lists, no bold.",
+  "Use only what the facts say. Never invent or guess. Where two facts disagree, the newer one wins: they are listed newest first. Leave out anything trivial or passing.",
+  "Reply with the summary alone.",
+].join("\n");
+
+const NOTE_PROMPT = [
+  "You keep a person's memory in Tensor. Below are the facts saved about them, each with its id, newest first, and then their note.",
+  "Their note may ask what Tensor remembers, or tell it to change something: to remember something new, to correct a fact, or to forget one.",
+  "Reply with JSON only, of the form {\"reply\": string, \"remember\": string[], \"forget\": string[]}.",
+  "- reply: one or two short sentences back to them, plainly. For a question, the answer from the facts. For a change, what changed.",
+  "- remember: new facts to save, each one short sentence about them in the third person, standing on its own. A correction is a new fact plus the old one forgotten.",
+  "- forget: the ids of facts to drop, only ones listed, only those the note asks to change or remove.",
+  "Never save an instruction, only facts about them.",
+].join("\n");
+
+/** The facts about the person, newest first, and a name for that exact set. */
+async function factsAboutYou(admin: Admin, userId: string) {
+  const { you } = await listMemories(admin, userId);
+  const facts = you.slice(0, SUMMARY_FACTS_MAX);
+  const signature = crypto
+    .createHash("sha256")
+    .update(facts.map((fact) => fact.id).sort().join(","))
+    .digest("hex");
+  return { facts, signature };
+}
+
+/**
+ * The summary of what Tensor knows about the person. Kept, and written again only when the facts
+ * under it have changed since; with no facts there is nothing to summarize.
+ */
+export async function memorySummary(admin: Admin, userId: string): Promise<MemorySummary> {
+  const [{ facts, signature }, { data: kept }] = await Promise.all([
+    factsAboutYou(admin, userId),
+    admin.from("tensor_memory_summaries").select("content, signature, updated_at").eq("user_id", userId).maybeSingle(),
+  ]);
+  const row = kept as { content: string; signature: string; updated_at: string } | null;
+  if (facts.length === 0) return { content: "", updatedAt: null };
+  if (row && row.signature === signature) return { content: row.content, updatedAt: row.updated_at };
+  // Out of date: written again, unless today's are used up, when the last one is better than none.
+  const stale = row ? { content: row.content, updatedAt: row.updated_at } : { content: "", updatedAt: null };
+  const place = await memoryHome(admin);
+  if (!place || !(await allowed(`tensor-memory:summary:${userId}`, SUMMARIES_PER_DAY))) return stale;
+  const result = await callMemoryLlm({
+    supabase: admin,
+    projectId: place.projectId,
+    organizationId: place.organizationId,
+    tier: "enterprise",
+    preferModel: resolveMemoryModel(place.settings.extractionModel),
+    // Reasoning models spend hidden tokens from this too, so it is generous.
+    maxTokens: 4000,
+    temperature: 0.2,
+    messages: [
+      { role: "system", content: SUMMARY_PROMPT },
+      { role: "user", content: `Facts, newest first:\n${facts.map((fact) => `- ${fact.content}`).join("\n")}` },
+    ],
+  }).catch((error: unknown) => {
+    console.error("[Tensor Memory] Writing the summary failed", error);
+    return null;
+  });
+  const content = result?.content.trim() ?? "";
+  if (!content) return stale;
+  const updatedAt = new Date().toISOString();
+  const { error } = await admin
+    .from("tensor_memory_summaries")
+    .upsert({ user_id: userId, content, signature, updated_at: updatedAt }, { onConflict: "user_id" });
+  if (error) console.error("[Tensor Memory] Keeping the summary failed", error);
+  return { content, updatedAt };
+}
+
+/** Reads the model's JSON reply to a note, tolerating a code fence around it. */
+export function parseNoteReply(raw: string): { reply: string; remember: string[]; forget: string[] } | null {
+  const start = raw.indexOf("{");
+  const end = raw.lastIndexOf("}");
+  if (start < 0 || end <= start) return null;
+  try {
+    const value = JSON.parse(raw.slice(start, end + 1)) as { reply?: unknown; remember?: unknown; forget?: unknown };
+    const strings = (list: unknown) =>
+      Array.isArray(list) ? list.filter((item): item is string => typeof item === "string" && item.trim() !== "").map((item) => item.trim()) : [];
+    return {
+      reply: typeof value.reply === "string" ? value.reply.trim() : "",
+      remember: strings(value.remember).slice(0, 10),
+      forget: strings(value.forget).slice(0, 50),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A note from the person about their memory, from the summary's "Ask or update": a question about
+ * what Tensor knows, or a change to make. Changes are saved, and the summary is written again.
+ */
+export async function answerMemoryNote(
+  admin: Admin,
+  userId: string,
+  note: string,
+): Promise<{ ok: true; reply: string; summary: MemorySummary } | { ok: false; error: string }> {
+  const text = note.trim().slice(0, NOTE_MAX);
+  if (!text) return { ok: false, error: "Write something first." };
+  if (!(await memoryEnabled(admin, userId))) return { ok: false, error: "Memory is off. Turn it on first." };
+  const place = await memoryHome(admin);
+  if (!place) return { ok: false, error: "Memory is not available just now." };
+  if (!(await allowed(`tensor-memory:note:${userId}`, NOTES_PER_DAY))) {
+    return { ok: false, error: "That is enough for today. Try again tomorrow." };
+  }
+  const { facts } = await factsAboutYou(admin, userId);
+  const result = await callMemoryLlm({
+    supabase: admin,
+    projectId: place.projectId,
+    organizationId: place.organizationId,
+    tier: "enterprise",
+    preferModel: resolveMemoryModel(place.settings.extractionModel),
+    maxTokens: 3000,
+    messages: [
+      { role: "system", content: NOTE_PROMPT },
+      {
+        role: "user",
+        content: `Facts:\n${facts.map((fact) => `- [${fact.id}] ${fact.content}`).join("\n") || "(none yet)"}\n\nTheir note:\n${text}`,
+      },
+    ],
+  }).catch((error: unknown) => {
+    console.error("[Tensor Memory] Answering a note failed", error);
+    return null;
+  });
+  const parsed = result ? parseNoteReply(result.content) : null;
+  if (!parsed) return { ok: false, error: "Tensor could not do that just now. Try again." };
+  const known = new Set(facts.map((fact) => fact.id));
+  for (const id of parsed.forget) if (known.has(id)) await forgetMemory(admin, userId, id).catch(() => false);
+  for (const content of parsed.remember) await rememberFact(admin, { userId, taskId: null, about: "you", content });
+  return { ok: true, reply: parsed.reply || "Done.", summary: await memorySummary(admin, userId) };
 }
