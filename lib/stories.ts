@@ -29,7 +29,7 @@ export const stories: Story[] = [
     useCase: "AI agents",
     product: "API",
     publishedAt: "2026-11-23",
-    cover: "/stories/dayroom-cover.jpg",
+    cover: "/stories/dayroom-night.jpg",
     body: [
       "Dayroom is an AI-native workspace for teams of 2 to 20 that run their work in chat: agencies, studios and startups. Rooms, calls, tasks and docs live together, and an AI companion keeps everyone in the loop. It answers what you missed with sources, posts notes after calls and drafts replies and to-dos that wait for your approval.",
       "The team builds those agents on Cencori. A companion that people lean on for their day-to-day work has to understand context and get the task right.",
