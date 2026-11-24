@@ -238,7 +238,19 @@ function formatContext(tokens: number): string {
     return formatContextWindow(tokens);
 }
 
-type SortKey = "name" | "contextWindow" | "provider" | "type" | "none";
+// ─── Price filter ───────────────────────────────────────────────────────────
+// Bands on the input rate, the number people compare models by. Image models
+// are priced per image, not per token, so they sit outside every band.
+type PriceBandId = "under-025" | "025-1" | "1-5" | "5-up";
+
+const PRICE_BANDS: { id: PriceBandId; label: string; min: number; max: number }[] = [
+    { id: "under-025", label: "Under $0.25", min: 0, max: 0.25 },
+    { id: "025-1", label: "$0.25 to $1", min: 0.25, max: 1 },
+    { id: "1-5", label: "$1 to $5", min: 1, max: 5 },
+    { id: "5-up", label: "$5 and up", min: 5, max: Infinity },
+];
+
+type SortKey = "name" | "contextWindow" | "provider" | "type" | "inputPrice" | "outputPrice" | "none";
 type SortDir = "asc" | "desc";
 
 // ─── Flat model with provider info ──────────────────────────────────────────
@@ -247,14 +259,20 @@ interface FlatModel extends AIModel {
     providerId: string;
     providerName: string;
     index: number;
+    /** USD per 1M tokens; null for models priced per image. */
+    inputPerMillion: number | null;
+    outputPerMillion: number | null;
 }
 
 function flattenModels(): FlatModel[] {
     const models: FlatModel[] = [];
     for (const provider of SUPPORTED_PROVIDERS) {
         for (const model of provider.models) {
+            const displayPrice = getModelDisplayPrice(model.id, model.type);
             models.push({
                 ...model,
+                inputPerMillion: displayPrice.inputPerMillion,
+                outputPerMillion: displayPrice.outputPerMillion,
                 // A free-tier model is served on Cencori's own upstream account,
                 // so it is listed under Cencori rather than the vendor Cencori
                 // happens to route it through. Paid models keep their real
@@ -291,11 +309,14 @@ export function ModelCatalog({ inConsole = false }: { inConsole?: boolean } = {}
     const [providerSearch, setProviderSearch] = useState("");
     const [typeFilter, setTypeFilter] = useState<string>("all");
     const [selectedFeatures, setSelectedFeatures] = useState<FeatureId[]>([]);
+    const [priceBand, setPriceBand] = useState<PriceBandId | "all">("all");
     const [sortKey, setSortKey] = useState<SortKey>("none");
     const [sortDir, setSortDir] = useState<SortDir>("desc");
     const [copiedId, setCopiedId] = useState<string | null>(null);
     const [isProviderOpen, setIsProviderOpen] = useState(false);
     const [isFeaturesOpen, setIsFeaturesOpen] = useState(false);
+    const [isPriceOpen, setIsPriceOpen] = useState(false);
+    const priceRef = useRef<HTMLDivElement>(null);
     const providerRef = useRef<HTMLDivElement>(null);
     const featuresRef = useRef<HTMLDivElement>(null);
 
@@ -308,6 +329,9 @@ export function ModelCatalog({ inConsole = false }: { inConsole?: boolean } = {}
             }
             if (featuresRef.current && !featuresRef.current.contains(e.target as Node)) {
                 setIsFeaturesOpen(false);
+            }
+            if (priceRef.current && !priceRef.current.contains(e.target as Node)) {
+                setIsPriceOpen(false);
             }
         }
         document.addEventListener("mousedown", handleClick);
@@ -383,7 +407,27 @@ export function ModelCatalog({ inConsole = false }: { inConsole?: boolean } = {}
             );
         }
 
-        // Sort
+        // Price band, on the input rate per 1M tokens
+        if (priceBand !== "all") {
+            const band = PRICE_BANDS.find((b) => b.id === priceBand);
+            if (band) {
+                result = result.filter((m) =>
+                    m.inputPerMillion !== null && m.inputPerMillion >= band.min && m.inputPerMillion < band.max
+                );
+            }
+        }
+
+        // Sort. Per-image models have no token rate, so they stay at the
+        // bottom of a price sort in either direction.
+        if (sortKey === "inputPrice" || sortKey === "outputPrice") {
+            const rate = (m: FlatModel) => (sortKey === "inputPrice" ? m.inputPerMillion : m.outputPerMillion);
+            return [...result].sort((a, b) => {
+                const ra = rate(a);
+                const rb = rate(b);
+                if (ra === null || rb === null) return (ra === null ? 1 : 0) - (rb === null ? 1 : 0);
+                return (sortDir === "asc" ? ra - rb : rb - ra) || a.name.localeCompare(b.name);
+            });
+        }
         result = [...result].sort((a, b) => {
             let cmp = 0;
             switch (sortKey) {
@@ -407,7 +451,7 @@ export function ModelCatalog({ inConsole = false }: { inConsole?: boolean } = {}
         });
 
         return result;
-    }, [allModels, search, providerFilter, typeFilter, selectedFeatures, sortKey, sortDir]);
+    }, [allModels, search, providerFilter, typeFilter, selectedFeatures, priceBand, sortKey, sortDir]);
 
     function toggleFeature(id: FeatureId) {
         setSelectedFeatures((prev) =>
@@ -617,6 +661,51 @@ export function ModelCatalog({ inConsole = false }: { inConsole?: boolean } = {}
                                 </div>
                             )}
                         </div>
+
+                        {/* Price filter dropdown */}
+                        <div ref={priceRef} className="relative flex-1 sm:flex-none">
+                            <button
+                                onClick={() => setIsPriceOpen((v) => !v)}
+                                className={cn(
+                                    "flex items-center gap-2 h-8 px-3 rounded-xl border text-sm cursor-pointer w-full sm:w-36 transition-all",
+                                    isPriceOpen
+                                        ? "border-border/60 bg-[#f3f3f1] dark:bg-[#212121]"
+                                        : "border-transparent bg-[#f3f3f1] hover:bg-[#e9e9e5] dark:bg-[#181818] dark:hover:bg-[#212121]",
+                                )}
+                            >
+                                <span className="truncate text-foreground">
+                                    {PRICE_BANDS.find((b) => b.id === priceBand)?.label ?? "Price"}
+                                </span>
+                                <ChevronDown className={cn(
+                                    "shrink-0 h-3.5 w-3.5 transition-transform ml-auto text-muted-foreground/60",
+                                    isPriceOpen && "rotate-180"
+                                )} />
+                            </button>
+
+                            {isPriceOpen && (
+                                <div className="absolute z-50 top-full mt-1.5 right-0 w-56 rounded-xl border border-border/40 bg-card shadow-xl shadow-black/30 py-1 backdrop-blur-xl">
+                                    <p className="px-3 pt-2 pb-1.5 text-[10px] uppercase tracking-wider text-muted-foreground/50">
+                                        Input price per 1M tokens
+                                    </p>
+                                    {[{ id: "all" as const, label: "Any price" }, ...PRICE_BANDS].map((band) => {
+                                        const active = priceBand === band.id;
+                                        return (
+                                            <button
+                                                key={band.id}
+                                                onClick={() => { setPriceBand(band.id); setIsPriceOpen(false); }}
+                                                className={cn(
+                                                    "flex items-center gap-2.5 w-full px-3 py-2 text-sm text-left transition-colors hover:bg-foreground/5",
+                                                    active ? "text-foreground" : "text-muted-foreground"
+                                                )}
+                                            >
+                                                <span className="flex-1">{band.label}</span>
+                                                {active && <HugeiconsIcon icon={CheckmarkCircle02Icon} size={14} className="shrink-0" />}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -753,11 +842,21 @@ export function ModelCatalog({ inConsole = false }: { inConsole?: boolean } = {}
                                         Context <SortIcon column="contextWindow" />
                                     </div>
                                 </th>
-                                <th className="text-right px-4 py-3 text-[11px] uppercase tracking-wider font-semibold text-muted-foreground/60 w-[14%]">
-                                    Input
+                                <th
+                                    className="text-right px-4 py-3 text-[11px] uppercase tracking-wider font-semibold text-muted-foreground/60 cursor-pointer hover:text-foreground/80 transition-colors select-none w-[14%]"
+                                    onClick={() => toggleSort("inputPrice")}
+                                >
+                                    <div className="flex items-center gap-1 justify-end">
+                                        Input <SortIcon column="inputPrice" />
+                                    </div>
                                 </th>
-                                <th className="text-right px-4 py-3 text-[11px] uppercase tracking-wider font-semibold text-muted-foreground/60 w-[14%]">
-                                    Output
+                                <th
+                                    className="text-right px-4 py-3 text-[11px] uppercase tracking-wider font-semibold text-muted-foreground/60 cursor-pointer hover:text-foreground/80 transition-colors select-none w-[14%]"
+                                    onClick={() => toggleSort("outputPrice")}
+                                >
+                                    <div className="flex items-center gap-1 justify-end">
+                                        Output <SortIcon column="outputPrice" />
+                                    </div>
                                 </th>
                             </tr>
                         </thead>
