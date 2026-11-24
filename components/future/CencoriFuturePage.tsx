@@ -739,7 +739,11 @@ export function CencoriFuturePage({
         </div>
 
         <div className={styles.storiesGrid}>
-          {stories.map((story) => (
+          {/* The homepage shows the three newest; the rest are on /stories. */}
+          {[...stories]
+            .sort((x, y) => y.publishedAt.localeCompare(x.publishedAt))
+            .slice(0, 3)
+            .map((story) => (
             <Link
               className={styles.storyCard}
               href={`/stories/${story.slug}`}
