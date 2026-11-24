@@ -22,16 +22,17 @@ export const stories: Story[] = [
   {
     slug: "dayroom",
     company: "Dayroom",
-    title: "An AI companion that knows the work",
+    title: "A team chat that turns into finished work",
     excerpt:
-      "How Dayroom builds its companion and agents on Cencori, with many models behind one integration.",
-    industry: "Productivity",
+      "How Dayroom, the AI-native workspace for small teams, builds its companion and agents on Cencori.",
+    industry: "Collaboration",
     useCase: "AI agents",
     product: "API",
     publishedAt: "2026-11-23",
     cover: "/stories/dayroom.jpg",
     body: [
-      "Dayroom builds its agents on Cencori. The Dayroom companion helps people with their day-to-day work inside the product, so it has to understand context and get the task right.",
+      "Dayroom is an AI-native workspace for teams of 2 to 20 that run their work in chat: agencies, studios and startups. Rooms, calls, tasks and docs live together, and an AI companion keeps everyone in the loop. It answers what you missed with sources, posts notes after calls and drafts replies and to-dos that wait for your approval.",
+      "The team builds those agents on Cencori. A companion that people lean on for their day-to-day work has to understand context and get the task right.",
       "Through Cencori, the team connects different AI models to Dayroom from one place, tries them against each other and picks by what each does best. They report that the companion rarely hallucinates on the tasks users rely on.",
     ],
     quote: {
