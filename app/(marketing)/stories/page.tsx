@@ -12,7 +12,7 @@ export default function StoriesPage() {
   const stories = getStories();
 
   return (
-    <main className="flex-1 pt-20 md:pt-40">
+    <main className="flex-1 pt-20 md:pt-28">
       <div className="container mx-auto max-w-5xl space-y-8 px-4 pb-8 pt-4 md:py-8">
         <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">
           Stories

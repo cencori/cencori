@@ -32,7 +32,7 @@ export default async function StoryPage({
   if (!story) notFound();
 
   return (
-    <main className="flex-1 pt-20 md:pt-40">
+    <main className="flex-1 pt-20 md:pt-28">
       <article className="container mx-auto max-w-3xl px-4 pb-10 pt-4 md:py-10">
         <div className="text-center">
           <div className="flex items-center justify-center gap-6 text-xs tracking-wide text-muted-foreground">
