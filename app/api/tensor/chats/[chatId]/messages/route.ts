@@ -6,7 +6,8 @@ import { invalidateTensorAccess, setCachedTensorAccess } from "@/lib/config-cach
 import { noStoreHeaders } from "@/lib/tensor-auth";
 import {
   PLAIN_CHAT_MESSAGE_MAX,
-  actionNote,
+  withActionNotes,
+  stripActionNote,
   addPlainMessage,
   contextMessages,
   plainChatInstructions,
@@ -272,20 +273,14 @@ export async function POST(request: NextRequest, context: Context) {
   let history: Awaited<ReturnType<typeof readPlainMessages>>;
   let saved: Awaited<ReturnType<typeof addPlainMessage>>;
   let projects: ProjectSummary[];
+  let traces: Map<string, TracePart[]>;
   try {
-    let traces: Map<string, TracePart[]>;
     [history, projects, traces] = await Promise.all([
       readPlainMessages(admin, chat.id),
       readProjects(admin, user.id),
       // Best effort: without them the model still has the conversation's words.
       readTraces(admin, chat.id).catch(() => new Map<string, TracePart[]>()),
     ]);
-    // Each answer goes back with a note of what it did (a proposal shown, a search made), so the
-    // model knows the cards under its answers are there.
-    history = history.map((message) => {
-      const note = message.role === "assistant" ? actionNote(traces.get(message.id), Boolean(chat.project_task_id)) : null;
-      return note ? { ...message, content: `${note}\n\n${message.content ?? ""}` } : message;
-    });
     saved = await addPlainMessage(admin, { chatId: chat.id, userId: user.id, role: "user", content: text });
     await updatePlainChat(admin, chat.id, history.length === 0 && !chat.title ? { title: titleFromMessage(text) } : { touch: true });
   } catch (error) {
@@ -330,7 +325,9 @@ export async function POST(request: NextRequest, context: Context) {
 
   const conversation: ChatMessage[] = [
     { role: "system", content: plainChatInstructions(projects, new Date(), memory.context) },
-    ...contextMessages([...history, saved]),
+    // Each answer's note of what it did (a proposal shown, a search made) goes on the message after
+    // it, so the model knows the cards under its answers are there.
+    ...contextMessages(withActionNotes([...history, saved], traces, Boolean(chat.project_task_id))),
   ];
   // This message's pictures are looked at by the vision model first, as the desktop app does, and
   // what it sees goes into the message as words: so the answer can use them whatever model writes
@@ -364,12 +361,29 @@ export async function POST(request: NextRequest, context: Context) {
       let answer = "";
       /** How the answer unfolds: its text, and each search between, in order. */
       const parts: TracePart[] = [];
-      const write = (text: string) => {
+      const emit = (text: string) => {
         answer += text;
         const last = parts.at(-1);
         if (last?.type === "text") last.text += text;
         else parts.push({ type: "text", text });
         send({ type: "delta", text });
+      };
+      // The head of each round's words is held until it is clear it is not a note in square
+      // brackets the model wrote itself (it is told not to): that is Tensor's to write, never shown.
+      let head: string | null = null;
+      const write = (raw: string) => {
+        if (head === null) return emit(raw);
+        head += raw;
+        const start = head.trimStart();
+        if (start === "" || (start.startsWith("[") && !start.includes("]") && start.length < 600)) return;
+        const text = stripActionNote(head);
+        head = null;
+        if (text) emit(text);
+      };
+      const flushHead = () => {
+        const text = head ? stripActionNote(head) : "";
+        head = null;
+        if (text.trim()) emit(text);
       };
       let status: "complete" | "stopped" | "failed" = "complete";
       let failure: { code: string; error: string } | null = null;
@@ -392,13 +406,18 @@ export async function POST(request: NextRequest, context: Context) {
           }
           const calls: ToolCall[] = [];
           let said = "";
-          for await (const event of readStream(upstream.body, upstreamAbort.signal)) {
-            if (event.kind === "text") {
-              said += event.text;
-              write(event.text);
-            } else {
-              calls.push(event.call);
+          head = "";
+          try {
+            for await (const event of readStream(upstream.body, upstreamAbort.signal)) {
+              if (event.kind === "text") {
+                said += event.text;
+                write(event.text);
+              } else {
+                calls.push(event.call);
+              }
             }
+          } finally {
+            flushHead();
           }
           if (calls.length === 0) break;
 

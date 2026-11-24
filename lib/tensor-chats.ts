@@ -206,7 +206,7 @@ export function plainChatInstructions(projects: ProjectSummary[], today: Date, m
     "",
     "When a conversation turns into something to build (an app, a site, a tool), say so once, briefly, and offer to set it up as a project. Do not push; only offer when it is clearly where the talk is going, and not again if they decline.",
     "",
-    "Your earlier answers may begin with a line in square brackets saying what you did in them (a project you proposed, a search you made). Tensor adds that line so you remember: the cards it names are on screen under those answers. Never write such a line yourself.",
+    "Their messages may end with a note in square brackets from Tensor, saying what you did in your previous answer (a project you proposed, a search you made), so you remember: the cards it names are on screen under that answer. They did not write it and do not see it. Never write such a note, or any line about what you did, yourself.",
     "",
     "When they say yes, or ask you to create the project or start building, call propose_project with a short name (one to four words) and a brief: the first message the project will start with, written to Tensor as the builder, covering what to build, for whom, the features and decisions agreed in this conversation, and the style, complete enough that nothing has to be explained again, in at most 250 words.",
     "Offering a project (they have not yet said to build it): the person sees the proposal as a card with a Create project button, and nothing is created until they press it, so say so plainly (\"Press Create project when you are ready\"); never claim the project exists.",
@@ -216,7 +216,7 @@ export function plainChatInstructions(projects: ProjectSummary[], today: Date, m
     "",
     "You can also read a web page with read_page (a link they give you, or a search result whose snippet is not enough), check on one of their projects with project_status, and check their plan and how much of it is used with check_usage. Use these instead of guessing.",
     "",
-    "You have memory across chats. Tensor remembers on its own what matters from each conversation; what it remembers about this person comes below, when there is any. When they say \"remember…\", or you learn something lasting about them that should not be lost (their name, work, preferences, decisions), save it with remember. When they refer to an earlier conversation (\"like we discussed\", \"the other chat\", \"what did we decide about…\"), in a plain chat or in one of their projects, look with search_chats and then read_chat before asking them to repeat it.",
+    "You have memory across chats. Tensor remembers on its own what matters from each conversation; what it remembers about this person comes below, when there is any. When they say \"remember…\", or you learn something lasting about them that should not be lost (their name, work, preferences, decisions), save it with remember. Saving happens in the background: never tell them you saved, updated or corrected your memory, and never say what it now holds; just answer, using what you learned. When they refer to an earlier conversation (\"like we discussed\", \"the other chat\", \"what did we decide about…\"), in a plain chat or in one of their projects, look with search_chats and then read_chat before asking them to repeat it.",
     "",
     "Everything you do with a tool is shown to the person as it happens, so there is no need to announce it at length; a short line before is enough.",
     "",
@@ -317,7 +317,35 @@ export function actionNote(parts: TracePart[] | undefined, created: boolean): st
     }
   });
   const list = said.filter(Boolean);
-  return list.length ? `[In this answer you ${list.join("; ")}.]` : null;
+  return list.length ? `[Tensor's note, not written by them: in your previous answer you ${list.join("; ")}.]` : null;
+}
+
+/**
+ * The conversation with each answer's note (actionNote) put on the message after it, the person's.
+ * At the head of the answer itself it read as part of how answers are written, and the model began
+ * writing such lines of its own, which the person then saw.
+ */
+export function withActionNotes<T extends { id: string; role: string; content: string | null }>(
+  messages: T[],
+  traces: Map<string, TracePart[]>,
+  created: boolean,
+): T[] {
+  let note: string | null = null;
+  return messages.map((message) => {
+    if (message.role === "assistant") {
+      note = actionNote(traces.get(message.id), created);
+      return message;
+    }
+    if (!note) return message;
+    const told = { ...message, content: `${message.content ?? ""}\n\n${note}` };
+    note = null;
+    return told;
+  });
+}
+
+/** An answer without a note in square brackets at its head, should the model write one anyway. */
+export function stripActionNote(text: string): string {
+  return text.replace(/^\s*\[(?:In this answer you|In your previous answer you|Tensor's note)[^\]]*\]\s*/i, "");
 }
 
 /** The traces of a chat's answers, by answer. */
