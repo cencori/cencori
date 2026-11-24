@@ -20,6 +20,26 @@ export type Story = {
 
 export const stories: Story[] = [
   {
+    slug: "dayroom",
+    company: "Dayroom",
+    title: "An AI companion that knows the work",
+    excerpt:
+      "How Dayroom builds its companion and agents on Cencori, with many models behind one integration.",
+    industry: "Productivity",
+    useCase: "AI agents",
+    product: "API",
+    publishedAt: "2026-11-23",
+    cover: "/stories/dayroom.jpg",
+    body: [
+      "Dayroom builds its agents on Cencori. The Dayroom companion helps people with their day-to-day work inside the product, so it has to understand context and get the task right.",
+      "Through Cencori, the team connects different AI models to Dayroom from one place, tries them against each other and picks by what each does best. They report that the companion rarely hallucinates on the tasks users rely on.",
+    ],
+    quote: {
+      text: "It's been very seamless to connect different AI models and plug them into Dayroom. The companion understands a lot of context, and we hardly get any periods where these models hallucinate.",
+      by: "Dayroom team",
+    },
+  },
+  {
     slug: "eleven",
     company: "Eleven",
     title: "Cinema-grade stories, computed in the cloud",
