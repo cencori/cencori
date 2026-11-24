@@ -33,11 +33,13 @@ export const stories: Story[] = [
     body: [
       "Dayroom is an AI-native workspace for teams of 2 to 20 that run their work in chat: agencies, studios and startups. Rooms, calls, tasks and docs live together, and an AI companion keeps everyone in the loop. It answers what you missed with sources, posts notes after calls and drafts replies and to-dos that wait for your approval.",
       "The team builds those agents on Cencori. A companion that people lean on for their day-to-day work has to understand context and get the task right.",
-      "Through Cencori, the team connects different AI models to Dayroom from one place, tries them against each other and picks by what each does best. They report that the companion rarely hallucinates on the tasks users rely on.",
+      "Through Cencori, the team connects different AI models to Dayroom from one place, tries them against each other and picks by what each does best. “Cencori has been a really great product for me to use, especially building agents right here on Dayroom,” says Dayroom's founder.",
+      "What matters most to him is accuracy on real work. “We hardly get any periods where these models hallucinate, especially when they're performing tasks that actually help the day-to-day workflows of users,” he says. “That's something I really love, and it's been a sticky experience for me.”",
+      "He now points other builders to it. “I always recommend it to my friends because of how seamless it is to get a plethora of AI models, use them and test them out based on their capabilities.”",
     ],
     quote: {
-      text: "It's been very seamless to connect different AI models and plug them into Dayroom. The companion understands a lot of context, and we hardly get any periods where these models hallucinate.",
-      by: "Dayroom team",
+      text: "It's been very seamless to connect different AI models and plug them into Dayroom. The Dayroom companion has been very intelligent, and it understands a lot of context.",
+      by: "Founder, Dayroom",
     },
   },
   {
