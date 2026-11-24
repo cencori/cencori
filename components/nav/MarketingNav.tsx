@@ -33,7 +33,7 @@ function TransparentAboutNav() {
   );
 }
 
-const SCROLL_SOLID_ROUTES = ["/thesis", "/contact", "/developers", "/business", "/ai-gateway", "/newsroom", "/models", "/brand"];
+const SCROLL_SOLID_ROUTES = ["/thesis", "/contact", "/developers", "/business", "/ai-gateway", "/newsroom", "/stories", "/models", "/brand"];
 
 export function MarketingNav() {
   const pathname = useMarketingPath();
