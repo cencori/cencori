@@ -62,6 +62,7 @@ export function FilterDropdown({
 
       {open ? (
         <span className="absolute left-0 top-full z-20 mt-2 min-w-48 rounded-xl bg-[#111110] p-1.5 text-[#f4f4ef] shadow-xl">
+          <span className="block max-h-72 overflow-y-auto overscroll-contain">
           {groups.map((group) => (
             <span className="block" key={group.heading ?? "options"}>
               {group.heading ? (
@@ -114,6 +115,7 @@ export function FilterDropdown({
               })}
             </span>
           ))}
+          </span>
           {selected.length > 0 ? (
             <button
               className="mt-0.5 w-full rounded-lg px-2.5 py-1.5 text-left text-xs text-white/55 hover:bg-white/10"

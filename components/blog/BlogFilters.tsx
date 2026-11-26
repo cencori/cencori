@@ -23,6 +23,8 @@ const SORT_LABELS: Record<Sort, string> = {
 };
 
 const PAGE_SIZE = 9;
+/** The filter lists only the most used tags, so one-off tags don't pile up. */
+const MAX_TAGS = 20;
 
 function sortPosts(posts: BlogCardPost[], sort: Sort | null): BlogCardPost[] {
   const list = [...posts];
@@ -64,10 +66,19 @@ export function BlogFilters({
   const [view, setView] = useState<View>("grid");
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
-  const tagOptions = useMemo(
-    () => [...new Set(posts.flatMap((p) => p.tags ?? []))].sort(),
-    [posts],
-  );
+  const tagOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const post of posts) {
+      for (const tag of post.tags ?? []) {
+        counts.set(tag, (counts.get(tag) ?? 0) + 1);
+      }
+    }
+    return [...counts.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .slice(0, MAX_TAGS)
+      .map(([tag]) => tag)
+      .sort((a, b) => a.localeCompare(b));
+  }, [posts]);
   const categoryOptions = visibleCategories;
 
   const filtered = useMemo(() => {
