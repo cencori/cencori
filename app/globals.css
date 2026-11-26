@@ -615,6 +615,18 @@ html.dark [data-rehype-pretty-code-figure] code span,
     text-decoration: var(--shiki-dark-text-decoration) !important;
 }
 
+/* Pages that are always dark (.editorial-dark) keep the dark code theme even
+   when the visitor's own theme is light and <html> has no .dark class. */
+:root .editorial-dark .shiki,
+:root .editorial-dark .shiki span,
+:root .editorial-dark [data-rehype-pretty-code-figure] code,
+:root .editorial-dark [data-rehype-pretty-code-figure] code span {
+    color: var(--shiki-dark) !important;
+    font-style: var(--shiki-dark-font-style) !important;
+    font-weight: var(--shiki-dark-font-weight) !important;
+    text-decoration: var(--shiki-dark-text-decoration) !important;
+}
+
 /* Make code lines stretch full width for highlights */
 pre:has([data-line]) {
     padding-left: 0 !important;
