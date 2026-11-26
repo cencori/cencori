@@ -1,31 +1,38 @@
+import fs from "fs";
+import path from "path";
 import { getAllPosts } from "@/lib/blog";
 import styles from "./AboutPress.module.css";
 
-/** Outlet names by the site the article lives on. */
-const OUTLETS: Record<string, string> = {
-  "techcabal.com": "TechCabal",
-  "techloy.com": "Techloy",
-  "connectingafrica.com": "Connecting Africa",
-  "iafrica.com": "iAfrica",
-  "thegeekcircle.com": "The Geek Circle",
-  "au-startups.com": "AU-Startups",
+/**
+ * Outlets by the site the article lives on. `file` names the logo in
+ * public/logos/press (svg or png, white on transparent); until that file
+ * exists the square shows the outlet's name instead.
+ */
+const OUTLETS: Record<string, { name: string; file: string }> = {
+  "techcabal.com": { name: "TechCabal", file: "techcabal" },
+  "techloy.com": { name: "Techloy", file: "techloy" },
+  "connectingafrica.com": { name: "Connecting Africa", file: "connecting-africa" },
+  "iafrica.com": { name: "iAfrica", file: "iafrica" },
+  "thegeekcircle.com": { name: "The Geek Circle", file: "the-geek-circle" },
+  "au-startups.com": { name: "AU-Startups", file: "au-startups" },
 };
 
-function outletFor(url: string): string {
+const LOGO_DIR = path.join(process.cwd(), "public", "logos", "press");
+
+function outletFor(url: string): { name: string; logo: string | null } {
   const host = new URL(url).hostname.replace(/^www\./, "");
-  return OUTLETS[host] ?? host;
+  const outlet = OUTLETS[host];
+  if (!outlet) return { name: host, logo: null };
+  const ext = ["svg", "png"].find((candidate) =>
+    fs.existsSync(path.join(LOGO_DIR, `${outlet.file}.${candidate}`)),
+  );
+  return {
+    name: outlet.name,
+    logo: ext ? `/logos/press/${outlet.file}.${ext}` : null,
+  };
 }
 
-function formatDate(date: string): string {
-  return new Date(date).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    timeZone: "UTC",
-  });
-}
-
-/** Coverage from other outlets: every press entry that links out to its article. */
+/** Coverage from other outlets: one square per article, linking out to it. */
 export function AboutPress() {
   const coverage = getAllPosts().filter(
     (post) => post.category === "press" && post.externalUrl,
@@ -41,29 +48,32 @@ export function AboutPress() {
       <p className={styles.label} id="about-press-title">
         In the news
       </p>
-      <ul className={styles.list}>
-        {coverage.map((post) => (
-          <li key={post.slug}>
-            <a
-              className={styles.row}
-              href={post.externalUrl}
-              rel="noopener noreferrer"
-              target="_blank"
-            >
-              <span className={styles.outlet}>
-                {outletFor(post.externalUrl as string)}
-              </span>
-              <span className={styles.headline}>{post.title}</span>
-              <span className={styles.date}>
-                {formatDate(post.date)}
-                <span aria-hidden="true" className={styles.arrow}>
-                  ↗
-                </span>
-              </span>
-            </a>
-          </li>
-        ))}
-      </ul>
+      <div className={styles.viewport}>
+        <ul className={styles.rail}>
+          {coverage.map((post) => {
+            const outlet = outletFor(post.externalUrl as string);
+            return (
+              <li key={post.slug}>
+                <a
+                  aria-label={`${outlet.name}: ${post.title}`}
+                  className={styles.cell}
+                  href={post.externalUrl}
+                  rel="noopener noreferrer"
+                  target="_blank"
+                  title={post.title}
+                >
+                  {outlet.logo ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img alt="" className={styles.logo} src={outlet.logo} />
+                  ) : (
+                    <span className={styles.name}>{outlet.name}</span>
+                  )}
+                </a>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
     </section>
   );
 }
