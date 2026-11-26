@@ -155,6 +155,12 @@ const nextConfig: NextConfig = {
         destination: "/newsroom/cencori-spitch-partnership",
         permanent: true,
       },
+      // End-user billing was relaunched as Revenue on 2026-11-25.
+      {
+        source: "/:prefix(blog|newsroom)/end-user-billing",
+        destination: "/newsroom/introducing-revenue",
+        permanent: true,
+      },
       // Blog hub moved to /newsroom.
       {
         source: "/blog",

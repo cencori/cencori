@@ -1,0 +1,101 @@
+---
+title: "Introducing Revenue"
+slug: "introducing-revenue"
+date: "2026-11-25"
+excerpt: "Charge your customers for the AI they use. Revenue gives you plans, limits, markup, invoices and Stripe payouts from the same gateway your AI traffic already runs through."
+coverImage: "/newsroom/images/covers/revenue-bloom.jpg"
+authors:
+  - bola
+tags: ["Product", "Launch", "Revenue", "Billing"]
+category: "product"
+published: true
+---
+Today we're relaunching end-user billing as **Revenue**. It lives in the console under **AI Gateway → Revenue**, and it does one job: it lets you charge your customers for the AI they use.
+
+Once real users show up, every AI product hits the same two questions. Who is using how much, and who is paying for it?
+
+Most teams answer them with four systems that don't talk to each other. Token counts come from the provider. Cost estimates live in a spreadsheet. Rate limits run on a Redis layer someone wrote in a weekend. Billing sits in Stripe with no link to any of it. So you either don't charge for AI at all and eat the cost, or you maintain a billing pipeline that breaks each time you add a model.
+
+Revenue replaces that with one system, built into the gateway.
+
+## What Revenue does
+
+- **Plans.** Define what each tier of customer gets: token and request limits by day and month, requests per minute, spend caps, which models they can use, and your markup. Mark one plan as the default for new customers.
+- **Limits enforced on every request.** The gateway checks each request against the customer's plan before it runs. A customer over their limit gets a `429` with a `Retry-After` header. If you'd rather not cut anyone off, a plan can let the request through and flag it for you.
+- **Usage per customer.** Every request is counted against the customer who made it: tokens, requests, what the provider charged and what you charged.
+- **Markup.** Add a percentage on top of provider cost, a flat fee per request, or both. Each plan can carry its own margin, and a default applies to everyone else.
+- **Invoices.** Generate invoices for a daily, weekly or monthly cycle. Customers with no usage are skipped, and nobody is invoiced twice for the same period.
+- **Payouts through Stripe.** Connect your Stripe account once for the whole organization. Your customers pay you directly. Cencori never touches the money.
+
+## One field to turn it on
+
+If your AI traffic already goes through Cencori, pass your customer's ID with the request. Metering, limits and markup follow from that.
+
+```typescript
+const client = new OpenAI({
+  apiKey: "csk_your_cencori_key",
+  baseURL: "https://api.cencori.com/v1",
+});
+
+const response = await client.chat.completions.create({
+  model: "gpt-4o",
+  messages: [{ role: "user", content: userMessage }],
+  user: "user_123", // your customer's ID
+});
+```
+
+Customers appear in the console the first time they have usage. You don't create them ahead of time.
+
+## Not on the gateway? Two calls
+
+If you call model providers directly, check the customer's quota before the request and report the usage after it.
+
+```typescript
+// Before the request
+const quota = await fetch(
+  `https://api.cencori.com/v1/billing/check-quota?end_user_id=${userId}`,
+  { headers: { Authorization: `Bearer ${CENCORI_KEY}` } },
+).then((r) => r.json());
+
+if (!quota.allowed) {
+  throw new Error(`Limit reached: ${quota.reason}`);
+}
+
+// After the request
+await fetch("https://api.cencori.com/v1/billing/usage-events", {
+  method: "POST",
+  headers: {
+    Authorization: `Bearer ${CENCORI_KEY}`,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    end_user_id: userId,
+    model: "gpt-4o",
+    provider: "openai",
+    prompt_tokens: response.usage.prompt_tokens,
+    completion_tokens: response.usage.completion_tokens,
+    cost_usd: 0.0085,
+  }),
+});
+```
+
+You can send up to 1,000 usage events in one request.
+
+## In the console
+
+Revenue has four tabs:
+
+- **Overview.** Turn usage billing on, set your default markup and billing cycle, and connect Stripe.
+- **Customers.** Search your customers, see what each one has used, change their plan, or block one.
+- **Plans.** Create and edit tiers with their limits, pricing and allowed models.
+- **Invoices.** Generate invoices, send them through Stripe, and see revenue against provider cost with your top customers. Export the numbers as CSV or JSON.
+
+## Who it's for
+
+Any team that charges for AI usage, and any team that should but hasn't because building the billing felt like too much work: SaaS products with AI features, API companies reselling model access, internal platforms that need to attribute cost by team, and enterprise deployments where departments get different limits.
+
+## Get started
+
+- **Turn it on:** open any project, then **AI Gateway → Revenue**.
+- **Follow the guide:** [Revenue setup](/docs/guides/monetization-setup) walks through it without code.
+- **For your engineers:** the [Revenue reference](/docs/platform/monetization) covers the API.
