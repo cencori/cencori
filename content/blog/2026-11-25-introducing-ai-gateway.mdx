@@ -1,0 +1,82 @@
+---
+title: "Introducing AI Gateway"
+slug: "introducing-ai-gateway"
+date: "2026-11-25"
+excerpt: "One API for every model. The Cencori AI Gateway routes your requests to more than 100 models across 14 providers, keeps them running when a provider fails, and records what each one cost."
+coverImage: "/newsroom/images/covers/ai-gateway-portal.jpg"
+authors:
+  - bola
+tags: ["Product", "Launch", "Infrastructure", "Developers"]
+category: "product"
+published: true
+---
+The **AI Gateway** is the product the rest of Cencori is built on, and it has never had its own announcement. This is that post.
+
+The gateway sits between your application and the companies that run AI models. You send every request to Cencori. Cencori sends it to the right provider, keeps it running if that provider fails, and records what happened and what it cost.
+
+## Why a gateway
+
+Calling one model from one provider is easy. Running AI in production is not.
+
+You end up with an account, a key and an SDK for each provider. One of them has an outage and your product goes down with it. Nobody can say what last month's AI bill was made of, or which customer drove it. And each new model means another integration.
+
+A gateway moves all of that out of your application and into one place.
+
+## One API for every model
+
+The gateway serves more than 100 models from 14 providers, including OpenAI, Anthropic, Google, xAI, Mistral, DeepSeek and Meta. You choose a model by name. Nothing else in your code changes.
+
+```typescript
+import { Cencori } from "cencori";
+
+const cencori = new Cencori({ apiKey: process.env.CENCORI_API_KEY });
+
+const response = await cencori.ai.chat({
+  model: "claude-sonnet-5",
+  messages: [{ role: "user", content: "Hello!" }],
+});
+```
+
+If you already use the OpenAI SDK, keep it. Point its base URL at `https://api.cencori.com/v1` and use your Cencori key.
+
+The same key covers more than chat: streaming, tool calling, embeddings, image generation, speech in both directions, moderation and structured judgments.
+
+## It keeps running when a provider doesn't
+
+Failover happens in the gateway, so there is nothing to configure in your code. When a request hits a rate limit, a server error or a timeout, Cencori:
+
+1. retries it,
+2. falls back to another provider or an equivalent route, and
+3. stops sending traffic to the failing path until it recovers.
+
+Errors that a retry can't fix, such as an invalid request or a bad provider key, come straight back to you.
+
+## You can see every request
+
+Each request is logged with its prompt, response, token count, latency and cost. In the console, **AI Gateway → Overview** shows your traffic and spend, and you can open any single request to see what was sent and what came back.
+
+## Your keys or ours
+
+- **Managed keys.** Start in minutes. Buy credits and use any model without opening an account with each provider.
+- **Your own keys.** Add your provider keys under **AI Gateway → BYOK**. The provider bills you directly, your own rate limits apply, and Cencori still routes and logs every request.
+
+## Controls you switch on
+
+Two controls ship with the gateway. Both are off until you turn them on in the project's **Settings → General**.
+
+- **PII protection.** Blocks a request that contains an email address, phone number, US Social Security number or card number before it reaches a model. Available on paid plans.
+- **Response caching.** Returns a stored answer when your project sends the same request again. A cache hit costs nothing and comes back much faster. Available on every plan.
+
+## What's built on it
+
+Everything else we ship runs through the gateway, which is why it takes one key to use:
+
+- **[Revenue](/newsroom/introducing-revenue)** charges your customers for the AI they use.
+- **[Voice](/newsroom/cencori-voice)** speaks and transcribes across six providers.
+- **[Embedded Agents](/newsroom/introducing-cencori-embedded-agents)**, **[Cencori Web](/newsroom/introducing-cencori-web)** and the **[Judgment API](/newsroom/judgment-api)** all make their model calls through it.
+
+## Get started
+
+- **Create a key:** open a project in the [console](/dashboard) and copy its API key.
+- **Try a model:** **AI Gateway → Playground** runs any model without code.
+- **Read the docs:** [AI Gateway](/docs/ai/gateway), [Failover](/docs/ai/failover) and [Providers](/docs/ai/providers).
