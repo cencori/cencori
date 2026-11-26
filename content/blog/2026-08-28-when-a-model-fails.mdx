@@ -1,7 +1,7 @@
 ---
 title: "When a model fails: retries, fallbacks and circuit breakers in the gateway"
 slug: "when-a-model-fails"
-date: "2026-11-12"
+date: "2026-08-28"
 excerpt: "What the Cencori gateway does when a provider returns an error, why a fallback is a different model and not the same one, and the mistake that taught us to scope circuit breakers by model."
 coverImage: "/newsroom/images/covers/mesh-eng-failover.jpg"
 authors:
@@ -12,7 +12,7 @@ published: true
 ---
 Every model provider fails sometimes. They rate-limit you, time out, or return a server error for a few minutes and then recover. If your product calls one provider directly, their bad five minutes are yours too.
 
-The gateway exists partly to absorb that. This post describes what it does when a request fails, the decisions behind it, and two mistakes we made along the way. It describes behaviour, not our code.
+The gateway exists partly to absorb that. This post describes what it does when a request fails, the decisions behind it, and a mistake we made along the way. It describes behaviour, not our code.
 
 ## First question: is this error worth retrying?
 
@@ -52,7 +52,7 @@ A circuit breaker fixes that. It has three states:
 
 The state is shared across our servers, so one server learning that a provider is down protects requests on all of them.
 
-## Mistake one: one breaker per provider
+## The mistake: one breaker per provider
 
 Our first breakers were scoped to a provider. That seemed natural: providers go down, so track providers.
 
@@ -62,20 +62,11 @@ Breakers are now scoped to a provider and a model together. One broken model can
 
 This has a cost and we accepted it knowingly. When a provider is truly down, each model has to fail enough times to trip its own breaker, where before the first few failures protected everything. We decided a slower reaction to a full outage is better than a healthy provider being switched off by one bad model.
 
-## Mistake two: two sources of truth
-
-The list of equivalent models used to be overridable from a table our team could edit without a deploy. That sounded flexible.
-
-In practice, any rows in that table replaced the built-in list entirely. The table was edited once, then forgotten. Every equivalent we added in code after that was silently ignored in production, because an old table was still speaking for the whole list.
-
-We removed the override. There is one list now, it lives in one place, and changing it goes through review like any other change. Flexibility you forget about is a liability.
-
 ## What we'd tell another team
 
 - Decide which errors are retryable before you write a retry loop.
 - Treat a fallback as a new request: check access, balance and price again.
 - Tell the caller which model answered.
 - Scope breakers to the smallest thing that fails independently.
-- Keep one source of truth for anything that decides where traffic goes.
 
 Fallback and circuit breaker settings for a project are under **Settings → Providers**. The [failover docs](/docs/ai/failover) list which errors are retried.

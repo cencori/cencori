@@ -1,7 +1,7 @@
 ---
 title: "The build that needed 12 GB"
 slug: "the-build-that-needed-12gb"
-date: "2026-11-09"
+date: "2026-11-07"
 excerpt: "For three days in November every deploy of ours was killed for running out of memory. What we measured, what didn't work, and why we stopped building where we run."
 coverImage: "/newsroom/images/covers/mesh-eng-build-memory.jpg"
 authors:
@@ -57,7 +57,7 @@ Three details were worth getting right.
 
 ## The cost
 
-This isn't free. A deploy now has two stages and two places to go wrong. The image is large, and when pulling it is slow, a deploy can time out before the application ever starts. We've had that happen. It's a better failure than the one we had, because a retry fixes it, but it is a new one.
+This isn't free. A deploy now has two stages and two places to go wrong. The image is large, and when pulling it is slow, a deploy can time out before the application ever starts. That's a better failure than the one we had, because a retry fixes it, but it is a new one.
 
 ## What we'd tell another team
 

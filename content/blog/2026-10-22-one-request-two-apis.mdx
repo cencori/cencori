@@ -1,7 +1,7 @@
 ---
 title: "One request, two upstream APIs: tool calls on reasoning models"
 slug: "one-request-two-apis"
-date: "2026-11-24"
+date: "2026-10-22"
 excerpt: "Some OpenAI models reject a request that combines function tools with a reasoning effort on one API and accept it on another. How the gateway picks the right one so your code doesn't change."
 coverImage: "/newsroom/images/covers/mesh-eng-tool-calls.jpg"
 authors:
@@ -42,12 +42,6 @@ We also tell the provider not to store these responses. The Responses API can ke
 ## Streaming
 
 Streaming has the same contract. Text arrives in pieces as the model writes it. The tool calls and the token usage arrive together on the final chunk, so code that waits for the end of the stream gets everything it needs in one place.
-
-## Two smaller things we learned
-
-**"Off" doesn't mean the same thing everywhere.** Our API lets you set reasoning effort to `none`. Some models accept that. Some can't turn reasoning off at all, and reject the value. Others don't reason and reject the parameter itself. So `none` is translated per model: passed through where it's accepted, mapped to the model's lowest setting where reasoning can't be switched off, and left out where the model doesn't reason. The intent is the same in all three: think as little as this model allows.
-
-**The token count can arrive after "finished".** On a Chat Completions stream, OpenAI sends the usage in its own message after the one that marks the response as finished. A gateway that stops reading at "finished" never sees the count, and a request with no count can't be billed or logged correctly. The gateway holds the finish until the usage has arrived and delivers them together.
 
 ## Why it matters
 
