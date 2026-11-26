@@ -195,9 +195,10 @@ export function signDeployTicket(
     /**
      * "env": hand a published app's machine the project's environment variables. "plan": bring a
      * published app in line with its owner's plan as it is now (its limits, or `paused`). "access":
-     * who may see the project's site, anyone or whoever has its password.
+     * who may see the project's site, anyone or whoever has its password. "quality": Quality's
+     * feedback toolbar on the project's pages, or not (lib/tensor-quality.ts).
      */
-    action: "publish" | "remove" | "env" | "plan" | "access";
+    action: "publish" | "remove" | "env" | "plan" | "access" | "quality";
     replaces?: string | null;
     /** An app is published to its own machine, which the ticket names; a static site has none. */
     machineId?: string | null;

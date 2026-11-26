@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { noStoreHeaders } from "@/lib/tensor-auth";
 import { authenticateProjectRequest } from "@/lib/tensor-cloud-project-auth";
+import { refreshQualityAfterPublish } from "@/lib/tensor-quality";
 import {
   gatewayHttpUrl,
   normalizeSiteName,
@@ -28,6 +29,7 @@ import {
   readTask,
   readVariables,
   siteNameAvailable,
+  sitesDomainOf,
   type SiteUsage,
   type TensorCloudTask,
 } from "@/lib/tensor-cloud-tasks";
@@ -238,6 +240,13 @@ export async function PATCH(request: NextRequest, context: Context) {
     const kind = body.kind === "app" ? "app" : "static";
     const deployment = await markPublished(session.admin, task.id, kind);
     if (!deployment) return json({ error: "This project has no site to mark as published." }, 404);
+    // Quality, when it is on, follows the app to its address (lib/tensor-quality.ts). Never fails this.
+    await refreshQualityAfterPublish(session.admin, config, {
+      siteName: deployment.name,
+      sitesDomain: await sitesDomainOf(config),
+      task: { id: task.id, user_id: task.user_id },
+      title: task.title || task.project_name || deployment.name,
+    }).catch((error: unknown) => console.error("[Tensor Quality] After publishing", error));
     // It was an app and is now files: the machine it ran on has nothing left to do.
     if (kind === "static" && (deployment.machine_id || deployment.volume_id)) {
       await destroySiteMachine(session.admin, sitesFly(config), deployment);

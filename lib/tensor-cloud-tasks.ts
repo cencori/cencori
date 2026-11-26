@@ -1072,7 +1072,7 @@ export async function applyPlanToApps(
 }
 
 /** The domain sites are served under, as the gateway says. */
-async function sitesDomainOf(config: TensorCloudConfig): Promise<string> {
+export async function sitesDomainOf(config: TensorCloudConfig): Promise<string> {
   try {
     const answer = await fetch(`${gatewayHttpUrl(config.gatewayUrl)}/v1/sites`, { signal: AbortSignal.timeout(15_000) });
     return ((await answer.json()) as { domain?: string }).domain || "cencori.app";
