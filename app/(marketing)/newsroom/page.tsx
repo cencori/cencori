@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { getAllPosts } from "@/lib/blog";
 import { BlogFilters } from "@/components/blog/BlogFilters";
-import { BLOG_CATEGORY_ORDER } from "@/components/blog/blog-client";
+import { BLOG_CATEGORY_ORDER, formatBlogCategory } from "@/components/blog/blog-client";
 
 export const metadata: Metadata = {
   title: "Newsroom | Cencori",
@@ -11,7 +11,9 @@ export const metadata: Metadata = {
 export default function BlogPage() {
   // Coverage from other outlets is on the About page ("In the news"), not here.
   const allPosts = getAllPosts().filter((post) => post.category !== "press");
-  const categories = BLOG_CATEGORY_ORDER.filter((label) => label !== "Press");
+  // Only tabs that have something in them: an empty tab is a dead end.
+  const used = new Set(allPosts.map((post) => formatBlogCategory(post.category)));
+  const categories = BLOG_CATEGORY_ORDER.filter((label) => used.has(label));
 
   return (
     <main className="flex-1 pt-20">
