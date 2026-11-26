@@ -30,8 +30,8 @@ const PAGE_SIZE = 9;
 const FILTER_TAGS = [
   "Agents",
   "AI Models",
-  "API",
   "Announcement",
+  "API",
   "Changelog",
   "Company",
   "Compliance",
