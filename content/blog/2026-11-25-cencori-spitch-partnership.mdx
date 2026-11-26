@@ -1,0 +1,71 @@
+---
+title: "Cencori partners with Spitch"
+slug: "cencori-spitch-partnership"
+date: "2026-11-25"
+excerpt: "Cencori is partnering with Spitch to bring native Yoruba, Hausa, Igbo and Amharic voice to the Cencori Voice API. Speak and transcribe in the languages your users actually use, through the same gateway as the rest of your AI."
+coverImage: "/newsroom/images/covers/cencori-spitch.jpg"
+authors:
+  - bola
+tags: ["Product", "Partnership", "Spitch", "Voice", "Integrations"]
+category: "product"
+published: true
+---
+Cencori is partnering with **[Spitch](https://spitch.app)** to bring native African-language voice to the Cencori Voice API.
+
+Most voice providers do English well, and a few do European and Asian languages well. Very few do Yoruba, Hausa or Igbo, and fewer still do them in both directions. For a product serving Nigerian or East African users, that gap decides whether people can use it at all.
+
+Spitch builds speech models for these languages. With this partnership, its text-to-speech and speech-to-text are available through Cencori, next to every other voice model we serve.
+
+## Five languages, both directions
+
+Spitch on Cencori speaks and transcribes **Yoruba, Hausa, Igbo, Amharic and English**. These are models built for the languages, not an English model with an accent.
+
+There are twelve voices to choose from: Sade, Funmi, Segun, Femi, Amara, Amina, Aliyu, Hasan, Ngozi, Obinna, Henry and Kani.
+
+## One line to use it
+
+You pick a Spitch model and the gateway routes the request. There is no separate account to wire up and no provider name to pass.
+
+```typescript
+// Speak Yoruba
+const { audio } = await cencori.voice.speak({
+  input: 'Bawo ni, e ku aaro.',
+  model: 'spitch-tts',
+  voice: 'sade',
+  language: 'yo',
+});
+
+// Transcribe a Yoruba voice note
+const { text } = await cencori.voice.transcribe({
+  audio: voiceNote,
+  model: 'spitch-stt',
+  language: 'yo',
+});
+```
+
+The same calls work in every Cencori SDK: TypeScript, Python, Go, PHP and Rust.
+
+## Built for voice notes
+
+Across much of West Africa, people send voice notes where others would type. With Spitch on Cencori you can take a WhatsApp voice note in Yoruba, transcribe it, pass the text to a model and reply with a Yoruba voice note, all through one API.
+
+The same loop works for phone lines, voicemail and any app where typing in English is a barrier.
+
+## The same gateway as everything else
+
+Spitch calls run through the Cencori gateway, so they get what the rest of your traffic gets:
+
+- **Metering and logs.** Every call is recorded with its cost.
+- **Spend caps.** The limits you set on a project apply to voice too.
+- **Your own key.** Bring your Spitch key per project if you have one.
+- **PII protection.** Opt in and personal data is handled the same way as in chat.
+
+## Why we partnered
+
+A bank assistant, a government service line or a support flow only reaches most Nigerians if it can listen and speak in the language they use. Spitch has built the models for that. Cencori puts them one model name away for every team already building on the gateway.
+
+## Get started
+
+- **Read the guide:** [Voice API](/docs/api/voice).
+- **Try it:** use `spitch-tts` or `spitch-stt` in any Voice API call.
+- **New to Spitch?** Start at [spitch.app](https://spitch.app).
