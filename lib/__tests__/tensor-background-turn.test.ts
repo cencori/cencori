@@ -170,4 +170,39 @@ describe("Tensor turns with no page open", () => {
     expect(runtime.calls.some((call) => call.method === "turn/interrupt")).toBe(true);
     expect(spies.finish).toHaveBeenCalledOnce();
   }, 15_000);
+
+  it("follows a turn another server started to its end, and closes that turn's reservation", async () => {
+    const runtime = new FakeRuntime({
+      "thread/resume": (_params, rt) => {
+        setTimeout(() => {
+          rt.emit("item/completed", { item: { text: "Footer centred.", type: "agentMessage" }, threadId: "thr_1", turnId: "turn_9" });
+          rt.emit("turn/completed", { threadId: "thr_1", turn: { id: "turn_9", status: "completed" } });
+        }, 5);
+        return { thread: { id: "thr_1", turns: [{ id: "turn_9", status: "inProgress" }] } };
+      },
+    });
+    const { all, spies } = deps([runtime]);
+    const resume = { startedAt: Date.now(), threadId: "thr_1", turnId: "turn_9", turnKey: "key-from-before" };
+    const result = await driveBackgroundTurn({ prompt: "x", resume, taskId: "t", userId: "u" }, all);
+    expect(result).toMatchObject({ reply: "Footer centred.", status: "completed", turnId: "turn_9" });
+    expect(spies.reserve).not.toHaveBeenCalled();
+    expect(runtime.calls.some((call) => call.method === "turn/start")).toBe(false);
+    expect(spies.finish).toHaveBeenCalledWith("key-from-before", "turn_9");
+  });
+
+  it("closes the reservation at once when the turn it picks up has already ended", async () => {
+    const runtime = new FakeRuntime({
+      "thread/resume": () => ({
+        thread: { id: "thr_1", turns: [{ id: "turn_9", items: [{ text: "All done.", type: "agentMessage" }], status: "completed" }] },
+      }),
+    });
+    const { all, spies } = deps([runtime]);
+    const result = await driveBackgroundTurn(
+      { prompt: "x", resume: { startedAt: Date.now(), threadId: "thr_1", turnId: "turn_9", turnKey: "k" }, taskId: "t", userId: "u" },
+      all,
+    );
+    expect(result).toMatchObject({ reply: "All done.", status: "completed" });
+    expect(spies.finish).toHaveBeenCalledWith("k", "turn_9");
+    expect(spies.turnEnded).toHaveBeenCalledOnce();
+  });
 });

@@ -24,6 +24,9 @@ create table if not exists public.tensor_cloud_background_turns (
   reply text,
   error text,
   created_at timestamptz not null default now(),
+  -- Kept fresh by the server following the turn. One gone quiet (the server restarted) is taken
+  -- over by another sweep (lib/tensor-background-sweep.ts), which follows the turn to its end.
+  heartbeat_at timestamptz not null default now(),
   started_at timestamptz,
   finished_at timestamptz
 );
