@@ -166,11 +166,11 @@ const nextConfig: NextConfig = {
         destination: "/newsroom/:path*",
         permanent: true,
       },
-      // Press coverage lives in the newsroom hub (Press tab) now.
+      // Press coverage is the "In the news" list on the About page.
       {
         source: "/press",
-        destination: "/newsroom",
-        permanent: true,
+        destination: "/about#press",
+        permanent: false,
       },
       // Model catalog lives on one surface now.
       {
