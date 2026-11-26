@@ -158,4 +158,66 @@ describe("Tensor x Quality", () => {
     const sent = calls.filter((call) => !call.url.endsWith("/oauth/apps/token")).map((call) => new URL(call.url).pathname);
     expect(sent).toEqual([`/api/v1/partner/teams/${USER}/projects/${TASK}`]);
   });
+  it("opens the app signed in with a one-time link from Quality, on a page of that app only", async () => {
+    const { qualitySignInUrl } = await import("@/lib/tensor-quality");
+    const { calls, fetcher } = quality({
+      "/oauth/apps/token": tokenAnswer(),
+      "/embed/launch": (call) =>
+        Response.json({
+          expires_at: "2026-11-26T10:05:00Z",
+          url: `${JSON.parse(call.body ?? "{}").url}#quality-signin=qls_one`,
+        }),
+    });
+    const link = { mode: "members" as const, site_id: "qs_live_abc", task_id: TASK, user_id: USER };
+    const input = { link, siteName: "bakery", sitesDomain: "cencori.app", title: "Bakery" };
+    expect(await qualitySignInUrl({} as never, config, { ...input, path: "/menu?x=1#top" }, fetcher)).toBe(
+      "https://bakery.cencori.app/menu?x=1#quality-signin=qls_one",
+    );
+    expect(await qualitySignInUrl({} as never, config, { ...input, path: "//evil.test/x" }, fetcher)).toBe(
+      "https://bakery.cencori.app/#quality-signin=qls_one",
+    );
+    const launch = calls.find((call) => call.url.includes("/embed/launch"));
+    expect(launch?.method).toBe("POST");
+    expect(new URL(launch?.url ?? "").pathname).toBe(
+      `/api/v1/partner/teams/${USER}/projects/${TASK}/members/${USER}/embed/launch`,
+    );
+  });
+
+  it("registers the owner and app again when Quality does not know them, then asks once more", async () => {
+    const { qualitySignInUrl } = await import("@/lib/tensor-quality");
+    let launches = 0;
+    const { calls, fetcher } = quality({
+      "/oauth/apps/token": tokenAnswer(),
+      "/embed/launch": () =>
+        ++launches === 1
+          ? Response.json({ error: "Member not found." }, { status: 404 })
+          : Response.json({ url: "https://bakery.cencori.app/#quality-signin=qls_two" }),
+      [`/teams/${USER}/members`]: () => Response.json({ members: [] }),
+      [`/projects/${TASK}`]: () => Response.json({ site_id: "qs_live_abc" }),
+      [`/teams/${USER}`]: () => Response.json({ id: USER }),
+    });
+    const link = { mode: "members" as const, site_id: "qs_live_abc", task_id: TASK, user_id: USER };
+    const url = await qualitySignInUrl({} as never, config, { link, siteName: "bakery", sitesDomain: "cencori.app", title: "Bakery" }, fetcher);
+    expect(url).toBe("https://bakery.cencori.app/#quality-signin=qls_two");
+    const sent = calls.filter((call) => !call.url.endsWith("/oauth/apps/token")).map((call) => `${call.method} ${new URL(call.url).pathname}`);
+    expect(sent).toEqual([
+      `POST /api/v1/partner/teams/${USER}/projects/${TASK}/members/${USER}/embed/launch`,
+      `PUT /api/v1/partner/teams/${USER}`,
+      `PUT /api/v1/partner/teams/${USER}/members`,
+      `PUT /api/v1/partner/teams/${USER}/projects/${TASK}`,
+      `POST /api/v1/partner/teams/${USER}/projects/${TASK}/members/${USER}/embed/launch`,
+    ]);
+  });
+
+  it("refuses a link Quality made for another site", async () => {
+    const { qualitySignInUrl, QualityError } = await import("@/lib/tensor-quality");
+    const { fetcher } = quality({
+      "/oauth/apps/token": tokenAnswer(),
+      "/embed/launch": () => Response.json({ url: "https://elsewhere.test/#quality-signin=qls_x" }),
+    });
+    const link = { mode: "members" as const, site_id: "qs_live_abc", task_id: TASK, user_id: USER };
+    await expect(
+      qualitySignInUrl({} as never, config, { link, siteName: "bakery", sitesDomain: "cencori.app", title: "Bakery" }, fetcher),
+    ).rejects.toThrow(QualityError);
+  });
 });

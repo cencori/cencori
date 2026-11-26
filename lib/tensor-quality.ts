@@ -291,6 +291,64 @@ export async function disableQuality(
 }
 
 /**
+ * A link that opens a project's published app with its owner already signed in to Quality, so
+ * they never sign in to Quality themselves. Quality makes it for one person, app and site; it
+ * works once, for five minutes, and the script takes the token off the address bar on arrival.
+ * After that they stay signed in on that site in that browser.
+ *
+ * If Quality no longer knows the team, the person or the app (404), they are registered again
+ * and the link asked for once more.
+ */
+export async function qualitySignInUrl(
+  admin: Admin,
+  config: QualityConfig,
+  input: {
+    link: QualityLink;
+    title: string;
+    siteName: string;
+    sitesDomain: string;
+    /** A page of the app to land on, such as "/settings"; the home page when left out. */
+    path?: string;
+  },
+  fetcher: typeof fetch = fetch,
+): Promise<string> {
+  const home = publishedUrl(input.siteName, input.sitesDomain);
+  const page = new URL(input.path && input.path.startsWith("/") ? input.path : "/", home);
+  // Only a page of this app: a path such as "//elsewhere.test" must not move the link off it.
+  if (page.origin !== new URL(home).origin) page.href = `${home}/`;
+  page.hash = "";
+  const { link } = input;
+  const launch = () =>
+    partner<{ url?: unknown }>(
+      config,
+      "POST",
+      `/teams/${path(link.user_id)}/projects/${path(link.task_id)}/members/${path(link.user_id)}/embed/launch`,
+      { url: page.href },
+      fetcher,
+    );
+
+  let said: { url?: unknown };
+  try {
+    said = await launch();
+  } catch (error) {
+    if (!(error instanceof QualityError && error.status === 404)) throw error;
+    await syncQualityTeam(admin, config, link.user_id, fetcher);
+    await upsertQualityApp(config, {
+      mode: link.mode,
+      name: input.title,
+      productionUrl: home,
+      taskId: link.task_id,
+      userId: link.user_id,
+    }, fetcher);
+    said = await launch();
+  }
+  if (typeof said.url !== "string" || new URL(said.url).origin !== page.origin) {
+    throw new QualityError(503, "Quality did not return a sign-in link for this app.");
+  }
+  return said.url;
+}
+
+/**
  * After a publish: a project with Quality on is registered again at its (perhaps new) address and
  * the gateway reminded of its site id. A failure here never fails the publish.
  */
