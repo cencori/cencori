@@ -36,7 +36,7 @@ Because a fallback is a different model, we treat it as a new request for every 
 - **Access.** If your API key is restricted to certain models, a fallback can't run one it isn't allowed to.
 - **Credits.** The balance check runs again for the fallback model.
 - **Price.** We don't fall back to a model we have no price for, so a fallback is never billed by guesswork.
-- **Honesty.** The response names the model and provider that actually answered, and the request log marks it as a fallback. You can also turn fallback off for a project if a different model answering is worse for you than an error.
+- **Honesty.** The response names the model that actually answered and says that a fallback was used. You can also turn fallback off for a project if a different model answering is worse for you than an error.
 
 Some requests are never retried or failed over at all. Where a second attempt could charge twice for one result, one attempt is all it gets.
 
@@ -78,4 +78,4 @@ We removed the override. There is one list now, it lives in one place, and chang
 - Scope breakers to the smallest thing that fails independently.
 - Keep one source of truth for anything that decides where traffic goes.
 
-Failover settings for a project are under **Settings → Providers**. The [failover docs](/docs/ai/failover) list which errors are retried.
+Fallback and circuit breaker settings for a project are under **Settings → Providers**. The [failover docs](/docs/ai/failover) list which errors are retried.
