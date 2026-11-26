@@ -149,6 +149,12 @@ const nextConfig: NextConfig = {
         destination: "/newsroom/energy-efficient-inference-infrastructure",
         permanent: true,
       },
+      // The July 2026 launch entry became the partnership post; old shared links follow it.
+      {
+        source: "/:prefix(blog|newsroom|changelog)/spitch-on-cencori",
+        destination: "/newsroom/cencori-spitch-partnership",
+        permanent: true,
+      },
       // Blog hub moved to /newsroom.
       {
         source: "/blog",
