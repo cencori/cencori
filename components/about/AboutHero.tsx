@@ -1,10 +1,11 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, type ReactNode } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
 import styles from "./AboutHero.module.css";
 
-export function AboutHero() {
+/** `children` sit along the base of the pinned screen, outside the fading statement. */
+export function AboutHero({ children }: { children?: ReactNode }) {
   const ref = useRef<HTMLElement>(null);
   const { scrollYProgress } = useScroll({
     target: ref,
@@ -30,6 +31,7 @@ export function AboutHero() {
             infrastructure AI runs on.
           </h1>
         </motion.div>
+        {children}
       </div>
     </section>
   );

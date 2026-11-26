@@ -32,8 +32,15 @@ function outletFor(url: string): { name: string; logo: string | null } {
   };
 }
 
-/** Coverage from other outlets: one square per article, linking out to it. */
-export function AboutPress() {
+/**
+ * Coverage from other outlets: one square per article, linking out to it.
+ * `placement="hero"` is the compact wall that sits along the base of the hero.
+ */
+export function AboutPress({
+  placement = "section",
+}: {
+  placement?: "section" | "hero";
+}) {
   const coverage = getAllPosts().filter(
     (post) => post.category === "press" && post.externalUrl,
   );
@@ -43,6 +50,7 @@ export function AboutPress() {
     <section
       aria-labelledby="about-press-title"
       className={styles.press}
+      data-placement={placement}
       id="press"
     >
       <p className={styles.label} id="about-press-title">

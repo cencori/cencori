@@ -15,12 +15,13 @@ export const metadata: Metadata = {
 export default function AboutPage() {
   return (
     <main className="min-h-screen bg-[#050505] text-[#f4f4ef]">
-      <AboutHero />
+      <AboutHero>
+        <AboutPress placement="hero" />
+      </AboutHero>
       <AboutMission />
       <AboutAfrica />
       <AboutThesis />
       <AboutTeam />
-      <AboutPress />
     </main>
   );
 }

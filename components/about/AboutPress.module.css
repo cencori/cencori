@@ -101,3 +101,51 @@
     border-left: 0;
   }
 }
+
+/* Along the base of the hero: pinned to its bottom edge, smaller squares,
+   and the label set as the hero's own eyebrow. */
+.press[data-placement="hero"] {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  padding: 0 2.25rem;
+  background: transparent;
+}
+
+.press[data-placement="hero"] .label {
+  margin-bottom: 1.1rem;
+  color: rgba(255, 255, 255, 0.5);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.72rem;
+  font-weight: 400;
+  letter-spacing: 0.1em;
+  text-align: center;
+}
+
+.press[data-placement="hero"] .viewport {
+  border-bottom: 0;
+}
+
+.press[data-placement="hero"] .rail {
+  grid-auto-columns: clamp(6.5rem, 10vw, 10rem);
+}
+
+.press[data-placement="hero"] .logo {
+  max-height: clamp(1.25rem, 2vw, 2rem);
+}
+
+@media (max-width: 900px) {
+  .press[data-placement="hero"] {
+    padding: 0 1.25rem;
+  }
+
+  /* Two short rows, so the wall leaves the statement its room. */
+  .press[data-placement="hero"] .cell {
+    aspect-ratio: 2 / 1;
+  }
+
+  .press[data-placement="hero"] .rail li:nth-last-child(-n + 3) {
+    border-bottom: 0;
+  }
+}
