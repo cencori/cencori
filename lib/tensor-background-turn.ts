@@ -31,6 +31,8 @@ const TABLE = "tensor_cloud_background_turns";
 const WORKSPACE = "/data/repo";
 /** The runtime settings the web opens every conversation with. */
 const THREAD_CONFIG = { "features.apply_patch_streaming_events": true };
+/** The model background turns run on and are reserved for: the web's default. */
+const DEFAULT_MODEL = "maximo-atlas-1.5";
 /** The origin the gateway lets connect: the site's own, as a page there would send. */
 const ORIGIN = (process.env.TENSOR_WEB_ORIGIN?.trim() || "https://tensorade.app").replace(/\/+$/, "");
 /** Longest a turn is followed before it is interrupted. */
@@ -101,16 +103,39 @@ function lastWords(items: Array<{ type: string; text?: string }> | undefined): s
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** Runs one turn in a project, from waking its machine to closing its reservation. */
+/**
+ * Runs one turn in a project, from reserving its usage to closing that reservation.
+ *
+ * The reservation comes first, before the project's machine is touched: while the account is
+ * busy (a chat, the desktop app), asking again costs a query, not a machine woken for nothing.
+ */
 export async function driveBackgroundTurn(input: BackgroundTurnInput, deps: BackgroundTurnDeps): Promise<BackgroundTurnResult> {
+  let reservedKey: string | null = null;
+  if (!input.resume) {
+    // Model calls are served only under an open reservation; one turn at a time per account.
+    const key = randomUUID();
+    const reservation = await deps.reserve(key, DEFAULT_MODEL);
+    if (!reservation.allowed) {
+      if (reservation.reason === "concurrency_limit") return { error: "Tensor is working on something else for this account.", status: "busy" };
+      return failed(
+        reservation.reason === "task_limit" || reservation.reason === "trial_limit" || reservation.reason === "pass_budget_limit"
+          ? "The account has used its allowance for now."
+          : "Tensor could not reserve usage for this turn.",
+      );
+    }
+    reservedKey = key;
+  }
+
   const connection = await deps.connect();
   if (!connection.ok) {
+    // Nothing ran: the reservation is let go at once, so the account is free again.
+    if (reservedKey) await deps.finish(reservedKey, null).catch(() => undefined);
     if (connection.code === "running_limit") return { error: connection.error, status: "busy" };
     return failed(connection.error);
   }
 
   let client = deps.open(connection.url);
-  let turnKey: string | null = input.resume?.turnKey ?? null;
+  const turnKey: string | null = input.resume?.turnKey ?? reservedKey;
   let threadId: string | null = input.resume?.threadId ?? null;
   let turnId: string | null = input.resume?.turnId ?? null;
   const heartbeat = deps.alive ? setInterval(() => void deps.alive?.().catch(() => undefined), 30_000) : null;
@@ -174,20 +199,6 @@ export async function driveBackgroundTurn(input: BackgroundTurnInput, deps: Back
       });
       threadId = thread.thread.id;
 
-      // Model calls are served only under an open reservation; one turn at a time per account.
-      const key = randomUUID();
-      const reservation = await deps.reserve(key, thread.model ?? null);
-      if (!reservation.allowed) {
-        if (reservation.reason === "concurrency_limit") return { error: "Tensor is working on something else for this account.", status: "busy" };
-        return failed(
-          reservation.reason === "task_limit" || reservation.reason === "trial_limit" || reservation.reason === "pass_budget_limit"
-            ? "The account has used its allowance for now."
-            : "Tensor could not reserve usage for this turn.",
-          threadId,
-        );
-      }
-      turnKey = key;
-
       const started = await client.request<{ turn: Turn }>("turn/start", {
         input: [{ text: input.prompt, text_elements: [], type: "text" }],
         // The project's machine is the sandbox, as on the web: it may commit, and reach the network.
@@ -195,7 +206,7 @@ export async function driveBackgroundTurn(input: BackgroundTurnInput, deps: Back
         threadId,
       });
       turnId = started.turn.id;
-      await deps.started?.({ threadId, turnId, turnKey });
+      if (turnKey) await deps.started?.({ threadId, turnId, turnKey });
     }
     if (!turnId) return failed("The turn did not start.", threadId);
 

@@ -78,7 +78,7 @@ type MemoryHome = { organizationId: string; projectId: string; settings: MemoryS
 let home: Promise<MemoryHome | null> | null = null;
 
 /** Tensor's product project in Cencori, found from the key the inference route sends with. */
-async function memoryHome(admin: Admin): Promise<MemoryHome | null> {
+export async function memoryHome(admin: Admin): Promise<MemoryHome | null> {
   home ??= (async () => {
     const key = process.env.BASECODE_GATEWAY_API_KEY?.trim();
     if (!key) return null;

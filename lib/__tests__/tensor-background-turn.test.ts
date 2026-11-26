@@ -122,14 +122,19 @@ describe("Tensor turns with no page open", () => {
     const result = await driveBackgroundTurn({ prompt: "x", taskId: "t", userId: "u" }, all);
     expect(result.status).toBe("busy");
     expect(spies.finish).not.toHaveBeenCalled();
-    expect(runtime.calls.some((call) => call.method === "turn/start")).toBe(false);
+    // Asked before the machine is touched: a busy account costs a query, not a woken machine.
+    expect(all.connect).not.toHaveBeenCalled();
+    expect(runtime.calls).toHaveLength(0);
   });
 
   it("says busy when another project is mid-turn and this one cannot be woken", async () => {
-    const { all } = deps([], {
+    const { all, spies } = deps([], {
       connect: vi.fn(async () => ({ code: "running_limit" as const, error: "still working", ok: false as const, status: 409 })),
     });
     expect((await driveBackgroundTurn({ prompt: "x", taskId: "t", userId: "u" }, all)).status).toBe("busy");
+    // The reservation it took is let go at once.
+    const key = (spies.reserve.mock.calls[0] as unknown[])[0];
+    expect(spies.finish).toHaveBeenCalledWith(key, null);
   });
 
   it("opens the connection again when it drops, and finds the turn that ended meanwhile", async () => {
