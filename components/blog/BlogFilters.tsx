@@ -23,8 +23,32 @@ const SORT_LABELS: Record<Sort, string> = {
 };
 
 const PAGE_SIZE = 9;
-/** The filter lists only the most used tags, so one-off tags don't pile up. */
-const MAX_TAGS = 20;
+/**
+ * The tags the filter offers: our own products and kinds of post, never
+ * another company's name. A tag shows once a post uses it. Keep to 20.
+ */
+const FILTER_TAGS = [
+  "Agents",
+  "AI Models",
+  "Announcement",
+  "Changelog",
+  "Company",
+  "Compliance",
+  "Developers",
+  "Engineering",
+  "Infrastructure",
+  "Integrations",
+  "Launch",
+  "Partnership",
+  "Press",
+  "Product",
+  "Release",
+  "Security",
+  "Tensor",
+  "Update",
+  "Vision",
+  "Voice",
+];
 
 function sortPosts(posts: BlogCardPost[], sort: Sort | null): BlogCardPost[] {
   const list = [...posts];
@@ -67,17 +91,8 @@ export function BlogFilters({
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const tagOptions = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const post of posts) {
-      for (const tag of post.tags ?? []) {
-        counts.set(tag, (counts.get(tag) ?? 0) + 1);
-      }
-    }
-    return [...counts.entries()]
-      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-      .slice(0, MAX_TAGS)
-      .map(([tag]) => tag)
-      .sort((a, b) => a.localeCompare(b));
+    const used = new Set(posts.flatMap((post) => post.tags ?? []));
+    return FILTER_TAGS.filter((tag) => used.has(tag));
   }, [posts]);
   const categoryOptions = visibleCategories;
 
