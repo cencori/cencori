@@ -161,6 +161,8 @@ export function BlogFilters({
               </button>
             );
           })}
+          {/* Room to scroll the last tab clear of the fade on the right. */}
+          <span aria-hidden="true" className="w-24 shrink-0" />
         </div>
 
         <div className="flex shrink-0 items-center justify-between gap-5">
