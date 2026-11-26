@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authenticateTensorBillingRequest } from "@/lib/tensor-billing";
-import { gatewayEntitlementFrom } from "@/lib/tensor-entitlement";
 import { authenticateTensorDataRequest, isUuid, readThreadUsageEntries } from "@/lib/tensor-data";
 import { noStoreHeaders } from "@/lib/tensor-auth";
-import { invalidateTensorAccess, setCachedTensorAccess } from "@/lib/config-cache";
+import { invalidateTensorAccess } from "@/lib/config-cache";
+import { finishTensorTurn, reserveTensorTurn } from "@/lib/tensor-turn-reservation";
 
 type TurnBillingBody = {
   action?: unknown;
@@ -92,42 +92,29 @@ export async function POST(request: NextRequest) {
 
   if (body.action === "reserve") {
     const model = typeof body.model === "string" ? body.model.slice(0, 160) : null;
-    const { data, error } = await session.admin.rpc("basecode_reserve_turn", {
-      p_user_id: session.user.id,
-      p_client_turn_key: body.clientTurnKey,
-      p_model: model,
-    });
-    if (error) {
+    let result;
+    try {
+      result = await reserveTensorTurn(session.admin, session.user.id, body.clientTurnKey, model);
+    } catch (error) {
       console.error("[Tensor Billing] Turn reservation failed", error);
       return NextResponse.json(
         { error: "Tensor could not reserve usage for this turn." },
         { headers: noStoreHeaders(), status: 503 },
       );
     }
-    const result = data as { allowed?: boolean; reason?: string } | null;
-    // The turn's first model call re-checks entitlement before it dispatches, and the cache it
-    // reads was cleared when the previous turn finished — so every turn paid that lookup
-    // (0.8–1.7s) right after this one had just answered it. Seeded here instead, awaited so the
-    // entry exists before the app is told to start. Only an answer with every field the lookup
-    // returns is cached: the plan's model policy rides on it, and a partial entry would skip it.
-    const entitlement = gatewayEntitlementFrom(result);
-    if (entitlement) await setCachedTensorAccess(session.user.id, entitlement);
-    return NextResponse.json(result ?? { allowed: false }, {
+    return NextResponse.json(result, {
       headers: noStoreHeaders(),
-      status: result?.allowed ? 200 : result?.reason === "concurrency_limit" ? 409 : 429,
+      status: result.allowed ? 200 : result.reason === "concurrency_limit" ? 409 : 429,
     });
   }
 
   if (body.action === "finish") {
     const runtimeTurnId =
       typeof body.runtimeTurnId === "string" ? body.runtimeTurnId.slice(0, 200) : null;
-    const { data, error } = await session.admin.rpc("basecode_finish_turn", {
-      p_user_id: session.user.id,
-      p_client_turn_key: body.clientTurnKey,
-      p_runtime_turn_id: runtimeTurnId,
-    });
-    await invalidateTensorAccess(session.user.id);
-    if (error) {
+    let finished: boolean;
+    try {
+      finished = await finishTensorTurn(session.admin, session.user.id, body.clientTurnKey, runtimeTurnId);
+    } catch (error) {
       console.error("[Tensor Billing] Turn finalization failed", error);
       return NextResponse.json(
         { error: "Tensor could not finish the usage reservation." },
@@ -150,7 +137,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ finished: data === true }, { headers: noStoreHeaders() });
+    return NextResponse.json({ finished }, { headers: noStoreHeaders() });
   }
 
   return NextResponse.json(
