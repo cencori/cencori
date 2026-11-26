@@ -138,4 +138,24 @@ describe("Tensor x Quality", () => {
     const claims = JSON.parse(Buffer.from(ticket.split(".")[1], "base64url").toString());
     expect(claims).toMatchObject({ action: "quality", name: "bakery", sub: USER, task: TASK });
   });
+  it("changes only the app when Quality is already on for the project", async () => {
+    const { enableQuality } = await import("@/lib/tensor-quality");
+    const { calls, fetcher } = quality({
+      "/oauth/apps/token": tokenAnswer(),
+      [`/projects/${TASK}`]: () => Response.json({ site_id: "qs_live_abc" }),
+    });
+    const upsert = vi.fn(async () => ({ error: null }));
+    const admin = { from: () => ({ upsert }) } as never;
+    const existing = { mode: "members" as const, site_id: "qs_live_abc", task_id: TASK, user_id: USER };
+    const link = await enableQuality(
+      admin,
+      { gatewayUrl: "wss://gateway.test", ticketSecret: "s3cret" } as never,
+      config,
+      { existing, mode: "anyone", siteName: "bakery", sitesDomain: "cencori.app", task: { id: TASK, user_id: USER }, title: "Bakery" },
+      fetcher,
+    );
+    expect(link.mode).toBe("anyone");
+    const sent = calls.filter((call) => !call.url.endsWith("/oauth/apps/token")).map((call) => new URL(call.url).pathname);
+    expect(sent).toEqual([`/api/v1/partner/teams/${USER}/projects/${TASK}`]);
+  });
 });

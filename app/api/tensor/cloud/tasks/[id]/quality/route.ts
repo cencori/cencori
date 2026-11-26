@@ -64,12 +64,16 @@ export async function PUT(request: NextRequest, context: Context) {
   const mode: QualityMode = body.mode === "anyone" ? "anyone" : "members";
 
   try {
-    const task = await readTask(session.admin, session.user.id, id);
+    const [task, deployment, existing, sitesDomain] = await Promise.all([
+      readTask(session.admin, session.user.id, id),
+      readDeployment(session.admin, id),
+      readQualityLink(session.admin, id),
+      sitesDomainOf(cloud),
+    ]);
     if (!task || !task.project_name) return json({ error: "That project does not exist." }, 404);
-    const deployment = await readDeployment(session.admin, id);
     const owner = { id: task.id, user_id: session.user.id };
     if (!body.enabled) {
-      if (await readQualityLink(session.admin, id)) {
+      if (existing) {
         await disableQuality(session.admin, cloud, config, owner, deployment?.name ?? "unpublished");
       }
       return json({ quality: { available: true, enabled: false, mode, published: Boolean(deployment) } });
@@ -79,7 +83,8 @@ export async function PUT(request: NextRequest, context: Context) {
     const link = await enableQuality(session.admin, cloud, config, {
       mode,
       siteName: deployment.name,
-      sitesDomain: await sitesDomainOf(cloud),
+      existing,
+      sitesDomain,
       task: owner,
       title: task.title || task.project_name,
     });

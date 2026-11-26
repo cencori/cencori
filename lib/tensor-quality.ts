@@ -247,10 +247,18 @@ export async function enableQuality(
   admin: Admin,
   cloud: TensorCloudConfig,
   config: QualityConfig,
-  input: { task: { id: string; user_id: string }; title: string; siteName: string; sitesDomain: string; mode: QualityMode },
+  input: {
+    task: { id: string; user_id: string };
+    title: string;
+    siteName: string;
+    sitesDomain: string;
+    mode: QualityMode;
+    /** What is kept already: the team is set up and the gateway has the site id, so only the app changes. */
+    existing?: QualityLink | null;
+  },
   fetcher: typeof fetch = fetch,
 ): Promise<QualityLink> {
-  await syncQualityTeam(admin, config, input.task.user_id, fetcher);
+  if (!input.existing) await syncQualityTeam(admin, config, input.task.user_id, fetcher);
   const siteId = await upsertQualityApp(config, {
     mode: input.mode,
     name: input.title,
@@ -258,7 +266,8 @@ export async function enableQuality(
     taskId: input.task.id,
     userId: input.task.user_id,
   }, fetcher);
-  await setGatewayQuality(cloud, input.task, input.siteName, siteId, fetcher);
+  // Quality's site id never changes for an app, so the gateway is told only the first time.
+  if (input.existing?.site_id !== siteId) await setGatewayQuality(cloud, input.task, input.siteName, siteId, fetcher);
   const link: QualityLink = { mode: input.mode, site_id: siteId, task_id: input.task.id, user_id: input.task.user_id };
   await writeQualityLink(admin, link);
   return link;
