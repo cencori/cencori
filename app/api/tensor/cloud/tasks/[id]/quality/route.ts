@@ -11,6 +11,7 @@ import {
   readQualityConfig,
   readQualityLink,
 } from "@/lib/tensor-quality";
+import { readQualityAutoFix, setQualityAutoFix } from "@/lib/tensor-quality-inbox";
 
 function json(body: unknown, status = 200) {
   return NextResponse.json(body, { headers: noStoreHeaders(), status });
@@ -33,6 +34,7 @@ export async function GET(request: NextRequest, context: Context) {
     const [link, deployment] = await Promise.all([readQualityLink(session.admin, id), readDeployment(session.admin, id)]);
     return json({
       quality: {
+        autoFix: link ? await readQualityAutoFix(session.admin, id) : true,
         available: Boolean(readQualityConfig()),
         enabled: Boolean(link),
         mode: link?.mode ?? "members",
@@ -54,7 +56,7 @@ export async function PUT(request: NextRequest, context: Context) {
   const config = readQualityConfig();
   if (!cloud || !config) return json({ error: "Quality is not available yet." }, 503);
 
-  let body: { enabled?: unknown; mode?: unknown };
+  let body: { enabled?: unknown; mode?: unknown; autoFix?: unknown };
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -76,7 +78,7 @@ export async function PUT(request: NextRequest, context: Context) {
       if (existing) {
         await disableQuality(session.admin, cloud, config, owner, deployment?.name ?? "unpublished");
       }
-      return json({ quality: { available: true, enabled: false, mode, published: Boolean(deployment) } });
+      return json({ quality: { autoFix: true, available: true, enabled: false, mode, published: Boolean(deployment) } });
     }
     // Quality is tied to the address an app is served at, so it comes on once there is one.
     if (!deployment) return json({ error: "Publish the app first, then turn Quality on." }, 409);
@@ -88,7 +90,10 @@ export async function PUT(request: NextRequest, context: Context) {
       task: owner,
       title: task.title || task.project_name,
     });
-    return json({ quality: { available: true, enabled: true, mode: link.mode, published: true } });
+    // Whether Tensor fixes the owner's comments by itself (lib/tensor-quality-inbox.ts); on unless turned off.
+    if (typeof body.autoFix === "boolean") await setQualityAutoFix(session.admin, id, body.autoFix);
+    const autoFix = typeof body.autoFix === "boolean" ? body.autoFix : await readQualityAutoFix(session.admin, id);
+    return json({ quality: { autoFix, available: true, enabled: true, mode: link.mode, published: true } });
   } catch (error) {
     if (error instanceof QualityError) return json({ error: error.message }, error.status === 400 ? 400 : 503);
     console.error("[Tensor Quality] Changing a project's Quality setting failed", error);

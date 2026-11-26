@@ -1,6 +1,6 @@
 import { after, NextRequest, NextResponse } from "next/server";
 import { noStoreHeaders } from "@/lib/tensor-auth";
-import { queueBackgroundTurn, readBackgroundTurn, runBackgroundTurn } from "@/lib/tensor-background-turn";
+import { queueBackgroundTurn, readBackgroundTurn, recentSiteChanges, runBackgroundTurn } from "@/lib/tensor-background-turn";
 import { readTensorCloudConfig } from "@/lib/tensor-cloud";
 import { authenticateProjectRequest } from "@/lib/tensor-cloud-project-auth";
 import { readTask } from "@/lib/tensor-cloud-tasks";
@@ -57,6 +57,15 @@ export async function GET(request: NextRequest, context: Context) {
   if (session === "forbidden") return json({ error: "That is not this project's." }, 403);
   if (!session) return json({ error: "Your Cencori session is invalid." }, 401);
   const run = request.nextUrl.searchParams.get("run") ?? "";
+  // With no run named: what Tensor changed lately from comments on the site, for the chat.
+  if (!run) {
+    try {
+      return json({ changes: await recentSiteChanges(session.admin, session.user.id, id) });
+    } catch (error) {
+      console.error("[Tensor Background] Reading recent changes failed", error);
+      return json({ error: "Tensor could not read that." }, 503);
+    }
+  }
   if (!UUID.test(run)) return json({ error: "That request is invalid." }, 400);
   try {
     const row = await readBackgroundTurn(session.admin, session.user.id, run);

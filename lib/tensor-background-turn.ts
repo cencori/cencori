@@ -342,3 +342,38 @@ export async function runBackgroundTurn(
   }).catch((error) => console.error("[Tensor Background] Keeping how a turn went failed", error));
   return result;
 }
+
+export type SiteChange = { id: string; at: string; asked: string[]; did: string | null; status: string };
+
+/**
+ * What Tensor did lately from comments on the published app, newest first: what was asked, and
+ * Tensor's own note on what it did. A chat is handed these, so "the copyright change" can be
+ * found and undone from there without naming where it was asked for.
+ */
+export async function recentSiteChanges(admin: Admin, userId: string, taskId: string, days = 7): Promise<SiteChange[]> {
+  const since = new Date(Date.now() - days * 86_400_000).toISOString();
+  const { data, error } = await admin
+    .from(TABLE)
+    .select("id, status, reply, finished_at")
+    .eq("task_id", taskId)
+    .eq("user_id", userId)
+    .eq("source", "quality")
+    .in("status", ["completed", "failed", "interrupted"])
+    .gte("finished_at", since)
+    .order("finished_at", { ascending: false })
+    .limit(10);
+  if (error) throw error;
+  const turns = (data ?? []) as Array<{ id: string; status: string; reply: string | null; finished_at: string }>;
+  if (turns.length === 0) return [];
+  const { data: comments, error: commentsError } = await admin
+    .from("tensor_cloud_quality_comments")
+    .select("background_turn_id, content, received_at")
+    .in("background_turn_id", turns.map((turn) => turn.id))
+    .order("received_at", { ascending: true });
+  if (commentsError) throw commentsError;
+  const asked = new Map<string, string[]>();
+  for (const comment of (comments ?? []) as Array<{ background_turn_id: string; content: string }>) {
+    asked.set(comment.background_turn_id, [...(asked.get(comment.background_turn_id) ?? []), comment.content]);
+  }
+  return turns.map((turn) => ({ asked: asked.get(turn.id) ?? [], at: turn.finished_at, did: turn.reply, id: turn.id, status: turn.status }));
+}
