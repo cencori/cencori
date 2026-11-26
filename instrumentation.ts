@@ -4,10 +4,12 @@
  * (lib/tensor-background-sweep.ts). Set TENSOR_BACKGROUND_SWEEP=off to keep a server out of it.
  */
 export async function register() {
-  if (process.env.NEXT_RUNTIME !== "nodejs") return;
-  if (process.env.NODE_ENV !== "production" || process.env.TENSOR_BACKGROUND_SWEEP === "off") return;
-  // `next build` loads this too; only a running server sweeps.
-  if (process.env.NEXT_PHASE === "phase-production-build") return;
-  const { startBackgroundSweep } = await import("./lib/tensor-background-sweep");
-  startBackgroundSweep();
+  // Written this way so the edge build leaves the import out entirely (Next's own pattern).
+  if (process.env.NEXT_RUNTIME === "nodejs") {
+    if (process.env.NODE_ENV !== "production" || process.env.TENSOR_BACKGROUND_SWEEP === "off") return;
+    // `next build` loads this too; only a running server sweeps.
+    if (process.env.NEXT_PHASE === "phase-production-build") return;
+    const { startBackgroundSweep } = await import("./lib/tensor-background-sweep");
+    startBackgroundSweep();
+  }
 }
