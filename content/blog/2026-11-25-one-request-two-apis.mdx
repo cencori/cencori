@@ -1,0 +1,56 @@
+---
+title: "One request, two upstream APIs: tool calls on reasoning models"
+slug: "one-request-two-apis"
+date: "2026-11-25"
+excerpt: "Some OpenAI models reject a request that combines function tools with a reasoning effort on one API and accept it on another. How the gateway picks the right one so your code doesn't change."
+coverImage: "/newsroom/images/covers/boxed-eng-tool-calls.jpg"
+authors:
+  - bola
+tags: ["Engineering", "API", "Developers"]
+category: "engineering"
+published: true
+---
+A gateway promises that you write one request and it works on any model. That promise is easy to keep while every model accepts the same request. It gets tested when a provider changes the rules for some models and not others.
+
+This is one of those cases, and how we handled it.
+
+## The problem
+
+OpenAI has two APIs for generating text: Chat Completions, which most code is written against, and the newer Responses API.
+
+For some of its newer reasoning models, a request that includes both function tools and a reasoning effort is rejected on Chat Completions. The provider returns a `400` saying that combination isn't supported on that endpoint. The same request is accepted on the Responses API.
+
+For a developer calling OpenAI directly, the fix is to rewrite the call against a different API with a different request and response shape. For a developer on a gateway, there should be nothing to fix.
+
+## What the gateway does
+
+The gateway decides, for each request, which upstream API to use. It looks at three things: the model family, whether the request carries tools, and what reasoning effort was asked for.
+
+- If the model and that combination need the Responses API, the request goes there.
+- If reasoning is explicitly turned off, or there are no tools, it stays on Chat Completions, which is the simpler and better-trodden path.
+
+The caller sees none of this. The request they send and the response they get back have the same shape either way.
+
+Making that true takes translation in both directions.
+
+**On the way in**, the conversation has to be rewritten. The two APIs describe a tool-call round trip differently. In one, a tool call is a property of an assistant message and the result is a message from a "tool" role. In the other, the call and its result are separate items in a list. The gateway converts each turn, keeping every tool call tied to its result by ID.
+
+**On the way out**, the gateway rebuilds the response you expect: the text, the tool calls with their names and arguments, a finish reason that says tools were called, and the token usage, with cached tokens counted separately so a cached prompt is billed as one.
+
+We also tell the provider not to store these responses. The Responses API can keep them on the provider's side; a gateway shouldn't turn that on for you.
+
+## Streaming
+
+Streaming has the same contract. Text arrives in pieces as the model writes it. The tool calls and the token usage arrive together on the final chunk, so code that waits for the end of the stream gets everything it needs in one place.
+
+## Two smaller things we learned
+
+**"Off" doesn't mean the same thing everywhere.** Our API lets you set reasoning effort to `none`. Some models accept that. Some can't turn reasoning off at all, and reject the value. Others don't reason and reject the parameter itself. So `none` is translated per model: passed through where it's accepted, mapped to the model's lowest setting where reasoning can't be switched off, and left out where the model doesn't reason. The intent is the same in all three: think as little as this model allows.
+
+**The token count can arrive after "finished".** On a Chat Completions stream, OpenAI sends the usage in its own message after the one that marks the response as finished. A gateway that stops reading at "finished" never sees the count, and a request with no count can't be billed or logged correctly. The gateway holds the finish until the usage has arrived and delivers them together.
+
+## Why it matters
+
+None of this is visible when it works, which is the point. The value of a gateway is not that it forwards requests. It is that when a provider changes what a model accepts, the change is absorbed in one place, by the people whose job that is, and the code in your product stays the same.
+
+When you hit a model that behaves differently through Cencori than you expect, tell us. Cases like this one usually start as a report from a team building on the gateway.

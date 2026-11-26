@@ -1,0 +1,81 @@
+---
+title: "When a model fails: retries, fallbacks and circuit breakers in the gateway"
+slug: "when-a-model-fails"
+date: "2026-11-25"
+excerpt: "What the Cencori gateway does when a provider returns an error, why a fallback is a different model and not the same one, and the mistake that taught us to scope circuit breakers by model."
+coverImage: "/newsroom/images/covers/boxed-eng-failover.jpg"
+authors:
+  - bola
+tags: ["Engineering", "API", "Infrastructure"]
+category: "engineering"
+published: true
+---
+Every model provider fails sometimes. They rate-limit you, time out, or return a server error for a few minutes and then recover. If your product calls one provider directly, their bad five minutes are yours too.
+
+The gateway exists partly to absorb that. This post describes what it does when a request fails, the decisions behind it, and two mistakes we made along the way. It describes behaviour, not our code.
+
+## First question: is this error worth retrying?
+
+Not every failure should be retried. We sort errors into two groups before doing anything else.
+
+- **Worth retrying.** Rate limits, timeouts, dropped connections and provider server errors. These are about the provider's state at that moment, so the same request may succeed a second later or somewhere else.
+- **Not worth retrying.** A bad provider key, an invalid request, a model that doesn't exist, or content the provider refused. These are about the request itself. Sending it again, or sending it to another provider, would fail the same way or do something the caller didn't ask for. They go straight back to you.
+
+Getting this split wrong is expensive in both directions. Retry too much and you hide real errors behind slow responses. Retry too little and a blip becomes an outage.
+
+## Then: retry, then fall back
+
+For an error worth retrying, the gateway tries the same provider again a small number of times. You set how many per project.
+
+If that doesn't work, it falls back to another provider. This is where a gateway has to make a choice that a simple proxy doesn't.
+
+**A fallback is a different model.** Providers don't serve each other's models, so "send it to someone else" means "send it to the closest equivalent model someone else runs". We maintain that list of equivalents ourselves, by capability tier. A project can also name its own fallback provider and model, and that choice wins over ours.
+
+Because a fallback is a different model, we treat it as a new request for every rule that matters:
+
+- **Access.** If your API key is restricted to certain models, a fallback can't run one it isn't allowed to.
+- **Credits.** The balance check runs again for the fallback model.
+- **Price.** We don't fall back to a model we have no price for, so a fallback is never billed by guesswork.
+- **Honesty.** The response names the model and provider that actually answered, and the request log marks it as a fallback. You can also turn fallback off for a project if a different model answering is worse for you than an error.
+
+Some requests are never retried or failed over at all. Where a second attempt could charge twice for one result, one attempt is all it gets.
+
+## Circuit breakers: stop asking a provider that's down
+
+Retries help with a blip. They hurt during a real outage, because every request now waits through several doomed attempts before falling back.
+
+A circuit breaker fixes that. It has three states:
+
+1. **Closed.** Traffic flows normally. Failures are counted.
+2. **Open.** After enough failures in a row, the gateway stops sending requests there and goes straight to the fallback.
+3. **Half-open.** After a cooling-off period it lets one request through as a test. If that succeeds, the breaker closes. If it fails, it opens again.
+
+The state is shared across our servers, so one server learning that a provider is down protects requests on all of them.
+
+## Mistake one: one breaker per provider
+
+Our first breakers were scoped to a provider. That seemed natural: providers go down, so track providers.
+
+Then a single model was retired upstream. Every call to it returned an error, the failures added up, and the breaker for that whole provider opened. For the cooling-off period, requests for healthy, unrelated models on the same provider would have been turned away because of a model they never asked for.
+
+Breakers are now scoped to a provider and a model together. One broken model can only trip its own breaker.
+
+This has a cost and we accepted it knowingly. When a provider is truly down, each model has to fail enough times to trip its own breaker, where before the first few failures protected everything. We decided a slower reaction to a full outage is better than a healthy provider being switched off by one bad model.
+
+## Mistake two: two sources of truth
+
+The list of equivalent models used to be overridable from a table our team could edit without a deploy. That sounded flexible.
+
+In practice, any rows in that table replaced the built-in list entirely. The table was edited once, then forgotten. Every equivalent we added in code after that was silently ignored in production, because an old table was still speaking for the whole list.
+
+We removed the override. There is one list now, it lives in one place, and changing it goes through review like any other change. Flexibility you forget about is a liability.
+
+## What we'd tell another team
+
+- Decide which errors are retryable before you write a retry loop.
+- Treat a fallback as a new request: check access, balance and price again.
+- Tell the caller which model answered.
+- Scope breakers to the smallest thing that fails independently.
+- Keep one source of truth for anything that decides where traffic goes.
+
+Failover settings for a project are under **Settings → Providers**. The [failover docs](/docs/ai/failover) list which errors are retried.

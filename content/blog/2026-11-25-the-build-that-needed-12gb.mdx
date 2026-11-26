@@ -1,0 +1,67 @@
+---
+title: "The build that needed 12 GB"
+slug: "the-build-that-needed-12gb"
+date: "2026-11-25"
+excerpt: "For three days in November every deploy of ours was killed for running out of memory. What we measured, what didn't work, and why we stopped building where we run."
+coverImage: "/newsroom/images/covers/boxed-eng-build-memory.jpg"
+authors:
+  - bola
+tags: ["Engineering", "Infrastructure"]
+category: "engineering"
+published: true
+---
+From 3 to 6 November, every deploy of Cencori failed. The build was killed partway through with "cannot allocate memory". The site and API stayed up the whole time, but they were stuck on the build from 2 November. Nothing we merged in those three days reached production.
+
+This is what we learned getting out of it.
+
+## The setup
+
+Cencori's console, website and API are one application, and it had grown. Our host builds each deploy on a shared machine with a fixed amount of memory. That limit wasn't going to change, so the build had to fit inside it.
+
+## Lesson one: we were reading the wrong number
+
+The first job was to find out how much memory the build really needed. On a laptop the build process showed about 7 GB of memory in use. That looked like it should fit.
+
+It didn't, because that number was wrong for our purpose. macOS compresses memory that a process isn't actively touching, and the figure most tools show is what's left after compression. The build machine doesn't get that discount.
+
+When we measured what the process had actually allocated, it was about 12 GB at the peak, during compilation. Almost all of it was native memory used by the compiler, outside the JavaScript heap.
+
+That explained why the first fixes did nothing. The usual advice for a Node process that runs out of memory is to cap or raise the heap. The heap wasn't the problem.
+
+## What didn't work
+
+We tried the obvious things in order, measuring each one:
+
+- **Capping the heap.** No effect on native memory.
+- **Removing heavy libraries.** We took out a UI library and a full syntax-highlighting bundle and marked more packages as external. It helped a little.
+- **The framework's memory optimisation setting.** It helped a little.
+- **Changing the number of build workers.** It moved the peak around without lowering it enough.
+- **Deleting half the application.** As an experiment we removed every website route and built the console alone. It was still far too large.
+
+That last one mattered most. We had planned to split the website and the console into two applications, assuming that would solve it. The experiment showed it wouldn't, before we spent weeks doing it.
+
+## What worked: stop building where we run
+
+The build needed more memory than the build machine had, and no amount of trimming was going to close that gap soon. So we moved the build.
+
+Deploys now work in two steps:
+
+1. **Build elsewhere.** On every merge, a CI runner with enough memory builds the application into a container image tagged with the commit.
+2. **Run the image.** The host no longer builds anything. It pulls the image for a named commit and starts it.
+
+Three details were worth getting right.
+
+- **No secrets in the image.** The build receives only the configuration that is public anyway, the values a browser can see, plus placeholders. Real secrets are supplied when the container starts. An image is a file that gets copied around; it shouldn't contain anything you'd mind leaking.
+- **The running version is written down.** Which commit is live is a line in the repository, changed by a commit. You can read it, and the history shows every deploy.
+- **Rolling back is the same operation as deploying.** Point at an older commit's image. Nothing is rebuilt, so a rollback can't fail the way the original build might have.
+
+## The cost
+
+This isn't free. A deploy now has two stages and two places to go wrong. The image is large, and when pulling it is slow, a deploy can time out before the application ever starts. We've had that happen. It's a better failure than the one we had, because a retry fixes it, but it is a new one.
+
+## What we'd tell another team
+
+- Measure what the build allocates, not what your laptop reports. They can differ by gigabytes.
+- When a fix "should" work, test the extreme version of it first. Deleting half the app for an afternoon saved us a migration that wouldn't have helped.
+- Building and running have different needs. If they're fighting over one machine, separate them.
+- Keep secrets out of build artefacts, and keep the record of what's live somewhere you can read.
