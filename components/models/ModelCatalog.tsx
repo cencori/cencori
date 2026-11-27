@@ -32,6 +32,7 @@ import {
     BotIcon,
     CheckmarkCircle02Icon,
     EyeIcon,
+    JusticeScale01Icon,
 } from "@hugeicons/core-free-icons";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -171,6 +172,7 @@ const CAPABILITY_ICONS: Record<string, React.ComponentProps<typeof HugeiconsIcon
     embedding: AiNetworkIcon,
     image: AiImageIcon,
     vision: EyeIcon,
+    judgment: JusticeScale01Icon,
 };
 
 const CAPABILITY_LABELS: Record<string, string> = {
@@ -483,7 +485,7 @@ export function ModelCatalog({ inConsole = false }: { inConsole?: boolean } = {}
                 {/* Filters: search, type tags and dropdowns on one line */}
                 <div className="flex flex-col xl:flex-row xl:items-center gap-3">
                     {/* Search — dashboard sidebar style */}
-                    <div className="relative flex-1 min-w-0 xl:max-w-xs xl:order-3 xl:ml-auto">
+                    <div className="relative flex-1 min-w-0 xl:flex-none xl:w-60 xl:order-3 xl:ml-auto">
                         <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <input
                             type="text"

@@ -12,7 +12,7 @@ export default function DashboardModelsPage() {
     const totalProviders = SUPPORTED_PROVIDERS.length;
 
     return (
-        <div className="w-full max-w-5xl mx-auto px-0 sm:px-6 pt-0 pb-6 sm:py-8">
+        <div className="w-full px-0 sm:px-6 pt-0 pb-6 sm:py-8">
             {/* On phones the title sits in the top bar instead (MobileNav). */}
             <div className="mb-6 hidden lg:block">
                 <h1 className="text-base sm:text-lg font-medium">Models</h1>
