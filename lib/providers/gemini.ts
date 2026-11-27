@@ -31,6 +31,18 @@ import { readResponseBuffer, safeProviderFetch } from '@/lib/security/outbound-u
 import { USAGE_MARKUP_PERCENT, withUsageMarkup } from '@/lib/billing/usage-markup';
 
 /**
+ * Output tokens Google bills for a reply. Thinking models report thought tokens in
+ * `thoughtsTokenCount`, separate from `candidatesTokenCount`, and Google charges them
+ * at the output rate, so both count.
+ */
+export function geminiCompletionTokens(
+    meta: { candidatesTokenCount?: number; thoughtsTokenCount?: number } | undefined | null,
+): number {
+    if (!meta) return 0;
+    return Math.max(0, Number(meta.candidatesTokenCount) || 0) + Math.max(0, Number(meta.thoughtsTokenCount) || 0);
+}
+
+/**
  * Google's inline image cap (mirrors VISION_PROVIDER_LIMITS.google in
  * lib/vision/analyze.ts). Remote images are downloaded into memory, so the
  * cap bounds both the fetch and the inline payload.
@@ -157,7 +169,7 @@ export class GeminiProvider extends AIProvider {
                 ? reportedPromptTokens
                 : (await model.countTokens(prompt)).totalTokens;
             const completionTokens = meta
-                ? Math.max(0, Number(meta.candidatesTokenCount) || 0)
+                ? geminiCompletionTokens(meta)
                 : (await model.countTokens(text)).totalTokens;
 
             // Gemini counts cached content inside promptTokenCount, so bill the
@@ -259,7 +271,7 @@ export class GeminiProvider extends AIProvider {
                     );
                     usage = {
                         promptTokens: promptTokens - cacheReadTokens,
-                        completionTokens: Math.max(0, Number(meta.candidatesTokenCount) || 0),
+                        completionTokens: geminiCompletionTokens(meta),
                         totalTokens: Math.max(0, Number(meta.totalTokenCount) || 0),
                         ...(cacheReadTokens ? { cacheReadTokens } : {}),
                     };

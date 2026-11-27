@@ -13,6 +13,7 @@ import type { NextRequest } from 'next/server';
 import { resolveProviderKey } from '@/lib/providers/byok-store';
 import { getCreditsBalance } from '@/lib/credits';
 import { getGoogleApiKey } from '@/lib/providers/google-env';
+import { geminiCompletionTokens } from '@/lib/providers/gemini';
 import {
     OPENAI_COMPATIBLE_ENDPOINTS,
     openAICompatibleHeaders,
@@ -583,7 +584,7 @@ async function analyzeGoogle(
     return {
         analysis: text,
         promptTokens: meta?.promptTokenCount ?? 0,
-        completionTokens: meta?.candidatesTokenCount ?? 0,
+        completionTokens: geminiCompletionTokens(meta),
     };
 }
 
@@ -707,7 +708,7 @@ async function* streamGoogle(
     yield {
         done: true,
         promptTokens: meta?.promptTokenCount ?? 0,
-        completionTokens: meta?.candidatesTokenCount ?? 0,
+        completionTokens: geminiCompletionTokens(meta),
     };
 }
 

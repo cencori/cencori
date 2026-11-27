@@ -132,6 +132,13 @@ export function getModelDisplayPrice(
 
     // Gemini
     if (id.includes('gemini')) {
+        // Gemini 4 (Google pricing page, 2026-11-26). Argon/Carbon show the
+        // Dec 1 2026 rate ($4/$20); their $2/$10 launch rate ends Nov 30.
+        if (id === 'gemini-4-neon') return price(3, 15);
+        if (id === 'gemini-4-carbon' || id === 'gemini-4-argon') return price(4, 20);
+        if (id === 'gemini-4-hydrogen') return price(1.5, 7.5);
+        if (id === 'gemini-3.8-flash') return price(0.75, 3.75);
+        if (id === 'gemini-3.5-flash-lite') return price(0.3, 2.5);
         if (id.includes('gemini-3.5-flash')) return price(1.5, 9);
         if (id.includes('pro')) return price(1.25, 5);
         if (id.includes('flash') || id.includes('lite')) return price(0.075, 0.3);
