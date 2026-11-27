@@ -441,6 +441,40 @@ export function supabaseCodeChallenge(verifier: string): string {
   return createHash("sha256").update(verifier).digest("base64url");
 }
 
+const PAWABASE_STATE_AUDIENCE = "tensor-pawabase";
+
+export type PawabaseState = SupabaseState;
+
+/** As Supabase's: who set out to connect Pawabase, where to return them, and their PKCE nonce. */
+export function signPawabaseState(
+  input: Omit<PawabaseState, "nonce">,
+  secret: string,
+  now: number = Math.floor(Date.now() / 1000),
+): { state: string; nonce: string } {
+  const nonce = randomBytes(18).toString("base64url");
+  const state = signJwt(
+    { aud: PAWABASE_STATE_AUDIENCE, sub: input.userId, site: input.site, path: input.path, jti: nonce, iat: now, exp: now + SUPABASE_STATE_TTL_SECONDS },
+    secret,
+  );
+  return { state, nonce };
+}
+
+export function verifyPawabaseState(token: unknown, secret: string, now: number = Math.floor(Date.now() / 1000)): PawabaseState | null {
+  if (typeof token !== "string" || token.length > 2048) return null;
+  const claims = verifyJwt(token, secret);
+  if (!claims || claims.aud !== PAWABASE_STATE_AUDIENCE) return null;
+  const { sub, site, path, jti, exp } = claims;
+  if (typeof sub !== "string" || !sub || typeof jti !== "string" || !jti || typeof exp !== "number" || exp <= now) return null;
+  const origin = tensorSiteOrigin(site);
+  if (!origin) return null;
+  return { userId: sub, site: origin, path: tensorSitePath(path), nonce: jti };
+}
+
+/** The PKCE verifier for a Pawabase sign-in, from its nonce; the challenge is supabaseCodeChallenge's. */
+export function pawabaseCodeVerifier(nonce: string, secret: string): string {
+  return createHmac("sha256", secret).update(`tensor-pawabase-pkce:${nonce}`).digest("base64url");
+}
+
 /** Seals something of a person's for the database (their Supabase tokens), keyed to them. */
 export function sealForUser(value: unknown, secret: string, userId: string, purpose: string): string {
   const key = Buffer.from(hkdfSync("sha256", secret, userId, purpose, 32));
