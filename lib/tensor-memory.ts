@@ -60,6 +60,8 @@ export const FACT_MAX = 600;
 /** Facts a new chat starts with: the most important ones about the person, and about its project. */
 const PINNED_ABOUT_YOU = 12;
 const PINNED_ABOUT_PROJECT = 15;
+/** How long each part of a message's memory may take before the message goes without it. */
+const PROMPT_BUDGET_MS = 1200;
 /** Facts recalled for what was just asked, from each store. */
 const RELEVANT_PER_SCOPE = 6;
 /** Other chats a new chat is pointed at. */
@@ -217,12 +219,36 @@ export async function promptContext(
   admin: Admin,
   input: { userId: string; taskId: string | null; prompt: string; first: boolean; known: string[]; place: TurnPlace | null },
 ): Promise<{ context: string; ids: string[] }> {
+  const began = Date.now();
   if (!(await memoryEnabled(admin, input.userId))) return { context: "", ids: [] };
   const known = new Set(input.known);
+  // Memory is a hint, and the agent waits for it before it reads the message: each part has a
+  // budget, and what is not ready by then is left out of this message rather than holding it up.
+  const took: Record<string, number | "late"> = {};
+  const within = <T,>(name: string, work: Promise<T>, fallback: T): Promise<T> => {
+    const start = Date.now();
+    return Promise.race([
+      work.then((value) => {
+        took[name] = Date.now() - start;
+        return value;
+      }),
+      new Promise<T>((resolve) =>
+        setTimeout(() => {
+          if (!(name in took)) took[name] = "late";
+          resolve(fallback);
+        }, PROMPT_BUDGET_MS),
+      ),
+    ]).catch(() => fallback);
+  };
   const [facts, chats] = await Promise.all([
-    recallFacts(admin, { userId: input.userId, taskId: input.taskId, query: input.prompt, pinned: input.first }),
-    input.first ? searchChats(admin, { userId: input.userId, query: input.prompt, limit: RELATED_CHATS, exclude: input.place }) : [],
+    within("facts", recallFacts(admin, { userId: input.userId, taskId: input.taskId, query: input.prompt, pinned: input.first }), []),
+    input.first
+      ? within("chats", searchChats(admin, { userId: input.userId, query: input.prompt, limit: RELATED_CHATS, exclude: input.place }), [])
+      : Promise.resolve([]),
   ]);
+  console.info(
+    `[Tensor Memory] Context for a message in ${Date.now() - began}ms (${Object.entries(took).map(([name, ms]) => `${name} ${ms === "late" ? "late" : `${ms}ms`}`).join(", ") || "nothing asked"})`,
+  );
   const fresh = facts.filter((fact) => !known.has(fact.id));
   if (!fresh.length && !chats.length) return { context: "", ids: [] };
 
