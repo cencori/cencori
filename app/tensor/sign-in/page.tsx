@@ -1,6 +1,6 @@
 import { getAuthUser } from "@/lib/auth/get-auth-user";
 import { redirect } from "next/navigation";
-import { Logo } from "@/components/logo";
+import { AuthMark, SecuredByCencori } from "@/components/auth/auth-mark";
 import {
   TENSOR_CALLBACK_URL,
   tensorSignInPath,
@@ -64,14 +64,11 @@ export default async function TensorSignInPage({ searchParams }: TensorSignInPag
     <main className="grid min-h-dvh place-items-center bg-background px-5 py-10 text-foreground">
       <section className="w-full max-w-sm text-center">
         <div className="mb-7 flex justify-center">
-          <Logo variant="mark" className="h-7" />
+          <AuthMark brand="tensor" className="h-7" />
         </div>
-        <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-          Tensor
-        </p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight">Sign in with Cencori</h1>
+        <h1 className="text-3xl font-semibold tracking-tight">Continue to Tensor</h1>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          Continue with the Cencori account already open in this browser.
+          You&apos;re signed in on this browser. Continue as:
         </p>
 
         <div className="my-7 flex items-center gap-3 rounded-2xl bg-muted/55 p-3 text-left">
@@ -113,6 +110,7 @@ export default async function TensorSignInPage({ searchParams }: TensorSignInPag
             Use another account
           </button>
         </form>
+        <SecuredByCencori className="mt-6" />
       </section>
     </main>
   );
@@ -123,7 +121,7 @@ function InvalidRequest() {
     <main className="grid min-h-dvh place-items-center bg-background px-5 text-foreground">
       <section className="w-full max-w-sm text-center">
         <div className="mb-6 flex justify-center">
-          <Logo variant="mark" className="h-7" />
+          <AuthMark brand="tensor" className="h-7" />
         </div>
         <h1 className="text-2xl font-semibold tracking-tight">This sign-in link isn&apos;t valid</h1>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">

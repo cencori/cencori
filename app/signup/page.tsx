@@ -3,21 +3,25 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { AuthGradient } from "@/components/auth/auth-gradient";
+import { SecuredByCencori } from "@/components/auth/auth-mark";
+import { authBrandFor, type AuthBrand } from "@/lib/auth/brand";
 import { SignupForm } from "@/components/signup-form";
 import Link from "next/link";
 import { createServerClient } from "@/lib/supabaseServer";
 import { getConsoleOrigin, getPostLoginDefault, getSafeSignedInDestination, sanitizeAuthRedirectTarget } from "@/lib/auth-redirect";
 
-function SignupPageContent() {
+function SignupPageContent({ brand }: { brand: AuthBrand }) {
   return (
     <div className="relative min-h-dvh flex flex-col overflow-hidden p-4 md:p-6">
-      <AuthGradient />
+      {/* Cencori's purple glow; Tensor's sign-in stays plain. */}
+      {brand !== "tensor" && <AuthGradient />}
       <div className="relative z-10 flex-1 flex items-center justify-center">
         <div className="w-full max-w-sm">
           <SignupForm />
         </div>
       </div>
       <div className="relative z-10 shrink-0 text-center pb-2">
+        {brand === "tensor" && <SecuredByCencori className="mb-1" />}
         <p className="text-xs text-muted-foreground">
           By creating an account, you agree to our{" "}
           <Link href="/privacy" className="underline underline-offset-2 hover:text-foreground">
@@ -58,7 +62,7 @@ export default async function SignupPage({
   }
   return (
     <Suspense fallback={<div className="min-h-dvh flex items-center justify-center">Loading...</div>}>
-      <SignupPageContent />
+      <SignupPageContent brand={authBrandFor(sanitizeAuthRedirectTarget(params?.redirect))} />
     </Suspense>
   );
 }

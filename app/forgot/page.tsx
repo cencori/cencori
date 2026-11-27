@@ -1,12 +1,27 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { Logo } from "@/components/logo";
+import { useSearchParams } from "next/navigation";
+import { AuthMark, SecuredByCencori } from "@/components/auth/auth-mark";
+import { authBrandFor } from "@/lib/auth/brand";
+import { sanitizeAuthRedirectTarget } from "@/lib/auth-redirect";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 export default function ForgotPasswordPage() {
+  return (
+    <Suspense fallback={<div className="min-h-dvh flex items-center justify-center">Loading...</div>}>
+      <ForgotPassword />
+    </Suspense>
+  );
+}
+
+function ForgotPassword() {
+  // A Tensor sign-in stays one: Tensor's mark here, in the email, and back into Tensor after.
+  const redirectParam = sanitizeAuthRedirectTarget(useSearchParams().get("redirect"));
+  const brand = authBrandFor(redirectParam);
+  const loginHref = redirectParam ? `/login?redirect=${encodeURIComponent(redirectParam)}` : "/login";
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,7 +35,7 @@ export default function ForgotPasswordPage() {
       const res = await fetch("/api/auth/forgot-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, ...(redirectParam ? { redirect: redirectParam } : {}) }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -38,9 +53,7 @@ export default function ForgotPasswordPage() {
   return (
     <div className="min-h-dvh flex flex-col items-center justify-center p-4 md:p-6">
       <div className="w-full max-w-sm flex flex-col items-center text-center gap-8">
-        <Link href="/">
-          <Logo variant="mark" className="h-6" />
-        </Link>
+        <AuthMark brand={brand} />
 
         {sent ? (
           <div className="space-y-2">
@@ -48,7 +61,7 @@ export default function ForgotPasswordPage() {
             <p className="text-sm text-muted-foreground">
               If an account exists for {email}, you&apos;ll receive a password reset link shortly.
             </p>
-            <Link href="/login" className="block mt-4 text-sm text-primary underline underline-offset-4 hover:text-foreground transition-colors">
+            <Link href={loginHref} className="block mt-4 text-sm text-primary underline underline-offset-4 hover:text-foreground transition-colors">
               Back to login
             </Link>
           </div>
@@ -81,11 +94,12 @@ export default function ForgotPasswordPage() {
               {loading ? "Sending…" : "Send reset link"}
             </Button>
 
-            <Link href="/login" className="text-sm text-muted-foreground underline underline-offset-2 hover:text-foreground transition-colors">
+            <Link href={loginHref} className="text-sm text-muted-foreground underline underline-offset-2 hover:text-foreground transition-colors">
               Back to login
             </Link>
           </form>
         )}
+        {brand === "tensor" && <SecuredByCencori />}
       </div>
     </div>
   );

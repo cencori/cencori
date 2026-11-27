@@ -1,5 +1,8 @@
 import { SendByte } from "@sendbyte/node";
 
+import { currentAuthBrand } from "@/lib/auth/brand-context";
+import { TENSOR_FOOTER } from "@/lib/email/verification-code-email";
+
 // Password reset email for Better Auth (lib/auth/better-auth.ts
 // sendResetPassword). Supabase sent its own until the RFC-0001 cutover; this
 // matches the verification-code email's sender and layout. No-op when
@@ -8,11 +11,13 @@ export async function sendPasswordResetEmail(params: { to: string; url: string }
   const apiKey = process.env.SENDBYTE_API_KEY;
   if (!apiKey) return;
 
+  // A Tensor sign-in's reset says Tensor (app/api/auth/forgot-password says whose it is).
+  const tensor = currentAuthBrand() === "tensor";
   const sendbyte = new SendByte(apiKey);
   await sendbyte.emails.send({
-    from: "Cencori <system@send.cencori.com>",
+    from: tensor ? "Tensor <system@send.cencori.com>" : "Cencori <system@send.cencori.com>",
     to: params.to,
-    subject: "Reset your password",
+    subject: tensor ? "Reset your Tensor password" : "Reset your password",
     html: `<!DOCTYPE html>
 <html>
 <head>
@@ -22,18 +27,20 @@ export async function sendPasswordResetEmail(params: { to: string; url: string }
 <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;margin:0;padding:0;color:#111;">
 <div style="max-width:560px;margin:0 auto;padding:32px 24px;">
   <p style="margin:0 0 24px;font-size:14px;line-height:1.6;color:#555;">Hi there,</p>
-  <p style="margin:0 0 24px;font-size:14px;line-height:1.6;color:#555;">We received a request to reset the password for your Cencori account. Use the button below to choose a new one.</p>
+  <p style="margin:0 0 24px;font-size:14px;line-height:1.6;color:#555;">We received a request to reset the password for your ${tensor ? "Tensor" : "Cencori"} account. Use the button below to choose a new one.</p>
   <div style="text-align:center;margin:32px 0;">
     <a href="${params.url}" style="display:inline-block;font-size:14px;font-weight:600;color:#fff;background:#111;padding:12px 24px;border-radius:8px;text-decoration:none;">Reset password</a>
   </div>
   <p style="margin:0 0 24px;font-size:13px;line-height:1.6;color:#999;">This link expires in 1 hour. If you didn&rsquo;t request this, you can safely ignore this email; your password won&rsquo;t change.</p>
   <div style="margin-top:32px;padding-top:24px;border-top:1px solid #eee;">
-    <p style="margin:0 0 12px;font-size:12px;color:#999;text-align:center;"><a href="https://cencori.com/docs" style="color:#888;text-decoration:underline;">Docs</a> &nbsp;&middot;&nbsp; <a href="https://cencori.com/newsroom" style="color:#888;text-decoration:underline;">Newsroom</a></p>
-    <p style="margin:0 0 8px;font-size:12px;color:#999;text-align:center;">Making AI infrastructure accessible &mdash; so builders can build and scale with confidence.</p>
-    <p style="margin:0 4px 0;font-size:11px;color:#aaa;text-align:center;">Cencori, Inc. &middot; San Francisco, CA</p>
+    ${tensor ? TENSOR_FOOTER : CENCORI_FOOTER}
   </div>
 </div>
 </body>
 </html>`,
   });
 }
+
+const CENCORI_FOOTER = `<p style="margin:0 0 12px;font-size:12px;color:#999;text-align:center;"><a href="https://cencori.com/docs" style="color:#888;text-decoration:underline;">Docs</a> &nbsp;&middot;&nbsp; <a href="https://cencori.com/newsroom" style="color:#888;text-decoration:underline;">Newsroom</a></p>
+    <p style="margin:0 0 8px;font-size:12px;color:#999;text-align:center;">Making AI infrastructure accessible &mdash; so builders can build and scale with confidence.</p>
+    <p style="margin:0 4px 0;font-size:11px;color:#aaa;text-align:center;">Cencori, Inc. &middot; San Francisco, CA</p>`;

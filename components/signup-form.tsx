@@ -25,7 +25,7 @@ import {
   markSignupWelcomeEmailPending,
 } from "@/lib/auth-welcome";
 import Link from "next/link";
-import { Logo } from "@/components/logo";
+import { AuthMark } from "@/components/auth/auth-mark";
 
 function isNetworkError(err: unknown): boolean {
   if (!(err instanceof TypeError)) return false;
@@ -185,7 +185,7 @@ export function SignupForm({ className, ...props }: SignupFormProps) {
       await fetch("/api/verify/send-code", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, userId }),
+        body: JSON.stringify({ email, userId, ...(isTensorSignUp ? { brand: "tensor" } : {}) }),
       });
 
       const verifyParams = new URLSearchParams({ email, userId });
@@ -242,17 +242,15 @@ export function SignupForm({ className, ...props }: SignupFormProps) {
       {...props}
     >
       <div className="flex justify-center mb-2">
-        <Link href="/" className="flex items-center gap-2 font-medium">
-          <Logo variant="mark" className="h-6" />
-        </Link>
+        <AuthMark brand={isTensorSignUp ? "tensor" : "cencori"} />
       </div>
       <div className="text-center">
         <h1 className="text-lg font-medium">
-          {isTensorSignUp ? "Create your Cencori account" : "Create an account"}
+          {isTensorSignUp ? "Create your Tensor account" : "Create an account"}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {isTensorSignUp
-            ? "You’ll return to Tensor after verification"
+            ? "You’ll be back in Tensor as soon as you verify your email"
             : "Enter your details below to get started"}
         </p>
       </div>

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { isBetterAuthEnabled } from "@/lib/auth/flags";
 import { sendVerificationCodeEmail } from "@/lib/email/verification-code-email";
+import { withAuthBrand } from "@/lib/auth/brand-context";
 
 function generateCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -9,7 +10,9 @@ function generateCode(): string {
 
 export async function POST(req: Request) {
   try {
-    const { email, userId } = await req.json();
+    const { email, userId, brand: askedBrand } = await req.json();
+    // A Tensor sign-up gets a Tensor email (lib/email/verification-code-email.ts).
+    const brand = askedBrand === "tensor" ? "tensor" : "cencori";
 
     if (!email || typeof email !== "string") {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
@@ -19,9 +22,11 @@ export async function POST(req: Request) {
     // its email OTP plugin, with the same email (lib/auth/better-auth.ts).
     if (isBetterAuthEnabled()) {
       const { auth } = await import("@/lib/auth/better-auth");
-      await auth.api.sendVerificationOTP({
-        body: { email: email.toLowerCase(), type: "email-verification" },
-      });
+      await withAuthBrand(brand, () =>
+        auth.api.sendVerificationOTP({
+          body: { email: email.toLowerCase(), type: "email-verification" },
+        }),
+      );
       return NextResponse.json({ success: true });
     }
 
@@ -55,7 +60,7 @@ export async function POST(req: Request) {
     }
 
     try {
-      await sendVerificationCodeEmail({ to: email, code, greeting });
+      await sendVerificationCodeEmail({ to: email, code, greeting, brand });
     } catch (emailErr) {
       console.error("Failed to send verification email:", emailErr);
     }

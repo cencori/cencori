@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Loading03Icon, CheckmarkBadge01Icon } from "@hugeicons/core-free-icons";
-import { Logo } from "@/components/logo";
+import { AuthMark } from "@/components/auth/auth-mark";
 
 function VerifyContent() {
   const searchParams = useSearchParams();
@@ -132,7 +132,7 @@ function VerifyContent() {
       await fetch("/api/verify/send-code", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, ...(isTensorSignUp ? { brand: "tensor" } : {}) }),
       });
     } catch {
       // silently fail
@@ -186,7 +186,7 @@ function VerifyContent() {
               and{" "}
               <Link href="/legal/privacy" className="underline hover:text-foreground transition-colors">Privacy Policy</Link>.
               <br />
-              &copy; {new Date().getFullYear()} Cencori Inc. All rights reserved.
+              {isTensorSignUp ? "Tensor, secured by Cencori." : <>&copy; {new Date().getFullYear()} Cencori Inc. All rights reserved.</>}
             </p>
           </div>
         </div>
@@ -208,7 +208,7 @@ function VerifyContent() {
       `}</style>
       <div className="min-h-dvh flex flex-col items-center justify-center p-4 md:p-6">
         <div className="w-full max-w-md flex flex-col items-center text-center gap-8">
-        <Logo variant="mark" className="h-6" />
+        <AuthMark brand={isTensorSignUp ? "tensor" : "cencori"} />
         <div className="space-y-2">
           <h1 className="text-xl font-medium">
             {isTensorSignUp ? "Verify to continue to Tensor" : "Check your email"}
@@ -274,7 +274,7 @@ function VerifyContent() {
             and{" "}
             <Link href="/legal/privacy" className="underline hover:text-foreground transition-colors">Privacy Policy</Link>.
             <br />
-            &copy; {new Date().getFullYear()} Cencori Inc. All rights reserved.
+            {isTensorSignUp ? "Tensor, secured by Cencori." : <>&copy; {new Date().getFullYear()} Cencori Inc. All rights reserved.</>}
           </p>
         </div>
       </div>

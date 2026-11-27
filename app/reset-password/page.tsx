@@ -6,7 +6,9 @@ import { supabase } from "@/lib/supabaseClient";
 import { isBetterAuthEnabled } from "@/lib/auth/flags";
 import { authClient } from "@/lib/auth/auth-client";
 import { Eye, EyeOff } from "lucide-react";
-import { Logo } from "@/components/logo";
+import { AuthMark, SecuredByCencori } from "@/components/auth/auth-mark";
+import { authBrandFor } from "@/lib/auth/brand";
+import { sanitizeAuthRedirectTarget } from "@/lib/auth-redirect";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -20,11 +22,15 @@ export default function ResetPasswordPage() {
   // Better Auth's emailed link checks the token, then lands here with
   // ?token=… (valid) or ?error=INVALID_TOKEN (expired or used).
   const [resetToken, setResetToken] = useState<string | null>(null);
+  // A Tensor sign-in's reset (app/api/auth/forgot-password) carries where it goes on to.
+  const [redirectTarget, setRedirectTarget] = useState<string | null>(null);
+  const brand = authBrandFor(redirectTarget);
 
   useEffect(() => {
     if (isBetterAuthEnabled()) {
       const params = new URLSearchParams(window.location.search);
       const token = params.get("token");
+      setRedirectTarget(sanitizeAuthRedirectTarget(params.get("redirect")));
       setResetToken(token);
       setSession(Boolean(token) && !params.get("error"));
       return;
@@ -68,7 +74,7 @@ export default function ResetPasswordPage() {
         return;
       }
 
-      router.push("/login");
+      router.push(redirectTarget ? `/login?redirect=${encodeURIComponent(redirectTarget)}` : "/login");
     } catch {
       setError("Something went wrong");
     } finally {
@@ -88,12 +94,12 @@ export default function ResetPasswordPage() {
     return (
       <div className="min-h-dvh flex flex-col items-center justify-center p-4 md:p-6">
         <div className="w-full max-w-sm flex flex-col items-center text-center gap-4">
-          <Logo variant="mark" className="h-6" />
+          <AuthMark brand={brand} />
           <h1 className="text-lg font-medium">Invalid or expired link</h1>
           <p className="text-sm text-muted-foreground">
             This password reset link is invalid or has expired.
           </p>
-          <a href="/forgot" className="text-sm text-primary underline underline-offset-4 hover:text-foreground transition-colors">
+          <a href={redirectTarget ? `/forgot?redirect=${encodeURIComponent(redirectTarget)}` : "/forgot"} className="text-sm text-primary underline underline-offset-4 hover:text-foreground transition-colors">
             Request a new reset link
           </a>
         </div>
@@ -104,7 +110,7 @@ export default function ResetPasswordPage() {
   return (
     <div className="min-h-dvh flex flex-col items-center justify-center p-4 md:p-6">
       <div className="w-full max-w-sm flex flex-col items-center text-center gap-8">
-        <Logo variant="mark" className="h-6" />
+        <AuthMark brand={brand} />
 
         <form onSubmit={handleSubmit} className="w-full flex flex-col gap-5">
           <div className="space-y-2">
@@ -146,6 +152,7 @@ export default function ResetPasswordPage() {
             {loading ? "Resetting…" : "Reset password"}
           </Button>
         </form>
+        {brand === "tensor" && <SecuredByCencori />}
       </div>
     </div>
   );

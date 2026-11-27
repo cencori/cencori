@@ -21,7 +21,7 @@ import {
 } from "@/lib/auth-redirect";
 import { clearSignupWelcomeEmailPending, markSignupWelcomeEmailPending } from "@/lib/auth-welcome";
 import Link from "next/link";
-import { Logo } from "@/components/logo";
+import { AuthMark } from "@/components/auth/auth-mark";
 
 function isNetworkError(err: unknown): boolean {
   if (!(err instanceof TypeError)) return false;
@@ -281,9 +281,7 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
   return (
     <form className={cn("flex flex-col gap-6", className)} onSubmit={handleSubmit} {...props}>
       <div className="flex justify-center mb-2">
-        <Link href="/" className="flex items-center gap-2 font-medium">
-          <Logo variant="mark" className="h-6" />
-        </Link>
+        <AuthMark brand={isTensorSignIn ? "tensor" : "cencori"} />
       </div>
       <div className="text-center">
         <h1 className="text-lg font-medium">
@@ -291,7 +289,7 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {isTensorSignIn
-            ? "Continue with your Cencori account"
+            ? "Welcome back. Enter your email to continue."
             : "Enter your email below to login to your account"}
         </p>
       </div>
@@ -346,7 +344,7 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
                   Password
                 </label>
                 <Link
-                  href="/forgot"
+                  href={redirectParam ? `/forgot?redirect=${encodeURIComponent(redirectParam)}` : "/forgot"}
                   className="text-sm text-primary underline underline-offset-4"
                 >
                   Forgot your password?
