@@ -30,6 +30,7 @@ function wordmark(src: string, tone: "black" | "white") {
 const SpitchLogo = wordmark("/logos/partners/spitch.png", "black");
 const CeloLogo = wordmark("/logos/partners/celo.png", "black");
 const UnivadLogo = wordmark("/logos/partners/univad-white.png", "white");
+const QualityLogo = wordmark("/logos/partners/quality.svg", "black");
 
 /** Fields the partner detail page doesn't render yet, kept minimal. */
 function basics(name: string, href: string) {
@@ -48,6 +49,44 @@ function basics(name: string, href: string) {
 }
 
 export const partners: Record<string, PartnerConfig> = {
+    "quality": {
+        slug: "quality",
+        name: "Quality",
+        category: "Feedback",
+        logo: QualityLogo,
+        logoWide: true,
+        websiteUrl: "https://usequality.app",
+        docsUrl: "/newsroom/cencori-quality-partnership",
+        overview: {
+            title: "What is Quality?",
+            content: (
+                <>
+                    <p className="mb-4">
+                        Quality is the feedback layer for teams and agents. Someone clicks any part of your site and writes a comment, and Quality keeps it pinned to that place with a replay of the session, the console logs and the network requests.
+                    </p>
+                    <p>
+                        Through the partnership, a Tensor agent reads the same evidence and fixes the problem from it. Connect Quality in Tensor for desktop under Settings → Extensions, or ask Tensor on the web to add Quality to an app you build.
+                    </p>
+                </>
+            ),
+        },
+        hero: {
+            title: "Quality and Cencori.",
+            subtitle: "Feedback from your live site, with the replay, console logs and network requests, for Tensor to fix from.",
+            cta: { text: "Read the announcement", href: "/newsroom/cencori-quality-partnership" },
+            secondaryCta: { text: "Visit Quality", href: "https://usequality.app" },
+        },
+        features: {
+            title: "Quality + Tensor",
+            subtitle: "Fix a bug from the thread.",
+            items: [
+                { title: "The full evidence", desc: "The thread, what the person did, console logs, network requests and screenshots." },
+                { title: "Sign in, no keys", desc: "Settings → Extensions → Quality → Sign in in Tensor for desktop." },
+                { title: "Read-only", desc: "The agent sees only the Quality projects your account can open, and can't reply to or resolve a thread." },
+            ],
+        },
+        ...basics("Quality", "https://usequality.app"),
+    },
     "costgraph": {
         slug: "costgraph",
         name: "CostGraph",

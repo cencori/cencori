@@ -23,6 +23,21 @@ import styles from "./CencoriFuturePage.module.css";
 
 const partners = [
   {
+    name: "Quality",
+    src: "/logos/partners/quality.svg",
+    width: 1112,
+    height: 261,
+  },
+  {
+    // Far wider than it is tall, so it runs out of width before height;
+    // its cell gives up most of its side padding to let it grow.
+    name: "CostGraph",
+    wide: true,
+    src: "/logos/partners/costgraph.svg",
+    width: 1102,
+    height: 187,
+  },
+  {
     name: "Spitch",
     src: "/logos/partners/spitch.png",
     width: 1430,
@@ -673,7 +688,7 @@ export function CencoriFuturePage({
         <div className={styles.partnerViewport}>
           <ul className={styles.partnerRail}>
             {partners.map((partner) => (
-              <li key={partner.name}>
+              <li data-wide={partner.wide ? "" : undefined} key={partner.name}>
                 <Image
                   alt={partner.name}
                   className={styles.partnerLogo}

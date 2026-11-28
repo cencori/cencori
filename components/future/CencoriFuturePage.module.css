@@ -617,6 +617,10 @@
   border-left: 1px solid var(--paper-line);
 }
 
+.partnerRail li[data-wide] {
+  padding-inline: clamp(0.35rem, 0.6vw, 0.6rem);
+}
+
 .partnerRail li:last-child {
   border-right: 1px solid var(--paper-line);
 }
