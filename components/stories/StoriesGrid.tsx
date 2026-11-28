@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import type { Story } from "@/lib/stories";
+import { storyHref, type Story } from "@/lib/stories";
 
 function formatDate(iso: string): string {
   return new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", {
@@ -32,7 +32,7 @@ export function StoriesGrid({ stories }: { stories: Story[] }) {
   return (
     <div className="grid grid-cols-1 gap-x-6 gap-y-12 md:grid-cols-3">
       {stories.map((story) => (
-        <Link className="group block" href={`/stories/${story.slug}`} key={story.slug}>
+        <Link className="group block" href={storyHref(story)} key={story.slug}>
           <span className="relative block aspect-square w-full overflow-hidden rounded-xl bg-muted">
             <Image
               alt={`${story.company} cover`}

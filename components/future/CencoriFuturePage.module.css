@@ -641,6 +641,15 @@
   padding: clamp(4rem, 8vw, 7rem) 2.25rem clamp(5rem, 8vw, 7rem);
 }
 
+/* News, Stories and Business stack; the bottom padding of one is the gap. */
+.stories + .stories {
+  padding-top: 0;
+}
+
+.stories:has(+ .stories) {
+  padding-bottom: clamp(2.5rem, 4vw, 3.5rem);
+}
+
 .stories .sectionEyebrow {
   color: rgba(8, 8, 8, 0.55);
 }

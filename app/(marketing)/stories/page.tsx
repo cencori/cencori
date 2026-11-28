@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 };
 
 export default function StoriesPage() {
-  const stories = getStories();
+  const stories = getStories("story");
 
   return (
     <main className="flex-1 pt-20 md:pt-28">

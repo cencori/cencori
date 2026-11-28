@@ -14,7 +14,7 @@ import { SiteCTA } from "@/components/marketing/SiteCTA";
 import { SiteFooter } from "@/components/marketing/SiteFooter";
 import { NewsBanner, type NewsBannerProps } from "@/components/marketing/NewsBanner";
 import { arcieBrand } from "@/lib/arcie-brand";
-import { stories } from "@/lib/stories";
+import { stories, storyHref } from "@/lib/stories";
 import styles from "./CencoriFuturePage.module.css";
 
 // `invert` marks logos supplied only as white-on-transparent. The rail sits on
@@ -713,7 +713,7 @@ export function CencoriFuturePage({
         <div className={styles.storiesHead}>
           <p className={styles.sectionEyebrow}>News</p>
           <Link className={styles.storiesAll} href="/newsroom">
-            View all news
+            See more
           </Link>
         </div>
 
@@ -745,45 +745,54 @@ export function CencoriFuturePage({
         </div>
       </section>
 
-      <section className={styles.stories} id="stories">
-        <div className={styles.storiesHead}>
-          <p className={styles.sectionEyebrow}>Stories</p>
-          <Link className={styles.storiesAll} href="/stories">
-            View all stories
-          </Link>
-        </div>
-
-        <div className={styles.storiesGrid}>
-          {/* The homepage shows the three newest; the rest are on /stories. */}
-          {[...stories]
-            .sort((x, y) => y.publishedAt.localeCompare(x.publishedAt))
-            .slice(0, 3)
-            .map((story) => (
-            <Link
-              className={styles.storyCard}
-              href={`/stories/${story.slug}`}
-              key={story.slug}
-            >
-              <span className={styles.storyCover}>
-                <Image
-                  alt={`${story.company} cover`}
-                  className={styles.storyImage}
-                  fill
-                  sizes="(max-width: 900px) 100vw, 33vw"
-                  src={story.cover}
-                />
-              </span>
-              <span className={styles.storyName}>{story.title}</span>
-              <span className={styles.storyDate}>
-                {new Date(`${story.publishedAt}T00:00:00`).toLocaleDateString(
-                  "en-US",
-                  { month: "short", day: "numeric", year: "numeric" },
-                )}
-              </span>
+      {/* Stories are about people and the ecosystem; Business is customers.
+          Each shows its three newest; the rest are on its own page. */}
+      {(
+        [
+          { id: "stories", label: "Stories", href: "/stories", all: "See more", kind: "story" },
+          { id: "business", label: "Business", href: "/customers", all: "See more", kind: "customer" },
+        ] as const
+      ).map((group) => (
+        <section className={styles.stories} id={group.id} key={group.id}>
+          <div className={styles.storiesHead}>
+            <p className={styles.sectionEyebrow}>{group.label}</p>
+            <Link className={styles.storiesAll} href={group.href}>
+              {group.all}
             </Link>
-          ))}
-        </div>
-      </section>
+          </div>
+
+          <div className={styles.storiesGrid}>
+            {stories
+              .filter((story) => story.kind === group.kind)
+              .sort((x, y) => y.publishedAt.localeCompare(x.publishedAt))
+              .slice(0, 3)
+              .map((story) => (
+                <Link
+                  className={styles.storyCard}
+                  href={storyHref(story)}
+                  key={story.slug}
+                >
+                  <span className={styles.storyCover}>
+                    <Image
+                      alt={`${story.company} cover`}
+                      className={styles.storyImage}
+                      fill
+                      sizes="(max-width: 900px) 100vw, 33vw"
+                      src={story.cover}
+                    />
+                  </span>
+                  <span className={styles.storyName}>{story.title}</span>
+                  <span className={styles.storyDate}>
+                    {new Date(`${story.publishedAt}T00:00:00`).toLocaleDateString(
+                      "en-US",
+                      { month: "short", day: "numeric", year: "numeric" },
+                    )}
+                  </span>
+                </Link>
+              ))}
+          </div>
+        </section>
+      ))}
 
       <SiteCTA />
       <SiteFooter />

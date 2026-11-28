@@ -1,7 +1,15 @@
 export const STORY_PRODUCTS = ["API", "Tensor", "Arcie"] as const;
 export type StoryProduct = (typeof STORY_PRODUCTS)[number];
 
+/**
+ * A customer is a company building on Cencori, told as a case study at
+ * /customers/[slug]. A story is about people and the ecosystem, at
+ * /stories/[slug]. Each piece has exactly one address.
+ */
+export type StoryKind = "customer" | "story";
+
 export type Story = {
+  kind: StoryKind;
   slug: string;
   company: string;
   title: string;
@@ -9,6 +17,8 @@ export type Story = {
   industry: string;
   useCase: string;
   product: StoryProduct;
+  /** Customers: the parts of Cencori they use, shown as "Built on". Defaults to `product`. */
+  uses?: string[];
   publishedAt: string;
   cover: string;
   body: string[];
@@ -20,16 +30,38 @@ export type Story = {
 
 export const stories: Story[] = [
   {
+    kind: "customer",
+    slug: "vbox",
+    company: "Vbox",
+    title: "How Vbox uses the Cencori API and SDKs to cut its AI bill by 75%",
+    excerpt:
+      "How Vbox, a speech AI company, cut its monthly AI bill from about $800 to about $200 on Cencori, and pays for it in naira.",
+    industry: "Voice AI",
+    useCase: "Conversational AI",
+    product: "API",
+    uses: ["Developer platform", "API", "SDKs"],
+    publishedAt: "2026-11-28",
+    cover: "/stories/vbox-mark.jpg",
+    body: [
+      "Vbox is a speech AI company that builds conversational technology: products where a person talks, and the system has to understand and answer in real time.",
+      "The team builds on Cencori's developer platform every day, using the API and SDKs for the models behind their conversations, with usage, costs and keys in one place.",
+      "Within a month of moving to Cencori, Vbox's AI bill fell from about $800 a month to about $200, a quarter of what it was.",
+      "Paying in naira made it better still. Vbox pays for Cencori in its own currency.",
+    ],
+  },
+  {
+    kind: "customer",
     slug: "dayroom",
     company: "Dayroom",
-    title: "A team chat that turns into finished work",
+    title: "How Dayroom uses the Cencori API to build an AI companion for team chat",
     excerpt:
       "How Dayroom, the AI-native workspace for small teams, builds its companion and agents on Cencori.",
     industry: "Collaboration",
     useCase: "AI agents",
     product: "API",
+    uses: ["API"],
     publishedAt: "2026-11-23",
-    cover: "/stories/dayroom-night.jpg",
+    cover: "/stories/dayroom-braille.jpg",
     body: [
       "Dayroom is an AI-native workspace for teams of 2 to 20 that run their work in chat: agencies, studios and startups. Rooms, calls, tasks and docs live together, and an AI companion keeps everyone in the loop. It answers what you missed with sources, posts notes after calls and drafts replies and to-dos that wait for your approval.",
       "The team builds those agents on Cencori. A companion that people lean on for their day-to-day work has to understand context and get the task right.",
@@ -43,22 +75,49 @@ export const stories: Story[] = [
     },
   },
   {
+    kind: "customer",
     slug: "eleven",
     company: "Eleven",
-    title: "Cinema-grade stories, computed in the cloud",
+    title: "How Eleven uses the Cencori API to render cinematic AI at scale",
     excerpt:
       "How Eleven renders cinematic AI experiences on Cencori — heavy creative workloads, one API.",
     industry: "Media",
     useCase: "Creative AI",
     product: "API",
+    uses: ["API"],
     publishedAt: "2026-09-12",
-    cover: "/stories/el.JPG",
+    cover: "/stories/eleven-metal.jpg",
     body: [
       "Eleven works where film meets machine intelligence — crafting cinematic experiences that demand serious compute behind every frame.",
       "Running on Cencori's API, the studio scales creative workloads up and down without managing infrastructure.",
     ],
   },
   {
+    kind: "story",
+    slug: "ifeoluwa-adebanjo",
+    company: "Ifeoluwa Adebanjo",
+    title: "From runner-up to first place, starting with the right question",
+    excerpt:
+      "How Ifeoluwa Adebanjo, a computer engineering student, wrote her APWEN-LASU Career Summit talk with Tensor and took first place.",
+    industry: "Education",
+    useCase: "Writing",
+    product: "Tensor",
+    publishedAt: "2026-11-23",
+    cover: "/stories/ifeoluwa-bloom.jpg",
+    body: [
+      "Ifeoluwa Adebanjo, a computer engineering student, had a talk to give, and asked Tensor to help her write it.",
+      "Tensor's draft opened with a question to the room: “How many of you know the gap between a syllabus and a job description?” It was exactly where she meant to start. “Tensor is smart because this is exactly the first thing I was going to ask too,” she says.",
+      "She tried the same request somewhere else and got a list of questions back before any writing: how long the slot was, what to cover, which field. “Not bad, but it wasn't what I was looking for.”",
+      "Tensor had already done that work, and she had the talk. Her verdict, posted to her status: “Tensor asks the right questions. Use Tensor!”",
+      "She gave it at the APWEN-LASU Career Summit and took first place, a year after finishing first runner-up.",
+    ],
+    quote: {
+      text: "Tensor asks the right questions.",
+      by: "Ifeoluwa Adebanjo, Computer Engineering student",
+    },
+  },
+  {
+    kind: "story",
     slug: "spitch",
     company: "Spitch",
     title: "Voice AI through a single API",
@@ -68,7 +127,7 @@ export const stories: Story[] = [
     useCase: "Media",
     product: "API",
     publishedAt: "2026-09-10",
-    cover: "/stories/stch.JPG",
+    cover: "/stories/spitch-mountain.jpg",
     body: [
       "Spitch is building realtime voice experiences — the kind where every millisecond matters and every call has to just work.",
       "Barely days after announcing, the team was already handling serious production volume through a single Cencori integration.",
@@ -79,6 +138,7 @@ export const stories: Story[] = [
     },
   },
   {
+    kind: "story",
     slug: "ypit",
     company: "YPIT",
     title: "Young People In Tech, building live",
@@ -88,7 +148,7 @@ export const stories: Story[] = [
     useCase: "Hackathons",
     product: "API",
     publishedAt: "2026-09-05",
-    cover: "/stories/pit.JPG",
+    cover: "/stories/ypit-event.jpg",
     body: [
       "Young People In Tech runs hackathons and programs where young builders go from idea to working product in days.",
       "Running on Cencori's API, teams ship real AI products — same foundation, from first prototype to production.",
@@ -103,8 +163,13 @@ export const stories: Story[] = [
   },
 ];
 
-export function getStories(): Story[] {
-  return stories;
+export function getStories(kind?: StoryKind): Story[] {
+  return kind ? stories.filter((story) => story.kind === kind) : stories;
+}
+
+/** The one address a story lives at. */
+export function storyHref(story: Pick<Story, "kind" | "slug">): string {
+  return story.kind === "customer" ? `/customers/${story.slug}` : `/stories/${story.slug}`;
 }
 
 export function getStoryFacets(stories: Story[]) {
