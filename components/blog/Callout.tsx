@@ -14,12 +14,12 @@ const icons = {
 } as const;
 
 const styles = {
-    info: "border-blue-500/40 bg-blue-500/10 text-blue-700 dark:text-blue-300 [&>svg]:text-blue-500",
-    warn: "border-yellow-500/40 bg-yellow-500/10 text-yellow-700 dark:text-yellow-300 [&>svg]:text-yellow-500",
-    warning: "border-yellow-500/40 bg-yellow-500/10 text-yellow-700 dark:text-yellow-300 [&>svg]:text-yellow-500",
-    error: "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300 [&>svg]:text-red-500",
-    success: "border-green-500/40 bg-green-500/10 text-green-700 dark:text-green-300 [&>svg]:text-green-500",
-    idea: "border-purple-500/40 bg-purple-500/10 text-purple-700 dark:text-purple-300 [&>svg]:text-purple-500",
+    info: "border-blue-500/20 bg-blue-500/10 text-blue-700 dark:text-blue-300 [&>svg]:text-blue-500",
+    warn: "border-yellow-500/20 bg-yellow-500/10 text-yellow-700 dark:text-yellow-300 [&>svg]:text-yellow-500",
+    warning: "border-yellow-500/20 bg-yellow-500/10 text-yellow-700 dark:text-yellow-300 [&>svg]:text-yellow-500",
+    error: "border-red-500/20 bg-red-500/10 text-red-700 dark:text-red-300 [&>svg]:text-red-500",
+    success: "border-green-500/20 bg-green-500/10 text-green-700 dark:text-green-300 [&>svg]:text-green-500",
+    idea: "border-purple-500/20 bg-purple-500/10 text-purple-700 dark:text-purple-300 [&>svg]:text-purple-500",
 } as const;
 
 type CalloutType = keyof typeof icons;
@@ -42,7 +42,7 @@ export function Callout({
     return (
         <div
             className={cn(
-                "my-6 flex gap-3 rounded-lg border-l-4 p-4",
+                "my-6 flex gap-3 rounded-lg border p-4",
                 styles[type],
                 className
             )}
